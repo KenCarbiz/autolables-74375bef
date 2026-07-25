@@ -1,4 +1,4 @@
-import { itemDepartment, type GetReadyItem } from "@/hooks/useGetReady";
+import { isThirdPartyItem, itemDepartment, type GetReadyItem } from "@/hooks/useGetReady";
 
 // Which department column a get-ready line is displayed under. Vendor first
 // (explicit department or accessory category), then service, then prep.
@@ -10,23 +10,13 @@ export function columnFor(item: GetReadyItem): "service" | "prep" | "vendor" {
   return itemDepartment(item) === "service" ? "service" : "prep";
 }
 
-// Whether the line is work a THIRD PARTY performs, which is what "Pending Proof"
-// and the five-business-day proof clock actually mean.
-//
-// This is a property of the row, never of the column it is displayed in:
-// columnFor() routes every `category === "accessory"` line into the Vendors &
-// Accessories column, including door-edge guards the store's own detail
-// department installs on an internal RO. Reading the column back as the answer
-// billed in-house work as vendor work owing proof it will never upload.
-//
-// installMethod is the row's own statement about who does the work, so it wins.
-// Otherwise an explicit vendor department, then an actual vendor assignment.
-export function isThirdPartyItem(item: GetReadyItem): boolean {
-  if (item.installMethod === "third_party_check_request") return true;
-  if (item.installMethod === "internal_ro") return false;
-  if (itemDepartment(item) === "vendor") return true;
-  return !!(item.vendorName || item.vendorEmail || item.checkRequest);
-}
+// Third-party identity is a property of the row, never of the column it is
+// displayed in: columnFor() routes every `category === "accessory"` line into
+// the Vendors & Accessories column, including door-edge guards the store's own
+// detail department installs on an internal RO. It is defined beside
+// GetReadyItem so the dispatch path and the display path cannot drift apart
+// again; re-exported here because the column model is where callers look for it.
+export { isThirdPartyItem };
 
 // One rule for every dealer-cost figure on the screen, so the per-column
 // "Estimated Cost" lines and the rail's "Estimated Total Cost" cannot disagree.
@@ -34,4 +24,16 @@ export function sumItemCosts(items: GetReadyItem[]): number | null {
   const costed = items.filter((i) => typeof i.cost === "number" && Number.isFinite(i.cost));
   if (costed.length === 0) return null;
   return costed.reduce((sum, i) => sum + (i.cost as number), 0);
+}
+
+// Where the get-ready stands, as the stepper numbers it. Both command surfaces
+// derive it here: screen 1's green "Ready to Market" is the same claim as
+// screen 2's step 4, and they used to be computed by different rules.
+//   1 — reviewed but not authorized
+//   3 — authorized and dispatched, work outstanding
+//   4 — authorized and every work item complete
+export function getReadyStep(args: { dispatched: boolean; items: GetReadyItem[] }): 1 | 3 | 4 {
+  const { dispatched, items } = args;
+  if (!dispatched) return 1;
+  return items.length > 0 && items.every((i) => i.status === "complete") ? 4 : 3;
 }

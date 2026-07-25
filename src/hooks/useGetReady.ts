@@ -77,6 +77,26 @@ export const defaultDepartmentFor = (category: GetReadyItem["category"]): GetRea
 export const itemDepartment = (item: GetReadyItem): GetReadyDepartment =>
   item.department ?? defaultDepartmentFor(item.category);
 
+// Whether the line is work a THIRD PARTY performs. This is the one fact behind
+// both halves of vendor handling — the "Pending Proof" pill and five-business-day
+// proof clock the manager reads, and the vendor work order dispatch actually
+// sends — so it lives beside GetReadyItem and both sides import it. Reading
+// `department === "vendor"` on the dispatch side while the display read this
+// predicate meant an accessory carrying a vendorName + vendorEmail but no
+// explicit department (createGetReady defaults accessories to "detail") was
+// listed under Vendor Assignments with a live Contact button and a proof clock,
+// and was never emailed — while the authorization it belonged to was recorded,
+// so the send could never be retried.
+//
+// installMethod is the row's own statement about who does the work, so it wins.
+// Otherwise an explicit vendor department, then an actual vendor assignment.
+export function isThirdPartyItem(item: GetReadyItem): boolean {
+  if (item.installMethod === "third_party_check_request") return true;
+  if (item.installMethod === "internal_ro") return false;
+  if (itemDepartment(item) === "vendor") return true;
+  return !!(item.vendorName || item.vendorEmail || item.checkRequest);
+}
+
 // The set of departments that actually have pending work — drives the dispatch
 // fan-out so only those departments (and assigned vendors) are notified.
 export const departmentsWithWork = (items: GetReadyItem[]): GetReadyDepartment[] => {
@@ -102,7 +122,7 @@ export async function deriveGetReadyDispatch(
   const depts = departmentsWithWork(items);
   const seen = new Set<string>();
   const vendors = items
-    .filter((i) => i.status !== "complete" && itemDepartment(i) === "vendor" && i.vendorEmail)
+    .filter((i) => i.status !== "complete" && isThirdPartyItem(i) && i.vendorEmail)
     .map((i) => ({ name: i.vendorName || "Vendor", email: (i.vendorEmail || "").trim() }))
     .filter((v) => v.email && !seen.has(v.email) && seen.add(v.email));
   // If there's no get-ready record yet, fall back to the legacy detail+service.

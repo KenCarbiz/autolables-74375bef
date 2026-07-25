@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { columnFor, isThirdPartyItem, sumItemCosts } from "./getReadyColumns";
+import { columnFor, getReadyStep, isThirdPartyItem, sumItemCosts } from "./getReadyColumns";
 import type { GetReadyItem } from "@/hooks/useGetReady";
 
 const item = (over: Partial<GetReadyItem> = {}): GetReadyItem => ({
@@ -56,6 +56,39 @@ describe("isThirdPartyItem", () => {
 
   it("leaves an unassigned accessory in-house", () => {
     expect(isThirdPartyItem(item())).toBe(false);
+  });
+
+  // The mismatch A4 names: an accessory carrying a vendor assignment but no
+  // explicit department (createGetReady defaults accessories to "detail") was
+  // displayed as vendor work and dispatched as detail work, so the vendor was
+  // shown a Contact button and a proof clock and never emailed.
+  it("is third party for an accessory with a vendor but no department", () => {
+    const assigned = item({ vendorName: "Tint Pros", vendorEmail: "shop@tintpros.test" });
+    expect(assigned.department).toBeUndefined();
+    expect(columnFor(assigned)).toBe("vendor");
+    expect(isThirdPartyItem(assigned)).toBe(true);
+  });
+});
+
+describe("getReadyStep", () => {
+  const pending = item({ status: "pending" });
+  const done = item({ status: "complete" });
+
+  it("is 1 until the manager authorizes", () => {
+    expect(getReadyStep({ dispatched: false, items: [pending] })).toBe(1);
+    expect(getReadyStep({ dispatched: false, items: [done] })).toBe(1);
+  });
+
+  it("is 3 once dispatched with work outstanding", () => {
+    expect(getReadyStep({ dispatched: true, items: [done, pending] })).toBe(3);
+  });
+
+  it("is 4 only when dispatched and every item is complete", () => {
+    expect(getReadyStep({ dispatched: true, items: [done, done] })).toBe(4);
+  });
+
+  it("is never 4 for a record with no work items", () => {
+    expect(getReadyStep({ dispatched: true, items: [] })).toBe(3);
   });
 });
 
