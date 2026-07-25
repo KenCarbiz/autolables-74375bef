@@ -18,13 +18,24 @@ import { realTenantId } from "@/lib/tenant/realTenantId";
 import { vinKey, vinKeys } from "@/lib/vinKeys";
 import { documentLabel, fmtDate, humanize } from "@/lib/commandCenter/format";
 import {
+  authorizationHeldBack,
+  authorizationReleasable,
   bundleNoteFor,
   printBlockedReason,
   printReleasable,
   printReleaseState,
   printSheetIncludes,
+  printSheetNoteFor,
   PRINT_STATE_PILL,
+  reprintable,
+  reprintCopyNumber,
 } from "@/lib/commandCenter/printRelease";
+import {
+  AUTOGEN_EXCEPTION_TYPE,
+  buildAutogenExceptionRows,
+  type AutogenExceptionRow,
+} from "@/lib/commandCenter/autogenExceptions";
+import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import {
   columnFor,
   getReadyStep,
@@ -136,6 +147,12 @@ export interface VinCommand {
   readiness: { state: string;
                tone: Tone;
                blocking: { title: string; detail: string; href?: string } | null };
+  /**
+   * Intake automation failures recorded by intake-autoprovision in
+   * vehicle_exceptions — one row per failed artifact, retriable where the
+   * artifact's draft RPC can be re-invoked from here.
+   */
+  autogenExceptions: AutogenExceptionRow[];
   timeline: { at: string | null; title: string; detail?: string; pending?: boolean }[];
 }
 
@@ -154,10 +171,27 @@ export interface GetReadyColumn {
   managerNote: string;
 }
 
+export type GetReadyPriority = "high" | "normal" | "low";
+
+/** A pending additional-work request from service (INTAKE_SPEC S8). */
+export interface ServiceApprovalRequest {
+  id: string;
+  workRequested: string;
+  reason: string | null;
+  isSafety: boolean;
+  estTotal: number | null;
+  requestedByName: string | null;
+  roNumber: string | null;
+  deliveryImpact: string | null;
+  createdAt: string | null;
+}
+
 export interface GetReadyCommandData {
   vehicle: CommandVehicle;
+  /** get_ready_records.id, for the delivery-target / priority edits. */
+  recordId: string | null;
   deliveryTarget: string | null;
-  priority: "high" | "normal" | "low" | null;
+  priority: GetReadyPriority | null;
   columns: GetReadyColumn[];
   summary: { workItems: number; departments: number;
              estimatedTotal: number | null; needAttention: number };
@@ -174,6 +208,12 @@ export interface GetReadyCommandData {
   authorizeBlockedReason: string | null;
   /** When Get Ready was authorized/dispatched for this vehicle, by any screen. */
   authorizedAt: string | null;
+  /** Who recorded the authorization, when the marker carries it. */
+  authorizedByEmail: string | null;
+  /** Pending additional-work requests awaiting a manager's decision. */
+  serviceRequests: ServiceApprovalRequest[];
+  /** Recent recorded activity for the vehicle — only read once authorized. */
+  activity: { at: string | null; title: string; detail?: string }[];
   /**
    * Recipients the dispatcher could not reach on the recorded authorization.
    * The authorization is one-shot, so a work order that never went out has to
@@ -195,6 +235,12 @@ export interface DocRow {
   passportVisibility: { label: string; tone: Tone };
   printStatus: { label: string; tone: Tone };
   href?: string;
+  /** The number the next copy wears — present exactly when Reprint is offered. */
+  reprintCopy?: number;
+  /** The generate-vehicle-forms kind that can rebuild this row's missing file. */
+  generateKind?: "buyers_guide" | "k208";
+  /** Why a file-less row has no Generate action. */
+  generateBlockedReason?: string;
 }
 
 export interface PrintCenterData {
@@ -271,6 +317,8 @@ export interface GetReadyAuthorization {
   at: string | null;
   /** Recipients the dispatcher reported as failed on that authorization. */
   failures: string[];
+  /** Who recorded it, when the marker carries the identity. */
+  byEmail: string | null;
 }
 
 // When Get Ready was authorized for this vehicle, or null if it never was.
@@ -298,6 +346,7 @@ async function getReadyAuthorization(r: SourceReader, tenantId: string, vehicleI
   return {
     at: (authorized?.occurred_at as string) || dispatched || (addendumStamp?.getready_dispatched_at as string) || null,
     failures,
+    byEmail: typeof meta.authorized_by_email === "string" ? meta.authorized_by_email : null,
   };
 }
 
@@ -437,6 +486,8 @@ const EVT_NOTE = "get_ready_manager_note";
 const EVT_CHECKLIST = "get_ready_authorization_checklist";
 const EVT_AUTHORIZED = "get_ready_authorized";
 const EVT_PACKET_PRINTED = "vehicle_packet_printed";
+const EVT_PRINT_BUNDLE = "print_bundle_created";
+const EVT_REPRINTED = "document_reprinted";
 
 // ── screen 1: VIN Command Center ─────────────────────────────────────
 
@@ -447,7 +498,7 @@ export async function loadVinCommand(r: SourceReader, tenantId: string, vehicleI
   const vk = vinKeys(vin);
   const used = isUsed(vehicle.condition);
 
-  const [allDocs, inspections, signedInspections, addendums, grRecords, descCase, qrTokens, recallTasks, auditRows, authorization] =
+  const [allDocs, inspections, signedInspections, addendums, grRecords, descCase, qrTokens, recallTasks, auditRows, authorization, exceptionRows] =
     await Promise.all([
       r.rows(sb().from("generated_documents")
         .select("id, document_type, document_status, version, pdf_url, png_url, online_url, printed_at, published_at, print_count, rejection_reason, tenant_id, vehicle_id, template_id, created_at")
@@ -501,6 +552,12 @@ export async function loadVinCommand(r: SourceReader, tenantId: string, vehicleI
         .eq("store_id", tenantId).in("entity_id", [vehicleId, ...vk].filter(Boolean))
         .order("created_at", { ascending: false }).limit(40), "audit_log"),
       getReadyAuthorization(r, tenantId, vehicleId, vin),
+      r.rows(sb().from("vehicle_exceptions")
+        .select("id, exception_type, status, title, explanation, source_values")
+        .eq("tenant_id", tenantId).in("vin", vk)
+        .eq("exception_type", AUTOGEN_EXCEPTION_TYPE)
+        .in("status", ["open", "in_progress"])
+        .order("created_at", { ascending: false }).limit(5), "vehicle_exceptions"),
     ]);
 
   // The section count has to be counted over the master the STATUS refers to.
@@ -557,7 +614,11 @@ export async function loadVinCommand(r: SourceReader, tenantId: string, vehicleI
   // and a prefilled K-208 exist, but neither is work anyone can stop doing.
   const automationDone = countFinished(items);
   const automationProduced = countProduced(items);
-  const exceptions = countExceptions(items);
+  // The intake exception queue is a second source of exceptions with its own
+  // rows; the stat card has to count both or the manager reads zero over a
+  // recorded automation failure.
+  const autogenExceptions = buildAutogenExceptionRows(exceptionRows);
+  const exceptions = countExceptions(items) + autogenExceptions.length;
   const pendingGrItems = grItems.filter((i) => i.status !== "complete").length;
   const awaitingAuthorization = grRecord && !dispatched && pendingGrItems > 0 ? pendingGrItems : null;
 
@@ -580,6 +641,18 @@ export async function loadVinCommand(r: SourceReader, tenantId: string, vehicleI
     readiness = {
       state: "Exceptions Need Review", tone: "amber",
       blocking: { title: retryItem.label, detail: retryItem.detail, href: retryItem.href },
+    };
+  } else if (autogenExceptions.length > 0) {
+    // A recorded intake failure (S4: ingest cannot silently finish with a
+    // required artifact missing) is an exception even when every package row
+    // that DID get created looks healthy.
+    readiness = {
+      state: "Exceptions Need Review", tone: "amber",
+      blocking: {
+        title: "Intake automation failed",
+        detail: `${autogenExceptions[0].label}: ${autogenExceptions[0].message}`,
+        href: "/admin/exceptions",
+      },
     };
   } else if (awaitingAuthorization) {
     readiness = {
@@ -625,14 +698,82 @@ export async function loadVinCommand(r: SourceReader, tenantId: string, vehicleI
     },
     packageItems: items,
     readiness,
+    autogenExceptions,
     timeline,
   };
 }
 
-export function useVinCommand(vehicleId?: string): Result<VinCommand> {
-  const { data, loading, error, errorDetail, notFound, noTenant, degraded, reload } =
+// Raw RPC/driver text for a retry, mapped to a sentence the manager can act on.
+function humanizeRetryError(raw: string): string {
+  if (/row-level security|permission denied|not authorized/i.test(raw)) {
+    return "You do not have access to retry this artifact in this dealership.";
+  }
+  if (/function .* does not exist/i.test(raw)) {
+    return "This retry is not available yet — the draft function has not been deployed.";
+  }
+  return "The retry failed. Try again in a moment, or resolve it from the exception queue.";
+}
+
+export function useVinCommand(vehicleId?: string): Result<VinCommand> & {
+  /** Re-invoke the failed artifact's draft RPC (VIN-idempotent), then clear it from the exception row. */
+  retryAutogenArtifact(exceptionId: string, artifact: string): Promise<MutationResult>;
+} {
+  const { data, dataRef, loading, error, errorDetail, notFound, noTenant, degraded, reload, tenantId, actorId } =
     useLoader<VinCommand>(vehicleId, loadVinCommand);
-  return { data, loading, error, errorDetail, notFound, noTenant, degraded, reload };
+
+  const retrying = useRef(false);
+  const retryAutogenArtifact = useCallback(async (exceptionId: string, artifact: string): Promise<MutationResult> => {
+    if (!tenantId) return { ok: false, error: "No dealership in context." };
+    const vin = dataRef.current?.vehicle.vin;
+    if (!vin) return { ok: false, error: "This vehicle has no VIN, so the artifact cannot be re-drafted." };
+    const row = dataRef.current?.autogenExceptions.find(
+      (e) => e.exceptionId === exceptionId && e.artifact === artifact);
+    if (!row) return { ok: false, error: "This exception is no longer open. Reload the page." };
+    if (!row.retryRpc) {
+      return { ok: false, error: "This artifact is rebuilt by a background task — retry it from the exception queue." };
+    }
+    if (retrying.current) return { ok: false, error: "A retry is already running." };
+    retrying.current = true;
+    try {
+      const { error: rpcErr } = await sb().rpc(row.retryRpc, { p_tenant_id: tenantId, p_vin: vin });
+      if (rpcErr) {
+        const detail = rpcErr.message || String(rpcErr);
+        console.error("[useCommandCenter] artifact retry failed:", detail);
+        return { ok: false, error: humanizeRetryError(detail), errorDetail: detail };
+      }
+      // The draft now exists, so the artifact comes off the exception row —
+      // and an emptied row is resolved, exactly as the queue would resolve it.
+      // Best-effort ONLY after the retry itself succeeded; a bookkeeping
+      // failure never converts a successful retry into a red toast.
+      const { data: exRows, error: readErr } = await sb().from("vehicle_exceptions")
+        .select("id, source_values")
+        .eq("tenant_id", tenantId).eq("id", exceptionId).limit(1);
+      if (!readErr) {
+        const ex = ((exRows as Row[] | null) || [])[0];
+        if (ex) {
+          const sv = (ex.source_values || {}) as { artifacts?: Record<string, unknown> };
+          const artifacts = { ...(sv.artifacts || {}) };
+          delete artifacts[artifact];
+          const emptied = Object.keys(artifacts).length === 0;
+          const patch: Row = { source_values: { ...sv, artifacts } };
+          if (emptied) {
+            patch.status = "resolved";
+            patch.resolved_at = new Date().toISOString();
+            patch.resolved_by = actorId;
+          }
+          const { error: updErr } = await sb().from("vehicle_exceptions")
+            .update(patch).eq("tenant_id", tenantId).eq("id", exceptionId);
+          if (updErr) console.error("[useCommandCenter] exception clear failed:", updErr.message || updErr);
+        }
+      }
+      await reload();
+      return { ok: true };
+    } finally {
+      retrying.current = false;
+    }
+  }, [tenantId, actorId, dataRef, reload]);
+
+  return { data, loading, error, errorDetail, notFound, noTenant, degraded, reload, retryAutogenArtifact };
 }
 
 // ── screen 2: Get Ready Command ──────────────────────────────────────
@@ -698,9 +839,9 @@ export async function loadGetReadyCommand(r: SourceReader, tenantId: string, veh
   // Notes and the checklist are read on their own event_type filters so that
   // neither can crowd the other out of a shared page, and the authorization
   // marker is a separate bounded existence check (see getReadyAuthorization).
-  const [grRecords, noteEvents, checklistEvents, authorization, detailSignoffs, pdiSignoffs] = await Promise.all([
+  const [grRecords, noteEvents, checklistEvents, authorization, detailSignoffs, pdiSignoffs, serviceRequestRows] = await Promise.all([
     r.rows(sb().from("get_ready_records")
-      .select("id, items, status, get_ready_start_date, get_ready_complete_date, inspection_complete, assigned_technician, ro_number")
+      .select("id, items, status, get_ready_start_date, get_ready_complete_date, inspection_complete, assigned_technician, ro_number, delivery_target, priority")
       .eq("tenant_id", tenantId).in("vin", vk)
       .order("created_at", { ascending: false }).limit(1), "get_ready_records"),
     r.rows(sb().from("document_lifecycle_events")
@@ -723,6 +864,11 @@ export async function loadGetReadyCommand(r: SourceReader, tenantId: string, veh
       .select("id, result, status, signed_at")
       .eq("tenant_id", tenantId).in("vin", vk)
       .order("created_at", { ascending: false }).limit(5), "pdi_signoffs"),
+    r.rows(sb().from("service_requests")
+      .select("id, work_requested, reason, is_safety, est_total, requested_by_name, ro_number, delivery_impact, status, created_at")
+      .eq("tenant_id", tenantId).in("vin", vk)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }).limit(10), "service_requests"),
   ]);
 
   const grRecord = grRecords[0] || null;
@@ -737,6 +883,51 @@ export async function loadGetReadyCommand(r: SourceReader, tenantId: string, veh
 
   const authorizedAt = authorization.at;
   const dispatched = !!authorizedAt;
+
+  // The activity feed exists only on the post-authorization view, so the rows
+  // are read only once a marker says the vehicle got there.
+  let activity: GetReadyCommandData["activity"] = [];
+  if (dispatched) {
+    const [activityAudit, activityEvents] = await Promise.all([
+      r.rows(sb().from("audit_log")
+        .select("action, entity_id, created_at, details")
+        .eq("store_id", tenantId).in("entity_id", [vehicleId, ...vk].filter(Boolean))
+        .order("created_at", { ascending: false }).limit(12), "audit_log(activity)"),
+      r.rows(sb().from("document_lifecycle_events")
+        .select("event_type, occurred_at, metadata")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+        .in("event_type", [EVT_AUTHORIZED, EVT_PRINT_BUNDLE, EVT_PACKET_PRINTED, EVT_REPRINTED])
+        .order("occurred_at", { ascending: false }).limit(12), "document_lifecycle_events(activity)"),
+    ]);
+    const LIFECYCLE_TITLES: Record<string, string> = {
+      [EVT_AUTHORIZED]: "Get Ready authorized and dispatched",
+      [EVT_PRINT_BUNDLE]: "Print bundle created",
+      [EVT_PACKET_PRINTED]: "Vehicle packet printed",
+      [EVT_REPRINTED]: "Document reprinted",
+    };
+    for (const a of activityAudit) {
+      const title = AUDIT_TITLES[String(a.action)] || humanize(String(a.action));
+      const det = (a.details || {}) as Row;
+      activity.push({
+        at: (a.created_at as string) || null,
+        title,
+        detail: typeof det.dept === "string" ? `Department: ${det.dept}` : undefined,
+      });
+    }
+    for (const e of activityEvents) {
+      const meta = (e.metadata || {}) as Row;
+      const type = String(e.event_type);
+      activity.push({
+        at: (e.occurred_at as string) || null,
+        title: LIFECYCLE_TITLES[type] || humanize(type),
+        detail: type === EVT_PRINT_BUNDLE
+          ? `${Number(meta.released || 0)} released, ${Number(meta.blocked || 0)} blocked`
+          : undefined,
+      });
+    }
+    activity.sort((x, y) => new Date(y.at || 0).getTime() - new Date(x.at || 0).getTime());
+    activity = activity.slice(0, 12);
+  }
 
   // Latest event wins per key; the table is append-only by convention.
   const notes: Record<string, string> = {};
@@ -875,19 +1066,17 @@ export async function loadGetReadyCommand(r: SourceReader, tenantId: string, veh
     }
   }
 
+  // 20260726030000 added the real columns; anything outside the CHECK is
+  // reported as unknown rather than invented.
+  const rawPriority = String(grRecord?.priority || "");
+  const priority: GetReadyPriority | null =
+    rawPriority === "high" || rawPriority === "normal" || rawPriority === "low" ? rawPriority : null;
+
   return {
     vehicle,
-    // get_ready_complete_date is the COMPLETION stamp — useGetReady writes it
-    // only once every item is done, and serviceStatus reads it as "done". Every
-    // in-progress vehicle therefore had a blank Delivery Target and every
-    // finished one had a past date labelled as a forward commitment. No column,
-    // JSONB key or setting in this schema carries a delivery target, so it is
-    // reported as unknown rather than invented; the completion stamp keeps its
-    // own name below.
-    deliveryTarget: null,
-    // No column, JSONB key, or setting in this schema carries a get-ready
-    // priority, so it is reported as unknown rather than invented.
-    priority: null,
+    recordId: (grRecord?.id as string) ?? null,
+    deliveryTarget: (grRecord?.delivery_target as string) ?? null,
+    priority,
     columns,
     summary: {
       workItems: grItems.length,
@@ -899,6 +1088,19 @@ export async function loadGetReadyCommand(r: SourceReader, tenantId: string, veh
     canAuthorize,
     authorizeBlockedReason,
     authorizedAt,
+    authorizedByEmail: authorization.byEmail,
+    serviceRequests: serviceRequestRows.map((s): ServiceApprovalRequest => ({
+      id: String(s.id),
+      workRequested: String(s.work_requested || ""),
+      reason: (s.reason as string) ?? null,
+      isSafety: s.is_safety === true,
+      estTotal: typeof s.est_total === "number" ? s.est_total : Number.isFinite(Number(s.est_total)) && s.est_total != null ? Number(s.est_total) : null,
+      requestedByName: (s.requested_by_name as string) ?? null,
+      roNumber: (s.ro_number as string) ?? null,
+      deliveryImpact: (s.delivery_impact as string) ?? null,
+      createdAt: (s.created_at as string) ?? null,
+    })),
+    activity,
     dispatchFailures: authorization.failures,
     completedAt: (grRecord?.get_ready_complete_date as string) ?? null,
     invoicedTotal,
@@ -906,18 +1108,85 @@ export async function loadGetReadyCommand(r: SourceReader, tenantId: string, veh
   };
 }
 
+// S6.8 — what an authorization releases to the Print Center: every live
+// pre-release document with a printable file, moved draft/pending -> approved
+// through the same workflow (and the same compare-and-set) every other
+// transition uses. The K-208 and file-less drafts are held back with their
+// reasons intact. Read directly, not through the source reader: a degraded
+// read must be reported as "could not release", never as "nothing to release".
+async function releaseAuthorizedDocuments(args: {
+  tenantId: string; vehicleId: string; vin: string | null; stock: string | null; actorId: string | null;
+}): Promise<{ released: string[]; blocked: number; error: string | null }> {
+  const { tenantId, vehicleId, actorId } = args;
+  const { data: rows, error: readErr } = await sb().from("generated_documents")
+    .select("id, tenant_id, vehicle_id, template_id, document_type, document_status, version, pdf_url, png_url, online_url, print_count, printed_at, published_at, created_at")
+    .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId);
+  if (readErr) {
+    const detail = readErr.message || String(readErr);
+    console.error("[useCommandCenter] release read failed:", detail);
+    return { released: [], blocked: 0, error: detail };
+  }
+  const docs = liveDocuments((rows as Row[]) || []);
+  const eligible = docs.filter(authorizationReleasable);
+  const held = docs.filter(authorizationHeldBack).length;
+  const released: string[] = [];
+  let failure: string | null = null;
+  for (const d of eligible) {
+    const res = await transitionDocument({
+      doc: d as unknown as GeneratedDocument,
+      action: "approve",
+      actorId,
+      reason: "get_ready_authorization",
+      // The row was read moments ago, but the dispatch window is long enough
+      // for another tab to move it; approve only what is still pre-release.
+      expectedStatus: String(d.document_status) as DocumentStatus,
+    });
+    if (res.ok) released.push(String(d.id));
+    else if (!failure && res.error !== "stale_status") failure = res.error || "transition_failed";
+  }
+  const blocked = held + (eligible.length - released.length);
+  const { error: eventErr } = await sb().from("document_lifecycle_events").insert({
+    tenant_id: tenantId, vehicle_id: vehicleId,
+    vin: args.vin, stock: args.stock,
+    event_type: EVT_PRINT_BUNDLE, occurred_at: new Date().toISOString(),
+    actor_id: actorId, source: "get-ready-command",
+    metadata: { document_ids: released, released: released.length, blocked },
+  });
+  if (eventErr) console.error("[useCommandCenter] print bundle event failed:", eventErr.message || eventErr);
+  return { released, blocked, error: failure ?? (eventErr ? eventErr.message || String(eventErr) : null) };
+}
+
+/** What the page renders as the four S6 result lines after an authorization. */
+export interface AuthorizationOutcome {
+  /** Named dispatch targets in send order, each with whether it was reached. */
+  targets: { name: string; ok: boolean }[];
+  documents: { released: number; blocked: number };
+  failures: string[];
+}
+
+export type AuthorizeResult = MutationResult & { outcome?: AuthorizationOutcome };
+
 export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandData> & {
   saveManagerNote(columnKey: string, note: string): Promise<MutationResult>;
   toggleChecklist(key: string, done: boolean): Promise<MutationResult>;
-  authorizeAndDispatch(): Promise<MutationResult>;
+  authorizeAndDispatch(): Promise<AuthorizeResult>;
+  setDeliveryTarget(value: string | null): Promise<MutationResult>;
+  setPriority(value: GetReadyPriority | null): Promise<MutationResult>;
+  decideServiceRequest(requestId: string, decision: "approved" | "declined" | "clarify", note?: string): Promise<MutationResult>;
 } {
   const { data: facts, dataRef, loading, error, errorDetail, notFound, noTenant, degraded, reload, tenantId, actorId } =
     useLoader<GetReadyCommandFacts>(vehicleId, loadGetReadyCommand);
   const { member } = useEntitlements();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const canDispatch = canDispatchGetReady(member?.role, isAdmin);
   const canDispatchRef = useRef(canDispatch);
   canDispatchRef.current = canDispatch;
+  const canApproveServiceWork = hasDealerCapability(member?.role, "can_approve_service_work", isAdmin);
+  const canApproveRef = useRef(canApproveServiceWork);
+  canApproveRef.current = canApproveServiceWork;
+  const actorEmail = user?.email ?? null;
+  const actorEmailRef = useRef(actorEmail);
+  actorEmailRef.current = actorEmail;
 
   const data: GetReadyCommandData | null = useMemo(() => {
     if (!facts) return null;
@@ -973,10 +1242,76 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
     });
   }, [writeEvent, dataRef, reload]);
 
+  // The delivery commitment and priority live on get_ready_records
+  // (20260726030000). Setting them is a manager act — the same authority the
+  // dispatch itself requires — and the write is tenant-scoped like every other.
+  const patchRecord = useCallback(async (patch: Row, deniedReason: string): Promise<MutationResult> => {
+    if (!tenantId) return { ok: false, error: "No dealership or vehicle in context." };
+    if (!canDispatchRef.current) return { ok: false, error: deniedReason };
+    const recordId = dataRef.current?.recordId;
+    if (!recordId) return { ok: false, error: "This vehicle has no Get Ready record yet." };
+    const { error: err } = await sb().from("get_ready_records")
+      .update(patch).eq("tenant_id", tenantId).eq("id", recordId);
+    if (err) {
+      const detail = err.message || String(err);
+      console.error("[useCommandCenter] get_ready_records patch failed:", detail);
+      return { ok: false, error: "Could not save that change. Nothing was recorded — try again.", errorDetail: detail };
+    }
+    await reload();
+    return { ok: true };
+  }, [tenantId, dataRef, reload]);
+
+  const setDeliveryTarget = useCallback(async (value: string | null): Promise<MutationResult> => {
+    return patchRecord({ delivery_target: value }, "Only a manager can set the delivery target.");
+  }, [patchRecord]);
+
+  const setPriority = useCallback(async (value: GetReadyPriority | null): Promise<MutationResult> => {
+    if (value !== null && value !== "high" && value !== "normal" && value !== "low") {
+      return { ok: false, error: "Priority must be high, normal, or low." };
+    }
+    return patchRecord({ priority: value }, "Only a manager can set the priority.");
+  }, [patchRecord]);
+
+  // S8 — the structured decision. decide_service_request is the ONLY sanctioned
+  // path (it writes audit_log and the requester's notification); a chat message
+  // can never authorize repairs.
+  const deciding = useRef(false);
+  const decideServiceRequest = useCallback(async (
+    requestId: string,
+    decision: "approved" | "declined" | "clarify",
+    note?: string,
+  ): Promise<MutationResult> => {
+    if (!tenantId) return { ok: false, error: "No dealership or vehicle in context." };
+    if (!canApproveRef.current) {
+      return { ok: false, error: "Only a manager with service-approval authority can decide this request." };
+    }
+    if (deciding.current) return { ok: false, error: "A decision is already being recorded." };
+    deciding.current = true;
+    try {
+      const { error: rpcErr } = await sb().rpc("decide_service_request", {
+        p_request_id: requestId, p_decision: decision, p_note: note || null,
+      });
+      if (rpcErr) {
+        const detail = rpcErr.message || String(rpcErr);
+        console.error("[useCommandCenter] service request decision failed:", detail);
+        const message = /not_authorized_to_decide/.test(detail)
+          ? "Only a manager with service-approval authority can decide this request."
+          : /request_not_found/.test(detail)
+            ? "This request no longer exists. Reload the page."
+            : "The decision could not be recorded. Nothing changed — try again.";
+        return { ok: false, error: message, errorDetail: detail };
+      }
+      await reload();
+      return { ok: true };
+    } finally {
+      deciding.current = false;
+    }
+  }, [tenantId, reload]);
+
   // Reuses the existing dispatch path (deriveGetReadyDispatch → notify-getready),
   // the same one ReadyBoard and the Vehicle File call on addendum acceptance.
   const dispatching = useRef(false);
-  const authorizeAndDispatch = useCallback(async (): Promise<MutationResult> => {
+  const authorizeAndDispatch = useCallback(async (): Promise<AuthorizeResult> => {
     if (!tenantId || !vehicleId) return { ok: false, error: "No dealership or vehicle in context." };
     // Asked here as well as on the button, because dataRef carries the loader's
     // role-blind facts and this is a one-shot irreversible send.
@@ -1061,12 +1396,14 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
       const canNameVendors = vendorResults.length === vendors.length;
       let vendorIdx = 0;
       const failedTargets: string[] = [];
+      const namedTargets: { name: string; ok: boolean }[] = [];
       for (const t of dispatchedTargets) {
         const isVendor = String(t.dept || "") === "vendor";
         const named = isVendor && canNameVendors
           ? (vendors[vendorIdx]?.name || vendors[vendorIdx]?.email || "vendor")
           : String(t.dept || "recipient");
         if (isVendor) vendorIdx += 1;
+        namedTargets.push({ name: named, ok: t.ok === true });
         if (t.ok !== true) failedTargets.push(named);
       }
       // A department with no email configured never becomes a target at all, so
@@ -1076,7 +1413,27 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
       if (vendors.length > 0 && vendorResults.length === 0) {
         for (const vd of vendors) neverAttempted.push(vd.name || vd.email);
       }
+      for (const name of neverAttempted) namedTargets.push({ name, ok: false });
       const failures = Array.from(new Set([...failedTargets, ...neverAttempted]));
+
+      // S6.1 — freeze the immutable instruction version: the exact work items
+      // as the shop will receive them, the manager's notes, the checklist that
+      // authorized them, and the delivery commitment. Read from the record at
+      // dispatch time so the frozen list is the one deriveGetReadyDispatch
+      // just emailed, not a render-old view of it.
+      const currentFacts = dataRef.current;
+      const { data: recRows } = await sb().from("get_ready_records")
+        .select("id, items, delivery_target, priority")
+        .eq("tenant_id", tenantId).in("vin", vinKeys(vin))
+        .order("created_at", { ascending: false }).limit(1);
+      const rec = ((recRows as Row[] | null) || [])[0] || null;
+      const snapshot = {
+        items: ((rec?.items as Row[]) || []).filter(Boolean),
+        notes: Object.fromEntries((currentFacts?.columns || []).map((c) => [c.key, c.managerNote])),
+        checklist: (currentFacts?.checklist || []).map((c) => ({ key: c.key, label: c.label, done: c.done })),
+        delivery_target: (rec?.delivery_target as string) ?? null,
+        priority: (rec?.priority as string) ?? null,
+      };
 
       // The dispatch is the authorization: record it only after the server
       // confirmed at least one work order actually went out. If that record
@@ -1084,6 +1441,17 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
       // authorizing a second time would send them all again.
       const recorded = await writeEvent(EVT_AUTHORIZED, {
         dispatched: payload.dispatched ?? null, depts, vendors: vendors.length, failures,
+        authorized_by_email: actorEmailRef.current, snapshot,
+      });
+
+      // S6.8/9 — release the eligible documents to the Print Center and file
+      // the print bundle. The work orders are already out, so this runs whether
+      // or not the marker write above succeeded; each blocked document keeps
+      // its exact reason (printBlockedReason / the bundle note state it).
+      const release = await releaseAuthorizedDocuments({
+        tenantId, vehicleId, vin,
+        stock: currentFacts?.vehicle.stockNumber ?? null,
+        actorId,
       });
       // Stamp the marker the Ready Board and the Vehicle File read, so those
       // screens stop offering a dispatch that has already happened. This is NOT
@@ -1120,11 +1488,17 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
         }
       }
       await reload();
+      const outcome: AuthorizationOutcome = {
+        targets: namedTargets,
+        documents: { released: release.released.length, blocked: release.blocked },
+        failures,
+      };
       if (!recorded.ok) {
         return {
           ok: false,
           error: `Work orders were dispatched, but the authorization could not be recorded: ${recorded.error || "unknown error"}. Do not authorize again — check the VIN timeline.`,
           errorDetail: recorded.errorDetail,
+          outcome,
         };
       }
       // Both problems are reported, not just the first. A run that BOTH missed a
@@ -1149,8 +1523,15 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
           "The Ready Board and Vehicle File could not be marked as dispatched. Do NOT use Accept & Dispatch there — it would send everything a second time.",
         );
       }
-      if (notes.length) return { ok: false, error: notes.join(" "), errorDetail: stampError ?? undefined };
-      return { ok: true };
+      if (release.error) {
+        notes.push(
+          "Some documents could not be released to the Print Center. The authorization stands — release them from the document list there.",
+        );
+      }
+      if (notes.length) {
+        return { ok: false, error: notes.join(" "), errorDetail: stampError ?? release.error ?? undefined, outcome };
+      }
+      return { ok: true, outcome };
     } catch (e) {
       const raw = (e as Error)?.message || "Dispatch failed.";
       console.error("[useCommandCenter] dispatch failed:", raw);
@@ -1158,11 +1539,12 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
     } finally {
       dispatching.current = false;
     }
-  }, [tenantId, vehicleId, dataRef, writeEvent, reload]);
+  }, [tenantId, vehicleId, actorId, dataRef, writeEvent, reload]);
 
   return {
     data, loading, error, errorDetail, notFound, noTenant, degraded, reload,
     saveManagerNote, toggleChecklist, authorizeAndDispatch,
+    setDeliveryTarget, setPriority, decideServiceRequest,
   };
 }
 
@@ -1234,6 +1616,13 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
     // a sheet the button does not put on paper.
     const printState = printReleaseState(d);
 
+    // Row actions, derived from the same state as the pill so the offer and
+    // the pill cannot disagree. Generate covers exactly the forms
+    // generate-vehicle-forms can fill (buyers_guide, k208); every other
+    // file-less row states why it has no button.
+    const docType = String(d.document_type || "");
+    const canGenerate = printState === "no_file" && (docType === "buyers_guide" || docType === "k208");
+
     rows.push({
       visibility,
       onPaper: printSheetIncludes(d),
@@ -1248,6 +1637,11 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
         passportVisibility: PASSPORT_VISIBILITY_PILL[visibility],
         printStatus: PRINT_STATE_PILL[printState],
         href: d.pdf_url || d.online_url || undefined,
+        reprintCopy: reprintable(d) ? reprintCopyNumber(d) : undefined,
+        generateKind: canGenerate ? (docType as "buyers_guide" | "k208") : undefined,
+        generateBlockedReason: printState === "no_file" && !canGenerate
+          ? "This document is not filled by the forms service — regenerate it from its own studio."
+          : undefined,
       },
     });
   }
@@ -1335,6 +1729,10 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
 export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
   printCompletePacket(): Promise<MutationResult>;
   printByStock(): Promise<MutationResult>;
+  /** Put an already-released document back on paper as copy N — no status transition. */
+  reprintDocument(docId: string): Promise<MutationResult>;
+  /** Rebuild a missing form file through generate-vehicle-forms. */
+  generateDocument(docId: string): Promise<MutationResult>;
 } {
   const { data, dataRef, loading, error, errorDetail, notFound, noTenant, degraded, reload, tenantId, actorId } =
     useLoader<PrintCenterData>(vehicleId, loadPrintCenter);
@@ -1395,6 +1793,9 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
           label: documentLabel(d.document_type as string | null),
           version: `v${d.version ?? 1}`,
           url: String(d.pdf_url || d.png_url || ""),
+          // The unexecuted K-208 goes on the paper only as a labelled working
+          // copy — the label travels with the sheet, not just the screen.
+          note: printSheetNoteFor(d),
         })),
       );
       // Three causes, three things for the employee to do. They used to share
@@ -1499,6 +1900,149 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
     }
   }, [tenantId, vehicleId, actorId, dataRef, reload]);
 
+  // A reprint is the SAME released document going back on paper. It follows the
+  // packet's human-confirmation pattern exactly — nothing is recorded until a
+  // person confirms the paper — and then it increments print_count ONLY.
+  // document_status and printed_at are the record of the FIRST release;
+  // rewriting either would rewrite the evidence a regulator reads.
+  const reprintDocument = useCallback(async (docId: string): Promise<MutationResult> => {
+    if (!tenantId || !vehicleId) return { ok: false, error: "No dealership or vehicle in context." };
+    if (printing.current) return { ok: false, error: "A print job is already running." };
+    const sheet = typeof window !== "undefined" ? window.open("", "_blank") : null;
+    const abandon = <T,>(result: T): T => { try { sheet?.close(); } catch { /* already gone */ } return result; };
+    printing.current = true;
+    try {
+      const { data: docRows, error: readErr } = await sb().from("generated_documents")
+        .select("id, tenant_id, vehicle_id, template_id, document_type, document_status, version, pdf_url, png_url, online_url, print_count, printed_at")
+        .eq("tenant_id", tenantId).eq("id", docId).limit(1);
+      if (readErr) {
+        const detail = readErr.message || String(readErr);
+        console.error("[useCommandCenter] reprint read failed:", detail);
+        return abandon({ ok: false, error: "Could not read this document, so nothing was printed. Retry in a moment.", errorDetail: detail });
+      }
+      const doc = ((docRows as Row[] | null) || [])[0] || null;
+      if (!doc) return abandon({ ok: false, error: "This document no longer exists. Reload the page." });
+      if (!reprintable(doc)) {
+        return abandon({
+          ok: false,
+          error: printReleaseState(doc) === "already_printed"
+            ? "This document's file is missing, so a copy cannot be printed. Regenerate it first."
+            : "This document has not been printed yet — release it with the packet first.",
+        });
+      }
+      const copy = reprintCopyNumber(doc);
+      const current = dataRef.current;
+      const opened = openPacketPrintSheet(
+        sheet,
+        {
+          ymm: current?.vehicle.ymm || "",
+          vin: current?.vehicle.vin || "",
+          stockNumber: current?.vehicle.stockNumber ?? null,
+        },
+        [{
+          id: String(doc.id),
+          label: documentLabel(doc.document_type as string | null),
+          version: `v${doc.version ?? 1}`,
+          url: String(doc.pdf_url || doc.png_url || ""),
+          note: `Copy ${copy}`,
+        }],
+      );
+      if (!opened.ok) {
+        return abandon({
+          ok: false,
+          error: opened.reason === "window_blocked"
+            ? "The print window could not be opened, so no copy was recorded. Allow pop-ups for this site, then reprint."
+            : opened.reason === "window_unwritable"
+              ? "This browser would not let AutoLabels write the print sheet, so no copy was recorded. Try again in a normal (non-private) window."
+              : "This document has no web address a printer can open, so no copy was recorded. Regenerate it first.",
+        });
+      }
+      const handle = opened.handle;
+      activeSheet.current = handle;
+      const outcome = await handle.printed;
+      if (outcome !== "printed") {
+        return {
+          ok: false,
+          error: "The copy was not confirmed as printed, so nothing was recorded. Reprint when you are at the printer.",
+        };
+      }
+      // Compare-and-set on the copy count so two tabs reprinting at once
+      // record two copies, not one count written twice.
+      const priorCount = doc.print_count;
+      let q = sb().from("generated_documents")
+        .update({ print_count: Number(priorCount || 0) + 1 })
+        .eq("id", docId);
+      q = priorCount == null ? q.is("print_count", null) : q.eq("print_count", priorCount);
+      const { data: updated, error: updErr } = await q.select("id");
+      if (updErr) {
+        const detail = updErr.message || String(updErr);
+        console.error("[useCommandCenter] reprint count failed:", detail);
+        const message = "The copy printed, but the copy count could not be recorded. Note the time and tell your manager.";
+        handle.acknowledge({ ok: false, detail: message });
+        return { ok: false, error: message, errorDetail: detail };
+      }
+      if (!Array.isArray(updated) || updated.length === 0) {
+        const message = "The copy count changed while you were printing, so this copy was not recorded. Reload and check the document row.";
+        handle.acknowledge({ ok: false, detail: message });
+        await reload();
+        return { ok: false, error: message };
+      }
+      const { error: ledgerErr } = await sb().from("document_lifecycle_events").insert({
+        tenant_id: tenantId, vehicle_id: vehicleId,
+        vin: current?.vehicle.vin || null, stock: current?.vehicle.stockNumber || null,
+        event_type: EVT_REPRINTED, occurred_at: new Date().toISOString(),
+        actor_id: actorId, source: "documents-print-center",
+        metadata: { document_id: String(doc.id), copy },
+      });
+      if (ledgerErr) console.error("[useCommandCenter] reprint ledger failed:", ledgerErr.message || ledgerErr);
+      await reload();
+      if (ledgerErr) {
+        const message = "The copy was recorded, but the reprint could not be added to the VIN timeline.";
+        handle.acknowledge({ ok: false, detail: message });
+        return { ok: false, error: message, errorDetail: ledgerErr.message || String(ledgerErr) };
+      }
+      handle.acknowledge({ ok: true });
+      return { ok: true };
+    } finally {
+      printing.current = false;
+      activeSheet.current = null;
+    }
+  }, [tenantId, vehicleId, actorId, dataRef, reload]);
+
+  // Rebuild a missing form file — the same generate-vehicle-forms invoke the
+  // Vehicle File's DealFlowPanel uses, scoped to this one document's kind.
+  const generating = useRef(false);
+  const generateDocument = useCallback(async (docId: string): Promise<MutationResult> => {
+    if (!tenantId || !vehicleId) return { ok: false, error: "No dealership or vehicle in context." };
+    const current = dataRef.current;
+    if (!current?.vehicle.vin) return { ok: false, error: "This vehicle has no VIN, so its forms cannot be filled." };
+    if (generating.current) return { ok: false, error: "A form is already being generated." };
+    const row = current.documents.find((d) => d.id === docId);
+    if (!row) return { ok: false, error: "This document no longer exists. Reload the page." };
+    if (!row.generateKind) {
+      return { ok: false, error: row.generateBlockedReason || "This document does not need regenerating." };
+    }
+    generating.current = true;
+    try {
+      const res = await sb().functions.invoke("generate-vehicle-forms", {
+        body: {
+          tenant_id: tenantId, vin: current.vehicle.vin, kinds: [row.generateKind],
+          app_base: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
+      });
+      const payload = (res?.data || {}) as Row;
+      if (res?.error || payload.ok !== true) {
+        const detail = res?.error?.message || String(payload.error || "generate failed");
+        console.error("[useCommandCenter] form generate failed:", detail);
+        return { ok: false, error: "The form could not be generated. Nothing changed — retry in a moment.", errorDetail: detail };
+      }
+      await reload();
+      return { ok: true };
+    } finally {
+      generating.current = false;
+    }
+  }, [tenantId, vehicleId, dataRef, reload]);
+
   // Queues a real stock-number label into public.zebra_print_jobs — the same
   // queue useZebraPrint writes, using the same ZPL builder.
   const printByStock = useCallback(async (): Promise<MutationResult> => {
@@ -1526,5 +2070,5 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
     return { ok: true };
   }, [tenantId, dataRef, reload]);
 
-  return { data, loading, error, errorDetail, notFound, noTenant, degraded, reload, printCompletePacket, printByStock };
+  return { data, loading, error, errorDetail, notFound, noTenant, degraded, reload, printCompletePacket, printByStock, reprintDocument, generateDocument };
 }

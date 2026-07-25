@@ -4,6 +4,7 @@ import {
   AlertTriangle, ArrowRight, Building2, Car, CheckCircle2, Clock, FileText, Globe, History,
   Lock, PlayCircle, QrCode, XCircle, type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useVinCommand, type PackageItem } from "@/hooks/useCommandCenter";
 import {
   ACTION_GROUP, capabilityDenialReason, capabilityForHref, CommandAction,
@@ -88,11 +89,23 @@ export default function VinCommandCenter() {
   // query, not just the render. The id stays in scope while entitlements settle
   // so the loader is not handed a fresh id after its first commit, which would
   // read as "vehicle not found" for one frame.
-  const { data, loading, error, errorDetail, notFound, degraded, reload } = useVinCommand(
+  const { data, loading, error, errorDetail, notFound, degraded, reload, retryAutogenArtifact } = useVinCommand(
     entLoading || canView ? vehicleId : undefined,
   );
 
   const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [retryingKey, setRetryingKey] = useState<string | null>(null);
+  const onRetryArtifact = async (exceptionId: string, artifact: string, label: string) => {
+    const key = `${exceptionId}:${artifact}`;
+    setRetryingKey(key);
+    try {
+      const res = await retryAutogenArtifact(exceptionId, artifact);
+      if (!res.ok) { toast.error(res.error || "The retry failed"); return; }
+      toast.success(`${label} re-drafted`);
+    } finally {
+      setRetryingKey(null);
+    }
+  };
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [menu, setMenu] = useState<{ key: string; item: PackageItem; trigger: HTMLElement } | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
@@ -462,6 +475,53 @@ export default function VinCommandCenter() {
                   {readiness.blocking.detail}
                 </CommandCallout>
               </>
+            )}
+
+            {/* Intake automation failures, one row per failed artifact
+                (vehicle_exceptions / artifact_autogen_failed). Retry re-invokes
+                the artifact's VIN-idempotent draft RPC; artifacts rebuilt by
+                background tasks say so and point at the queue. */}
+            {data.autogenExceptions.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[11.5px] font-semibold text-muted-foreground mb-1.5">Intake Exceptions</p>
+                <div className="space-y-2">
+                  {data.autogenExceptions.map((ex) => {
+                    const key = `${ex.exceptionId}:${ex.artifact}`;
+                    const running = retryingKey === key;
+                    return (
+                      <CommandCallout
+                        key={key}
+                        tone="amber"
+                        Icon={AlertTriangle}
+                        title={ex.label}
+                        action={
+                          <CommandAction
+                            variant="link"
+                            busy={running}
+                            disabledReason={
+                              running ? "This retry is already running."
+                              : retryingKey ? "Another retry is already running."
+                              : ex.retryRpc ? null
+                              : "This artifact is rebuilt by a background task — retry it from the exception queue."
+                            }
+                            onClick={() => onRetryArtifact(ex.exceptionId, ex.artifact, ex.label)}>
+                            Retry
+                          </CommandAction>
+                        }>
+                        {ex.message}
+                      </CommandCallout>
+                    );
+                  })}
+                </div>
+                <div className="mt-2">
+                  <CommandAction
+                    variant="link"
+                    href="/admin/exceptions"
+                    capability={capabilityForHref("/admin/exceptions")}>
+                    Open exception queue
+                  </CommandAction>
+                </div>
+              </div>
             )}
 
             <CommandAction

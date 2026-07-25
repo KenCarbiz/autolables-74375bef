@@ -271,6 +271,10 @@ const HREF_CAPABILITY: { prefix: string; capability: DealerCapability }[] = [
   { prefix: "/get-ready-command", capability: "can_view_get_ready" },
   { prefix: "/k208", capability: "can_view_get_ready" },
   { prefix: "/ready-board", capability: "can_view_get_ready" },
+  // The capabilities RouteCapabilityGuard enforces for these prefixes, quoted
+  // here so the link is disabled with a reason instead of redirect-bouncing.
+  { prefix: "/service", capability: "can_view_get_ready" },
+  { prefix: "/admin/exceptions", capability: "can_manage_settings" },
   { prefix: "/print-center", capability: "can_view_print_queue" },
   { prefix: "/vehicle-file", capability: "can_view_inventory" },
   { prefix: "/vin-command", capability: "can_view_inventory" },

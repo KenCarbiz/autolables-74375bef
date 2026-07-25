@@ -45,6 +45,12 @@ export interface PacketPrintDocument {
   label: string;
   version: string;
   url: string;
+  /**
+   * A qualifier printed beside the name — the pre-execution K-208 carries
+   * "Working copy — not executed" so the paper can never read as the executed
+   * form. Anything here is escaped like every other string on the sheet.
+   */
+  note?: string;
 }
 
 export interface PacketPrintVehicle {
@@ -111,7 +117,7 @@ export function renderPacketPrintSheet(
   const items = docs.map((d, i) => `
       <li class="doc">
         <span class="n">${i + 1}</span>
-        <span class="meta"><span class="name">${esc(d.label)}</span> <span class="ver">${esc(d.version)}</span></span>
+        <span class="meta"><span class="name">${esc(d.label)}</span> <span class="ver">${esc(d.version)}</span>${d.note ? `<span class="note">(${esc(d.note)})</span>` : ""}</span>
         <a class="open" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">Open &amp; print</a>
       </li>`).join("");
 
@@ -130,6 +136,7 @@ export function renderPacketPrintSheet(
   .meta { flex: 1; min-width: 0; font-size: 14px; }
   .name { font-weight: 600; }
   .ver { color: #64748B; font-weight: 500; }
+  .note { display: block; color: #B45309; font-size: 12px; font-weight: 600; }
   .open { color: #2563EB; font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; }
   .confirm { background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 16px; }
   .confirm p { margin: 0 0 12px; font-size: 13px; color: #334155; }

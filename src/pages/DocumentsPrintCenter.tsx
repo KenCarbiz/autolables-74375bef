@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, Building2, Car, FileCheck, FileLock, FileSearch,
-  FileText, FileX, Gauge, KeyRound, Layers, Lock, Package, Printer, QrCode, Rocket, Tag,
+  FileText, FileX, Gauge, KeyRound, Layers, Lock, Package, Printer, QrCode,
+  RefreshCw, Rocket, Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,11 +43,13 @@ export default function DocumentsPrintCenter() {
   // a fresh id after its first commit, which would read as "vehicle not found"
   // for one frame. The read is tenant-scoped either way; once the role is known
   // a denied one never queries again.
-  const { data, loading, error, errorDetail, notFound, degraded, reload, printCompletePacket, printByStock } = usePrintCenter(
+  const { data, loading, error, errorDetail, notFound, degraded, reload, printCompletePacket, printByStock, reprintDocument, generateDocument } = usePrintCenter(
     entLoading || canView ? vehicleId : undefined,
   );
 
   const [busy, setBusy] = useState<"packet" | "stock" | null>(null);
+  // One in-flight row action at a time — the hook enforces it, this names it.
+  const [busyRow, setBusyRow] = useState<{ id: string; kind: "reprint" | "generate" } | null>(null);
   const [menu, setMenu] = useState<{ id: string; row: DocRow; trigger: HTMLElement } | null>(null);
 
   const runPrint = async (which: "packet" | "stock") => {
@@ -62,6 +65,28 @@ export default function DocumentsPrintCenter() {
         : "Stock label queued for printing");
     } finally {
       setBusy(null);
+    }
+  };
+
+  const runReprint = async (row: DocRow) => {
+    setBusyRow({ id: row.id, kind: "reprint" });
+    try {
+      const res = await reprintDocument(row.id);
+      if (!res.ok) { toast.error(res.error || "The copy was not recorded"); return; }
+      toast.success(`${row.label} reprinted — copy recorded`);
+    } finally {
+      setBusyRow(null);
+    }
+  };
+
+  const runGenerate = async (row: DocRow) => {
+    setBusyRow({ id: row.id, kind: "generate" });
+    try {
+      const res = await generateDocument(row.id);
+      if (!res.ok) { toast.error(res.error || "The form could not be generated"); return; }
+      toast.success(`${row.label} generated and filed`);
+    } finally {
+      setBusyRow(null);
     }
   };
 
@@ -314,13 +339,50 @@ export default function DocumentsPrintCenter() {
                             <StatusPill tone={d.printStatus.tone}>{d.printStatus.label}</StatusPill>
                           </td>
                           <td className="px-3 py-3 text-right">
-                            <CommandKebab
-                              label={`More actions for ${d.label}`}
-                              expanded={menu?.id === d.id}
-                              onOpen={(trigger) =>
-                                setMenu((m) => (m?.id === d.id ? null : { id: d.id, row: d, trigger }))
-                              }
-                            />
+                            <span className="inline-flex items-center gap-1 justify-end">
+                              {/* Reprint follows the same confirm-at-the-printer
+                                  pattern as the packet: nothing is recorded
+                                  until the sheet reports paper. */}
+                              {d.reprintCopy != null && (
+                                <CommandAction
+                                  variant="link"
+                                  capability="can_print"
+                                  Icon={Printer}
+                                  busy={busyRow?.id === d.id && busyRow.kind === "reprint"}
+                                  disabledReason={
+                                    busyRow?.id === d.id && busyRow.kind === "reprint"
+                                      ? "Waiting for the print confirmation in the reprint tab."
+                                      : busyRow ? "Another document action is already running." : null
+                                  }
+                                  onClick={() => runReprint(d)}>
+                                  Reprint (copy {d.reprintCopy})
+                                </CommandAction>
+                              )}
+                              {(d.generateKind || d.generateBlockedReason) && (
+                                <CommandAction
+                                  variant="link"
+                                  capability="can_create_documents"
+                                  Icon={RefreshCw}
+                                  busy={busyRow?.id === d.id && busyRow.kind === "generate"}
+                                  disabledReason={
+                                    d.generateBlockedReason
+                                      ? d.generateBlockedReason
+                                      : busyRow?.id === d.id && busyRow.kind === "generate"
+                                        ? "The form is being generated."
+                                        : busyRow ? "Another document action is already running." : null
+                                  }
+                                  onClick={() => runGenerate(d)}>
+                                  Generate
+                                </CommandAction>
+                              )}
+                              <CommandKebab
+                                label={`More actions for ${d.label}`}
+                                expanded={menu?.id === d.id}
+                                onOpen={(trigger) =>
+                                  setMenu((m) => (m?.id === d.id ? null : { id: d.id, row: d, trigger }))
+                                }
+                              />
+                            </span>
                           </td>
                         </tr>
                       );
