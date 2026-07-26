@@ -156,6 +156,9 @@ describe("clearance reason labels", () => {
     const sql = readFileSync(
       join(__dirname, "../../../supabase/migrations/20260726104000_delivery_clearance.sql"),
       "utf8",
+    ) + readFileSync(
+      join(__dirname, "../../../supabase/migrations/20260727000000_safety_request_clearance_enforcement.sql"),
+      "utf8",
     );
     for (const code of Object.keys(CLEARANCE_REASON_LABELS)) {
       expect(sql).toContain(`'${code}'`);

@@ -77,6 +77,8 @@ export const CLEARANCE_REASON_LABELS: Record<string, string> = {
   INSPECTION_NOT_STARTED: "The safety inspection has not started",
   INSPECTION_IN_PROGRESS: "The safety inspection is still in progress",
   REINSPECTION_REQUIRED: "Repaired items are waiting for reinspection",
+  SAFETY_REQUEST_PENDING: "A safety repair authorization is awaiting a manager decision",
+  SAFETY_DECLINED_UNRESOLVED: "A declined safety repair is unresolved — authorize the repair or remove the vehicle from retail",
   K208_READY_NOT_EXECUTED: "The K-208 has not been executed",
   FINALIZE_GATE_BLOCKED: "The store's finalize gate is not yet satisfied",
   NOT_APPLICABLE_NEW_VEHICLE: "New vehicle: no K-208 requirement",
