@@ -286,7 +286,7 @@ serve(async (req) => {
       } else {
         const slug = makeSlug(v.vin, v.ymm);
         const { data: inserted, error } = await admin.from("vehicle_listings").insert({
-          ...patch,
+          ...insertPatch,
           slug,
           status: "draft",
           sticker_snapshot: {},
