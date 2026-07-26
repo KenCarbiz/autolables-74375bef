@@ -1,5 +1,7 @@
-import type { OemId } from "./identity";
-import { OEM_REGISTRY } from "./identity";
+// Explicit .ts extensions keep this module importable from the Deno edge
+// renderer (supabase/functions/_shared/factorySticker/render.ts).
+import type { OemId } from "./identity.ts";
+import { OEM_REGISTRY } from "./identity.ts";
 
 export type TemplateFamilyId =
   | "PREMIUM_LUXURY"
