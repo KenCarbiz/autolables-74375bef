@@ -45,6 +45,7 @@ BEGIN
       PERFORM public.create_draft_get_ready(r.tenant_id, r.vin);
       PERFORM public.create_draft_addendum(r.tenant_id, r.vin);
       PERFORM public.create_draft_window_sticker(r.tenant_id, r.vin);
+      PERFORM public.issue_vehicle_ready_token(r.tenant_id, r.vin);
     EXCEPTION WHEN OTHERS THEN
       v_failed := v_failed + 1;
       v_err := left(SQLERRM, 500);
