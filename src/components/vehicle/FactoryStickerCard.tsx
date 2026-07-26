@@ -196,17 +196,25 @@ export default function FactoryStickerCard({ vehicleId, tenantId, condition, oem
             Generated automatically from the saved factory build data for this VIN. Review and publishing live in Admin.
           </p>
         </div>
-        {manager && record && (
-          <button
-            type="button"
-            onClick={() => regenerate("regenerate")}
-            disabled={busy}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted/40 disabled:opacity-50"
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/factory-sticker/${vehicleId}`}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted/40"
           >
-            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            Regenerate
-          </button>
-        )}
+            <ExternalLink className="w-3 h-3" /> Open workspace
+          </Link>
+          {manager && record && (
+            <button
+              type="button"
+              onClick={() => regenerate("regenerate")}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted/40 disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Regenerate
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (

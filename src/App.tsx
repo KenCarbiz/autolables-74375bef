@@ -120,6 +120,7 @@ const DevHeroPreview = lazy(() => import("./pages/DevHeroPreview"));
 const DevSaturdayPreview = lazy(() => import("./pages/DevSaturdayPreview"));
 const DevConnecticutSmokeTest = lazy(() => import("./pages/DevConnecticutSmokeTest"));
 const DevPrepMobilePreview = lazy(() => import("./pages/DevPrepMobilePreview"));
+const FactoryStickerWorkspace = lazy(() => import("./pages/FactoryStickerWorkspace"));
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -256,6 +257,7 @@ const App = () => (
                       <Route path="/dev/saturday-preview" element={<DevSaturdayPreview />} />
                       <Route path="/dev/connecticut-smoke-test" element={<DevConnecticutSmokeTest />} />
                       <Route path="/dev/prep-mobile-preview" element={<DevPrepMobilePreview />} />
+                      <Route path="/dev/factory-sticker-preview" element={<FactoryStickerWorkspace fixture />} />
                       <Route path="/q/:token" element={<QrRedirect />} />
 
                       <Route element={<GatedLayout />}>
@@ -274,6 +276,7 @@ const App = () => (
                         <Route path="/inventory-v2" element={<InventoryCommandCenterV2 />} />
                         <Route path="/dashboard-legacy" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/vehicle-file/:id" element={<VehicleFile />} />
+                        <Route path="/factory-sticker/:vehicleId" element={<FactoryStickerWorkspace />} />
                         <Route path="/admin" element={<Admin />} />
                         <Route path="/admin/smoke-test" element={<AdminSmokeTest />} />
                         <Route path="/admin/design-system/addendum-icons" element={<AddendumIconLibrary />} />
