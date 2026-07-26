@@ -7679,6 +7679,10 @@ export type Database = {
         }
         Returns: Json
       }
+      assert_tenant_member_or_service: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
       assign_safety_inspection: {
         Args: { p_inspection_id: string; p_user_id: string }
         Returns: Json
@@ -8430,6 +8434,10 @@ export type Database = {
           _signing_id: string
         }
         Returns: undefined
+      }
+      respond_service_clarification: {
+        Args: { p_request_id: string; p_response: string }
+        Returns: Json
       }
       save_description_channel_version: {
         Args: {
