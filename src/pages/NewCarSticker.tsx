@@ -180,6 +180,7 @@ const NewCarSticker = () => {
         vin: vehicle.vin,
         ymm: ymm || undefined,
         trim: vehicle.trim || undefined,
+        stock: vehicle.stock || undefined,
         condition: "new",
         price: totalSuggestedRetail,
         sticker_snapshot: {

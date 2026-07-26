@@ -11,7 +11,7 @@ import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { deriveWorkspaceStatus, clearanceReasonLabel, type WorkspaceStatus, type WorkspaceActionKey } from "@/lib/service/workspaceStatus";
 import { k208SignerAllowedClient, K208_SIGNER_DENIAL } from "@/lib/service/signerAuthority";
 import { isExecutedSignoff, isFailedInspection } from "@/lib/commandCenter/inspectionState";
-import { REPAIR_STATES, isFailureResolved, type RepairState } from "@/lib/service/transitions";
+import { REPAIR_STATES, failuresForInspection, isFailureResolved, type RepairState } from "@/lib/service/transitions";
 import { notificationDedupeKey } from "@/lib/service/notificationTypes";
 import type { GetReadyItem } from "@/hooks/useGetReady";
 import K208Checklist, { K208_ITEMS, k208Answered, k208Result, k208Checklist, type K208Mark } from "@/components/service/K208Checklist";
@@ -203,6 +203,18 @@ export default function ServiceVehicleWorkspace() {
     [inspections],
   );
   const openFailures = useMemo(() => failures.filter((f) => !isFailureResolved(f.repair_state)), [failures]);
+  // Status derivation reads only the NEWEST SIGNED inspection's rows — an
+  // older inspection's resolved failures must never turn a fresh signed FAIL
+  // (whose per-item filing errored) amber. openFailures above stays VIN-wide
+  // for the execution gate, mirroring certify's server-side check.
+  const signedScopedFailures = useMemo(
+    () => failuresForInspection(failures, newestSigned?.id ?? null),
+    [failures, newestSigned],
+  );
+  const signedScopedOpen = useMemo(
+    () => signedScopedFailures.filter((f) => !isFailureResolved(f.repair_state)),
+    [signedScopedFailures],
+  );
   const canExecute = isAdmin || hasDealerCapability(role, "can_execute_k208", isAdmin) || k208SignerAllowedClient({
     isPlatformAdmin: isAdmin,
     userId: user?.id ?? null,
@@ -228,16 +240,16 @@ export default function ServiceVehicleWorkspace() {
     hasSignedFail: isFailedInspection(newestSigned),
     certified: !!newestSigned?.licensee_certified_at,
     workflowState: newestActive?.inspection_state ?? null,
-    openFailures: openFailures.length,
-    failuresReadyForReinspection: openFailures.filter((f) => f.repair_state === "ready_for_reinspection").length,
-    resolvedFailures: failures.length - openFailures.length,
+    openFailures: signedScopedOpen.length,
+    failuresReadyForReinspection: signedScopedOpen.filter((f) => f.repair_state === "ready_for_reinspection").length,
+    resolvedFailures: signedScopedFailures.length - signedScopedOpen.length,
     awaitingApproval: pendingRequests > 0,
     grStarted,
     recallStatus: veh?.recall_status,
     clearanceState: clearance?.state ?? null,
     clearanceReasons: clearance?.reason_codes ?? [],
     canExecute,
-  }), [newestSigned, newestActive, openFailures, failures, pendingRequests, grStarted, veh, clearance, canExecute]);
+  }), [newestSigned, newestActive, signedScopedOpen, signedScopedFailures, pendingRequests, grStarted, veh, clearance, canExecute]);
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -1169,7 +1181,11 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
   const { settings } = useDealerSettings();
   const [busyId, setBusyId] = useState<string | null>(null);
   const open = failures.filter((f) => !isFailureResolved(f.repair_state));
-  const signedFailNoRows = isFailedInspection(newestSigned) && failures.length === 0;
+  // The no-rows recovery is judged against the NEWEST SIGNED inspection only:
+  // a fresh signed FAIL whose per-item filing errored must offer "File failed
+  // items" even when an older inspection's (resolved) rows still exist.
+  const signedScoped = failuresForInspection(failures, newestSigned?.id ?? null);
+  const signedFailNoRows = isFailedInspection(newestSigned) && signedScoped.length === 0;
 
   // Who gets the ready_for_reinspection bell: members allowed to reinspect
   // under this store's policy (deduped by notifyMembers' key).
@@ -1223,10 +1239,12 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
   // Zero open items with at least one resolved (every failure already passed
   // reinspection while the workflow state lagged behind) must still allow
   // repairs_in_progress -> ready_for_reinspection, or the record is stranded
-  // with no enabled control except void.
+  // with no enabled control except void. The resolved fallback reads only the
+  // newest signed inspection's rows — an older inspection's resolved failures
+  // must not enable "Send to reinspection" for a signed FAIL with nothing filed.
   const allItemsReady = open.length > 0
     ? open.every((f) => f.repair_state === "ready_for_reinspection")
-    : failures.some((f) => isFailureResolved(f.repair_state));
+    : signedScoped.some((f) => isFailureResolved(f.repair_state));
 
   const addFailurePhoto = async (f: FailureRow, files: FileList | null) => {
     if (!files?.length) return;

@@ -71,6 +71,9 @@ const ageLabel = (hours: number): string => {
 
 const TABS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
+  // Cross-bucket view matching the Pending-work KPI exactly: not cleared and
+  // not executed. Like Overdue, it filters on row facts, not on the bucket.
+  { key: "pending", label: "Pending" },
   { key: "get_ready", label: "Get Ready" },
   { key: "in_progress", label: "In Progress" },
   { key: "failed", label: "Failed" },
@@ -136,7 +139,7 @@ export default function ServiceQueue() {
         // 'clarify' rows are still-open requests (waiting on the requester's
         // answer), not decided ones — they must not vanish from the queue.
         vins.length ? sb().from("service_requests").select("vin").eq("tenant_id", tenant.id).in("status", ["pending", "clarify"]).in("vin", vins) : empty,
-        vins.length ? sb().from("safety_inspection_item_failures").select("vin, repair_state").eq("tenant_id", tenant.id).in("vin", vins) : empty,
+        vins.length ? sb().from("safety_inspection_item_failures").select("vin, inspection_id, repair_state").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         vins.length ? sb().from("vehicle_delivery_clearance").select("vin, state, reason_codes").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         sb().rpc("list_tenant_members", { p_tenant_id: tenant.id }),
         // Stock truth: marketcheck-sync writes stock to
@@ -169,8 +172,14 @@ export default function ServiceQueue() {
       }
 
       const awaitingVins = new Set<string>(((srRes.data as { vin: string }[]) || []).map((r) => r.vin));
+      // Failure counts are scoped to the NEWEST SIGNED inspection per VIN — a
+      // VIN-wide aggregate lets an older inspection's resolved rows turn a
+      // fresh signed FAIL (whose per-item filing errored) amber and hide the
+      // failed bucket. The stored clearance still carries the VIN-wide block.
       const failuresByVin = new Map<string, { open: number; ready: number; resolved: number }>();
-      for (const f of ((failRes.data as { vin: string; repair_state: string }[]) || [])) {
+      for (const f of ((failRes.data as { vin: string; inspection_id: string; repair_state: string }[]) || [])) {
+        const signed = signedByVin.get(f.vin);
+        if (!signed || f.inspection_id !== signed.id) continue;
         const cur = failuresByVin.get(f.vin) || { open: 0, ready: 0, resolved: 0 };
         if (!isFailureResolved(f.repair_state)) {
           cur.open += 1;
@@ -331,6 +340,7 @@ export default function ServiceQueue() {
     const term = q.trim().toLowerCase();
     return rows.filter((r) => {
       if (tab === "overdue") { if (!r.overdue) return false; }
+      else if (tab === "pending") { if (r.cleared || r.k208State === "executed") return false; }
       else if (tab !== "all" && r.bucket !== tab) return false;
       if (techFilter === "unassigned" && r.assignedTo) return false;
       if (techFilter !== "any" && techFilter !== "unassigned" && r.assignedTo !== techFilter) return false;
@@ -362,7 +372,7 @@ export default function ServiceQueue() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <CommandStatCard label="Pending work" value={stats.pending} sub={stats.pendingSub} Icon={ClipboardList} tone="blue" onClick={() => setTab("all")} />
+        <CommandStatCard label="Pending work" value={stats.pending} sub={stats.pendingSub} Icon={ClipboardList} tone="blue" onClick={() => setTab("pending")} />
         <CommandStatCard label="K-208 ready" value={stats.ready} sub={stats.readySub} Icon={ShieldCheck} tone="emerald" onClick={() => setTab("ready_to_sign")} />
         <CommandStatCard label="Blocked / exceptions" value={stats.blocked} sub={stats.blockedSub} Icon={AlertTriangle} tone="red" onClick={() => setTab("failed")} />
         <CommandStatCard label="Completed today" value={stats.doneToday} sub={stats.doneSub} Icon={CheckCircle2} tone="slate" onClick={() => setTab("done")} />

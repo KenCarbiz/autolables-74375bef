@@ -11,7 +11,7 @@ import { useAdvertisedPrices, assessDrift, SOURCE_LABELS, type AdvertisedPrice }
 import { useGetReady } from "@/hooks/useGetReady";
 import { usedSafetyInspectionForm } from "@/data/safetyInspection";
 import { useVinDecode } from "@/hooks/useVinDecode";
-import { runManualIntakeOrchestration } from "@/lib/manualIntakeOrchestration";
+import { clearIntakeQueued, markIntakeQueued, persistStockNumber, runManualIntakeOrchestration } from "@/lib/manualIntakeOrchestration";
 import { toast } from "sonner";
 import {
   Plus, Search, Upload, Car, FileText, Printer, Signature, ScanLine,
@@ -1324,9 +1324,12 @@ const AddVehicleModal = ({ tenantId, userId, onClose, onCreated }: AddProps) => 
     if (error) { toast.error(`Failed: ${error.message}`); return; }
     // Fire-and-forget recall check for the new VIN (best-effort).
     supabase.functions.invoke("marketcheck-recalls", { body: { vin: vin.trim().toUpperCase(), tenant_id: tenantId } }).catch(() => {});
-    // Same intake orchestration the ingest paths run (drafts + hub token +
-    // clearance) — best-effort, never blocks the insert.
-    void runManualIntakeOrchestration(tenantId, vin.trim().toUpperCase(), condition);
+    // The required stock number lands on vehicle_files.stock_number (the stock
+    // truth the draft RPCs read back) BEFORE orchestration, then the same
+    // intake orchestration the ingest paths run (drafts + hub token +
+    // clearance) — both best-effort, never block the insert.
+    void persistStockNumber(tenantId, vin.trim().toUpperCase(), stock)
+      .then(() => runManualIntakeOrchestration(tenantId, vin.trim().toUpperCase(), condition));
     onCreated(data.id);
   };
 
@@ -1389,10 +1392,15 @@ const CsvImportModal = ({ tenantId, userId, onClose, onImported }: ImportProps) 
     const col = (name: string) => header.findIndex((h) => h === name || h === name.replace(/_/g, " "));
     const idx = { vin: col("vin"), stock: col("stock"), mileage: col("mileage"), condition: col("condition"), price: col("price"), year: col("year"), make: col("make"), model: col("model"), trim: col("trim") };
     if (idx.vin < 0 || idx.stock < 0) { toast.error("CSV must have at least 'vin' and 'stock' columns"); setSubmitting(false); return; }
+    // vehicle_listings has no stock_number column — stock lives on
+    // vehicle_files (UNIQUE tenant_id+vin), written after the insert below.
+    const stockByVin = new Map<string, string>();
     const toInsert = lines.slice(1).map((line) => {
       const cells = line.split(/[,\t]/).map((c) => c.trim());
       const vin = (cells[idx.vin] || "").toUpperCase();
       if (vin.length < 11) return null;
+      const stockNo = (cells[idx.stock] || "").trim();
+      if (stockNo) stockByVin.set(vin, stockNo);
       const year = idx.year >= 0 ? cells[idx.year] : "";
       const make = idx.make >= 0 ? cells[idx.make] : "";
       const model = idx.model >= 0 ? cells[idx.model] : "";
@@ -1413,9 +1421,19 @@ const CsvImportModal = ({ tenantId, userId, onClose, onImported }: ImportProps) 
     toast.success(`Imported ${data?.length ?? 0} vehicle(s)`);
     // Same intake orchestration the ingest paths run, sequentially so a large
     // import doesn't stampede the RPCs — best-effort, never blocks the import.
+    // Every vehicle gets an open "intake queued" exception BEFORE its
+    // orchestration runs and is resolved after it completes, so a tab closed
+    // mid-import leaves visible open markers (the nightly sweep completes the
+    // drafts) instead of nothing at all.
     void (async () => {
       for (const row of toInsert) {
-        await runManualIntakeOrchestration(tenantId, String(row.vin || ""), String(row.condition || "used"));
+        await markIntakeQueued(tenantId, String(row.vin || ""));
+      }
+      for (const row of toInsert) {
+        const vin = String(row.vin || "");
+        await persistStockNumber(tenantId, vin, stockByVin.get(vin));
+        await runManualIntakeOrchestration(tenantId, vin, String(row.condition || "used"));
+        await clearIntakeQueued(tenantId, vin, userId);
       }
     })();
     onImported();

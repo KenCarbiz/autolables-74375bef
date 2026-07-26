@@ -261,6 +261,7 @@ const UsedCarSticker = () => {
         vin: vehicle.vin,
         ymm: ymm || undefined,
         trim: vehicle.trim || undefined,
+        stock: vehicle.stock || undefined,
         mileage: parseInt(vehicle.mileage) || undefined,
         condition: "used",
         price: totalPrice,

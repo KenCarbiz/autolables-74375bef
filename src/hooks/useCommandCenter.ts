@@ -721,6 +721,13 @@ function humanizeRetryError(raw: string): string {
 export function useVinCommand(vehicleId?: string): Result<VinCommand> & {
   /** Re-invoke the failed artifact's draft RPC (VIN-idempotent), then clear it from the exception row. */
   retryAutogenArtifact(exceptionId: string, artifact: string): Promise<MutationResult>;
+  /**
+   * Dismiss an artifact that no longer applies (the retry's NULL path: the
+   * vehicle no longer qualifies). Removes the artifact from the row and, when
+   * the row empties, marks it resolved with the dismissal reason recorded —
+   * the same resolved_at/resolved_by bookkeeping the retry-clear path writes.
+   */
+  dismissAutogenArtifact(exceptionId: string, artifact: string): Promise<MutationResult>;
 } {
   const { data, dataRef, loading, error, errorDetail, notFound, noTenant, degraded, reload, tenantId, actorId } =
     useLoader<VinCommand>(vehicleId, loadVinCommand);
@@ -789,7 +796,46 @@ export function useVinCommand(vehicleId?: string): Result<VinCommand> & {
     }
   }, [tenantId, actorId, dataRef, reload]);
 
-  return { data, loading, error, errorDetail, notFound, noTenant, degraded, reload, retryAutogenArtifact };
+  const dismissAutogenArtifact = useCallback(async (exceptionId: string, artifact: string): Promise<MutationResult> => {
+    if (!tenantId) return { ok: false, error: "No dealership in context." };
+    const row = dataRef.current?.autogenExceptions.find(
+      (e) => e.exceptionId === exceptionId && e.artifact === artifact);
+    if (!row) return { ok: false, error: "This exception is no longer open. Reload the page." };
+    const { data: exRows, error: readErr } = await sb().from("vehicle_exceptions")
+      .select("id, source_values")
+      .eq("tenant_id", tenantId).eq("id", exceptionId).limit(1);
+    if (readErr) {
+      const detail = readErr.message || String(readErr);
+      return { ok: false, error: "The exception could not be read. Nothing was changed.", errorDetail: detail };
+    }
+    const ex = ((exRows as Row[] | null) || [])[0];
+    if (!ex) return { ok: false, error: "This exception is no longer open. Reload the page." };
+    const sv = (ex.source_values || {}) as { artifacts?: Record<string, unknown>; dismissed?: Record<string, unknown> };
+    const artifacts = { ...(sv.artifacts || {}) };
+    if (artifact) delete artifacts[artifact];
+    // The dismissal is recorded on the row (who, when, why), so a resolved
+    // exception still says WHY the artifact never materialized.
+    const dismissed = {
+      ...(sv.dismissed || {}),
+      [artifact || "all"]: { reason: "no_longer_applies", at: new Date().toISOString(), by: actorId },
+    };
+    const patch: Row = { source_values: { ...sv, artifacts, dismissed } };
+    if (Object.keys(artifacts).length === 0) {
+      patch.status = "resolved";
+      patch.resolved_at = new Date().toISOString();
+      patch.resolved_by = actorId;
+    }
+    const { error: updErr } = await sb().from("vehicle_exceptions")
+      .update(patch).eq("tenant_id", tenantId).eq("id", exceptionId);
+    if (updErr) {
+      const detail = updErr.message || String(updErr);
+      return { ok: false, error: "The dismissal could not be saved. Nothing was changed.", errorDetail: detail };
+    }
+    await reload();
+    return { ok: true };
+  }, [tenantId, actorId, dataRef, reload]);
+
+  return { data, loading, error, errorDetail, notFound, noTenant, degraded, reload, retryAutogenArtifact, dismissAutogenArtifact };
 }
 
 // ── screen 2: Get Ready Command ──────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { runManualIntakeOrchestration } from "@/lib/manualIntakeOrchestration";
+import { persistStockNumber, runManualIntakeOrchestration } from "@/lib/manualIntakeOrchestration";
 import type { DealerProgram } from "@/lib/dealerPrograms";
 
 // ──────────────────────────────────────────────────────────────
@@ -241,6 +241,8 @@ export const useVehicleListing = (storeId: string) => {
       vin: string;
       ymm?: string;
       trim?: string;
+      /** Dealer stock number — persisted to vehicle_files.stock_number (the stock truth). */
+      stock?: string;
       mileage?: number;
       condition?: "new" | "used" | "cpo";
       price?: number;
@@ -281,9 +283,12 @@ export const useVehicleListing = (storeId: string) => {
         console.error("createListing error", error);
         return null;
       }
-      // Same intake orchestration the ingest paths run (drafts + hub token +
-      // clearance) — best-effort, never blocks the listing creation.
-      void runManualIntakeOrchestration(storeId, input.vin, input.condition);
+      // Stock lands on vehicle_files.stock_number first (the draft RPCs read
+      // it back), then the same intake orchestration the ingest paths run
+      // (drafts + hub token + clearance) — best-effort, never blocks the
+      // listing creation.
+      void persistStockNumber(storeId, input.vin, input.stock)
+        .then(() => runManualIntakeOrchestration(storeId, input.vin, input.condition));
       await load();
       return data as VehicleListing;
     },

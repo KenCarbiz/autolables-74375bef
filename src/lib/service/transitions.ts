@@ -59,3 +59,17 @@ export type RepairState = (typeof REPAIR_STATES)[number];
 
 export const isFailureResolved = (state: RepairState | string | null | undefined): boolean =>
   String(state || "") === "passed_on_reinspection";
+
+/**
+ * Failure rows scoped to ONE inspection. The resolved/open/no-rows checks that
+ * drive the status derivations must read only the NEWEST SIGNED inspection's
+ * rows: a VIN-wide aggregate lets an older inspection's resolved failures make
+ * a fresh signed FAIL (whose per-item filing errored) read amber
+ * "ready for reinspection" and hide the file-failed-items recovery. The
+ * VIN-wide set still matters for the execution gate (certify's server check is
+ * VIN-wide) — callers keep both.
+ */
+export const failuresForInspection = <T extends { inspection_id?: string | null }>(
+  failures: T[],
+  inspectionId: string | null | undefined,
+): T[] => (inspectionId ? failures.filter((f) => f.inspection_id === inspectionId) : []);

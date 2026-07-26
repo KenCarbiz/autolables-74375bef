@@ -89,7 +89,7 @@ export default function VinCommandCenter() {
   // query, not just the render. The id stays in scope while entitlements settle
   // so the loader is not handed a fresh id after its first commit, which would
   // read as "vehicle not found" for one frame.
-  const { data, loading, error, errorDetail, notFound, degraded, reload, retryAutogenArtifact } = useVinCommand(
+  const { data, loading, error, errorDetail, notFound, degraded, reload, retryAutogenArtifact, dismissAutogenArtifact } = useVinCommand(
     entLoading || canView ? vehicleId : undefined,
   );
 
@@ -102,6 +102,17 @@ export default function VinCommandCenter() {
       const res = await retryAutogenArtifact(exceptionId, artifact);
       if (!res.ok) { toast.error(res.error || "The retry failed"); return; }
       toast.success(`${label} re-drafted`);
+    } finally {
+      setRetryingKey(null);
+    }
+  };
+  const onDismissArtifact = async (exceptionId: string, artifact: string, label: string) => {
+    const key = `${exceptionId}:${artifact}:dismiss`;
+    setRetryingKey(key);
+    try {
+      const res = await dismissAutogenArtifact(exceptionId, artifact);
+      if (!res.ok) { toast.error(res.error || "The dismissal failed"); return; }
+      toast.success(`${label} dismissed — no longer applies`);
     } finally {
       setRetryingKey(null);
     }
@@ -489,6 +500,7 @@ export default function VinCommandCenter() {
                   {data.autogenExceptions.map((ex) => {
                     const key = `${ex.exceptionId}:${ex.artifact}`;
                     const running = retryingKey === key;
+                    const dismissing = retryingKey === `${key}:dismiss`;
                     return (
                       <CommandCallout
                         key={key}
@@ -496,21 +508,38 @@ export default function VinCommandCenter() {
                         Icon={AlertTriangle}
                         title={ex.label}
                         action={
-                          <CommandAction
-                            variant="link"
-                            busy={running}
-                            disabledReason={
-                              running ? "This retry is already running."
-                              : retryingKey ? "Another retry is already running."
-                              : ex.retryRpc ? null
-                              // Honest per artifact: sweep-covered rows say a
-                              // sweep retries them; edge-only rows say nothing
-                              // will, instead of promising a background rebuild.
-                              : ex.noRetryReason
-                            }
-                            onClick={() => onRetryArtifact(ex.exceptionId, ex.artifact, ex.label)}>
-                            Retry
-                          </CommandAction>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <CommandAction
+                              variant="link"
+                              busy={running}
+                              disabledReason={
+                                running ? "This retry is already running."
+                                : retryingKey ? "Another retry or dismissal is already running."
+                                : ex.retryRpc ? null
+                                // Honest per artifact: sweep-covered rows say a
+                                // sweep retries them; edge-only rows say nothing
+                                // will, instead of promising a background rebuild.
+                                : ex.noRetryReason
+                              }
+                              onClick={() => onRetryArtifact(ex.exceptionId, ex.artifact, ex.label)}>
+                              Retry
+                            </CommandAction>
+                            {/* The retry's NULL path (the vehicle no longer
+                                qualifies) used to be resolvable only from the
+                                queue page — this closes it in place. */}
+                            <CommandAction
+                              variant="link"
+                              capability="resolve_exceptions"
+                              busy={dismissing}
+                              disabledReason={
+                                dismissing ? "This dismissal is already running."
+                                : retryingKey ? "Another retry or dismissal is already running."
+                                : null
+                              }
+                              onClick={() => onDismissArtifact(ex.exceptionId, ex.artifact, ex.label)}>
+                              Dismiss — no longer applies
+                            </CommandAction>
+                          </div>
                         }>
                         {ex.message}
                       </CommandCallout>

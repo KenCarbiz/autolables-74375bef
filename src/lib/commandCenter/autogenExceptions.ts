@@ -37,6 +37,8 @@ const ARTIFACT_LABEL: Record<string, string> = {
   title_request_email: "Title request email",
   ingest_orchestrate: "Recon orchestration",
   description: "Description generation",
+  stock_number: "Stock number",
+  intake_incomplete: "Intake orchestration (queued)",
 };
 
 // Why a row without a retry RPC has no Retry button — honest per artifact.
@@ -52,6 +54,8 @@ const ARTIFACT_NO_RETRY_REASON: Record<string, string> = {
   form_pdfs: "The official form PDFs are not retried by any sweep. Regenerate them from this vehicle's Print Center document list.",
   oem_window_sticker: "The OEM window sticker lookup runs once at ingest and is not retried by any sweep. Resolve it from the exception queue.",
   title_request_email: "The title request email is sent once at intake and is not retried by any sweep. Send it manually, then resolve this from the exception queue.",
+  stock_number: "Re-enter the stock number on the vehicle file. No sweep retries it.",
+  intake_incomplete: "The import was interrupted before this vehicle's intake finished. The nightly intake sweep completes the drafts — no manual retry is needed here.",
 };
 
 export const artifactRetryRpc = (artifact: string): string | null =>
