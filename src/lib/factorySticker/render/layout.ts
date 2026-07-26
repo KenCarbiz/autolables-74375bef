@@ -482,10 +482,12 @@ function paintTopStrip(p: Painter, ctx: BuildContext): number {
     cx += measureText(value, "bold", size) + 14;
   }
 
-  const stock = v.stockNumber ? `  ${v.stockNumber}` : "";
-  p.text(`VIN: ${v.vin}`, RX + 4, baseline, 6.6, "bold", BLACK);
-  if (stock.trim()) {
-    p.text(stock.trim(), IR, baseline, size, "body", BLACK, { align: "right" });
+  // The bare VIN is its own drawn string: the orchestrator QA contract
+  // asserts drawnStrings contains the exact VIN with no prefix.
+  p.text("VIN:", RX + 4, baseline, 6.6, "bold", BLACK);
+  p.text(v.vin, RX + 4 + measureText("VIN: ", "bold", 6.6), baseline, 6.6, "bold", BLACK);
+  if (v.stockNumber) {
+    p.text(v.stockNumber, IR, baseline, size, "body", BLACK, { align: "right" });
   }
 
   const ruleY = baseline + 4.5;
@@ -862,13 +864,7 @@ function paintVinBarcode(p: Painter, y: number, ctx: BuildContext): number {
   p.rect(LX, y, boxW, boxH, null, BLACK, 0.7);
   p.text(`VIN: ${v.vin}`, LX + 5, y + 9, 7, "bold", BLACK);
   if (showBarcode) {
-    const barW = boxW * 0.62;
-    p.barcode(LX + 5, y + 13, barW, 32, input.barcodePayload, BLACK);
-    // The bare VIN under the bars is part of the render QA contract: the
-    // orchestrator asserts drawnStrings contains the exact VIN.
-    p.text(v.vin, LX + 5 + barW / 2, y + 52, 6, "body", BLACK, { align: "center" });
-  } else {
-    p.text(v.vin, LX + boxW - 5, y + 9, 7, "body", BLACK, { align: "right" });
+    p.barcode(LX + 5, y + 14, boxW * 0.62, 36, input.barcodePayload, BLACK);
   }
   return y + boxH;
 }
@@ -1035,9 +1031,16 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   paintRatingSlider(p, sliderX, subTop + 3, sliderW * 0.58, "Fuel Economy & Greenhouse Gas Rating", reg.greenhouseGasRating, ctx.theme);
   paintRatingSlider(p, sliderX + sliderW * 0.66, subTop + 3, sliderW * 0.34, "Smog Rating (tailpipe only)", reg.smogRating, ctx.theme);
 
-  // Fine print.
+  // Fine print. CO2 grams per mile derives from the EPA constant of 8,887 g
+  // CO2 per gallon of gasoline at the verified combined MPG — computed, not
+  // asserted, and only for fuel-burning vehicles.
   let fy = subTop + costBoxH + 10;
+  const isGas = !/electric|ev\b/.test((input.data.vehicle.fuelType || "").toLowerCase());
+  const co2 = combined !== undefined && combined > 0 && isGas ? Math.round(8887 / combined) : null;
   const finePrint =
+    (co2 !== null
+      ? `This vehicle emits ${co2} grams CO2 per mile. The best emits 0 grams per mile (tailpipe only). Producing and distributing fuel also create emissions. `
+      : "") +
     "Actual results will vary for many reasons, including driving conditions and how you drive and maintain your vehicle. " +
     "Cost estimates are based on 15,000 miles per year at $3.00 per gallon. MPGe is miles per gasoline gallon equivalent. " +
     "Vehicle emissions are a significant cause of climate change and smog.";
