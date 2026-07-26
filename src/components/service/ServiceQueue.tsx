@@ -62,6 +62,7 @@ interface Row {
   assignedName: string | null;
   inspectionId: string | null;
   inspectionStatus: string | null;
+  requestStatus: "pending" | "clarify" | "approved" | null;
   ageHours: number;
   openFailures: number;
   readySince: string | null;
@@ -96,6 +97,9 @@ const TABS: { key: string; label: string }[] = [
   { key: "get_ready", label: "Get Ready" },
   { key: "in_progress", label: "In Progress" },
   { key: "failed", label: "Failed" },
+  { key: "waiting_manager", label: "Waiting for Manager" },
+  { key: "authorized", label: "Authorized Work" },
+  { key: "returned", label: "Returned" },
   { key: "reinspect", label: "Reinspect" },
   { key: "ready_to_sign", label: "Ready to Sign" },
   { key: "pending_clearance", label: "Pending Clearance" },
@@ -164,7 +168,8 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
         vins.length ? sb().from("safety_inspections").select("id, vin, status, result, inspection_state, assigned_to, licensee_certified_at, signed_at, created_at").eq("tenant_id", tenant.id).in("vin", vins).order("created_at", { ascending: false }) : empty,
         // 'clarify' rows are still-open requests (waiting on the requester's
         // answer), not decided ones — they must not vanish from the queue.
-        vins.length ? sb().from("service_requests").select("vin").eq("tenant_id", tenant.id).in("status", ["pending", "clarify"]).in("vin", vins) : empty,
+        // Approved rows feed the Authorized Work bucket.
+        vins.length ? sb().from("service_requests").select("vin, status").eq("tenant_id", tenant.id).in("status", ["pending", "clarify", "approved", "approved_limit"]).in("vin", vins) : empty,
         vins.length ? sb().from("safety_inspection_item_failures").select("vin, inspection_id, repair_state").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         vins.length ? sb().from("vehicle_delivery_clearance").select("vin, state, reason_codes").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         sb().rpc("list_tenant_members", { p_tenant_id: tenant.id }),
@@ -197,7 +202,15 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
         }
       }
 
-      const awaitingVins = new Set<string>(((srRes.data as { vin: string }[]) || []).map((r) => r.vin));
+      const reqRows = (srRes.data as { vin: string; status: string }[]) || [];
+      const awaitingVins = new Set<string>(reqRows.filter((r) => r.status === "pending" || r.status === "clarify").map((r) => r.vin));
+      // Newest-wins per VIN by precedence: pending > clarify > approved.
+      const reqByVin = new Map<string, "pending" | "clarify" | "approved">();
+      for (const r of reqRows) {
+        const cur = reqByVin.get(r.vin);
+        const next = r.status === "approved_limit" ? "approved" : (r.status as "pending" | "clarify" | "approved");
+        if (!cur || next === "pending" || (next === "clarify" && cur === "approved")) reqByVin.set(r.vin, next);
+      }
       // Failure counts are scoped to the NEWEST SIGNED inspection per VIN — a
       // VIN-wide aggregate lets an older inspection's resolved rows turn a
       // fresh signed FAIL (whose per-item filing errored) amber and hide the
@@ -306,6 +319,7 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
           assignedName: active?.assigned_to ? memberById.get(active.assigned_to) ?? null : null,
           inspectionId: (active?.id as string) || null,
           inspectionStatus: (active?.status as string) || null,
+          requestStatus: reqByVin.get(v.vin) ?? null,
           ageHours,
           openFailures: fails.open,
           readySince: s.k208State === "ready" ? ((signed?.signed_at as string) || null) : null,
@@ -376,6 +390,9 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
     return rows.filter((r) => {
       if (tab === "overdue") { if (!r.overdue) return false; }
       else if (tab === "pending") { if (r.cleared || r.k208State === "executed") return false; }
+      else if (tab === "waiting_manager") { if (r.requestStatus !== "pending") return false; }
+      else if (tab === "returned") { if (r.requestStatus !== "clarify") return false; }
+      else if (tab === "authorized") { if (r.requestStatus !== "approved" || r.cleared) return false; }
       else if (tab !== "all" && r.bucket !== tab) return false;
       if (techFilter === "unassigned" && r.assignedTo) return false;
       if (techFilter !== "any" && techFilter !== "unassigned" && r.assignedTo !== techFilter) return false;
@@ -398,14 +415,21 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
     const active = (r: Row) => !r.cleared && r.k208State !== "executed";
     const term = q.trim().toLowerCase();
     const match = (r: Row) => !term || `${r.ymm} ${r.vin} ${r.stock}`.toLowerCase().includes(term);
-    const inProgressMine = rows.filter((r) => match(r) && active(r) && r.assignedTo === uid && r.inspectionState === "in_progress");
-    const assignedMine = rows.filter((r) => match(r) && active(r) && r.assignedTo === uid && r.k208State !== "voided" && r.inspectionState !== "in_progress");
+    const inLoop = (r: Row) => r.requestStatus != null;
+    const inProgressMine = rows.filter((r) => match(r) && active(r) && !inLoop(r) && r.assignedTo === uid && r.inspectionState === "in_progress");
+    const assignedMine = rows.filter((r) => match(r) && active(r) && !inLoop(r) && r.assignedTo === uid && r.k208State !== "voided" && r.inspectionState !== "in_progress");
     const returnedMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.k208State === "voided");
     const unassigned = rows.filter((r) => match(r) && active(r) && !r.assignedTo && r.k208State === "waiting");
     const doneTodayMine = rows.filter((r) => match(r) && r.completedToday && r.assignedTo === uid);
+    const waitingManagerMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.requestStatus === "pending");
+    const clarifyMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.requestStatus === "clarify");
+    const authorizedMine = rows.filter((r) => match(r) && !r.cleared && r.assignedTo === uid && r.requestStatus === "approved");
     const sections: { title: string; hint: string; items: Row[] }[] = [
       { title: "Assigned to me", hint: "Vehicles waiting on you to start", items: assignedMine },
       { title: "In progress", hint: "Inspections you have started", items: inProgressMine },
+      { title: "Waiting for manager", hint: "Your authorization requests awaiting a decision", items: waitingManagerMine },
+      { title: "Authorized work", hint: "Approved repairs to complete and verify", items: authorizedMine },
+      { title: "Returned for clarification", hint: "The manager needs more information from you", items: clarifyMine },
       { title: "Returned to me", hint: "Voided inspections that must be corrected", items: returnedMine },
       { title: "Unassigned & available", hint: "No technician yet — first to start takes it", items: unassigned },
       { title: "Completed today", hint: "Certified today", items: doneTodayMine },
