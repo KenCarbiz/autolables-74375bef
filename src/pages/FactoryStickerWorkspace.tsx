@@ -9,7 +9,13 @@ import { buildRenderLayout } from "@/lib/factorySticker/render/contract.ts";
 import type { FactoryStickerRenderData, FactoryStickerTheme } from "@/lib/factorySticker/render/contract.ts";
 import { layoutToSvg } from "@/lib/factorySticker/render/previewSvg.ts";
 import type { LayoutModel } from "@/lib/factorySticker/render/layout.ts";
-import { infinitiBenchmark, themeFor } from "@/lib/factorySticker/render/__fixtures__/renderData.ts";
+import {
+  genericDecodeFixture,
+  infinitiBenchmark,
+  longEquipmentFixture,
+  newConditionBenchmark,
+  themeFor,
+} from "@/lib/factorySticker/render/__fixtures__/renderData.ts";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Download,
@@ -126,6 +132,13 @@ const StatusRow = ({ label, value, tone }: { label: string; value: React.ReactNo
   </div>
 );
 
+const FIXTURE_SCENARIOS = {
+  used: { label: "Used QX80", data: infinitiBenchmark },
+  new: { label: "New vehicle", data: newConditionBenchmark },
+  generic: { label: "Generic decode", data: genericDecodeFixture },
+  twopage: { label: "Two-page overflow", data: longEquipmentFixture },
+} as const;
+
 const GEN_STATUS_TONE: Record<string, Tone> = {
   PUBLISHED: "pass", APPROVED: "info", REVIEW_REQUIRED: "warn", PENDING_DATA: "warn",
   READY_TO_GENERATE: "info", GENERATING: "info", NORMALIZING: "info", VALIDATING: "info",
@@ -147,6 +160,7 @@ export default function FactoryStickerWorkspace({ fixture = false }: { fixture?:
   const [busy, setBusy] = useState<string | null>(null);
   const [pageIdx, setPageIdx] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
+  const [scenario, setScenario] = useState<keyof typeof FIXTURE_SCENARIOS>("used");
 
   const load = useCallback(async () => {
     if (fixture || !vehicleId) return;
@@ -186,7 +200,7 @@ export default function FactoryStickerWorkspace({ fixture = false }: { fixture?:
   useEffect(() => { load(); }, [load]);
 
   const renderInput = useMemo((): { data: FactoryStickerRenderData; theme: FactoryStickerTheme } | null => {
-    if (fixture) return { data: infinitiBenchmark(), theme: themeFor("INFINITI") };
+    if (fixture) return { data: FIXTURE_SCENARIOS[scenario].data(), theme: themeFor("INFINITI") };
     if (!record?.normalized_data_json) return null;
     return {
       data: record.normalized_data_json,
@@ -210,6 +224,8 @@ export default function FactoryStickerWorkspace({ fixture = false }: { fixture?:
       return null;
     }
   }, [renderInput]);
+
+  useEffect(() => { setPageIdx(0); }, [scenario]);
 
   const pageSvg = useMemo(() => {
     if (!model) return null;
@@ -321,9 +337,27 @@ export default function FactoryStickerWorkspace({ fixture = false }: { fixture?:
     <div className={fixture ? "min-h-screen bg-slate-100 p-4 md:p-6" : "p-4 md:p-6"}>
       <div className="max-w-[1600px] mx-auto space-y-4">
         {fixture && (
-          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-[12px] font-semibold text-amber-800">
-            Fixture preview — INFINITI QX80 benchmark data rendered live by renderer v1.0.0. This is not a live
-            vehicle record; publication actions are disabled. Identity checks below are computed against this render.
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 space-y-2">
+            <p className="text-[12px] font-semibold text-amber-800">
+              Fixture preview — INFINITI QX80 benchmark data rendered live by renderer v1.0.0. This is not a live
+              vehicle record; publication actions are disabled. Identity checks below are computed against this render.
+            </p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(Object.keys(FIXTURE_SCENARIOS) as Array<keyof typeof FIXTURE_SCENARIOS>).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setScenario(key)}
+                  className={`h-7 px-2.5 rounded-md text-[11px] font-bold border ${
+                    scenario === key
+                      ? "bg-amber-800 text-white border-amber-800"
+                      : "bg-white text-amber-800 border-amber-300 hover:bg-amber-100"
+                  }`}
+                >
+                  {FIXTURE_SCENARIOS[key].label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
