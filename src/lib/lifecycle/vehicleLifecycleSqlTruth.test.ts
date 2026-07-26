@@ -162,3 +162,38 @@ describe("freshness + hygiene (L4)", () => {
     expect(body).toContain("on conflict (tenant_id, vehicle_id) do nothing");
   });
 });
+
+describe("authorize_vehicle_for_get_ready — the atomic release (L5)", () => {
+  const sql = latestText(/CREATE OR REPLACE FUNCTION public\.authorize_vehicle_for_get_ready/);
+  const body = norm(sql);
+
+  it("locks the row and enforces manager authority for interactive callers", () => {
+    expect(body).toContain("for update");
+    expect(body).toContain("'owner','general_manager','gsm','admin','manager','used_car_manager','inventory_manager','sales_manager'");
+  });
+
+  it("is double-release-proof: an authorized vehicle returns already_authorized, never a second dispatch", () => {
+    expect(body).toContain("'already_authorized'");
+    expect(body).toContain("v_row.authorized_at is not null");
+  });
+
+  it("only releases from the pre-authorization states", () => {
+    expect(body).toContain("not in ('awaiting_manager_authorization','ingested','preload_running','preload_exception')");
+    expect(body).toContain("'not_awaiting'");
+  });
+
+  it("audits the release and notifies the service team once per VIN", () => {
+    expect(body).toContain("vehicle_authorized_for_get_ready");
+    expect(body).toContain("'vehicle_released_to_service'");
+    expect(body).toContain("on conflict (dedupe_key) do nothing");
+  });
+
+  it("re-review clears the one-shot stamp so a deliberate second release is possible", () => {
+    expect(body).toContain("new.authorized_at := null");
+  });
+
+  it("arrival notice: gate-born rows notify intake authority once per VIN and swallow their own errors", () => {
+    expect(body).toContain("'new_vehicle_arrived'");
+    expect(body).toContain("exception when others then null");
+  });
+});
