@@ -65,10 +65,39 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function loadTemplate(base: string, name: string): Promise<ArrayBuffer> {
+// compliance_form_templates registry keys per bundled template file. The
+// fallback version is only used when the registry has no active row (e.g. a
+// project where the migration hasn't landed); when a row exists, its pinned
+// hash MUST match the fetched bytes or the fill fails — never silently fill a
+// wrong-revision government form.
+const TEMPLATE_KEYS: Record<string, string> = {
+  "ftc-buyers-guide-en.pdf": "ftc-buyers-guide-en",
+  "ftc-buyers-guide-es.pdf": "ftc-buyers-guide-es",
+  "k208-inspection.pdf": "ct-k208",
+};
+const FALLBACK_TEMPLATE_VERSION = "2026.07.1";
+
+interface VerifiedTemplate { bytes: ArrayBuffer; version: string; contentHash: string; verified: boolean }
+
+// deno-lint-ignore no-explicit-any
+async function loadTemplate(admin: any, base: string, name: string): Promise<VerifiedTemplate> {
   const res = await fetch(`${base}/forms/${name}`);
   if (!res.ok) throw new Error(`template ${name} ${res.status} from ${base}`);
-  return await res.arrayBuffer();
+  const bytes = await res.arrayBuffer();
+  const contentHash = await sha256Hex(new Uint8Array(bytes));
+  const key = TEMPLATE_KEYS[name];
+  const { data: reg } = await admin.from("compliance_form_templates")
+    .select("version, content_hash").eq("template_key", key).is("retired_at", null).maybeSingle();
+  const registered = (reg || null) as { version: string; content_hash: string } | null;
+  if (registered?.content_hash) {
+    if (registered.content_hash !== contentHash) {
+      throw new Error(
+        `template drift: ${name} sha256 ${contentHash.slice(0, 12)}… does not match registered ${key}@${registered.version} (${registered.content_hash.slice(0, 12)}…)`,
+      );
+    }
+    return { bytes, version: registered.version, contentHash, verified: true };
+  }
+  return { bytes, version: FALLBACK_TEMPLATE_VERSION, contentHash, verified: false };
 }
 
 // deno-lint-ignore no-explicit-any
@@ -93,8 +122,8 @@ const COVERED_SYSTEMS = [
   "Electrical — Alternator, voltage regulator, starter, ignition switch, and electronic ignition.",
 ];
 
-async function fillFtc(base: string, box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
-  const pdf = await PDFDocument.load(await loadTemplate(base, "ftc-buyers-guide-en.pdf"));
+async function fillFtc(tpl: ArrayBuffer, box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(tpl);
   const form = pdf.getForm();
   const implied = box === "implied";
   const sub = implied ? "topmostSubform[0].BG-Implied[0]" : "topmostSubform[0].BG-AsIs[0]";
@@ -135,8 +164,8 @@ async function fillFtc(base: string, box: string, pct: number, days: number, mil
 // artwork at measured coordinates (validated against the rendered form). Only
 // the blanks are drawn; the form itself is never altered. Pages: 0 As-Is front,
 // 1 Implied front, 2 back. Coordinates are PDF points, origin bottom-left.
-async function fillFtcEs(base: string, box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
-  const pdf = await PDFDocument.load(await loadTemplate(base, "ftc-buyers-guide-es.pdf"));
+async function fillFtcEs(tpl: ArrayBuffer, box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(tpl);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const black = rgb(0, 0, 0);
@@ -186,8 +215,8 @@ function initialsOf(name?: string | null): string {
   return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
 
-async function fillK208(base: string, v: Vehicle, d: Dealer, opts?: { initial?: string; licenseeName?: string }): Promise<Uint8Array> {
-  const pdf = await PDFDocument.load(await loadTemplate(base, "k208-inspection.pdf"));
+async function fillK208(tpl: ArrayBuffer, v: Vehicle, d: Dealer, opts?: { initial?: string; licenseeName?: string }): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(tpl);
   const form = pdf.getForm();
   setText(form, "FillText1", v.year);
   setText(form, "FillText6", v.make);
@@ -231,10 +260,12 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
   if (signErr || !signed?.signedUrl) throw new Error(`signed url failed (${BUCKET}/${path}): ${signErr?.message || "no url returned"}`);
   const url = signed.signedUrl;
   try {
-    await admin.from("signed_document_archive").insert({
+    // Idempotent: a byte-identical artifact for the same entity is the same
+    // archive record (ux_signed_document_archive_unique_artifact).
+    await admin.from("signed_document_archive").upsert({
       tenant_id: tenantId, doc_type: docType, entity_id: vehicleId || vin, vin,
       storage_path: path, storage_bucket: BUCKET, content_hash: hash, byte_size: bytes.length,
-    });
+    }, { onConflict: "tenant_id,doc_type,entity_id,content_hash", ignoreDuplicates: true });
   } catch { /* archive best-effort */ }
   // Keyed upsert: ONE row per (tenant, vehicle, doc type) through the whole draft
   // phase — overwrite it in place on every re-fill instead of minting a new
@@ -276,11 +307,28 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
 
     // Locked + changed (or none yet) → mint a new immutable version.
     const nextVersion = rows.reduce((m, r) => Math.max(m, r.version || 0), 0) + 1;
-    const { data: inserted } = await admin.from("generated_documents").insert({
+    const { data: inserted, error: insErr } = await admin.from("generated_documents").insert({
       tenant_id: tenantId, vehicle_id: vehicleId, template_id: docType === "k208" ? "ct-k208" : "ftc-buyers-guide",
       document_type: docType, document_status: "draft", version: nextVersion, template_version: 1,
       online_url: url, pdf_url: url, data_snapshot: snap,
     }).select("id").maybeSingle();
+    if (insErr) {
+      // Race: a concurrent fill minted the live draft first
+      // (ux_generated_documents_one_live_compliance_draft) — fold into it.
+      if (insErr.code === "23505") {
+        const { data: race } = await admin.from("generated_documents").select("id")
+          .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("document_type", docType)
+          .in("document_status", ["draft", "pending_approval"]).maybeSingle();
+        const raceId = (race as { id?: string } | null)?.id;
+        if (raceId) {
+          await admin.from("generated_documents")
+            .update({ online_url: url, pdf_url: url, data_snapshot: snap, updated_at: new Date().toISOString() })
+            .eq("id", raceId);
+          return url;
+        }
+      }
+      throw new Error(`generated_documents insert failed: ${insErr.message}`);
+    }
     const newId = (inserted as { id?: string } | null)?.id;
     if (newId && liveRows.length) {
       await admin.from("generated_documents")
@@ -349,10 +397,13 @@ Deno.serve(async (req) => {
     const pct = Number(snap.min_pct) || 0, dd = Number(snap.min_duration_days) || 0, mi = Number(snap.min_miles) || 0;
 
     if (kinds.includes("buyers_guide")) {
+      const tpl = await loadTemplate(admin, appBase, lang === "es" ? "ftc-buyers-guide-es.pdf" : "ftc-buyers-guide-en.pdf");
       const bytes = lang === "es"
-        ? await fillFtcEs(appBase, effBox, pct, dd, mi, vehicle, dealer)
-        : await fillFtc(appBase, effBox, pct, dd, mi, vehicle, dealer);
-      out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year, { box: effBox, lang, template_version: "2026.07.1" });
+        ? await fillFtcEs(tpl.bytes, effBox, pct, dd, mi, vehicle, dealer)
+        : await fillFtc(tpl.bytes, effBox, pct, dd, mi, vehicle, dealer);
+      out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year, {
+        box: effBox, lang, template_version: tpl.version, template_content_hash: tpl.contentHash, template_verified: tpl.verified,
+      });
     }
     if (kinds.includes("k208") && ["used", "cpo", "certified"].includes(String(listing.condition || "used").toLowerCase())) {
       // A/B/C: the licensee's certified result when present, else derive from the
@@ -365,8 +416,11 @@ Deno.serve(async (req) => {
         .order("signed_at", { ascending: false }).limit(1).maybeSingle();
       const certInitial = ["A", "B", "C"].includes(String(si?.result_initial)) ? String(si!.result_initial) : "";
       const initial = certInitial || (effBox === "as-is" ? "B" : (effBox === "warranty" || effBox === "implied") ? "A" : "");
-      const bytes = await fillK208(appBase, vehicle, dealer, { initial, licenseeName: si?.licensee_name || "" });
-      out.k208 = await fileForm(admin, tenantId, vin, listing.id as string, "k208", bytes, vehicle.year, { template_version: "2026.07.1", result_initial: initial });
+      const tpl = await loadTemplate(admin, appBase, "k208-inspection.pdf");
+      const bytes = await fillK208(tpl.bytes, vehicle, dealer, { initial, licenseeName: si?.licensee_name || "" });
+      out.k208 = await fileForm(admin, tenantId, vin, listing.id as string, "k208", bytes, vehicle.year, {
+        template_version: tpl.version, template_content_hash: tpl.contentHash, template_verified: tpl.verified, result_initial: initial,
+      });
     }
   } catch (e) {
     return json(500, { ok: false, error: String((e as Error)?.message || e) });
