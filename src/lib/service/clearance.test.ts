@@ -6,6 +6,9 @@ import { CLEARANCE_STATES, CLEARANCE_REASON_CODES, deriveClearance } from "./cle
 const MIGRATION = readFileSync(
   join(__dirname, "../../../supabase/migrations/20260726104000_delivery_clearance.sql"),
   "utf8",
+) + readFileSync(
+  join(__dirname, "../../../supabase/migrations/20260727000000_safety_request_clearance_enforcement.sql"),
+  "utf8",
 );
 
 const base = {
