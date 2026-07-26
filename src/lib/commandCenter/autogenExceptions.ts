@@ -39,8 +39,29 @@ const ARTIFACT_LABEL: Record<string, string> = {
   description: "Description generation",
 };
 
+// Why a row without a retry RPC has no Retry button — honest per artifact.
+// The nightly intake sweep re-runs only the draft RPCs and the hub token, and
+// recon/description have their own sweeps. The three edge-only artifacts
+// (form_pdfs, oem_window_sticker, title_request_email) are fired once at
+// ingest and are retried by nothing, so claiming a background task rebuilds
+// them promised a retry that never comes.
+const ARTIFACT_NO_RETRY_REASON: Record<string, string> = {
+  get_ready_token: "The Get-Ready QR token is re-minted by the nightly intake sweep — no manual retry is needed here.",
+  ingest_orchestrate: "Recon orchestration is re-run by its nightly sweep — no manual retry is needed here.",
+  description: "Description generation is re-run by the nightly description reconcile sweep — no manual retry is needed here.",
+  form_pdfs: "The official form PDFs are not retried by any sweep. Regenerate them from this vehicle's Print Center document list.",
+  oem_window_sticker: "The OEM window sticker lookup runs once at ingest and is not retried by any sweep. Resolve it from the exception queue.",
+  title_request_email: "The title request email is sent once at intake and is not retried by any sweep. Send it manually, then resolve this from the exception queue.",
+};
+
 export const artifactRetryRpc = (artifact: string): string | null =>
   ARTIFACT_RETRY_RPC[artifact] ?? null;
+
+export const artifactNoRetryReason = (artifact: string): string | null =>
+  ARTIFACT_RETRY_RPC[artifact]
+    ? null
+    : ARTIFACT_NO_RETRY_REASON[artifact]
+      ?? "This artifact has no in-app retry. Resolve it from the exception queue.";
 
 export const artifactLabel = (artifact: string): string =>
   ARTIFACT_LABEL[artifact]
@@ -53,6 +74,8 @@ export interface AutogenExceptionRow {
   message: string;
   /** The draft RPC a Retry button re-invokes, or null when only the queue can. */
   retryRpc: string | null;
+  /** Why there is no Retry button, when retryRpc is null. Honest per artifact. */
+  noRetryReason: string | null;
 }
 
 export interface VehicleExceptionRecord {
@@ -85,6 +108,7 @@ export function buildAutogenExceptionRows(rows: VehicleExceptionRecord[]): Autog
         label: String(row.title || "Intake auto-generation failed"),
         message: String(row.explanation || "An intake artifact failed to generate."),
         retryRpc: null,
+        noRetryReason: "This exception predates per-artifact retries. Resolve it from the exception queue.",
       });
       continue;
     }
@@ -95,6 +119,7 @@ export function buildAutogenExceptionRows(rows: VehicleExceptionRecord[]): Autog
         label: artifactLabel(name),
         message: String(artifacts[name] ?? "unknown error"),
         retryRpc: artifactRetryRpc(name),
+        noRetryReason: artifactNoRetryReason(name),
       });
     }
   }

@@ -3,6 +3,7 @@ import {
   autoPreload,
   ensureComplianceDrafts,
   ensureReadyToken,
+  recommendedActionFor,
   recordArtifactFailure,
 } from "./intake-autoprovision";
 
@@ -12,6 +13,8 @@ import {
 
 interface TableState {
   maybeSingleResults: Array<{ data: unknown }>;
+  /** Served (FIFO) when a builder is awaited as a list read. */
+  listResults: Array<{ data: unknown; error?: { message: string } | null }>;
   inserts: Record<string, unknown>[];
   updates: Array<{ patch: Record<string, unknown>; filters: Record<string, unknown> }>;
 }
@@ -19,7 +22,7 @@ interface TableState {
 function makeAdmin(rpcErrors: Record<string, string> = {}) {
   const tables: Record<string, TableState> = {};
   const state = (t: string): TableState =>
-    (tables[t] ||= { maybeSingleResults: [], inserts: [], updates: [] });
+    (tables[t] ||= { maybeSingleResults: [], listResults: [], inserts: [], updates: [] });
   const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = [];
 
   const admin = {
@@ -34,6 +37,7 @@ function makeAdmin(rpcErrors: Record<string, string> = {}) {
         select: () => builder,
         eq: (k: string, v: unknown) => { filters[k] = v; return builder; },
         in: (k: string, v: unknown) => { filters[k] = v; return builder; },
+        not: () => builder,
         maybeSingle: async () => t.maybeSingleResults.shift() ?? { data: null },
         insert: async (row: Record<string, unknown>) => { t.inserts.push(row); return { data: null, error: null }; },
         update: (patch: Record<string, unknown>) => ({
@@ -42,6 +46,10 @@ function makeAdmin(rpcErrors: Record<string, string> = {}) {
             return { data: null, error: null };
           },
         }),
+        then: (onFulfilled: (v: { data: unknown; error: { message: string } | null }) => unknown) => {
+          const next = t.listResults.shift() ?? { data: [], error: null };
+          return Promise.resolve({ data: next.data, error: next.error ?? null }).then(onFulfilled);
+        },
       };
       return builder;
     },
@@ -98,6 +106,45 @@ describe("recordArtifactFailure", () => {
     };
     await expect(recordArtifactFailure(admin, "t1", "V", "a", "m")).resolves.toBeUndefined();
   });
+
+  it("claims the nightly sweep only for sweep-covered artifacts", async () => {
+    const { admin, state } = makeAdmin();
+    await recordArtifactFailure(admin, "t1", "VIN123", "buyers_guide", "boom");
+    const [row] = state("vehicle_exceptions").inserts;
+    expect(String(row.recommended_action)).toContain("nightly intake sweep will also retry");
+  });
+
+  it("tells the truth for an edge-only artifact: nothing retries it", async () => {
+    const { admin, state } = makeAdmin();
+    await recordArtifactFailure(admin, "t1", "VIN123", "form_pdfs", "http_500");
+    const [row] = state("vehicle_exceptions").inserts;
+    const action = String(row.recommended_action);
+    expect(action).not.toContain("sweep will also retry");
+    expect(action).toContain("will not retry on its own");
+    expect(action).toContain("form_pdfs");
+  });
+
+  it("recomputes the recommendation when an edge-only artifact merges into a sweep-covered row", async () => {
+    const { admin, state } = makeAdmin();
+    state("vehicle_exceptions").maybeSingleResults.push({
+      data: { id: "exc-1", source_values: { artifacts: { k208: "earlier" } } },
+    });
+    await recordArtifactFailure(admin, "t1", "VIN123", "oem_window_sticker", "later");
+    const [upd] = state("vehicle_exceptions").updates;
+    const action = String(upd.patch.recommended_action);
+    expect(action).toContain("nightly intake sweep will retry k208");
+    expect(action).toContain("oem_window_sticker will not retry on its own");
+  });
+});
+
+describe("recommendedActionFor", () => {
+  it("splits sweep-covered from edge-only artifacts honestly", () => {
+    expect(recommendedActionFor(["addendum", "get_ready_token"])).toContain("will also retry");
+    expect(recommendedActionFor(["title_request_email"])).toContain("will not retry on its own");
+    const mixed = recommendedActionFor(["window_sticker", "form_pdfs"]);
+    expect(mixed).toContain("will retry window_sticker");
+    expect(mixed).toContain("form_pdfs will not retry on its own");
+  });
 });
 
 describe("ensureReadyToken", () => {
@@ -142,6 +189,56 @@ describe("ensureComplianceDrafts", () => {
     expect((rows[0].source_values as { artifacts: Record<string, string> }).artifacts).toEqual({
       get_ready: "rls denied",
     });
+  });
+
+  it("fires generate-vehicle-forms on the resync path when a form draft was missing", async () => {
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "used" } });
+    // buyers_guide exists; the K-208 form doc does not — the drafts created
+    // here would otherwise sit file-less forever.
+    state("generated_documents").listResults.push({ data: [{ id: "d1", document_type: "buyers_guide" }] });
+    await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await flush();
+    expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
+      "https://x.supabase.co/functions/v1/generate-vehicle-forms",
+    ]);
+  });
+
+  it("does not re-render when both form documents already exist", async () => {
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "cpo" } });
+    state("generated_documents").listResults.push({
+      data: [{ id: "d1", document_type: "buyers_guide" }, { id: "d2", document_type: "k208" }],
+    });
+    await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("never renders for a new car or without a render target", async () => {
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "new" } });
+    await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await ensureComplianceDrafts(admin, "t1", "VIN456");
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips the render when the form-document read fails, instead of rendering blind", async () => {
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "used" } });
+    state("generated_documents").listResults.push({ data: null, error: { message: "denied" } });
+    await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

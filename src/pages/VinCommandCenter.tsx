@@ -479,8 +479,9 @@ export default function VinCommandCenter() {
 
             {/* Intake automation failures, one row per failed artifact
                 (vehicle_exceptions / artifact_autogen_failed). Retry re-invokes
-                the artifact's VIN-idempotent draft RPC; artifacts rebuilt by
-                background tasks say so and point at the queue. */}
+                the artifact's VIN-idempotent draft RPC; a row without one states
+                its honest reason — a sweep that covers it, or that nothing
+                retries it at all. */}
             {data.autogenExceptions.length > 0 && (
               <div className="mt-3">
                 <p className="text-[11.5px] font-semibold text-muted-foreground mb-1.5">Intake Exceptions</p>
@@ -502,7 +503,10 @@ export default function VinCommandCenter() {
                               running ? "This retry is already running."
                               : retryingKey ? "Another retry is already running."
                               : ex.retryRpc ? null
-                              : "This artifact is rebuilt by a background task — retry it from the exception queue."
+                              // Honest per artifact: sweep-covered rows say a
+                              // sweep retries them; edge-only rows say nothing
+                              // will, instead of promising a background rebuild.
+                              : ex.noRetryReason
                             }
                             onClick={() => onRetryArtifact(ex.exceptionId, ex.artifact, ex.label)}>
                             Retry

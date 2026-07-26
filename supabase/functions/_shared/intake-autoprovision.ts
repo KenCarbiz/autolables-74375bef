@@ -32,6 +32,29 @@ export interface AutoPreloadInput {
 
 const EXCEPTION_TYPE = "artifact_autogen_failed";
 
+// What actually retries a failed artifact. The nightly intake sweep
+// (sweep_missing_intake_drafts) re-runs only the draft RPCs and the hub token,
+// and recon/description have their own sweeps. The edge-only artifacts
+// (form_pdfs, oem_window_sticker, title_request_email) are fired once at
+// ingest and retried by nothing — claiming "the nightly sweep will also retry"
+// for them promised a retry that never comes.
+const SWEEP_RETRIED = new Set([
+  "addendum", "buyers_guide", "k208", "get_ready", "window_sticker",
+  "get_ready_token", "ingest_orchestrate", "description",
+]);
+
+export function recommendedActionFor(artifacts: string[]): string {
+  const sweep = artifacts.filter((a) => SWEEP_RETRIED.has(a));
+  const edge = artifacts.filter((a) => !SWEEP_RETRIED.has(a));
+  if (edge.length === 0) {
+    return "Retry from the vehicle intake summary; the nightly intake sweep will also retry.";
+  }
+  if (sweep.length === 0) {
+    return `Retry from the vehicle intake summary. No nightly sweep re-runs ${edge.join(", ")} — it will not retry on its own.`;
+  }
+  return `Retry from the vehicle intake summary. The nightly intake sweep will retry ${sweep.join(", ")}, but ${edge.join(", ")} will not retry on its own.`;
+}
+
 const hex16 = () => {
   const a = new Uint8Array(16);
   crypto.getRandomValues(a);
@@ -63,11 +86,15 @@ export async function recordArtifactFailure(
       .maybeSingle();
     if (existing?.id) {
       const prev = ((existing.source_values || {}) as { artifacts?: Record<string, string> }).artifacts || {};
+      const merged = { ...prev, [artifact]: message };
       await admin.from("vehicle_exceptions").update({
         severity: "high",
         title: `Intake auto-generation failed: ${artifact}`,
         explanation: `Automatic creation of "${artifact}" failed: ${message}`,
-        source_values: { ...(existing.source_values || {}), artifacts: { ...prev, [artifact]: message } },
+        source_values: { ...(existing.source_values || {}), artifacts: merged },
+        // Recomputed over the merged set: a row that gains an edge-only
+        // artifact must stop promising the sweep will retry everything.
+        recommended_action: recommendedActionFor(Object.keys(merged)),
       }).eq("id", existing.id);
       return;
     }
@@ -77,7 +104,7 @@ export async function recordArtifactFailure(
       title: `Intake auto-generation failed: ${artifact}`,
       explanation: `Automatic creation of "${artifact}" failed: ${message}. Ingestion continued without this artifact.`,
       source_values: { artifacts: { [artifact]: message } },
-      recommended_action: "Retry from the vehicle intake summary; the nightly intake sweep will also retry.",
+      recommended_action: recommendedActionFor([artifact]),
       status: "open",
     });
   } catch { /* exception recording is best-effort — never break ingest */ }
@@ -139,14 +166,56 @@ export async function ensureReadyToken(
   }
 }
 
+/** How ensureComplianceDrafts reaches generate-vehicle-forms on the resync path. */
+export interface RenderTarget { supabaseUrl: string; serviceKey: string }
+
 // Ensure the compliance drafts exist for a used/CPO vehicle on EVERY sync —
 // not just first insert. Each RPC is VIN-idempotent and no-ops for new cars,
 // so re-syncs safely backfill inventory that predates the autogen flow.
-export async function ensureComplianceDrafts(admin: Admin, tenantId: string, vin: string): Promise<void> {
+//
+// When `render` is passed (the resync/backfill path — autoPreload fires
+// generate-vehicle-forms itself and passes nothing), a form draft newly
+// created here also gets its render: without it, a backfilled Buyers Guide /
+// K-208 draft sat file-less forever, because generate-vehicle-forms only ran
+// on first ingest. Fire-and-forget; a failure is recorded as form_pdfs.
+export async function ensureComplianceDrafts(
+  admin: Admin, tenantId: string, vin: string, render?: RenderTarget,
+): Promise<void> {
+  // Before the idempotent RPCs run, ask whether the vehicle is missing either
+  // form document generate-vehicle-forms fills. Best-effort: an undecidable
+  // read skips the render rather than re-rendering every vehicle every night.
+  let needsFormRender = false;
+  if (render) {
+    try {
+      const { data: listing } = await admin.from("vehicle_listings")
+        .select("id, condition")
+        .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
+      const cond = String(listing?.condition || "used").toLowerCase();
+      if (listing?.id && ["used", "cpo", "certified"].includes(cond)) {
+        const { data: formDocs, error } = await admin.from("generated_documents")
+          .select("id, document_type")
+          .eq("tenant_id", tenantId).eq("vehicle_id", listing.id)
+          .in("document_type", ["buyers_guide", "k208"])
+          .not("document_status", "in", '("superseded","archived","rejected")');
+        if (!error) {
+          const types = new Set(
+            (((formDocs || []) as { document_type?: string }[])).map((d) => String(d.document_type)));
+          needsFormRender = !types.has("buyers_guide") || !types.has("k208");
+        }
+      }
+    } catch { /* undecidable — do not render */ }
+  }
+
   await draftRpc(admin, tenantId, vin, "create_draft_buyers_guide", "buyers_guide");
   await draftRpc(admin, tenantId, vin, "create_draft_safety_inspection", "k208");
   await draftRpc(admin, tenantId, vin, "create_draft_get_ready", "get_ready");
   await draftRpc(admin, tenantId, vin, "create_draft_window_sticker", "window_sticker");
+
+  if (render && needsFormRender) {
+    firePost(admin, render.serviceKey, tenantId, vin,
+      `${render.supabaseUrl}/functions/v1/generate-vehicle-forms`,
+      { tenant_id: tenantId, vin }, 25000, "form_pdfs");
+  }
 }
 
 // Auto-preload a brand-new vehicle the moment it's ingested: hub token, draft

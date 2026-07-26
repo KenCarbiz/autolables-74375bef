@@ -149,6 +149,53 @@ describe("B4 — authorization releases only the approvable documents", () => {
     expect(res.outcome?.documents).toEqual({ released: 2, blocked: 2 });
     expect(res.outcome?.targets).toEqual([{ name: "detail", ok: true }]);
     expect(res.outcome?.failures).toEqual([]);
+    // Line 1 renders these, not a hardcoded yes.
+    expect(res.outcome?.recorded).toBe(true);
+    expect(res.outcome?.snapshotFrozen).toBe(true);
+  });
+
+  it("aborts the freeze — never an empty snapshot — when the record read fails at dispatch time", async () => {
+    const view = await mount();
+    // The work-item read fails only now, after load: the authorization has
+    // already gone out, so the freeze must be aborted and said so, not frozen
+    // as items:[] pretending the shop was told to do nothing.
+    db.errors.get_ready_records = "statement timeout";
+    const res = await view.result.current.authorizeAndDispatch();
+    const authorized = db.inserts.find((i) =>
+      i.table === "document_lifecycle_events" && i.values.event_type === "get_ready_authorized");
+    const meta = authorized?.values.metadata as MockRow;
+    expect(meta.snapshot).toBeNull();
+    expect(String(meta.snapshot_error)).toContain("statement timeout");
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/instruction snapshot could not be recorded/i);
+    expect(res.error).toMatch(/do not authorize again/i);
+    // The authorization itself still stands and is reported as recorded.
+    expect(res.outcome?.recorded).toBe(true);
+    expect(res.outcome?.snapshotFrozen).toBe(false);
+  });
+
+  it("carries a failed authorization record into the outcome instead of claiming ok", async () => {
+    const view = await mount();
+    // Fail ONLY lifecycle-event inserts: reads (the pre-dispatch re-check, the
+    // freeze) still work, so the run reaches the EVT_AUTHORIZED write and that
+    // write alone is refused. A table-wide error would instead trip the
+    // fail-closed degraded check before anything was sent.
+    const realFrom = db.from.bind(db);
+    (db as unknown as { from: (t: string) => unknown }).from = (table: string) => {
+      const chain = realFrom(table) as Record<string, unknown>;
+      if (table === "document_lifecycle_events") {
+        chain.insert = () => ({
+          then: (f: (v: { data: null; error: { message: string } }) => unknown) =>
+            Promise.resolve({ data: null, error: { message: "insert denied" } }).then(f),
+        });
+      }
+      return chain;
+    };
+    const res = await view.result.current.authorizeAndDispatch();
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/could not be recorded/i);
+    expect(res.outcome?.recorded).toBe(false);
+    expect(res.outcome?.snapshotFrozen).toBe(false);
   });
 
   it("freezes items, notes, and checklist into the EVT_AUTHORIZED metadata", async () => {

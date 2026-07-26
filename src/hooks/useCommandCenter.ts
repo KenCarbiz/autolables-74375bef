@@ -730,7 +730,9 @@ export function useVinCommand(vehicleId?: string): Result<VinCommand> & {
       (e) => e.exceptionId === exceptionId && e.artifact === artifact);
     if (!row) return { ok: false, error: "This exception is no longer open. Reload the page." };
     if (!row.retryRpc) {
-      return { ok: false, error: "This artifact is rebuilt by a background task — retry it from the exception queue." };
+      // Honest per artifact: only sweep-covered artifacts get a "a background
+      // task retries this" answer; edge-only ones say nothing will.
+      return { ok: false, error: row.noRetryReason || "This artifact has no in-app retry. Resolve it from the exception queue." };
     }
     if (retrying.current) return { ok: false, error: "A retry is already running." };
     retrying.current = true;
@@ -1158,6 +1160,15 @@ async function releaseAuthorizedDocuments(args: {
 
 /** What the page renders as the four S6 result lines after an authorization. */
 export interface AuthorizationOutcome {
+  /**
+   * The EVT_AUTHORIZED marker actually reached the VIN timeline. Line 1 of the
+   * results card renders THIS, not a hardcoded yes — a failed marker write with
+   * a green "recorded on the VIN timeline" line was a lie about the one record
+   * that prevents a second dispatch.
+   */
+  recorded: boolean;
+  /** The frozen instruction snapshot was captured on that marker. */
+  snapshotFrozen: boolean;
   /** Named dispatch targets in send order, each with whether it was reached. */
   targets: { name: string; ok: boolean }[];
   documents: { released: number; blocked: number };
@@ -1418,22 +1429,50 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
 
       // S6.1 — freeze the immutable instruction version: the exact work items
       // as the shop will receive them, the manager's notes, the checklist that
-      // authorized them, and the delivery commitment. Read from the record at
-      // dispatch time so the frozen list is the one deriveGetReadyDispatch
-      // just emailed, not a render-old view of it.
+      // authorized them, and the delivery commitment. Items AND notes are read
+      // fresh at dispatch time so the frozen list is the one
+      // deriveGetReadyDispatch just emailed, not a render-old view of it. A
+      // failed read must NOT freeze an empty snapshot as if the shop had no
+      // instructions — the freeze is aborted and said so; the authorization
+      // has already happened and is still recorded.
       const currentFacts = dataRef.current;
-      const { data: recRows } = await sb().from("get_ready_records")
-        .select("id, items, delivery_target, priority")
-        .eq("tenant_id", tenantId).in("vin", vinKeys(vin))
-        .order("created_at", { ascending: false }).limit(1);
-      const rec = ((recRows as Row[] | null) || [])[0] || null;
-      const snapshot = {
-        items: ((rec?.items as Row[]) || []).filter(Boolean),
-        notes: Object.fromEntries((currentFacts?.columns || []).map((c) => [c.key, c.managerNote])),
-        checklist: (currentFacts?.checklist || []).map((c) => ({ key: c.key, label: c.label, done: c.done })),
-        delivery_target: (rec?.delivery_target as string) ?? null,
-        priority: (rec?.priority as string) ?? null,
-      };
+      const [recRes, noteRes] = await Promise.all([
+        sb().from("get_ready_records")
+          .select("id, items, delivery_target, priority")
+          .eq("tenant_id", tenantId).in("vin", vinKeys(vin))
+          .order("created_at", { ascending: false }).limit(1),
+        sb().from("document_lifecycle_events")
+          .select("metadata, occurred_at")
+          .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+          .eq("event_type", EVT_NOTE)
+          .order("occurred_at", { ascending: false }).limit(60),
+      ]);
+      const snapshotError: string | null =
+        recRes.error ? (recRes.error.message || String(recRes.error))
+        : noteRes.error ? (noteRes.error.message || String(noteRes.error))
+        : null;
+      let snapshot: Row | null = null;
+      if (snapshotError) {
+        console.error("[useCommandCenter] instruction snapshot read failed:", snapshotError);
+      } else {
+        const rec = ((recRes.data as Row[] | null) || [])[0] || null;
+        // Latest event wins per column — the same rule the loader applies —
+        // read from the DB rather than dataRef so the frozen note is the one
+        // that was saved, not a render-old textarea.
+        const freshNotes: Record<string, string> = {};
+        for (const e of ((noteRes.data as Row[] | null) || [])) {
+          const meta = ((e as Row).metadata || {}) as Row;
+          const col = String(meta.column || "");
+          if (col && !(col in freshNotes)) freshNotes[col] = String(meta.note ?? "");
+        }
+        snapshot = {
+          items: ((rec?.items as Row[]) || []).filter(Boolean),
+          notes: freshNotes,
+          checklist: (currentFacts?.checklist || []).map((c) => ({ key: c.key, label: c.label, done: c.done })),
+          delivery_target: (rec?.delivery_target as string) ?? null,
+          priority: (rec?.priority as string) ?? null,
+        };
+      }
 
       // The dispatch is the authorization: record it only after the server
       // confirmed at least one work order actually went out. If that record
@@ -1441,7 +1480,7 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
       // authorizing a second time would send them all again.
       const recorded = await writeEvent(EVT_AUTHORIZED, {
         dispatched: payload.dispatched ?? null, depts, vendors: vendors.length, failures,
-        authorized_by_email: actorEmailRef.current, snapshot,
+        authorized_by_email: actorEmailRef.current, snapshot, snapshot_error: snapshotError,
       });
 
       // S6.8/9 — release the eligible documents to the Print Center and file
@@ -1489,6 +1528,8 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
       }
       await reload();
       const outcome: AuthorizationOutcome = {
+        recorded: recorded.ok,
+        snapshotFrozen: recorded.ok && snapshot !== null,
         targets: namedTargets,
         documents: { released: release.released.length, blocked: release.blocked },
         failures,
@@ -1518,6 +1559,12 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
           "re-sending from the Ready Board would email the whole shop again.",
         );
       }
+      if (snapshotError) {
+        notes.push(
+          "The instruction snapshot could not be recorded — the work items and notes could not be re-read at dispatch time. " +
+          "The authorization stands and the work orders are out; do not authorize again.",
+        );
+      }
       if (stampError) {
         notes.push(
           "The Ready Board and Vehicle File could not be marked as dispatched. Do NOT use Accept & Dispatch there — it would send everything a second time.",
@@ -1529,7 +1576,7 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
         );
       }
       if (notes.length) {
-        return { ok: false, error: notes.join(" "), errorDetail: stampError ?? release.error ?? undefined, outcome };
+        return { ok: false, error: notes.join(" "), errorDetail: stampError ?? release.error ?? snapshotError ?? undefined, outcome };
       }
       return { ok: true, outcome };
     } catch (e) {

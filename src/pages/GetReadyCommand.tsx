@@ -376,9 +376,16 @@ function AuthorizationResults({ outcome }: { outcome: AuthorizationOutcome }) {
   const reached = outcome.targets.filter((t) => t.ok).map((t) => deptLabel(t.name));
   const lines: { label: string; detail: string; ok: boolean }[] = [
     {
+      // The real EVT_AUTHORIZED write status, not a hardcoded yes: a marker
+      // that never reached the timeline is the one failure this line exists
+      // to surface.
       label: "Get Ready Authorized",
-      detail: "Instructions frozen and recorded on the VIN timeline.",
-      ok: true,
+      detail: !outcome.recorded
+        ? "The work orders went out, but the authorization could not be recorded on the VIN timeline. Do not authorize again — check the VIN timeline first."
+        : outcome.snapshotFrozen
+          ? "Instructions frozen and recorded on the VIN timeline."
+          : "Recorded on the VIN timeline, but the instruction snapshot could not be captured — the shop has the emailed work orders.",
+      ok: outcome.recorded && outcome.snapshotFrozen,
     },
     {
       label: "Work Dispatched",
@@ -746,24 +753,21 @@ export default function GetReadyCommand() {
           can never be re-sent from here, so it has to stay on the page after the
           toast is gone. A manager who reloads had no surface saying service was
           never told to start. */}
+      {/* No "Open Ready Board" action here on purpose: the Ready Board cannot
+          re-send a single recipient — it re-emails the whole shop — so pointing
+          at it was advice that could not work. Same sentence as the dispatch
+          toast: contact the missed recipient directly. */}
       {dispatchFailures.length > 0 && (
         <CommandCallout
           tone="red"
           Icon={AlertTriangle}
           className="mb-4"
-          title="Some work orders were never sent"
-          action={
-            <CommandAction
-              variant="link"
-              href="/ready-board"
-              capability={capabilityForHref("/ready-board")}>
-              Open Ready Board
-            </CommandAction>
-          }>
+          title="Some work orders were never sent">
           {dispatchFailures.map(deptLabel).join(" and ")}{" "}
           {dispatchFailures.length === 1 ? "was" : "were"} not reached when Get Ready was authorized
           {authorizedLabel ? ` on ${authorizedLabel}` : ""}. The authorization is recorded and cannot
-          be repeated — send those work orders from the Ready Board.
+          be repeated, so contact them directly with the work order — re-sending from the Ready Board
+          would email the whole shop again.
         </CommandCallout>
       )}
 

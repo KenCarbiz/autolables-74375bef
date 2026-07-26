@@ -810,8 +810,11 @@ serve(async (req) => {
                 // feature or were first ingested by another path (autocurb-sync,
                 // manual add) so they never fall out of the get-ready flow.
                 await ensureReadyToken(admin, cfg.tenant_id, vin, ymm, vl.id);
-                // Backfill the compliance drafts for existing inventory (idempotent).
-                await ensureComplianceDrafts(admin, cfg.tenant_id, vin);
+                // Backfill the compliance drafts for existing inventory
+                // (idempotent) — with the render target, so a draft newly
+                // created on this resync path also gets its form PDFs instead
+                // of sitting file-less forever.
+                await ensureComplianceDrafts(admin, cfg.tenant_id, vin, { supabaseUrl, serviceKey });
               } else if (!firstWriteErr) firstWriteErr = error.message;
             } else {
               const ins = await admin.from("vehicle_listings").insert({

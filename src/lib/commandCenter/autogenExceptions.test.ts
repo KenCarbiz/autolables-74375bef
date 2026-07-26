@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   artifactLabel,
+  artifactNoRetryReason,
   artifactRetryRpc,
   buildAutogenExceptionRows,
 } from "./autogenExceptions";
@@ -18,6 +19,27 @@ describe("artifactRetryRpc", () => {
     for (const a of ["form_pdfs", "oem_window_sticker", "title_request_email", "ingest_orchestrate", "description", "get_ready_token"]) {
       expect(artifactRetryRpc(a)).toBeNull();
     }
+  });
+});
+
+describe("artifactNoRetryReason", () => {
+  it("claims a sweep only for the sweep-covered artifacts", () => {
+    expect(artifactNoRetryReason("get_ready_token")).toMatch(/nightly intake sweep/i);
+    expect(artifactNoRetryReason("ingest_orchestrate")).toMatch(/nightly sweep/i);
+    expect(artifactNoRetryReason("description")).toMatch(/reconcile sweep/i);
+  });
+
+  it("says nothing retries the edge-only artifacts — no fake background rebuild", () => {
+    for (const a of ["form_pdfs", "oem_window_sticker", "title_request_email"]) {
+      const reason = String(artifactNoRetryReason(a));
+      expect(reason).toMatch(/not retried by any sweep/i);
+      expect(reason).not.toMatch(/rebuilt by a background task/i);
+    }
+  });
+
+  it("is null exactly where a retry RPC exists", () => {
+    expect(artifactNoRetryReason("buyers_guide")).toBeNull();
+    expect(artifactNoRetryReason("window_sticker")).toBeNull();
   });
 });
 
@@ -41,6 +63,8 @@ describe("buildAutogenExceptionRows", () => {
     expect(k208?.message).toBe("rpc timed out");
     expect(pdfs?.retryRpc).toBeNull();
     expect(pdfs?.label).toBe("Official form PDFs");
+    expect(k208?.noRetryReason).toBeNull();
+    expect(pdfs?.noRetryReason).toMatch(/not retried by any sweep/i);
   });
 
   it("drops resolved rows and foreign exception types", () => {
