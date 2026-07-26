@@ -2,7 +2,8 @@
 // Desk queue and the per-vehicle status banner — so every surface agrees on the
 // status and the single next action. Computed from data we already keep
 // (get_ready_records items + the signed safety_inspection + a pending
-// service_request), no new "task" table.
+// service_request + the STORED vehicle_delivery_clearance row), no new
+// "task" table.
 
 import { isExecutedSignoff, isFailedInspection } from "@/lib/commandCenter/inspectionState";
 
@@ -12,12 +13,19 @@ export type GRState = "not_started" | "in_progress" | "complete" | "failed";
 export type K208Stage = "waiting" | "ready" | "executed" | "blocked";
 export type Tone = "slate" | "amber" | "red" | "blue" | "emerald";
 
+export interface ServiceStatusContext {
+  /** Stored vehicle_delivery_clearance.state; null when no row exists yet. */
+  clearanceState?: string | null;
+  /** Item failures for the VIN with repair_state != passed_on_reinspection. */
+  openFailures?: number;
+}
+
 export interface ServiceStatus {
   grState: GRState;
   k208State: K208Stage;
   awaiting: boolean;   // an additional-work request is pending a manager decision
-  blocked: boolean;    // delivery blocked (failed safety / recall)
-  cleared: boolean;    // all get-ready complete + K-208 executed
+  blocked: boolean;    // delivery blocked (failed safety / open failures / recall)
+  cleared: boolean;    // stored clearance says cleared_for_delivery — never derived
   bannerKey: string;
   bannerLabel: string;
   tone: Tone;
@@ -27,7 +35,9 @@ export interface ServiceStatus {
 }
 
 // deno-lint-ignore no-explicit-any
-export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean): ServiceStatus {
+export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean, ctx: ServiceStatusContext = {}): ServiceStatus {
+  const openFailures = ctx.openFailures ?? 0;
+  const clearanceState = ctx.clearanceState ?? null;
   const items: { status?: string }[] = Array.isArray(gr?.items) ? gr.items : [];
   const anyItems = items.length > 0;
   const someComplete = items.some((i) => i.status === "complete");
@@ -43,26 +53,32 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean)
   const siPass = isExecutedSignoff(signedRow);
   const siFail = isFailedInspection(signedRow);
   const certified = !!(si && si.licensee_certified_at);
+  // A newer signed pass never launders unresolved item failures from an
+  // earlier inspection — the failure loop dominates until reinspection.
+  const failed = siFail || openFailures > 0;
 
-  const grState: GRState = siFail ? "failed"
+  const grState: GRState = failed ? "failed"
     : !gr ? "not_started"
     : grComplete ? "complete"
     : (someComplete || (gr.status && gr.status !== "pending")) ? "in_progress"
     : "not_started";
 
-  const k208State: K208Stage = (recallBlocking || siFail) ? "blocked"
+  const k208State: K208Stage = (recallBlocking || failed) ? "blocked"
     : certified ? "executed"
     : siPass ? "ready"
     : "waiting";
 
-  const blocked = siFail || recallBlocking;
-  const cleared = grComplete && k208State === "executed" && !blocked && !awaiting;
+  const blocked = failed || recallBlocking;
+  // The STORED clearance row is the only authority for "cleared". A vehicle
+  // whose derived state looks done but has no cleared_for_delivery row is
+  // never shown as cleared.
+  const cleared = clearanceState === "cleared_for_delivery" && !blocked && !awaiting;
 
   let bannerKey: string, bannerLabel: string, tone: Tone, nextLabel: string, nextTone: ServiceStatus["nextTone"];
   if (awaiting) {
     bannerKey = "awaiting"; bannerLabel = "Additional work awaiting approval"; tone = "amber";
     nextLabel = "Review request"; nextTone = "primary";
-  } else if (siFail) {
+  } else if (failed) {
     bannerKey = "failed"; bannerLabel = "Failed items require repair"; tone = "red";
     nextLabel = "Resolve failed items"; nextTone = "danger";
   } else if (recallBlocking) {
@@ -71,6 +87,11 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean)
   } else if (cleared) {
     bannerKey = "cleared"; bannerLabel = "Cleared for delivery"; tone = "emerald";
     nextLabel = "View completed record"; nextTone = "ghost";
+  } else if (k208State === "executed") {
+    // Executed, but the stored clearance is missing or still blocked — say so;
+    // never claim cleared from derivation alone.
+    bannerKey = "awaiting_clearance"; bannerLabel = "K-208 executed — delivery clearance pending"; tone = "amber";
+    nextLabel = "Review delivery clearance"; nextTone = "primary";
   } else if (k208State === "ready") {
     bannerKey = "ready"; bannerLabel = "Ready for K-208"; tone = "blue";
     nextLabel = "Review & sign K-208"; nextTone = "primary";

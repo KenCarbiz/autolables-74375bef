@@ -234,10 +234,13 @@ export default function ServiceVehicleWorkspace() {
         p_inspection_id: newestActive.id, p_new_state: "in_progress",
       });
       if (error) toast.error("Couldn't record the start on the server; you can still work the checklist.");
-      else void load();
+      else {
+        await sb().rpc("recompute_delivery_clearance", { p_tenant_id: tenantId, p_vin: vin });
+        void load();
+      }
     }
     scrollTo("inspection");
-  }, [newestActive, load]);
+  }, [newestActive, load, tenantId, vin]);
 
   const onPrimaryAction = (key: WorkspaceActionKey) => {
     switch (key) {
@@ -336,8 +339,6 @@ export default function ServiceVehicleWorkspace() {
               members={members}
               canAssign={canAssign}
               onAssigned={() => void load()}
-              tenantId={tenantId}
-              vin={vin}
             />
             <ProgressCard items={grItems} />
             <ServiceQrCard tenantId={tenantId} vin={vin} />
@@ -487,28 +488,40 @@ function StatusBannerCard({ ws, onAction }: { ws: WorkspaceStatus; onAction: (k:
 
 /* ─────────────────────────── assignment ─────────────────────────── */
 
-function AssignmentCard({ inspection, members, canAssign, onAssigned, tenantId, vin }: {
+function AssignmentCard({ inspection, members, canAssign, onAssigned }: {
   inspection: InspRow | null; members: MemberRow[]; canAssign: boolean;
-  onAssigned: () => void; tenantId: string; vin: string;
+  onAssigned: () => void;
 }) {
-  const { log } = useAudit();
   const [busy, setBusy] = useState(false);
   const reason = !inspection
     ? "No inspection row exists for this vehicle yet."
     : !canAssign ? "Your role can't assign service work. Ask a writer or manager." : null;
 
+  // assign_safety_inspection (20260726108000) is the only write path: a direct
+  // UPDATE is silently filtered by RLS for service_manager/service_advisor and
+  // would toast success over a no-op. The RPC authorizes, writes, and audits.
   const assign = async (userId: string) => {
     if (!inspection) return;
     setBusy(true);
-    const { error } = await sb().from("safety_inspections")
-      .update({ assigned_to: userId || null }).eq("id", inspection.id);
+    const { data, error } = await sb().rpc("assign_safety_inspection", {
+      p_inspection_id: inspection.id, p_user_id: userId || null,
+    });
     setBusy(false);
     if (error) {
-      // 20260629070000 restricts UPDATE to legacy roles; surface the truth.
-      toast.error("The server refused the assignment for your role. Nothing was recorded.");
+      const m = String(error.message || "");
+      toast.error(/not_authorized/.test(m)
+        ? "The server refused the assignment for your role. Nothing was recorded."
+        : /assignee_not_in_tenant/.test(m)
+          ? "That member is not part of this store."
+          : "Couldn't record the assignment. Nothing was changed.");
       return;
     }
-    log({ action: "service_tech_assigned", entity_type: "vehicle", entity_id: vin, store_id: tenantId, user_id: "", details: { inspection_id: inspection.id, assigned_to: userId || null } });
+    if (data && data.ok === false) {
+      toast.error(data.reason === "not_pending"
+        ? "This inspection is already signed; the assignment can no longer change."
+        : "The server refused the assignment. Nothing was recorded.");
+      return;
+    }
     toast.success(userId ? "Technician assigned" : "Assignment cleared");
     onAssigned();
   };
@@ -616,11 +629,28 @@ interface K208PanelProps {
 }
 
 function K208Panel(props: K208PanelProps) {
-  const { newestSigned, ws } = props;
+  const { newestSigned, ws, openFailureCount } = props;
   const executed = isExecutedSignoff(newestSigned);
   const failedSigned = isFailedInspection(newestSigned);
+  const certified = !!newestSigned?.licensee_certified_at;
 
-  if (executed) return <ExecutedOrExecutePanel {...props} signedRow={newestSigned as InspRow} />;
+  if (executed) {
+    // Open item failures (from any inspection on this VIN) block execution —
+    // a newer signed pass never launders an unresolved failure. The server
+    // enforces the same gate in certify_safety_inspection.
+    if (!certified && openFailureCount > 0) {
+      return (
+        <CommandCard title="CT K-208 safety inspection" subtitle="Execution is blocked while failed items are open.">
+          <CommandCallout tone="red" Icon={AlertTriangle}
+            title={`${openFailureCount} open failed item${openFailureCount === 1 ? "" : "s"} block K-208 execution`}>
+            Every failed item must be repaired and pass reinspection by an authorized employee before the
+            K-208 can be executed. Resolve them in the failed-items panel below.
+          </CommandCallout>
+        </CommandCard>
+      );
+    }
+    return <ExecutedOrExecutePanel {...props} signedRow={newestSigned as InspRow} />;
+  }
 
   if (failedSigned && ws.key !== "ready_for_reinspection") {
     return (
@@ -639,7 +669,7 @@ function K208Panel(props: K208PanelProps) {
 }
 
 /** Signed non-fail: execution/certification review, then the success record. */
-function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, logAudit, onChanged }: K208PanelProps & { signedRow: InspRow }) {
+function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFailureCount, logAudit, onChanged }: K208PanelProps & { signedRow: InspRow }) {
   const { user } = useAuth();
   const vin = veh.vin.toUpperCase();
   const certified = !!signedRow.licensee_certified_at;
@@ -677,7 +707,8 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, logAudit
   }
 
   const allConfirmed = confirms.every(Boolean);
-  const reason = !canExecute ? K208_SIGNER_DENIAL
+  const reason = openFailureCount > 0 ? "Open failed items must pass reinspection before the K-208 can be executed."
+    : !canExecute ? K208_SIGNER_DENIAL
     : !allConfirmed ? "Confirm each statement above to enable execution."
     : !resultInitial ? "Choose the A/B/C warranty result."
     : !sig.data ? "Sign to execute."
@@ -699,6 +730,9 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, logAudit
       return;
     }
     logAudit({ action: "k208_executed", entity_type: "vehicle", entity_id: vin, store_id: tenantId, user_id: "", details: { inspection_id: signedRow.id, result_initial: resultInitial } });
+    // Materialize the stored clearance now, so the queue and Ready Board see
+    // the change without anyone re-opening this workspace.
+    await sb().rpc("recompute_delivery_clearance", { p_tenant_id: tenantId, p_vin: vin });
     toast.success("K-208 executed");
     onChanged();
   };
@@ -818,9 +852,42 @@ function InspectionChecklistPanel({ tenantId, veh, newestActive, canConduct, pas
     } catch { /* unreadable draft: start clean */ }
   }, [key]);
 
-  // Autosave per material action — to THIS DEVICE, stated honestly. The server
-  // only learns the marks on submit (there is no incremental server save that
-  // does not sign the record).
+  // Autosave per material action: the device draft writes immediately (offline
+  // fallback), and the pending inspection row's checklist syncs server-side
+  // through save_inspection_draft (20260726108000) on a debounce. The RPC
+  // never signs — signatures still only move through submit.
+  const serverDraftId = newestActive && newestActive.status === "pending" ? newestActive.id : null;
+  const [serverSave, setServerSave] = useState<"idle" | "saving" | "saved" | "offline">("idle");
+  const [serverSavedAt, setServerSavedAt] = useState<string | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearanceSeeded = useRef(false);
+
+  const scheduleServerSave = useCallback((m: Record<string, K208Mark>, n: Record<string, string>) => {
+    if (!serverDraftId) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setServerSave("saving");
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const { data, error } = await sb().rpc("save_inspection_draft", {
+          p_inspection_id: serverDraftId, p_checklist: k208Checklist(m, n),
+        });
+        if (error || (data && data.ok === false)) throw new Error(error?.message || "draft_refused");
+        setServerSave("saved");
+        setServerSavedAt(String(data?.saved_at ?? new Date().toISOString()));
+        if (!clearanceSeeded.current) {
+          // First server save flips not_started -> in_progress; refresh the
+          // stored clearance so the queue sees it without a workspace reload.
+          clearanceSeeded.current = true;
+          void sb().rpc("recompute_delivery_clearance", { p_tenant_id: tenantId, p_vin: vin });
+        }
+      } catch {
+        setServerSave("offline");
+      }
+    }, 1200);
+  }, [serverDraftId, tenantId, vin]);
+
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
   const persistDraft = useCallback((m: Record<string, K208Mark>, n: Record<string, string>, txt: string) => {
     try {
       const savedAt = new Date().toISOString();
@@ -830,7 +897,8 @@ function InspectionChecklistPanel({ tenantId, veh, newestActive, canConduct, pas
     } catch {
       setDraftState("unsaved");
     }
-  }, [key]);
+    scheduleServerSave(m, n);
+  }, [key, scheduleServerSave]);
 
   const answered = k208Answered(marks);
   const result = k208Result(marks);
@@ -949,8 +1017,15 @@ function InspectionChecklistPanel({ tenantId, veh, newestActive, canConduct, pas
         : "Mark each item, explain any failure, review, then sign."}
       action={
         <span className="text-[11px] text-muted-foreground" role="status" aria-live="polite">
-          {draftState === "saved" && draftSavedAt ? `Draft saved on this device ${formatCommandDateTime(draftSavedAt) ?? ""}` : null}
-          {draftState === "unsaved" ? "Draft NOT saved — this device blocked storage" : null}
+          {serverSave === "saving" ? "Saving…"
+            : serverSave === "saved" ? `Saved ${formatCommandDateTime(serverSavedAt) ?? ""}`
+            : serverSave === "offline"
+              ? (draftState === "saved" && draftSavedAt
+                ? `Offline — draft saved on this device ${formatCommandDateTime(draftSavedAt) ?? ""}`
+                : "Offline — changes are waiting to sync")
+            : draftState === "saved" && draftSavedAt ? `Draft saved on this device ${formatCommandDateTime(draftSavedAt) ?? ""}`
+            : draftState === "unsaved" ? "Draft NOT saved — this device blocked storage"
+            : null}
         </span>
       }
     >
@@ -1061,9 +1136,16 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
   onChanged: () => void; logAudit: ReturnType<typeof useAudit>["log"];
 }) {
   const { user } = useAuth();
+  const { settings } = useDealerSettings();
   const [busyId, setBusyId] = useState<string | null>(null);
   const open = failures.filter((f) => !isFailureResolved(f.repair_state));
   const signedFailNoRows = isFailedInspection(newestSigned) && failures.length === 0;
+
+  // Who gets the ready_for_reinspection bell: members allowed to reinspect
+  // under this store's policy (deduped by notifyMembers' key).
+  const reinspectorPredicate = (m: MemberRow) =>
+    hasDealerCapability(m.role, "can_conduct_inspection", false)
+    && (!settings.service_reinspection_managers_only || hasDealerCapability(m.role, "can_approve_service_work", false));
 
   const fileFromChecklist = async () => {
     if (!newestSigned) return;
@@ -1086,6 +1168,12 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
     setBusyId(null);
     if (error) { toast.error("Couldn't save the change."); return; }
     logAudit({ action: auditAction, entity_type: "vehicle", entity_id: vin, store_id: tenantId, user_id: "", details: { failure_id: f.id, item_id: f.item_id, ...patch } });
+    if (patch.repair_state === "ready_for_reinspection"
+      && open.filter((o) => o.id !== f.id).every((o) => o.repair_state === "ready_for_reinspection")) {
+      // Last open item just reached ready: tell the authorized reinspectors.
+      await notifyMembers(tenantId, vin, members, reinspectorPredicate,
+        "ready_for_reinspection", f.inspection_id, { failure_id: f.id, item_id: f.item_id });
+    }
     await sb().rpc("recompute_delivery_clearance", { p_tenant_id: tenantId, p_vin: vin });
     onChanged();
   };
@@ -1095,6 +1183,10 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
     if (!newestSigned) return;
     const { error } = await sb().rpc("transition_safety_inspection", { p_inspection_id: newestSigned.id, p_new_state: to });
     if (error) { toast.error("The server refused that transition."); return; }
+    if (to === "ready_for_reinspection") {
+      await notifyMembers(tenantId, vin, members, reinspectorPredicate,
+        "ready_for_reinspection", newestSigned.id, { open_items: open.length });
+    }
     await sb().rpc("recompute_delivery_clearance", { p_tenant_id: tenantId, p_vin: vin });
     onChanged();
   };

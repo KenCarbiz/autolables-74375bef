@@ -69,6 +69,22 @@ describe("get_vehicle_ready — latest migration definition (S8)", () => {
   });
 });
 
+describe("certify_safety_inspection — latest migration definition", () => {
+  const def = latestDefinition("certify_safety_inspection");
+  const body = norm(def.body);
+
+  it("refuses to certify while item failures are open on the VIN", () => {
+    expect(body).toContain("safety_inspection_item_failures");
+    expect(body).toContain("repair_state <> 'passed_on_reinspection'");
+    expect(body).toContain("'failed_items_open'");
+  });
+
+  it("still refuses a failed inspection and an unauthorized signer", () => {
+    expect(body).toContain("'inspection_failed_items_open'");
+    expect(body).toContain("k208_signer_allowed");
+  });
+});
+
 describe("get_ready_blocks_finalize — latest migration definition (S8)", () => {
   const def = latestDefinition("get_ready_blocks_finalize");
   const body = norm(def.body);

@@ -178,9 +178,15 @@ export default function ServiceQueue() {
         const signed = signedByVin.get(v.vin);
         const active = activeByVin.get(v.vin);
         const awaiting = awaitingVins.has(v.vin);
-        const s = deriveServiceStatus(v, gr, signed, awaiting);
         const fails = failuresByVin.get(v.vin) || { open: 0, ready: 0 };
         const clr = clrByVin.get(v.vin) || null;
+        // The stored clearance + open item failures feed the derivation so the
+        // queue can never render "Cleared" (or offer Execute K-208) unless the
+        // stored facts allow it.
+        const s = deriveServiceStatus(v, gr, signed, awaiting, {
+          clearanceState: clr?.state ?? null,
+          openFailures: fails.open,
+        });
         const ageHours = v.created_at ? (now - new Date(v.created_at).getTime()) / 36e5 : 0;
         const sold = !!v.deal_processed_at || String(v.status || "") === "sold";
         const inspectionState = (active?.inspection_state as string) || null;
@@ -264,10 +270,12 @@ export default function ServiceQueue() {
     };
   }, [rows]);
 
-  // Needs Attention: true exceptions only.
+  // Needs Attention: true exceptions only. Auto-created tasks sit at
+  // inspection_state 'not_started' (never null), so both spellings of
+  // "not started" must fire the delivery-today rule.
   const attention = useMemo(() => rows.filter((r) => {
     if (r.cleared) return false;
-    if (r.sold && isToday(r.deliveryTarget) && r.inspectionState == null) return true;
+    if (r.sold && isToday(r.deliveryTarget) && (r.inspectionState == null || r.inspectionState === "not_started")) return true;
     if (r.openFailures > 0 || r.grState === "failed") return true;
     if (r.k208State === "ready" && r.readySince && (Date.now() - new Date(r.readySince).getTime()) / 36e5 >= 18) return true;
     if (r.sold && r.clearanceState && r.clearanceState !== "cleared_for_delivery") return true;
@@ -341,18 +349,60 @@ export default function ServiceQueue() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        <div className="px-4 pt-4 flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="text-body font-bold text-foreground">Vehicles requiring service action</h2>
-          <div className="flex items-center gap-2 flex-wrap">
+      {/* Mobile (<lg): stacked vehicle cards under a sticky filter row —
+          never the squeezed 1020px table. */}
+      <div className="lg:hidden">
+        <div className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-background/95 backdrop-blur border-b border-border space-y-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto" aria-label="Queue status filters">
+            {TABS.map((f) => (
+              <button key={f.key} onClick={() => setTab(f.key)} aria-pressed={tab === f.key}
+                className={cn("h-11 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0",
+                  tab === f.key ? "bg-primary text-primary-foreground" : "text-muted-foreground bg-muted/60")}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
             <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} aria-label="Filter by technician"
-              className="h-9 rounded-lg border border-border bg-background px-2 text-xs">
+              className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs">
               <option value="any">Technician: any</option>
               <option value="unassigned">Unassigned</option>
               {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
             </select>
             <select value={urgencyFilter} onChange={(e) => setUrgencyFilter(e.target.value)} aria-label="Filter by delivery urgency"
-              className="h-9 rounded-lg border border-border bg-background px-2 text-xs">
+              className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs">
+              <option value="any">Delivery: any</option>
+              <option value="today">Delivery today</option>
+              <option value="scheduled">Delivery scheduled</option>
+              <option value="unscheduled">No delivery scheduled</option>
+            </select>
+          </div>
+        </div>
+        <div className="mt-3 space-y-3">
+          {visible.map((r) => (
+            <MobileVehicleCard key={r.id} r={r} onOpen={() => setDrawer(r)} onPrimary={() => openWorkspace(r)} />
+          ))}
+          {visible.length === 0 && (
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <EmptyState Icon={CheckCircle2} title="All caught up"
+                detail="No vehicles in this view. Change the filters, scan a Service QR, or search a VIN." />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="hidden lg:block rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="px-4 pt-4 flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-body font-bold text-foreground">Vehicles requiring service action</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} aria-label="Filter by technician"
+              className="h-11 rounded-lg border border-border bg-background px-2 text-xs">
+              <option value="any">Technician: any</option>
+              <option value="unassigned">Unassigned</option>
+              {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+            <select value={urgencyFilter} onChange={(e) => setUrgencyFilter(e.target.value)} aria-label="Filter by delivery urgency"
+              className="h-11 rounded-lg border border-border bg-background px-2 text-xs">
               <option value="any">Delivery: any</option>
               <option value="today">Delivery today</option>
               <option value="scheduled">Delivery scheduled</option>
@@ -363,7 +413,7 @@ export default function ServiceQueue() {
         <div className="px-4 pt-3 flex items-center gap-1.5 overflow-x-auto">
           {TABS.map((f) => (
             <button key={f.key} onClick={() => setTab(f.key)} aria-pressed={tab === f.key}
-              className={cn("h-9 px-3 rounded-full text-xs font-semibold whitespace-nowrap",
+              className={cn("h-11 px-3 rounded-full text-xs font-semibold whitespace-nowrap",
                 tab === f.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>
               {f.label}
             </button>
@@ -436,6 +486,53 @@ export default function ServiceQueue() {
 
       {drawer && <RowDrawer r={drawer} onClose={() => setDrawer(null)} onOpenWorkspace={() => { openWorkspace(drawer); setDrawer(null); }} />}
     </div>
+  );
+}
+
+/** Mobile queue card: thumb, YMM, stock, VIN-6, status chips, plain-language
+ *  priority reason, ONE full-width primary action. Tapping the card body opens
+ *  the preview drawer; only the button starts work. */
+function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => void; onPrimary: () => void }) {
+  const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
+  const P = PRIORITY_ICON[r.priority.level];
+  return (
+    <article className="rounded-2xl border border-border bg-card p-3.5 space-y-2.5" onClick={onOpen}>
+      <div className="flex items-start gap-3">
+        <VehThumb r={r} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-foreground truncate">{r.ymm}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">Stock {r.stock || "—"} · …{r.vin.slice(-6)} · {r.condition}</p>
+        </div>
+        <span className={cn("inline-flex items-center gap-1 text-[11px] font-bold shrink-0", PRIORITY_CLS[r.priority.level])}>
+          <P className="w-3.5 h-3.5" aria-hidden="true" /> {r.priority.level}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span className={cn("inline-flex items-center gap-1 font-semibold", G.cls)}>
+          <G.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {G.label}{r.openFailures > 0 ? ` (${r.openFailures})` : ""}
+        </span>
+        <span className={cn("inline-flex items-center gap-1 font-semibold", K.cls)}>
+          <K.Icon className="w-3.5 h-3.5" aria-hidden="true" /> K-208: {K.label}
+        </span>
+        <span className={cn("font-medium", r.delivery === "Delivery blocked" ? "text-red-600" : r.delivery === "Cleared" ? "text-emerald-600" : "text-muted-foreground")}>
+          {r.delivery}{r.deliveryTarget ? ` · ${formatCommandDateTime(r.deliveryTarget)}` : ""}
+        </span>
+        <span className={cn("tabular-nums", r.overdue ? "text-red-600 font-semibold" : "text-muted-foreground")}>
+          {ageLabel(r.ageHours)} since intake{r.overdue ? " · Overdue" : ""}
+        </span>
+        <span className="text-muted-foreground">{r.assignedName ?? "Unassigned"}</span>
+        {r.sold && <StatusPill tone="blue">Sold</StatusPill>}
+      </div>
+      <p className="text-[11.5px] text-muted-foreground">{r.priority.label}</p>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onPrimary(); }}
+        className={cn("w-full min-h-[44px] rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-1.5",
+          r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-border text-foreground" : "bg-primary text-primary-foreground")}
+      >
+        {r.next.label} <ChevronRight className="w-4 h-4" aria-hidden="true" />
+      </button>
+    </article>
   );
 }
 

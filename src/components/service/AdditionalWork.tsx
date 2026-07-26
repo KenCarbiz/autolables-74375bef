@@ -157,6 +157,10 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
   const [reqs, setReqs] = useState<Req[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Decisions that need input (limit amount, clarify/decline note) open a
+  // small inline form instead of window.prompt.
+  const [pendingDecision, setPendingDecision] = useState<{ id: string; kind: "approved_limit" | "clarify" | "declined" } | null>(null);
+  const [decisionValue, setDecisionValue] = useState("");
 
   const load = async () => {
     let q = (supabase as any).from("service_requests")
@@ -181,6 +185,34 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
       return;
     }
     toast.success("Decision recorded"); load(); onDecided?.();
+  };
+
+  const openDecisionForm = (id: string, kind: "approved_limit" | "clarify" | "declined") => {
+    setPendingDecision({ id, kind });
+    setDecisionValue("");
+  };
+
+  const confirmDecision = (id: string) => {
+    if (!pendingDecision || pendingDecision.id !== id) return;
+    const v = decisionValue.trim();
+    if (pendingDecision.kind === "approved_limit") {
+      const n = Number(v.replace(/[^0-9.]/g, ""));
+      if (!n || n <= 0) { toast.error("Enter the dollar limit to approve up to"); return; }
+      decide(id, "approved_limit", null, n);
+    } else if (pendingDecision.kind === "clarify") {
+      if (!v) { toast.error("Say what you need clarified"); return; }
+      decide(id, "clarify", v);
+    } else {
+      decide(id, "declined", v || null);
+    }
+    setPendingDecision(null);
+    setDecisionValue("");
+  };
+
+  const DECISION_FORM_META = {
+    approved_limit: { label: "Approve up to what dollar amount?", placeholder: "e.g. 500", inputMode: "decimal" as const, confirm: "Approve with limit" },
+    clarify: { label: "What do you need clarified?", placeholder: "Question for the requester", inputMode: "text" as const, confirm: "Send question" },
+    declined: { label: "Reason for declining (optional)", placeholder: "Optional reason", inputMode: "text" as const, confirm: "Decline request" },
   };
 
   if (loading || reqs.length === 0) return null;
@@ -220,11 +252,42 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
               </div>
             </div>
             {canApprove ? (
-              <div className="flex items-center gap-1.5 flex-wrap mt-3 pt-3 border-t border-border">
-                <button disabled={busyId === r.id} onClick={() => decide(r.id, "approved")} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><Check className="w-3.5 h-3.5" /> Approve</button>
-                <button disabled={busyId === r.id} onClick={() => { const v = window.prompt("Approve up to what dollar amount?"); if (v == null) return; const n = Number(v.replace(/[^0-9.]/g, "")); if (!n) return; decide(r.id, "approved_limit", null, n); }} className="h-9 px-3 rounded-md border border-emerald-300 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><DollarSign className="w-3.5 h-3.5" /> Approve w/ limit</button>
-                <button disabled={busyId === r.id} onClick={() => { const note = window.prompt("What do you need clarified?") || ""; decide(r.id, "clarify", note || null); }} className="h-9 px-3 rounded-md border border-border text-foreground text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><MessageSquare className="w-3.5 h-3.5" /> Clarify</button>
-                <button disabled={busyId === r.id} onClick={() => { const note = window.prompt("Reason for declining (optional)") || ""; decide(r.id, "declined", note || null); }} className="h-9 px-3 rounded-md border border-rose-200 text-rose-600 text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><X className="w-3.5 h-3.5" /> Decline</button>
+              <div className="mt-3 pt-3 border-t border-border space-y-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button disabled={busyId === r.id} onClick={() => decide(r.id, "approved")} className="min-h-[44px] px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><Check className="w-3.5 h-3.5" /> Approve</button>
+                  <button disabled={busyId === r.id} aria-expanded={pendingDecision !== null && pendingDecision.id === r.id && pendingDecision.kind === "approved_limit"} onClick={() => openDecisionForm(r.id, "approved_limit")} className="min-h-[44px] px-3 rounded-md border border-emerald-300 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><DollarSign className="w-3.5 h-3.5" /> Approve w/ limit</button>
+                  <button disabled={busyId === r.id} aria-expanded={pendingDecision !== null && pendingDecision.id === r.id && pendingDecision.kind === "clarify"} onClick={() => openDecisionForm(r.id, "clarify")} className="min-h-[44px] px-3 rounded-md border border-border text-foreground text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><MessageSquare className="w-3.5 h-3.5" /> Clarify</button>
+                  <button disabled={busyId === r.id} aria-expanded={pendingDecision !== null && pendingDecision.id === r.id && pendingDecision.kind === "declined"} onClick={() => openDecisionForm(r.id, "declined")} className="min-h-[44px] px-3 rounded-md border border-rose-200 text-rose-600 text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><X className="w-3.5 h-3.5" /> Decline</button>
+                </div>
+                {(() => {
+                  const pd = pendingDecision;
+                  if (!pd || pd.id !== r.id) return null;
+                  const meta = DECISION_FORM_META[pd.kind];
+                  return (
+                    <form
+                      onSubmit={(e) => { e.preventDefault(); confirmDecision(r.id); }}
+                      className="flex items-end gap-2 flex-wrap rounded-lg border border-border bg-muted/40 p-2.5"
+                    >
+                      <label className="flex-1 min-w-[180px]">
+                        <span className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">{meta.label}</span>
+                        <input
+                          autoFocus
+                          value={decisionValue}
+                          onChange={(e) => setDecisionValue(e.target.value)}
+                          inputMode={meta.inputMode}
+                          placeholder={meta.placeholder}
+                          className="mt-1 w-full h-11 rounded-lg border border-border bg-background px-3 text-sm"
+                        />
+                      </label>
+                      <button type="submit" disabled={busyId === r.id} className="min-h-[44px] px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">
+                        {meta.confirm}
+                      </button>
+                      <button type="button" onClick={() => { setPendingDecision(null); setDecisionValue(""); }} className="min-h-[44px] px-3 rounded-md border border-border text-foreground text-xs font-semibold">
+                        Cancel
+                      </button>
+                    </form>
+                  );
+                })()}
               </div>
             ) : (
               <p className="text-caption text-muted-foreground mt-3 pt-3 border-t border-border">Awaiting a manager's decision. Your role can't decide additional-work requests.</p>
