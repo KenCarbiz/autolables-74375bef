@@ -3117,6 +3117,7 @@ export type Database = {
           condition: string
           created_at: string
           created_by: string
+          delivery_target: string | null
           get_ready_complete_date: string | null
           get_ready_start_date: string | null
           id: string
@@ -3128,6 +3129,7 @@ export type Database = {
           inspection_signature_data: string | null
           inventory_date: string | null
           items: Json
+          priority: string | null
           ro_number: string
           service_advisor: string
           status: string
@@ -3147,6 +3149,7 @@ export type Database = {
           condition?: string
           created_at?: string
           created_by?: string
+          delivery_target?: string | null
           get_ready_complete_date?: string | null
           get_ready_start_date?: string | null
           id?: string
@@ -3158,6 +3161,7 @@ export type Database = {
           inspection_signature_data?: string | null
           inventory_date?: string | null
           items?: Json
+          priority?: string | null
           ro_number?: string
           service_advisor?: string
           status?: string
@@ -3177,6 +3181,7 @@ export type Database = {
           condition?: string
           created_at?: string
           created_by?: string
+          delivery_target?: string | null
           get_ready_complete_date?: string | null
           get_ready_start_date?: string | null
           id?: string
@@ -3188,6 +3193,7 @@ export type Database = {
           inspection_signature_data?: string | null
           inventory_date?: string | null
           items?: Json
+          priority?: string | null
           ro_number?: string
           service_advisor?: string
           status?: string
@@ -5011,6 +5017,79 @@ export type Database = {
         }
         Relationships: []
       }
+      safety_inspection_item_failures: {
+        Row: {
+          assignee: string | null
+          created_at: string
+          explanation: string
+          id: string
+          inspection_id: string
+          item_id: string
+          photos: Json
+          reinspected_at: string | null
+          reinspected_by: string | null
+          repair_state: string
+          ro_number: string | null
+          tenant_id: string
+          updated_at: string
+          vin: string | null
+        }
+        Insert: {
+          assignee?: string | null
+          created_at?: string
+          explanation: string
+          id?: string
+          inspection_id: string
+          item_id: string
+          photos?: Json
+          reinspected_at?: string | null
+          reinspected_by?: string | null
+          repair_state?: string
+          ro_number?: string | null
+          tenant_id: string
+          updated_at?: string
+          vin?: string | null
+        }
+        Update: {
+          assignee?: string | null
+          created_at?: string
+          explanation?: string
+          id?: string
+          inspection_id?: string
+          item_id?: string
+          photos?: Json
+          reinspected_at?: string | null
+          reinspected_by?: string | null
+          repair_state?: string
+          ro_number?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_inspection_item_failures_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "safety_inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_inspection_item_failures_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_inspection_item_failures_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       safety_inspection_revisions: {
         Row: {
           captured_at: string
@@ -5075,6 +5154,7 @@ export type Database = {
       }
       safety_inspections: {
         Row: {
+          assigned_to: string | null
           buyer_name: string | null
           buyer_signature_data: string | null
           buyer_signed_at: string | null
@@ -5083,11 +5163,13 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_ip: string | null
+          doc_version: number
           documents: Json
           esign_consent: Json | null
           failure_notes: string | null
           form_type: string
           id: string
+          inspection_state: string
           inspector_name: string | null
           inspector_role: string | null
           licensee_certified_at: string | null
@@ -5100,9 +5182,11 @@ export type Database = {
           signature_data: string | null
           signature_type: string | null
           signed_at: string | null
+          started_at: string | null
           status: string
           stock_number: string | null
           submitted_via: string
+          superseded_by: string | null
           tenant_id: string
           updated_at: string
           user_agent: string | null
@@ -5111,6 +5195,7 @@ export type Database = {
           ymm: string | null
         }
         Insert: {
+          assigned_to?: string | null
           buyer_name?: string | null
           buyer_signature_data?: string | null
           buyer_signed_at?: string | null
@@ -5119,11 +5204,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_ip?: string | null
+          doc_version?: number
           documents?: Json
           esign_consent?: Json | null
           failure_notes?: string | null
           form_type?: string
           id?: string
+          inspection_state?: string
           inspector_name?: string | null
           inspector_role?: string | null
           licensee_certified_at?: string | null
@@ -5136,9 +5223,11 @@ export type Database = {
           signature_data?: string | null
           signature_type?: string | null
           signed_at?: string | null
+          started_at?: string | null
           status?: string
           stock_number?: string | null
           submitted_via?: string
+          superseded_by?: string | null
           tenant_id: string
           updated_at?: string
           user_agent?: string | null
@@ -5147,6 +5236,7 @@ export type Database = {
           ymm?: string | null
         }
         Update: {
+          assigned_to?: string | null
           buyer_name?: string | null
           buyer_signature_data?: string | null
           buyer_signed_at?: string | null
@@ -5155,11 +5245,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_ip?: string | null
+          doc_version?: number
           documents?: Json
           esign_consent?: Json | null
           failure_notes?: string | null
           form_type?: string
           id?: string
+          inspection_state?: string
           inspector_name?: string | null
           inspector_role?: string | null
           licensee_certified_at?: string | null
@@ -5172,9 +5264,11 @@ export type Database = {
           signature_data?: string | null
           signature_type?: string | null
           signed_at?: string | null
+          started_at?: string | null
           status?: string
           stock_number?: string | null
           submitted_via?: string
+          superseded_by?: string | null
           tenant_id?: string
           updated_at?: string
           user_agent?: string | null
@@ -5183,6 +5277,13 @@ export type Database = {
           ymm?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "safety_inspections_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "safety_inspections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "safety_inspections_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -5206,8 +5307,57 @@ export type Database = {
           },
         ]
       }
+      service_messages: {
+        Row: {
+          attachments: Json
+          author: string | null
+          author_name: string | null
+          body: string
+          created_at: string
+          id: string
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          attachments?: Json
+          author?: string | null
+          author_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          attachments?: Json
+          author?: string | null
+          author_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_requests: {
         Row: {
+          clarification_response: string | null
           created_at: string
           decided_at: string | null
           decided_by: string | null
@@ -5217,16 +5367,19 @@ export type Database = {
           est_parts: number | null
           est_total: number | null
           id: string
+          inspection_item_id: string | null
           is_safety: boolean
           manager_note: string | null
           message: string | null
           photos: Json
           reason: string | null
+          recommended_repair: string | null
           requested_by: string | null
           requested_by_name: string | null
           ro_number: string | null
           spend_limit: number | null
           status: string
+          sublet_cost: number | null
           tenant_id: string
           updated_at: string
           vehicle_listing_id: string | null
@@ -5235,6 +5388,7 @@ export type Database = {
           ymm: string | null
         }
         Insert: {
+          clarification_response?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -5244,16 +5398,19 @@ export type Database = {
           est_parts?: number | null
           est_total?: number | null
           id?: string
+          inspection_item_id?: string | null
           is_safety?: boolean
           manager_note?: string | null
           message?: string | null
           photos?: Json
           reason?: string | null
+          recommended_repair?: string | null
           requested_by?: string | null
           requested_by_name?: string | null
           ro_number?: string | null
           spend_limit?: number | null
           status?: string
+          sublet_cost?: number | null
           tenant_id: string
           updated_at?: string
           vehicle_listing_id?: string | null
@@ -5262,6 +5419,7 @@ export type Database = {
           ymm?: string | null
         }
         Update: {
+          clarification_response?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -5271,16 +5429,19 @@ export type Database = {
           est_parts?: number | null
           est_total?: number | null
           id?: string
+          inspection_item_id?: string | null
           is_safety?: boolean
           manager_note?: string | null
           message?: string | null
           photos?: Json
           reason?: string | null
+          recommended_repair?: string | null
           requested_by?: string | null
           requested_by_name?: string | null
           ro_number?: string | null
           spend_limit?: number | null
           status?: string
+          sublet_cost?: number | null
           tenant_id?: string
           updated_at?: string
           vehicle_listing_id?: string | null
@@ -5288,7 +5449,15 @@ export type Database = {
           work_requested?: string
           ymm?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "service_requests_inspection_item_id_fkey"
+            columns: ["inspection_item_id"]
+            isOneToOne: false
+            referencedRelation: "safety_inspection_item_failures"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       signature_evidence: {
         Row: {
@@ -6065,6 +6234,57 @@ export type Database = {
           },
         ]
       }
+      user_notifications: {
+        Row: {
+          created_at: string
+          dedupe_key: string | null
+          id: string
+          payload: Json
+          read_at: string | null
+          tenant_id: string
+          type: string
+          user_id: string
+          vin: string | null
+        }
+        Insert: {
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          payload?: Json
+          read_at?: string | null
+          tenant_id: string
+          type: string
+          user_id: string
+          vin?: string | null
+        }
+        Update: {
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          payload?: Json
+          read_at?: string | null
+          tenant_id?: string
+          type?: string
+          user_id?: string
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notifications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_notifications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -6231,6 +6451,48 @@ export type Database = {
           vin?: string
         }
         Relationships: []
+      }
+      vehicle_delivery_clearance: {
+        Row: {
+          computed_at: string
+          id: string
+          reason_codes: string[]
+          state: string
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          computed_at?: string
+          id?: string
+          reason_codes?: string[]
+          state: string
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          computed_at?: string
+          id?: string
+          reason_codes?: string[]
+          state?: string
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_delivery_clearance_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_delivery_clearance_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vehicle_documents: {
         Row: {
@@ -7417,6 +7679,10 @@ export type Database = {
         }
         Returns: Json
       }
+      assign_safety_inspection: {
+        Args: { p_inspection_id: string; p_user_id: string }
+        Returns: Json
+      }
       attach_title_document: {
         Args: {
           _doc_type: string
@@ -7490,6 +7756,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: string
       }
+      create_draft_window_sticker: {
+        Args: { p_tenant_id: string; p_vin: string }
+        Returns: string
+      }
       current_tenant_id: { Args: never; Returns: string }
       decide_recon_estimate: {
         Args: {
@@ -7508,6 +7778,15 @@ export type Database = {
           _channel?: string
           _line_id: string
           _reason?: string
+        }
+        Returns: Json
+      }
+      decide_service_request: {
+        Args: {
+          p_decision: string
+          p_note?: string
+          p_request_id: string
+          p_spend_limit?: number
         }
         Returns: Json
       }
@@ -7886,6 +8165,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: string
       }
+      k208_authority_configured: {
+        Args: { p_tenant_id: string }
+        Returns: boolean
+      }
       k208_record_buyer_signature: {
         Args: {
           _buyer_name: string
@@ -7894,6 +8177,10 @@ export type Database = {
           _signing_token: string
         }
         Returns: Json
+      }
+      k208_signer_allowed: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: boolean
       }
       listings_with_stale_recalls: {
         Args: { p_limit?: number }
@@ -7997,6 +8284,10 @@ export type Database = {
       rbac_is_tenant_admin: { Args: { p_tenant_id: string }; Returns: boolean }
       recalc_tenant_doc_fee: { Args: { p_tenant_id: string }; Returns: number }
       recall_payload_signature: { Args: { p: Json }; Returns: string }
+      recompute_delivery_clearance: {
+        Args: { p_tenant_id: string; p_vin: string }
+        Returns: Json
+      }
       recon_caller_role: { Args: { _tenant: string }; Returns: string }
       recon_confirm_lines_done: {
         Args: { _by: string; _line_ids: Json; _notes?: string; _token: string }
@@ -8159,6 +8450,10 @@ export type Database = {
         Args: { p_settings: Json; p_tenant_id: string }
         Returns: Json
       }
+      save_inspection_draft: {
+        Args: { p_checklist: Json; p_inspection_id: string }
+        Returns: Json
+      }
       save_marketcheck_config:
         | {
             Args: {
@@ -8185,6 +8480,14 @@ export type Database = {
             }
             Returns: undefined
           }
+      schedule_ingest_orchestrate_sweep: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
       schedule_marketcheck_sync: {
         Args: {
           _cron_expr?: string
@@ -8334,9 +8637,18 @@ export type Database = {
         Returns: Json
       }
       sweep_getready_install_safety_net: { Args: never; Returns: number }
+      sweep_missing_intake_drafts: { Args: { _limit?: number }; Returns: Json }
       tenant_price_verification_on: {
         Args: { _tenant_id: string }
         Returns: boolean
+      }
+      transition_safety_inspection: {
+        Args: {
+          p_inspection_id: string
+          p_new_state: string
+          p_reason?: string
+        }
+        Returns: Json
       }
       unschedule_marketcheck_sync: { Args: never; Returns: undefined }
       unschedule_reengage_abandoned_signings: {
