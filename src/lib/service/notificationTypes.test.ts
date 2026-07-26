@@ -36,6 +36,19 @@ describe("service notifications (S5)", () => {
     expect(SERVICE_NOTIFICATION_TYPES).toContain("service_request_decision");
   });
 
+  it("respond_service_clarification emits a type this vocabulary knows", () => {
+    const sql = readFileSync(
+      join(__dirname, "../../../supabase/migrations/20260726162000_respond_service_clarification.sql"),
+      "utf8",
+    );
+    expect(sql).toContain("'service_request_clarified'");
+    expect(SERVICE_NOTIFICATION_TYPES).toContain("service_request_clarified");
+  });
+
+  it("k208_executed is a declared type — the workspace notifies approvers on execution", () => {
+    expect(SERVICE_NOTIFICATION_TYPES).toContain("k208_executed");
+  });
+
   it("unread means no read_at stamp", () => {
     expect(isUnread({ read_at: null })).toBe(true);
     expect(isUnread({ read_at: "2026-07-25T00:00:00Z" })).toBe(false);

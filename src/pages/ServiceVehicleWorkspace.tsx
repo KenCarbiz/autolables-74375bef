@@ -447,6 +447,7 @@ export default function ServiceVehicleWorkspace() {
               canCompleteWork={canCompleteWork}
               userLabel={user?.email?.split("@")[0] || "member"}
               onChanged={() => void load()}
+              logAudit={log}
             />
           </div>
 
@@ -711,7 +712,7 @@ function K208Panel(props: K208PanelProps) {
 }
 
 /** Signed non-fail: execution/certification review, then the success record. */
-function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFailureCount, logAudit, onChanged }: K208PanelProps & { signedRow: InspRow }) {
+function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFailureCount, members, logAudit, onChanged }: K208PanelProps & { signedRow: InspRow }) {
   const { user } = useAuth();
   const vin = veh.vin.toUpperCase();
   const certified = !!signedRow.licensee_certified_at;
@@ -772,6 +773,9 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFail
       return;
     }
     logAudit({ action: "k208_executed", entity_type: "vehicle", entity_id: vin, store_id: tenantId, user_id: "", details: { inspection_id: signedRow.id, result_initial: resultInitial } });
+    await notifyMembers(tenantId, vin, members, (m) =>
+      hasDealerCapability(m.role, "can_approve_service_work", false),
+      "k208_executed", signedRow.id, { result_initial: resultInitial });
     // Materialize the stored clearance now, so the queue and Ready Board see
     // the change without anyone re-opening this workspace.
     await sb().rpc("recompute_delivery_clearance", { p_tenant_id: tenantId, p_vin: vin });
@@ -962,11 +966,15 @@ function InspectionChecklistPanel({ tenantId, veh, newestActive, canConduct, pas
   // existing failure (or N/A) is never overwritten — and forces re-review.
   const passAllEligible = () => {
     setReviewed(false);
-    setMarks((s) => {
-      const next = { ...s };
-      for (const item of K208_ITEMS) if (!next[item.id]) next[item.id] = "pass";
-      persistDraft(next, itemNotes, notes);
-      return next;
+    const filled = K208_ITEMS.filter((item) => !marks[item.id]).map((item) => item.id);
+    const next = { ...marks };
+    for (const id of filled) next[id] = "pass";
+    setMarks(next);
+    persistDraft(next, itemNotes, notes);
+    logAudit({
+      action: "inspection_pass_all", entity_type: "vehicle", entity_id: vin,
+      store_id: tenantId, user_id: "",
+      details: { inspection_id: serverDraftId, filled_items: filled.length, filled_item_ids: filled },
     });
     toast.message("Eligible items marked passed. Existing failures were kept. Review before submitting.");
   };
@@ -1413,9 +1421,10 @@ const SECTION_DEFS: { key: string; title: string; categories: string[] }[] = [
   { key: "documents", title: "Required documents", categories: ["docs"] },
 ];
 
-function WorkSections({ tenantId, vin, gr, vehRecall, canCompleteWork, userLabel, onChanged }: {
+function WorkSections({ tenantId, vin, gr, vehRecall, canCompleteWork, userLabel, onChanged, logAudit }: {
   tenantId: string; vin: string; gr: GrRow | null; vehRecall: string | null;
   canCompleteWork: boolean; userLabel: string; onChanged: () => void;
+  logAudit: ReturnType<typeof useAudit>["log"];
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const items = (gr?.items || []).filter(Boolean);
@@ -1436,8 +1445,9 @@ function WorkSections({ tenantId, vin, gr, vehRecall, canCompleteWork, userLabel
   const patchItem = async (itemId: string, patch: Partial<GetReadyItem>, failMessage: string) => {
     setBusyId(itemId);
     const next = items.map((i) => (i.id === itemId ? { ...i, ...patch } : i));
-    await saveItems(next, failMessage);
+    const ok = await saveItems(next, failMessage);
     setBusyId(null);
+    return ok;
   };
 
   const addItemPhoto = async (item: GetReadyItem, files: FileList | null) => {
@@ -1508,7 +1518,14 @@ function WorkSections({ tenantId, vin, gr, vehRecall, canCompleteWork, userLabel
                           aria-disabled={!canCompleteWork || busyId === item.id || undefined}
                           onClick={() => {
                             if (!canCompleteWork) return;
-                            void patchItem(item.id, { status: "complete", completedAt: new Date().toISOString(), completedBy: userLabel }, "Couldn't mark the item complete.");
+                            void patchItem(item.id, { status: "complete", completedAt: new Date().toISOString(), completedBy: userLabel }, "Couldn't mark the item complete.").then((ok) => {
+                              if (!ok) return;
+                              logAudit({
+                                action: "get_ready_item_completed", entity_type: "vehicle", entity_id: vin,
+                                store_id: tenantId, user_id: "",
+                                details: { get_ready_id: gr?.id, item_id: item.id, item_label: item.label, category: item.category ?? null, ro_number: item.roNumber || null },
+                              });
+                            });
                           }}
                           className={cn(BTN_SECONDARY, (!canCompleteWork || busyId === item.id) && "opacity-50 cursor-not-allowed")}
                         >

@@ -135,3 +135,92 @@ describe("get_ready_blocks_finalize — latest migration definition (S8)", () =>
     expect(body).toContain("is distinct from 'fail'");
   });
 });
+
+// 20260726190000: the safety_inspections write guard (audit D3.1 + D2.5).
+// A later redefinition that drops the signed-birth authority check or the
+// signed-row freeze reopens the direct-insert signing bypass — fail CI instead.
+describe("enforce_safety_inspection_guard — latest migration definition (D3.1/D2.5)", () => {
+  const body = norm(latestDefinition("enforce_safety_inspection_guard").body);
+
+  it("a row only becomes signed with conduct authority or the QR token flag", () => {
+    expect(body).toContain("k208_conduct_allowed");
+    expect(body).toContain("current_setting('app.k208_token_submit',true)");
+    expect(body).toContain("'not_authorized_to_sign_inspection'");
+  });
+
+  it("stamps created_by with the authenticated signer so authority checks cannot be spoofed", () => {
+    expect(body).toContain("new.created_by := v_uid");
+  });
+
+  it("licensee certification cannot be born on INSERT and only signers may write it on UPDATE", () => {
+    expect(body).toContain("'certification_only_via_certify_rpc'");
+    expect(body).toContain("k208_signer_allowed");
+    expect(body).toContain("'not_authorized_to_certify'");
+  });
+
+  it("signed rows freeze every legal field and only transition to voided", () => {
+    expect(body).toContain("'signed_inspection_frozen'");
+    for (const col of ["checklist", "result", "signature_data", "content_hash", "signed_at", "inspector_name"]) {
+      expect(body).toContain(`new.${col} is distinct from old.${col}`);
+    }
+  });
+
+  it("voiding a signed row requires manager authority and a documented reason", () => {
+    expect(body).toContain("'not_authorized_to_void'");
+    expect(body).toContain("'void_reason_required'");
+  });
+
+  it("voided rows are immutable", () => {
+    expect(body).toContain("'voided_inspection_immutable'");
+  });
+});
+
+describe("k208_conduct_allowed — latest migration definition", () => {
+  it("mirrors save_inspection_draft's conduct role matrix exactly", () => {
+    const guard = norm(latestDefinition("k208_conduct_allowed").body);
+    const draft = norm(latestDefinition("save_inspection_draft").body);
+    const roleList = "'owner','general_manager','gsm','admin','manager','service_manager','service_advisor','detail','service'";
+    expect(guard).toContain(roleList);
+    expect(draft).toContain(roleList);
+  });
+});
+
+describe("submit_safety_inspection — write-guard integration (D3.1)", () => {
+  const body = norm(latestDefinition("submit_safety_inspection").body);
+
+  it("sets the transaction-local token flag before writing the signed row", () => {
+    expect(body).toContain("set_config('app.k208_token_submit','1',true)");
+  });
+});
+
+describe("transition_safety_inspection — latest migration definition (D2.5)", () => {
+  const body = norm(latestDefinition("transition_safety_inspection").body);
+
+  it("the void branch records the voided metadata the write guard requires", () => {
+    expect(body).toContain("void_reason = trim(p_reason)");
+    expect(body).toContain("voided_by = v_uid");
+    expect(body).toContain("voided_at = now()");
+  });
+
+  it("still requires manager authority and a documented reason to void", () => {
+    expect(body).toContain("'not_authorized_to_void'");
+    expect(body).toContain("'void_reason_required'");
+  });
+});
+
+// 20260726191000: tenant_members.role feeds k208_signer_allowed's compat
+// fallback — role-granting authority must require an ACCEPTED admin membership
+// and every tenant-level role change must be audited.
+describe("member role authority — latest migration definitions (D2.1)", () => {
+  it("rbac_is_tenant_admin requires an accepted membership", () => {
+    const body = norm(latestDefinition("rbac_is_tenant_admin").body);
+    expect(body).toContain("accepted_at is not null");
+    expect(body).toContain("'owner','admin','general_manager'");
+  });
+
+  it("set_tenant_member_role audits the change like the platform-admin path", () => {
+    const body = norm(latestDefinition("set_tenant_member_role").body);
+    expect(body).toContain("'member_role_changed'");
+    expect(body).toContain("prev_role");
+  });
+});

@@ -3,6 +3,13 @@
 // double-clicked decision can never double-notify — the UNIQUE(dedupe_key)
 // insert becomes a no-op.
 
+// Wired producers today: failure_entered / k208_ready / ready_for_reinspection /
+// k208_executed (ServiceVehicleWorkspace), service_request_decision
+// (decide_service_request, 20260726107000), service_request_clarified
+// (respond_service_clarification, 20260726162000). The remaining types are the
+// SERVICE_DESK_SPEC forward vocabulary (cron/threshold alerts not built yet) —
+// keep them declared so the bell renders any early producer, but do not treat
+// them as emitted.
 export const SERVICE_NOTIFICATION_TYPES = [
   "service_task_created",
   "inspection_overdue",
@@ -13,6 +20,7 @@ export const SERVICE_NOTIFICATION_TYPES = [
   "k208_executed",
   "k208_unsigned_past_threshold",
   "service_request_decision",
+  "service_request_clarified",
   "storage_failure",
   "delivery_compliance_conflict",
 ] as const;
@@ -42,6 +50,7 @@ export const SERVICE_NOTIFICATION_LABELS: Record<ServiceNotificationType, string
   k208_executed: "K-208 executed",
   k208_unsigned_past_threshold: "K-208 unsigned past threshold",
   service_request_decision: "Additional-work decision",
+  service_request_clarified: "Additional-work clarification",
   storage_failure: "Document storage failure",
   delivery_compliance_conflict: "Delivery compliance conflict",
 };
