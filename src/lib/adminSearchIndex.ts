@@ -33,6 +33,8 @@ export const ADMIN_SETTINGS_INDEX: SettingEntry[] = [
   e("Store Settings", "settings", ["optional features", "store configuration"]),
   e("Branding", "branding", ["logo", "brand color", "dealership details", "address", "dealer license", "dms provider", "inventory feed urls"]),
   e("Label Templates", "labels", ["sticker templates", "label defaults", "sticker studio"]),
+  e("Factory Build Records", "labels", ["factory sticker", "factory build record", "monroney", "oem window sticker", "msrp reconciliation", "approve publish", "regenerate", "build sheet"], "factory-sticker"),
+  e("Factory Build Record Settings", "labels", ["factory sticker settings", "auto publish build record", "show on passport", "passport qr"], "factory-sticker-settings"),
   e("Included with Sale & Warranties", "programs", ["dealer programs", "perks", "loaner", "free car washes", "lifetime warranty", "dealer warranty", "dealer cpo", "dealer certified pre-owned", "warranty", "lifetime powertrain"]),
   e("Factory Warranty & CPO", "factory-warranty", ["oem warranty", "cpo", "certified pre-owned", "remaining coverage"]),
   e("Passport Buttons", "passport-ctas", ["sticky buttons", "cta", "call to action", "shopper buttons"]),

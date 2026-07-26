@@ -29,6 +29,7 @@ import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
+import FactoryStickerCard from "@/components/vehicle/FactoryStickerCard";
 import MerchandisingContentSection from "@/components/vehicle/MerchandisingContentSection";
 import DealFlowPanel from "@/components/vehicle/DealFlowPanel";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
@@ -1117,6 +1118,13 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
       <TabHeader
         title="Documents"
         description="Files available to shoppers and dealership staff — upload PDFs, links, brochures, reports, and warranty paperwork."
+      />
+      {/* Generated factory build record + the provider's actual OEM sticker */}
+      <FactoryStickerCard
+        vehicleId={vehicle.id}
+        tenantId={vehicle.tenant_id}
+        condition={vehicle.condition}
+        oemStickerUrl={(vehicle as unknown as { oem_sticker_url?: string | null }).oem_sticker_url ?? null}
       />
       {/* OEM brochure link — auto-harvested from the manufacturer's own site */}
       <BrochureFinderRow vehicle={vehicle} />

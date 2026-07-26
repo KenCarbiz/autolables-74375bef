@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronDown, Search, LayoutGrid, List, Eye, Download, Printer,
@@ -270,6 +270,25 @@ const RecordCover = ({ hero, label }: { hero?: string | null; label: string }) =
     : <div className="h-44 sm:h-full sm:min-h-[150px] w-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center"><span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/85">{label}</span></div>
 );
 
+// The generated factory build record, served only when its generated_documents
+// row is published (get_published_documents_public returns nothing else).
+interface FactoryStickerDoc {
+  id: string;
+  version: number;
+  pdf_url?: string | null;
+  online_url?: string | null;
+  published_at?: string | null;
+}
+
+// Customer-safe wording only — internal pipeline statuses never reach shoppers.
+// UNVERIFIED_GENERIC is deliberately absent: no verification claim is made.
+const FACTORY_VERIFICATION_BADGE: Record<string, string> = {
+  AUTO_VERIFIED: "Factory Build Data Verified",
+  PROVIDER_DECODED: "OEM Data Matched",
+  OEM_DATA_MATCHED: "OEM Data Matched",
+  DEALER_VERIFIED: "Dealer Verified",
+};
+
 const VehiclePassportDocuments = () => {
   const params = useParams<{ vehicleSlug?: string; slug?: string }>();
   const vehicleSlug = params.vehicleSlug ?? params.slug;
@@ -282,6 +301,8 @@ const VehiclePassportDocuments = () => {
   const [emailOpen, setEmailOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [reqSel, setReqSel] = useState<Set<string>>(() => new Set());
+  const [factoryDoc, setFactoryDoc] = useState<FactoryStickerDoc | null>(null);
+  const [factoryVerification, setFactoryVerification] = useState<string | null>(null);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
@@ -317,6 +338,46 @@ const VehiclePassportDocuments = () => {
 
   const grouped = useMemo(() => CATEGORIES.map((c) => ({ c, docs: filtered.filter((x) => categoryOf(x) === c.key) })).filter((g) => g.docs.length > 0), [filtered]);
 
+  // Published factory build record via the same anon-safe RPC that backs the
+  // passport document list — only published rows exist in its result, so an
+  // unpublished or review-held sticker can never appear here. Honors the
+  // dealer's packet documents toggle like every other document on this page.
+  useEffect(() => {
+    const s = listing?.slug;
+    if (!s || isPreview || !packetVisible(listing, "documents")) { setFactoryDoc(null); setFactoryVerification(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        // The RPC's parameter was renamed across migrations (p_slug vs _slug);
+        // accept either deployment.
+        // deno-lint-ignore no-explicit-any
+        let res = await (supabase as any).rpc("get_published_documents_public", { p_slug: s });
+        // deno-lint-ignore no-explicit-any
+        if (res.error) res = await (supabase as any).rpc("get_published_documents_public", { _slug: s });
+        const rows = (Array.isArray(res.data) ? res.data : []) as (FactoryStickerDoc & { document_type?: string })[];
+        const doc = rows
+          .filter((r) => r.document_type === "factory_sticker" && (r.pdf_url || r.online_url))
+          .sort((a, b) => (b.version || 0) - (a.version || 0))[0] || null;
+        if (cancelled) return;
+        setFactoryDoc(doc);
+        if (doc && listing?.id) {
+          // Verification detail is tenant-RLS'd: signed-in dealership staff see
+          // the badge source; anonymous shoppers simply get no badge.
+          // deno-lint-ignore no-explicit-any
+          const { data: rec } = await (supabase as any)
+            .from("factory_sticker_records")
+            .select("verification_status")
+            .eq("vehicle_id", listing.id)
+            .maybeSingle();
+          if (!cancelled) setFactoryVerification((rec?.verification_status as string) || null);
+        } else {
+          setFactoryVerification(null);
+        }
+      } catch { if (!cancelled) { setFactoryDoc(null); setFactoryVerification(null); } }
+    })();
+    return () => { cancelled = true; };
+  }, [listing, isPreview]);
+
   if (loading) return <DocSkeleton />;
   if (notFound || !listing || !d) return (
     <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Documents unavailable</h1></div></div>
@@ -348,7 +409,13 @@ const VehiclePassportDocuments = () => {
   if (oemManual?.url && packetVisible(listing, "ownersManual") && !allDocs.some((x) => x.type === "owners_manual"))
     printLinks.push({ title: `Official ${brochureMk.toUpperCase()} Owner's Manual${oemManual.year ? ` (${oemManual.year})` : ""}`, note: "Manufacturer website", url: oemManual.url });
   if (listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker"))
-    printLinks.push({ title: "Original Window Sticker", note: "Factory Monroney label", url: listing.oem_sticker_url });
+    printLinks.push({ title: "Original OEM Window Sticker", note: "Factory Monroney label", url: listing.oem_sticker_url });
+  const factoryDocUrl = factoryDoc ? (factoryDoc.pdf_url || factoryDoc.online_url || "") : "";
+  const isNewCar = listing.condition === "new";
+  const factoryTitle = isNewCar ? "Factory Window Sticker" : "Original Factory Build & MSRP Record";
+  const factorySubtitle = isNewCar ? "Factory Configuration & MSRP" : "VIN-Specific Factory Configuration When New";
+  if (factoryDocUrl)
+    printLinks.push({ title: factoryTitle, note: factorySubtitle, url: factoryDocUrl });
 
   // ── Document Center data (real records only — never fabricated) ──
   const dealerName = d.dealerName || "the dealership";
@@ -364,7 +431,7 @@ const VehiclePassportDocuments = () => {
   const manualLink = oemManual?.url && packetVisible(listing, "ownersManual") && !manualStored ? oemManual : null;
   const stickerLink = listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker") ? listing.oem_sticker_url : null;
   const externalCount = (histLink ? 1 : 0) + (brochureLink ? 1 : 0) + (manualLink ? 1 : 0) + (stickerLink ? 1 : 0);
-  const availableCount = uploaded.length + externalCount;
+  const availableCount = uploaded.length + externalCount + (factoryDocUrl ? 1 : 0);
   const lastChecked = lastUpdated || "Today";
   const trackDoc = (cta: string, meta: Record<string, unknown> = {}) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page", ...meta } }); };
   const toggleReq = (k: string) => setReqSel((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
@@ -514,6 +581,44 @@ const VehiclePassportDocuments = () => {
                         meta={<span className="inline-flex items-center gap-1">{fileType(doc.url)}{doc.uploaded_at ? ` · Added ${fmtDate(doc.uploaded_at)}` : ""}</span>}
                         action={uploadedAction(doc)} />
                     ))}
+                    {factoryDocUrl && factoryDoc && (
+                      <RecordCard
+                        cover={<RecordCover hero={hero} label={isNewCar ? "Window Sticker" : "Build Record"} />}
+                        title={factoryTitle}
+                        source={factorySubtitle}
+                        status="available"
+                        explanation={`The equipment, packages and MSRP this exact VIN carried when it left the factory, prepared by ${dealerName} from the factory build data.`}
+                        meta={<>
+                          {factoryVerification && FACTORY_VERIFICATION_BADGE[factoryVerification] && (
+                            <span className="inline-flex items-center gap-1 text-[#15803D] font-semibold"><BadgeCheck className="w-3.5 h-3.5" /> {FACTORY_VERIFICATION_BADGE[factoryVerification]}</span>
+                          )}
+                          <span className="inline-flex items-center gap-1">PDF{factoryDoc.published_at ? ` · Added ${fmtDate(factoryDoc.published_at)}` : ""}</span>
+                        </>}
+                        action={
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => { trackDoc("factory_build_record_view"); setPreview({ type: "factory_sticker", name: factoryTitle, url: factoryDocUrl }); }}
+                              className="h-9 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
+                            >
+                              <Eye className="w-4 h-4" /> View Document
+                            </button>
+                            <a
+                              href={factoryDoc.pdf_url || factoryDocUrl} download target="_blank" rel="noreferrer"
+                              onClick={() => trackDoc("factory_build_record_download")}
+                              className="h-9 px-3.5 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"
+                            >
+                              <Download className="w-4 h-4" /> Download PDF
+                            </a>
+                            <button
+                              onClick={() => { trackDoc("factory_build_record_print"); window.open(factoryDocUrl, "_blank", "noopener"); }}
+                              className="h-9 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#0F172A] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
+                            >
+                              <Printer className="w-4 h-4" /> Print
+                            </button>
+                          </div>
+                        }
+                        why="The factory build record confirms the original equipment and MSRP for this exact VIN, so you can compare it with how the vehicle is equipped today." />
+                    )}
                     {histLink && (
                       <RecordCard
                         cover={<RecordCover hero={hero} label="History Report" />}
@@ -540,7 +645,7 @@ const VehiclePassportDocuments = () => {
                     {stickerLink && (
                       <RecordCard
                         cover={<RecordCover hero={hero} label="Window Sticker" />}
-                        title="Original Window Sticker"
+                        title="Original OEM Window Sticker"
                         source="Manufacturer source"
                         status="external"
                         explanation="Original factory window sticker — MSRP and factory equipment as built."

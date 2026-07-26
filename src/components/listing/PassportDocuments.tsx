@@ -24,6 +24,7 @@ const TYPE_LABEL: Record<string, string> = {
   passport: "Vehicle Passport",
   buyers_guide: "Buyer's Guide",
   cpo: "CPO Sheet",
+  factory_sticker: "Factory Build Record",
 };
 
 const fmt = (d?: string | null) => (d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "");

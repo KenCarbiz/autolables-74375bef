@@ -37,6 +37,7 @@ import DocumentRulesPanel from "@/components/admin/DocumentRulesPanel";
 import EnabledFeaturesPanel from "@/components/admin/EnabledFeaturesPanel";
 import StickerPrintTemplates from "@/components/admin/StickerPrintTemplates";
 import LabelDefaultsPanel from "@/components/admin/LabelDefaultsPanel";
+import FactoryStickerPanel from "@/components/admin/FactoryStickerPanel";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
@@ -2097,6 +2098,7 @@ const Admin = () => {
         {tab === "labels" && (
           <div className="space-y-3">
             <LabelDefaultsPanel />
+            <FactoryStickerPanel />
             <div className="bg-card rounded-lg p-4 shadow-premium">
               <h4 className="text-sm font-bold text-foreground mb-1">Design your own templates</h4>
               <p className="text-xs text-muted-foreground mb-2">

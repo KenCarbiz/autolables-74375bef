@@ -19,6 +19,8 @@ export const DOC_TYPE_LABEL: Record<string, string> = {
   buyers_guide: "FTC Buyers Guide",
   // generated_documents accepts 'k208' since 20260722180000_k208_ingest_forms_flow.
   k208: "CT K-208 Safety Inspection",
+  // generated_documents accepts 'factory_sticker' since 20260727070000_factory_sticker_foundation.
+  factory_sticker: "Factory Build Record",
 };
 
 export const documentLabel = (documentType: string | null | undefined): string =>

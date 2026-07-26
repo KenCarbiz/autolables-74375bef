@@ -3,7 +3,7 @@ import { FileText, ExternalLink } from "lucide-react";
 
 const TYPE_LABEL: Record<string, string> = {
   window: "Window Sticker", addendum: "Addendum", passport: "Vehicle Passport",
-  buyers_guide: "Buyer's Guide", cpo: "CPO Sheet",
+  buyers_guide: "Buyer's Guide", cpo: "CPO Sheet", factory_sticker: "Factory Build Record",
 };
 const fmt = (d?: string | null) => (d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "");
 

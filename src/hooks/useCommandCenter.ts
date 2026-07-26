@@ -237,8 +237,9 @@ export interface DocRow {
   href?: string;
   /** The number the next copy wears — present exactly when Reprint is offered. */
   reprintCopy?: number;
-  /** The generate-vehicle-forms kind that can rebuild this row's missing file. */
-  generateKind?: "buyers_guide" | "k208";
+  /** The service that can rebuild this row's missing file: generate-vehicle-forms
+   *  for buyers_guide/k208, factory-sticker-orchestrate for factory_sticker. */
+  generateKind?: "buyers_guide" | "k208" | "factory_sticker";
   /** Why a file-less row has no Generate action. */
   generateBlockedReason?: string;
 }
@@ -1725,11 +1726,13 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
     const printState = printReleaseState(d);
 
     // Row actions, derived from the same state as the pill so the offer and
-    // the pill cannot disagree. Generate covers exactly the forms
-    // generate-vehicle-forms can fill (buyers_guide, k208); every other
-    // file-less row states why it has no button.
+    // the pill cannot disagree. Generate covers the forms generate-vehicle-forms
+    // can fill (buyers_guide, k208) plus the factory build record, which
+    // regenerates through factory-sticker-orchestrate; every other file-less
+    // row states why it has no button.
     const docType = String(d.document_type || "");
-    const canGenerate = printState === "no_file" && (docType === "buyers_guide" || docType === "k208");
+    const canGenerate = printState === "no_file"
+      && (docType === "buyers_guide" || docType === "k208" || docType === "factory_sticker");
 
     rows.push({
       visibility,
@@ -1746,7 +1749,7 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
         printStatus: PRINT_STATE_PILL[printState],
         href: d.pdf_url || d.online_url || undefined,
         reprintCopy: reprintable(d) ? reprintCopyNumber(d) : undefined,
-        generateKind: canGenerate ? (docType as "buyers_guide" | "k208") : undefined,
+        generateKind: canGenerate ? (docType as "buyers_guide" | "k208" | "factory_sticker") : undefined,
         generateBlockedReason: printState === "no_file" && !canGenerate
           ? "This document is not filled by the forms service — regenerate it from its own studio."
           : undefined,
@@ -2132,6 +2135,30 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
     }
     generating.current = true;
     try {
+      // The factory build record has its own pipeline: factory-sticker-orchestrate
+      // rebuilds it from the saved build data (manager authority enforced there).
+      if (row.generateKind === "factory_sticker") {
+        const res = await sb().functions.invoke("factory-sticker-orchestrate", {
+          body: {
+            action: "regenerate", tenant_id: tenantId, vehicle_id: vehicleId,
+            app_base: typeof window !== "undefined" ? window.location.origin : undefined,
+          },
+        });
+        const payload = (res?.data || {}) as Row;
+        if (res?.error || payload.success !== true) {
+          const detail = res?.error?.message || String(payload.error || "regenerate failed");
+          console.error("[useCommandCenter] factory sticker regenerate failed:", detail);
+          return {
+            ok: false,
+            error: /insufficient_permission/i.test(detail)
+              ? "Regenerating the factory build record needs manager authority."
+              : "The factory build record could not be regenerated. Nothing changed — retry in a moment.",
+            errorDetail: detail,
+          };
+        }
+        await reload();
+        return { ok: true };
+      }
       const res = await sb().functions.invoke("generate-vehicle-forms", {
         body: {
           tenant_id: tenantId, vin: current.vehicle.vin, kinds: [row.generateKind],

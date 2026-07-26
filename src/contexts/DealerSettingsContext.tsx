@@ -98,6 +98,25 @@ const defaultStickerTemplates = (): Record<StickerDocType, StickerPrintTemplate>
   used_addendum: { ...DEFAULT_STICKER_TEMPLATE, content_area: { ...DEFAULT_CONTENT_AREA } },
 });
 
+// Factory Build Record pipeline controls, read by the sticker orchestrator and
+// the passport surfaces. Auto-publish stays per-condition: used/CPO records
+// default to auto-publish, new-car records default to manager review.
+export interface FactoryStickerSettings {
+  enabled: boolean;
+  auto_publish_used: boolean;
+  auto_publish_new: boolean;
+  show_on_passport: boolean;
+  show_qr: boolean;
+}
+
+export const DEFAULT_FACTORY_STICKER_SETTINGS: FactoryStickerSettings = {
+  enabled: true,
+  auto_publish_used: true,
+  auto_publish_new: false,
+  show_on_passport: true,
+  show_qr: true,
+};
+
 export interface DealerSettings {
   // Branding
   dealer_name: string;
@@ -359,6 +378,9 @@ export interface DealerSettings {
   // own VDP or entered manually); this hides all of them instantly — e.g.
   // if the CARFAX subscription lapses and links would land on a paywall.
   history_report_links_enabled: boolean;
+  // Factory Build Record generation + publishing controls (Admin > Label
+  // Templates > Factory Build Records).
+  factory_sticker: FactoryStickerSettings;
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -518,6 +540,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   iihs_awards_enabled: false,
   iihs_awards: [],
   history_report_links_enabled: true,
+  factory_sticker: { ...DEFAULT_FACTORY_STICKER_SETTINGS },
 };
 
 interface DealerSettingsContextType {
