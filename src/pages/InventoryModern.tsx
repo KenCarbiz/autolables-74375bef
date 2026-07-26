@@ -11,6 +11,7 @@ import { useAdvertisedPrices, assessDrift, SOURCE_LABELS, type AdvertisedPrice }
 import { useGetReady } from "@/hooks/useGetReady";
 import { usedSafetyInspectionForm } from "@/data/safetyInspection";
 import { useVinDecode } from "@/hooks/useVinDecode";
+import { runManualIntakeOrchestration } from "@/lib/manualIntakeOrchestration";
 import { toast } from "sonner";
 import {
   Plus, Search, Upload, Car, FileText, Printer, Signature, ScanLine,
@@ -1323,6 +1324,9 @@ const AddVehicleModal = ({ tenantId, userId, onClose, onCreated }: AddProps) => 
     if (error) { toast.error(`Failed: ${error.message}`); return; }
     // Fire-and-forget recall check for the new VIN (best-effort).
     supabase.functions.invoke("marketcheck-recalls", { body: { vin: vin.trim().toUpperCase(), tenant_id: tenantId } }).catch(() => {});
+    // Same intake orchestration the ingest paths run (drafts + hub token +
+    // clearance) — best-effort, never blocks the insert.
+    void runManualIntakeOrchestration(tenantId, vin.trim().toUpperCase(), condition);
     onCreated(data.id);
   };
 
@@ -1407,6 +1411,13 @@ const CsvImportModal = ({ tenantId, userId, onClose, onImported }: ImportProps) 
     setSubmitting(false);
     if (error) { toast.error(`Import failed: ${error.message}`); return; }
     toast.success(`Imported ${data?.length ?? 0} vehicle(s)`);
+    // Same intake orchestration the ingest paths run, sequentially so a large
+    // import doesn't stampede the RPCs — best-effort, never blocks the import.
+    void (async () => {
+      for (const row of toInsert) {
+        await runManualIntakeOrchestration(tenantId, String(row.vin || ""), String(row.condition || "used"));
+      }
+    })();
     onImported();
   };
 

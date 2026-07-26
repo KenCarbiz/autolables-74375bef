@@ -741,11 +741,21 @@ export function useVinCommand(vehicleId?: string): Result<VinCommand> & {
     if (retrying.current) return { ok: false, error: "A retry is already running." };
     retrying.current = true;
     try {
-      const { error: rpcErr } = await sb().rpc(row.retryRpc, { p_tenant_id: tenantId, p_vin: vin });
+      const { data: draftId, error: rpcErr } = await sb().rpc(row.retryRpc, { p_tenant_id: tenantId, p_vin: vin });
       if (rpcErr) {
         const detail = rpcErr.message || String(rpcErr);
         console.error("[useCommandCenter] artifact retry failed:", detail);
         return { ok: false, error: humanizeRetryError(detail), errorDetail: detail };
+      }
+      // Every draft RPC returns the artifact's row id, and NULL when the
+      // listing is gone or no longer qualifies (wrong condition, no VIN
+      // match). NULL means nothing was created — clearing the exception here
+      // would silently bury a still-missing artifact.
+      if (draftId == null) {
+        return {
+          ok: false,
+          error: `${row.label} could not be created: the vehicle no longer qualifies for it, or is missing. The exception stays open.`,
+        };
       }
       // The draft now exists, so the artifact comes off the exception row —
       // and an emptied row is resolved, exactly as the queue would resolve it.

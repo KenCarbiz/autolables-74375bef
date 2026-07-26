@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { runManualIntakeOrchestration } from "@/lib/manualIntakeOrchestration";
 import type { DealerProgram } from "@/lib/dealerPrograms";
 
 // ──────────────────────────────────────────────────────────────
@@ -280,6 +281,9 @@ export const useVehicleListing = (storeId: string) => {
         console.error("createListing error", error);
         return null;
       }
+      // Same intake orchestration the ingest paths run (drafts + hub token +
+      // clearance) — best-effort, never blocks the listing creation.
+      void runManualIntakeOrchestration(storeId, input.vin, input.condition);
       await load();
       return data as VehicleListing;
     },

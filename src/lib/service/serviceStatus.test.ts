@@ -122,6 +122,21 @@ describe("deriveServiceStatus — ready for reinspection (amber, matching derive
     expect(s.tone).toBe("amber");
   });
 
+  it("all failures resolved (passed_on_reinspection) with the workflow lagging is amber Reinspect, not a red dead-end", () => {
+    const s = deriveServiceStatus(veh, grComplete, { result: "fail" }, false,
+      { openFailures: 0, resolvedFailures: 2, inspectionState: "repairs_in_progress" });
+    expect(s.bannerKey).toBe("ready_for_reinspection");
+    expect(s.tone).toBe("amber");
+    expect(s.nextLabel).toBe("Reinspect repaired items");
+  });
+
+  it("a signed fail with no failure rows filed stays red Resolve failed items", () => {
+    const s = deriveServiceStatus(veh, grComplete, { result: "fail" }, false,
+      { openFailures: 0, resolvedFailures: 0, inspectionState: "failed_items_open" });
+    expect(s.bannerKey).toBe("failed");
+    expect(s.tone).toBe("red");
+  });
+
   it("a mix of repaired and unrepaired items stays red Resolve failed items", () => {
     const s = deriveServiceStatus(veh, grComplete, { result: "fail" }, false,
       { openFailures: 3, failuresReadyForReinspection: 2 });

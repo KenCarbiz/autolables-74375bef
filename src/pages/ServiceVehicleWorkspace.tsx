@@ -119,6 +119,7 @@ export default function ServiceVehicleWorkspace() {
   const [inspections, setInspections] = useState<InspRow[]>([]);
   const [failures, setFailures] = useState<FailureRow[]>([]);
   const [pendingRequests, setPendingRequests] = useState(0);
+  const [fileStock, setFileStock] = useState<string | null>(null);
   const [clearance, setClearance] = useState<Clearance | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
@@ -128,7 +129,7 @@ export default function ServiceVehicleWorkspace() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [vehRes, grRes, siRes, srRes, memRes, auditRes] = await Promise.all([
+      const [vehRes, grRes, siRes, srRes, memRes, auditRes, vfRes] = await Promise.all([
         sb().from("vehicle_listings")
           .select("id, vin, ymm, condition, status, mileage, recall_status, hero_image_url, mc_attributes, created_at, deal_processed_at")
           .eq("tenant_id", tenantId).eq("vin", vin).limit(1).maybeSingle(),
@@ -146,6 +147,10 @@ export default function ServiceVehicleWorkspace() {
         sb().from("audit_log").select("id, action, created_at, details")
           .eq("store_id", tenantId).eq("entity_id", vin)
           .order("created_at", { ascending: false }).limit(25),
+        // Stock truth is vehicle_files.stock_number (marketcheck-sync writes
+        // it there); mc_attributes.stock_no is only a legacy fallback.
+        sb().from("vehicle_files").select("stock_number")
+          .eq("tenant_id", tenantId).eq("vin", vin).limit(1).maybeSingle(),
       ]);
       if (vehRes.error) throw new Error(vehRes.error.message);
       const listing = (vehRes.data as Listing) || null;
@@ -156,6 +161,7 @@ export default function ServiceVehicleWorkspace() {
       setPendingRequests(((srRes.data as { id: string }[]) || []).length);
       setMembers(((memRes.data as MemberRow[]) || []).filter((m) => m.accepted_at && m.user_id));
       setAuditRows((auditRes.data as AuditRow[]) || []);
+      setFileStock(String((vfRes.data as { stock_number?: string | null } | null)?.stock_number || "") || null);
       const inspIds = insp.map((r) => r.id);
       if (inspIds.length) {
         const { data: fRows } = await sb().from("safety_inspection_item_failures")
@@ -224,13 +230,14 @@ export default function ServiceVehicleWorkspace() {
     workflowState: newestActive?.inspection_state ?? null,
     openFailures: openFailures.length,
     failuresReadyForReinspection: openFailures.filter((f) => f.repair_state === "ready_for_reinspection").length,
+    resolvedFailures: failures.length - openFailures.length,
     awaitingApproval: pendingRequests > 0,
     grStarted,
     recallStatus: veh?.recall_status,
     clearanceState: clearance?.state ?? null,
     clearanceReasons: clearance?.reason_codes ?? [],
     canExecute,
-  }), [newestSigned, newestActive, openFailures, pendingRequests, grStarted, veh, clearance, canExecute]);
+  }), [newestSigned, newestActive, openFailures, failures, pendingRequests, grStarted, veh, clearance, canExecute]);
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -300,7 +307,7 @@ export default function ServiceVehicleWorkspace() {
     );
   }
 
-  const stock = String((veh.mc_attributes as Record<string, unknown> | null)?.stock_no || "") || null;
+  const stock = fileStock || String((veh.mc_attributes as Record<string, unknown> | null)?.stock_no || "") || null;
   const ymm = veh.ymm || "Vehicle";
   const trim = ymm.split(/\s+/).slice(3).join(" ") || null;
   const assignedMember = members.find((m) => m.user_id === newestActive?.assigned_to);
@@ -1213,7 +1220,13 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
     await sb().rpc("recompute_delivery_clearance", { p_tenant_id: tenantId, p_vin: vin });
     onChanged();
   };
-  const allItemsReady = open.length > 0 && open.every((f) => f.repair_state === "ready_for_reinspection");
+  // Zero open items with at least one resolved (every failure already passed
+  // reinspection while the workflow state lagged behind) must still allow
+  // repairs_in_progress -> ready_for_reinspection, or the record is stranded
+  // with no enabled control except void.
+  const allItemsReady = open.length > 0
+    ? open.every((f) => f.repair_state === "ready_for_reinspection")
+    : failures.some((f) => isFailureResolved(f.repair_state));
 
   const addFailurePhoto = async (f: FailureRow, files: FileList | null) => {
     if (!files?.length) return;

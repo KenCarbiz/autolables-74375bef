@@ -8,6 +8,7 @@ import { deriveServiceStatus } from "@/lib/service/serviceStatus";
 import { deriveServicePriority, compareServicePriority, type ServicePriority } from "@/lib/service/priority";
 import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
 import { isFailureResolved } from "@/lib/service/transitions";
+import { isFailedInspection } from "@/lib/commandCenter/inspectionState";
 import {
   CommandStatCard, EmptyState, ErrorCard, LoadingCard, StatusPill,
   BTN_PRIMARY, BTN_SECONDARY, formatCommandDateTime,
@@ -98,15 +99,6 @@ const K208_CHIP: Record<Row["k208State"], { label: string; cls: string; Icon: ty
 const PRIORITY_ICON = { High: ArrowUp, Medium: Minus, Low: ArrowDown } as const;
 const PRIORITY_CLS = { High: "text-red-600", Medium: "text-amber-600", Low: "text-slate-400" } as const;
 
-// Keyboard activation for the non-button row/card openers (WCAG 2.1.1):
-// Enter and Space both open, and Space must not scroll the page.
-const activateOnKey = (fn: () => void) => (e: React.KeyboardEvent) => {
-  if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
-    e.preventDefault();
-    fn();
-  }
-};
-
 export default function ServiceQueue() {
   const { tenant } = useTenant();
   const { openScan } = useVinScan();
@@ -138,7 +130,7 @@ export default function ServiceQueue() {
       const vs = (vehicles as any[]) || [];
       const vins = vs.map((v) => v.vin).filter(Boolean);
       const empty = Promise.resolve({ data: [] });
-      const [grRes, siRes, srRes, failRes, clrRes, memRes] = await Promise.all([
+      const [grRes, siRes, srRes, failRes, clrRes, memRes, vfRes] = await Promise.all([
         vins.length ? sb().from("get_ready_records").select("vin, status, items, get_ready_complete_date, delivery_target").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         vins.length ? sb().from("safety_inspections").select("vin, status, result, inspection_state, assigned_to, licensee_certified_at, signed_at, created_at").eq("tenant_id", tenant.id).in("vin", vins).order("created_at", { ascending: false }) : empty,
         // 'clarify' rows are still-open requests (waiting on the requester's
@@ -147,6 +139,10 @@ export default function ServiceQueue() {
         vins.length ? sb().from("safety_inspection_item_failures").select("vin, repair_state").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         vins.length ? sb().from("vehicle_delivery_clearance").select("vin, state, reason_codes").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         sb().rpc("list_tenant_members", { p_tenant_id: tenant.id }),
+        // Stock truth: marketcheck-sync writes stock to
+        // vehicle_files.stock_number; mc_attributes.stock_no is only a legacy
+        // fallback that no ingest path fills anymore.
+        vins.length ? sb().from("vehicle_files").select("vin, stock_number").eq("tenant_id", tenant.id).in("vin", vins) : empty,
       ]);
 
       // deno-lint-ignore no-explicit-any
@@ -173,14 +169,21 @@ export default function ServiceQueue() {
       }
 
       const awaitingVins = new Set<string>(((srRes.data as { vin: string }[]) || []).map((r) => r.vin));
-      const failuresByVin = new Map<string, { open: number; ready: number }>();
+      const failuresByVin = new Map<string, { open: number; ready: number; resolved: number }>();
       for (const f of ((failRes.data as { vin: string; repair_state: string }[]) || [])) {
-        const cur = failuresByVin.get(f.vin) || { open: 0, ready: 0 };
+        const cur = failuresByVin.get(f.vin) || { open: 0, ready: 0, resolved: 0 };
         if (!isFailureResolved(f.repair_state)) {
           cur.open += 1;
           if (f.repair_state === "ready_for_reinspection") cur.ready += 1;
+        } else {
+          cur.resolved += 1;
         }
         failuresByVin.set(f.vin, cur);
+      }
+      const stockByVin = new Map<string, string>();
+      for (const f of ((vfRes.data as { vin: string; stock_number: string | null }[]) || [])) {
+        const s = String(f.stock_number || "").trim();
+        if (s) stockByVin.set(String(f.vin || "").toUpperCase(), s);
       }
       const clrByVin = new Map<string, { state: string; reason_codes: string[] }>();
       for (const c of ((clrRes.data as { vin: string; state: string; reason_codes: string[] }[]) || [])) clrByVin.set(c.vin, c);
@@ -196,7 +199,7 @@ export default function ServiceQueue() {
         const signed = signedByVin.get(v.vin);
         const active = activeByVin.get(v.vin);
         const awaiting = awaitingVins.has(v.vin);
-        const fails = failuresByVin.get(v.vin) || { open: 0, ready: 0 };
+        const fails = failuresByVin.get(v.vin) || { open: 0, ready: 0, resolved: 0 };
         const clr = clrByVin.get(v.vin) || null;
         // The stored clearance + open item failures feed the derivation so the
         // queue can never render "Cleared" (or offer Execute K-208) unless the
@@ -206,13 +209,18 @@ export default function ServiceQueue() {
           clearanceState: clr?.state ?? null,
           openFailures: fails.open,
           failuresReadyForReinspection: fails.ready,
+          resolvedFailures: fails.resolved,
           inspectionState,
           newestVoided: newestByVin.get(v.vin)?.status === "voided",
         });
         const ageHours = v.created_at ? (now - new Date(v.created_at).getTime()) / 36e5 : 0;
         const sold = !!v.deal_processed_at || String(v.status || "") === "sold";
+        // Mirrors deriveServiceStatus/deriveWorkspaceStatus: a signed fail
+        // whose filed failures ALL passed reinspection is waiting on the
+        // reinspection, not stuck in the failed bucket.
         const awaitingReinspection = inspectionState === "ready_for_reinspection"
-          || (fails.open > 0 && fails.ready === fails.open);
+          || (fails.open > 0 && fails.ready === fails.open)
+          || (fails.open === 0 && fails.resolved > 0 && isFailedInspection(signed ?? null));
         const overdue = !s.cleared && s.k208State !== "executed" && ageHours > overdueHours;
         const priority = deriveServicePriority({
           sold,
@@ -241,7 +249,7 @@ export default function ServiceQueue() {
         const parts = ymm.split(/\s+/);
         return {
           id: v.id, vin, ymm, trim: parts.slice(3).join(" "),
-          stock: (v.mc_attributes?.stock_no as string) || "",
+          stock: stockByVin.get(vin) || (v.mc_attributes?.stock_no as string) || "",
           photo: (v.hero_image_url as string) || (Array.isArray(v.mc_attributes?.photo_links) ? v.mc_attributes.photo_links[0] : "") || "",
           condition: String(v.condition || "used").toUpperCase(),
           grState: s.grState, k208State: s.k208State, inspectionState,
@@ -280,7 +288,10 @@ export default function ServiceQueue() {
     const oldestReadyH = ready.length
       ? Math.max(...ready.map((r) => (r.readySince ? (Date.now() - new Date(r.readySince).getTime()) / 36e5 : 0)))
       : 0;
-    const blocked = rows.filter((r) => r.k208State === "blocked" || r.awaiting);
+    // Counts exactly what its click target (the Failed tab) shows: rows in the
+    // "failed" bucket. Awaiting-approval and reinspect rows live in other tabs
+    // and must not inflate a KPI whose target cannot show them.
+    const blocked = rows.filter((r) => r.bucket === "failed");
     const soldBlocked = blocked.filter((r) => r.sold).length;
     // Counts exactly what the Completed tab shows, restricted to today: a
     // vehicle certified today but still pending clearance is NOT completed.
@@ -461,15 +472,15 @@ export default function ServiceQueue() {
               {visible.map((r) => {
                 const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
                 const P = PRIORITY_ICON[r.priority.level];
+                // Never role="button" on the tr: nesting the real action
+                // buttons inside an interactive row destroys table semantics.
+                // The vehicle-name button is the accessible opener; the row's
+                // onClick is a mouse convenience only.
                 return (
                   <tr
                     key={r.id}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Open service preview for ${r.ymm}`}
-                    className="hover:bg-muted/40 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    className="hover:bg-muted/40 cursor-pointer"
                     onClick={() => setDrawer(r)}
-                    onKeyDown={activateOnKey(() => setDrawer(r))}
                   >
                     <td className="px-4 py-2.5">
                       <span className={cn("inline-flex items-center gap-1 text-xs font-bold", PRIORITY_CLS[r.priority.level])}>
@@ -477,7 +488,17 @@ export default function ServiceQueue() {
                       </span>
                       <p className="text-[10.5px] text-muted-foreground">{r.priority.label}</p>
                     </td>
-                    <td className="px-4 py-2.5"><div className="flex items-center gap-2.5 min-w-0"><VehThumb r={r} /><div className="min-w-0"><p className="font-semibold text-foreground truncate">{r.ymm}</p><p className="text-[11px] text-muted-foreground">{r.condition}{r.trim ? ` · ${r.trim}` : ""}</p></div></div></td>
+                    <td className="px-4 py-2.5"><div className="flex items-center gap-2.5 min-w-0"><VehThumb r={r} /><div className="min-w-0">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setDrawer(r); }}
+                        aria-label={`Open service preview for ${r.ymm}`}
+                        className="block max-w-full font-semibold text-foreground truncate text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
+                      >
+                        {r.ymm}
+                      </button>
+                      <p className="text-[11px] text-muted-foreground">{r.condition}{r.trim ? ` · ${r.trim}` : ""}</p>
+                    </div></div></td>
                     <td className="px-4 py-2.5"><p className="font-mono text-[12px] text-foreground">{r.stock || "—"}</p><p className="font-mono text-[11px] text-muted-foreground">…{r.vin.slice(-6)}</p></td>
                     <td className="px-4 py-2.5">
                       <span className={cn("text-xs font-semibold tabular-nums", r.overdue ? "text-red-600" : "text-foreground")}>{ageLabel(r.ageHours)}</span>
@@ -526,20 +547,15 @@ export default function ServiceQueue() {
 }
 
 /** Mobile queue card: thumb, YMM, stock, VIN-6, status chips, plain-language
- *  priority reason, ONE full-width primary action. Tapping the card body opens
- *  the preview drawer; only the button starts work. */
+ *  priority reason, ONE full-width primary action plus an explicit Details
+ *  button that opens the preview drawer. The card body itself is never
+ *  interactive — a role="button" wrapper around real buttons breaks the
+ *  buttons for assistive tech. */
 function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => void; onPrimary: () => void }) {
   const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
   const P = PRIORITY_ICON[r.priority.level];
   return (
-    <article
-      role="button"
-      tabIndex={0}
-      aria-label={`Open service preview for ${r.ymm}`}
-      className="rounded-2xl border border-border bg-card p-3.5 space-y-2.5 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-      onClick={onOpen}
-      onKeyDown={activateOnKey(onOpen)}
-    >
+    <article className="rounded-2xl border border-border bg-card p-3.5 space-y-2.5">
       <div className="flex items-start gap-3">
         <VehThumb r={r} />
         <div className="min-w-0 flex-1">
@@ -567,14 +583,24 @@ function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => voi
         {r.sold && <StatusPill tone="blue">Sold</StatusPill>}
       </div>
       <p className="text-[11.5px] text-muted-foreground">{r.priority.label}</p>
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onPrimary(); }}
-        className={cn("w-full min-h-[44px] rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-1.5",
-          r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-border text-foreground" : "bg-primary text-primary-foreground")}
-      >
-        {r.next.label} <ChevronRight className="w-4 h-4" aria-hidden="true" />
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onPrimary}
+          className={cn("flex-1 min-h-[44px] rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-1.5",
+            r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-border text-foreground" : "bg-primary text-primary-foreground")}
+        >
+          {r.next.label} <ChevronRight className="w-4 h-4" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={`Open service preview for ${r.ymm}`}
+          className="min-h-[44px] px-3.5 rounded-xl border border-border text-sm font-semibold text-foreground shrink-0"
+        >
+          Details
+        </button>
+      </div>
     </article>
   );
 }

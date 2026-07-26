@@ -118,6 +118,15 @@ describe("create_draft_* — latest definitions carry the tenant-membership guar
   });
 });
 
+describe("recompute_delivery_clearance — latest migration definition", () => {
+  const def = latestDefinition("recompute_delivery_clearance");
+  const body = norm(def.body);
+
+  it("picks the newest signed row with the shared tiebreak: signed_at DESC NULLS LAST, created_at DESC", () => {
+    expect(body).toContain("order by signed_at desc nulls last,created_at desc");
+  });
+});
+
 describe("get_ready_blocks_finalize — latest migration definition (S8)", () => {
   const def = latestDefinition("get_ready_blocks_finalize");
   const body = norm(def.body);

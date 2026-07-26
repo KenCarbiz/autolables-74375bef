@@ -188,6 +188,15 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
     setBusyId(null);
     if (error) {
       const m = String(error.message || "");
+      // A double submit (or another tab answering first) trips
+      // not_awaiting_clarification AFTER an answer was already recorded —
+      // that's a benign already-answered state, not a failure.
+      if (/not_awaiting_clarification/.test(m)) {
+        toast.message("This clarification was already answered — the request is back with the manager.");
+        setClarifyForId(null); setClarifyValue("");
+        load(); onDecided?.();
+        return;
+      }
       toast.error(/not_authorized/.test(m)
         ? "Only the requester or a service role can answer this clarification."
         : "Couldn't record the answer");

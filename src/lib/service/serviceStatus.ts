@@ -22,6 +22,8 @@ export interface ServiceStatusContext {
   openFailures?: number;
   /** Of those, how many sit at repair_state='ready_for_reinspection'. */
   failuresReadyForReinspection?: number;
+  /** Item failures already at repair_state='passed_on_reinspection'. */
+  resolvedFailures?: number;
   /** Newest non-voided safety_inspections.inspection_state, when read. */
   inspectionState?: string | null;
   /** Newest inspection row for the VIN is status='voided'. */
@@ -67,9 +69,13 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean,
   // Mirrors deriveWorkspaceStatus: the failure loop is "ready for
   // reinspection" (amber) once the workflow state says so, or once every open
   // item failure sits at repair_state='ready_for_reinspection'.
+  // A signed fail whose FILED failures have all passed reinspection (open = 0,
+  // resolved > 0) is also waiting on the reinspection, not on repair — the
+  // red "Resolve failed items" state would have nothing left to resolve.
   const readyForReinspection = failed && (
     ctx.inspectionState === "ready_for_reinspection"
-    || (openFailures > 0 && (ctx.failuresReadyForReinspection ?? 0) === openFailures));
+    || (openFailures > 0 && (ctx.failuresReadyForReinspection ?? 0) === openFailures)
+    || (openFailures === 0 && (ctx.resolvedFailures ?? 0) > 0));
   const voided = !!ctx.newestVoided && !si;
 
   const grState: GRState = failed ? "failed"

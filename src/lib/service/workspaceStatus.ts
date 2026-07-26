@@ -46,6 +46,8 @@ export interface WorkspaceStatusInput {
   openFailures: number;
   /** Of those, how many sit at ready_for_reinspection. */
   failuresReadyForReinspection: number;
+  /** Item failures already at passed_on_reinspection (resolved). */
+  resolvedFailures?: number;
   awaitingApproval: boolean;
   grStarted: boolean;
   recallStatus?: string | null;
@@ -116,9 +118,15 @@ export function deriveWorkspaceStatus(i: WorkspaceStatusInput): WorkspaceStatus 
   }
 
   if (i.hasSignedFail || i.openFailures > 0) {
+    // Every FILED failure passing reinspection while the workflow state still
+    // reads failed_items_open/repairs_in_progress must land here too —
+    // otherwise the banner stays red with no enabled control left (the
+    // reinspection dead-end: openFailures is 0, so resolve_failures has
+    // nothing to resolve and the reinspection checklist never renders).
     const allReady =
       i.workflowState === "ready_for_reinspection" ||
-      (i.openFailures > 0 && i.failuresReadyForReinspection === i.openFailures);
+      (i.openFailures > 0 && i.failuresReadyForReinspection === i.openFailures) ||
+      (i.openFailures === 0 && (i.resolvedFailures ?? 0) > 0);
     if (allReady) {
       return {
         key: "ready_for_reinspection",

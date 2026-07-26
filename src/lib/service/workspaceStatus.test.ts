@@ -67,6 +67,30 @@ describe("deriveWorkspaceStatus — the 8 banner states (B1)", () => {
     expect(s.key).toBe("ready_for_reinspection");
   });
 
+  it("every failure PASSED on reinspection while the workflow lags is Ready for Reinspection, not a red dead-end", () => {
+    // The exact dead-end sequence: signed fail -> all item failures marked
+    // passed_on_reinspection (openFailures 0, resolvedFailures > 0) while
+    // inspection_state is still failed_items_open / repairs_in_progress.
+    for (const workflowState of ["failed_items_open", "repairs_in_progress"]) {
+      const s = deriveWorkspaceStatus({
+        ...base, hasSignedFail: true, workflowState,
+        openFailures: 0, failuresReadyForReinspection: 0, resolvedFailures: 2,
+      });
+      expect(s.key).toBe("ready_for_reinspection");
+      expect(s.action.key).toBe("reinspect");
+      expect(s.tone).toBe("amber");
+    }
+  });
+
+  it("a signed fail with NO failures filed at all stays red Failed Items — nothing has been repaired", () => {
+    const s = deriveWorkspaceStatus({
+      ...base, hasSignedFail: true, workflowState: "failed_items_open",
+      openFailures: 0, resolvedFailures: 0,
+    });
+    expect(s.key).toBe("failed_items");
+    expect(s.tone).toBe("red");
+  });
+
   it("a signed pass, not certified, is Ready for K-208 — and the action names review vs execute by authority", () => {
     const viewer = deriveWorkspaceStatus({ ...base, hasSignedNonFail: true, workflowState: "passed" });
     expect(viewer.key).toBe("ready_for_k208");
