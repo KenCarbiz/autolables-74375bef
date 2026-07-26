@@ -132,6 +132,7 @@ const DescriptionStudio = lazy(() => import("./pages/DescriptionStudio"));
 const DescriptionOperations = lazy(() => import("./pages/DescriptionOperations"));
 const VinCommandCenter = lazy(() => import("./pages/VinCommandCenter"));
 const GetReadyCommand = lazy(() => import("./pages/GetReadyCommand"));
+const ManagerIntake = lazy(() => import("./pages/ManagerIntake"));
 const DocumentsPrintCenter = lazy(() => import("./pages/DocumentsPrintCenter"));
 const DescriptionIntelligence = lazy(() => import("./pages/DescriptionIntelligence"));
 const SaveCarInventory = lazy(() => import("./pages/SaveCarInventory"));
@@ -307,7 +308,9 @@ const App = () => (
                             pick-a-vehicle empty state when reached bare. */}
                         <Route path="/vin-command" element={<VinCommandCenter />} />
                         <Route path="/vin-command/:vehicleId" element={<VinCommandCenter />} />
-                        <Route path="/get-ready-command" element={<GetReadyCommand />} />
+                        {/* Fleet-level intake queue; per-vehicle authorization
+                            detail keeps the :vehicleId route below. */}
+                        <Route path="/get-ready-command" element={<ManagerIntake />} />
                         <Route path="/get-ready-command/:vehicleId" element={<GetReadyCommand />} />
                         <Route path="/print-center" element={<DocumentsPrintCenter />} />
                         <Route path="/print-center/:vehicleId" element={<DocumentsPrintCenter />} />
