@@ -150,11 +150,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // deno-lint-ignore no-explicit-any
 type Req = any;
 
+interface ReqLine { id: string; request_id: string; item: string; line_type: string; amount: number }
+
 export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: string; vin?: string; onDecided?: () => void }) {
   const { isAdmin } = useAuth();
   const { member } = useEntitlements();
   const canApprove = hasDealerCapability(member?.role, "can_approve_service_work", isAdmin);
   const [reqs, setReqs] = useState<Req[]>([]);
+  const [linesByReq, setLinesByReq] = useState<Record<string, ReqLine[]>>({});
+  // Line selection per request; every line starts approved (Select All).
+  const [unchecked, setUnchecked] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   // Decisions that need input (limit amount, clarify/decline note) open a
@@ -170,7 +175,19 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
       .select("*").eq("tenant_id", tenantId).in("status", ["pending", "clarify"]).order("created_at", { ascending: false });
     if (vin) q = q.eq("vin", vin.toUpperCase());
     const { data } = await q;
-    setReqs((data as Req[]) || []); setLoading(false);
+    const rows = (data as Req[]) || [];
+    setReqs(rows);
+    const ids = rows.map((r) => r.id);
+    if (ids.length) {
+      const { data: lines } = await (supabase as any).from("service_request_lines")
+        .select("id, request_id, item, line_type, amount").in("request_id", ids).order("created_at");
+      const map: Record<string, ReqLine[]> = {};
+      for (const l of ((lines as ReqLine[]) || [])) (map[l.request_id] ??= []).push(l);
+      setLinesByReq(map);
+    } else {
+      setLinesByReq({});
+    }
+    setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [tenantId, vin]);
 
@@ -211,8 +228,15 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
   // audit_log, and notifies the requester (deduped) server-side.
   const decide = async (id: string, decision: string, note?: string | null, spendLimit?: number | null) => {
     setBusyId(id);
+    // Per-line verdicts ride along on approvals: unchecked lines are rejected,
+    // everything else is authorized (decide_service_request stamps them).
+    const lines = linesByReq[id] || [];
+    const lineDecisions = lines.length && decision !== "clarify"
+      ? lines.map((l) => ({ id: l.id, approved: decision !== "declined" && !unchecked[l.id] }))
+      : null;
     const { error } = await (supabase as any).rpc("decide_service_request", {
       p_request_id: id, p_decision: decision, p_note: note ?? null, p_spend_limit: spendLimit ?? null,
+      p_line_decisions: lineDecisions,
     });
     setBusyId(null);
     if (error) {
@@ -330,11 +354,46 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
             )}
             {canApprove ? (
               <div className="mt-3 pt-3 border-t border-border space-y-2">
+                {(() => {
+                  const lines = linesByReq[r.id] || [];
+                  if (lines.length === 0) return null;
+                  const approvedTotal = lines.reduce((s, l) => s + (unchecked[l.id] ? 0 : Number(l.amount)), 0);
+                  return (
+                    <div className="rounded-lg border border-border bg-muted/30 p-2.5 space-y-1.5">
+                      <p className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Approval selection — unchecked items will not be approved
+                      </p>
+                      {lines.map((l) => (
+                        <label key={l.id} className="flex items-center justify-between gap-2 min-h-[36px] text-sm">
+                          <span className="inline-flex items-center gap-2 min-w-0">
+                            <input type="checkbox" checked={!unchecked[l.id]}
+                              onChange={(e) => setUnchecked((u) => ({ ...u, [l.id]: !e.target.checked }))} />
+                            <span className="truncate text-foreground">{l.item}</span>
+                          </span>
+                          <span className="font-semibold text-foreground shrink-0">{money(l.amount)}</span>
+                        </label>
+                      ))}
+                      <p className="text-sm text-foreground pt-1 border-t border-border">
+                        Authorizing <span className="font-bold">{money(approvedTotal)}</span>
+                        {approvedTotal !== lines.reduce((s, l) => s + Number(l.amount), 0) ? " of the request" : ""}
+                      </p>
+                    </div>
+                  );
+                })()}
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <button disabled={busyId === r.id} onClick={() => decide(r.id, "approved")} className="min-h-[44px] px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><Check className="w-3.5 h-3.5" /> Approve</button>
+                  <button disabled={busyId === r.id} onClick={() => decide(r.id, "approved")} className="min-h-[44px] px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50">
+                    <Check className="w-3.5 h-3.5" />
+                    {(linesByReq[r.id] || []).some((l) => unchecked[l.id]) ? "Authorize Selected Work" : "Approve"}
+                  </button>
                   <button disabled={busyId === r.id} aria-expanded={pendingDecision !== null && pendingDecision.id === r.id && pendingDecision.kind === "approved_limit"} onClick={() => openDecisionForm(r.id, "approved_limit")} className="min-h-[44px] px-3 rounded-md border border-emerald-300 text-emerald-700 text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><DollarSign className="w-3.5 h-3.5" /> Approve w/ limit</button>
                   <button disabled={busyId === r.id} aria-expanded={pendingDecision !== null && pendingDecision.id === r.id && pendingDecision.kind === "clarify"} onClick={() => openDecisionForm(r.id, "clarify")} className="min-h-[44px] px-3 rounded-md border border-border text-foreground text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><MessageSquare className="w-3.5 h-3.5" /> Clarify</button>
-                  <button disabled={busyId === r.id} aria-expanded={pendingDecision !== null && pendingDecision.id === r.id && pendingDecision.kind === "declined"} onClick={() => openDecisionForm(r.id, "declined")} className="min-h-[44px] px-3 rounded-md border border-rose-200 text-rose-600 text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><X className="w-3.5 h-3.5" /> Decline</button>
+                  {r.is_safety ? (
+                    <span className="text-[11.5px] font-semibold text-red-700 inline-flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Safety work — cannot be declined. Authorize the repair or remove the vehicle from retail.
+                    </span>
+                  ) : (
+                    <button disabled={busyId === r.id} aria-expanded={pendingDecision !== null && pendingDecision.id === r.id && pendingDecision.kind === "declined"} onClick={() => openDecisionForm(r.id, "declined")} className="min-h-[44px] px-3 rounded-md border border-rose-200 text-rose-600 text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-50"><X className="w-3.5 h-3.5" /> Decline</button>
+                  )}
                 </div>
                 {(() => {
                   const pd = pendingDecision;
