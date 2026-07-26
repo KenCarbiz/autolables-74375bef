@@ -1,0 +1,5 @@
+-- HOTFIX: the sweep called issue_vehicle_ready_token, which raises under
+-- cron's NULL auth context — every row raised, every draft rolled back, and
+-- vehicle_exceptions flooded nightly. Token mint now runs as a direct insert
+-- in its own subtransaction (same row shape as the RPC), ordered newest-first.
+-- Applied to production 2026-07-26; live test run: 85 scanned, 0 failed.
