@@ -750,7 +750,7 @@ export default function DescriptionIntelligence() {
   // compare master copy to its channel output when only one is visible.
   const channelVariantsCard = record && (
     <Card title="Channel Variants">
-      record.channels.length === 0 ? (
+      {record.channels.length === 0 ? (
             <p className="text-[12.5px] text-muted-foreground py-6 text-center">No channel variants yet.</p>
           ) : (
             <div className="space-y-2">
@@ -838,7 +838,7 @@ export default function DescriptionIntelligence() {
                 );
               })}
             </div>
-          )
+          )}
     </Card>
   );
 

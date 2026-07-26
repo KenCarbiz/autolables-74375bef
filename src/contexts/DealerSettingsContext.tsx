@@ -267,6 +267,7 @@ export interface DealerSettings {
   service_pass_all_enabled: boolean;           // allow Pass All Eligible Items in the inspection workspace
   service_failure_photo_required: boolean;     // a failed item needs a photo before the inspection submits
   service_reinspection_managers_only: boolean; // restrict passed-on-reinspection to approve-authority roles
+  service_auto_assign: "off" | "round_robin"; // route pending K-208s at release: round-robin to the least-loaded inspector, or manual
   require_install_verification: boolean;       // finalize gate: all preinstalls verified before signing
   ingest_recon_dispatch: "manual" | "auto";   // recon estimate → UCM queue
   ingest_detail_dispatch: "manual" | "auto";  // get-ready → detail shop
@@ -457,6 +458,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   service_pass_all_enabled: true,
   service_failure_photo_required: false,
   service_reinspection_managers_only: false,
+  service_auto_assign: "off",
   require_install_verification: false,
   ingest_recon_dispatch: "manual",
   ingest_detail_dispatch: "manual",

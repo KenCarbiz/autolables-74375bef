@@ -215,6 +215,32 @@ export default function ServiceSettings() {
               className="w-24 h-11 rounded-lg border border-border bg-background px-3 text-sm text-right"
             />
           </label>
+          <div className="flex items-start justify-between gap-3">
+            <div className="pr-2">
+              <p className="text-sm font-semibold text-foreground">Automatic assignment</p>
+              <p className="text-xs text-muted-foreground">Round-robin routes each released vehicle's pending K-208 to the service or detail member with the fewest open inspections. Off: managers assign from the queue.</p>
+            </div>
+            <div className="shrink-0 inline-flex rounded-lg border border-border overflow-hidden mt-0.5" role="radiogroup" aria-label="Automatic assignment">
+              {([["off", "Off"], ["round_robin", "Round-robin"]] as const).map(([key, label]) => {
+                const on = (settings.service_auto_assign || "off") === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => { if (!on) void change("service_auto_assign", key, "Automatic assignment"); }}
+                    className={cn(
+                      "h-9 px-3 text-xs font-semibold transition-colors",
+                      on ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted",
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <ToggleRow
             title="Allow Pass All Eligible Items"
             detail="One tap passes every unmarked line. It never signs the K-208 and never overwrites an existing failure; review is still required before submit."

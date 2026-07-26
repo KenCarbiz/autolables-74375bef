@@ -62,7 +62,17 @@ export const useNavBadges = (): NavBadgeCounts => {
       storeId
         ? safeCount(() => sb().from("leads").select("id", { count: "exact", head: true }).eq("store_id", storeId).eq("status", "new"))
         : Promise.resolve(0),
-      safeCount(() => sb().from("recon_estimates").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "submitted")),
+      // Actionable decisions only: stale ingest-seeded estimates are excluded
+      // both by status (the 20260727040000 reconcile voids them) and by age,
+      // so the badge stays honest even before that migration applies.
+      safeCount(() =>
+        sb()
+          .from("recon_estimates")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .eq("status", "submitted")
+          .or(`origin.neq.ingest,created_at.gte.${new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()}`)
+      ),
       safeCount(() => sb().from("stale_document_flags").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "open")),
       safeCount(() => sb().from("addendum_signings").select("id", { count: "exact", head: true }).eq("return_status", "requested")),
       // Latest certification run per vehicle, counted not-ready. Bounded read

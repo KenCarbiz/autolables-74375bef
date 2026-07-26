@@ -450,6 +450,7 @@ serve(async (req) => {
     let tenantSeen = 0, tenantNew = 0, tenantPrices = 0;
     let firstWriteErr: string | null = null;
     const liveVins = new Set<string>();
+    const updatedListingIds: string[] = [];
     const runStartedAt = new Date().toISOString();
 
     // ── Phase 2.3 reconciliation / change-detection state ─────────────────
@@ -806,6 +807,7 @@ serve(async (req) => {
               const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
               if (!error) {
                 listingsUpserted++;
+                updatedListingIds.push(vl.id);
                 // Back-fill the Get-Ready hub token for cars that predate this
                 // feature or were first ingested by another path (autocurb-sync,
                 // manual add) so they never fall out of the get-ready flow.
@@ -1176,6 +1178,22 @@ serve(async (req) => {
             enrichQueue.push({ tenant_id: cfg.tenant_id, vin: v, zip: tenantZip || undefined });
           }
         }
+      }
+
+      // Description Intelligence for UPDATED vehicles (new inserts are covered by
+      // autoPreload above). Fire-and-forget by design — a description failure must
+      // never block or slow inventory ingestion. The orchestrator is idempotent
+      // on (tenant, vehicle, source_data_version, config_version), and anything
+      // missed here is picked up by the nightly reconcile sweep.
+      for (const vehicleId of updatedListingIds.slice(0, 200)) {
+        try {
+          fetch(`${supabaseUrl}/functions/v1/description-orchestrate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({ action: "orchestrate", tenant_id: cfg.tenant_id, vehicle_id: vehicleId, reason: "feed_update" }),
+            signal: AbortSignal.timeout(20000),
+          }).catch(() => { /* best-effort */ });
+        } catch { /* description best-effort */ }
       }
 
       tenantsSynced++;

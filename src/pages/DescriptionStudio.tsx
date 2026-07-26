@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useVinDecode } from "@/hooks/useVinDecode";
@@ -162,8 +163,6 @@ const platformCards: PlatformConfig[] = [
   },
 ];
 
-const platformLimits: Record<Platform, number> = platformCards.reduce((limits, card) => ({ ...limits, [card.id]: card.characterLimit }), {} as Record<Platform, number>);
-
 const featureList = [
   "Navigation System",
   "Bose Premium Audio",
@@ -182,7 +181,8 @@ const featureList = [
 const fallbackImage = "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=80";
 
 const DescriptionStudio = () => {
-  const { currentStore } = useTenant();
+  const navigate = useNavigate();
+  const { currentStore, tenant } = useTenant();
   const { settings } = useDealerSettings();
   const { decode, decoding } = useVinDecode();
   const [step] = useState(1);
@@ -321,21 +321,24 @@ const DescriptionStudio = () => {
   };
 
 
+  // Generation is governed: fact snapshots, validation, versioning, and
+  // publication gates only exist in the Description Intelligence flow, so this
+  // studio never calls the ai-description function directly.
   const generate = async () => {
     if (!vehicle.year || !vehicle.make || !vehicle.model) return toast.error("Enter vehicle details first");
+    if (vehicle.vin.length !== 17) return toast.error("Enter a 17-character VIN to open the governed description workspace");
     setGenerating(true);
-    const maxChars = platformLimits[platform];
-    const allKeywords = [primaryKeyword, ...extraKeywords].filter(Boolean).join("; ");
-    const prompt = `Write an SEO-optimized vehicle description for ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}. Platform: ${selectedPlatform.name}. Tone: ${tone}. Max ${maxChars} characters. Recommended length: ${selectedPlatform.recommendedLength}. Location: ${geoCity}, ${geoState} ${zipCode}. Target keywords: ${allKeywords || "none"}. Dealer: ${includeDealerName ? dealerName : "omit"}. Include CTA: ${includeCallToAction}. Features: ${selectedFeatures.join(", ")}. SEO focus: ${selectedPlatform.seoFocus.join(", ")}. Formatting rules: ${selectedPlatform.formattingRules}. Platform instruction: ${selectedPlatform.templateInstruction}. Avoid unverifiable claims and write for retail customers.`;
     try {
-      const { data, error } = await supabase.functions.invoke("ai-description", { body: { vehicle: { ...vehicle, prompt_override: prompt } } });
-      if (error) throw error;
-      const next = (data?.description || buildFallback(vehicle, selectedFeatures, dealerName, geoCity, geoState, includeCallToAction)).slice(0, maxChars);
-      setDescription(next);
-      toast.success(`${selectedPlatform.name} description generated`);
-    } catch {
-      setDescription(buildFallback(vehicle, selectedFeatures, dealerName, geoCity, geoState, includeCallToAction).slice(0, maxChars));
-      toast.info("Used local description template");
+      let q = (supabase as any).from("vehicle_listings").select("id").eq("vin", vehicle.vin.toUpperCase());
+      if (tenant?.id) q = q.eq("tenant_id", tenant.id);
+      const { data } = await q.maybeSingle();
+      if (data?.id) {
+        toast.info("Descriptions are generated through the governed Description Intelligence workspace.");
+        navigate(`/description-intelligence/${data.id}`);
+      } else {
+        toast.error("This VIN is not in inventory. Generate descriptions from Description Operations.");
+        navigate("/description-operations");
+      }
     } finally {
       setGenerating(false);
     }
@@ -624,10 +627,6 @@ function scoreDescription(text: string, vehicle: VehicleState, city: string, sta
   if (text.length > 500) score += 8;
   if (!text.includes("!")) score += 5;
   return Math.min(100, Math.max(0, score));
-}
-
-function buildFallback(vehicle: VehicleState, features: string[], dealer: string, city: string, state: string, cta: boolean) {
-  return `Experience confidence and comfort in this ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}. Finished in ${vehicle.color || "a premium exterior finish"} with a ${vehicle.interiorColor || "refined"} interior, this ${vehicle.condition === "new" ? "new" : "pre-owned"} vehicle delivers the presence, technology, and capability shoppers expect.\n\nKey highlights include ${features.slice(0, 8).join(", ")}. Powered by ${vehicle.engine || "a responsive engine"} with ${vehicle.transmission || "automatic transmission"} and ${vehicle.drivetrain || "confident drivability"}, this ${vehicle.make} ${vehicle.model} is built for daily driving and weekend travel.\n\n${cta ? `Visit ${dealer} in ${city}, ${state} today to see this ${vehicle.year} ${vehicle.make} ${vehicle.model} for sale and schedule your test drive.` : ""}`;
 }
 
 function downloadText(text: string) {

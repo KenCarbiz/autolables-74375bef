@@ -9,6 +9,9 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { canDispatchGetReady } from "@/lib/commandCenter/dispatchAuthority";
+import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
+import { StatusPill } from "@/components/command/CommandPrimitives";
 import { toast } from "sonner";
 import { CheckCircle2, MinusCircle, Loader2, RefreshCw, QrCode, AlertTriangle, ShieldCheck, X, Printer, Send, Wrench, FolderCheck } from "lucide-react";
 import NextStepBanner from "@/components/workflow/NextStepBanner";
@@ -36,6 +39,9 @@ export default function ReadyBoard() {
   const { isAdmin } = useAuth();
   const { member } = useEntitlements();
   const canAccept = hasDealerCapability(member?.role, "can_approve_print", isAdmin);
+  // Client mirror of the mark_vehicle_retail_ready authority matrix — the
+  // server still decides.
+  const canDecideRetailReady = canDispatchGetReady(member?.role, isAdmin);
   const navigate = useNavigate();
   const tenantId = tenant?.id || null;
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -45,6 +51,8 @@ export default function ReadyBoard() {
   const [recallReview, setRecallReview] = useState<Set<string>>(new Set());
   const [reconNeeds, setReconNeeds] = useState<Set<string>>(new Set());
   const [addMap, setAddMap] = useState<Map<string, Addn>>(new Map());
+  const [lifecycle, setLifecycle] = useState<Map<string, string>>(new Map());
+  const [marking, setMarking] = useState<string | null>(null);
   const [staleVins, setStaleVins] = useState<Set<string>>(new Set());
   const [requireK208, setRequireK208] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -58,7 +66,7 @@ export default function ReadyBoard() {
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
-    const [list, si, fails, ds, ps, rr, re, prof] = await Promise.all([
+    const [list, si, fails, ds, ps, rr, re, prof, lc] = await Promise.all([
       (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check, orchestrated_at, deal_processed_at").eq("tenant_id", tenantId).limit(500),
       // All signed rows, reduced through the ONE executed predicate — a signed
       // FAIL (or a stale pass behind a newer signed failure) must not read as
@@ -73,6 +81,7 @@ export default function ReadyBoard() {
       (supabase as any).from("recall_service_tasks").select("vin").eq("tenant_id", tenantId).eq("status", "open_review"),
       (supabase as any).from("recon_estimates").select("vin").eq("tenant_id", tenantId).eq("status", "submitted"),
       (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle(),
+      (supabase as any).from("vehicle_lifecycle").select("vin, state").eq("tenant_id", tenantId).limit(1000),
     ]);
     setRows((list.data as Row[]) || []);
     const svc = executedVinSet((si.data as { vin: string; status: string; result: string | null; signed_at: string | null; created_at: string | null }[]) || []);
@@ -85,6 +94,7 @@ export default function ReadyBoard() {
     setRecallReview(new Set(((rr.data as { vin: string }[]) || []).map((r) => r.vin)));
     setReconNeeds(new Set(((re.data as { vin: string }[]) || []).map((r) => r.vin)));
     setRequireK208(!!(prof.data?.settings as { require_safety_inspection?: boolean } | null)?.require_safety_inspection);
+    setLifecycle(new Map(((lc.data as { vin: string; state: string }[]) || []).map((r) => [r.vin, r.state])));
 
     // Active draft addendum per VIN (newest non-signed). Resilient to the
     // acceptance columns not yet being applied in a given environment.
@@ -164,6 +174,32 @@ export default function ReadyBoard() {
       await load();
     } finally {
       setAccepting(null);
+    }
+  };
+
+  // Lifecycle rows key on upper(vin).
+  const lifecycleOf = useCallback((r: Row) => lifecycle.get(String(r.vin || "").toUpperCase()) ?? null, [lifecycle]);
+
+  // Final acceptance: one server-side RPC decides. The rejections carry the
+  // stored blocker codes so the manager sees exactly what still blocks.
+  const markRetailReady = async (r: Row) => {
+    setMarking(r.vin);
+    try {
+      const { data, error } = await (supabase as any).rpc("mark_vehicle_retail_ready", { p_vehicle_id: r.id });
+      if (error) { toast.error("Couldn't mark the vehicle retail ready."); return; }
+      if (data?.ok) {
+        toast.success(data.already ? "Already retail ready." : "Vehicle marked retail ready.");
+        await load();
+      } else if (data?.reason === "not_cleared") {
+        const blockers = ((data.blockers as string[]) || []).map(clearanceReasonLabel).join(". ");
+        toast.error(blockers ? `Not cleared for delivery: ${blockers}` : "Not cleared for delivery yet.");
+      } else if (data?.reason === "not_certified") {
+        toast.error("Licensee certification is still pending on the K-208.");
+      } else {
+        toast.error("This vehicle can't be marked retail ready right now.");
+      }
+    } finally {
+      setMarking(null);
     }
   };
 
@@ -326,6 +362,14 @@ export default function ReadyBoard() {
                     </td>
                     <td className="py-2 pl-2">
                       <div className="flex items-center justify-end gap-1">
+                        {lifecycleOf(r) === "RETAIL_READY" && (
+                          <StatusPill tone="emerald" Icon={CheckCircle2}>Retail Ready</StatusPill>
+                        )}
+                        {canDecideRetailReady && lifecycleOf(r) === "FINAL_READY_VERIFICATION" && (
+                          <button onClick={() => markRetailReady(r)} disabled={marking === r.vin} title="Final acceptance — mark this vehicle retail ready" className="h-7 px-2 rounded-md bg-emerald-600 text-white text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50">
+                            {marking === r.vin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />} Mark Retail Ready
+                          </button>
+                        )}
                         {staleVins.has(r.vin) && addMap.get(r.vin) && (
                           <button onClick={() => navigate(`/addendum?id=${addMap.get(r.vin)!.id}&edit=1`)} title="Get-Ready changed — rebuild the addendum from the latest installs" className="h-7 px-2 rounded-md bg-amber-500 text-white text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-amber-600">
                             <RefreshCw className="w-3.5 h-3.5" /> Update

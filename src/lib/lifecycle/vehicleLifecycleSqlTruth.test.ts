@@ -188,12 +188,57 @@ describe("authorize_vehicle_for_get_ready — the atomic release (L5)", () => {
     expect(body).toContain("on conflict (dedupe_key) do nothing");
   });
 
+  // The release RPC may be redefined by later migrations (e.g. auto-assign),
+  // but the re-review trigger and the arrival notice live with their own
+  // functions — anchor on those, not on whichever file last touched the RPC.
   it("re-review clears the one-shot stamp so a deliberate second release is possible", () => {
-    expect(body).toContain("new.authorized_at := null");
+    const trg = norm(latestText(/CREATE OR REPLACE FUNCTION public\.lifecycle_clear_authorization_on_rereview/));
+    expect(trg).toContain("new.authorized_at := null");
   });
 
   it("arrival notice: gate-born rows notify intake authority once per VIN and swallow their own errors", () => {
-    expect(body).toContain("'new_vehicle_arrived'");
-    expect(body).toContain("exception when others then null");
+    const trg = norm(latestText(/CREATE OR REPLACE FUNCTION public\.notify_vehicle_arrival/));
+    expect(trg).toContain("'new_vehicle_arrived'");
+    expect(trg).toContain("exception when others then null");
+  });
+});
+
+describe("mark_vehicle_retail_ready — the final acceptance (L6)", () => {
+  const sql = latestText(/CREATE OR REPLACE FUNCTION public\.mark_vehicle_retail_ready/);
+  const body = norm(sql);
+
+  it("locks the row and enforces the same manager authority matrix as the release", () => {
+    expect(body).toContain("for update");
+    expect(body).toContain("'owner','general_manager','gsm','admin','manager','used_car_manager','inventory_manager','sales_manager'");
+  });
+
+  it("is double-click safe: an already retail-ready vehicle returns ok without re-accepting", () => {
+    expect(body).toContain("v_row.state = 'retail_ready'");
+    expect(body).toContain("'already', true");
+  });
+
+  it("requires the stored clearance to read cleared_for_delivery and rejects 'not_cleared' with the blocker codes", () => {
+    expect(body).toContain("<> 'cleared_for_delivery'");
+    expect(body).toContain("'not_cleared'");
+    expect(body).toContain("reason_codes");
+    expect(body).toContain("'blockers'");
+  });
+
+  it("requires licensee certification on the newest signed non-fail inspection, rejecting 'not_certified'", () => {
+    expect(body).toContain("licensee_certified_at");
+    expect(body).toContain("s.status = 'signed' and lower(coalesce(s.result, '')) <> 'fail'");
+    expect(body).toContain("'not_certified'");
+  });
+
+  it("audits the acceptance and notifies sales leadership once per VIN", () => {
+    expect(body).toContain("'vehicle_marked_retail_ready'");
+    expect(body).toContain("'vehicle_retail_ready'");
+    expect(body).toContain("'sales_manager','gsm','general_manager','owner'");
+    expect(body).toContain("on conflict (dedupe_key) do nothing");
+  });
+
+  it("is revoked from anon and granted to authenticated + service_role", () => {
+    expect(body).toContain("revoke all on function public.mark_vehicle_retail_ready(uuid, text) from public, anon");
+    expect(body).toContain("grant execute on function public.mark_vehicle_retail_ready(uuid, text) to authenticated, service_role");
   });
 });

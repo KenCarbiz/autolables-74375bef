@@ -93,10 +93,10 @@ const timeAgo = (iso: string): string => {
 interface RecentRow { id: string; action: string; created_at: string; details: Record<string, unknown> | null }
 
 const WORKFLOW: { title: string; sub: string }[] = [
-  { title: "Build the Deal", sub: "Add vehicle, pricing, and key details." },
-  { title: "Add Compliance", sub: "Generate required documents and disclosures." },
-  { title: "Create Labels", sub: "Produce stickers and tags for the vehicle." },
-  { title: "Market & Sell", sub: "Use AI tools to create listings that convert." },
+  { title: "Vehicle Ingests", sub: "The feed adds the vehicle and starts document prep." },
+  { title: "Documents Auto-Generate", sub: "Stickers, disclosures, and listing copy are produced for you." },
+  { title: "Exceptions Surface", sub: "Anything needing a decision lands in your work queues." },
+  { title: "Retail Ready", sub: "The vehicle publishes with its complete packet." },
 ];
 
 const InventoryGlyph = toolIcon("inventory");
@@ -172,7 +172,7 @@ export default function CreateHub() {
     <div className="max-w-[1280px] mx-auto p-4 sm:p-6">
       {/* Header + search */}
       <h1 className="font-display text-[28px] sm:text-[30px] font-bold tracking-tight text-foreground leading-none">Create</h1>
-      <p className="text-sm text-muted-foreground mt-2 mb-4">Generate documents, vehicle labels, and merchandising assets.</p>
+      <p className="text-sm text-muted-foreground mt-2 mb-4">Most documents are created automatically at ingest — use these tools for one-off and exception work.</p>
       <div className="relative max-w-[720px]">
         <Search className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
@@ -272,7 +272,7 @@ export default function CreateHub() {
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4">
-            <h3 className="text-sm font-bold text-foreground mb-3">Recommended workflow</h3>
+            <h3 className="text-sm font-bold text-foreground mb-3">How vehicles get retail-ready</h3>
             <ol className="space-y-3.5 relative">
               {/* subtle connector spine linking the numbered steps */}
               <span aria-hidden className="absolute left-3 top-3 bottom-3 w-px bg-border -translate-x-1/2" />
