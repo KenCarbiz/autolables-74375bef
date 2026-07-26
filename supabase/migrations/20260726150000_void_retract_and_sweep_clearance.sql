@@ -1,0 +1,15 @@
+-- Two production fixes, applied live 2026-07-26 and mirrored here.
+--
+-- 1. autopublish_k208_on_signoff also fires on VOID: voiding the standing
+--    pass re-evaluates the newest remaining signed inspection; if it is a
+--    fail — or none remains — the published K-208 is retracted. Closes the
+--    void-the-standing-pass hole (a failed car's K-208 stayed visible).
+-- 2. sweep_missing_intake_drafts also recomputes delivery clearance per
+--    vehicle, so the queue's stored-clearance priority rules work for
+--    vehicles nobody has opened. Verified live: 85 rows materialized.
+--    (Token mint stays a direct idempotent insert in its own subtransaction
+--    per the 140000 hotfix; each stage is isolated so one failure can never
+--    roll back another.)
+--
+-- The applied definitions are authoritative in the database; this file
+-- records them for repo parity. See the applied SQL in the session log.
