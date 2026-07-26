@@ -34,13 +34,15 @@ const EXCEPTION_TYPE = "artifact_autogen_failed";
 
 // What actually retries a failed artifact. The nightly intake sweep
 // (sweep_missing_intake_drafts) re-runs only the draft RPCs and the hub token,
-// and recon/description have their own sweeps. The edge-only artifacts
+// and recon/description have their own sweeps. factory_sticker is re-fired by
+// every nightly resync pass (ensureComplianceDrafts' render path re-posts it
+// while the record is missing or retryable). The edge-only artifacts
 // (form_pdfs, oem_window_sticker, title_request_email) are fired once at
 // ingest and retried by nothing — claiming "the nightly sweep will also retry"
 // for them promised a retry that never comes.
 const SWEEP_RETRIED = new Set([
   "addendum", "buyers_guide", "k208", "get_ready", "window_sticker",
-  "get_ready_token", "ingest_orchestrate", "description",
+  "get_ready_token", "ingest_orchestrate", "description", "factory_sticker",
 ]);
 
 export function recommendedActionFor(artifacts: string[]): string {
@@ -191,12 +193,15 @@ export async function ensureComplianceDrafts(
   // form document generate-vehicle-forms fills. Best-effort: an undecidable
   // read skips the render rather than re-rendering every vehicle every night.
   let needsFormRender = false;
+  let needsFactorySticker = false;
+  let listingId: string | null = null;
   if (render) {
     try {
       const { data: listing } = await admin.from("vehicle_listings")
         .select("id, condition")
         .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
       const cond = String(listing?.condition || "used").toLowerCase();
+      listingId = (listing?.id as string | undefined) ?? null;
       if (listing?.id && ["used", "cpo", "certified"].includes(cond)) {
         const { data: formDocs, error } = await admin.from("generated_documents")
           .select("id, document_type")
@@ -207,6 +212,22 @@ export async function ensureComplianceDrafts(
           const types = new Set(
             (((formDocs || []) as { document_type?: string }[])).map((d) => String(d.document_type)));
           needsFormRender = !types.has("buyers_guide") || !types.has("k208");
+        }
+      }
+      // Factory sticker orchestration (all conditions — new cars get the
+      // Monroney-style configuration record too): re-fire only while the
+      // record is missing or parked awaiting data / a retry / the renderer
+      // (READY_TO_GENERATE is how records wait for the renderer to land —
+      // without re-firing it the fleet would never generate once it does),
+      // so resyncs and backfills cover the fleet without re-posting settled
+      // vehicles every night. Undecidable read → do not fire.
+      if (listing?.id) {
+        const { data: fsr, error: fsErr } = await admin.from("factory_sticker_records")
+          .select("id, generation_status")
+          .eq("tenant_id", tenantId).eq("vehicle_id", listing.id).maybeSingle();
+        if (!fsErr) {
+          const status = String((fsr as { generation_status?: string } | null)?.generation_status || "");
+          needsFactorySticker = !fsr || ["PENDING_DATA", "FAILED_RETRYABLE", "READY_TO_GENERATE"].includes(status);
         }
       }
     } catch { /* undecidable — do not render */ }
@@ -221,6 +242,12 @@ export async function ensureComplianceDrafts(
     firePost(admin, render.serviceKey, tenantId, vin,
       `${render.supabaseUrl}/functions/v1/generate-vehicle-forms`,
       { tenant_id: tenantId, vin }, 25000, "form_pdfs");
+  }
+  if (render && needsFactorySticker && listingId) {
+    firePost(admin, render.serviceKey, tenantId, vin,
+      `${render.supabaseUrl}/functions/v1/factory-sticker-orchestrate`,
+      { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "resync" },
+      20000, "factory_sticker");
   }
 }
 
@@ -258,5 +285,10 @@ export async function autoPreload(
     firePost(admin, serviceKey, tenantId, vin,
       `${supabaseUrl}/functions/v1/description-orchestrate`,
       { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "ingest" }, 20000, "description");
+    // Factory Window Sticker: fingerprint-idempotent server-side; the nightly
+    // resync path (ensureComplianceDrafts) re-fires anything missed here.
+    firePost(admin, serviceKey, tenantId, vin,
+      `${supabaseUrl}/functions/v1/factory-sticker-orchestrate`,
+      { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "ingest" }, 20000, "factory_sticker");
   }
 }

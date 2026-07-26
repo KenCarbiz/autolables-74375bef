@@ -1,0 +1,620 @@
+// ─────────────────────────────────────────────────────────────────────
+// factory-sticker-orchestrate — the Factory Window Sticker lifecycle
+// engine. Composable server-side operations behind one entry point:
+//
+//   orchestrate     — load saved data → normalize → reconcile → render →
+//                     QA → file → (auto-)publish. Fired from ingest and
+//                     resync; idempotent on the generation fingerprint.
+//   regenerate      — forced re-run (manager roles), including reingest
+//                     out of FAILED_PERMANENT / ARCHIVED.
+//   approve_publish — manager approves a review-required sticker.
+//   unpublish       — manager pulls a published sticker back to review.
+//
+// Hard rules:
+//   * This function performs NO provider HTTP calls. Everything renders
+//     from data already SAVED on vehicle_listings (mc_attributes /
+//     build_sheet / epa_economy) and dealer_profiles.settings. Provider
+//     pulls belong to marketcheck-specs; the raw capture belongs to
+//     neovin_snapshots.
+//   * Rendering goes through ONE interface (_shared/factorySticker/
+//     render.ts). Until the renderer lands it throws "renderer_pending",
+//     which parks the record READY_TO_GENERATE — not a failure.
+//   * Fire-and-forget from ingest: failures are isolated into
+//     factory_sticker_records (bounded to 3 retryable attempts) and
+//     never propagate back into the inventory pipeline.
+// ─────────────────────────────────────────────────────────────────────
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { normalizeForSticker } from "./normalize.ts";
+import {
+  renderFactorySticker, FACTORY_STICKER_RENDERER_VERSION,
+  type FactoryStickerRenderResult, type FactoryStickerTheme,
+} from "../_shared/factorySticker/render.ts";
+
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
+};
+const json = (b: unknown, status = 200) =>
+  new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
+
+const BUCKET = "vehicle-docs";
+const TEMPLATE_FAMILY_ID = "factory-sticker-standard";
+const TEMPLATE_VERSION = "1.0.0";
+const OEM_THEME_VERSION = "1";
+const MAX_RETRYABLE_ATTEMPTS = 3;
+
+const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
+
+// Decision authority mirrors generate-vehicle-forms MANAGER_ROLES.
+const MANAGER_ROLES = new Set([
+  "owner", "general_manager", "gsm", "admin", "manager",
+  "sales_manager", "used_car_manager", "inventory_manager",
+]);
+
+// Same resolveAppBase pattern as generate-vehicle-forms: caller app_base →
+// browser Origin → APP_BASE_URL secret → app host. The canonical passport
+// URL (the QR payload) is derived from this.
+function resolveAppBase(req: Request, appBase?: string): string {
+  const isHttp = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
+  const clean = (u: string) => u.replace(/\/+$/, "");
+  if (isHttp(appBase)) return clean(appBase);
+  const origin = req.headers.get("origin");
+  if (isHttp(origin)) return clean(origin);
+  const env = Deno.env.get("APP_BASE_URL");
+  if (isHttp(env)) return clean(env);
+  return "https://app.autolabels.io";
+}
+
+async function sha256Hex(input: Uint8Array | string): Promise<string> {
+  const bytes = typeof input === "string" ? new TextEncoder().encode(input) : input;
+  const h = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// deno-lint-ignore no-explicit-any
+type Admin = any;
+
+async function audit(admin: Admin, tenantId: string, action: string, recordId: string, details: Record<string, unknown>) {
+  try {
+    await admin.from("audit_log").insert({
+      action, entity_type: "factory_sticker_record", entity_id: recordId,
+      store_id: tenantId, details,
+    });
+  } catch { /* audit must never break the pipeline */ }
+}
+
+// Guard-tolerant record write: the SQL transition guard may reject a status
+// move (terminal states). Retry without generation_status so the rest of the
+// patch (fingerprint, QA statuses, error text) is never lost to the guard.
+async function setRecord(admin: Admin, recordId: string, patch: Record<string, unknown>) {
+  const body = { ...patch, updated_at: new Date().toISOString() };
+  const { error } = await admin.from("factory_sticker_records").update(body).eq("id", recordId);
+  if (error && "generation_status" in patch) {
+    console.error("setRecord rejected", recordId, error.message);
+    const { generation_status: _drop, ...rest } = body as Record<string, unknown>;
+    if (Object.keys(rest).length > 1) {
+      await admin.from("factory_sticker_records").update(rest).eq("id", recordId);
+    }
+  } else if (error) {
+    console.error("setRecord failed", recordId, error.message);
+  }
+}
+
+interface RecordRow {
+  id: string; tenant_id: string; vehicle_id: string; vin: string;
+  generation_status: string; generation_fingerprint: string | null;
+  current_document_id: string | null; attempt_count: number;
+  qa_metadata: Record<string, unknown> | null;
+}
+
+async function loadOrCreateRecord(admin: Admin, tenantId: string, vehicleId: string, vin: string): Promise<{ record: RecordRow | null; created: boolean }> {
+  const { data: existing } = await admin.from("factory_sticker_records")
+    .select("*").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+  if (existing) return { record: existing as RecordRow, created: false };
+  // insert-then-reselect: a concurrent orchestrate may win the unique key race
+  await admin.from("factory_sticker_records").upsert(
+    { tenant_id: tenantId, vehicle_id: vehicleId, vin, generation_status: "PENDING_DATA" },
+    { onConflict: "tenant_id,vehicle_id", ignoreDuplicates: true },
+  );
+  const { data: row } = await admin.from("factory_sticker_records")
+    .select("*").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+  return { record: (row as RecordRow) ?? null, created: true };
+}
+
+// fileForm-style filing (generate-vehicle-forms precedent): one mutable
+// draft/pending row per (tenant, vehicle, type) overwritten in place; a
+// locked row byte-identical → URL refresh; locked + changed → new immutable
+// version + supersede.
+async function fileStickerDocument(
+  admin: Admin, tenantId: string, vehicleId: string, vin: string,
+  pdfBytes: Uint8Array, previewSvg: string, snapExtra: Record<string, unknown>,
+  publish: boolean,
+): Promise<{ documentId: string | null; version: number; pdfUrl: string; previewUrl: string | null }> {
+  const hash = await sha256Hex(pdfBytes);
+
+  const { data: all } = await admin.from("generated_documents")
+    .select("id, version, document_status, data_snapshot")
+    .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("document_type", "factory_sticker")
+    .order("version", { ascending: false });
+  const rows = (all || []) as { id: string; version: number; document_status: string; data_snapshot: Record<string, unknown> | null }[];
+  const RETIRED = new Set(["superseded", "archived", "rejected"]);
+  const MUTABLE = new Set(["draft", "pending_approval"]);
+  const liveRows = rows.filter((r) => !RETIRED.has(r.document_status));
+  const current = liveRows[0];
+  const nextVersion = rows.reduce((m, r) => Math.max(m, r.version || 0), 0) + 1;
+  const version = current && MUTABLE.has(current.document_status) ? current.version : nextVersion;
+
+  const dir = `${tenantId}/vehicles/${vehicleId}/factory-stickers/v${version}`;
+  const pdfPath = `${dir}/sticker.pdf`;
+  const svgPath = `${dir}/preview.svg`;
+
+  const { error: upErr } = await admin.storage.from(BUCKET)
+    .upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: true });
+  if (upErr) throw new Error(`storage upload failed (${BUCKET}/${pdfPath}): ${upErr.message}`);
+  let previewUrl: string | null = null;
+  try {
+    await admin.storage.from(BUCKET)
+      .upload(svgPath, new TextEncoder().encode(previewSvg), { contentType: "image/svg+xml", upsert: true });
+    const { data: sp } = await admin.storage.from(BUCKET).createSignedUrl(svgPath, 60 * 60 * 24 * 7);
+    previewUrl = sp?.signedUrl || null;
+  } catch { /* preview is best-effort; the PDF is the artifact of record */ }
+  const { data: signed, error: signErr } = await admin.storage.from(BUCKET).createSignedUrl(pdfPath, 60 * 60 * 24 * 7);
+  if (signErr || !signed?.signedUrl) throw new Error(`signed url failed (${BUCKET}/${pdfPath}): ${signErr?.message || "no url returned"}`);
+  const url = signed.signedUrl as string;
+
+  try {
+    await admin.from("signed_document_archive").upsert({
+      tenant_id: tenantId, doc_type: "factory_sticker", entity_id: vehicleId, vin,
+      storage_path: pdfPath, storage_bucket: BUCKET, content_hash: hash, byte_size: pdfBytes.length,
+    }, { onConflict: "tenant_id,doc_type,entity_id,content_hash", ignoreDuplicates: true });
+  } catch { /* archive best-effort */ }
+
+  const targetStatus = publish ? "published" : "pending_approval";
+  const snap = {
+    source: "factory-sticker-orchestrate", storage_path: pdfPath, storage_bucket: BUCKET,
+    preview_path: svgPath, content_hash: hash, ...snapExtra,
+  };
+
+  if (current && MUTABLE.has(current.document_status)) {
+    await admin.from("generated_documents").update({
+      online_url: url, pdf_url: url, data_snapshot: snap,
+      document_status: targetStatus, updated_at: new Date().toISOString(),
+      ...(publish ? { published_at: new Date().toISOString() } : {}),
+    }).eq("id", current.id);
+    const extras = liveRows.slice(1).map((r) => r.id);
+    if (extras.length) {
+      await admin.from("generated_documents")
+        .update({ document_status: "superseded", superseded_by: current.id, updated_at: new Date().toISOString() })
+        .in("id", extras);
+    }
+    return { documentId: current.id, version, pdfUrl: url, previewUrl };
+  }
+
+  if (current && (current.data_snapshot as { content_hash?: string } | null)?.content_hash === hash) {
+    await admin.from("generated_documents").update({ online_url: url, pdf_url: url, updated_at: new Date().toISOString() }).eq("id", current.id);
+    return { documentId: current.id, version: current.version, pdfUrl: url, previewUrl };
+  }
+
+  const { data: inserted, error: insErr } = await admin.from("generated_documents").insert({
+    tenant_id: tenantId, vehicle_id: vehicleId, template_id: TEMPLATE_FAMILY_ID,
+    document_type: "factory_sticker", document_status: targetStatus, version: nextVersion,
+    template_version: 1, online_url: url, pdf_url: url, data_snapshot: snap,
+    ...(publish ? { published_at: new Date().toISOString() } : {}),
+  }).select("id").maybeSingle();
+  if (insErr) throw new Error(`generated_documents insert failed: ${insErr.message}`);
+  const newId = (inserted as { id?: string } | null)?.id ?? null;
+  if (newId && liveRows.length) {
+    await admin.from("generated_documents")
+      .update({ document_status: "superseded", superseded_by: newId, updated_at: new Date().toISOString() })
+      .in("id", liveRows.map((r) => r.id));
+  }
+  return { documentId: newId, version: nextVersion, pdfUrl: url, previewUrl };
+}
+
+// ── The pipeline for a single vehicle ────────────────────────────────
+async function orchestrateVehicle(
+  admin: Admin, req: Request, tenantId: string, vehicleId: string,
+  opts: { force?: boolean; reason?: string; appBase?: string } = {},
+): Promise<Record<string, unknown>> {
+  const { data: listing } = await admin.from("vehicle_listings").select("*").eq("id", vehicleId).maybeSingle();
+  if (!listing) return { vehicle_id: vehicleId, skipped: "listing_not_found" };
+  // A NULL-tenant listing must never be adopted by whoever asks first.
+  if (listing.tenant_id !== tenantId) return { vehicle_id: vehicleId, skipped: "tenant_mismatch" };
+
+  const vin = String(listing.vin || "").toUpperCase().trim();
+  const { record } = await loadOrCreateRecord(admin, tenantId, vehicleId, vin);
+  if (!record) return { vehicle_id: vehicleId, skipped: "record_not_initialized" };
+
+  if (listing.status === "archived") {
+    // The SQL trigger normally handles this; belt-and-suspenders for records
+    // orchestrated after an archive raced past it.
+    if (!["ARCHIVED", "SUPERSEDED"].includes(record.generation_status)) {
+      await setRecord(admin, record.id, { generation_status: "ARCHIVED" });
+    }
+    return { vehicle_id: vehicleId, record_id: record.id, skipped: "archived" };
+  }
+
+  // Terminal-state handling: SUPERSEDED never re-runs; FAILED_PERMANENT and
+  // ARCHIVED only re-enter via an explicit force (the guard allows exactly
+  // the → PENDING_DATA edge).
+  if (record.generation_status === "SUPERSEDED") {
+    return { vehicle_id: vehicleId, record_id: record.id, skipped: "superseded" };
+  }
+  if (["FAILED_PERMANENT", "ARCHIVED"].includes(record.generation_status)) {
+    if (!opts.force) return { vehicle_id: vehicleId, record_id: record.id, skipped: record.generation_status.toLowerCase() };
+    await setRecord(admin, record.id, {
+      generation_status: "PENDING_DATA", attempt_count: 0, last_error: null,
+      review_required: false, review_reason: null,
+    });
+    record.attempt_count = 0;
+  }
+  if (record.generation_status === "FAILED_RETRYABLE" && record.attempt_count >= MAX_RETRYABLE_ATTEMPTS && !opts.force) {
+    await setRecord(admin, record.id, {
+      generation_status: "FAILED_PERMANENT",
+      review_required: true, review_reason: "retry_budget_exhausted",
+    });
+    return { vehicle_id: vehicleId, record_id: record.id, skipped: "retry_budget_exhausted" };
+  }
+
+  await audit(admin, tenantId, "factory_sticker.ingest_triggered", record.id,
+    { vin, reason: opts.reason || "ingest", force: !!opts.force });
+
+  // ── VIN validation: a bad or drifted VIN is deterministic — it would fail
+  // identically on every retry, so it is FAILED_PERMANENT, not retryable.
+  if (!VIN_RE.test(vin) || (record.vin && record.vin.toUpperCase() !== vin)) {
+    const reason = !VIN_RE.test(vin)
+      ? `invalid_vin: listing VIN ${JSON.stringify(vin)} is not a valid 17-character VIN`
+      : `vin_mismatch: record VIN ${record.vin} does not match listing VIN ${vin}`;
+    await setRecord(admin, record.id, {
+      generation_status: "FAILED_PERMANENT",
+      review_required: true, review_reason: reason, last_error: reason,
+    });
+    await audit(admin, tenantId, "factory_sticker.review_required", record.id, { vin, reason });
+    return { vehicle_id: vehicleId, record_id: record.id, status: "FAILED_PERMANENT", error: reason };
+  }
+
+  try {
+    // ── Load SAVED data only. No provider calls, ever.
+    const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+    const sheet = (mc.build_sheet || null) as Record<string, unknown> | null;
+    if (!sheet) {
+      await setRecord(admin, record.id, {
+        generation_status: "PENDING_DATA",
+        last_error: "awaiting_build_sheet: no saved NeoVIN build sheet on this listing yet",
+      });
+      return { vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA", skipped: "no_build_sheet" };
+    }
+
+    const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+    const dealerSettings = (prof?.settings || {}) as Record<string, unknown>;
+
+    // ── Normalize
+    await setRecord(admin, record.id, { generation_status: "NORMALIZING" });
+    const slug = String(listing.slug || "").trim();
+    const appBase = resolveAppBase(req, opts.appBase);
+    const canonicalPassportUrl = slug ? `${appBase}/v/${slug}` : null;
+
+    const condRaw = String(listing.condition || "used").toLowerCase();
+    const title = condRaw === "new"
+      ? "Factory Window Sticker — Configuration & MSRP"
+      : "Original Factory Build & MSRP Record";
+
+    const normalized = normalizeForSticker(listing, dealerSettings, canonicalPassportUrl || "", title);
+    await audit(admin, tenantId, "factory_sticker.normalized", record.id,
+      { vin, confidence: normalized.confidence, missing: normalized.missing });
+
+    // ── OEM resolution (theme identity; the renderer maps the id to a theme)
+    const make = normalized.data.identity.make;
+    const canonicalOemId = make ? make.toLowerCase().replace(/[^a-z0-9]+/g, "-") : null;
+    const theme: FactoryStickerTheme = {
+      oemThemeId: canonicalOemId ? `oem-${canonicalOemId}` : "oem-neutral",
+      oemThemeVersion: OEM_THEME_VERSION,
+      canonicalOemId,
+      templateFamilyId: TEMPLATE_FAMILY_ID,
+      templateVersion: TEMPLATE_VERSION,
+      logoAssetId: String(dealerSettings.dealer_logo_url ?? dealerSettings.logo_url ?? "").trim() || null,
+      logoAssetVersion: null,
+    };
+
+    // ── Reconcile MSRP: computed (base + options + destination) vs the
+    // stated total (NeoVIN combined_msrp, else the feed MSRP).
+    await setRecord(admin, record.id, { generation_status: "VALIDATING" });
+    let reconciliationStatus = "INSUFFICIENT_DATA";
+    let reconciliationDifference: number | null = null;
+    let reviewRequired = false;
+    let reviewReason: string | null = null;
+    if (normalized.baseMsrp && normalized.statedTotalMsrp) {
+      const computed = normalized.baseMsrp + (normalized.optionsTotal || 0) + (normalized.destinationCharge || 0);
+      reconciliationDifference = Math.round(Math.abs(computed - normalized.statedTotalMsrp) * 100) / 100;
+      if (reconciliationDifference <= 5) reconciliationStatus = "MATCHED";
+      else if (reconciliationDifference <= 100) reconciliationStatus = "MINOR_VARIANCE";
+      else {
+        reconciliationStatus = "REVIEW_REQUIRED";
+        reviewRequired = true;
+        reviewReason = `msrp_reconciliation: computed ${computed} differs from stated ${normalized.statedTotalMsrp} by ${reconciliationDifference}`;
+      }
+    }
+    if (!canonicalPassportUrl) {
+      reviewRequired = true;
+      reviewReason = reviewReason || "missing_passport_slug: the QR payload cannot be resolved";
+    }
+    if (reviewRequired) {
+      await audit(admin, tenantId, "factory_sticker.review_required", record.id,
+        { vin, reason: reviewReason, reconciliation: reconciliationStatus });
+    }
+
+    // ── Existing OEM provider sticker: recorded as the original-document
+    // reference, but per §25 the generated record is still produced — the
+    // two artifacts serve different classifications.
+    const oemOriginalUrl = String(listing.oem_sticker_url || "").trim() || null;
+
+    // ── Fingerprint: stable inputs + every version knob + the passport URL.
+    const fingerprint = await sha256Hex(JSON.stringify({
+      data: normalized.data,
+      template_family_id: TEMPLATE_FAMILY_ID,
+      template_version: TEMPLATE_VERSION,
+      renderer_version: FACTORY_STICKER_RENDERER_VERSION,
+      oem_theme_id: theme.oemThemeId,
+      oem_theme_version: theme.oemThemeVersion,
+      logo_asset_id: theme.logoAssetId,
+      logo_asset_version: theme.logoAssetVersion,
+      passport_url: canonicalPassportUrl,
+    }));
+
+    const basePatch: Record<string, unknown> = {
+      vin,
+      source_provider: String(sheet.source || "neovin"),
+      source_classification: "REGENERATED_RECORD",
+      confidence_level: normalized.confidence,
+      verification_status: normalized.data.generic ? "UNVERIFIED_GENERIC" : "PROVIDER_DECODED",
+      reconciliation_status: reconciliationStatus,
+      reconciliation_difference: reconciliationDifference,
+      review_required: reviewRequired,
+      review_reason: reviewReason,
+      normalized_data_json: normalized.data,
+      canonical_oem_id: canonicalOemId,
+      detected_make_value: make || null,
+      oem_resolution_confidence: canonicalOemId ? "EXACT" : "UNKNOWN",
+      oem_theme_id: theme.oemThemeId,
+      oem_theme_version: theme.oemThemeVersion,
+      template_family_id: TEMPLATE_FAMILY_ID,
+      template_version: TEMPLATE_VERSION,
+      renderer_version: FACTORY_STICKER_RENDERER_VERSION,
+      logo_asset_id: theme.logoAssetId,
+      logo_asset_version: theme.logoAssetVersion,
+      passport_slug: slug || null,
+      canonical_passport_url: canonicalPassportUrl,
+      qr_payload: canonicalPassportUrl,
+      barcode_payload: vin,
+      generation_fingerprint: fingerprint,
+      qa_metadata: {
+        ...(record.qa_metadata || {}),
+        ...(oemOriginalUrl ? { oem_original_url: oemOriginalUrl, oem_original_classification: "ORIGINAL_OEM_DOCUMENT" } : {}),
+      },
+    };
+
+    // ── Idempotency: identical inputs with a live document → reuse.
+    if (!opts.force && record.generation_fingerprint === fingerprint && record.current_document_id) {
+      const { data: doc } = await admin.from("generated_documents")
+        .select("id, document_status").eq("id", record.current_document_id).maybeSingle();
+      if (doc && !["superseded", "archived", "rejected"].includes(String(doc.document_status))) {
+        await audit(admin, tenantId, "factory_sticker.existing_document_reused", record.id,
+          { vin, document_id: doc.id, fingerprint });
+        return {
+          vehicle_id: vehicleId, record_id: record.id, document_id: doc.id,
+          status: record.generation_status, reused: true,
+        };
+      }
+    }
+
+    // ── Render through the one interface. "renderer_pending" is NOT a
+    // failure: everything upstream is durable and the record waits
+    // READY_TO_GENERATE for the renderer to land.
+    await setRecord(admin, record.id, { ...basePatch, generation_status: "GENERATING" });
+    let rendered: FactoryStickerRenderResult;
+    try {
+      rendered = await renderFactorySticker(normalized.data, theme);
+    } catch (e) {
+      const msg = String((e as Error)?.message || e);
+      if (msg === "renderer_pending") {
+        await setRecord(admin, record.id, { generation_status: "READY_TO_GENERATE", last_error: "renderer_pending" });
+        return {
+          vehicle_id: vehicleId, record_id: record.id, status: "READY_TO_GENERATE",
+          renderer: "pending", reconciliation: reconciliationStatus, confidence: normalized.confidence,
+        };
+      }
+      throw e;
+    }
+
+    // ── QA: identity invariants the sticker must never violate.
+    await setRecord(admin, record.id, { generation_status: "RUNNING_QA" });
+    const drawn = rendered.layout?.drawnStrings || [];
+    const qaChecks = {
+      vin_drawn: drawn.includes(vin),
+      barcode_is_vin: normalized.data.barcodePayload === vin,
+      qr_is_canonical_passport: !!canonicalPassportUrl && normalized.data.passportUrl === canonicalPassportUrl,
+      page_count_ok: Number(rendered.layout?.pages) >= 1 && Number(rendered.layout?.pages) <= 2,
+    };
+    const qaPass = Object.values(qaChecks).every(Boolean);
+    const qaPatch = {
+      qr_identity_qa_status: qaChecks.qr_is_canonical_passport ? "PASS" : "FAIL",
+      barcode_identity_qa_status: qaChecks.barcode_is_vin ? "PASS" : "FAIL",
+      visual_qa_status: qaChecks.vin_drawn && qaChecks.page_count_ok ? "PASS" : "FAIL",
+      qa_metadata: { ...(basePatch.qa_metadata as Record<string, unknown>), checks: qaChecks, pages: rendered.layout?.pages ?? null },
+    };
+    await audit(admin, tenantId, qaPass ? "factory_sticker.qa_passed" : "factory_sticker.qa_failed",
+      record.id, { vin, checks: qaChecks });
+
+    // ── File + publish decision: auto-publish ONLY on a fully clean run.
+    const autoPublish = qaPass && reconciliationStatus === "MATCHED" && normalized.confidence === "HIGH" && !reviewRequired;
+    const filed = await fileStickerDocument(admin, tenantId, vehicleId, vin,
+      rendered.pdfBytes, rendered.previewSvg, {
+        title, condition: normalized.data.condition, vin,
+        template_family_id: TEMPLATE_FAMILY_ID, template_version: TEMPLATE_VERSION,
+        renderer_version: FACTORY_STICKER_RENDERER_VERSION,
+        oem_theme_id: theme.oemThemeId, generation_fingerprint: fingerprint,
+        reconciliation_status: reconciliationStatus, confidence_level: normalized.confidence,
+        ...(oemOriginalUrl ? { oem_original_url: oemOriginalUrl } : {}),
+      }, autoPublish);
+
+    await audit(admin, tenantId, "factory_sticker.generated", record.id,
+      { vin, document_id: filed.documentId, version: filed.version, auto_publish: autoPublish });
+
+    const finalStatus = autoPublish ? "PUBLISHED" : "REVIEW_REQUIRED";
+    await setRecord(admin, record.id, {
+      ...qaPatch,
+      generation_status: finalStatus,
+      current_document_id: filed.documentId,
+      review_required: !autoPublish,
+      review_reason: autoPublish ? null : (reviewReason
+        || (!qaPass ? "qa_failed" : reconciliationStatus !== "MATCHED" ? `reconciliation_${reconciliationStatus.toLowerCase()}` : `confidence_${normalized.confidence.toLowerCase()}`)),
+      attempt_count: 0, last_error: null,
+      ...(autoPublish ? { published_at: new Date().toISOString(), approved_at: new Date().toISOString() } : {}),
+    });
+    if (autoPublish) {
+      await audit(admin, tenantId, "factory_sticker.published", record.id,
+        { vin, document_id: filed.documentId, mode: "auto" });
+    }
+
+    return {
+      vehicle_id: vehicleId, record_id: record.id, document_id: filed.documentId,
+      status: finalStatus, version: filed.version, qa: qaChecks,
+      reconciliation: reconciliationStatus, confidence: normalized.confidence, published: autoPublish,
+    };
+  } catch (e) {
+    const msg = String((e as Error)?.message || e).slice(0, 500);
+    const attempts = (record.attempt_count || 0) + 1;
+    const permanent = attempts >= MAX_RETRYABLE_ATTEMPTS;
+    await setRecord(admin, record.id, {
+      generation_status: permanent ? "FAILED_PERMANENT" : "FAILED_RETRYABLE",
+      attempt_count: attempts, last_error: msg,
+      ...(permanent ? { review_required: true, review_reason: "retry_budget_exhausted" } : {}),
+    });
+    await audit(admin, tenantId, "factory_sticker.generation_failed", record.id,
+      { vin, error: msg, attempts, permanent });
+    return { vehicle_id: vehicleId, record_id: record.id, error: msg, retryable: !permanent };
+  }
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  try {
+    const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    const cronHeader = req.headers.get("x-cron-secret") || "";
+    const isService = !!SERVICE_KEY && jwt === SERVICE_KEY;
+    const isCron = !!CRON_SECRET && cronHeader === CRON_SECRET;
+
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const body = await req.json().catch(() => ({}));
+    const action = String(body.action || "orchestrate");
+
+    // Interactive callers must be an accepted member of the tenant; decisions
+    // (regenerate / approve / unpublish) additionally need manager authority.
+    let callerTenants: string[] | null = null;
+    let callerIsPlatformAdmin = false;
+    let callerUserId: string | null = null;
+    const callerRoles = new Map<string, string>();
+    if (!isService && !isCron) {
+      if (!jwt) return json({ error: "missing bearer token" }, 401);
+      const { data: userRes, error } = await admin.auth.getUser(jwt);
+      if (error || !userRes?.user) return json({ error: "invalid token" }, 401);
+      callerUserId = userRes.user.id;
+      const { data: mems } = await admin.from("tenant_members")
+        .select("tenant_id, role").eq("user_id", userRes.user.id).not("accepted_at", "is", null);
+      callerTenants = (mems || []).map((m: { tenant_id: string }) => m.tenant_id);
+      for (const m of mems || []) callerRoles.set(m.tenant_id, String(m.role || ""));
+      const { data: pa } = await admin.from("user_roles")
+        .select("role").eq("user_id", userRes.user.id).eq("role", "admin").maybeSingle();
+      callerIsPlatformAdmin = !!pa;
+      if (!callerTenants.length && !callerIsPlatformAdmin) {
+        return json({ error: "no tenant membership" }, 403);
+      }
+    }
+    const allowed = (t: string) => !callerTenants || callerIsPlatformAdmin || callerTenants.includes(t);
+    const isManager = (t: string) =>
+      !callerTenants || callerIsPlatformAdmin || MANAGER_ROLES.has((callerRoles.get(t) || "").trim().toLowerCase());
+
+    const tenantId = String(body.tenant_id || "");
+    if (!tenantId) return json({ error: "tenant_id required" }, 400);
+    if (!allowed(tenantId)) return json({ error: "forbidden" }, 403);
+
+    // vehicle_id or vin: the manual add paths only know the VIN.
+    let vehicleId = String(body.vehicle_id || "");
+    if (!vehicleId && body.vin) {
+      const vin = String(body.vin).toUpperCase().trim();
+      const { data: byVin } = await admin.from("vehicle_listings")
+        .select("id").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
+      vehicleId = String(byVin?.id || "");
+    }
+    if (!vehicleId) return json({ error: "vehicle_id or vin required" }, 400);
+
+    if (action === "orchestrate" || action === "regenerate") {
+      const force = action === "regenerate" || !!body.force;
+      // A forced run overrides review decisions and terminal states — that is
+      // a manager decision, not a membership privilege.
+      if (force && !isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+      const result = await orchestrateVehicle(admin, req, tenantId, vehicleId, {
+        force,
+        reason: action === "regenerate" ? "manual_regenerate" : String(body.reason || "ingest"),
+        appBase: body.app_base ? String(body.app_base) : undefined,
+      });
+      return json({ success: !result.error, generated: !result.error && !result.skipped && !result.reused, ...result });
+    }
+
+    if (action === "approve_publish") {
+      if (!isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+      const { data: record } = await admin.from("factory_sticker_records")
+        .select("id, generation_status, current_document_id, vin")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+      if (!record) return json({ error: "record_not_found" }, 404);
+      if (!record.current_document_id) return json({ error: "nothing_to_publish" }, 409);
+      const now = new Date().toISOString();
+      await admin.from("generated_documents").update({
+        document_status: "published", published_at: now, updated_at: now,
+      }).eq("id", record.current_document_id);
+      await setRecord(admin, record.id, {
+        generation_status: "PUBLISHED", review_required: false,
+        reviewed_by: callerUserId, reviewed_at: now,
+        approved_by: callerUserId, approved_at: now, published_at: now,
+      });
+      await audit(admin, tenantId, "factory_sticker.published", record.id,
+        { vin: record.vin, document_id: record.current_document_id, mode: "manual", user_id: callerUserId });
+      return json({ success: true, record_id: record.id, document_id: record.current_document_id, status: "PUBLISHED" });
+    }
+
+    if (action === "unpublish") {
+      if (!isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+      const { data: record } = await admin.from("factory_sticker_records")
+        .select("id, generation_status, current_document_id, vin")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+      if (!record) return json({ error: "record_not_found" }, 404);
+      const now = new Date().toISOString();
+      if (record.current_document_id) {
+        await admin.from("generated_documents").update({
+          document_status: "pending_approval", updated_at: now,
+        }).eq("id", record.current_document_id);
+      }
+      await setRecord(admin, record.id, {
+        generation_status: "REVIEW_REQUIRED", review_required: true,
+        review_reason: "manual_unpublish", published_at: null,
+        reviewed_by: callerUserId, reviewed_at: now,
+      });
+      await audit(admin, tenantId, "factory_sticker.unpublished", record.id,
+        { vin: record.vin, document_id: record.current_document_id, user_id: callerUserId });
+      return json({ success: true, record_id: record.id, status: "REVIEW_REQUIRED" });
+    }
+
+    return json({ error: `unknown action: ${action}` }, 400);
+  } catch (e) {
+    return json({ error: (e as Error).message || "unknown error" }, 500);
+  }
+});

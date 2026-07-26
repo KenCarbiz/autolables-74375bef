@@ -1,0 +1,162 @@
+export type OemId =
+  | "INFINITI"
+  | "NISSAN"
+  | "HYUNDAI"
+  | "GENESIS"
+  | "TOYOTA"
+  | "LEXUS"
+  | "HONDA"
+  | "ACURA"
+  | "FORD"
+  | "LINCOLN"
+  | "CHEVROLET"
+  | "GMC"
+  | "BUICK"
+  | "CADILLAC"
+  | "JEEP"
+  | "DODGE"
+  | "RAM"
+  | "CHRYSLER"
+  | "VOLKSWAGEN"
+  | "AUDI"
+  | "BMW"
+  | "MERCEDES_BENZ"
+  | "SUBARU"
+  | "MAZDA"
+  | "KIA"
+  | "VOLVO"
+  | "LAND_ROVER"
+  | "PORSCHE"
+  | "TESLA"
+  | "AUTOLABELS_FALLBACK";
+
+export interface OemIdentity {
+  id: OemId;
+  displayName: string;
+  country: string;
+  group?: string;
+}
+
+export const OEM_REGISTRY: Record<OemId, OemIdentity> = {
+  INFINITI: { id: "INFINITI", displayName: "INFINITI", country: "JP", group: "Nissan Motor Corporation" },
+  NISSAN: { id: "NISSAN", displayName: "Nissan", country: "JP", group: "Nissan Motor Corporation" },
+  HYUNDAI: { id: "HYUNDAI", displayName: "Hyundai", country: "KR", group: "Hyundai Motor Group" },
+  GENESIS: { id: "GENESIS", displayName: "Genesis", country: "KR", group: "Hyundai Motor Group" },
+  TOYOTA: { id: "TOYOTA", displayName: "Toyota", country: "JP", group: "Toyota Motor Corporation" },
+  LEXUS: { id: "LEXUS", displayName: "Lexus", country: "JP", group: "Toyota Motor Corporation" },
+  HONDA: { id: "HONDA", displayName: "Honda", country: "JP", group: "Honda Motor Co." },
+  ACURA: { id: "ACURA", displayName: "Acura", country: "JP", group: "Honda Motor Co." },
+  FORD: { id: "FORD", displayName: "Ford", country: "US", group: "Ford Motor Company" },
+  LINCOLN: { id: "LINCOLN", displayName: "Lincoln", country: "US", group: "Ford Motor Company" },
+  CHEVROLET: { id: "CHEVROLET", displayName: "Chevrolet", country: "US", group: "General Motors" },
+  GMC: { id: "GMC", displayName: "GMC", country: "US", group: "General Motors" },
+  BUICK: { id: "BUICK", displayName: "Buick", country: "US", group: "General Motors" },
+  CADILLAC: { id: "CADILLAC", displayName: "Cadillac", country: "US", group: "General Motors" },
+  JEEP: { id: "JEEP", displayName: "Jeep", country: "US", group: "Stellantis" },
+  DODGE: { id: "DODGE", displayName: "Dodge", country: "US", group: "Stellantis" },
+  RAM: { id: "RAM", displayName: "Ram", country: "US", group: "Stellantis" },
+  CHRYSLER: { id: "CHRYSLER", displayName: "Chrysler", country: "US", group: "Stellantis" },
+  VOLKSWAGEN: { id: "VOLKSWAGEN", displayName: "Volkswagen", country: "DE", group: "Volkswagen Group" },
+  AUDI: { id: "AUDI", displayName: "Audi", country: "DE", group: "Volkswagen Group" },
+  BMW: { id: "BMW", displayName: "BMW", country: "DE", group: "BMW Group" },
+  MERCEDES_BENZ: { id: "MERCEDES_BENZ", displayName: "Mercedes-Benz", country: "DE", group: "Mercedes-Benz Group" },
+  SUBARU: { id: "SUBARU", displayName: "Subaru", country: "JP", group: "Subaru Corporation" },
+  MAZDA: { id: "MAZDA", displayName: "Mazda", country: "JP", group: "Mazda Motor Corporation" },
+  KIA: { id: "KIA", displayName: "Kia", country: "KR", group: "Hyundai Motor Group" },
+  VOLVO: { id: "VOLVO", displayName: "Volvo", country: "SE", group: "Volvo Cars" },
+  LAND_ROVER: { id: "LAND_ROVER", displayName: "Land Rover", country: "GB", group: "JLR" },
+  PORSCHE: { id: "PORSCHE", displayName: "Porsche", country: "DE", group: "Volkswagen Group" },
+  TESLA: { id: "TESLA", displayName: "Tesla", country: "US", group: "Tesla, Inc." },
+  AUTOLABELS_FALLBACK: { id: "AUTOLABELS_FALLBACK", displayName: "AutoLabels", country: "US" },
+};
+
+export type OemResolutionConfidence = "EXACT" | "ALIAS" | "FUZZY" | "UNRESOLVED";
+
+export interface OemResolution {
+  identity: OemIdentity;
+  confidence: OemResolutionConfidence;
+  fallbackReason?: string;
+}
+
+const makeKey = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+const RESOLVABLE_IDS = (Object.keys(OEM_REGISTRY) as OemId[]).filter((id) => id !== "AUTOLABELS_FALLBACK");
+
+const EXACT_KEYS = new Map<string, OemId>();
+for (const id of RESOLVABLE_IDS) {
+  EXACT_KEYS.set(makeKey(id), id);
+  EXACT_KEYS.set(makeKey(OEM_REGISTRY[id].displayName), id);
+}
+
+const ALIASES: Record<string, OemId> = {
+  chevy: "CHEVROLET",
+  chev: "CHEVROLET",
+  vw: "VOLKSWAGEN",
+  volkswagon: "VOLKSWAGEN",
+  mercedes: "MERCEDES_BENZ",
+  benz: "MERCEDES_BENZ",
+  mercedesamg: "MERCEDES_BENZ",
+  rangerover: "LAND_ROVER",
+  infinity: "INFINITI",
+  datsun: "NISSAN",
+  scion: "TOYOTA",
+  genesismotors: "GENESIS",
+  genesismotor: "GENESIS",
+  gmctruck: "GMC",
+  gmctrucks: "GMC",
+  ramtruck: "RAM",
+  ramtrucks: "RAM",
+  dodgeram: "RAM",
+  fordmotorcompany: "FORD",
+  audiag: "AUDI",
+  porscheag: "PORSCHE",
+  volvocars: "VOLVO",
+  teslamotors: "TESLA",
+};
+
+const unresolved = (reason: string): OemResolution => ({
+  identity: OEM_REGISTRY.AUTOLABELS_FALLBACK,
+  confidence: "UNRESOLVED",
+  fallbackReason: reason,
+});
+
+export function resolveOem(rawMake: string, modelYear?: number): OemResolution {
+  const raw = String(rawMake ?? "").trim();
+  if (!raw) return unresolved("empty make");
+  const key = makeKey(raw);
+  if (!key) return unresolved(`make "${raw}" has no resolvable characters`);
+
+  // Ram was a Dodge nameplate until the 2011 brand split.
+  if (key === "ram" && modelYear !== undefined && modelYear <= 2010) {
+    return { identity: OEM_REGISTRY.DODGE, confidence: "ALIAS" };
+  }
+
+  const exact = EXACT_KEYS.get(key);
+  if (exact) return { identity: OEM_REGISTRY[exact], confidence: "EXACT" };
+
+  const alias = ALIASES[key];
+  if (alias) return { identity: OEM_REGISTRY[alias], confidence: "ALIAS" };
+
+  if (key.length >= 3) {
+    const matches = new Set<OemId>();
+    const candidates: Array<[string, OemId]> = [];
+    for (const id of RESOLVABLE_IDS) {
+      candidates.push([makeKey(id), id], [makeKey(OEM_REGISTRY[id].displayName), id]);
+    }
+    for (const [ak, id] of Object.entries(ALIASES)) candidates.push([ak, id]);
+    for (const [ck, id] of candidates) {
+      if (ck.length >= 3 && (key.includes(ck) || (key.length >= 4 && ck.includes(key)))) {
+        matches.add(id);
+      }
+    }
+    if (matches.size === 1) {
+      const id = [...matches][0];
+      return { identity: OEM_REGISTRY[id], confidence: "FUZZY" };
+    }
+    if (matches.size > 1) {
+      return unresolved(`make "${raw}" matches multiple OEMs: ${[...matches].sort().join(", ")}`);
+    }
+  }
+
+  return unresolved(`unknown make "${raw}"`);
+}

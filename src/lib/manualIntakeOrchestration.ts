@@ -144,6 +144,23 @@ export async function runManualIntakeOrchestration(
   const v = String(vin || "").trim().toUpperCase();
   const cond = String(condition || "used").toLowerCase();
   if (!tenantId || !v) return;
+  // Factory Window Sticker orchestration applies to EVERY condition (new
+  // cars get the Monroney-style configuration record too), so it fires
+  // before the used-only draft gate below. Same fire-and-forget contract as
+  // the edge ingest path: fingerprint-idempotent server-side, and the
+  // nightly resync re-fires unsettled records, so 'factory_sticker' keeps
+  // the sweep-retried promise honest.
+  try {
+    void sb().functions.invoke("factory-sticker-orchestrate", {
+      body: { action: "orchestrate", tenant_id: tenantId, vin: v, reason: "manual_intake" },
+    })
+      .then(({ error }: { error: unknown }) => {
+        if (error) void recordArtifactFailure(tenantId, v, "factory_sticker", errText(error));
+      })
+      .catch((e: unknown) => { void recordArtifactFailure(tenantId, v, "factory_sticker", errText(e)); });
+  } catch (e) {
+    await recordArtifactFailure(tenantId, v, "factory_sticker", errText(e));
+  }
   if (!["used", "cpo", "certified"].includes(cond)) return;
   for (const { fn, artifact } of DRAFT_RPCS) {
     try {

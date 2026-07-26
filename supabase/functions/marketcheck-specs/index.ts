@@ -17,6 +17,11 @@ const MC_BASE = "https://api.marketcheck.com/v2";
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 const redact = (u: string) => u.replace(/api_key=[^&]+/, "api_key=***");
 
+const sha256Hex = async (text: string): Promise<string> => {
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+
 // Flatten a feed value (string | {name|label|description|...}) to a clean name.
 // deno-lint-ignore no-explicit-any
 // NeoVIN shapes: InstalledOption/AvailableOption use `name`; Feature/
@@ -80,7 +85,15 @@ function structuredSheet(payload: any): Record<string, unknown> | null {
   const src = payload || {};
   const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
 
-  const packages: { name: string; msrp?: number; contents: string[] }[] = [];
+  // Per-item factory option codes are sticker-grade data (the Monroney lists
+  // them); persist them additively when the feed carries them.
+  const codeOf = (x: unknown): string | undefined => {
+    const c = String((x as { code?: unknown; option_code?: unknown } | null)?.code
+      ?? (x as { option_code?: unknown } | null)?.option_code ?? "").trim();
+    return c || undefined;
+  };
+
+  const packages: { name: string; code?: string; msrp?: number; contents: string[] }[] = [];
   const pkgSrc = Array.isArray(src.options_packages) ? src.options_packages : [];
   for (const p of pkgSrc) {
     const name = flat(p);
@@ -88,10 +101,10 @@ function structuredSheet(payload: any): Record<string, unknown> | null {
     const contents = ([] as unknown[])
       .concat(p?.options ?? p?.contents ?? p?.items ?? p?.features ?? [])
       .map(flat).filter(Boolean);
-    packages.push({ name, msrp: num(p?.msrp ?? p?.price), contents });
+    packages.push({ name, code: codeOf(p), msrp: num(p?.msrp ?? p?.price), contents });
   }
 
-  const options: { name: string; msrp?: number }[] = [];
+  const options: { name: string; code?: string; msrp?: number }[] = [];
   const optSrc = Array.isArray(src.installed_options_details) ? src.installed_options_details : [];
   for (const o of optSrc) {
     const name = flat(o);
@@ -100,9 +113,9 @@ function structuredSheet(payload: any): Record<string, unknown> | null {
     // by the presence of sub-contents.
     const subs = ([] as unknown[]).concat(o?.options ?? o?.contents ?? []).map(flat).filter(Boolean);
     if (/package/i.test(String(o?.type ?? o?.category ?? "")) || subs.length) {
-      if (!packages.some((p) => p.name === name)) packages.push({ name, msrp: num(o?.msrp ?? o?.price), contents: subs });
+      if (!packages.some((p) => p.name === name)) packages.push({ name, code: codeOf(o), msrp: num(o?.msrp ?? o?.price), contents: subs });
     } else {
-      options.push({ name, msrp: num(o?.msrp ?? o?.price) });
+      options.push({ name, code: codeOf(o), msrp: num(o?.msrp ?? o?.price) });
     }
   }
 
@@ -124,8 +137,54 @@ function structuredSheet(payload: any): Record<string, unknown> | null {
   // can't be fully decoded — the passport must label those, never assert them.
   const generic = Boolean(src.is_generic ?? src.generic ?? /generic/i.test(String(src.decode_mode ?? src.decode ?? "")));
 
+  // ── Sticker-grade fields (Factory Window Sticker Generator) ──────────
+  // The raw NeoVIN payload was historically discarded after extraction, so
+  // base MSRP, destination charge, and color codes were lost forever. These
+  // additive keys persist them for future decodes (the complete raw response
+  // is also captured verbatim in neovin_snapshots). NeoVIN field names, per
+  // the parsing above + mc-probe: msrp (base), delivery_charges
+  // (destination), combined_msrp (total); exterior_color/interior_color as
+  // {name|generic_name, code, msrp}; made_in/made_in_city for assembly.
+  const pricing: Record<string, number> = {};
+  const baseMsrp = num(src.msrp ?? src.base_msrp ?? src.base_price);
+  const destCharge = num(src.delivery_charges ?? src.destination_charge ?? src.destination ?? src.freight_charge);
+  const totalMsrp = num(src.combined_msrp ?? src.total_msrp ?? src.total_price ?? src.msrp_with_options);
+  if (baseMsrp) pricing.base_msrp = baseMsrp;
+  if (destCharge) pricing.destination_charge = destCharge;
+  if (totalMsrp) pricing.total_msrp = totalMsrp;
+
+  // deno-lint-ignore no-explicit-any
+  const colorOf = (c: any): Record<string, unknown> | undefined => {
+    if (c == null) return undefined;
+    if (typeof c === "string") return c.trim() ? { name: c.trim() } : undefined;
+    if (typeof c !== "object") return undefined;
+    const name = String(c.name ?? c.generic_name ?? c.description ?? "").trim();
+    const code = String(c.code ?? c.color_code ?? "").trim();
+    const cMsrp = num(c.msrp ?? c.price);
+    if (!name && !code) return undefined;
+    return { ...(name ? { name } : {}), ...(code ? { code } : {}), ...(cMsrp ? { msrp: cMsrp } : {}) };
+  };
+  const exterior = colorOf(src.exterior_color ?? src.base_ext_color);
+  const interior = colorOf(src.interior_color ?? src.base_int_color);
+  const colors = exterior || interior
+    ? { ...(exterior ? { exterior } : {}), ...(interior ? { interior } : {}) }
+    : undefined;
+
+  const plant = String(src.plant ?? src.assembly_plant ?? "").trim();
+  const country = String(src.made_in ?? src.assembly_country ?? "").trim();
+  const city = String(src.made_in_city ?? "").trim();
+  const assembly = plant || country || city
+    ? { ...(plant ? { plant } : {}), ...(country ? { country } : {}), ...(city ? { city } : {}) }
+    : undefined;
+
   if (!packages.length && !options.length && !Object.keys(key_features).length && !Object.keys(standard).length) return null;
-  return { packages, options, key_features, standard, generic, decoded_at: new Date().toISOString(), source: "neovin" };
+  return {
+    packages, options, key_features, standard, generic,
+    ...(Object.keys(pricing).length ? { pricing } : {}),
+    ...(colors ? { colors } : {}),
+    ...(assembly ? { assembly } : {}),
+    decoded_at: new Date().toISOString(), source: "neovin",
+  };
 }
 
 // Candidate MarketCheck VIN-decode endpoints — the specs/options path differs
@@ -179,6 +238,7 @@ Deno.serve(async (req) => {
   // deno-lint-ignore no-explicit-any
   let payload: any = null;
   let endpoint = "";
+  let payloadStatus = 0;
   // NeoVIN (endpoint 0) carries the equipment breakout but is the slow, heavy
   // call — a tight timeout makes it fall through to the basic decoder that
   // returns core specs with ZERO equipment, which then writes options=null and
@@ -197,14 +257,30 @@ Deno.serve(async (req) => {
       const data = await res.json().catch(() => null);
       if (data == null) continue;
       const probe = extractLists(data);
-      if (probe.options.length || probe.features.length) { payload = data; endpoint = redact(url); break; }
-      if (!payload) { payload = data; endpoint = redact(url); } // keep specs-only as a fallback, keep looking
+      if (probe.options.length || probe.features.length) { payload = data; endpoint = redact(url); payloadStatus = res.status; break; }
+      if (!payload) { payload = data; endpoint = redact(url); payloadStatus = res.status; } // keep specs-only as a fallback, keep looking
     } catch (_e) {
       tried.push({ url: redact(url), status: "timeout_or_network" });
     }
   }
 
   if (!payload) return json(200, { ok: false, error: "no_endpoint_matched", tried });
+
+  // ── Complete provider capture: capture FIRST, extract SECOND ─────────
+  // The FULL raw decode response is persisted to neovin_snapshots before any
+  // extraction runs, so an extractor bug or coverage gap can never lose
+  // provider data (the raw payload is otherwise discarded when this request
+  // ends). Best-effort + error-swallowing: capture must never fail the
+  // decode. Identical re-pulls dedupe on (tenant_id, vin, payload_hash).
+  try {
+    const hash = await sha256Hex(JSON.stringify(payload));
+    await admin.from("neovin_snapshots").upsert({
+      tenant_id: tenantId, vehicle_id: vehicleId, vin,
+      endpoint, payload, payload_hash: hash,
+      http_status: payloadStatus || null,
+      raw_key_count: payload && typeof payload === "object" ? Object.keys(payload).length : null,
+    }, { onConflict: "tenant_id,vin,payload_hash", ignoreDuplicates: true });
+  } catch { /* capture is best-effort; the table may not be migrated yet */ }
 
   const { options, features } = extractLists(payload);
   const sheet = structuredSheet(payload);

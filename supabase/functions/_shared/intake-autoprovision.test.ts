@@ -211,6 +211,8 @@ describe("ensureComplianceDrafts", () => {
     });
   });
 
+  const settledSticker = { data: { id: "r1", generation_status: "PUBLISHED" } };
+
   it("fires generate-vehicle-forms on the resync path when a form draft was missing", async () => {
     const fetchMock = okFetch();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -219,6 +221,7 @@ describe("ensureComplianceDrafts", () => {
     // buyers_guide exists; the K-208 form doc does not — the drafts created
     // here would otherwise sit file-less forever.
     state("generated_documents").listResults.push({ data: [{ id: "d1", document_type: "buyers_guide" }] });
+    state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
     await flush();
     expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
@@ -226,7 +229,7 @@ describe("ensureComplianceDrafts", () => {
     ]);
   });
 
-  it("does not re-render when both form documents already exist", async () => {
+  it("does not re-render when both form documents already exist and the sticker record is settled", async () => {
     const fetchMock = okFetch();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const { admin, state } = makeAdmin();
@@ -234,16 +237,18 @@ describe("ensureComplianceDrafts", () => {
     state("generated_documents").listResults.push({
       data: [{ id: "d1", document_type: "buyers_guide" }, { id: "d2", document_type: "k208" }],
     });
+    state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
     await flush();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("never renders for a new car or without a render target", async () => {
+  it("never renders the form PDFs for a new car or without a render target", async () => {
     const fetchMock = okFetch();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const { admin, state } = makeAdmin();
     state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "new" } });
+    state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
     await ensureComplianceDrafts(admin, "t1", "VIN456");
     await flush();
@@ -256,9 +261,49 @@ describe("ensureComplianceDrafts", () => {
     const { admin, state } = makeAdmin();
     state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "used" } });
     state("generated_documents").listResults.push({ data: null, error: { message: "denied" } });
+    state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
     await flush();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fires factory-sticker-orchestrate on resync while the record is missing or retryable", async () => {
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    // A NEW car: the form docs never render, but the factory sticker does.
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "new" } });
+    // no factory_sticker_records row queued → maybeSingle returns null → missing
+    await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await flush();
+    expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
+      "https://x.supabase.co/functions/v1/factory-sticker-orchestrate",
+    ]);
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as { body: string }).body));
+    expect(body).toMatchObject({ action: "orchestrate", tenant_id: "t1", vehicle_id: "l1", reason: "resync" });
+  });
+
+  it("re-fires factory-sticker-orchestrate for retryable/renderer-waiting records but not settled ones", async () => {
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "new" } });
+    state("factory_sticker_records").maybeSingleResults.push({ data: { id: "r1", generation_status: "FAILED_RETRYABLE" } });
+    await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    // READY_TO_GENERATE waits on the renderer — resync must keep re-firing it
+    // so the fleet generates the night the renderer lands.
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l2", condition: "new" } });
+    state("factory_sticker_records").maybeSingleResults.push({ data: { id: "r2", generation_status: "READY_TO_GENERATE" } });
+    await ensureComplianceDrafts(admin, "t1", "VIN456", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    // REVIEW_REQUIRED is a human decision in flight — never re-posted.
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l3", condition: "new" } });
+    state("factory_sticker_records").maybeSingleResults.push({ data: { id: "r3", generation_status: "REVIEW_REQUIRED" } });
+    await ensureComplianceDrafts(admin, "t1", "VIN789", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await flush();
+    expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
+      "https://x.supabase.co/functions/v1/factory-sticker-orchestrate",
+      "https://x.supabase.co/functions/v1/factory-sticker-orchestrate",
+    ]);
   });
 });
 
@@ -284,6 +329,7 @@ describe("autoPreload", () => {
       "https://x.supabase.co/functions/v1/email-title-request",
       "https://x.supabase.co/functions/v1/ingest-orchestrate",
       "https://x.supabase.co/functions/v1/description-orchestrate",
+      "https://x.supabase.co/functions/v1/factory-sticker-orchestrate",
     ]);
   });
 
