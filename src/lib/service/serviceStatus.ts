@@ -41,6 +41,10 @@ export interface ServiceStatus {
   tone: Tone;
   nextLabel: string;
   nextTone: "primary" | "danger" | "ghost";
+  /** The next REQUIRED task in the order of operations, named for the drawer. */
+  nextTask: string;
+  /** Plain-language reason the vehicle is parked on this task, when blocked. */
+  nextWhy: string | null;
   priority: "High" | "Medium" | "Low";
 }
 
@@ -96,43 +100,64 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean,
   // never shown as cleared.
   const cleared = clearanceState === "cleared_for_delivery" && !blocked && !awaiting;
 
+  // Order of operations (SERVICE_DESK correction): the K-208 safety inspection
+  // is the FIRST required task for every used/CPO vehicle. "Start Get Ready"
+  // never renders while the K-208 is next — repair/prep work is downstream of
+  // certification and manager authorization.
   let bannerKey: string, bannerLabel: string, tone: Tone, nextLabel: string, nextTone: ServiceStatus["nextTone"];
+  let nextTask: string, nextWhy: string | null;
   if (awaiting) {
     bannerKey = "awaiting"; bannerLabel = "Additional work awaiting approval"; tone = "amber";
     nextLabel = "Review request"; nextTone = "primary";
+    nextTask = "Additional-work approval"; nextWhy = "A work request is waiting on a manager decision.";
   } else if (readyForReinspection) {
     // All repaired: the loop is waiting on an authorized reinspection, not on
     // more repair work — amber, matching deriveWorkspaceStatus.
     bannerKey = "ready_for_reinspection"; bannerLabel = "Ready for reinspection"; tone = "amber";
-    nextLabel = "Reinspect repaired items"; nextTone = "primary";
+    nextLabel = "Verify Repair"; nextTone = "primary";
+    nextTask = "Repair verification"; nextWhy = "Repaired items are waiting for reinspection.";
   } else if (failed) {
     bannerKey = "failed"; bannerLabel = "Failed items require repair"; tone = "red";
     nextLabel = "Resolve failed items"; nextTone = "danger";
+    nextTask = "Repair failed items"; nextWhy = "The signed inspection recorded failed items that are still open.";
   } else if (recallBlocking) {
     bannerKey = "blocked"; bannerLabel = "Delivery blocked — open recall"; tone = "red";
     nextLabel = "Record recall outcome"; nextTone = "danger";
+    nextTask = "Recall resolution"; nextWhy = "An open do-not-drive recall blocks delivery.";
   } else if (cleared) {
     bannerKey = "cleared"; bannerLabel = "Cleared for delivery"; tone = "emerald";
-    nextLabel = "View completed record"; nextTone = "ghost";
+    nextLabel = "View Completed Inspection"; nextTone = "ghost";
+    nextTask = "None — cleared for delivery"; nextWhy = null;
   } else if (k208State === "executed") {
     // Executed, but the stored clearance is missing or still blocked — say so;
     // never claim cleared from derivation alone.
     bannerKey = "awaiting_clearance"; bannerLabel = "K-208 executed — delivery clearance pending"; tone = "amber";
     nextLabel = "Review delivery clearance"; nextTone = "primary";
+    nextTask = "Delivery clearance"; nextWhy = "The K-208 is executed; the stored clearance has not released the vehicle.";
   } else if (k208State === "ready") {
-    bannerKey = "ready"; bannerLabel = "Ready for K-208"; tone = "blue";
-    nextLabel = "Review & sign K-208"; nextTone = "primary";
+    bannerKey = "ready"; bannerLabel = "Awaiting certification"; tone = "blue";
+    nextLabel = "Review & Certify K-208"; nextTone = "primary";
+    nextTask = "K-208 certification"; nextWhy = "The inspection is signed and waiting on the licensee's certification.";
   } else if (k208State === "voided") {
     bannerKey = "voided"; bannerLabel = "K-208 voided"; tone = "slate";
-    nextLabel = "Start new inspection"; nextTone = "primary";
+    nextLabel = "Correct Inspection"; nextTone = "primary";
+    nextTask = "K-208 Safety Inspection"; nextWhy = "The prior inspection was voided and must be redone.";
+  } else if (ctx.inspectionState === "in_progress") {
+    bannerKey = "inspection_in_progress"; bannerLabel = "K-208 inspection in progress"; tone = "blue";
+    nextLabel = "Continue K-208 Inspection"; nextTone = "primary";
+    nextTask = "K-208 Safety Inspection"; nextWhy = null;
   } else if (grState === "in_progress") {
-    bannerKey = "in_progress"; bannerLabel = "Get Ready in progress"; tone = "amber";
-    nextLabel = "Continue work"; nextTone = "primary";
+    // Prep items may be moving, but the required inspection still has not
+    // started — the K-208 remains the one next required task.
+    bannerKey = "in_progress"; bannerLabel = "Get Ready in progress — K-208 not started"; tone = "amber";
+    nextLabel = "Start K-208 Inspection"; nextTone = "primary";
+    nextTask = "K-208 Safety Inspection"; nextWhy = "Required safety inspection has not been started.";
   } else {
-    bannerKey = "not_started"; bannerLabel = "Work not started"; tone = "slate";
-    nextLabel = "Start Get Ready"; nextTone = "primary";
+    bannerKey = "not_started"; bannerLabel = "K-208 not started"; tone = "slate";
+    nextLabel = "Start K-208 Inspection"; nextTone = "primary";
+    nextTask = "K-208 Safety Inspection"; nextWhy = "Required safety inspection has not been started.";
   }
 
   const priority: ServiceStatus["priority"] = (awaiting || blocked) ? "High" : cleared ? "Low" : "Medium";
-  return { grState, k208State, awaiting, blocked, cleared, bannerKey, bannerLabel, tone, nextLabel, nextTone, priority };
+  return { grState, k208State, awaiting, blocked, cleared, bannerKey, bannerLabel, tone, nextLabel, nextTone, nextTask, nextWhy, priority };
 }

@@ -131,6 +131,7 @@ export function ManagerMessagesRail({ tenantId, vehicles }: {
   const { rows, reload } = useMessages(tenantId);
   const [filter, setFilter] = useState("all");
   const [composeVin, setComposeVin] = useState("");
+  const [composing, setComposing] = useState(false);
 
   const visible = useMemo(
     () => (rows ?? []).filter((m) => filter === "all" || m.vin === filter),
@@ -142,6 +143,26 @@ export function ManagerMessagesRail({ tenantId, vehicles }: {
   );
   const labelFor = (vin: string) =>
     vehicles.find((v) => v.vin === vin)?.ymm || `VIN …${vin.slice(-6)}`;
+
+  // No messages and not composing: yield the rail space instead of parking a
+  // permanent empty panel beside the queue.
+  if ((rows ?? []).length === 0 && !composing) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-3.5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
+          <p className="text-xs text-muted-foreground truncate">No manager messages</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setComposing(true)}
+          className="h-9 px-3 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted shrink-0"
+        >
+          New message
+        </button>
+      </div>
+    );
+  }
 
   return (
     <CommandCard

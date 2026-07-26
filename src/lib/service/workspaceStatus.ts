@@ -132,7 +132,7 @@ export function deriveWorkspaceStatus(i: WorkspaceStatusInput): WorkspaceStatus 
         key: "ready_for_reinspection",
         label: "Ready for reinspection",
         tone: "amber",
-        action: { key: "reinspect", label: "Reinspect repaired items" },
+        action: { key: "reinspect", label: "Verify Repair" },
         blockerLabel,
       };
     }
@@ -161,17 +161,17 @@ export function deriveWorkspaceStatus(i: WorkspaceStatusInput): WorkspaceStatus 
         key: "cleared",
         label: "Cleared for delivery",
         tone: "emerald",
-        action: { key: "view_record", label: "View completed record" },
+        action: { key: "view_record", label: "View Completed Inspection" },
         blockerLabel: null,
       };
     }
     if (!i.certified) {
       return {
         key: "ready_for_k208",
-        label: "Ready for K-208",
+        label: "Awaiting certification",
         tone: "blue",
         action: i.canExecute
-          ? { key: "execute_k208", label: "Review & execute K-208" }
+          ? { key: "execute_k208", label: "Review & Certify K-208" }
           : { key: "review_k208", label: "Review K-208" },
         blockerLabel,
       };
@@ -185,21 +185,33 @@ export function deriveWorkspaceStatus(i: WorkspaceStatusInput): WorkspaceStatus 
     };
   }
 
-  if (i.workflowState === "in_progress" || i.grStarted) {
+  // Order of operations: the K-208 safety inspection is the FIRST required
+  // task. "Start Get Ready" never renders while the K-208 is next — prep and
+  // repair work is downstream of certification and manager authorization.
+  if (i.workflowState === "in_progress") {
     return {
       key: "in_progress",
-      label: "Get Ready in progress",
+      label: "K-208 inspection in progress",
       tone: "blue",
-      action: { key: "continue_work", label: "Continue work" },
+      action: { key: "continue_work", label: "Continue K-208 Inspection" },
+      blockerLabel,
+    };
+  }
+  if (i.grStarted) {
+    return {
+      key: "in_progress",
+      label: "Get Ready in progress — K-208 not started",
+      tone: "blue",
+      action: { key: "start_work", label: "Start K-208 Inspection" },
       blockerLabel,
     };
   }
 
   return {
     key: "not_started",
-    label: "Work not started",
+    label: "K-208 not started",
     tone: "slate",
-    action: { key: "start_work", label: "Start Get Ready" },
+    action: { key: "start_work", label: "Start K-208 Inspection" },
     blockerLabel,
   };
 }

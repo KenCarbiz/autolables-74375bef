@@ -42,6 +42,8 @@ export interface ServicePriorityInput {
   readyForK208: boolean;
   inspectionStarted: boolean;
   overdue: boolean;
+  /** Whole days past the store's overdue threshold (0 when not overdue). */
+  overdueDays?: number;
   assigned: boolean;
   ageHours: number;
   cleared: boolean;
@@ -64,17 +66,32 @@ const make = (rank: number, code: ServicePriorityCode): ServicePriority => ({
   level: levelFor(rank),
 });
 
+/** Age past this many days overdue is a High-priority exception, whatever the
+ *  rule that matched — a 38-day-old pending inspection is never "Medium". */
+const OVERDUE_ESCALATION_DAYS = 7;
+
 /** Spec order, first match wins: sold+today+blocked, sold+failure,
- *  reinspection, K-208 ready, overdue, unassigned, oldest pending, new. */
+ *  reinspection, K-208 ready, overdue, unassigned, oldest pending, new.
+ *  Severely overdue vehicles escalate to High and say how many days. */
 export function deriveServicePriority(i: ServicePriorityInput): ServicePriority {
   if (i.cleared) return { rank: 9, code: "NO_ACTION_REQUIRED", label: SERVICE_PRIORITY_LABELS.NO_ACTION_REQUIRED, level: "Low" };
+  const days = Math.max(0, Math.floor(i.overdueDays ?? 0));
+  const escalate = (p: ServicePriority): ServicePriority =>
+    i.overdue && days >= OVERDUE_ESCALATION_DAYS && p.level !== "High"
+      ? { ...p, level: "High", label: `${p.label} — ${days} days overdue` }
+      : p;
   if (i.sold && i.deliveryToday && i.blocked) {
     return make(1, i.inspectionStarted ? "DELIVERY_TODAY_DELIVERY_BLOCKED" : "DELIVERY_TODAY_INSPECTION_NOT_STARTED");
   }
   if (i.sold && i.failedItemsOpen) return make(2, "SOLD_VEHICLE_FAILED_ITEMS_OPEN");
-  if (i.awaitingReinspection) return make(3, "REINSPECTION_REQUIRED");
-  if (i.readyForK208) return make(4, "K208_READY_NOT_EXECUTED");
-  if (i.overdue) return make(5, "INSPECTION_OVERDUE");
+  if (i.awaitingReinspection) return escalate(make(3, "REINSPECTION_REQUIRED"));
+  if (i.readyForK208) return escalate(make(4, "K208_READY_NOT_EXECUTED"));
+  if (i.overdue) {
+    const p = make(5, "INSPECTION_OVERDUE");
+    return days >= 1
+      ? { ...p, label: `Inspection overdue ${days} ${days === 1 ? "day" : "days"}`, level: days >= OVERDUE_ESCALATION_DAYS ? "High" : p.level }
+      : p;
+  }
   if (!i.assigned) return make(6, "INSPECTION_UNASSIGNED");
   if (i.ageHours >= 24) return make(7, "OLDEST_PENDING_INSPECTION");
   return make(8, "NEW_INVENTORY_PENDING_INSPECTION");

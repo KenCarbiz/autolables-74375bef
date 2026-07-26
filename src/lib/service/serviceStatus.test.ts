@@ -108,7 +108,7 @@ describe("deriveServiceStatus — ready for reinspection (amber, matching derive
     expect(s.bannerKey).toBe("ready_for_reinspection");
     expect(s.bannerLabel).toBe("Ready for reinspection");
     expect(s.tone).toBe("amber");
-    expect(s.nextLabel).toBe("Reinspect repaired items");
+    expect(s.nextLabel).toBe("Verify Repair");
     expect(s.nextTone).toBe("primary");
     // The K-208 stays blocked until an authorized reinspection passes.
     expect(s.k208State).toBe("blocked");
@@ -127,7 +127,7 @@ describe("deriveServiceStatus — ready for reinspection (amber, matching derive
       { openFailures: 0, resolvedFailures: 2, inspectionState: "repairs_in_progress" });
     expect(s.bannerKey).toBe("ready_for_reinspection");
     expect(s.tone).toBe("amber");
-    expect(s.nextLabel).toBe("Reinspect repaired items");
+    expect(s.nextLabel).toBe("Verify Repair");
   });
 
   it("a signed fail with no failure rows filed stays red Resolve failed items", () => {
@@ -157,7 +157,7 @@ describe("deriveServiceStatus — voided chip", () => {
     const s = deriveServiceStatus(veh, grComplete, null, false, { newestVoided: true });
     expect(s.k208State).toBe("voided");
     expect(s.bannerKey).toBe("voided");
-    expect(s.nextLabel).toBe("Start new inspection");
+    expect(s.nextLabel).toBe("Correct Inspection");
     expect(s.cleared).toBe(false);
   });
 
@@ -165,5 +165,55 @@ describe("deriveServiceStatus — voided chip", () => {
     const s = deriveServiceStatus(veh, grComplete, { result: "pass", licensee_certified_at: null }, false,
       { newestVoided: true });
     expect(s.k208State).toBe("ready");
+  });
+});
+
+describe("deriveServiceStatus — the K-208 is the next required task (order of operations)", () => {
+  it("nothing started: the action is Start K-208 Inspection, never Start Get Ready", () => {
+    const s = deriveServiceStatus(veh, null, null, false);
+    expect(s.nextLabel).toBe("Start K-208 Inspection");
+    expect(s.nextTask).toBe("K-208 Safety Inspection");
+    expect(s.nextWhy).toBe("Required safety inspection has not been started.");
+  });
+
+  it("get-ready items moving but inspection not started: the K-208 is still the next required task", () => {
+    const gr = { items: [{ status: "complete" }, { status: "pending" }], status: "in_progress" };
+    const s = deriveServiceStatus(veh, gr, null, false, { inspectionState: "not_started" });
+    expect(s.grState).toBe("in_progress");
+    expect(s.nextLabel).toBe("Start K-208 Inspection");
+    expect(s.bannerLabel).toContain("K-208 not started");
+  });
+
+  it("an in-progress inspection continues — never restarts", () => {
+    const gr = { items: [{ status: "complete" }], status: "in_progress" };
+    const s = deriveServiceStatus(veh, gr, null, false, { inspectionState: "in_progress" });
+    expect(s.nextLabel).toBe("Continue K-208 Inspection");
+    expect(s.bannerKey).toBe("inspection_in_progress");
+    expect(s.nextWhy).toBeNull();
+  });
+
+  it("a signed uncertified pass reads Awaiting certification with a certify action", () => {
+    const s = deriveServiceStatus(veh, grComplete, { result: "pass", licensee_certified_at: null }, false);
+    expect(s.bannerLabel).toBe("Awaiting certification");
+    expect(s.nextLabel).toBe("Review & Certify K-208");
+    expect(s.nextTask).toBe("K-208 certification");
+  });
+
+  it("cleared vehicles offer View Completed Inspection with no blocker copy", () => {
+    const s = deriveServiceStatus(veh, grComplete, { result: "pass", licensee_certified_at: "2026-07-02" }, false,
+      { clearanceState: "cleared_for_delivery" });
+    expect(s.nextLabel).toBe("View Completed Inspection");
+    expect(s.nextWhy).toBeNull();
+  });
+
+  it("no state ever renders a Start Get Ready action from the service queue", () => {
+    const variants = [
+      deriveServiceStatus(veh, null, null, false),
+      deriveServiceStatus(veh, { items: [], status: "in_progress" }, null, false),
+      deriveServiceStatus(veh, grComplete, { result: "pass" }, false),
+      deriveServiceStatus(veh, grComplete, { result: "fail" }, false),
+      deriveServiceStatus(veh, null, null, false, { newestVoided: true }),
+    ];
+    for (const s of variants) expect(s.nextLabel).not.toMatch(/Get Ready/);
   });
 });

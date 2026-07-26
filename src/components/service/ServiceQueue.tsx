@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { deriveServiceStatus } from "@/lib/service/serviceStatus";
@@ -44,15 +48,20 @@ interface Row {
   clearanceState: string | null;
   clearanceReasons: string[];
   next: { label: string; tone: "primary" | "danger" | "ghost" };
+  nextTask: string;
+  nextWhy: string | null;
   priority: ServicePriority;
   bucket: "get_ready" | "in_progress" | "failed" | "reinspect" | "ready_to_sign" | "pending_clearance" | "done";
   overdue: boolean;
+  overdueDays: number;
   completedToday: boolean;
   awaiting: boolean;
   cleared: boolean;
   sold: boolean;
   assignedTo: string | null;
   assignedName: string | null;
+  inspectionId: string | null;
+  inspectionStatus: string | null;
   ageHours: number;
   openFailures: number;
   readySince: string | null;
@@ -67,6 +76,16 @@ const isToday = (iso?: string | null) => {
 const ageLabel = (hours: number): string => {
   if (hours < 24) return `${Math.max(0, Math.round(hours))}h`;
   return `${Math.floor(hours / 24)}d ${Math.round(hours % 24)}h`;
+};
+
+// The operational truth, not a stopwatch: overdue vehicles say how many days
+// overdue they are; on-time vehicles say how long they have been in service.
+const ageDisplay = (r: Pick<Row, "overdue" | "overdueDays" | "ageHours">): string => {
+  if (r.overdue) {
+    return r.overdueDays >= 1 ? `${r.overdueDays} ${r.overdueDays === 1 ? "day" : "days"} overdue` : "Overdue";
+  }
+  const days = Math.floor(r.ageHours / 24);
+  return days >= 1 ? `${days}d in service` : `${Math.max(0, Math.round(r.ageHours))}h in service`;
 };
 
 const TABS: { key: string; label: string }[] = [
@@ -92,7 +111,7 @@ const GR_CHIP: Record<Row["grState"], { label: string; cls: string; Icon: typeof
 };
 const K208_CHIP: Record<Row["k208State"], { label: string; cls: string; Icon: typeof Circle }> = {
   waiting: { label: "Waiting", cls: "text-slate-500", Icon: Clock },
-  ready: { label: "Ready to execute", cls: "text-blue-600", Icon: Clock },
+  ready: { label: "Ready to certify", cls: "text-blue-600", Icon: Clock },
   blocked: { label: "Blocked", cls: "text-red-600", Icon: AlertTriangle },
   executed: { label: "Executed", cls: "text-emerald-600", Icon: CheckCircle2 },
   // "superseded" is deliberately unbuilt: nothing in this repo writes it yet.
@@ -102,12 +121,15 @@ const K208_CHIP: Record<Row["k208State"], { label: string; cls: string; Icon: ty
 const PRIORITY_ICON = { High: ArrowUp, Medium: Minus, Low: ArrowDown } as const;
 const PRIORITY_CLS = { High: "text-red-600", Medium: "text-amber-600", Low: "text-slate-400" } as const;
 
-export default function ServiceQueue() {
+export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "desk" }) {
   const { tenant } = useTenant();
+  const { user, isAdmin } = useAuth();
+  const { member } = useEntitlements();
   const { openScan } = useVinScan();
   const { settings } = useDealerSettings();
   const navigate = useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
+  const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState("all");
@@ -116,6 +138,8 @@ export default function ServiceQueue() {
   const [urgencyFilter, setUrgencyFilter] = useState("any");
   const [drawer, setDrawer] = useState<Row | null>(null);
   const overdueHours = settings.service_overdue_hours || 24;
+  const uid = user?.id ?? null;
+  const canAssign = isAdmin || hasDealerCapability(member?.role, "can_assign_service_work", isAdmin);
 
   const load = useCallback(async () => {
     if (!tenant?.id) { setLoading(false); return; }
@@ -135,7 +159,9 @@ export default function ServiceQueue() {
       const empty = Promise.resolve({ data: [] });
       const [grRes, siRes, srRes, failRes, clrRes, memRes, vfRes] = await Promise.all([
         vins.length ? sb().from("get_ready_records").select("vin, status, items, get_ready_complete_date, delivery_target").eq("tenant_id", tenant.id).in("vin", vins) : empty,
-        vins.length ? sb().from("safety_inspections").select("vin, status, result, inspection_state, assigned_to, licensee_certified_at, signed_at, created_at").eq("tenant_id", tenant.id).in("vin", vins).order("created_at", { ascending: false }) : empty,
+        // `id` is load-bearing: failure counts are scoped by inspection_id
+        // against the newest signed row — without it every failure is skipped.
+        vins.length ? sb().from("safety_inspections").select("id, vin, status, result, inspection_state, assigned_to, licensee_certified_at, signed_at, created_at").eq("tenant_id", tenant.id).in("vin", vins).order("created_at", { ascending: false }) : empty,
         // 'clarify' rows are still-open requests (waiting on the requester's
         // answer), not decided ones — they must not vanish from the queue.
         vins.length ? sb().from("service_requests").select("vin").eq("tenant_id", tenant.id).in("status", ["pending", "clarify"]).in("vin", vins) : empty,
@@ -200,6 +226,9 @@ export default function ServiceQueue() {
       for (const m of ((memRes.data as MemberRow[]) || [])) {
         if (m.user_id && m.email) memberById.set(m.user_id, m.email.split("@")[0]);
       }
+      setMembers(((memRes.data as MemberRow[]) || [])
+        .filter((m) => m.user_id && m.email && m.accepted_at)
+        .map((m) => ({ id: m.user_id as string, name: (m.email as string).split("@")[0] })));
 
       const now = Date.now();
       const out: Row[] = vs.map((v) => {
@@ -231,6 +260,7 @@ export default function ServiceQueue() {
           || (fails.open > 0 && fails.ready === fails.open)
           || (fails.open === 0 && fails.resolved > 0 && isFailedInspection(signed ?? null));
         const overdue = !s.cleared && s.k208State !== "executed" && ageHours > overdueHours;
+        const overdueDays = overdue ? Math.floor((ageHours - overdueHours) / 24) : 0;
         const priority = deriveServicePriority({
           sold,
           deliveryToday: isToday(gr?.delivery_target),
@@ -240,6 +270,7 @@ export default function ServiceQueue() {
           readyForK208: s.k208State === "ready",
           inspectionStarted: inspectionState != null && inspectionState !== "not_started",
           overdue,
+          overdueDays,
           assigned: !!active?.assigned_to,
           ageHours,
           cleared: s.cleared,
@@ -267,11 +298,14 @@ export default function ServiceQueue() {
           clearanceState: clr?.state ?? null,
           clearanceReasons: clr?.reason_codes ?? [],
           next: { label: s.nextLabel, tone: s.nextTone },
-          priority, bucket, overdue,
+          nextTask: s.nextTask, nextWhy: s.nextWhy,
+          priority, bucket, overdue, overdueDays,
           completedToday: !!signed?.licensee_certified_at && isToday(signed.licensee_certified_at),
           awaiting, cleared: s.cleared, sold,
           assignedTo: (active?.assigned_to as string) || null,
           assignedName: active?.assigned_to ? memberById.get(active.assigned_to) ?? null : null,
+          inspectionId: (active?.id as string) || null,
+          inspectionStatus: (active?.status as string) || null,
           ageHours,
           openFailures: fails.open,
           readySince: s.k208State === "ready" ? ((signed?.signed_at as string) || null) : null,
@@ -293,6 +327,7 @@ export default function ServiceQueue() {
   const stats = useMemo(() => {
     const pending = rows.filter((r) => !r.cleared && r.k208State !== "executed");
     const unassigned = pending.filter((r) => !r.assignedTo).length;
+    const mine = uid ? pending.filter((r) => r.assignedTo === uid).length : 0;
     const ready = rows.filter((r) => r.k208State === "ready");
     const oldestReadyH = ready.length
       ? Math.max(...ready.map((r) => (r.readySince ? (Date.now() - new Date(r.readySince).getTime()) / 36e5 : 0)))
@@ -308,7 +343,7 @@ export default function ServiceQueue() {
     const doneToday = done.filter((r) => r.completedToday).length;
     return {
       pending: pending.length,
-      pendingSub: `${unassigned} have not been assigned`,
+      pendingSub: `${mine} assigned to you · ${unassigned} unassigned`,
       ready: ready.length,
       readySub: ready.length ? `Oldest waiting ${ageLabel(oldestReadyH)}` : "None waiting",
       blocked: blocked.length,
@@ -357,6 +392,65 @@ export default function ServiceQueue() {
     return <ErrorCard message="We could not load the Service Desk. Your existing inspection work has not been changed." detail={loadError} onRetry={() => void load()} />;
   }
 
+  // My Service Work: the technician's default. Five queues, tablet-sized
+  // cards, one context-aware action each — never the 300-row backlog.
+  if (mode === "my_work") {
+    const active = (r: Row) => !r.cleared && r.k208State !== "executed";
+    const term = q.trim().toLowerCase();
+    const match = (r: Row) => !term || `${r.ymm} ${r.vin} ${r.stock}`.toLowerCase().includes(term);
+    const inProgressMine = rows.filter((r) => match(r) && active(r) && r.assignedTo === uid && r.inspectionState === "in_progress");
+    const assignedMine = rows.filter((r) => match(r) && active(r) && r.assignedTo === uid && r.k208State !== "voided" && r.inspectionState !== "in_progress");
+    const returnedMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.k208State === "voided");
+    const unassigned = rows.filter((r) => match(r) && active(r) && !r.assignedTo && r.k208State === "waiting");
+    const doneTodayMine = rows.filter((r) => match(r) && r.completedToday && r.assignedTo === uid);
+    const sections: { title: string; hint: string; items: Row[] }[] = [
+      { title: "Assigned to me", hint: "Vehicles waiting on you to start", items: assignedMine },
+      { title: "In progress", hint: "Inspections you have started", items: inProgressMine },
+      { title: "Returned to me", hint: "Voided inspections that must be corrected", items: returnedMine },
+      { title: "Unassigned & available", hint: "No technician yet — first to start takes it", items: unassigned },
+      { title: "Completed today", hint: "Certified today", items: doneTodayMine },
+    ];
+    const total = sections.reduce((n, s) => n + s.items.length, 0);
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN or stock #"
+              aria-label="Search VIN or stock number"
+              className="w-full h-11 pl-9 pr-3 rounded-lg border border-border bg-background text-sm" />
+          </div>
+          <button onClick={openScan} className="h-11 px-4 rounded-lg border border-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-muted">
+            <QrCode className="w-4 h-4" aria-hidden="true" /> Scan Service QR
+          </button>
+        </div>
+        {total === 0 ? (
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <EmptyState Icon={CheckCircle2} title="No work in your queues"
+              detail="Nothing is assigned to you and no unassigned vehicles are waiting. Scan a Service QR or switch to the full desk." />
+          </div>
+        ) : sections.map((s) => s.items.length > 0 && (
+          <section key={s.title} aria-label={s.title}>
+            <div className="flex items-baseline gap-2 mb-2.5">
+              <h2 className="text-body font-bold text-foreground">{s.title}</h2>
+              <span className="text-xs font-semibold text-muted-foreground">{s.items.length}</span>
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">· {s.hint}</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {s.items.map((r) => (
+                <MobileVehicleCard key={r.id} r={r} onOpen={() => setDrawer(r)} onPrimary={() => openWorkspace(r)} />
+              ))}
+            </div>
+          </section>
+        ))}
+        {drawer && (
+          <RowDrawer r={drawer} members={members} canAssign={canAssign} onAssigned={() => void load()}
+            onClose={() => setDrawer(null)} onOpenWorkspace={() => { openWorkspace(drawer); setDrawer(null); }} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
@@ -373,7 +467,7 @@ export default function ServiceQueue() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <CommandStatCard label="Pending work" value={stats.pending} sub={stats.pendingSub} Icon={ClipboardList} tone="blue" onClick={() => setTab("pending")} />
-        <CommandStatCard label="K-208 ready" value={stats.ready} sub={stats.readySub} Icon={ShieldCheck} tone="emerald" onClick={() => setTab("ready_to_sign")} />
+        <CommandStatCard label="Awaiting certification" value={stats.ready} sub={stats.readySub} Icon={ShieldCheck} tone="emerald" onClick={() => setTab("ready_to_sign")} />
         <CommandStatCard label="Blocked / exceptions" value={stats.blocked} sub={stats.blockedSub} Icon={AlertTriangle} tone="red" onClick={() => setTab("failed")} />
         <CommandStatCard label="Completed today" value={stats.doneToday} sub={stats.doneSub} Icon={CheckCircle2} tone="slate" onClick={() => setTab("done")} />
       </div>
@@ -511,8 +605,8 @@ export default function ServiceQueue() {
                     </div></div></td>
                     <td className="px-4 py-2.5"><p className="font-mono text-[12px] text-foreground">{r.stock || "—"}</p><p className="font-mono text-[11px] text-muted-foreground">…{r.vin.slice(-6)}</p></td>
                     <td className="px-4 py-2.5">
-                      <span className={cn("text-xs font-semibold tabular-nums", r.overdue ? "text-red-600" : "text-foreground")}>{ageLabel(r.ageHours)}</span>
-                      {r.overdue && <p className="text-[10px] text-red-600">Overdue</p>}
+                      <span className={cn("text-xs font-semibold tabular-nums", r.overdue ? "text-red-600" : "text-foreground")}>{ageDisplay(r)}</span>
+                      {r.overdue && <p className="text-[10px] text-muted-foreground">{ageLabel(r.ageHours)} since intake</p>}
                     </td>
                     <td className="px-4 py-2.5">
                       {r.assignedName ? (
@@ -551,7 +645,10 @@ export default function ServiceQueue() {
         </div>
       </div>
 
-      {drawer && <RowDrawer r={drawer} onClose={() => setDrawer(null)} onOpenWorkspace={() => { openWorkspace(drawer); setDrawer(null); }} />}
+      {drawer && (
+        <RowDrawer r={drawer} members={members} canAssign={canAssign} onAssigned={() => void load()}
+          onClose={() => setDrawer(null)} onOpenWorkspace={() => { openWorkspace(drawer); setDrawer(null); }} />
+      )}
     </div>
   );
 }
@@ -587,7 +684,7 @@ function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => voi
           {r.delivery}{r.deliveryTarget ? ` · ${formatCommandDateTime(r.deliveryTarget)}` : ""}
         </span>
         <span className={cn("tabular-nums", r.overdue ? "text-red-600 font-semibold" : "text-muted-foreground")}>
-          {ageLabel(r.ageHours)} since intake{r.overdue ? " · Overdue" : ""}
+          {ageDisplay(r)}
         </span>
         <span className="text-muted-foreground">{r.assignedName ?? "Unassigned"}</span>
         {r.sold && <StatusPill tone="blue">Sold</StatusPill>}
@@ -615,10 +712,35 @@ function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => voi
   );
 }
 
-/** Preview drawer — identity, status, blocker, K-208 state, primary action.
+/** Preview drawer — the next REQUIRED task, why the vehicle is parked on it,
+ *  ONE primary action, and the secondary actions (assign, vehicle file).
  *  A preview, NOT the inspection form. */
-function RowDrawer({ r, onClose, onOpenWorkspace }: { r: Row; onClose: () => void; onOpenWorkspace: () => void }) {
+function RowDrawer({ r, members, canAssign, onAssigned, onClose, onOpenWorkspace }: {
+  r: Row;
+  members: { id: string; name: string }[];
+  canAssign: boolean;
+  onAssigned: () => void;
+  onClose: () => void;
+  onOpenWorkspace: () => void;
+}) {
   const navigate = useNavigate();
+  const [assigning, setAssigning] = useState(false);
+  const [assignBusy, setAssignBusy] = useState(false);
+  const canReassign = canAssign && !!r.inspectionId && r.inspectionStatus === "pending";
+  const assign = async (userId: string | null) => {
+    if (!r.inspectionId) return;
+    setAssignBusy(true);
+    const { data, error } = await sb().rpc("assign_safety_inspection", { p_inspection_id: r.inspectionId, p_user_id: userId });
+    setAssignBusy(false);
+    if (error || (data && data.ok === false)) {
+      toast.error("Couldn't assign the technician");
+      return;
+    }
+    toast.success(userId ? "Technician assigned" : "Assignment cleared");
+    setAssigning(false);
+    onAssigned();
+    onClose();
+  };
   const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
   const asideRef = useRef<HTMLElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
@@ -667,15 +789,32 @@ function RowDrawer({ r, onClose, onOpenWorkspace }: { r: Row; onClose: () => voi
           </div>
           <div className="flex flex-wrap gap-2">
             <StatusPill tone={r.priority.level === "High" ? "red" : r.priority.level === "Medium" ? "amber" : "slate"}>{r.priority.label}</StatusPill>
-            {r.overdue && <StatusPill tone="red">Overdue</StatusPill>}
+            {r.overdue && <StatusPill tone="red">{ageDisplay(r)}</StatusPill>}
             {r.sold && <StatusPill tone="blue">Sold</StatusPill>}
           </div>
+
+          <div className="rounded-xl border border-border bg-muted/30 p-3.5 space-y-2.5">
+            <div>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">Next required task</p>
+              <p className="text-sm font-bold text-foreground mt-0.5">{r.nextTask}</p>
+            </div>
+            {r.nextWhy && (
+              <div>
+                <p className="text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">Why it is waiting</p>
+                <p className="text-[12.5px] text-foreground mt-0.5">{r.nextWhy}</p>
+              </div>
+            )}
+            <button onClick={onOpenWorkspace} className={cn(BTN_PRIMARY, "w-full")}>
+              {r.next.label} <ChevronRight className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+
           <dl className="space-y-1.5 text-[12.5px]">
-            <DrawerRow label="Get Ready" value={<span className={cn("inline-flex items-center gap-1 font-semibold", G.cls)}><G.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {G.label}</span>} />
             <DrawerRow label="K-208" value={<span className={cn("inline-flex items-center gap-1 font-semibold", K.cls)}><K.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {K.label}</span>} />
+            <DrawerRow label="Get Ready" value={<span className={cn("inline-flex items-center gap-1 font-semibold", G.cls)}><G.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {G.label}</span>} />
             <DrawerRow label="Failed items open" value={<span className={r.openFailures ? "text-red-700 font-semibold" : ""}>{r.openFailures}</span>} />
             <DrawerRow label="Assigned to" value={r.assignedName ?? "Unassigned"} />
-            <DrawerRow label="Age since intake" value={ageLabel(r.ageHours)} />
+            <DrawerRow label="Time in service" value={ageLabel(r.ageHours)} />
             <DrawerRow label="Delivery target" value={r.deliveryTarget ? formatCommandDateTime(r.deliveryTarget) : "Not scheduled"} />
           </dl>
           {r.clearanceReasons.length > 0 && (
@@ -686,12 +825,32 @@ function RowDrawer({ r, onClose, onOpenWorkspace }: { r: Row; onClose: () => voi
               </ul>
             </div>
           )}
+
           <div className="space-y-2">
-            <button onClick={onOpenWorkspace} className={cn(BTN_PRIMARY, "w-full")}>
-              {r.next.label} <ChevronRight className="w-4 h-4" aria-hidden="true" />
-            </button>
+            {canReassign && !assigning && (
+              <button onClick={() => setAssigning(true)} className={cn(BTN_SECONDARY, "w-full")}>
+                Assign Technician
+              </button>
+            )}
+            {canReassign && assigning && (
+              <div className="rounded-xl border border-border p-3 space-y-2">
+                <label className="block text-[11px] font-bold uppercase tracking-wide text-muted-foreground" htmlFor="drawer-assign">
+                  Assign to
+                </label>
+                <select
+                  id="drawer-assign"
+                  defaultValue={r.assignedTo ?? ""}
+                  disabled={assignBusy}
+                  onChange={(e) => void assign(e.target.value || null)}
+                  className="w-full h-11 rounded-lg border border-border bg-background px-2 text-sm"
+                >
+                  <option value="">Unassigned</option>
+                  {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+            )}
             <button onClick={() => navigate(`/vehicle-file/${r.id}`)} className={cn(BTN_SECONDARY, "w-full")}>
-              <FileText className="w-4 h-4" aria-hidden="true" /> Vehicle File
+              <FileText className="w-4 h-4" aria-hidden="true" /> Open Vehicle File
             </button>
           </div>
         </div>

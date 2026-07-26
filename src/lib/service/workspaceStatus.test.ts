@@ -25,16 +25,24 @@ const base: WorkspaceStatusInput = {
 };
 
 describe("deriveWorkspaceStatus — the 8 banner states (B1)", () => {
-  it("nothing recorded is Work Not Started with Start as the one action", () => {
+  it("nothing recorded is K-208 Not Started with Start K-208 as the one action", () => {
     const s = deriveWorkspaceStatus(base);
     expect(s.key).toBe("not_started");
     expect(s.action.key).toBe("start_work");
+    expect(s.action.label).toBe("Start K-208 Inspection");
     expect(s.tone).toBe("slate"); // ordinary pending is never red
   });
 
-  it("an in_progress workflow state (or started get-ready) is Get Ready in Progress", () => {
-    expect(deriveWorkspaceStatus({ ...base, workflowState: "in_progress" }).key).toBe("in_progress");
-    expect(deriveWorkspaceStatus({ ...base, grStarted: true }).action.key).toBe("continue_work");
+  it("an in_progress workflow state continues the K-208; started get-ready alone still starts it", () => {
+    const running = deriveWorkspaceStatus({ ...base, workflowState: "in_progress" });
+    expect(running.key).toBe("in_progress");
+    expect(running.action.key).toBe("continue_work");
+    expect(running.action.label).toBe("Continue K-208 Inspection");
+    // Prep items moving does not change the next REQUIRED task: the K-208.
+    const grOnly = deriveWorkspaceStatus({ ...base, grStarted: true });
+    expect(grOnly.key).toBe("in_progress");
+    expect(grOnly.action.key).toBe("start_work");
+    expect(grOnly.action.label).toBe("Start K-208 Inspection");
   });
 
   it("a pending additional-work request outranks everything, including failures", () => {

@@ -72,6 +72,7 @@ const TitleUpload = lazy(() => import("./pages/TitleUpload"));
 const GetReady = lazy(() => import("./pages/GetReady"));
 const ReconApproval = lazy(() => import("./pages/ReconApproval"));
 const ServiceDesk = lazy(() => import("./pages/ServiceDesk"));
+const ServiceApprovals = lazy(() => import("./pages/ServiceApprovals"));
 const ServiceVehicleWorkspace = lazy(() => import("./pages/ServiceVehicleWorkspace"));
 const ServiceScan = lazy(() => import("./pages/ServiceScan"));
 const ServiceSettings = lazy(() => import("./pages/ServiceSettings"));
@@ -315,6 +316,7 @@ const App = () => (
                         <Route path="/prep/:vin" element={<PrepMobile />} />
                         <Route path="/recon" element={<ReconBoard />} />
                         <Route path="/service" element={<ServiceDesk />} />
+                        <Route path="/service/approvals" element={<ServiceApprovals />} />
                         {/* The ONE shared vehicle workspace; the Service QR
                             resolves through /service/scan to the same screen. */}
                         <Route path="/service/vehicle/:vin" element={<ServiceVehicleWorkspace />} />

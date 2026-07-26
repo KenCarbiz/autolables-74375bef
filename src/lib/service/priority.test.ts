@@ -69,4 +69,34 @@ describe("deriveServicePriority — deterministic spec order", () => {
     expect(compareServicePriority(b, a)).toBeLessThan(0);
     expect(compareServicePriority(c, a)).toBeLessThan(0);
   });
+
+  it("severely overdue escalates to High and states the days — 38 days is never Medium", () => {
+    const p = deriveServicePriority({ ...base, overdue: true, overdueDays: 37, ageHours: 38 * 24 });
+    expect(p.level).toBe("High");
+    expect(p.label).toBe("Inspection overdue 37 days");
+  });
+
+  it("mildly overdue stays Medium but still states the days", () => {
+    const p = deriveServicePriority({ ...base, overdue: true, overdueDays: 2, ageHours: 3 * 24 });
+    expect(p.level).toBe("Medium");
+    expect(p.label).toBe("Inspection overdue 2 days");
+  });
+
+  it("overdue under a day keeps the plain label", () => {
+    const p = deriveServicePriority({ ...base, overdue: true, overdueDays: 0, ageHours: 30 });
+    expect(p.label).toBe("Inspection overdue");
+    expect(p.level).toBe("Medium");
+  });
+
+  it("a severely overdue vehicle matched by an earlier rule still escalates to High", () => {
+    const p = deriveServicePriority({ ...base, readyForK208: true, overdue: true, overdueDays: 10, ageHours: 11 * 24 });
+    expect(p.rank).toBe(4);
+    expect(p.level).toBe("High");
+    expect(p.label).toContain("10 days overdue");
+  });
+
+  it("cleared vehicles never escalate", () => {
+    const p = deriveServicePriority({ ...base, cleared: true, overdue: true, overdueDays: 40, ageHours: 41 * 24 });
+    expect(p.level).toBe("Low");
+  });
 });
