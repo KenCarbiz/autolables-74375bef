@@ -10,7 +10,9 @@ import { isExecutedSignoff, isFailedInspection } from "@/lib/commandCenter/inspe
 export type GRState = "not_started" | "in_progress" | "complete" | "failed";
 // Renamed from K208State: inspectionState.ts exports the row-level K208State
 // ("signed"/"failed"/…); this is the workflow stage the queue chips render.
-export type K208Stage = "waiting" | "ready" | "executed" | "blocked";
+// "voided" renders where the newest inspection row is status='voided' and no
+// signed row stands; "superseded" is deliberately unbuilt — nothing writes it.
+export type K208Stage = "waiting" | "ready" | "executed" | "blocked" | "voided";
 export type Tone = "slate" | "amber" | "red" | "blue" | "emerald";
 
 export interface ServiceStatusContext {
@@ -18,6 +20,12 @@ export interface ServiceStatusContext {
   clearanceState?: string | null;
   /** Item failures for the VIN with repair_state != passed_on_reinspection. */
   openFailures?: number;
+  /** Of those, how many sit at repair_state='ready_for_reinspection'. */
+  failuresReadyForReinspection?: number;
+  /** Newest non-voided safety_inspections.inspection_state, when read. */
+  inspectionState?: string | null;
+  /** Newest inspection row for the VIN is status='voided'. */
+  newestVoided?: boolean;
 }
 
 export interface ServiceStatus {
@@ -56,6 +64,13 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean,
   // A newer signed pass never launders unresolved item failures from an
   // earlier inspection — the failure loop dominates until reinspection.
   const failed = siFail || openFailures > 0;
+  // Mirrors deriveWorkspaceStatus: the failure loop is "ready for
+  // reinspection" (amber) once the workflow state says so, or once every open
+  // item failure sits at repair_state='ready_for_reinspection'.
+  const readyForReinspection = failed && (
+    ctx.inspectionState === "ready_for_reinspection"
+    || (openFailures > 0 && (ctx.failuresReadyForReinspection ?? 0) === openFailures));
+  const voided = !!ctx.newestVoided && !si;
 
   const grState: GRState = failed ? "failed"
     : !gr ? "not_started"
@@ -66,6 +81,7 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean,
   const k208State: K208Stage = (recallBlocking || failed) ? "blocked"
     : certified ? "executed"
     : siPass ? "ready"
+    : voided ? "voided"
     : "waiting";
 
   const blocked = failed || recallBlocking;
@@ -78,6 +94,11 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean,
   if (awaiting) {
     bannerKey = "awaiting"; bannerLabel = "Additional work awaiting approval"; tone = "amber";
     nextLabel = "Review request"; nextTone = "primary";
+  } else if (readyForReinspection) {
+    // All repaired: the loop is waiting on an authorized reinspection, not on
+    // more repair work — amber, matching deriveWorkspaceStatus.
+    bannerKey = "ready_for_reinspection"; bannerLabel = "Ready for reinspection"; tone = "amber";
+    nextLabel = "Reinspect repaired items"; nextTone = "primary";
   } else if (failed) {
     bannerKey = "failed"; bannerLabel = "Failed items require repair"; tone = "red";
     nextLabel = "Resolve failed items"; nextTone = "danger";
@@ -95,6 +116,9 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean,
   } else if (k208State === "ready") {
     bannerKey = "ready"; bannerLabel = "Ready for K-208"; tone = "blue";
     nextLabel = "Review & sign K-208"; nextTone = "primary";
+  } else if (k208State === "voided") {
+    bannerKey = "voided"; bannerLabel = "K-208 voided"; tone = "slate";
+    nextLabel = "Start new inspection"; nextTone = "primary";
   } else if (grState === "in_progress") {
     bannerKey = "in_progress"; bannerLabel = "Get Ready in progress"; tone = "amber";
     nextLabel = "Continue work"; nextTone = "primary";

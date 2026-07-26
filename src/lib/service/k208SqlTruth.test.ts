@@ -85,6 +85,39 @@ describe("certify_safety_inspection — latest migration definition", () => {
   });
 });
 
+// 20260726160000/161000: every intake draft RPC must check tenant membership
+// INSIDE the function (SECURITY DEFINER bypasses RLS) now that authenticated
+// holds EXECUTE for the retry buttons. A later redefinition that drops the
+// guard reopens the cross-tenant injection hole — fail CI instead.
+describe("create_draft_* — latest definitions carry the tenant-membership guard", () => {
+  for (const fn of [
+    "create_draft_addendum",
+    "create_draft_buyers_guide",
+    "create_draft_safety_inspection",
+    "create_draft_get_ready",
+    "create_draft_window_sticker",
+  ]) {
+    it(`${fn} asserts membership before writing`, () => {
+      const body = norm(latestDefinition(fn).body);
+      expect(body).toContain("perform public.assert_tenant_member_or_service(p_tenant_id)");
+    });
+  }
+
+  it("the guard passes service contexts (NULL uid) and refuses non-members", () => {
+    const body = norm(latestDefinition("assert_tenant_member_or_service").body);
+    expect(body).toContain("if v_uid is null then return");
+    expect(body).toContain("'not_a_tenant_member'");
+  });
+
+  it("stock comes from vehicle_files.stock_number first — mc_attributes stock_no is only a fallback", () => {
+    for (const fn of ["create_draft_get_ready", "create_draft_window_sticker"]) {
+      const body = norm(latestDefinition(fn).body);
+      expect(body).toContain("from public.vehicle_files");
+      expect(body).toContain("stock_number");
+    }
+  });
+});
+
 describe("get_ready_blocks_finalize — latest migration definition (S8)", () => {
   const def = latestDefinition("get_ready_blocks_finalize");
   const body = norm(def.body);

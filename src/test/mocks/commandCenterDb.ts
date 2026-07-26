@@ -73,7 +73,9 @@ export class CommandDb {
   from(table: string) {
     const db = this;
     const filters: Filter[] = [];
-    let sort: { column: string; ascending: boolean } | null = null;
+    // PostgREST semantics: chained .order() calls APPEND sort keys (primary
+    // first), they do not replace each other.
+    const sorts: { column: string; ascending: boolean }[] = [];
     let cap: number | null = null;
     let mode: "select" | "update" | "insert" | "delete" = "select";
     let patch: MockRow = {};
@@ -92,12 +94,15 @@ export class CommandDb {
       // the stored objects let a test's "meanwhile, another tab changed this
       // row" mutation reach into rows the code under test had already read.
       let out = hits.map((r) => ({ ...r }));
-      if (sort) {
-        const { column, ascending } = sort;
+      if (sorts.length) {
         out = [...out].sort((a, b) => {
-          const av = a[column] == null ? "" : String(a[column]);
-          const bv = b[column] == null ? "" : String(b[column]);
-          return ascending ? av.localeCompare(bv) : bv.localeCompare(av);
+          for (const { column, ascending } of sorts) {
+            const av = a[column] == null ? "" : String(a[column]);
+            const bv = b[column] == null ? "" : String(b[column]);
+            const cmp = ascending ? av.localeCompare(bv) : bv.localeCompare(av);
+            if (cmp !== 0) return cmp;
+          }
+          return 0;
         });
       }
       if (cap != null) out = out.slice(0, cap);
@@ -112,7 +117,7 @@ export class CommandDb {
       is: (column: string, value: unknown) => { filters.push({ op: "is", column, value }); return chain; },
       not: (column: string, _op: string, value: unknown) => { filters.push({ op: "not_is", column, value }); return chain; },
       order: (column: string, opts?: { ascending?: boolean }) => {
-        sort = { column, ascending: opts?.ascending !== false };
+        sorts.push({ column, ascending: opts?.ascending !== false });
         return chain;
       },
       limit: (n: number) => { cap = n; return chain; },

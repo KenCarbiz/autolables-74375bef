@@ -162,14 +162,41 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
   const [pendingDecision, setPendingDecision] = useState<{ id: string; kind: "approved_limit" | "clarify" | "declined" } | null>(null);
   const [decisionValue, setDecisionValue] = useState("");
 
+  // 'clarify' rows stay visible: the request is parked on the requester's
+  // answer, not decided — filtering them out made them vanish from every
+  // surface with no way to respond.
   const load = async () => {
     let q = (supabase as any).from("service_requests")
-      .select("*").eq("tenant_id", tenantId).eq("status", "pending").order("created_at", { ascending: false });
+      .select("*").eq("tenant_id", tenantId).in("status", ["pending", "clarify"]).order("created_at", { ascending: false });
     if (vin) q = q.eq("vin", vin.toUpperCase());
     const { data } = await q;
     setReqs((data as Req[]) || []); setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [tenantId, vin]);
+
+  // respond_service_clarification (20260726162000): requester or a service
+  // role answers, the row re-pends, the deciders are notified, audited.
+  const [clarifyValue, setClarifyValue] = useState("");
+  const [clarifyForId, setClarifyForId] = useState<string | null>(null);
+  const respond = async (id: string) => {
+    const v = clarifyValue.trim();
+    if (!v) { toast.error("Write the answer first"); return; }
+    setBusyId(id);
+    const { error } = await (supabase as any).rpc("respond_service_clarification", {
+      p_request_id: id, p_response: v,
+    });
+    setBusyId(null);
+    if (error) {
+      const m = String(error.message || "");
+      toast.error(/not_authorized/.test(m)
+        ? "Only the requester or a service role can answer this clarification."
+        : "Couldn't record the answer");
+      return;
+    }
+    toast.success("Answer sent — the request is back with the manager");
+    setClarifyForId(null); setClarifyValue("");
+    load(); onDecided?.();
+  };
 
   // The ONLY decision path: decide_service_request checks authority, writes
   // audit_log, and notifies the requester (deduped) server-side.
@@ -249,8 +276,49 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
                   </div>
                 )}
                 {r.message && <p className="text-caption text-muted-foreground mt-1 inline-flex items-start gap-1"><MessageSquare className="w-3 h-3 mt-0.5" /> {r.message}</p>}
+                {r.clarification_response && (
+                  <p className="text-caption text-foreground mt-1">
+                    <span className="font-bold">Requester answered:</span> {r.clarification_response}
+                  </p>
+                )}
               </div>
             </div>
+            {r.status === "clarify" && (
+              <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2.5 space-y-2">
+                <p className="text-[11.5px] text-amber-900">
+                  <span className="font-bold">Clarification requested{r.decided_by_name ? ` by ${r.decided_by_name}` : ""}:</span>{" "}
+                  {r.manager_note || "The manager asked for more detail."}
+                </p>
+                {clarifyForId === r.id ? (
+                  <form onSubmit={(e) => { e.preventDefault(); respond(r.id); }} className="flex items-end gap-2 flex-wrap">
+                    <label className="flex-1 min-w-[180px]">
+                      <span className="text-[10.5px] font-bold uppercase tracking-wide text-amber-900">Your answer</span>
+                      <input
+                        autoFocus
+                        value={clarifyValue}
+                        onChange={(e) => setClarifyValue(e.target.value)}
+                        placeholder="Answer the manager's question"
+                        className="mt-1 w-full h-11 rounded-lg border border-border bg-background px-3 text-sm"
+                      />
+                    </label>
+                    <button type="submit" disabled={busyId === r.id} className="min-h-[44px] px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">
+                      Send answer
+                    </button>
+                    <button type="button" onClick={() => { setClarifyForId(null); setClarifyValue(""); }} className="min-h-[44px] px-3 rounded-md border border-border text-foreground text-xs font-semibold">
+                      Cancel
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setClarifyForId(r.id); setClarifyValue(""); }}
+                    className="min-h-[44px] px-3 rounded-md border border-amber-400 bg-card text-amber-900 text-xs font-semibold inline-flex items-center gap-1.5"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" /> Answer clarification
+                  </button>
+                )}
+              </div>
+            )}
             {canApprove ? (
               <div className="mt-3 pt-3 border-t border-border space-y-2">
                 <div className="flex items-center gap-1.5 flex-wrap">

@@ -100,3 +100,55 @@ describe("deriveServiceStatus — stored clearance is the only cleared truth", (
     expect(s.nextLabel).toBe("Resolve failed items");
   });
 });
+
+describe("deriveServiceStatus — ready for reinspection (amber, matching deriveWorkspaceStatus)", () => {
+  it("all open failures at ready_for_reinspection render amber Reinspect, not red Resolve", () => {
+    const s = deriveServiceStatus(veh, grComplete, { result: "fail" }, false,
+      { openFailures: 2, failuresReadyForReinspection: 2 });
+    expect(s.bannerKey).toBe("ready_for_reinspection");
+    expect(s.bannerLabel).toBe("Ready for reinspection");
+    expect(s.tone).toBe("amber");
+    expect(s.nextLabel).toBe("Reinspect repaired items");
+    expect(s.nextTone).toBe("primary");
+    // The K-208 stays blocked until an authorized reinspection passes.
+    expect(s.k208State).toBe("blocked");
+    expect(s.cleared).toBe(false);
+  });
+
+  it("the workflow state alone also flips the loop to reinspection", () => {
+    const s = deriveServiceStatus(veh, grComplete, { result: "fail" }, false,
+      { openFailures: 1, failuresReadyForReinspection: 0, inspectionState: "ready_for_reinspection" });
+    expect(s.bannerKey).toBe("ready_for_reinspection");
+    expect(s.tone).toBe("amber");
+  });
+
+  it("a mix of repaired and unrepaired items stays red Resolve failed items", () => {
+    const s = deriveServiceStatus(veh, grComplete, { result: "fail" }, false,
+      { openFailures: 3, failuresReadyForReinspection: 2 });
+    expect(s.bannerKey).toBe("failed");
+    expect(s.nextLabel).toBe("Resolve failed items");
+    expect(s.tone).toBe("red");
+  });
+
+  it("a pending approval still outranks the reinspection banner", () => {
+    const s = deriveServiceStatus(veh, grComplete, { result: "fail" }, true,
+      { openFailures: 1, failuresReadyForReinspection: 1 });
+    expect(s.bannerKey).toBe("awaiting");
+  });
+});
+
+describe("deriveServiceStatus — voided chip", () => {
+  it("newest row voided with no standing signed row renders the voided stage", () => {
+    const s = deriveServiceStatus(veh, grComplete, null, false, { newestVoided: true });
+    expect(s.k208State).toBe("voided");
+    expect(s.bannerKey).toBe("voided");
+    expect(s.nextLabel).toBe("Start new inspection");
+    expect(s.cleared).toBe(false);
+  });
+
+  it("a standing signed row outranks a voided newer-row flag", () => {
+    const s = deriveServiceStatus(veh, grComplete, { result: "pass", licensee_certified_at: null }, false,
+      { newestVoided: true });
+    expect(s.k208State).toBe("ready");
+  });
+});

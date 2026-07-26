@@ -139,7 +139,9 @@ export default function ServiceVehicleWorkspace() {
         sb().from("safety_inspections")
           .select("id, status, result, inspection_state, assigned_to, started_at, signed_at, created_at, licensee_certified_at, licensee_name, inspector_name, checklist, doc_version, notes")
           .eq("tenant_id", tenantId).eq("vin", vin).order("created_at", { ascending: false }),
-        sb().from("service_requests").select("id").eq("tenant_id", tenantId).eq("vin", vin).eq("status", "pending"),
+        // 'clarify' counts as awaiting too: the request is parked on the
+        // requester's answer, not resolved.
+        sb().from("service_requests").select("id").eq("tenant_id", tenantId).eq("vin", vin).in("status", ["pending", "clarify"]),
         sb().rpc("list_tenant_members", { p_tenant_id: tenantId }),
         sb().from("audit_log").select("id, action, created_at, details")
           .eq("store_id", tenantId).eq("entity_id", vin)
@@ -207,6 +209,10 @@ export default function ServiceVehicleWorkspace() {
   const canCompleteWork = isAdmin || hasDealerCapability(role, "can_complete_get_ready", isAdmin);
   const canApprove = isAdmin || hasDealerCapability(role, "can_approve_service_work", isAdmin);
   const canReinspect = canConduct && (!settings.service_reinspection_managers_only || canApprove);
+  // Voiding retires a legal record: manager authority (mirrors the server's
+  // transition_safety_inspection void gate) + a documented reason.
+  const canVoid = isAdmin || hasDealerCapability(role, "can_void_inspection", isAdmin);
+  const newestAny = inspections[0] ?? null;
 
   const grItems: GetReadyItem[] = useMemo(() => (gr?.items || []).filter(Boolean), [gr]);
   const grStarted = !!gr && (gr.status !== "pending" || grItems.some((i) => i.status === "complete"));
@@ -348,6 +354,13 @@ export default function ServiceVehicleWorkspace() {
           {/* Center region: the work */}
           <div className="space-y-4 order-1 xl:order-2">
             <div id="k208" />
+            {newestAny?.status === "voided" && (
+              <CommandCallout tone="amber" Icon={AlertTriangle} title="A K-208 on this VIN was voided">
+                {newestSigned
+                  ? "The most recent inspection record was voided; the newest remaining signed inspection below is the standing record."
+                  : "The prior inspection record was voided. A new inspection is required — no signed K-208 stands for this vehicle."}
+              </CommandCallout>
+            )}
             <div id="inspection">
               <K208Panel
                 tenantId={tenantId}
@@ -367,6 +380,16 @@ export default function ServiceVehicleWorkspace() {
                 logAudit={log}
               />
             </div>
+
+            {newestSigned && (
+              <VoidInspectionCard
+                tenantId={tenantId}
+                vin={vin}
+                inspection={newestSigned}
+                canVoid={canVoid}
+                onChanged={() => void load()}
+              />
+            )}
 
             {(failures.length > 0 || isFailedInspection(newestSigned)) && (
               <div id="failures">
@@ -1531,6 +1554,87 @@ function ServiceQrCard({ tenantId, vin }: { tenantId: string; vin: string }) {
           </button>
         </div>
       )}
+    </CommandCard>
+  );
+}
+
+/* ─────────────────────────── void action ────────────────────────── */
+
+// Voids the signed inspection through transition_safety_inspection
+// (20260726102000): manager authority + documented reason enforced
+// server-side, audited, and the void-retract trigger (20260726150000)
+// re-evaluates the published K-208. "Superseded" is deliberately unbuilt —
+// nothing in this repo writes it yet.
+function VoidInspectionCard({ tenantId, vin, inspection, canVoid, onChanged }: {
+  tenantId: string; vin: string; inspection: InspRow; canVoid: boolean; onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    const r = reason.trim();
+    if (!r) { toast.error("A documented reason is required to void an inspection."); return; }
+    setBusy(true);
+    const { error } = await sb().rpc("transition_safety_inspection", {
+      p_inspection_id: inspection.id, p_new_state: "voided", p_reason: r,
+    });
+    setBusy(false);
+    if (error) {
+      const m = String(error.message || "");
+      toast.error(/not_authorized_to_void/.test(m)
+        ? "The server refused: your role can't void an inspection."
+        : /void_reason_required/.test(m)
+          ? "A documented reason is required to void an inspection."
+          : /invalid_transition/.test(m)
+            ? "This inspection can't be voided from its current state."
+            : "Couldn't void the inspection. Nothing was changed.");
+      return;
+    }
+    await sb().rpc("recompute_delivery_clearance", { p_tenant_id: tenantId, p_vin: vin });
+    toast.success("Inspection voided. The record is retired and fully audited.");
+    setOpen(false); setReason("");
+    onChanged();
+  };
+
+  return (
+    <CommandCard
+      title="Void this inspection"
+      subtitle="Retires the signed record via the documented process. It cannot be silently edited."
+    >
+      <DisabledReason reason={canVoid ? null : "Voiding requires manager authority (service manager or above)."}>
+        {!open ? (
+          <button
+            type="button"
+            aria-disabled={!canVoid || undefined}
+            onClick={() => { if (canVoid) setOpen(true); }}
+            className={cn(BTN_SECONDARY, "border-red-200 text-red-700", !canVoid && "opacity-50 cursor-not-allowed")}
+          >
+            <AlertTriangle className="w-4 h-4" aria-hidden="true" /> Void inspection
+          </button>
+        ) : (
+          <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-2">
+            <label className="block">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Reason (required, recorded in the audit trail)</span>
+              <textarea
+                autoFocus
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                placeholder="Why this signed record is being retired"
+                className="mt-1 w-full rounded-lg border border-border bg-background p-2.5 text-sm"
+              />
+            </label>
+            <div className={ACTION_GROUP}>
+              <button type="submit" disabled={busy || !reason.trim()} className="min-h-[44px] px-4 rounded-lg bg-red-600 text-white text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <AlertTriangle className="w-4 h-4" aria-hidden="true" />}
+                Confirm void
+              </button>
+              <button type="button" onClick={() => { setOpen(false); setReason(""); }} className={BTN_SECONDARY}>Cancel</button>
+            </div>
+          </form>
+        )}
+      </DisabledReason>
     </CommandCard>
   );
 }

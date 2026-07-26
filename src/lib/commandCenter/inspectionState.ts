@@ -60,15 +60,25 @@ export const isExecutedInspection = isExecutedSignoff;
  * (NextStepBanner, Ready Board) previously counted ANY signed row, so a signed
  * FAIL — or a stale pass behind a newer signed failure — read as done.
  */
+// "Newest" ordered exactly as the SQL truth (20260726110000): signed_at DESC
+// NULLS LAST, then created_at DESC. The old coalesce(signed_at, created_at)
+// let a null-signed_at row with a late created_at outrank a genuinely signed
+// row — a different answer than every SQL reader gives.
+const newerSigned = (candidate: SafetyInspectionRow, incumbent: SafetyInspectionRow): boolean => {
+  const cs = candidate.signed_at || null;
+  const is = incumbent.signed_at || null;
+  if (!!cs !== !!is) return !!cs;
+  if (cs && is && cs !== is) return cs > is;
+  return String(candidate.created_at || "") >= String(incumbent.created_at || "");
+};
+
 export function executedVinSet(rows: (SafetyInspectionRow & { vin?: string | null })[]): Set<string> {
   const newestByVin = new Map<string, SafetyInspectionRow>();
   for (const r of rows) {
     const vin = String(r.vin || "");
     if (!vin || String(r.status || "") !== "signed") continue;
     const prev = newestByVin.get(vin);
-    const at = r.signed_at || r.created_at || "";
-    const prevAt = prev ? prev.signed_at || prev.created_at || "" : "";
-    if (!prev || at >= prevAt) newestByVin.set(vin, r);
+    if (!prev || newerSigned(r, prev)) newestByVin.set(vin, r);
   }
   const out = new Set<string>();
   for (const [vin, row] of newestByVin) if (isExecutedSignoff(row)) out.add(vin);

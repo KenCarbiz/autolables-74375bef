@@ -160,9 +160,29 @@ describe("ensureReadyToken", () => {
     expect(String(rows[0].token)).toMatch(/^[0-9a-f]{32}$/);
   });
 
-  it("does not mint a second token when a pending one exists", async () => {
+  it("does not mint a second token when a live pending one exists", async () => {
     const { admin, state } = makeAdmin();
-    state("dept_signoff_tokens").maybeSingleResults.push({ data: { id: "tok-1" } });
+    state("dept_signoff_tokens").listResults.push({
+      data: [{ id: "tok-1", expires_at: new Date(Date.now() + 864e5).toISOString() }],
+    });
+    await ensureReadyToken(admin, "t1", "VIN123", null, null);
+    expect(state("dept_signoff_tokens").inserts).toHaveLength(0);
+  });
+
+  it("re-mints when every pending token is expired — dead media counts as missing", async () => {
+    const { admin, state } = makeAdmin();
+    state("dept_signoff_tokens").listResults.push({
+      data: [{ id: "tok-1", expires_at: new Date(Date.now() - 864e5).toISOString() }],
+    });
+    await ensureReadyToken(admin, "t1", "VIN123", "2024 Honda Civic", "l1");
+    const rows = state("dept_signoff_tokens").inserts;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ tenant_id: "t1", vin: "VIN123", department: "vehicle" });
+  });
+
+  it("treats a pending token without an expires_at as live", async () => {
+    const { admin, state } = makeAdmin();
+    state("dept_signoff_tokens").listResults.push({ data: [{ id: "tok-1", expires_at: null }] });
     await ensureReadyToken(admin, "t1", "VIN123", null, null);
     expect(state("dept_signoff_tokens").inserts).toHaveLength(0);
   });

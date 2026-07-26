@@ -514,11 +514,15 @@ export async function loadVinCommand(r: SourceReader, tenantId: string, vehicleI
       // January, a signed failure in February and a prefilled revision in March
       // resolved to the January pass and rendered "Ready · Signed Jan 12" over a
       // failed inspection. k208State decides; the query only supplies the rows.
+      // Ordered exactly as the SQL truth (20260726110000): signed_at DESC
+      // NULLS LAST, then created_at DESC — the tiebreak keeps same-second
+      // re-signings deterministic across every surface.
       r.rows(sb().from("safety_inspections")
         .select("id, status, result, signed_at, created_at")
         .eq("tenant_id", tenantId).in("vin", vk)
         .eq("status", "signed")
         .order("signed_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .limit(1), "safety_inspections(signed)"),
       // An archived addendum is retired paper. Reading the newest row without
       // that filter reported a superseded deal as the vehicle's live addendum.
@@ -1625,6 +1629,7 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
       .eq("tenant_id", tenantId).in("vin", vk)
       .eq("status", "signed")
       .order("signed_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
       .limit(1), "safety_inspections(signed)"),
     r.rows(sb().from("safety_inspections")
       .select("id, status, result, signed_at, created_at")

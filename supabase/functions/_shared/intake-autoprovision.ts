@@ -151,9 +151,15 @@ export async function ensureReadyToken(
   admin: Admin, tenantId: string, vin: string, ymm: string | null, listingId: string | null,
 ): Promise<void> {
   try {
-    const { data: tok } = await admin.from("dept_signoff_tokens").select("id")
-      .eq("tenant_id", tenantId).eq("vin", vin).eq("department", "vehicle").eq("status", "pending").maybeSingle();
-    if (!tok) {
+    // A pending token past its expires_at is dead media — the /ready resolver
+    // refuses it — so it counts as missing and a fresh token is minted. A row
+    // without expires_at is treated as live (no evidence it expired).
+    const { data: toks } = await admin.from("dept_signoff_tokens").select("id, expires_at")
+      .eq("tenant_id", tenantId).eq("vin", vin).eq("department", "vehicle").eq("status", "pending");
+    const now = Date.now();
+    const live = (((toks as { expires_at?: string | null }[] | null) || []))
+      .some((t) => !t.expires_at || new Date(t.expires_at).getTime() > now);
+    if (!live) {
       const { error } = await admin.from("dept_signoff_tokens").insert({
         tenant_id: tenantId, vehicle_listing_id: listingId, vin, ymm,
         department: "vehicle", purpose: "get_ready", token: hex16(),

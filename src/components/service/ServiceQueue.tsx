@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -36,7 +36,7 @@ interface Row {
   id: string; vin: string; ymm: string; trim: string; stock: string; photo: string;
   condition: string;
   grState: "not_started" | "in_progress" | "complete" | "failed";
-  k208State: "waiting" | "ready" | "executed" | "blocked";
+  k208State: "waiting" | "ready" | "executed" | "blocked" | "voided";
   inspectionState: string | null;
   delivery: string;
   deliveryTarget: string | null;
@@ -44,7 +44,7 @@ interface Row {
   clearanceReasons: string[];
   next: { label: string; tone: "primary" | "danger" | "ghost" };
   priority: ServicePriority;
-  bucket: "get_ready" | "in_progress" | "failed" | "reinspect" | "ready_to_sign" | "done";
+  bucket: "get_ready" | "in_progress" | "failed" | "reinspect" | "ready_to_sign" | "pending_clearance" | "done";
   overdue: boolean;
   completedToday: boolean;
   awaiting: boolean;
@@ -75,6 +75,7 @@ const TABS: { key: string; label: string }[] = [
   { key: "failed", label: "Failed" },
   { key: "reinspect", label: "Reinspect" },
   { key: "ready_to_sign", label: "Ready to Sign" },
+  { key: "pending_clearance", label: "Pending Clearance" },
   { key: "overdue", label: "Overdue" },
   { key: "done", label: "Completed" },
 ];
@@ -90,10 +91,21 @@ const K208_CHIP: Record<Row["k208State"], { label: string; cls: string; Icon: ty
   ready: { label: "Ready to execute", cls: "text-blue-600", Icon: Clock },
   blocked: { label: "Blocked", cls: "text-red-600", Icon: AlertTriangle },
   executed: { label: "Executed", cls: "text-emerald-600", Icon: CheckCircle2 },
+  // "superseded" is deliberately unbuilt: nothing in this repo writes it yet.
+  voided: { label: "Voided", cls: "text-slate-500", Icon: XCircle },
 };
 
 const PRIORITY_ICON = { High: ArrowUp, Medium: Minus, Low: ArrowDown } as const;
 const PRIORITY_CLS = { High: "text-red-600", Medium: "text-amber-600", Low: "text-slate-400" } as const;
+
+// Keyboard activation for the non-button row/card openers (WCAG 2.1.1):
+// Enter and Space both open, and Space must not scroll the page.
+const activateOnKey = (fn: () => void) => (e: React.KeyboardEvent) => {
+  if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+    e.preventDefault();
+    fn();
+  }
+};
 
 export default function ServiceQueue() {
   const { tenant } = useTenant();
@@ -129,7 +141,9 @@ export default function ServiceQueue() {
       const [grRes, siRes, srRes, failRes, clrRes, memRes] = await Promise.all([
         vins.length ? sb().from("get_ready_records").select("vin, status, items, get_ready_complete_date, delivery_target").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         vins.length ? sb().from("safety_inspections").select("vin, status, result, inspection_state, assigned_to, licensee_certified_at, signed_at, created_at").eq("tenant_id", tenant.id).in("vin", vins).order("created_at", { ascending: false }) : empty,
-        vins.length ? sb().from("service_requests").select("vin").eq("tenant_id", tenant.id).eq("status", "pending").in("vin", vins) : empty,
+        // 'clarify' rows are still-open requests (waiting on the requester's
+        // answer), not decided ones — they must not vanish from the queue.
+        vins.length ? sb().from("service_requests").select("vin").eq("tenant_id", tenant.id).in("status", ["pending", "clarify"]).in("vin", vins) : empty,
         vins.length ? sb().from("safety_inspection_item_failures").select("vin, repair_state").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         vins.length ? sb().from("vehicle_delivery_clearance").select("vin, state, reason_codes").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         sb().rpc("list_tenant_members", { p_tenant_id: tenant.id }),
@@ -140,13 +154,17 @@ export default function ServiceQueue() {
       // deno-lint-ignore no-explicit-any
       for (const g of ((grRes.data as any[]) || [])) if (!grByVin.has(g.vin)) grByVin.set(g.vin, g);
 
-      // Newest SIGNED row (by signed_at) and newest non-voided row per VIN.
+      // Newest SIGNED row (by signed_at), newest non-voided row, and the
+      // newest row of ANY status (to render a voided chip) per VIN.
       // deno-lint-ignore no-explicit-any
       const signedByVin = new Map<string, any>();
       // deno-lint-ignore no-explicit-any
       const activeByVin = new Map<string, any>();
       // deno-lint-ignore no-explicit-any
+      const newestByVin = new Map<string, any>();
+      // deno-lint-ignore no-explicit-any
       for (const s of ((siRes.data as any[]) || [])) {
+        if (!newestByVin.has(s.vin)) newestByVin.set(s.vin, s);
         if (s.status !== "voided" && !activeByVin.has(s.vin)) activeByVin.set(s.vin, s);
         if (s.status === "signed") {
           const prev = signedByVin.get(s.vin);
@@ -183,13 +201,16 @@ export default function ServiceQueue() {
         // The stored clearance + open item failures feed the derivation so the
         // queue can never render "Cleared" (or offer Execute K-208) unless the
         // stored facts allow it.
+        const inspectionState = (active?.inspection_state as string) || null;
         const s = deriveServiceStatus(v, gr, signed, awaiting, {
           clearanceState: clr?.state ?? null,
           openFailures: fails.open,
+          failuresReadyForReinspection: fails.ready,
+          inspectionState,
+          newestVoided: newestByVin.get(v.vin)?.status === "voided",
         });
         const ageHours = v.created_at ? (now - new Date(v.created_at).getTime()) / 36e5 : 0;
         const sold = !!v.deal_processed_at || String(v.status || "") === "sold";
-        const inspectionState = (active?.inspection_state as string) || null;
         const awaitingReinspection = inspectionState === "ready_for_reinspection"
           || (fails.open > 0 && fails.ready === fails.open);
         const overdue = !s.cleared && s.k208State !== "executed" && ageHours > overdueHours;
@@ -206,9 +227,13 @@ export default function ServiceQueue() {
           ageHours,
           cleared: s.cleared,
         });
+        // Executed-but-not-cleared is sign-off aftermath, not get-ready work:
+        // it sits beside Ready to Sign as "Pending Clearance", never back in
+        // the Get Ready bucket.
         const bucket: Row["bucket"] = s.cleared ? "done"
           : awaitingReinspection ? "reinspect"
           : s.k208State === "blocked" ? "failed"
+          : s.k208State === "executed" ? "pending_clearance"
           : s.k208State === "ready" ? "ready_to_sign"
           : s.grState === "in_progress" ? "in_progress"
           : "get_ready";
@@ -257,7 +282,10 @@ export default function ServiceQueue() {
       : 0;
     const blocked = rows.filter((r) => r.k208State === "blocked" || r.awaiting);
     const soldBlocked = blocked.filter((r) => r.sold).length;
-    const doneToday = rows.filter((r) => r.completedToday).length;
+    // Counts exactly what the Completed tab shows, restricted to today: a
+    // vehicle certified today but still pending clearance is NOT completed.
+    const done = rows.filter((r) => r.bucket === "done");
+    const doneToday = done.filter((r) => r.completedToday).length;
     return {
       pending: pending.length,
       pendingSub: `${unassigned} have not been assigned`,
@@ -266,7 +294,7 @@ export default function ServiceQueue() {
       blocked: blocked.length,
       blockedSub: soldBlocked ? `${soldBlocked} sold and still blocked` : "None sold",
       doneToday,
-      doneSub: `of ${rows.length} vehicles`,
+      doneSub: `of ${done.length} completed`,
     };
   }, [rows]);
 
@@ -434,7 +462,15 @@ export default function ServiceQueue() {
                 const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
                 const P = PRIORITY_ICON[r.priority.level];
                 return (
-                  <tr key={r.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => setDrawer(r)}>
+                  <tr
+                    key={r.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open service preview for ${r.ymm}`}
+                    className="hover:bg-muted/40 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    onClick={() => setDrawer(r)}
+                    onKeyDown={activateOnKey(() => setDrawer(r))}
+                  >
                     <td className="px-4 py-2.5">
                       <span className={cn("inline-flex items-center gap-1 text-xs font-bold", PRIORITY_CLS[r.priority.level])}>
                         <P className="w-3.5 h-3.5" aria-hidden="true" /> {r.priority.level}
@@ -496,7 +532,14 @@ function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => voi
   const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
   const P = PRIORITY_ICON[r.priority.level];
   return (
-    <article className="rounded-2xl border border-border bg-card p-3.5 space-y-2.5" onClick={onOpen}>
+    <article
+      role="button"
+      tabIndex={0}
+      aria-label={`Open service preview for ${r.ymm}`}
+      className="rounded-2xl border border-border bg-card p-3.5 space-y-2.5 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+      onClick={onOpen}
+      onKeyDown={activateOnKey(onOpen)}
+    >
       <div className="flex items-start gap-3">
         <VehThumb r={r} />
         <div className="min-w-0 flex-1">
@@ -541,19 +584,42 @@ function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => voi
 function RowDrawer({ r, onClose, onOpenWorkspace }: { r: Row; onClose: () => void; onOpenWorkspace: () => void }) {
   const navigate = useNavigate();
   const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
+  const asideRef = useRef<HTMLElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  // Modal dialog contract: focus moves into the drawer on open, Tab cycles
+  // inside it, Escape closes, and focus returns to the row/card that opened it.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const opener = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key !== "Tab" || !asideRef.current) return;
+      const focusables = Array.from(asideRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'));
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || !asideRef.current.contains(active))) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && (active === last || !asideRef.current.contains(active))) {
+        e.preventDefault(); first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
   }, [onClose]);
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} aria-hidden />
-      <aside role="dialog" aria-modal="true" aria-label={`${r.ymm} service preview`}
+      <aside ref={asideRef} role="dialog" aria-modal="true" aria-label={`${r.ymm} service preview`}
         className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[400px] bg-card border-l border-border shadow-xl overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card z-10">
           <h3 className="text-sm font-bold text-foreground">Service preview</h3>
-          <button onClick={onClose} aria-label="Close preview" className="w-11 h-11 grid place-items-center text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+          <button ref={closeRef} onClick={onClose} aria-label="Close preview" className="w-11 h-11 grid place-items-center text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-4 space-y-4">
           <div className="flex items-center gap-3">
