@@ -1,5 +1,6 @@
--- HOTFIX: the sweep called issue_vehicle_ready_token, which raises under
--- cron's NULL auth context — every row raised, every draft rolled back, and
--- vehicle_exceptions flooded nightly. Token mint now runs as a direct insert
--- in its own subtransaction (same row shape as the RPC), ordered newest-first.
--- Applied to production 2026-07-26; live test run: 85 scanned, 0 failed.
+-- Superseded marker: the real sweep definition (token mint in its own
+-- subtransaction, deterministic order, clearance recompute) lives in
+-- 20260726150000_void_retract_and_sweep_clearance.sql, which redefines the
+-- function created by 20260726040000. Kept so applied-migration history
+-- matches file history; intentionally contains no SQL beyond this note.
+SELECT 1;
