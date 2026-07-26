@@ -251,7 +251,7 @@ serve(async (req) => {
         .eq("vin", v.vin)
         .maybeSingle();
 
-      const patch = {
+      const insertPatch = {
         tenant_id: tenant.id,
         vin: v.vin,
         ymm: v.ymm || null,
@@ -266,16 +266,27 @@ serve(async (req) => {
       } as Record<string, unknown>;
 
       if (existing) {
+        // Update ONLY the inventory fields the feed actually carries. The feed
+        // is not the source of truth for the customer packet, so it must never
+        // zero dealer-curated documents / videos / value_props or null a good
+        // ymm/trim/mileage/price. Mirrors autocurb-sync's narrow update patch.
+        const updatePatch: Record<string, unknown> = { tenant_id: tenant.id, vin: v.vin, dealer_snapshot: dealerSnapshot };
+        if (v.ymm) updatePatch.ymm = v.ymm;
+        if (v.trim) updatePatch.trim = v.trim;
+        if (typeof v.mileage === "number") updatePatch.mileage = v.mileage;
+        if (v.condition) updatePatch.condition = v.condition;
+        if (typeof v.price === "number") updatePatch.price = v.price;
         const { error } = await admin
           .from("vehicle_listings")
-          .update(patch)
+          .update(updatePatch)
           .eq("id", existing.id);
         if (error) errors.push({ vin: v.vin, error: error.message });
         else { upserted++; updatedIds.push(existing.id); }
+
       } else {
         const slug = makeSlug(v.vin, v.ymm);
         const { data: inserted, error } = await admin.from("vehicle_listings").insert({
-          ...patch,
+          ...insertPatch,
           slug,
           status: "draft",
           sticker_snapshot: {},
