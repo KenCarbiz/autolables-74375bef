@@ -45,7 +45,7 @@ export interface FactoryStickerRenderData {
     totalMsrp: number | null;
   };
   packages: Array<{ name: string; code: string | null; msrp: number | null; contents: string[] }>;
-  options: Array<{ name: string; code: string | null; msrp: number | null }>;
+  options: Array<{ name: string; code: string | null; msrp: number | null; contents?: string[] }>;
   standardEquipment: Record<string, string[]>;
   keyFeatures: Record<string, string[]>;
   colors: {
@@ -53,6 +53,18 @@ export interface FactoryStickerRenderData {
     interior: { name: string | null; code: string | null };
   };
   assembly: { plant: string | null; city: string | null; country: string | null };
+  /** Powertrain identity for the spec grid; optional for older payloads. */
+  mechanical?: { engine: string | null; transmission: string | null; drivetrain: string | null };
+  stockNumber?: string | null;
+  transportMethod?: string | null;
+  /** Factory administrative codes for the Monroney top strip. */
+  factoryCodes?: {
+    location?: string | null;
+    emissions?: string | null;
+    sequence?: string | null;
+    order?: string | null;
+    dealer?: string | null;
+  };
   epa: {
     city: number | null;
     highway: number | null;
@@ -61,6 +73,20 @@ export interface FactoryStickerRenderData {
     ghgScore: number | null;
     rangeMiles: number | null;
     fuelType: string | null;
+    smogScore?: number | null;
+    gallonsPer100Miles?: number | null;
+    /** Positive = saves vs average new vehicle over 5 years; negative = spends more. */
+    fiveYearCostDifference?: number | null;
+    classNote?: string | null;
+  } | null;
+  /** NHTSA star ratings; null field = Not Rated. Omit the block entirely when unverified. */
+  safety?: {
+    overall: number | null;
+    frontalDriver: number | null;
+    frontalPassenger: number | null;
+    sideFront: number | null;
+    sideRear: number | null;
+    rollover: number | null;
   } | null;
   dealer: {
     name: string | null;
@@ -166,6 +192,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
     name: o.name,
     ...(o.msrp !== null ? { price: o.msrp } : {}),
     priceStatus: o.msrp !== null ? "PRICED" : "UNAVAILABLE",
+    ...(o.contents && o.contents.length ? { features: o.contents } : {}),
   }));
 
   const opt = <T>(key: string, value: T | null | undefined): Record<string, T> =>
@@ -184,6 +211,10 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       ...opt("interiorColor", d.colors.interior.name),
       ...opt("interiorColorCode", d.colors.interior.code),
       ...opt("fuelType", d.epa?.fuelType ?? null),
+      ...opt("engine", d.mechanical?.engine ?? null),
+      ...opt("transmission", d.mechanical?.transmission ?? null),
+      ...opt("drivetrain", d.mechanical?.drivetrain ?? null),
+      ...opt("stockNumber", d.stockNumber ?? null),
     },
     equipment: {
       standard: groupStandardEquipment([d.standardEquipment, d.keyFeatures]),
@@ -199,17 +230,33 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       ...opt("sourceReportedTotalMsrp", d.pricing.totalMsrp),
       reconciliationStatus: status,
     },
-    regulatory: d.epa
-      ? {
-          epaStatus: "VERIFIED",
-          ...opt("cityMpg", d.epa.city),
-          ...opt("highwayMpg", d.epa.highway),
-          ...opt("combinedMpg", d.epa.combined),
-          ...opt("annualFuelCost", d.epa.annualFuelCost),
-          ...opt("greenhouseGasRating", d.epa.ghgScore),
-          nhtsaStatus: "UNAVAILABLE",
-        }
-      : { epaStatus: "UNAVAILABLE", nhtsaStatus: "UNAVAILABLE" },
+    regulatory: {
+      ...(d.epa
+        ? {
+            epaStatus: "VERIFIED" as const,
+            ...opt("cityMpg", d.epa.city),
+            ...opt("highwayMpg", d.epa.highway),
+            ...opt("combinedMpg", d.epa.combined),
+            ...opt("annualFuelCost", d.epa.annualFuelCost),
+            ...opt("greenhouseGasRating", d.epa.ghgScore),
+            ...opt("smogRating", d.epa.smogScore ?? null),
+            ...opt("gallonsPer100Miles", d.epa.gallonsPer100Miles ?? null),
+            ...opt("fiveYearCostDifference", d.epa.fiveYearCostDifference ?? null),
+            ...opt("epaClassNote", d.epa.classNote ?? null),
+          }
+        : { epaStatus: "UNAVAILABLE" as const }),
+      ...(d.safety
+        ? {
+            nhtsaStatus: "VERIFIED" as const,
+            ...opt("overallRating", d.safety.overall),
+            ...opt("frontalDriverRating", d.safety.frontalDriver),
+            ...opt("frontalPassengerRating", d.safety.frontalPassenger),
+            ...opt("sideFrontRating", d.safety.sideFront),
+            ...opt("sideRearRating", d.safety.sideRear),
+            ...opt("rolloverRating", d.safety.rollover),
+          }
+        : { nhtsaStatus: "UNAVAILABLE" as const }),
+    },
     factory: {
       ...opt("assemblyPlant", d.assembly.plant),
       ...opt("assemblyCountry", d.assembly.country),
@@ -219,6 +266,12 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
           ? [d.assembly.city, d.assembly.country].filter(Boolean).join(", ")
           : null,
       ),
+      ...opt("orderNumber", d.factoryCodes?.order ?? null),
+      ...opt("sequenceNumber", d.factoryCodes?.sequence ?? null),
+      ...opt("dealerCode", d.factoryCodes?.dealer ?? null),
+      ...opt("emissionsCode", d.factoryCodes?.emissions ?? null),
+      ...opt("locationCode", d.factoryCodes?.location ?? null),
+      ...opt("transportMethod", d.transportMethod ?? null),
     },
     dealer: {
       tenantId: "",

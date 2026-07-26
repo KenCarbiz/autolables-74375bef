@@ -16,7 +16,7 @@ describe("previewSvg", () => {
   });
 
   it("contains the VIN, total, barcode bars and QR cells", () => {
-    expect(svg).toContain("JN8AZ2NE8P9123456");
+    expect(svg).toContain("JN8AZ3NE5S9123456");
     expect(svg).toContain("$95,695.00");
     expect(svg).toContain('data-barcode="code128"');
     expect(svg).toContain('data-qr="1"');

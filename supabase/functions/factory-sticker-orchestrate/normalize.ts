@@ -105,16 +105,25 @@ export function normalizeForSticker(
   };
 
   const epaRow = (listing.epa_economy || null) as AnyRow | null;
+  const epaCombined = epaRow && !epaRow.error ? num(epaRow.combined) : null;
   const epa = epaRow && !epaRow.error ? {
     city: num(epaRow.city),
     highway: num(epaRow.highway),
-    combined: num(epaRow.combined),
+    combined: epaCombined,
     annualFuelCost: num(epaRow.annualFuelCost),
     ghgScore: num(epaRow.ghgScore),
     rangeMiles: num(epaRow.rangeMiles),
     fuelType: str(epaRow.fuelType),
+    gallonsPer100Miles: epaCombined ? Math.round((100 / epaCombined) * 10) / 10 : null,
   } : null;
   if (!epa) missing.push("epa_economy");
+
+  const mechanical = {
+    engine: str(mc.engine) ?? str(sheet?.mechanical?.engine),
+    transmission: str(mc.transmission) ?? str(sheet?.mechanical?.transmission),
+    drivetrain: str(mc.drivetrain) ?? str(sheet?.mechanical?.drivetrain),
+  };
+  const stockNumber = str(mc.stock_no);
 
   const s = dealerSettings as Record<string, unknown>;
   const dealer = {
@@ -158,6 +167,8 @@ export function normalizeForSticker(
       keyFeatures: catMap(sheet?.key_features),
       colors,
       assembly,
+      mechanical,
+      stockNumber,
       epa,
       dealer,
       passportUrl,

@@ -35,6 +35,13 @@ export interface PdfPageLike {
     borderColor?: PdfColor;
     borderWidth?: number;
   }): void;
+  drawSvgPath(path: string, options: {
+    x: number;
+    y: number;
+    color?: PdfColor;
+    borderColor?: PdfColor;
+    borderWidth?: number;
+  }): void;
 }
 
 export interface PdfDocumentLike {
@@ -111,6 +118,16 @@ export async function realizePdf(model: LayoutModel, lib: PdfLibModule): Promise
           y: model.height - prim.y - prim.h,
           width: prim.w,
           height: prim.h,
+          ...(prim.fill !== null ? { color: color(prim.fill) } : {}),
+          ...(prim.stroke !== undefined
+            ? { borderColor: color(prim.stroke), borderWidth: prim.strokeWidth ?? 0.75 }
+            : {}),
+        });
+      } else if (prim.kind === "path") {
+        // pdf-lib anchors SVG paths at (x, y) with path coordinates y-down.
+        page.drawSvgPath(prim.d, {
+          x: prim.x,
+          y: model.height - prim.y,
           ...(prim.fill !== null ? { color: color(prim.fill) } : {}),
           ...(prim.stroke !== undefined
             ? { borderColor: color(prim.stroke), borderWidth: prim.strokeWidth ?? 0.75 }

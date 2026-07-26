@@ -2,6 +2,13 @@
 // Consumes FactoryStickerData + an OemStickerTheme and produces a LayoutModel
 // of drawing primitives in points on a 792x612 letter-landscape page, with
 // measurement-based content fit, density fallback, and a continuation page.
+//
+// The page structure mirrors the OEM Monroney reference approved as the
+// visual goal: a full-width factory code strip, a ~57% left column (header,
+// four-column standard equipment, included/optional pricing split, spec
+// grid, VIN barcode, navy total band) and a right column (EPA Fuel Economy
+// & Environment panel, Government 5-Star Safety Ratings, Vehicle Passport
+// QR, federal-label notice, AutoLabels verification box).
 
 import type { FactoryStickerData, EquipmentCategory } from "../types.ts";
 import type { OemStickerTheme } from "../oem/themes.ts";
@@ -9,7 +16,7 @@ import type { OemStickerTheme } from "../oem/themes.ts";
 export const PAGE_WIDTH = 792;
 export const PAGE_HEIGHT = 612;
 export const PAGE_MARGIN = 9;
-export const MIN_BODY_FONT_SIZE = 5.5;
+export const MIN_BODY_FONT_SIZE = 4.4;
 
 export type LayoutFont = "heading" | "body" | "numeric" | "bold";
 export type LayoutAlign = "left" | "right" | "center";
@@ -67,12 +74,28 @@ export interface QrPrimitive {
   color: string;
 }
 
+// Small vector glyph (star, slider marker, icon). `d` is SVG path data in a
+// local y-down coordinate space anchored at (x, y); w/h declare its bounds
+// for validation.
+export interface PathPrimitive {
+  kind: "path";
+  d: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  fill: string | null;
+  stroke?: string;
+  strokeWidth?: number;
+}
+
 export type LayoutPrimitive =
   | TextPrimitive
   | RulePrimitive
   | RectPrimitive
   | BarcodePrimitive
-  | QrPrimitive;
+  | QrPrimitive
+  | PathPrimitive;
 
 export interface LayoutPage {
   primitives: LayoutPrimitive[];
@@ -208,7 +231,7 @@ function sanitize(raw: string): string {
     .replace(/[“”„]/g, '"')
     .replace(/[–—−]/g, "-")
     .replace(/…/g, "...")
-    .replace(/[ \s]+/g, " ")
+    .replace(/[ \s]+/g, " ")
     .split("")
     .filter((ch) => ch.charCodeAt(0) <= 255)
     .join("")
@@ -223,14 +246,14 @@ export function formatMoney(n: number): string {
   return `${sign}$${grouped}.${frac}`;
 }
 
+// Monroney option rows carry plain amounts without a currency symbol.
+export function formatPlain(n: number): string {
+  return formatMoney(n).replace("$", "");
+}
+
 const parseEm = (v: string): number => {
   const m = /^(-?[\d.]+)em$/.exec(v.trim());
   return m ? Number(m[1]) : 0;
-};
-
-const parsePt = (v: string): number => {
-  const m = /^(-?[\d.]+)pt$/.exec(v.trim());
-  return m ? Number(m[1]) : 0.75;
 };
 
 interface Density {
@@ -242,9 +265,10 @@ interface Density {
   head: number;
 }
 
-const DENSITY_STANDARD: Density = { mode: "STANDARD", item: 6.5, itemLh: 8.2, row: 7, rowLh: 9.2, head: 7.5 };
-const DENSITY_DENSE: Density = { mode: "DENSE", item: 5.9, itemLh: 7.4, row: 6.5, rowLh: 8.4, head: 7 };
-const DENSITY_FLOOR: Density = { mode: "CONTINUATION_REQUIRED", item: 5.5, itemLh: 6.9, row: 6, rowLh: 7.8, head: 7 };
+const DENSITY_LARGE: Density = { mode: "STANDARD", item: 6.8, itemLh: 8.6, row: 7.2, rowLh: 9.8, head: 8 };
+const DENSITY_STANDARD: Density = { mode: "STANDARD", item: 6.1, itemLh: 7.6, row: 6.6, rowLh: 9, head: 7.5 };
+const DENSITY_DENSE: Density = { mode: "DENSE", item: 5.5, itemLh: 6.8, row: 6.2, rowLh: 8.2, head: 7 };
+const DENSITY_FLOOR: Density = { mode: "CONTINUATION_REQUIRED", item: 5, itemLh: 6.2, row: 6, rowLh: 7.8, head: 7 };
 
 const CATEGORY_LABELS: Record<EquipmentCategory, string> = {
   EXTERIOR: "Exterior",
@@ -252,17 +276,39 @@ const CATEGORY_LABELS: Record<EquipmentCategory, string> = {
   COMFORT_CONVENIENCE: "Comfort & Convenience",
   FUNCTIONAL: "Functional",
   POWERTRAIN: "Powertrain & Mechanical",
-  SAFETY_SECURITY: "Safety & Security",
+  SAFETY_SECURITY: "Safety / Security",
   TECHNOLOGY: "Technology",
   OTHER: "Additional Equipment",
 };
 
-const LEFT_X = PAGE_MARGIN;
-const LEFT_W = 546;
-const RIGHT_X = 567;
-const RIGHT_W = PAGE_WIDTH - PAGE_MARGIN - RIGHT_X;
-const CONTENT_BOTTOM = PAGE_HEIGHT - PAGE_MARGIN;
+// Monroney column assignment: four fixed columns as on the OEM reference.
+const CATEGORY_COLUMN: Record<EquipmentCategory, number> = {
+  EXTERIOR: 0,
+  INTERIOR: 1,
+  COMFORT_CONVENIENCE: 1,
+  FUNCTIONAL: 2,
+  POWERTRAIN: 2,
+  TECHNOLOGY: 2,
+  OTHER: 2,
+  SAFETY_SECURITY: 3,
+};
+
+const COLUMN_HEADS = ["EXTERIOR", "INTERIOR", "FUNCTIONAL", "SAFETY / SECURITY"];
+
+// ── Page geometry ─────────────────────────────────────────────────────
+
+const IX = PAGE_MARGIN + 6;                     // content inset inside the border
+const IR = PAGE_WIDTH - PAGE_MARGIN - 6;
+const SPLIT_X = 449;                            // left/right column divider
+const LX = IX;
+const LW = SPLIT_X - 7 - LX;
+const RX = SPLIT_X + 7;
+const RW = IR - RX;
+const CONTENT_BOTTOM = PAGE_HEIGHT - PAGE_MARGIN - 5;
 const SECTION_GAP = 5;
+
+const BLACK = "#0d0d0d";
+const EPA_TAG_BLUE = "#b7d9f1";
 
 class Painter {
   primitives: LayoutPrimitive[] = [];
@@ -314,26 +360,60 @@ class Painter {
   qr(x: number, y: number, size: number, payload: string, color: string): void {
     this.primitives.push({ kind: "qr", x, y, size, payload, color });
   }
+
+  path(d: string, x: number, y: number, w: number, h: number, fill: string | null, stroke?: string, strokeWidth?: number): void {
+    this.primitives.push({
+      kind: "path", d, x, y, w, h, fill,
+      ...(stroke !== undefined ? { stroke } : {}),
+      ...(strokeWidth !== undefined ? { strokeWidth } : {}),
+    });
+  }
 }
 
-interface FlowEntry {
-  heading?: string;
-  lines: string[];
+// ── Vector glyphs ─────────────────────────────────────────────────────
+
+function starPath(s: number): string {
+  // 5-point star in an s×s box, y-down.
+  const p = (a: number, r: number): [number, number] => [
+    s / 2 + r * Math.sin(a), s / 2 - r * Math.cos(a),
+  ];
+  const outer = s / 2;
+  const inner = s / 5;
+  const pts: string[] = [];
+  for (let i = 0; i < 5; i++) {
+    const [ox, oy] = p((i * 2 * Math.PI) / 5, outer);
+    const [ix2, iy2] = p(((i * 2 + 1) * Math.PI) / 5, inner);
+    pts.push(`${i === 0 ? "M" : "L"}${ox.toFixed(2)} ${oy.toFixed(2)}`);
+    pts.push(`L${ix2.toFixed(2)} ${iy2.toFixed(2)}`);
+  }
+  return `${pts.join(" ")} Z`;
 }
 
-interface BuildContext {
-  input: StickerLayoutInput;
-  theme: OemStickerTheme;
-  density: Density;
+function drawStars(p: Painter, x: number, y: number, count: number, size: number, color: string): void {
+  for (let i = 0; i < count; i++) {
+    p.path(starPath(size), x + i * (size + 1.6), y, size, size, color);
+  }
 }
+
+const PUMP_BODY = "M0 3 h9 v12 h-9 Z M10.5 6 l2.6 2.6 v5.2 a1.5 1.5 0 0 1 -3 0 v-3.4 h-1.1";
+const PUMP_WINDOW = "M1.6 4.6 h5.8 v3.6 h-5.8 Z";
+const CHECK_MARK = "M2 7.5 L5.6 11 L12 3.4";
+
+function sliderMarkerPath(w: number, h: number): string {
+  // Downward-pointing tab: rectangle with a chevron tail.
+  const tail = h * 0.45;
+  return `M0 0 H${w} V${h - tail} L${w / 2} ${h} L0 ${h - tail} Z`;
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────
 
 const headingCase = (theme: OemStickerTheme, s: string): string =>
   theme.typography.uppercaseSectionHeadings ? s.toUpperCase() : s;
 
-const priceLabel = (item: { price?: number; priceStatus: string }): string => {
+const priceLabel = (item: { price?: number; priceStatus: string }, plain: boolean): string => {
   if (item.priceStatus === "INCLUDED") return "INCLUDED";
   if (item.priceStatus === "NO_CHARGE") return "NO CHARGE";
-  if (item.price !== undefined) return formatMoney(item.price);
+  if (item.price !== undefined) return plain ? formatPlain(item.price) : formatMoney(item.price);
   return "SEE DEALER";
 };
 
@@ -346,126 +426,846 @@ function leaderRow(
   price: string,
   size: number,
   nameFont: LayoutFont,
-  theme: OemStickerTheme,
+  color: string,
+  dotColor: string,
 ): void {
-  const priceW = measureText(price, "numeric", size);
+  const priceW = measureText(price, "bold", size);
   const nameMax = rowRight - x - priceW - 10;
   const shown = ellipsize(name, nameFont, size, nameMax);
-  p.text(shown, x, y, size, nameFont, theme.colors.bodyText);
+  p.text(shown, x, y, size, nameFont, color);
   const nameW = measureText(shown, nameFont, size);
   const dotW = measureText(".", "body", size);
-  const gapStart = x + nameW + 3;
-  const gapEnd = rowRight - priceW - 4;
+  const gapStart = x + nameW + 2;
+  const gapEnd = rowRight - priceW - 3;
   const dots = Math.floor((gapEnd - gapStart) / dotW);
   if (dots > 0) {
-    p.text(".".repeat(dots), gapStart, y, size, "body", theme.colors.mutedText);
+    p.text(".".repeat(dots), gapStart, y, size, "body", dotColor);
   }
-  p.text(price, rowRight, y, size, "numeric", theme.colors.bodyText, { align: "right" });
+  p.text(price, rowRight, y, size, nameFont === "bold" ? "bold" : "body", color, { align: "right" });
 }
 
-// ── Section painters. Each takes a painter and a top-y and returns the new y.
-// Measurement runs the same painter code against a scratch painter, so the
-// measured height is exactly the painted height.
+interface FlowEntry {
+  heading?: string;
+  lines: string[];
+  bullet?: boolean;
+}
 
-function paintTopStrip(p: Painter, y: number, ctx: BuildContext): number {
+interface BuildContext {
+  input: StickerLayoutInput;
+  theme: OemStickerTheme;
+  density: Density;
+}
+
+// ── Top strip: factory administrative codes across the full width ─────
+
+function paintTopStrip(p: Painter, ctx: BuildContext): number {
   const { data } = ctx.input;
   const v = data.vehicle;
-  const cells: Array<[string, string]> = [];
-  if (v.exteriorColorCode || v.exteriorColor) {
-    cells.push(["EXT", [v.exteriorColorCode, v.exteriorColor].filter(Boolean).join(" ")]);
+  const f = data.factory;
+  const size = 6;
+  const baseline = PAGE_MARGIN + 10.5;
+
+  const left: Array<[string, string]> = [];
+  if (f.locationCode) left.push(["LOC", f.locationCode]);
+  if (v.exteriorColorCode) left.push(["EXT", v.exteriorColorCode]);
+  if (v.interiorColorCode) left.push(["INT", v.interiorColorCode]);
+  if (f.emissionsCode) left.push(["EMS", f.emissionsCode]);
+  if (f.sequenceNumber) left.push(["SEQ", f.sequenceNumber]);
+  if (f.orderNumber) left.push(["ORDER", f.orderNumber]);
+  if (f.dealerCode) left.push(["DEALER", f.dealerCode]);
+
+  let cx = LX;
+  for (const [label, value] of left) {
+    p.text(`${label}:`, cx, baseline, size, "body", BLACK);
+    cx += measureText(`${label}:`, "body", size) + 3;
+    p.text(value, cx, baseline, size, "bold", BLACK);
+    cx += measureText(value, "bold", size) + 14;
   }
-  if (v.interiorColorCode || v.interiorColor) {
-    cells.push(["INT", [v.interiorColorCode, v.interiorColor].filter(Boolean).join(" ")]);
+
+  const stock = v.stockNumber ? `  ${v.stockNumber}` : "";
+  p.text(`VIN: ${v.vin}`, RX + 4, baseline, 6.6, "bold", BLACK);
+  if (stock.trim()) {
+    p.text(stock.trim(), IR, baseline, size, "body", BLACK, { align: "right" });
   }
-  if (ctx.input.data.factory.orderNumber) cells.push(["ORDER", ctx.input.data.factory.orderNumber]);
-  if (ctx.input.data.factory.dealerCode) cells.push(["DLR", ctx.input.data.factory.dealerCode]);
-  if (v.stockNumber) cells.push(["STOCK", v.stockNumber]);
-  cells.push(["VIN", v.vin]);
-  if (!cells.length) return y;
-  const size = 5.5;
-  const baseline = y + size;
-  const cellW = LEFT_W / cells.length;
-  cells.forEach(([label, value], i) => {
-    const cx = LEFT_X + i * cellW;
-    p.text(`${label}:`, cx, baseline, size, "bold", ctx.theme.colors.mutedText);
-    const labelW = measureText(`${label}:`, "bold", size) + 3;
-    const shown = ellipsize(value, "numeric", size, cellW - labelW - 4);
-    p.text(shown, cx + labelW, baseline, size, "numeric", ctx.theme.colors.bodyText);
+
+  const ruleY = baseline + 4.5;
+  p.rule(PAGE_MARGIN, ruleY, PAGE_WIDTH - 2 * PAGE_MARGIN, 1.1, BLACK);
+  return ruleY + 1.1;
+}
+
+// ── Left column: header (wordmark / model / identity block) ──────────
+
+function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
+  const { theme, input } = ctx;
+  const v = input.data.vehicle;
+  const bandH = 46;
+
+  const wordmarkSize = 16;
+  const spacing = Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * wordmarkSize, wordmarkSize * 0.34);
+  p.text(theme.logo.wordmarkText, LX + 2, y + 28, wordmarkSize, "heading", BLACK, {
+    charSpacing: spacing,
   });
-  const ruleY = baseline + 3;
-  p.rule(LEFT_X, ruleY, LEFT_W, 0.5, ctx.theme.colors.divider);
+
+  const centerX = LX + LW * 0.52;
+  const yearModel = [v.year > 0 ? String(v.year) : "", v.model].filter(Boolean).join(" ").toUpperCase();
+  p.text(ellipsize(yearModel, "bold", 20, 200), centerX, y + 24, 20, "bold", BLACK, { align: "center" });
+  if (v.trim) {
+    p.text(ellipsize(v.trim.toUpperCase(), "bold", 11.5, 200), centerX, y + 38, 11.5, "bold", BLACK, { align: "center" });
+  }
+
+  const bx = LX + LW;
+  let by = y + 12;
+  if (v.exteriorColor) {
+    p.text(`EXTERIOR: ${v.exteriorColor.toUpperCase()}`, bx, by, 6.2, "bold", BLACK, { align: "right" });
+    by += 8;
+  }
+  if (v.interiorColor) {
+    p.text(`INTERIOR: ${v.interiorColor.toUpperCase()}`, bx, by, 6.2, "bold", BLACK, { align: "right" });
+    by += 8;
+  }
+  p.text(`VIN: ${v.vin}`, bx, by, 6.2, "body", BLACK, { align: "right" });
+  by += 8;
+  if (ctx.input.generic) {
+    p.text("TYPICAL FACTORY CONFIGURATION FOR THIS TRIM - NOT VIN-SPECIFIC", bx, by, 4.8, "bold", "#8a6d1a", { align: "right" });
+  }
+
+  const ruleY = y + bandH;
+  p.rule(LX, ruleY, LW, 1.6, BLACK);
   return ruleY + 3;
 }
 
-function paintHeaderBand(p: Painter, y: number, ctx: BuildContext): number {
-  const { theme, input } = ctx;
-  const bandH = 30;
-  const banded = theme.layout.headerVariant === "BANDED" || theme.layout.headerVariant === "BLOCK";
-  const textColor = banded ? theme.colors.headerText : theme.colors.bodyText;
-  if (banded) {
-    p.rect(LEFT_X, y, LEFT_W, bandH, theme.colors.headerBackground);
-  } else {
-    p.rule(LEFT_X, y + bandH, LEFT_W, parsePt(theme.layout.borderWeight) + 0.5, theme.colors.headerBackground);
-  }
-  const wordmarkSize = 15;
-  const spacing = parseEm(theme.logo.wordmarkLetterSpacing) * wordmarkSize;
-  p.text(theme.logo.wordmarkText, LEFT_X + 8, y + 20, wordmarkSize, "heading", textColor, {
-    charSpacing: spacing,
-  });
-  p.text(headingCase(theme, input.title).toUpperCase(), LEFT_X + LEFT_W - 8, y + 13, 7, "bold", textColor, {
-    align: "right",
-  });
-  const sub = input.generic
-    ? "TYPICAL FACTORY CONFIGURATION FOR THIS TRIM - NOT VIN-SPECIFIC"
-    : "COMPILED FROM VIN-SPECIFIC FACTORY BUILD DATA";
-  p.text(sub, LEFT_X + LEFT_W - 8, y + 23, 5.5, "body", textColor, { align: "right" });
-  return y + bandH + 4;
+// ── Standard equipment: four fixed Monroney columns ───────────────────
+
+interface BucketedEquipment {
+  columns: FlowEntry[][];
+  flat: FlowEntry[];
+  multiCategory: boolean;
 }
 
-function paintIdentity(p: Painter, y: number, ctx: BuildContext): number {
-  const { data } = ctx.input;
-  const v = data.vehicle;
-  const theme = ctx.theme;
-  const nameParts = [v.year > 0 ? String(v.year) : "", v.make, v.model, v.trim ?? ""].filter(Boolean);
-  const modelLine = nameParts.join(" ").toUpperCase();
-  let cursor = y + 12;
-  p.text(ellipsize(modelLine, "bold", 12.5, LEFT_W), LEFT_X, cursor, 12.5, "bold", theme.colors.bodyText);
-  cursor += 9.5;
-  const colorBits: string[] = [];
-  if (v.exteriorColor) colorBits.push(`EXTERIOR: ${v.exteriorColor.toUpperCase()}`);
-  if (v.interiorColor) colorBits.push(`INTERIOR: ${v.interiorColor.toUpperCase()}`);
-  if (colorBits.length) {
-    p.text(ellipsize(colorBits.join("   "), "body", 6.8, LEFT_W), LEFT_X, cursor, 6.8, "body", theme.colors.bodyText);
-    cursor += 8.5;
-  }
-  const specBits = [`VIN: ${v.vin}`];
-  if (v.bodyStyle) specBits.push(`BODY: ${v.bodyStyle.toUpperCase()}`);
-  if (v.drivetrain) specBits.push(`DRIVE: ${v.drivetrain.toUpperCase()}`);
-  if (v.fuelType) specBits.push(`FUEL: ${v.fuelType.toUpperCase()}`);
-  p.text(ellipsize(specBits.join("   "), "numeric", 6.5, LEFT_W), LEFT_X, cursor, 6.5, "numeric", theme.colors.bodyText);
-  cursor += 4;
-  p.rule(LEFT_X, cursor, LEFT_W, parsePt(ctx.theme.layout.borderWeight), theme.colors.divider);
-  return cursor + SECTION_GAP;
-}
-
-function equipmentFlowEntries(ctx: BuildContext, colWidth: number): FlowEntry[] {
+function bucketEquipment(ctx: BuildContext, colWidth: number): BucketedEquipment {
   const { density } = ctx;
-  const entries: FlowEntry[] = [];
+  const columns: FlowEntry[][] = [[], [], [], []];
+  const flat: FlowEntry[] = [];
+  const perColumnCategories = [0, 0, 0, 0];
   for (const group of ctx.input.data.equipment.standard) {
     if (!group.items.length) continue;
-    entries.push({ heading: headingCase(ctx.theme, CATEGORY_LABELS[group.category]), lines: [] });
+    perColumnCategories[CATEGORY_COLUMN[group.category]] += 1;
+  }
+  for (const group of ctx.input.data.equipment.standard) {
+    if (!group.items.length) continue;
+    const col = CATEGORY_COLUMN[group.category];
+    const needsSubhead = perColumnCategories[col] > 1 &&
+      !(columns[col].length === 0 && CATEGORY_LABELS[group.category].toUpperCase() === COLUMN_HEADS[col]);
+    if (needsSubhead) {
+      columns[col].push({ heading: CATEGORY_LABELS[group.category].toUpperCase(), lines: [] });
+    }
+    flat.push({ heading: CATEGORY_LABELS[group.category].toUpperCase(), lines: [] });
     for (const item of group.items) {
-      const lines = wrapText(sanitize(item), "body", density.item, colWidth);
-      if (lines.length) entries.push({ lines });
+      const lines = wrapText(sanitize(item), "body", density.item, colWidth - 6);
+      if (lines.length) {
+        columns[col].push({ lines, bullet: true });
+        flat.push({ lines, bullet: true });
+      }
     }
   }
-  return entries;
+  return { columns, flat, multiCategory: perColumnCategories.some((n) => n > 1) };
 }
 
-interface FlowResult {
-  leftover: FlowEntry[];
-  usedHeight: number;
+// U+2022 is outside WinAnsi-safe range for the text sanitizer, so bullets
+// are drawn as tiny filled circles that realize identically in SVG and PDF.
+function bulletDot(p: Painter, x: number, baseline: number, size: number, color: string): void {
+  const r = Math.max(0.9, size * 0.16);
+  const d = `M${(r * 2).toFixed(2)} ${r.toFixed(2)} A${r.toFixed(2)} ${r.toFixed(2)} 0 1 1 0 ${r.toFixed(2)} A${r.toFixed(2)} ${r.toFixed(2)} 0 1 1 ${(r * 2).toFixed(2)} ${r.toFixed(2)} Z`;
+  p.path(d, x, baseline - size * 0.55, r * 2, r * 2, color);
 }
+
+function paintEntryLines(
+  p: Painter,
+  entry: FlowEntry,
+  x: number,
+  cy: number,
+  density: Density,
+  color: string,
+): number {
+  let yy = cy;
+  entry.lines.forEach((line, li) => {
+    yy += density.itemLh;
+    if (entry.bullet && li === 0) {
+      bulletDot(p, x + 0.5, yy, density.item, color);
+      p.text(line, x + 5, yy, density.item, "body", color);
+    } else {
+      p.text(line, x + 5, yy, density.item, "body", color);
+    }
+  });
+  return yy;
+}
+
+function paintStandardEquipment(
+  p: Painter,
+  y: number,
+  budget: number,
+  ctx: BuildContext,
+): { yEnd: number; leftover: FlowEntry[] } {
+  const { density } = ctx;
+  const gap = 9;
+  const colW = (LW - gap * 3) / 4;
+  const buckets = bucketEquipment(ctx, colW);
+  const hasAny = buckets.columns.some((c) => c.length > 0);
+  if (!hasAny) return { yEnd: y, leftover: [] };
+
+  let cursor = y + 8.5;
+  const h1 = "STANDARD EQUIPMENT";
+  const h2 = "INCLUDED AT NO EXTRA CHARGE";
+  p.text(h1, LX, cursor, 8, "bold", BLACK);
+  const h1W = measureText(h1, "bold", 8);
+  p.text(h2, LX + h1W + 5, cursor, 5.8, "bold", BLACK);
+  const underW = h1W + 5 + measureText(h2, "bold", 5.8);
+  p.rule(LX, cursor + 1.6, underW, 0.7, BLACK);
+  cursor += 6;
+
+  const colTop = cursor;
+  // Reserve the footnote + closing rule (~12pt) and the pricing offset that
+  // follows this section, so a full column never pushes the bottom stack out.
+  const colBudget = Math.max(0, budget - (cursor - y) - 19);
+  const leftover: FlowEntry[] = [];
+  let usedMax = 0;
+
+  for (let col = 0; col < 4; col++) {
+    const cx = LX + col * (colW + gap);
+    let cy = colTop + 7;
+    p.text(COLUMN_HEADS[col], cx, cy, density.item + 0.7, "bold", BLACK);
+    p.rule(cx, cy + 1.4, measureText(COLUMN_HEADS[col], "bold", density.item + 0.7), 0.6, BLACK);
+    cy += 2.2;
+    const entries = buckets.columns[col];
+    let idx = 0;
+    let pendingHead: string | null = null;
+    while (idx < entries.length) {
+      const entry = entries[idx];
+      if (entry.heading !== undefined) {
+        pendingHead = entry.heading;
+        idx++;
+        continue;
+      }
+      const needed = (pendingHead ? density.itemLh + 2 : 0) + entry.lines.length * density.itemLh;
+      if (cy + needed > colTop + colBudget) break;
+      if (pendingHead) {
+        cy += density.itemLh + 1;
+        p.text(pendingHead, cx, cy, density.item + 0.3, "bold", BLACK);
+        p.rule(cx, cy + 1.2, measureText(pendingHead, "bold", density.item + 0.3), 0.5, BLACK);
+        cy += 1.6;
+        pendingHead = null;
+      }
+      cy = paintEntryLines(p, entry, cx, cy, density, BLACK);
+      idx++;
+    }
+    if (idx < entries.length) {
+      if (pendingHead) leftover.push({ heading: pendingHead, lines: [] });
+      else leftover.push({ heading: COLUMN_HEADS[col], lines: [] });
+      for (let i = idx; i < entries.length; i++) leftover.push(entries[i]);
+    }
+    usedMax = Math.max(usedMax, cy - colTop);
+  }
+
+  for (let col = 1; col < 4; col++) {
+    const sx = LX + col * (colW + gap) - gap / 2;
+    p.rule(sx, colTop + 1, 0.5, usedMax + 2, "#9a9da1");
+  }
+
+  let end = colTop + usedMax + 8;
+  p.text(
+    "* See Owner's Manual for complete details, limitations and exclusions.",
+    LX + LW / 2, end, 5.2, "body", BLACK, { align: "center" },
+  );
+  end += 3;
+  p.rule(LX, end, LW, 1.1, BLACK);
+  return { yEnd: end + 1.1, leftover };
+}
+
+// ── Included / Optional pricing split ─────────────────────────────────
+
+function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
+  const { input } = ctx;
+  const leftW = LW * 0.415;
+  const rightX = LX + leftW + 10;
+  const rightW = LX + LW - rightX;
+  // The pricing pair reads larger than the equipment lists on the OEM
+  // reference, so its sizes are fixed rather than density-driven.
+  const size = 7.4;
+  const lh = 11;
+  const density = { ...ctx.density, item: 6.6, itemLh: 8.8 };
+
+  // Left half: packages included on this vehicle.
+  let ly = y + 9;
+  p.text("INCLUDED ON THIS VEHICLE", LX, ly, 6.8, "bold", BLACK);
+  p.text("(MSRP)", LX + leftW - 2, ly, 5.6, "body", BLACK, { align: "right" });
+  ly += 2;
+  for (const pkg of input.data.equipment.packages) {
+    ly += lh + 1;
+    const label = [pkg.code, pkg.name].filter(Boolean).join(" ").toUpperCase();
+    p.text(ellipsize(label, "bold", size, leftW - 46), LX, ly, size, "bold", BLACK);
+    p.rule(LX, ly + 1.4, Math.min(measureText(label, "bold", size), leftW - 46), 0.5, BLACK);
+    p.text(priceLabel(pkg, true), LX + leftW - 2, ly, size, "bold", BLACK, { align: "right" });
+    for (const feature of pkg.features) {
+      const lines = wrapText(sanitize(feature), "body", density.item, leftW - 12);
+      for (const [li, line] of lines.entries()) {
+        ly += density.itemLh;
+        if (li === 0) bulletDot(p, LX + 3.5, ly, density.item, BLACK);
+        p.text(line, LX + 8, ly, density.item, "body", BLACK);
+      }
+    }
+  }
+
+  // Right half: optional equipment with dot leaders and the MSRP rollup.
+  let ry = y + 9;
+  p.text("OPTIONAL EQUIPMENT / OTHER", rightX, ry, 6.8, "bold", BLACK);
+  p.rule(rightX, ry + 1.4, measureText("OPTIONAL EQUIPMENT / OTHER", "bold", 6.8), 0.5, BLACK);
+  p.text("(MSRP)", rightX + rightW, ry, 5.6, "body", BLACK, { align: "right" });
+  ry += 2;
+  for (const opt of input.data.equipment.options) {
+    ry += lh;
+    const code = opt.code ? `${opt.code}` : "";
+    const codeW = 20;
+    if (code) p.text(code, rightX, ry, size, "body", BLACK);
+    const nameX = rightX + (code ? codeW : 0);
+    if (opt.features && opt.features.length) {
+      // Package rows put the price leader on the contents line, as on the
+      // OEM reference ("Cargo Package" / "• Cargo Net ... 250.00").
+      p.text(ellipsize(opt.name, "body", size, rightW - codeW - 10), nameX, ry, size, "body", BLACK);
+      ry += density.itemLh;
+      let fx = nameX + 6;
+      for (const feature of opt.features) {
+        const shown = ellipsize(sanitize(feature), "body", density.item, rightW - codeW - 60);
+        bulletDot(p, fx, ry, density.item, BLACK);
+        p.text(shown, fx + 4, ry, density.item, "body", BLACK);
+        fx += 4 + measureText(shown, "body", density.item) + 9;
+        if (fx > rightX + rightW - 70) break;
+      }
+      const price = priceLabel(opt, true);
+      const priceW = measureText(price, "body", density.item);
+      const dotW = measureText(".", "body", density.item);
+      const dotStart = fx - 6;
+      const dots = Math.floor((rightX + rightW - priceW - 3 - dotStart) / dotW);
+      if (dots > 0) p.text(".".repeat(dots), dotStart, ry, density.item, "body", BLACK);
+      p.text(price, rightX + rightW, ry, density.item, "body", BLACK, { align: "right" });
+    } else {
+      leaderRow(p, nameX, rightX + rightW, ry, opt.name, priceLabel(opt, true), size, "body", BLACK, BLACK);
+    }
+  }
+  const destination = input.data.pricing.destinationCharge;
+  if (destination !== undefined) {
+    ry += lh + 1.5;
+    leaderRow(p, rightX, rightX + rightW, ry, "DESTINATION & HANDLING", formatPlain(destination), size, "bold", BLACK, BLACK);
+  }
+
+  ry += lh + 4;
+  const pricing = input.data.pricing;
+  const rollup: Array<[string, number | undefined, boolean]> = [
+    ["BASE MSRP", pricing.baseMsrp, true],
+    ["FACTORY OPTIONS", pricing.factoryInstalledTotal ??
+      (pricing.packagesTotal !== undefined || pricing.optionsTotal !== undefined
+        ? (pricing.packagesTotal ?? 0) + (pricing.optionsTotal ?? 0)
+        : undefined), false],
+    ["DESTINATION & HANDLING", pricing.destinationCharge, false],
+  ];
+  for (const [label, amount, dollar] of rollup) {
+    if (amount === undefined) continue;
+    ry += lh;
+    leaderRow(p, rightX, rightX + rightW, ry, label, dollar ? formatMoney(amount) : formatPlain(amount), size, "body", BLACK, BLACK);
+  }
+
+  ry += lh + 3;
+  const condition = input.data.vehicle.condition;
+  const totalLabel = condition === "NEW" ? "TOTAL FACTORY MSRP" : "TOTAL ORIGINAL MSRP";
+  const total = pricing.sourceReportedTotalMsrp ?? pricing.calculatedTotalMsrp;
+  leaderRow(
+    p, rightX, rightX + rightW, ry,
+    totalLabel, total !== undefined ? formatMoney(total) : "SEE DEALER",
+    size + 1.4, "bold", BLACK, BLACK,
+  );
+  ry += 3;
+
+  const end = Math.max(ly, ry) + 4;
+  p.rule(rightX - 5, y + 3, 0.5, end - y - 6, "#9a9da1");
+  p.rule(LX, end, LW, 1.1, BLACK);
+  return end + 1.1;
+}
+
+// ── Spec grid + VIN barcode ───────────────────────────────────────────
+
+function specCell(
+  p: Painter,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  label: string,
+  value: string,
+): void {
+  p.rect(x, y, w, h, null, BLACK, 0.7);
+  p.text(label, x + 3, y + 6.5, 4.9, "bold", BLACK);
+  p.text(ellipsize(value.toUpperCase(), "body", 6.4, w - 6), x + 3, y + h - 4.5, 6.4, "body", BLACK);
+}
+
+function paintSpecGrid(p: Painter, y: number, ctx: BuildContext): number {
+  const { input } = ctx;
+  const v = input.data.vehicle;
+  const f = input.data.factory;
+  const rowH = 19;
+  const gridW = LW * 0.72;
+
+  const assembly = f.finalAssemblyPoint || [f.assemblyPlant, f.assemblyCountry].filter(Boolean).join(", ");
+  const row1: Array<[string, string]> = [];
+  if (assembly) row1.push(["FINAL ASSEMBLY POINT:", assembly]);
+  if (f.transportMethod) row1.push(["METHOD OF TRANSPORT:", f.transportMethod]);
+  if (v.stockNumber) row1.push(["STOCK NO.:", v.stockNumber]);
+
+  const row2: Array<[string, string]> = [];
+  if (v.exteriorColor) {
+    row2.push(["EXT. COLOR:", [v.exteriorColor, v.exteriorColorCode ? `(${v.exteriorColorCode})` : ""].filter(Boolean).join(" ")]);
+  }
+  if (v.interiorColor) {
+    row2.push(["INT. COLOR:", [v.interiorColor, v.interiorColorCode ? `(${v.interiorColorCode})` : ""].filter(Boolean).join(" ")]);
+  }
+  if (v.engine) row2.push(["ENGINE:", v.engine]);
+  if (v.transmission) row2.push(["TRANS:", v.transmission]);
+
+  let cursor = y;
+  if (row1.length) {
+    const widths = row1.length === 3 ? [0.4, 0.3, 0.3] : row1.map(() => 1 / row1.length);
+    let cx = LX;
+    row1.forEach(([label, value], i) => {
+      const w = gridW * widths[i];
+      specCell(p, cx, cursor, w, rowH, label, value);
+      cx += w;
+    });
+    cursor += rowH;
+  }
+  if (row2.length) {
+    const widths = row2.length === 4 ? [0.31, 0.25, 0.22, 0.22] : row2.map(() => 1 / row2.length);
+    let cx = LX;
+    row2.forEach(([label, value], i) => {
+      const w = gridW * widths[i];
+      specCell(p, cx, cursor, w, rowH, label, value);
+      cx += w;
+    });
+    cursor += rowH;
+  }
+  return cursor;
+}
+
+function paintVinBarcode(p: Painter, y: number, ctx: BuildContext): number {
+  const { theme, input } = ctx;
+  const v = input.data.vehicle;
+  const boxW = LW * 0.72;
+  const showBarcode = theme.layout.barcodeVariant !== "NONE";
+  const boxH = showBarcode ? 56 : 18;
+  p.rect(LX, y, boxW, boxH, null, BLACK, 0.7);
+  p.text(`VIN: ${v.vin}`, LX + 5, y + 9, 7, "bold", BLACK);
+  if (showBarcode) {
+    const barW = boxW * 0.62;
+    p.barcode(LX + 5, y + 13, barW, 32, input.barcodePayload, BLACK);
+    // The bare VIN under the bars is part of the render QA contract: the
+    // orchestrator asserts drawnStrings contains the exact VIN.
+    p.text(v.vin, LX + 5 + barW / 2, y + 52, 6, "body", BLACK, { align: "center" });
+  } else {
+    p.text(v.vin, LX + boxW - 5, y + 9, 7, "body", BLACK, { align: "right" });
+  }
+  return y + boxH;
+}
+
+// ── Navy total band ───────────────────────────────────────────────────
+
+function paintTotalBand(p: Painter, y: number, ctx: BuildContext): number {
+  const { theme, input } = ctx;
+  const pricing = input.data.pricing;
+  const condition = input.data.vehicle.condition;
+  const label = condition === "NEW" ? "TOTAL FACTORY MSRP" : "TOTAL ORIGINAL MSRP";
+  const total = pricing.sourceReportedTotalMsrp ?? pricing.calculatedTotalMsrp;
+  const bandH = 34;
+  p.rect(LX, y, LW, bandH, theme.colors.totalMsrpBackground);
+  p.text(label, LX + 10, y + 22.5, 15, "bold", theme.colors.totalMsrpText, {
+    charSpacing: 0.4,
+  });
+  const amount = total !== undefined ? formatMoney(total) : "SEE DEALER";
+  p.text(amount, LX + LW - 10, y + 23, 16.5, "bold", theme.colors.totalMsrpText, { align: "right" });
+  return y + bandH;
+}
+
+// ── Right column: EPA Fuel Economy & Environment ──────────────────────
+
+function fuelCategoryLabel(fuelType: string | undefined): string {
+  const f = (fuelType || "").toLowerCase();
+  if (/electric|ev\b/.test(f)) return "Electric Vehicle";
+  if (/hybrid|phev/.test(f)) return "Hybrid Vehicle";
+  if (/diesel/.test(f)) return "Diesel Vehicle";
+  return "Gasoline Vehicle";
+}
+
+function paintRatingSlider(
+  p: Painter,
+  x: number,
+  y: number,
+  w: number,
+  label: string,
+  value: number | undefined,
+  theme: OemStickerTheme,
+): number {
+  p.text(label, x, y + 6, 5.2, "bold", BLACK);
+  const barY = y + 13;
+  const barH = 8.5;
+  const cap = 9;
+  // Reversed end caps with a continuous track filled up to the marker.
+  p.rect(x, barY, cap, barH, BLACK);
+  p.text("1", x + cap / 2, barY + barH - 1.5, 5, "bold", "#ffffff", { align: "center" });
+  p.rect(x + cap, barY, w - cap * 2, barH, "#ffffff", BLACK, 0.7);
+  p.rect(x + w - cap, barY, cap, barH, BLACK);
+  p.text("10", x + w - cap / 2, barY + barH - 1.5, 5, "bold", "#ffffff", { align: "center" });
+  p.text("Best", x + w, barY + barH + 6, 5, "body", BLACK, { align: "right" });
+  if (value !== undefined && value >= 1 && value <= 10) {
+    const track = w - cap * 2;
+    const fillW = Math.max(0, track * ((value - 0.5) / 10));
+    p.rect(x + cap + 0.7, barY + 0.7, Math.max(0, fillW - 0.7), barH - 1.4, "#4a4f55");
+    const mw = 13.5;
+    const mx = Math.min(Math.max(x + cap + fillW - mw / 2, x), x + w - mw);
+    p.path(sliderMarkerPath(mw, 13.5), mx, barY - 4.5, mw, 13.5, theme.colors.totalMsrpBackground);
+    p.text(String(value), mx + mw / 2, barY + 3.4, 6.8, "bold", "#ffffff", { align: "center" });
+  }
+  return barY + barH + 8;
+}
+
+function pumpPath(s: number): { body: string; window: string; w: number; h: number } {
+  const n = (v: number): string => (v * s).toFixed(2);
+  return {
+    body: `M0 ${n(3)} h${n(9)} v${n(12)} h-${n(9)} Z M${n(10.5)} ${n(6)} l${n(2.6)} ${n(2.6)} v${n(5.2)} a${n(1.5)} ${n(1.5)} 0 0 1 -${n(3)} 0 v-${n(3.4)} h-${n(1.1)}`,
+    window: `M${n(1.6)} ${n(4.6)} h${n(5.8)} v${n(3.6)} h-${n(5.8)} Z`,
+    w: 13.5 * s,
+    h: 15.5 * s,
+  };
+}
+
+function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
+  const { theme, input } = ctx;
+  const reg = input.data.regulatory;
+  if (reg.epaStatus !== "VERIFIED") return y;
+  const header = theme.colors.headerBackground;
+  const headerText = theme.colors.headerText;
+
+  const boxTop = y;
+  const headH = 24;
+  const bodyTop = y + headH;
+
+  // Header band.
+  p.rect(RX, boxTop, RW, headH, header);
+  p.text("EPA", RX + 6, boxTop + 11, 6.5, "bold", headerText);
+  p.text("DOT", RX + 6, boxTop + 19, 6.5, "bold", headerText);
+  p.rule(RX + 24, boxTop + 4.5, 0.5, headH - 9, "#8b8f94");
+  p.text("Fuel Economy & Environment", RX + 30, boxTop + 16, 12, "bold", headerText);
+  const tagW = 92;
+  const tagX = RX + RW - tagW - 5;
+  p.rect(tagX, boxTop + 4.5, tagW, headH - 9, EPA_TAG_BLUE);
+  const tagPump = pumpPath(0.75);
+  p.path(tagPump.body, tagX + 4, boxTop + 7, tagPump.w, tagPump.h, BLACK);
+  p.text(fuelCategoryLabel(input.data.vehicle.fuelType), tagX + tagW / 2 + 6, boxTop + 14.6, 7.6, "bold", BLACK, { align: "center" });
+
+  let cy = bodyTop + 13;
+  p.text("Fuel Economy", RX + 7, cy, 10, "bold", BLACK);
+
+  // Big combined MPG block.
+  const mpgTop = cy + 6.5;
+  const pump = pumpPath(1.35);
+  p.path(pump.body, RX + 7, mpgTop + 5, pump.w, pump.h, BLACK);
+  p.path(pump.window, RX + 7, mpgTop + 5, pump.w, pump.h, "#ffffff");
+  const combined = reg.combinedMpg;
+  let numW = 0;
+  if (combined !== undefined) {
+    p.text(String(combined), RX + 29, mpgTop + 33, 38, "bold", BLACK);
+    numW = measureText(String(combined), "bold", 38);
+    p.text("MPG", RX + 33 + numW, mpgTop + 17, 13, "bold", BLACK);
+    p.text("combined city/hwy", RX + 29, mpgTop + 41, 5.8, "body", BLACK);
+    let colX = RX + 37 + numW;
+    if (reg.cityMpg !== undefined) {
+      p.text(String(reg.cityMpg), colX, mpgTop + 32, 11, "bold", BLACK);
+      p.text("city", colX, mpgTop + 39.5, 5.8, "body", BLACK);
+      colX += 26;
+    }
+    if (reg.highwayMpg !== undefined) {
+      p.text(String(reg.highwayMpg), colX, mpgTop + 32, 11, "bold", BLACK);
+      p.text("highway", colX, mpgTop + 39.5, 5.8, "body", BLACK);
+    }
+  }
+  if (reg.epaClassNote) {
+    let ny = mpgTop + 6;
+    for (const line of wrapText(reg.epaClassNote, "body", 4.8, 58)) {
+      p.text(line, RX + 146, ny, 4.8, "body", BLACK);
+      ny += 5.6;
+    }
+  }
+
+  // Right: five-year cost comparison.
+  const fiveYear = reg.fiveYearCostDifference;
+  const costX = RX + RW - 98;
+  p.rule(costX - 8, bodyTop + 5, 0.5, 64, "#b5b8bc");
+  if (fiveYear !== undefined) {
+    const spend = fiveYear < 0;
+    p.text("You", costX, bodyTop + 13, 10, "body", BLACK);
+    p.text(spend ? "spend" : "save", costX + measureText("You ", "body", 10), bodyTop + 13, 13.5, "bold", BLACK);
+    p.text(formatMoney(Math.abs(fiveYear)).replace(/\.00$/, ""), costX, bodyTop + 34.5, 21, "bold", BLACK);
+    p.text(`${spend ? "more" : ""} in fuel costs`.trim(), costX, bodyTop + 44.5, 8, "bold", BLACK);
+    p.text("over 5 years", costX, bodyTop + 53.5, 8, "bold", BLACK);
+    p.text("compared to the", costX, bodyTop + 62, 6.4, "body", BLACK);
+    p.text("average new vehicle.", costX, bodyTop + 69.5, 6.4, "body", BLACK);
+  }
+  if (reg.gallonsPer100Miles !== undefined) {
+    p.text(`${reg.gallonsPer100Miles}`, RX + 9, mpgTop + 56, 10, "bold", BLACK);
+    p.text("gallons per 100 miles", RX + 11 + measureText(String(reg.gallonsPer100Miles), "bold", 10), mpgTop + 56, 6.4, "body", BLACK);
+  }
+
+  // Annual fuel cost sub-box + rating sliders.
+  const subTop = mpgTop + 72;
+  const costBoxW = 104;
+  const costBoxH = 46;
+  if (reg.annualFuelCost !== undefined) {
+    p.rect(RX + 5, subTop, costBoxW, costBoxH, null, BLACK, 0.9);
+    p.text("Annual fuel", RX + 10, subTop + 13, 9.5, "body", BLACK);
+    p.text("cost", RX + 10 + measureText("Annual fuel ", "body", 9.5), subTop + 13, 10.5, "bold", BLACK);
+    p.text(formatMoney(reg.annualFuelCost).replace(/\.00$/, ""), RX + 10, subTop + 34, 19, "bold", BLACK);
+  }
+  const sliderX = RX + costBoxW + 16;
+  const sliderW = RW - costBoxW - 28;
+  paintRatingSlider(p, sliderX, subTop + 3, sliderW * 0.58, "Fuel Economy & Greenhouse Gas Rating", reg.greenhouseGasRating, ctx.theme);
+  paintRatingSlider(p, sliderX + sliderW * 0.66, subTop + 3, sliderW * 0.34, "Smog Rating (tailpipe only)", reg.smogRating, ctx.theme);
+
+  // Fine print.
+  let fy = subTop + costBoxH + 10;
+  const finePrint =
+    "Actual results will vary for many reasons, including driving conditions and how you drive and maintain your vehicle. " +
+    "Cost estimates are based on 15,000 miles per year at $3.00 per gallon. MPGe is miles per gasoline gallon equivalent. " +
+    "Vehicle emissions are a significant cause of climate change and smog.";
+  for (const line of wrapText(finePrint, "body", 5, RW - 14)) {
+    p.text(line, RX + 7, fy, 5, "body", BLACK);
+    fy += 5.8;
+  }
+  fy += 2;
+
+  // fueleconomy.gov band.
+  const bandH = 34;
+  p.rect(RX, fy, RW, bandH, header);
+  p.text("fueleconomy.gov", RX + 7, fy + 15.5, 13, "bold", headerText);
+  p.text("Calculate personalized estimates and compare vehicles", RX + 7, fy + 24, 6, "body", headerText);
+  // Medallion glyphs: double ring + filled core reads as an agency roundel.
+  const medallion = (cx: number): void => {
+    p.path("M15 7.5 A7.5 7.5 0 1 1 0 7.5 A7.5 7.5 0 1 1 15 7.5 Z", cx, fy + 7.5, 15, 15, null, "#ffffff", 1);
+    p.path("M11.4 5.7 A5.7 5.7 0 1 1 0 5.7 A5.7 5.7 0 1 1 11.4 5.7 Z", cx + 1.8, fy + 9.3, 11.4, 11.4, null, "#ffffff", 0.5);
+    p.path("M7 3.5 A3.5 3.5 0 1 1 0 3.5 A3.5 3.5 0 1 1 7 3.5 Z", cx + 4, fy + 11.5, 7, 7, "#ffffff");
+  };
+  medallion(RX + RW - 84);
+  medallion(RX + RW - 65);
+  medallion(RX + RW - 46);
+  const qrTile = 25;
+  p.rect(RX + RW - qrTile - 3, fy + 2.5, qrTile, qrTile, "#ffffff");
+  p.qr(RX + RW - qrTile - 1, fy + 4.5, qrTile - 4, "https://fueleconomy.gov", BLACK);
+
+  const boxBottom = fy + bandH;
+  p.rect(RX, boxTop, RW, boxBottom - boxTop, null, BLACK, 1.8);
+  return boxBottom;
+}
+
+// ── Right column: Government 5-Star Safety Ratings + Vehicle Passport ─
+
+function paintSafetyContent(
+  p: Painter,
+  y: number,
+  safetyW: number,
+  pad: number,
+  ctx: BuildContext,
+  boxH?: number,
+): number {
+  const { theme, input } = ctx;
+  const reg = input.data.regulatory;
+  const headH = 15;
+  p.rect(RX, y, safetyW, headH, theme.colors.headerBackground);
+  p.text("GOVERNMENT 5-STAR SAFETY RATINGS", RX + safetyW / 2, y + 10, 6.6, "bold", theme.colors.headerText, { align: "center" });
+  let cy = y + headH + 9 + pad / 2;
+  const valueX = RX + safetyW - 6;
+  const rated = reg.nhtsaStatus === "VERIFIED";
+  const starOrNot = (stars: number | undefined, yy: number): void => {
+    if (rated && stars !== undefined && stars >= 1) {
+      drawStars(p, valueX - stars * 8.6, yy - 6, stars, 7, BLACK);
+    } else {
+      p.text("Not Rated", valueX, yy, 6.6, "bold", BLACK, { align: "right" });
+    }
+  };
+  const explain = (text: string, yy: number): number => {
+    let ey = yy;
+    for (const line of wrapText(text, "body", 4.6, safetyW - 12)) {
+      p.text(line, RX + 6, ey, 4.6, "body", BLACK);
+      ey += 5.2;
+    }
+    return ey;
+  };
+  const divider = (yy: number): number => {
+    p.rule(RX + 4, yy - 1, safetyW - 8, 0.6, BLACK);
+    return yy + 7.5 + pad;
+  };
+
+  p.text("Overall Vehicle Score", RX + 6, cy, 7, "bold", BLACK);
+  starOrNot(reg.overallRating, cy);
+  cy = explain("Based on the combined ratings of frontal, side and rollover. Should ONLY be compared to other vehicles of similar size and weight.", cy + 6.5);
+  cy = divider(cy);
+
+  p.text("Frontal", RX + 6, cy, 7, "bold", BLACK);
+  p.text("Crash", RX + 6, cy + 7.5, 7, "bold", BLACK);
+  p.text("Driver", RX + 42, cy, 6.4, "body", BLACK);
+  starOrNot(reg.frontalDriverRating, cy);
+  p.text("Passenger", RX + 42, cy + 7.5, 6.4, "body", BLACK);
+  starOrNot(reg.frontalPassengerRating, cy + 7.5);
+  cy = explain("Based on the risk of injury in a frontal impact. Should ONLY be compared to other vehicles of similar size and weight.", cy + 14);
+  cy = divider(cy);
+
+  p.text("Side", RX + 6, cy, 7, "bold", BLACK);
+  p.text("Crash", RX + 6, cy + 7.5, 7, "bold", BLACK);
+  p.text("Front seat", RX + 42, cy, 6.4, "body", BLACK);
+  starOrNot(reg.sideFrontRating, cy);
+  p.text("Rear seat", RX + 42, cy + 7.5, 6.4, "body", BLACK);
+  starOrNot(reg.sideRearRating, cy + 7.5);
+  cy = explain("Based on the risk of injury in a side impact.", cy + 14);
+  cy = divider(cy);
+
+  p.text("Rollover", RX + 6, cy, 7, "bold", BLACK);
+  starOrNot(reg.rolloverRating, cy);
+  cy = explain("Based on the risk of rollover in a single-vehicle crash.", cy + 6.5);
+  if (reg.nhtsaStatus === "NOT_RATED") {
+    cy += 2;
+    p.text("NOT RATED", RX + 6, cy, 6.6, "bold", BLACK);
+    cy = explain("This vehicle has not been rated by the National Highway Traffic Safety Administration.", cy + 6);
+  }
+  cy += 2 + pad / 2;
+
+  const srcLines = [
+    "Star ratings range from 1 to 5 stars, with 5 being the highest.",
+    "Source: National Highway Traffic Safety Administration (NHTSA).",
+    "www.safercar.gov or 1-888-327-4236",
+  ];
+  const srcH = srcLines.length * 5.6 + 5;
+  // The source band closes the panel: anchor it to the box bottom when the
+  // box is stretched taller than the flowed content.
+  const srcTop = boxH !== undefined ? Math.max(cy, y + boxH - srcH) : cy;
+  p.rect(RX, srcTop, safetyW, srcH, theme.colors.headerBackground);
+  let sy = srcTop + 6.8;
+  for (const line of srcLines) {
+    p.text(line, RX + safetyW / 2, sy, 4.8, "bold", theme.colors.headerText, { align: "center" });
+    sy += 5.6;
+  }
+  return srcTop + srcH;
+}
+
+function paintSafetyAndPassport(p: Painter, y: number, ctx: BuildContext, targetH: number): number {
+  const { theme, input } = ctx;
+  const reg = input.data.regulatory;
+  const showSafety = reg.nhtsaStatus !== "UNAVAILABLE";
+  const passportUrl = input.data.document.passportUrl.trim();
+  const navy = theme.colors.totalMsrpBackground;
+
+  const safetyW = showSafety ? RW * 0.635 : 0;
+  const passX = showSafety ? RX + safetyW + 6 : RX;
+  const passW = IR - passX;
+  let safetyBottom = y;
+  let passBottom = y;
+
+  if (showSafety) {
+    // Measure at zero padding, then spread the slack across the sections so
+    // the panel fills its stretch target like the OEM reference.
+    const contentH = paintSafetyContent(new Painter(null), y, safetyW, 0, ctx) - y;
+    const slack = Math.max(0, Math.min(targetH, contentH + 95) - contentH);
+    const pad = Math.min(16, slack / 5);
+    const padded = paintSafetyContent(new Painter(null), y, safetyW, pad, ctx) - y;
+    const boxH = Math.min(Math.max(padded, Math.min(targetH, contentH + 95)), Math.max(targetH, 40));
+    paintSafetyContent(p, y, safetyW, pad, ctx, boxH);
+    p.rect(RX, y, safetyW, boxH, null, BLACK, 1);
+    safetyBottom = y + boxH;
+  }
+
+  if (passportUrl) {
+    const boxH = showSafety
+      ? safetyBottom - y
+      : Math.min(Math.max(150, targetH), 300);
+    let cy = y + 13;
+    p.text("Vehicle Passport", passX + passW / 2, cy, 9.5, "heading", navy, { align: "center" });
+    cy += 4;
+    for (const line of wrapText("Scan this code to view your vehicle's unique features, specs, warranty and more.", "body", 5.4, passW - 14)) {
+      cy += 6.2;
+      p.text(line, passX + passW / 2, cy, 5.4, "body", BLACK, { align: "center" });
+    }
+    const tailH = 34;
+    const qrSize = Math.min(passW - 22, Math.max(56, y + boxH - tailH - cy - 10));
+    p.qr(passX + (passW - qrSize) / 2, cy + (y + boxH - tailH - cy - qrSize) / 2 + 2, qrSize, passportUrl, BLACK);
+    let ty = y + boxH - tailH + 4;
+    p.text("Or visit", passX + passW / 2, ty, 5.4, "body", BLACK, { align: "center" });
+    ty += 7;
+    const shortUrl = passportUrl.replace(/^https?:\/\//i, "");
+    p.text(ellipsize(shortUrl, "bold", 6, passW - 10), passX + passW / 2, ty, 6, "bold", BLACK, { align: "center" });
+    ty += 6.5;
+    p.text("and enter your", passX + passW / 2, ty, 5.4, "body", BLACK, { align: "center" });
+    ty += 6;
+    p.text("17-digit VIN.", passX + passW / 2, ty, 5.4, "body", BLACK, { align: "center" });
+    passBottom = y + boxH;
+    p.rect(passX, y, passW, boxH, null, navy, 1.2);
+  }
+
+  return Math.max(safetyBottom, passBottom);
+}
+
+// ── Right column: federal notice + verification + footer ──────────────
+
+function paintNoticeRow(p: Painter, y: number, ctx: BuildContext): number {
+  const { theme, input } = ctx;
+  const navy = theme.colors.totalMsrpBackground;
+  const noticeW = RW * 0.42;
+  const boxH = 32;
+
+  const noticeLines = [
+    "This label has been applied",
+    "pursuant to Federal law -",
+    "Do not remove prior to delivery",
+    "to the ultimate purchaser.",
+  ];
+  p.rect(RX, y, noticeW, boxH, null, navy, 1);
+  let ny = y + 8;
+  for (const line of noticeLines) {
+    p.text(line, RX + 4, ny, 4.9, "body", navy);
+    ny += 6;
+  }
+
+  const vx = RX + noticeW + 8;
+  const vw = IR - vx;
+  p.rect(vx, y, vw, boxH, navy);
+  const verified = !input.generic && input.data.document.confidence !== "LOW";
+  p.text("FACTORY BUILD DATA", vx + 8, y + 13.5, 7.2, "bold", "#ffffff");
+  p.text(verified ? "VERIFIED BY AUTOLABELS" : "COMPILED BY AUTOLABELS", vx + 8, y + 23, 7.2, "bold", "#ffffff");
+  const cbSize = 16;
+  const cbX = vx + vw - cbSize - 8;
+  p.rect(cbX, y + (boxH - cbSize) / 2, cbSize, cbSize, "#ffffff");
+  p.path(CHECK_MARK, cbX + 1.5, y + (boxH - cbSize) / 2 + 1.5, 13, 13, null, navy, 2.2);
+  return y + boxH;
+}
+
+function paintRightFooter(p: Painter, y: number, ctx: BuildContext, pageLabel: string): number {
+  const { input } = ctx;
+  let cy = y + 8;
+  for (const disclaimer of input.disclaimers) {
+    for (const line of wrapText(disclaimer, "body", 5.2, RW - 8)) {
+      p.text(line, RX + RW / 2, cy, 5.2, "body", BLACK, { align: "center" });
+      cy += 6.2;
+    }
+  }
+  p.text(
+    `GENERATED BY AUTOLABELS - ${input.data.document.sourceProvider} BUILD DATA - TEMPLATE ${input.data.document.templateVersion} - ${pageLabel}`,
+    RX + RW / 2, cy, 4.6, "body", "#6b6f76", { align: "center" },
+  );
+  return cy;
+}
+
+// ── Continuation page ─────────────────────────────────────────────────
 
 function flowColumns(
   p: Painter,
@@ -476,8 +1276,8 @@ function flowColumns(
   height: number,
   columns: number,
   ctx: BuildContext,
-): FlowResult {
-  const { density, theme } = ctx;
+): { leftover: FlowEntry[]; usedHeight: number } {
+  const { density } = ctx;
   const gap = 10;
   const colW = (totalWidth - gap * (columns - 1)) / columns;
   const headH = density.itemLh + 2.5;
@@ -509,14 +1309,11 @@ function flowColumns(
     }
     if (pendingHeading !== null) {
       cy += density.itemLh;
-      p.text(pendingHeading, colX(), cy, density.item + 0.5, "bold", theme.colors.sectionHeadingText);
+      p.text(pendingHeading, colX(), cy, density.item + 0.5, "bold", BLACK);
       cy += 2.5;
       pendingHeading = null;
     }
-    for (const line of entry.lines) {
-      cy += density.itemLh;
-      p.text(line, colX(), cy, density.item, "body", theme.colors.bodyText);
-    }
+    cy = paintEntryLines(p, entry, colX(), cy, density, BLACK);
     usedHeight = Math.max(usedHeight, cy - y0);
     idx++;
   }
@@ -529,343 +1326,6 @@ function flowColumns(
   return { leftover, usedHeight };
 }
 
-function paintStandardEquipment(
-  p: Painter,
-  y: number,
-  height: number,
-  ctx: BuildContext,
-): { yEnd: number; leftover: FlowEntry[] } {
-  const { theme, density } = ctx;
-  const entries = equipmentFlowEntries(ctx, (LEFT_W - 30) / 4);
-  if (!entries.length) return { yEnd: y, leftover: [] };
-  let cursor = y + density.head;
-  p.text(headingCase(theme, "Standard Equipment"), LEFT_X, cursor, density.head, "bold", theme.colors.sectionHeadingText, {
-    charSpacing: parseEm(theme.typography.headingLetterSpacing) * density.head,
-  });
-  cursor += 2.5;
-  p.rule(LEFT_X, cursor, LEFT_W, 0.5, theme.colors.divider);
-  cursor += 1;
-  const colsBudget = Math.max(0, height - (cursor - y));
-
-  // Balance across the four columns: start from the ideal per-column height
-  // and grow until everything fits (or the budget is exhausted), so short
-  // equipment lists spread wide instead of stacking into column one.
-  const headH = density.itemLh + 2.5;
-  const totalNeeded = entries.reduce(
-    (a, e) => a + (e.heading !== undefined ? headH : e.lines.length * density.itemLh),
-    0,
-  );
-  let target = Math.min(colsBudget, Math.max(headH * 2, Math.ceil(totalNeeded / 4) + headH));
-  let scratch = flowColumns(new Painter(null), entries, LEFT_X, cursor, LEFT_W, target, 4, ctx);
-  while (scratch.leftover.length && target < colsBudget) {
-    target = Math.min(colsBudget, target * 1.2 + density.itemLh);
-    scratch = flowColumns(new Painter(null), entries, LEFT_X, cursor, LEFT_W, target, 4, ctx);
-  }
-  const { leftover, usedHeight } = flowColumns(p, entries, LEFT_X, cursor, LEFT_W, target, 4, ctx);
-  return { yEnd: cursor + usedHeight, leftover };
-}
-
-function paintIncluded(p: Painter, y: number, ctx: BuildContext): number {
-  const { theme, density } = ctx;
-  const packages = ctx.input.data.equipment.packages;
-  if (!packages.length) return y;
-  let cursor = y + density.head;
-  p.text(headingCase(theme, "Included On This Vehicle"), LEFT_X, cursor, density.head, "bold", theme.colors.sectionHeadingText, {
-    charSpacing: parseEm(theme.typography.headingLetterSpacing) * density.head,
-  });
-  cursor += 2.5;
-  p.rule(LEFT_X, cursor, LEFT_W, 0.5, theme.colors.divider);
-  for (const pkg of packages) {
-    cursor += density.rowLh;
-    const label = [pkg.code, pkg.name].filter(Boolean).join(" - ");
-    leaderRow(p, LEFT_X, LEFT_X + LEFT_W, cursor, label.toUpperCase(), priceLabel(pkg), density.row, "bold", theme);
-    if (pkg.features.length) {
-      const colGap = 10;
-      const colW = (LEFT_W - 12 - colGap) / 2;
-      const lines = pkg.features.map((f) => ellipsize(`- ${f}`, "body", density.item, colW));
-      const rows = Math.ceil(lines.length / 2);
-      for (let r = 0; r < rows; r++) {
-        cursor += density.itemLh;
-        p.text(lines[r], LEFT_X + 12, cursor, density.item, "body", theme.colors.bodyText);
-        const second = lines[r + rows];
-        if (second !== undefined) {
-          p.text(second, LEFT_X + 12 + colW + colGap, cursor, density.item, "body", theme.colors.bodyText);
-        }
-      }
-    }
-  }
-  return cursor + SECTION_GAP;
-}
-
-function paintOptional(p: Painter, y: number, ctx: BuildContext): number {
-  const { theme, density } = ctx;
-  const options = ctx.input.data.equipment.options;
-  const destination = ctx.input.data.pricing.destinationCharge;
-  if (!options.length && destination === undefined) return y;
-  let cursor = y;
-  if (options.length) {
-    cursor += density.head;
-    p.text(headingCase(theme, "Optional Equipment"), LEFT_X, cursor, density.head, "bold", theme.colors.sectionHeadingText, {
-      charSpacing: parseEm(theme.typography.headingLetterSpacing) * density.head,
-    });
-    cursor += 2.5;
-    p.rule(LEFT_X, cursor, LEFT_W, 0.5, theme.colors.divider);
-    for (const opt of options) {
-      cursor += density.rowLh;
-      const label = [opt.code, opt.name].filter(Boolean).join(" - ");
-      leaderRow(p, LEFT_X, LEFT_X + LEFT_W, cursor, label.toUpperCase(), priceLabel(opt), density.row, "body", theme);
-    }
-  }
-  if (destination !== undefined) {
-    cursor += density.rowLh + 1;
-    leaderRow(p, LEFT_X, LEFT_X + LEFT_W, cursor, headingCase(theme, "Destination & Handling"), formatMoney(destination), density.row, "bold", theme);
-  }
-  return cursor + SECTION_GAP;
-}
-
-function paintRollup(p: Painter, y: number, ctx: BuildContext): number {
-  const { theme, density } = ctx;
-  const pricing = ctx.input.data.pricing;
-  const rows: Array<[string, string]> = [];
-  if (pricing.baseMsrp !== undefined) rows.push(["BASE MSRP", formatMoney(pricing.baseMsrp)]);
-  const optTotal = pricing.factoryInstalledTotal ??
-    (pricing.packagesTotal !== undefined || pricing.optionsTotal !== undefined
-      ? (pricing.packagesTotal ?? 0) + (pricing.optionsTotal ?? 0)
-      : undefined);
-  if (optTotal !== undefined) rows.push(["FACTORY OPTIONS & PACKAGES", formatMoney(optTotal)]);
-  if (pricing.destinationCharge !== undefined) rows.push(["DESTINATION & HANDLING", formatMoney(pricing.destinationCharge)]);
-  if (!rows.length) return y;
-  const boxPad = 5;
-  const rowH = density.rowLh;
-  const boxH = rows.length * rowH + boxPad * 2 - 2;
-  const boxed = theme.layout.pricingVariant === "BOXED";
-  if (boxed) {
-    p.rect(LEFT_X, y, LEFT_W, boxH, null, theme.colors.divider, parsePt(theme.layout.borderWeight));
-  }
-  let cursor = y + boxPad;
-  const inset = boxed ? 8 : 0;
-  for (const [label, amount] of rows) {
-    cursor += rowH - 2;
-    p.text(label, LEFT_X + inset, cursor, density.row, "bold", theme.colors.bodyText);
-    p.text(amount, LEFT_X + LEFT_W - inset, cursor, density.row, "numeric", theme.colors.bodyText, { align: "right" });
-    if (theme.layout.pricingVariant === "UNDERLINED") {
-      p.rule(LEFT_X, cursor + 2, LEFT_W, 0.5, theme.colors.divider);
-    }
-    cursor += 2;
-  }
-  return y + boxH + 3;
-}
-
-function paintTotalBanner(p: Painter, y: number, ctx: BuildContext): number {
-  const { theme } = ctx;
-  const pricing = ctx.input.data.pricing;
-  const condition = ctx.input.data.vehicle.condition;
-  const label = condition === "NEW"
-    ? "TOTAL FACTORY MSRP"
-    : "TOTAL ORIGINAL MSRP WHEN NEW";
-  const total = pricing.sourceReportedTotalMsrp ?? pricing.calculatedTotalMsrp;
-  const bannerH = 24;
-  p.rect(LEFT_X, y, LEFT_W, bannerH, theme.colors.totalMsrpBackground);
-  p.text(label, LEFT_X + 10, y + 15.5, 10, "bold", theme.colors.totalMsrpText, {
-    charSpacing: parseEm(theme.typography.headingLetterSpacing) * 10,
-  });
-  const amount = total !== undefined ? formatMoney(total) : "SEE DEALER";
-  p.text(amount, LEFT_X + LEFT_W - 10, y + 17, 15, "numeric", theme.colors.totalMsrpText, { align: "right" });
-  return y + bannerH + SECTION_GAP;
-}
-
-function paintFactoryStrip(p: Painter, y: number, ctx: BuildContext): number {
-  const { theme } = ctx;
-  const v = ctx.input.data.vehicle;
-  const f = ctx.input.data.factory;
-  const cells: Array<[string, string]> = [];
-  const assembly = [f.assemblyPlant, f.finalAssemblyPoint ?? f.assemblyCountry].filter(Boolean).join(", ");
-  if (assembly) cells.push(["FINAL ASSEMBLY", assembly]);
-  if (f.transportMethod) cells.push(["TRANSPORT", f.transportMethod]);
-  if (v.engine) cells.push(["ENGINE", v.engine]);
-  if (v.transmission) cells.push(["TRANSMISSION", v.transmission]);
-  if (v.stockNumber) cells.push(["STOCK", v.stockNumber]);
-  if (!cells.length) return y;
-  const stripH = 18;
-  p.rule(LEFT_X, y, LEFT_W, 0.5, theme.colors.divider);
-  const cellW = LEFT_W / cells.length;
-  cells.forEach(([label, value], i) => {
-    const cx = LEFT_X + i * cellW;
-    p.text(label, cx, y + 7.5, 5.5, "bold", theme.colors.mutedText);
-    p.text(ellipsize(value.toUpperCase(), "body", 6, cellW - 6), cx, y + 15, 6, "body", theme.colors.bodyText);
-  });
-  p.rule(LEFT_X, y + stripH, LEFT_W, 0.5, theme.colors.divider);
-  return y + stripH + SECTION_GAP;
-}
-
-function paintBottomRow(p: Painter, y: number, ctx: BuildContext): number {
-  const { theme, input } = ctx;
-  const barcodeW = 190;
-  const barcodeH = 24;
-  const showBarcode = theme.layout.barcodeVariant !== "NONE";
-  if (showBarcode) {
-    p.barcode(LEFT_X, y, barcodeW, barcodeH, input.barcodePayload, theme.colors.bodyText);
-    p.text(input.data.vehicle.vin, LEFT_X + barcodeW / 2, y + barcodeH + 7, 6.5, "numeric", theme.colors.bodyText, {
-      align: "center",
-    });
-  } else {
-    p.text(input.data.vehicle.vin, LEFT_X, y + 12, 8, "numeric", theme.colors.bodyText);
-  }
-
-  const noticeX = LEFT_X + barcodeW + 14;
-  const noticeW = LEFT_X + LEFT_W - noticeX;
-  const barH = 11;
-  p.rect(noticeX, y, noticeW, barH, theme.colors.accent);
-  const barText = input.generic || input.data.document.confidence === "LOW"
-    ? "FACTORY BUILD DATA COMPILED BY AUTOLABELS"
-    : "FACTORY BUILD DATA VERIFIED BY AUTOLABELS";
-  p.text(barText, noticeX + noticeW / 2, y + 7.5, 6, "bold", "#ffffff", { align: "center" });
-  const notice = input.data.vehicle.condition === "NEW"
-    ? "This document supplements and does not replace the manufacturer's federal Monroney label required by 15 U.S.C. 1232."
-    : "This is a reconstructed factory build record, not the original federal Monroney label affixed at manufacture.";
-  let ny = y + barH + 2;
-  for (const line of wrapText(notice, "body", 5.5, noticeW)) {
-    ny += 6.6;
-    p.text(line, noticeX, ny, 5.5, "body", theme.colors.mutedText);
-  }
-  return Math.max(y + (showBarcode ? barcodeH + 10 : 16), ny + 2) + 2;
-}
-
-function paintFooter(p: Painter, y: number, ctx: BuildContext, pageLabel: string): number {
-  const { theme, input } = ctx;
-  let cursor = y;
-  for (const disclaimer of input.disclaimers) {
-    for (const line of wrapText(disclaimer, "body", 5.5, LEFT_W)) {
-      cursor += 6.6;
-      p.text(line, LEFT_X, cursor, 5.5, "body", theme.colors.mutedText);
-    }
-  }
-  cursor += 7.5;
-  p.text(
-    `GENERATED BY AUTOLABELS - ${input.data.document.sourceProvider} BUILD DATA - TEMPLATE ${input.data.document.templateVersion}`,
-    LEFT_X,
-    cursor,
-    5.5,
-    "body",
-    theme.colors.mutedText,
-  );
-  p.text(pageLabel, LEFT_X + LEFT_W, cursor, 5.5, "bold", theme.colors.mutedText, { align: "right" });
-  return cursor;
-}
-
-function measureStack(
-  ctx: BuildContext,
-  sections: Array<(p: Painter, y: number) => number>,
-): number {
-  const scratch = new Painter(null);
-  let y = 0;
-  for (const section of sections) y = section(scratch, y);
-  return y;
-}
-
-function paintRightPanel(p: Painter, ctx: BuildContext): void {
-  const { theme, input } = ctx;
-  const reg = input.data.regulatory;
-  const border = parsePt(theme.layout.borderWeight);
-  let ry = PAGE_MARGIN;
-
-  if (reg.epaStatus === "VERIFIED") {
-    const rows: Array<[string, string]> = [];
-    if (reg.cityMpg !== undefined) rows.push(["CITY", String(reg.cityMpg)]);
-    if (reg.highwayMpg !== undefined) rows.push(["HIGHWAY", String(reg.highwayMpg)]);
-    if (reg.annualFuelCost !== undefined) rows.push(["EST. ANNUAL FUEL COST", formatMoney(reg.annualFuelCost)]);
-    if (reg.greenhouseGasRating !== undefined) rows.push(["GREENHOUSE GAS RATING", `${reg.greenhouseGasRating} / 10`]);
-    if (reg.smogRating !== undefined) rows.push(["SMOG RATING", `${reg.smogRating} / 10`]);
-    const hasCombined = reg.combinedMpg !== undefined;
-    const boxH = 24 + (hasCombined ? 30 : 0) + rows.length * 9 + 16;
-    p.rect(RIGHT_X, ry, RIGHT_W, boxH, null, theme.colors.divider, border);
-    p.rect(RIGHT_X, ry, RIGHT_W, 14, theme.colors.headerBackground);
-    p.text("EPA FUEL ECONOMY", RIGHT_X + RIGHT_W / 2, ry + 9.5, 7, "bold", theme.colors.headerText, { align: "center" });
-    let cy = ry + 22;
-    if (hasCombined) {
-      p.text(String(reg.combinedMpg), RIGHT_X + RIGHT_W / 2, cy + 14, 20, "bold", theme.colors.bodyText, { align: "center" });
-      p.text("COMBINED MPG", RIGHT_X + RIGHT_W / 2, cy + 22, 5.5, "body", theme.colors.mutedText, { align: "center" });
-      cy += 30;
-    }
-    for (const [label, value] of rows) {
-      cy += 9;
-      p.text(label, RIGHT_X + 8, cy, 6, "body", theme.colors.bodyText);
-      p.text(value, RIGHT_X + RIGHT_W - 8, cy, 6, "numeric", theme.colors.bodyText, { align: "right" });
-    }
-    cy += 9;
-    p.text("Actual results will vary.", RIGHT_X + 8, cy, 5.5, "body", theme.colors.mutedText);
-    ry += boxH + 7;
-  }
-
-  if (reg.nhtsaStatus !== "UNAVAILABLE") {
-    const rows: Array<[string, number]> = [];
-    if (reg.overallRating !== undefined) rows.push(["OVERALL VEHICLE SCORE", reg.overallRating]);
-    if (reg.frontalDriverRating !== undefined) rows.push(["FRONTAL CRASH - DRIVER", reg.frontalDriverRating]);
-    if (reg.frontalPassengerRating !== undefined) rows.push(["FRONTAL CRASH - PASSENGER", reg.frontalPassengerRating]);
-    if (reg.sideFrontRating !== undefined) rows.push(["SIDE CRASH - FRONT SEAT", reg.sideFrontRating]);
-    if (reg.sideRearRating !== undefined) rows.push(["SIDE CRASH - REAR SEAT", reg.sideRearRating]);
-    if (reg.rolloverRating !== undefined) rows.push(["ROLLOVER", reg.rolloverRating]);
-    const rated = reg.nhtsaStatus === "VERIFIED" && rows.length > 0;
-    const notRatedLines = wrapText(
-      "This vehicle has not been rated by the National Highway Traffic Safety Administration.",
-      "body", 6, RIGHT_W - 16,
-    );
-    const boxH = 22 + (rated ? rows.length * 9 + 14 : notRatedLines.length * 7.5 + 8);
-    p.rect(RIGHT_X, ry, RIGHT_W, boxH, null, theme.colors.divider, border);
-    p.rect(RIGHT_X, ry, RIGHT_W, 14, theme.colors.headerBackground);
-    p.text("GOVERNMENT 5-STAR SAFETY RATINGS", RIGHT_X + RIGHT_W / 2, ry + 9.5, 6, "bold", theme.colors.headerText, { align: "center" });
-    let cy = ry + 20;
-    if (rated) {
-      for (const [label, stars] of rows) {
-        cy += 9;
-        p.text(label, RIGHT_X + 8, cy, 6, "body", theme.colors.bodyText);
-        p.text(`${stars} OF 5 STARS`, RIGHT_X + RIGHT_W - 8, cy, 6, "numeric", theme.colors.bodyText, { align: "right" });
-      }
-      cy += 10;
-      p.text("Source: safercar.gov", RIGHT_X + 8, cy, 5.5, "body", theme.colors.mutedText);
-    } else {
-      p.text("NOT RATED", RIGHT_X + 8, cy + 4, 6.5, "bold", theme.colors.bodyText);
-      cy += 6;
-      for (const line of notRatedLines) {
-        cy += 7.5;
-        p.text(line, RIGHT_X + 8, cy, 6, "body", theme.colors.mutedText);
-      }
-    }
-    ry += boxH + 7;
-  }
-
-  const passportUrl = input.data.document.passportUrl.trim();
-  if (passportUrl) {
-    const qrSize = 82;
-    const captionLines = ["SCAN TO VIEW THIS VEHICLE'S", "AUTOLABELS PASSPORT"];
-    const shortUrl = passportUrl.replace(/^https?:\/\//i, "");
-    const boxH = 10 + qrSize + 6 + captionLines.length * 8 + 9 + 8;
-    p.rect(RIGHT_X, ry, RIGHT_W, boxH, null, theme.colors.divider, border);
-    p.qr(RIGHT_X + (RIGHT_W - qrSize) / 2, ry + 8, qrSize, passportUrl, theme.colors.bodyText);
-    let cy = ry + 8 + qrSize + 4;
-    for (const line of captionLines) {
-      cy += 8;
-      p.text(line, RIGHT_X + RIGHT_W / 2, cy, 6.5, "bold", theme.colors.sectionHeadingText, { align: "center" });
-    }
-    cy += 8.5;
-    p.text(ellipsize(shortUrl, "numeric", 5.5, RIGHT_W - 12), RIGHT_X + RIGHT_W / 2, cy, 5.5, "numeric", theme.colors.mutedText, { align: "center" });
-    ry += boxH + 7;
-  }
-
-  const dealer = input.data.dealer;
-  if (dealer.name) {
-    let cy = ry + 6;
-    p.text("OFFERED BY", RIGHT_X, cy, 5.5, "bold", theme.colors.mutedText);
-    cy += 9;
-    p.text(ellipsize(dealer.name.toUpperCase(), "bold", 7.5, RIGHT_W), RIGHT_X, cy, 7.5, "bold", theme.colors.bodyText);
-    const cityLine = [dealer.city, dealer.state, dealer.postalCode].filter(Boolean).join(", ");
-    for (const line of [dealer.address, cityLine, dealer.phone].filter((s): s is string => !!s)) {
-      cy += 8;
-      p.text(ellipsize(line, "body", 6, RIGHT_W), RIGHT_X, cy, 6, "body", theme.colors.mutedText);
-    }
-  }
-}
-
 function paintContinuationPage(
   drawn: string[],
   ctx: BuildContext,
@@ -876,26 +1336,28 @@ function paintContinuationPage(
   const v = input.data.vehicle;
   const fullW = PAGE_WIDTH - 2 * PAGE_MARGIN;
   const nameParts = [v.year > 0 ? String(v.year) : "", v.make, v.model, v.trim ?? ""].filter(Boolean);
-  p.text(nameParts.join(" ").toUpperCase(), PAGE_MARGIN, 21, 11, "bold", theme.colors.bodyText);
-  p.text(`VIN: ${v.vin}`, PAGE_WIDTH - PAGE_MARGIN, 21, 7.5, "numeric", theme.colors.bodyText, { align: "right" });
-  p.rule(PAGE_MARGIN, 25, fullW, parsePt(theme.layout.borderWeight), theme.colors.divider);
-  p.text(headingCase(theme, "Factory Equipment Continuation"), PAGE_MARGIN, 38, 9, "bold", theme.colors.sectionHeadingText, {
+  p.text(nameParts.join(" ").toUpperCase(), PAGE_MARGIN, 21, 11, "bold", BLACK);
+  p.text(`VIN: ${v.vin}`, PAGE_WIDTH - PAGE_MARGIN, 21, 7.5, "bold", BLACK, { align: "right" });
+  p.rule(PAGE_MARGIN, 25, fullW, 1, BLACK);
+  p.text(headingCase(theme, "Factory Equipment Continuation"), PAGE_MARGIN, 38, 9, "bold", BLACK, {
     charSpacing: parseEm(theme.typography.headingLetterSpacing) * 9,
   });
   p.text(
     `Continuation of the factory build record for VIN ${v.vin}. This page belongs to the sticker on page 1 and is not valid on its own.`,
-    PAGE_MARGIN, 48, 6, "body", theme.colors.mutedText,
+    PAGE_MARGIN, 48, 6, "body", "#6b6f76",
   );
   const colsTop = 56;
-  const colsH = CONTENT_BOTTOM - 14 - colsTop;
+  const colsH = PAGE_HEIGHT - PAGE_MARGIN - 14 - colsTop;
   const withContinuedHeading: FlowEntry[] =
     leftover[0] && leftover[0].heading === undefined
       ? [{ heading: headingCase(theme, "Continued"), lines: [] }, ...leftover]
       : leftover;
   flowColumns(p, withContinuedHeading, PAGE_MARGIN, colsTop, fullW, colsH, 4, ctx);
-  p.text("PAGE 2 OF 2", PAGE_WIDTH - PAGE_MARGIN, CONTENT_BOTTOM - 2, 5.5, "bold", theme.colors.mutedText, { align: "right" });
+  p.text("PAGE 2 OF 2", PAGE_WIDTH - PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN - 2, 5.5, "bold", "#6b6f76", { align: "right" });
   return { primitives: p.primitives };
 }
+
+// ── Validation ────────────────────────────────────────────────────────
 
 function validateModel(model: LayoutModel): void {
   const bad = (msg: string): never => {
@@ -928,6 +1390,17 @@ function validateModel(model: LayoutModel): void {
   if (model.pages.length < 1 || model.pages.length > 2) bad(`page count ${model.pages.length}`);
 }
 
+// ── Assembly ──────────────────────────────────────────────────────────
+
+function measureStack(
+  sections: Array<(p: Painter, y: number) => number>,
+): number {
+  const scratch = new Painter(null);
+  let y = 0;
+  for (const section of sections) y = section(scratch, y);
+  return y;
+}
+
 function buildAttempt(
   input: StickerLayoutInput,
   theme: OemStickerTheme,
@@ -938,46 +1411,56 @@ function buildAttempt(
   const drawn: string[] = [];
   const p = new Painter(drawn);
 
-  let y = paintTopStrip(p, PAGE_MARGIN, ctx);
-  y = paintHeaderBand(p, y, ctx);
-  y = paintIdentity(p, y, ctx);
+  // Outer border + column divider.
+  p.rect(PAGE_MARGIN, PAGE_MARGIN, PAGE_WIDTH - 2 * PAGE_MARGIN, PAGE_HEIGHT - 2 * PAGE_MARGIN, null, BLACK, 1.8);
 
-  const lowerH = measureStack(ctx, [
-    (sp, sy) => paintIncluded(sp, sy, ctx),
-    (sp, sy) => paintOptional(sp, sy, ctx),
-    (sp, sy) => paintRollup(sp, sy, ctx),
-    (sp, sy) => paintTotalBanner(sp, sy, ctx),
-    (sp, sy) => paintFactoryStrip(sp, sy, ctx),
-    (sp, sy) => paintBottomRow(sp, sy, ctx),
-    (sp, sy) => paintFooter(sp, sy, ctx, "PAGE 1 OF 1"),
+  const stripBottom = paintTopStrip(p, ctx);
+  p.rule(SPLIT_X, stripBottom, 1.1, PAGE_HEIGHT - PAGE_MARGIN - stripBottom, BLACK);
+
+  let y = paintHeader(p, stripBottom + 2, ctx);
+
+  // The pricing split follows the equipment block directly; the spec grid,
+  // barcode and navy band anchor together at the page bottom, so any slack
+  // lands between the optional list and the spec grid as on the reference.
+  const bottomH = measureStack([
+    (sp, sy) => paintSpecGrid(sp, sy, ctx),
+    (sp, sy) => paintVinBarcode(sp, sy, ctx) + SECTION_GAP,
+    (sp, sy) => paintTotalBand(sp, sy, ctx),
   ]);
+  const pricingH = measureStack([(sp, sy) => paintPricingSplit(sp, sy, ctx) + SECTION_GAP]);
 
   const hasStandard = input.data.equipment.standard.some((g) => g.items.length > 0);
   const stdBudget = hasStandard
-    ? Math.max(30, CONTENT_BOTTOM - y - lowerH - SECTION_GAP)
+    ? Math.max(40, CONTENT_BOTTOM - y - bottomH - pricingH - SECTION_GAP)
     : 0;
 
   let leftover: FlowEntry[] = [];
   if (hasStandard) {
     const result = paintStandardEquipment(p, y, stdBudget, ctx);
     leftover = result.leftover;
-    y = result.yEnd + SECTION_GAP;
+    y = result.yEnd;
   }
   if (leftover.length && !allowContinuation) return null;
 
-  // Anchor the pricing stack to the page bottom (Monroney convention); the
-  // measured height makes the footer land exactly on the content edge.
-  y = Math.max(y, CONTENT_BOTTOM - lowerH);
-  y = paintIncluded(p, y, ctx);
-  y = paintOptional(p, y, ctx);
-  y = paintRollup(p, y, ctx);
-  y = paintTotalBanner(p, y, ctx);
-  y = paintFactoryStrip(p, y, ctx);
-  y = paintBottomRow(p, y, ctx);
-  const pages = leftover.length ? 2 : 1;
-  paintFooter(p, y, ctx, pages === 2 ? "PAGE 1 OF 2 - EQUIPMENT CONTINUED ON PAGE 2" : "PAGE 1 OF 1");
+  y = paintPricingSplit(p, y + 3, ctx);
+  const bottomTop = CONTENT_BOTTOM - bottomH;
+  if (y + SECTION_GAP > bottomTop + 0.5) return null;
+  y = paintSpecGrid(p, bottomTop, ctx);
+  y = paintVinBarcode(p, y, ctx) + SECTION_GAP;
+  paintTotalBand(p, y, ctx);
 
-  paintRightPanel(p, ctx);
+  // Right column: EPA panel at the top, notice row and footer pinned to the
+  // bottom, and the safety/passport row stretched to fill the space between.
+  const pages = leftover.length ? 2 : 1;
+  const pageLabel = pages === 2 ? "PAGE 1 OF 2 - EQUIPMENT CONTINUED ON PAGE 2" : "PAGE 1 OF 1";
+  const noticeH = measureStack([(sp, sy) => paintNoticeRow(sp, sy, ctx)]);
+  const footerH = measureStack([(sp, sy) => paintRightFooter(sp, sy, ctx, pageLabel)]);
+  const epaBottom = paintEpaPanel(p, stripBottom + 4, ctx);
+  const noticeTop = CONTENT_BOTTOM - footerH - 4 - noticeH;
+  const rowTop = epaBottom > stripBottom + 4 ? epaBottom + 5 : stripBottom + 4;
+  paintSafetyAndPassport(p, rowTop, ctx, noticeTop - 5 - rowTop);
+  const afterNotice = paintNoticeRow(p, noticeTop, ctx);
+  paintRightFooter(p, afterNotice, ctx, pageLabel);
 
   const layoutPages: LayoutPage[] = [{ primitives: p.primitives }];
   if (leftover.length) {
@@ -1001,6 +1484,8 @@ function buildAttempt(
 }
 
 export function buildStickerLayout(input: StickerLayoutInput, theme: OemStickerTheme): LayoutModel {
+  const large = buildAttempt(input, theme, DENSITY_LARGE, false);
+  if (large) return large;
   const standard = buildAttempt(input, theme, DENSITY_STANDARD, false);
   if (standard) return standard;
   const dense = buildAttempt(input, theme, DENSITY_DENSE, false);

@@ -17,7 +17,7 @@ import {
   pageStrings,
 } from "./__fixtures__/layoutAsserts";
 
-const VIN = "JN8AZ2NE8P9123456";
+const VIN = "JN8AZ3NE5S9123456";
 
 describe("layout: INFINITI benchmark", () => {
   const model = buildRenderLayout(infinitiBenchmark(), themeFor("infiniti"));
@@ -32,7 +32,8 @@ describe("layout: INFINITI benchmark", () => {
     expect(page1.some((s) => s.includes("TOTAL ORIGINAL MSRP"))).toBe(true);
     expect(page1).toContain("$95,695.00");
     expect(page1).toContain("$89,450.00");
-    expect(page1).toContain("$1,995.00");
+    // Monroney convention: option and rollup rows carry plain amounts.
+    expect(page1).toContain("1,995.00");
   });
 
   it("draws the VIN as an exact drawn string and as the barcode payload", () => {
@@ -42,22 +43,22 @@ describe("layout: INFINITI benchmark", () => {
   });
 
   it("draws the passport QR with the canonical URL and scan caption", () => {
-    const qr = model.pages[0].primitives.find((p) => p.kind === "qr");
-    expect(qr && qr.kind === "qr" ? qr.payload : null).toBe("https://autolabels.io/v/demo-qx80");
-    expect(page1).toContain("SCAN TO VIEW THIS VEHICLE'S");
-    expect(page1).toContain("AUTOLABELS PASSPORT");
+    const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
+    expect(qrs.some((q) => q.kind === "qr" && q.payload === "https://autolabels.io/v/demo-qx80")).toBe(true);
+    expect(page1).toContain("Vehicle Passport");
     expect(page1).toContain("autolabels.io/v/demo-qx80");
   });
 
   it("renders the Monroney-style sections", () => {
     expect(page1).toContain("STANDARD EQUIPMENT");
     expect(page1).toContain("INCLUDED ON THIS VEHICLE");
-    expect(page1).toContain("OPTIONAL EQUIPMENT");
+    expect(page1.some((s) => s.includes("OPTIONAL EQUIPMENT"))).toBe(true);
     expect(page1.some((s) => s.includes("DESTINATION & HANDLING"))).toBe(true);
-    expect(page1).toContain("BASE MSRP");
-    expect(page1.some((s) => s.includes("EPA FUEL ECONOMY"))).toBe(true);
-    expect(page1.some((s) => s.includes("PREMIUM REAR SEAT PACKAGE"))).toBe(true);
-    expect(page1).toContain("INCLUDED");
+    expect(page1.some((s) => s.includes("BASE MSRP"))).toBe(true);
+    expect(page1.some((s) => s.includes("Fuel Economy & Environment"))).toBe(true);
+    expect(page1.some((s) => s.includes("EQUIPMENT GROUP SENSORY"))).toBe(true);
+    expect(page1).toContain("3,400.00");
+    expect(page1.some((s) => s.includes("GOVERNMENT 5-STAR SAFETY RATINGS"))).toBe(true);
   });
 
   it("keeps every primitive inside the page bounds", () => {
@@ -127,7 +128,7 @@ describe("layout: long equipment continuation", () => {
     expect(page1.some((s) => s.includes("TOTAL ORIGINAL MSRP"))).toBe(true);
     expect(page1).toContain("$95,695.00");
     expect(page1).toContain(VIN);
-    expect(page1.some((s) => s.includes("Reconstructed factory build record"))).toBe(true);
+    expect(page1.some((s) => s.includes("Not the original manufacturer Monroney label"))).toBe(true);
     expect(page1.some((s) => s.includes("CONTINUED ON PAGE 2"))).toBe(true);
   });
 
@@ -148,13 +149,16 @@ describe("layout: long equipment continuation", () => {
         if (t.kind !== "text" || t.font !== "bold") continue;
         if (!/EQUIPMENT ITEM|^(EXTERIOR|INTERIOR|SAFETY|MECHANICAL|TECHNOLOGY|COMFORT)/.test(t.str)) continue;
         if (/ITEM/.test(t.str)) continue;
+        // Identity lines like "EXTERIOR: MAJESTIC WHITE" are not column headings.
+        if (t.str.includes(":")) continue;
+        // Items sit a bullet-indent (5pt) right of their column heading.
         const follower = texts.find(
           (o) =>
             o.kind === "text" &&
             o.font === "body" &&
-            Math.abs(o.x - t.x) < 0.01 &&
+            Math.abs(o.x - t.x) < 6 &&
             o.y > t.y &&
-            o.y - t.y < 12,
+            o.y - t.y < 14,
         );
         expect(follower, `heading ${t.str} on page ${page + 1} has no item beneath it`).toBeDefined();
       }
@@ -168,7 +172,7 @@ describe("layout: long equipment continuation", () => {
 });
 
 describe("layout: NHTSA panel states", () => {
-  it("renders verified star ratings", () => {
+  it("renders verified star ratings as star glyphs", () => {
     const input = adaptRenderData(infinitiBenchmark());
     input.data.regulatory.nhtsaStatus = "VERIFIED";
     input.data.regulatory.overallRating = 5;
@@ -176,8 +180,12 @@ describe("layout: NHTSA panel states", () => {
     const model = buildStickerLayout(input, getTheme("INFINITI"));
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("GOVERNMENT 5-STAR SAFETY RATINGS");
-    expect(page1).toContain("5 OF 5 STARS");
-    expect(page1).toContain("4 OF 5 STARS");
+    // 5 overall + 4 rollover stars drawn as vector paths, never as text.
+    const starPaths = model.pages[0].primitives.filter(
+      (p) => p.kind === "path" && p.w === 7 && p.h === 7,
+    );
+    expect(starPaths.length).toBeGreaterThanOrEqual(9);
+    expect(page1.some((s) => s.includes("OF 5 STARS"))).toBe(false);
     expectWithinBounds(model);
   });
 

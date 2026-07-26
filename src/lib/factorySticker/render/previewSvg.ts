@@ -51,6 +51,14 @@ export function layoutToSvg(model: LayoutModel): string {
         parts.push(
           `<rect x="${num(prim.x)}" y="${num(oy + prim.y)}" width="${num(prim.w)}" height="${num(prim.h)}" fill="${fill}"${stroke}/>`,
         );
+      } else if (prim.kind === "path") {
+        const fill = prim.fill !== null ? esc(prim.fill) : "none";
+        const stroke = prim.stroke !== undefined
+          ? ` stroke="${esc(prim.stroke)}" stroke-width="${num(prim.strokeWidth ?? 0.75)}" stroke-linecap="round" stroke-linejoin="round"`
+          : "";
+        parts.push(
+          `<path transform="translate(${num(prim.x)} ${num(oy + prim.y)})" d="${esc(prim.d)}" fill="${fill}"${stroke}/>`,
+        );
       } else if (prim.kind === "barcode") {
         const encoding = encodeCode128(prim.payload);
         const quiet = 10;

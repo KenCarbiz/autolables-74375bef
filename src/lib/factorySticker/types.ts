@@ -52,6 +52,7 @@ export interface StickerOption {
   description?: string;
   price?: number;
   priceStatus: PriceStatus;
+  features?: string[];
 }
 
 export interface StickerEquipment {
@@ -92,6 +93,7 @@ export interface StickerRegulatory {
   fiveYearCostDifference?: number;
   greenhouseGasRating?: number;
   smogRating?: number;
+  epaClassNote?: string;
   epaSourceReference?: string;
   nhtsaStatus: NhtsaStatus;
   overallRating?: number;
@@ -117,6 +119,8 @@ export interface StickerFactory {
   orderNumber?: string;
   sequenceNumber?: string;
   dealerCode?: string;
+  emissionsCode?: string;
+  locationCode?: string;
   partsContent?: PartsContentEntry[];
 }
 

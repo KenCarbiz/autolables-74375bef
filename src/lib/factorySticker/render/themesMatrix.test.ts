@@ -30,7 +30,7 @@ describe("theme matrix: benchmark renders under every OEM theme", () => {
       expectMinFontRespected(model);
       expectNoPlaceholderArtifacts(model);
       const page1 = pageStrings(model, 0);
-      expect(model.drawnStrings).toContain("JN8AZ2NE8P9123456");
+      expect(model.drawnStrings).toContain("JN8AZ3NE5S9123456");
       expect(page1).toContain("$95,695.00");
       expect(page1.some((s) => s.includes("TOTAL ORIGINAL MSRP"))).toBe(true);
       expect(page1.some((s) => s.includes(theme.logo.wordmarkText.toUpperCase()))).toBe(true);
@@ -38,7 +38,7 @@ describe("theme matrix: benchmark renders under every OEM theme", () => {
         expect(model.pages[0].primitives.some((p) => p.kind === "barcode")).toBe(false);
       } else {
         const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
-        expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("JN8AZ2NE8P9123456");
+        expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("JN8AZ3NE5S9123456");
       }
     });
   }
