@@ -101,6 +101,10 @@ export interface OemStickerTheme {
   colors: OemColorSpec;
   typography: OemTypographySpec;
   layout: OemLayoutSpec;
+  /** Verified brand wording for the NEW-vehicle total band; the engine
+   *  default is TOTAL FACTORY MSRP. Used documents always read
+   *  TOTAL ORIGINAL MSRP. */
+  totalLabel?: string;
 }
 
 const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
@@ -464,6 +468,7 @@ const theme = (
     typography?: Partial<OemTypographySpec>;
     layout?: Partial<OemLayoutSpec>;
     logo?: Partial<Omit<OemLogoSpec, "assetId">>;
+    totalLabel?: string;
   },
 ): OemStickerTheme => ({
   oemId,
@@ -478,6 +483,7 @@ const theme = (
   colors,
   typography: { ...FAMILY_TYPOGRAPHY[family], ...overrides?.typography },
   layout: { ...FAMILY_LAYOUT[family], ...overrides?.layout },
+  ...(overrides?.totalLabel ? { totalLabel: overrides.totalLabel } : {}),
 });
 
 export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
@@ -515,7 +521,7 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     sectionHeadingText: "#141414",
     totalMsrpBackground: "#101010",
     totalMsrpText: "#ffffff",
-  }),
+  }, { totalLabel: "TOTAL VEHICLE PRICE" }),
   // Acura factory treatment (acura-us-2026-v1): black masthead block with
   // reversed wordmark, paper model band, black rules; color held to the
   // regulatory panels and the small AutoLabels provenance mark.
@@ -530,7 +536,7 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     sectionHeadingText: "#141414",
     totalMsrpBackground: "#101010",
     totalMsrpText: "#ffffff",
-  }),
+  }, { totalLabel: "TOTAL VEHICLE PRICE" }),
   FORD: theme("FORD", "AMERICAN_MAINSTREAM", palette({ header: "#003478", accent: "#1e4f91" })),
   LINCOLN: theme("LINCOLN", "MODERN_LUXURY", palette({ header: "#17150f", accent: "#a08d5f" })),
   CHEVROLET: theme("CHEVROLET", "AMERICAN_MAINSTREAM", palette({
@@ -594,7 +600,7 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     sectionHeadingText: "#111111",
     totalMsrpBackground: "#101010",
     totalMsrpText: "#ffffff",
-  }),
+  }, { totalLabel: "TOTAL SUGGESTED RETAIL PRICE" }),
   GENESIS: theme("GENESIS", "KOREAN_PREMIUM", palette({
     header: "#111111", accent: "#9a7448", sectionHeading: "#4b4b4b",
     totalBg: "#141414", totalText: "#ffffff",

@@ -416,6 +416,7 @@ describe("Honda profile (honda-us-2026-v1)", () => {
     expect(page1.some((s) => s.includes("Hybrid Vehicle"))).toBe(true);
     expect(page1.some((s) => s.includes("MPGe"))).toBe(false);
     expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expect(page1).toContain("TOTAL VEHICLE PRICE");
     expectWithinBounds(model);
     expectMinFontRespected(model);
   });
@@ -511,6 +512,7 @@ describe("Acura profile (acura-us-2026-v1)", () => {
     expect(page1.some((s) => s.includes("Scan for verified vehicle details"))).toBe(true);
     expect(page1.some((s) => s === "auto")).toBe(true);
     expect(page1.some((s) => s === "(LABELS)")).toBe(true);
+    expect(page1).toContain("TOTAL VEHICLE PRICE");
     // Rated vehicle: stars render, never "Not Rated".
     expect(page1.some((s) => s.includes("Not Rated"))).toBe(false);
     // Passport QR still present and distinct from the EPA QR.
@@ -631,6 +633,7 @@ describe("Hyundai profile (hyundai-us-2026-v2)", () => {
     expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
     expect(page1.some((s) => s === "auto")).toBe(true);
     expect(page1.some((s) => s === "(LABELS)")).toBe(true);
+    expect(page1).toContain("TOTAL SUGGESTED RETAIL PRICE");
     const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
     expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
     const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");

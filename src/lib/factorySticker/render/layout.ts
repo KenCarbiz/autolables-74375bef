@@ -1087,7 +1087,9 @@ function paintTotalBand(p: Painter, y: number, ctx: BuildContext): number {
   const { theme, input } = ctx;
   const pricing = input.data.pricing;
   const condition = input.data.vehicle.condition;
-  const label = condition === "NEW" ? "TOTAL FACTORY MSRP" : "TOTAL ORIGINAL MSRP";
+  const label = condition === "NEW"
+    ? (theme.totalLabel ?? "TOTAL FACTORY MSRP")
+    : "TOTAL ORIGINAL MSRP";
   const total = pricing.sourceReportedTotalMsrp ?? pricing.calculatedTotalMsrp;
   // The total concludes the factory-pricing section: a strong upper rule
   // (brand accent for keyline families) and a restrained band.
