@@ -79,6 +79,8 @@ export interface StickerPricing {
   factoryInstalledTotal?: number;
   portOptionsTotal?: number;
   destinationCharge?: number;
+  /** Federal gas-guzzler tax when applicable and source-backed. */
+  gasGuzzlerTax?: number;
   calculatedTotalMsrp?: number;
   sourceReportedTotalMsrp?: number;
   reconciliationDifference?: number;

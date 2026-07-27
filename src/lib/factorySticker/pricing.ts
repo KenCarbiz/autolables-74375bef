@@ -17,6 +17,9 @@ export interface PricedComponent {
 export interface MsrpReconciliationInput {
   baseMsrp?: number;
   destinationCharge?: number;
+  /** Federal gas-guzzler tax, only when applicable to the exact vehicle and
+   *  present on the manufacturer price record. Never estimated from MPG. */
+  gasGuzzlerTax?: number;
   sourceReportedTotalMsrp?: number;
   packages: PricedComponent[];
   options: PricedComponent[];
@@ -80,6 +83,7 @@ export function derivePriceStatus(raw: {
 export function reconcileMsrp(input: MsrpReconciliationInput): MsrpReconciliation {
   assertHeadlineAmount("baseMsrp", input.baseMsrp);
   assertHeadlineAmount("destinationCharge", input.destinationCharge);
+  assertHeadlineAmount("gasGuzzlerTax", input.gasGuzzlerTax);
   assertHeadlineAmount("sourceReportedTotalMsrp", input.sourceReportedTotalMsrp);
 
   const notes: string[] = [];
@@ -99,6 +103,7 @@ export function reconcileMsrp(input: MsrpReconciliationInput): MsrpReconciliatio
     ...(factoryInstalledTotal !== undefined ? { factoryInstalledTotal } : {}),
     ...(portOptionsTotal !== undefined ? { portOptionsTotal } : {}),
     ...(input.destinationCharge !== undefined ? { destinationCharge: input.destinationCharge } : {}),
+    ...(input.gasGuzzlerTax !== undefined ? { gasGuzzlerTax: input.gasGuzzlerTax } : {}),
     ...(input.sourceReportedTotalMsrp !== undefined
       ? { sourceReportedTotalMsrp: input.sourceReportedTotalMsrp }
       : {}),
@@ -112,7 +117,8 @@ export function reconcileMsrp(input: MsrpReconciliationInput): MsrpReconciliatio
   }
 
   const calculatedTotalMsrp = round2(
-    input.baseMsrp + (factoryInstalledTotal ?? 0) + (portOptionsTotal ?? 0) + (input.destinationCharge ?? 0),
+    input.baseMsrp + (factoryInstalledTotal ?? 0) + (portOptionsTotal ?? 0) +
+      (input.destinationCharge ?? 0) + (input.gasGuzzlerTax ?? 0),
   );
   base.calculatedTotalMsrp = calculatedTotalMsrp;
 

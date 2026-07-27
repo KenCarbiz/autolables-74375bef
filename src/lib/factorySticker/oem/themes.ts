@@ -16,6 +16,7 @@ export type TemplateFamilyId =
   | "GERMAN_FACTORY"
   | "SCANDINAVIAN_FACTORY"
   | "COMMERCIAL_FACTORY"
+  | "SPORT_FACTORY"
   | "MINIMAL_FACTORY"
   | "PERFORMANCE"
   | "AUTOLABELS_FALLBACK";
@@ -33,6 +34,7 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "GERMAN_FACTORY",
   "SCANDINAVIAN_FACTORY",
   "COMMERCIAL_FACTORY",
+  "SPORT_FACTORY",
   "MINIMAL_FACTORY",
   "PERFORMANCE",
   "AUTOLABELS_FALLBACK",
@@ -261,6 +263,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.04em",
     uppercaseSectionHeadings: true,
   },
+  // Porsche's engineering-document voice: neutral grotesque, medium
+  // headings, tight tracking — precise and dense rather than ornamental.
+  SPORT_FACTORY: {
+    headingFont: '"Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif',
+    bodyFont: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+    numericFont: '"Helvetica Neue", "Arial Narrow", Arial, sans-serif',
+    headingWeight: 600,
+    bodyWeight: 400,
+    labelWeight: 700,
+    letterSpacing: "0em",
+    headingLetterSpacing: "0.07em",
+    uppercaseSectionHeadings: true,
+  },
   // Tesla's digital-first factory voice: neutral geometric grotesque, light
   // heading weight, wide tracking — minimal rather than industrial.
   MINIMAL_FACTORY: {
@@ -399,6 +414,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  SPORT_FACTORY: {
+    headerVariant: "BLOCK",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "13pt",
+    borderWeight: "0.75pt",
+    cornerTreatment: "SQUARE",
+  },
   MINIMAL_FACTORY: {
     headerVariant: "MINIMAL",
     pricingVariant: "UNDERLINED",
@@ -459,6 +484,7 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
   GERMAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.18em" },
   SCANDINAVIAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.3em" },
+  SPORT_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
   MINIMAL_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.34em" },
   COMMERCIAL_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.04em" },
   PREMIUM_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 200, maxHeightPx: 56, alignment: "CENTER", wordmarkLetterSpacing: "0.3em" },
@@ -753,7 +779,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     totalMsrpText: "#ffffff",
   }, { totalLabel: "TOTAL MSRP" }),
   LAND_ROVER: theme("LAND_ROVER", "PREMIUM_LUXURY", palette({ header: "#0c3c26", accent: "#b49b57", sectionHeading: "#0c3c26" })),
-  PORSCHE: theme("PORSCHE", "PERFORMANCE", palette({ header: "#000000", accent: "#d5001c" })),
+  // Porsche factory treatment (porsche-us-2026-v1): black masthead block
+  // carrying the reversed PORSCHE wordmark over a paper model band, with
+  // Porsche red confined to the single accent keyline.
+  PORSCHE: theme("PORSCHE", "SPORT_FACTORY", {
+    headerBackground: "#0a0a0a",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#111111",
+    mutedText: "#55595e",
+    accent: "#d5001c",
+    divider: "#d0d2d4",
+    sectionHeadingText: "#111111",
+    totalMsrpBackground: "#0a0a0a",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL MSRP" }),
   // Tesla factory treatment (tesla-us-2026-v1): white masthead carrying the
   // red TESLA wordmark, black model band ink, fine grey rules. Direct-sales
   // identity: no franchise dealer block, delivery entity instead.

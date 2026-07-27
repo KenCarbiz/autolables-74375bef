@@ -46,6 +46,8 @@ export interface FactoryStickerRenderData {
     totalMsrp: number | null;
     /** Port-installed accessory total; participates in reconciliation when present. */
     portOptionsTotal?: number | null;
+    /** Federal gas-guzzler tax; only when applicable and on the source record. */
+    gasGuzzlerTax?: number | null;
   };
   packages: Array<{ name: string; code: string | null; msrp: number | null; contents: string[] }>;
   options: Array<{
@@ -195,7 +197,8 @@ function reconcile(pricing: FactoryStickerRenderData["pricing"]): {
 } {
   if (pricing.baseMsrp === null) return { calculated: undefined, status: "INSUFFICIENT_DATA" };
   const calculated = pricing.baseMsrp + (pricing.optionsTotal ?? 0) +
-    (pricing.portOptionsTotal ?? 0) + (pricing.destinationCharge ?? 0);
+    (pricing.portOptionsTotal ?? 0) + (pricing.destinationCharge ?? 0) +
+    (pricing.gasGuzzlerTax ?? 0);
   if (pricing.totalMsrp === null) return { calculated, status: "INSUFFICIENT_DATA" };
   const diff = Math.abs(calculated - pricing.totalMsrp);
   const status: ReconciliationStatus =
@@ -261,6 +264,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       ...opt("baseMsrp", d.pricing.baseMsrp),
       ...opt("factoryInstalledTotal", d.pricing.optionsTotal),
       ...opt("portOptionsTotal", d.pricing.portOptionsTotal ?? null),
+      ...opt("gasGuzzlerTax", d.pricing.gasGuzzlerTax ?? null),
       ...opt("destinationCharge", d.pricing.destinationCharge),
       ...opt("calculatedTotalMsrp", calculated),
       ...opt("sourceReportedTotalMsrp", d.pricing.totalMsrp),

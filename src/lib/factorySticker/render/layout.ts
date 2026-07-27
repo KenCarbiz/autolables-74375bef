@@ -348,6 +348,7 @@ const FAMILY_STYLES: Record<string, FamilyStyle> = {
   LUXURY_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true },
   GERMAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, passportBrandLine: true },
   MINIMAL_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
+  SPORT_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
   COMMERCIAL_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, passportBrandLine: true },
   SCANDINAVIAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, passportBrandLine: true },
   PREMIUM_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
@@ -978,6 +979,11 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
       ? [["PORT OF ENTRY OPTIONS", pricing.portOptionsTotal ?? 0, false] as [string, number | undefined, boolean]]
       : []),
     ["DESTINATION & HANDLING", pricing.destinationCharge, false],
+    // Federal gas-guzzler tax: printed only when the source record carries
+    // it for this exact vehicle; never derived from fuel economy.
+    ...(pricing.gasGuzzlerTax !== undefined
+      ? [["GAS GUZZLER TAX", pricing.gasGuzzlerTax, false] as [string, number | undefined, boolean]]
+      : []),
   ];
   for (const [label, amount, dollar] of rollup) {
     if (amount === undefined) continue;
@@ -1328,17 +1334,25 @@ function paintSafetyPanel(p: Painter, y: number, ctx: BuildContext): number {
     cy += 11.5;
   };
 
-  row("Overall Score", null, reg.overallRating);
-  row("Frontal Crash", "Driver", reg.frontalDriverRating);
-  row("", "Passenger", reg.frontalPassengerRating);
-  row("Side Crash", "Front seat", reg.sideFrontRating);
-  row("", "Rear seat", reg.sideRearRating);
-  row("Rollover", null, reg.rolloverRating);
-
-  if (!anyRating || reg.nhtsaStatus === "NOT_RATED") {
+  // A vehicle with no applicable rating gets one plain statement rather
+  // than six identical "Not Rated" rows: the repetition carries no extra
+  // information and costs the rail the space the regulatory panels need.
+  const unrated = !anyRating || reg.nhtsaStatus === "NOT_RATED";
+  if (!unrated) {
+    row("Overall Score", null, reg.overallRating);
+    row("Frontal Crash", "Driver", reg.frontalDriverRating);
+    row("", "Passenger", reg.frontalPassengerRating);
+    row("Side Crash", "Front seat", reg.sideFrontRating);
+    row("", "Rear seat", reg.sideRearRating);
+    row("Rollover", null, reg.rolloverRating);
+  } else {
+    p.text("Not Rated", RX + 7, cy, 7.5, "bold", BLACK);
+    cy += 9.5;
     p.text("This vehicle has not been rated by the National Highway Traffic", RX + 7, cy, 5.5, "body", "#4c5157");
     cy += 6.4;
-    p.text("Safety Administration.", RX + 7, cy, 5.5, "body", "#4c5157");
+    p.text("Safety Administration for overall vehicle score, frontal crash,", RX + 7, cy, 5.5, "body", "#4c5157");
+    cy += 6.4;
+    p.text("side crash or rollover risk.", RX + 7, cy, 5.5, "body", "#4c5157");
     cy += 6;
   }
   cy += 1;

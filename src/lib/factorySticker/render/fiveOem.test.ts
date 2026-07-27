@@ -8,6 +8,9 @@ import {
   audiEtronFixture,
   audiPhevFixture,
   audiQ5Fixture,
+  porsche911Fixture,
+  porscheGuzzlerFixture,
+  porscheMacanEvFixture,
   teslaCybertruckFixture,
   teslaModelYFixture,
   volvoEvFixture,
@@ -1324,6 +1327,107 @@ describe("Tesla profile (tesla-us-2026-v1, minimal-factory-technical)", () => {
     // Purchased software is a priced factory line; hardware capability is
     // never presented as an activated entitlement.
     expect(joined).toContain("Full Self-Driving (Supervised) - Purchased");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Porsche profile (porsche-us-2026-v1, sport-factory-technical)", () => {
+  it("Porsche names resolve to the Porsche profile; other VW Group brands never do", () => {
+    for (const alias of ["Porsche", "PORSCHE", "Porsche AG", "Porsche Cars North America", "Dr. Ing. h.c. F. Porsche AG"]) {
+      const r = resolveThemeProfile(alias, 2026);
+      expect(r.theme.oemId, alias).toBe("PORSCHE");
+      expect(r.profile.themeVersion, alias).toBe("porsche-us-2026-v1");
+    }
+    const p = resolveThemeProfile("Porsche", 2026);
+    expect(p.profile.status).toBe("draft");
+    expect(p.profile.layoutFamily).toBe("sport-factory-technical");
+    expect(p.theme.templateFamilyId).toBe("SPORT_FACTORY");
+    // Sibling VW Group brands and Porsche-adjacent vocabulary stay out.
+    for (const other of ["Volkswagen", "Audi", "Bentley", "Lamborghini"]) {
+      expect(resolveThemeProfile(other, 2026).theme.oemId, other).not.toBe("PORSCHE");
+    }
+    for (const noise of ["PDK", "Stuttgart", "Weissach", "Zuffenhausen"]) {
+      expect(resolveThemeProfile(noise, 2026).resolution, noise).toBe("FALLBACK");
+    }
+    expect(resolveThemeProfile("Porsche", 2019).profile.status).toBe("fallback");
+  });
+
+  it("renders the owner's 911 Carrera 4 GTS reference reconciled to $182,785", () => {
+    const model = buildRenderLayout(porsche911Fixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$182,785.00");
+    expect(page1).toContain("$164,900.00");
+    expect(page1).toContain("TOTAL MSRP");
+    // Porsche option codes render alongside their descriptions.
+    for (const code of ["0Q", "Q1J", "8JU", "9VL", "3FE", "1N3", "KA6", "FI8", "UD1"]) {
+      expect(page1, code).toContain(code);
+    }
+    // T-Hybrid is a performance hybrid, not a plug-in: gasoline EPA layout,
+    // no electric range and no charging content.
+    expect(page1).toContain("MPG");
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(false);
+    expect(page1).not.toContain("MPGe");
+    // No gas-guzzler line unless the source record carries one.
+    expect(joined).not.toContain("GAS GUZZLER TAX");
+    // Unrated configuration: honest treatment, no fabricated stars.
+    expect(joined).toContain("has not been rated");
+    expect(joined).toContain("STUTTGART-ZUFFENHAUSEN, GERMANY");
+    expect(joined).toContain("GERMANY 75%");
+    expect(joined).toContain("Not an original Porsche-issued Monroney label");
+    // Black masthead block with the Porsche-red keyline, never Audi or VW.
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#0a0a0a")).toBe(true);
+    const rules = new Set(model.pages[0].primitives.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(rules.has("#d5001c")).toBe(true);
+    expect(rules.has("#001e50")).toBe(false);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("WP0AB2A99TS223847");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("gas-guzzler tax prints and reconciles only when it is on the price record", () => {
+    const model = buildRenderLayout(porscheGuzzlerFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    // 165,650 + 8,940 + 1,995 + 2,600 — the tax participates in the total.
+    expect(page1).toContain("$179,185.00");
+    expect(joined).toContain("GAS GUZZLER TAX");
+    expect(page1).toContain("2,600.00");
+    // Weissach and Paint to Sample are priced options; the no-cost bucket
+    // seat selection reads INCLUDED rather than as a priced line.
+    expect(joined).toContain("Weissach Package");
+    expect(joined).toContain("Paint to Sample");
+    expect(page1.filter((s) => s === "INCLUDED").length).toBe(1);
+    expect(joined).toContain("718 CAYMAN");
+    expect(joined).not.toContain("2026 PORSCHE 911");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Macan Electric keeps its own EPA record, plant and battery coverage", () => {
+    const model = buildRenderLayout(porscheMacanEvFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$85,485.00");
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+    // Leipzig, not the 911's Zuffenhausen: assembly is matched per vehicle.
+    expect(joined).toContain("LEIPZIG, GERMANY");
+    expect(joined).not.toContain("STUTTGART-ZUFFENHAUSEN");
+    expect(joined).toContain("HIGH-VOLTAGE BATTERY LIMITED WARRANTY");
+    // Package membership listed beneath the parent, priced once.
+    expect(joined).toContain("Premium Package");
+    expect(joined).toContain("Ventilated Front Seats");
+    expect(page1.filter((s) => s === "3,300.00").length).toBe(1);
     expectWithinBounds(model);
     expectMinFontRespected(model);
   });

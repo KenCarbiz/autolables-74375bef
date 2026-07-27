@@ -4321,6 +4321,241 @@ export const teslaCybertruckFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "7G2CEHED4RA012345",
 });
 
+// Owner's reference benchmark (2026-07-27 Porsche directive). It reconciles
+// exactly as printed: 164,900 + 15,890 + 1,995 = 182,785. The 3.6 T-Hybrid
+// is a performance hybrid, not a plug-in; its EPA record is the gasoline
+// label the reference shows, and no charging content is implied.
+export const porsche911Fixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "WP0AB2A99TS223847",
+  identity: { year: "2026", make: "Porsche", model: "911", trim: "CARRERA 4 GTS COUPE" },
+  pricing: { baseMsrp: 164900, destinationCharge: 1995, optionsTotal: 15890, totalMsrp: 182785 },
+  options: [
+    { name: "Cartagena Yellow Metallic", code: "0Q", msrp: 3270 },
+    { name: "Adaptive Sport Seats Plus (18-Way)", code: "Q1J", msrp: 3830 },
+    { name: "HD-Matrix Design LED Headlights", code: "8JU", msrp: 2980 },
+    { name: "BOSE Surround Sound System", code: "9VL", msrp: 1600 },
+    { name: "Electric Slide/Tilt Sunroof", code: "3FE", msrp: 1490 },
+    { name: "Power Steering Plus", code: "1N3", msrp: 300 },
+    { name: "Surround View w/ Active Parking Support", code: "KA6", msrp: 1430 },
+    { name: "Seat Belts in Racing Yellow", code: "FI8", msrp: 660 },
+    { name: "Under Door Puddle Light Projectors", code: "UD1", msrp: 330 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.6L T-Hybrid Twin-Turbo Flat-Six Engine",
+      "8-Speed Porsche Doppelkupplung (PDK)",
+      "Porsche Traction Management (PTM)",
+      "Porsche Active Suspension Management (PASM)",
+      "Rear-Axle Steering",
+      "Sport Chrono Package",
+      "Porsche Torque Vectoring Plus (PTV Plus)",
+      "GTS Sport Exhaust System",
+    ],
+    safety_features: [
+      "Porsche Stability Management (PSM)",
+      "Anti-Lock Braking System (ABS)",
+      "Porsche Surface Coated Brakes (PSCB)",
+      "Brake Assist & Automatic Hold",
+      "Front & Rear ParkAssist w/ Reversing Camera",
+      "Side Impact Protection System (POSIP)",
+      "Tire Pressure Monitoring System (TPM)",
+      "LATCH Child Seat Preparation",
+    ],
+    exterior: [
+      "LED Matrix Design Headlights",
+      "Daytime Running Lights w/ 4-Point LED Signature",
+      "Power Folding Exterior Mirrors",
+      "Front Air Intake w/ Active Cooling",
+      "GTS-Specific Front & Rear Fascia",
+      "Model Designation in Black (High Gloss)",
+      "Dual Center Exit Sport Exhaust Tips",
+    ],
+    interior: [
+      "Adaptive Sport Seats Plus (18-Way) w/ Memory Package",
+      "Leather/Race-Tex Seat Centers",
+      "Heated GT Sport Steering Wheel",
+      "Interior Trim in Brushed Aluminum",
+      "Race-Tex Headliner",
+      "GTS Interior Package w/ Contrast Stitching",
+      "Porsche Communication Management (PCM) w/ 10.9-Inch Touchscreen",
+      "Wireless Apple CarPlay",
+      "Two-Zone Automatic Climate Control",
+      "Keyless Drive",
+      "Electric Parking Brake",
+      "Cruise Control",
+      "HomeLink Garage Door Opener",
+      "Digital Radio & Online Navigation",
+      "SiriusXM w/ 360L",
+      "USB-C Connectivity and Charging",
+    ],
+  },
+  colors: { exterior: { name: "Cartagena Yellow Metallic", code: "0Q" }, interior: { name: "Black Leather/Race-Tex", code: null } },
+  assembly: { plant: "Stuttgart-Zuffenhausen", city: "Stuttgart-Zuffenhausen", country: "Germany" },
+  mechanical: { engine: "3.6L T-HYBRID TWIN-TURBO FLAT-SIX", transmission: "8-SPEED PDK", drivetrain: "ALL-WHEEL DRIVE" },
+  stockNumber: "P260184",
+  transportMethod: "OCEAN",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: null, dealer: null },
+  epa: {
+    city: 18, highway: 24, combined: 20, annualFuelCost: 2850, ghgScore: 4,
+    rangeMiles: null, fuelType: "Premium Gasoline", smogScore: null, gallonsPer100Miles: 5.0,
+    fiveYearCostDifference: -14250, classNote: "Subcompact Cars range from 15 to 110 MPG.",
+  },
+  safety: null,
+  nhtsaNotRated: true,
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: null,
+    corrosion: "12-Year/Unlimited-Mile Corrosion Perforation Limited Warranty",
+    roadside: "4-Year/50,000-Mile Roadside Assistance",
+    emissions: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "0%" },
+    { label: "Major sources of foreign parts content", value: "Germany 75%" },
+    { label: "Final assembly point", value: "Stuttgart-Zuffenhausen, Germany" },
+    { label: "Country of origin - engine", value: "Germany" },
+    { label: "Country of origin - transmission", value: "Germany" },
+  ],
+  dealer: { name: "Porsche Cars North America", address: "980 Hammond Dr", city: "Atlanta", state: "GA", zip: "30328", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-911gts",
+  barcodePayload: "WP0AB2A99TS223847",
+  disclaimers: [
+    "AutoLabels manufacturer-style reproduction generated from verified vehicle data. Not an original Porsche-issued Monroney label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
+// 718 Cayman GT4 RS: the gas-guzzler case. The tax is printed only because
+// it sits on this vehicle's manufacturer price record — never derived from
+// fuel economy. 165,650 + 8,940 + 1,995 + 2,600 = 179,185.
+export const porscheGuzzlerFixture = (): FactoryStickerRenderData => ({
+  ...porsche911Fixture(),
+  vin: "WP0AC2A87TK287654",
+  identity: { year: "2026", make: "Porsche", model: "718 Cayman", trim: "GT4 RS" },
+  pricing: { baseMsrp: 165650, destinationCharge: 1995, optionsTotal: 8940, totalMsrp: 179185, gasGuzzlerTax: 2600 },
+  options: [
+    { name: "Weissach Package", code: "XRS", msrp: 6100 },
+    { name: "Paint to Sample - Rubystone Red", code: "M9A", msrp: 2840 },
+    { name: "Full Bucket Seats in Carbon Fiber", code: "P73", msrp: null, included: true },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "4.0L Naturally Aspirated Flat-Six Engine",
+      "7-Speed Porsche Doppelkupplung (PDK)",
+      "Rear-Wheel Drive",
+      "Porsche Active Suspension Management (PASM) Sport",
+      "Porsche Torque Vectoring w/ Mechanical Limited-Slip Differential",
+      "Porsche Ceramic Composite Brakes (PCCB)",
+    ],
+    safety_features: [
+      "Porsche Stability Management (PSM)",
+      "Anti-Lock Braking System (ABS)",
+      "Side Impact Protection System (POSIP)",
+      "Tire Pressure Monitoring System (TPM)",
+    ],
+    exterior: [
+      "Carbon Fiber Reinforced Plastic Hood & Fenders",
+      "Fixed Rear Wing w/ Swan-Neck Mounts",
+      "NACA Ducts in Front Lid",
+      "Titanium Sport Exhaust System",
+      "20-Inch Forged Magnesium Wheels",
+    ],
+    interior: [
+      "Full Bucket Seats in Carbon Fiber Reinforced Plastic",
+      "Race-Tex Interior Package",
+      "Weissach Package Interior Trim",
+      "Porsche Communication Management (PCM)",
+      "Two-Zone Automatic Climate Control",
+    ],
+  },
+  colors: { exterior: { name: "Rubystone Red (Paint to Sample)", code: "M9A" }, interior: { name: "Black Race-Tex", code: null } },
+  mechanical: { engine: "4.0L FLAT-SIX", transmission: "7-SPEED PDK", drivetrain: "REAR-WHEEL DRIVE" },
+  stockNumber: "P260287",
+  epa: {
+    city: 15, highway: 20, combined: 17, annualFuelCost: 3350, ghgScore: 3,
+    rangeMiles: null, fuelType: "Premium Gasoline", smogScore: null, gallonsPer100Miles: 5.9,
+    fiveYearCostDifference: -16750, classNote: "Subcompact Cars range from 15 to 110 MPG.",
+  },
+  passportUrl: "https://autolabels.io/v/demo-gt4rs",
+  barcodePayload: "WP0AC2A87TK287654",
+});
+
+// Macan Electric 4: battery-electric, assembled in Leipzig — deliberately
+// a different plant and a different EPA record from the gasoline Macan,
+// and never given Taycan data. 78,800 + 4,690 + 1,995 = 85,485.
+export const porscheMacanEvFixture = (): FactoryStickerRenderData => ({
+  ...porsche911Fixture(),
+  vin: "WP1AG2A56TL045678",
+  identity: { year: "2026", make: "Porsche", model: "Macan Electric", trim: "4 ALL-WHEEL DRIVE" },
+  pricing: { baseMsrp: 78800, destinationCharge: 1995, optionsTotal: 4690, totalMsrp: 85485 },
+  options: [
+    { name: "Premium Package", code: "PPR", msrp: 3300, contents: ["Ventilated Front Seats", "Bose Surround Sound System", "Panoramic Roof"] },
+    { name: "21-Inch Macan Design Wheels", code: "45J", msrp: 1390 },
+    { name: "Dolomite Silver Metallic", code: "M7X", msrp: null, included: true },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Permanently Excited Synchronous Motors",
+      "100 kWh Lithium-Ion Battery (95 kWh Usable)",
+      "800V Architecture w/ DC Fast Charging up to 270 kW",
+      "11 kW AC Onboard Charger",
+      "All-Wheel Drive w/ Porsche Traction Management",
+      "Porsche Active Suspension Management (PASM)",
+    ],
+    safety_features: [
+      "Porsche Stability Management (PSM)",
+      "Anti-Lock Braking System (ABS)",
+      "Front & Rear ParkAssist w/ Reversing Camera",
+      "Lane Departure Warning",
+      "Tire Pressure Monitoring System (TPM)",
+    ],
+    exterior: [
+      "Matrix Design LED Headlights",
+      "Four-Point LED Daytime Running Lights",
+      "Adaptive Rear Spoiler",
+      "Flush Door Handles",
+      "Charge Ports - Both Front Fenders",
+    ],
+    interior: [
+      "Porsche Driver Experience w/ 12.6-Inch Curved Display",
+      "10.9-Inch Central Display",
+      "Partial Leather Seats w/ Heating",
+      "Two-Zone Automatic Climate Control",
+      "Porsche Communication Management (PCM)",
+      "Wireless Apple CarPlay",
+    ],
+  },
+  colors: { exterior: { name: "Dolomite Silver Metallic", code: "M7X" }, interior: { name: "Black Partial Leather", code: null } },
+  assembly: { plant: "Leipzig", city: "Leipzig", country: "Germany" },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "SINGLE-SPEED", drivetrain: "ALL-WHEEL DRIVE" },
+  stockNumber: "P260456",
+  factoryCodes: { location: null, emissions: "ZEV", sequence: null, order: null, dealer: null },
+  epa: {
+    city: 94, highway: 82, combined: 88, annualFuelCost: 750, ghgScore: 10,
+    rangeMiles: 308, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 4750, classNote: null,
+  },
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: null,
+    corrosion: "12-Year/Unlimited-Mile Corrosion Perforation Limited Warranty",
+    roadside: "4-Year/50,000-Mile Roadside Assistance",
+    emissions: "8-Year/100,000-Mile High-Voltage Battery Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "0%" },
+    { label: "Major sources of foreign parts content", value: "Germany 70%" },
+    { label: "Final assembly point", value: "Leipzig, Germany" },
+    { label: "Country of origin - drive units", value: "Germany" },
+    { label: "Country of origin - battery", value: "Germany" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-macan-ev",
+  barcodePayload: "WP1AG2A56TL045678",
+});
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,
