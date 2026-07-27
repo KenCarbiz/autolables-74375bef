@@ -7209,6 +7209,162 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_fact_conflicts: {
+        Row: {
+          authority: string
+          blocks_generation: boolean
+          candidates: Json
+          created_at: string
+          fact_key: string
+          id: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          authority: string
+          blocks_generation?: boolean
+          candidates: Json
+          created_at?: string
+          fact_key: string
+          id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          authority?: string
+          blocks_generation?: boolean
+          candidates?: Json
+          created_at?: string
+          fact_key?: string
+          id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_fact_conflicts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_fact_conflicts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_fact_conflicts_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_facts: {
+        Row: {
+          authority: string
+          confidence: string
+          created_at: string
+          evidence: Json
+          fact_key: string
+          fact_value: Json
+          id: string
+          observed_at: string
+          overridden_by: string | null
+          override_reason: string | null
+          source_kind: string
+          source_record_id: string | null
+          tenant_id: string
+          updated_at: string
+          usable_in_copy: boolean
+          vehicle_id: string
+        }
+        Insert: {
+          authority: string
+          confidence: string
+          created_at?: string
+          evidence?: Json
+          fact_key: string
+          fact_value: Json
+          id?: string
+          observed_at?: string
+          overridden_by?: string | null
+          override_reason?: string | null
+          source_kind: string
+          source_record_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          usable_in_copy?: boolean
+          vehicle_id: string
+        }
+        Update: {
+          authority?: string
+          confidence?: string
+          created_at?: string
+          evidence?: Json
+          fact_key?: string
+          fact_value?: Json
+          id?: string
+          observed_at?: string
+          overridden_by?: string | null
+          override_reason?: string | null
+          source_kind?: string
+          source_record_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          usable_in_copy?: boolean
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_facts_source_record_id_fkey"
+            columns: ["source_record_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_source_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_facts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_facts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_facts_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_files: {
         Row: {
           aftermarket_installs: Json
@@ -7687,6 +7843,150 @@ export type Database = {
             columns: ["vehicle_file_id"]
             isOneToOne: false
             referencedRelation: "vehicle_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_snapshots: {
+        Row: {
+          affected_families: string[]
+          content_checksum: string
+          created_at: string
+          has_unresolved_conflicts: boolean
+          id: string
+          material_changes: Json
+          parent_snapshot_id: string | null
+          snapshot_json: Json
+          snapshot_version: number
+          source_kinds: string[]
+          tenant_id: string
+          vehicle_id: string
+          vin: string
+        }
+        Insert: {
+          affected_families?: string[]
+          content_checksum: string
+          created_at?: string
+          has_unresolved_conflicts?: boolean
+          id?: string
+          material_changes?: Json
+          parent_snapshot_id?: string | null
+          snapshot_json: Json
+          snapshot_version: number
+          source_kinds?: string[]
+          tenant_id: string
+          vehicle_id: string
+          vin: string
+        }
+        Update: {
+          affected_families?: string[]
+          content_checksum?: string
+          created_at?: string
+          has_unresolved_conflicts?: boolean
+          id?: string
+          material_changes?: Json
+          parent_snapshot_id?: string | null
+          snapshot_json?: Json
+          snapshot_version?: number
+          source_kinds?: string[]
+          tenant_id?: string
+          vehicle_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_snapshots_parent_snapshot_id_fkey"
+            columns: ["parent_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_snapshots_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_source_records: {
+        Row: {
+          billable: boolean
+          created_at: string
+          id: string
+          payload: Json
+          payload_checksum: string
+          request_reason: string | null
+          retrieved_at: string
+          source_kind: string
+          source_name: string
+          tenant_id: string
+          vehicle_id: string | null
+          vin: string
+        }
+        Insert: {
+          billable?: boolean
+          created_at?: string
+          id?: string
+          payload: Json
+          payload_checksum: string
+          request_reason?: string | null
+          retrieved_at?: string
+          source_kind: string
+          source_name: string
+          tenant_id: string
+          vehicle_id?: string | null
+          vin: string
+        }
+        Update: {
+          billable?: boolean
+          created_at?: string
+          id?: string
+          payload?: Json
+          payload_checksum?: string
+          request_reason?: string | null
+          retrieved_at?: string
+          source_kind?: string
+          source_name?: string
+          tenant_id?: string
+          vehicle_id?: string | null
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_source_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_source_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_source_records_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
             referencedColumns: ["id"]
           },
         ]
@@ -8263,6 +8563,30 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_identity_duplicates: {
+        Row: {
+          listing_count: number | null
+          listing_ids: string[] | null
+          tenant_id: string | null
+          vin: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_listings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_listings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       _audit_chain_payload: {
@@ -8518,6 +8842,17 @@ export type Database = {
           last_start: string
           last_status: string
           schedule: string
+        }[]
+      }
+      get_current_vehicle_snapshot: {
+        Args: { _vehicle_id: string }
+        Returns: {
+          content_checksum: string
+          created_at: string
+          has_unresolved_conflicts: boolean
+          snapshot_id: string
+          snapshot_json: Json
+          snapshot_version: number
         }[]
       }
       get_deal_token: {
