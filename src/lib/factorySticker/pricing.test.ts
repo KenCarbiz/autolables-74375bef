@@ -36,6 +36,26 @@ describe("reconcileMsrp benchmark", () => {
     expect(r.reconciliationStatus).toBe("MATCHED");
     expect(r.currency).toBe("USD");
   });
+
+  it("port-installed accessories participate in the calculated total, separate from factory options", () => {
+    const r = reconcileMsrp(base({
+      sourceReportedTotalMsrp: 95995,
+      portOptions: [
+        { name: "All-Weather Floor Liners", price: 200, priceStatus: "PRICED" },
+        { name: "Cargo Net", price: 100, priceStatus: "PRICED" },
+      ],
+    }));
+    expect(r.portOptionsTotal).toBe(300);
+    expect(r.factoryInstalledTotal).toBe(4250);
+    expect(r.calculatedTotalMsrp).toBe(95995);
+    expect(r.reconciliationStatus).toBe("MATCHED");
+  });
+
+  it("omitting port options changes nothing about existing reconciliation", () => {
+    const r = reconcileMsrp(base());
+    expect(r.portOptionsTotal).toBeUndefined();
+    expect(r.calculatedTotalMsrp).toBe(95695);
+  });
 });
 
 describe("reconciliation thresholds", () => {

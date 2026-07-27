@@ -30,6 +30,13 @@ import {
   kiaPhevFixture,
   kiaTellurideFixture,
   kiaTellurideLongFixture,
+  mazdaCx90Fixture,
+  mazdaLongFixture,
+  mazdaMiataFixture,
+  mazdaPhevFixture,
+  subaruAscentLongFixture,
+  subaruOutbackFixture,
+  subaruSolterraFixture,
   themeFor,
   toyotaFixture,
 } from "@/lib/factorySticker/render/__fixtures__/renderData.ts";
@@ -184,6 +191,31 @@ const FIXTURE_SCENARIOS = {
       const d = kiaTellurideFixture();
       d.pricing = { ...d.pricing, destinationCharge: null };
       d.barcodePayload = "5XYP5DGC0TG999999";
+      return d;
+    },
+  },
+  mazda: { label: "Mazda CX-90", data: mazdaCx90Fixture },
+  mazdaphev: { label: "Mazda CX-90 PHEV", data: mazdaPhevFixture },
+  mazdamiata: { label: "Mazda MX-5 RF", data: mazdaMiataFixture },
+  mazdalong: { label: "Mazda CX-90 (2-page)", data: mazdaLongFixture },
+  mazdaqa: {
+    label: "Mazda QA blocked",
+    data: () => {
+      const d = mazdaCx90Fixture();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      d.barcodePayload = "JM3KKEHC7T1999999";
+      return d;
+    },
+  },
+  subaru: { label: "Subaru Outback", data: subaruOutbackFixture },
+  subaruev: { label: "Subaru Solterra", data: subaruSolterraFixture },
+  subarulong: { label: "Subaru Ascent (2-page)", data: subaruAscentLongFixture },
+  subaruqa: {
+    label: "Subaru QA blocked",
+    data: () => {
+      const d = subaruOutbackFixture();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      d.barcodePayload = "4S4BTGPD0T3999999";
       return d;
     },
   },

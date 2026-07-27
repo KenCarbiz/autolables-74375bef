@@ -11,6 +11,7 @@ export type TemplateFamilyId =
   | "AMERICAN_MAINSTREAM"
   | "EUROPEAN_TECHNICAL"
   | "JAPANESE_MAINSTREAM"
+  | "JAPANESE_FACTORY"
   | "KOREAN_MODERN"
   | "PERFORMANCE"
   | "EV_TECHNICAL"
@@ -25,6 +26,7 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "AMERICAN_MAINSTREAM",
   "EUROPEAN_TECHNICAL",
   "JAPANESE_MAINSTREAM",
+  "JAPANESE_FACTORY",
   "KOREAN_MODERN",
   "PERFORMANCE",
   "EV_TECHNICAL",
@@ -181,6 +183,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.06em",
     uppercaseSectionHeadings: true,
   },
+  // Mazda's factory allocation-label voice: neutral grotesque, strong
+  // uppercase hierarchy, restrained tracking — technical, not promotional.
+  JAPANESE_FACTORY: {
+    headingFont: '"Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif',
+    bodyFont: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+    numericFont: '"Helvetica Neue", "Arial Narrow", Arial, sans-serif',
+    headingWeight: 700,
+    bodyWeight: 400,
+    labelWeight: 700,
+    letterSpacing: "0.01em",
+    headingLetterSpacing: "0.05em",
+    uppercaseSectionHeadings: true,
+  },
   KOREAN_MODERN: {
     headingFont: '"Segoe UI", "Malgun Gothic", Arial, sans-serif',
     bodyFont: '"Segoe UI", "Malgun Gothic", Arial, sans-serif',
@@ -309,6 +324,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  JAPANESE_FACTORY: {
+    headerVariant: "BANDED",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "14pt",
+    borderWeight: "1pt",
+    cornerTreatment: "SQUARE",
+  },
   KOREAN_MODERN: {
     headerVariant: "MINIMAL",
     pricingVariant: "BOXED",
@@ -364,6 +389,7 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
 const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> = {
   KOREAN_PREMIUM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 200, maxHeightPx: 50, alignment: "LEFT", wordmarkLetterSpacing: "0.26em" },
   KOREAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.22em" },
+  JAPANESE_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.24em" },
   PREMIUM_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 200, maxHeightPx: 56, alignment: "CENTER", wordmarkLetterSpacing: "0.3em" },
   MODERN_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 190, maxHeightPx: 52, alignment: "CENTER", wordmarkLetterSpacing: "0.22em" },
   AMERICAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.08em" },
@@ -466,8 +492,35 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
   AUDI: theme("AUDI", "EUROPEAN_TECHNICAL", palette({ header: "#000000", accent: "#bb0a30" })),
   BMW: theme("BMW", "EUROPEAN_TECHNICAL", palette({ header: "#262626", accent: "#0066b1" })),
   MERCEDES_BENZ: theme("MERCEDES_BENZ", "PREMIUM_LUXURY", palette({ header: "#000000", accent: "#9c9c9c", sectionHeading: "#2b2b2b" })),
-  SUBARU: theme("SUBARU", "JAPANESE_MAINSTREAM", palette({ header: "#013c74", accent: "#6ba3d6", sectionHeading: "#013c74" })),
-  MAZDA: theme("MAZDA", "JAPANESE_MAINSTREAM", palette({ header: "#101010", accent: "#910a2d" })),
+  // Subaru factory treatment (subaru-us-2026-v1): white identity block,
+  // Subaru-blue header band, blue used with restraint (band, keyline, total).
+  SUBARU: theme("SUBARU", "JAPANESE_FACTORY", {
+    headerBackground: "#003b70",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#1a1a1a",
+    mutedText: "#55595e",
+    accent: "#003b70",
+    divider: "#c9ccd0",
+    sectionHeadingText: "#0f2c4c",
+    totalMsrpBackground: "#003b70",
+    totalMsrpText: "#ffffff",
+  }),
+  // Mazda factory treatment (mazda-us-2026-v1): white identity block, black
+  // header band, restrained factory red used only for the accent keyline —
+  // never for backgrounds, pricing, or promotional emphasis.
+  MAZDA: theme("MAZDA", "JAPANESE_FACTORY", {
+    headerBackground: "#0d0d0d",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#1a1a1a",
+    mutedText: "#55595e",
+    accent: "#c8102e",
+    divider: "#c9ccd0",
+    sectionHeadingText: "#141414",
+    totalMsrpBackground: "#101010",
+    totalMsrpText: "#ffffff",
+  }),
   HYUNDAI: theme("HYUNDAI", "KOREAN_MODERN", palette({ header: "#002c5f", accent: "#7d9bc1", sectionHeading: "#002c5f" })),
   GENESIS: theme("GENESIS", "KOREAN_PREMIUM", palette({
     header: "#111111", accent: "#9a7448", sectionHeading: "#4b4b4b",

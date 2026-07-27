@@ -20,6 +20,7 @@ export interface MsrpReconciliationInput {
   sourceReportedTotalMsrp?: number;
   packages: PricedComponent[];
   options: PricedComponent[];
+  portOptions?: PricedComponent[];
 }
 
 export interface MsrpReconciliation extends StickerPricing {
@@ -84,6 +85,7 @@ export function reconcileMsrp(input: MsrpReconciliationInput): MsrpReconciliatio
   const notes: string[] = [];
   const packagesTotal = sumPriced(input.packages, "package");
   const optionsTotal = sumPriced(input.options, "option");
+  const portOptionsTotal = sumPriced(input.portOptions ?? [], "port option");
   const factoryInstalledTotal =
     packagesTotal === undefined && optionsTotal === undefined
       ? undefined
@@ -95,6 +97,7 @@ export function reconcileMsrp(input: MsrpReconciliationInput): MsrpReconciliatio
     ...(packagesTotal !== undefined ? { packagesTotal } : {}),
     ...(optionsTotal !== undefined ? { optionsTotal } : {}),
     ...(factoryInstalledTotal !== undefined ? { factoryInstalledTotal } : {}),
+    ...(portOptionsTotal !== undefined ? { portOptionsTotal } : {}),
     ...(input.destinationCharge !== undefined ? { destinationCharge: input.destinationCharge } : {}),
     ...(input.sourceReportedTotalMsrp !== undefined
       ? { sourceReportedTotalMsrp: input.sourceReportedTotalMsrp }
@@ -109,7 +112,7 @@ export function reconcileMsrp(input: MsrpReconciliationInput): MsrpReconciliatio
   }
 
   const calculatedTotalMsrp = round2(
-    input.baseMsrp + (factoryInstalledTotal ?? 0) + (input.destinationCharge ?? 0),
+    input.baseMsrp + (factoryInstalledTotal ?? 0) + (portOptionsTotal ?? 0) + (input.destinationCharge ?? 0),
   );
   base.calculatedTotalMsrp = calculatedTotalMsrp;
 

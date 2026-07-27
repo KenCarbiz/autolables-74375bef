@@ -59,6 +59,10 @@ export interface StickerEquipment {
   standard: StandardEquipmentGroup[];
   packages: StickerPackage[];
   options: StickerOption[];
+  /** Port-installed accessories: kept separate from factory-installed
+   *  options and from dealer-installed accessories (which never appear
+   *  on the factory document). */
+  portInstalled?: StickerOption[];
 }
 
 export type ReconciliationStatus =
@@ -73,6 +77,7 @@ export interface StickerPricing {
   packagesTotal?: number;
   optionsTotal?: number;
   factoryInstalledTotal?: number;
+  portOptionsTotal?: number;
   destinationCharge?: number;
   calculatedTotalMsrp?: number;
   sourceReportedTotalMsrp?: number;

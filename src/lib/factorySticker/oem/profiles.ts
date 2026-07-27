@@ -142,6 +142,26 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     status: "draft",
     logoAuthorized: false,
   },
+  {
+    oemId: "MAZDA",
+    market: "US",
+    modelYearStart: 2022,
+    modelYearEnd: 2027,
+    themeVersion: "mazda-us-2026-v1",
+    layoutFamily: "japanese-factory-technical",
+    status: "draft",
+    logoAuthorized: false,
+  },
+  {
+    oemId: "SUBARU",
+    market: "US",
+    modelYearStart: 2022,
+    modelYearEnd: 2027,
+    themeVersion: "subaru-us-2026-v1",
+    layoutFamily: "japanese-factory-technical",
+    status: "draft",
+    logoAuthorized: false,
+  },
 ];
 
 const FAMILY_BY_TEMPLATE: Record<string, string> = {
@@ -149,6 +169,7 @@ const FAMILY_BY_TEMPLATE: Record<string, string> = {
   MODERN_LUXURY: "premium-minimalist",
   EUROPEAN_TECHNICAL: "german-technical",
   JAPANESE_MAINSTREAM: "mainstream-structured",
+  JAPANESE_FACTORY: "japanese-factory-technical",
   KOREAN_MODERN: "mainstream-structured",
   AMERICAN_MAINSTREAM: "american-utility",
   PERFORMANCE: "adventure-performance",

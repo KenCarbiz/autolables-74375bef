@@ -1168,6 +1168,437 @@ export const kiaTellurideLongFixture = (): FactoryStickerRenderData => {
   };
 };
 
+// ── Mazda fixtures (japanese-factory-technical, mazda-us-2026-v1) ──────
+
+const NEW_LABEL_DISCLAIMERS = [
+  "This label is prepared pursuant to the Automobile Information Disclosure Act. Gasoline, license, title, state and local taxes, and dealer-installed options and accessories are not included in the manufacturer's suggested retail price. Dealer final price will vary.",
+  "Digitally prepared by AutoLabels.io",
+];
+
+// Fixture 1 — CX-90 benchmark. 54,400 + 4,720 + 0 (port) + 1,475 = 60,595.
+export const mazdaCx90Fixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "JM3KKEHC7T1234567",
+  identity: { year: "2026", make: "Mazda", model: "CX-90", trim: "3.3 TURBO PREMIUM PLUS AWD" },
+  pricing: { baseMsrp: 54400, destinationCharge: 1475, optionsTotal: 4720, totalMsrp: 60595, portOptionsTotal: 0 },
+  options: [
+    { name: "Rhodium White Premium Paint Charge", code: null, msrp: 595 },
+    { name: "Premium Plus Package", code: "PPP", msrp: 2500, contents: ["Surround View Monitor", "Traffic Jam Assist"] },
+    { name: "Tow Package", code: "TOW", msrp: 600, contents: ["Trailer Hitch w/ 4-Pin Connector", "Trailer Hitch View"] },
+    { name: "21-Inch Alloy Wheels - Dark Finish", code: "W21", msrp: 600 },
+    { name: "All-Weather Floor Mats", code: null, msrp: 225 },
+    { name: "Cargo Tray", code: null, msrp: 125 },
+    { name: "Wheel Locks", code: null, msrp: 75 },
+  ],
+  portOptions: [{ name: "Rhodium White Premium", code: null, msrp: 0 }],
+  standardEquipment: {
+    mechanical: [
+      "3.3L Inline 6 e-Skyactiv G Turbo Engine - 340 HP",
+      "8-Speed Automatic Transmission",
+      "i-Activ All-Wheel Drive",
+      "G-Vectoring Control Plus",
+      "Mi-Drive: Normal, Sport, Off-Road, Towing",
+      "5,000-lb Towing Capacity",
+    ],
+    exterior: [
+      "LED Headlights w/ Auto On/Off",
+      "LED Daytime Running Lights & Signature Lighting",
+      "Power Liftgate w/ Programmable Height",
+      "Power-Folding Side Mirrors",
+      "Rain-Sensing Windshield Wipers",
+      "Panoramic Power Moonroof",
+      "Roof Rails",
+    ],
+    interior: [
+      "Three-Row Seating",
+      "Nappa Leather-Trimmed Seats",
+      "Power Driver & Front-Passenger Seats",
+      "Heated & Ventilated Front Seats",
+      "Heated Second-Row Outboard Seats",
+      "Three-Zone Automatic Climate Control",
+      "Mazda Connect Infotainment w/ 12.3-Inch Display",
+      "Wireless Apple CarPlay & Android Auto",
+      "Bose Premium Audio - 12 Speakers",
+      "Head-Up Display",
+      "Wireless Phone Charger",
+    ],
+    safety_features: [
+      "i-Activsense Safety Suite",
+      "Smart Brake Support w/ Pedestrian Detection",
+      "Blind Spot Monitoring w/ Rear Cross Traffic Alert",
+      "Lane Departure Warning w/ Lane Keep Assist",
+      "Mazda Radar Cruise Control w/ Stop & Go",
+      "Driver Attention Alert",
+      "360-Degree View Monitor",
+      "Front & Rear Parking Sensors",
+      "Anti-Theft Engine Immobilizer",
+    ],
+  },
+  colors: { exterior: { name: "Rhodium White Premium", code: "46G" }, interior: { name: "Black", code: "BLK" } },
+  assembly: { plant: "Hiroshima", city: "Hiroshima", country: "Japan" },
+  mechanical: { engine: "3.3L TURBO I6", transmission: "8-SPEED A/T", drivetrain: "i-ACTIV AWD" },
+  stockNumber: "26CX90PPA",
+  transportMethod: "OCEAN",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: null, dealer: "00000" },
+  epa: {
+    city: 21, highway: 28, combined: 24, annualFuelCost: 2250, ghgScore: 5,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 7, gallonsPer100Miles: 4.2,
+    fiveYearCostDifference: 1750, classNote: null,
+  },
+  safety: null,
+  warranty: {
+    basic: "3-Year/36,000-Mile Basic Limited Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: null,
+    roadside: "5-Year/Unlimited-Mile Roadside Assistance",
+    emissions: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "0%" },
+    { label: "Major foreign parts content", value: "Japan 85%" },
+    { label: "Final assembly point", value: "Hiroshima, Japan" },
+    { label: "Country of origin - engine", value: "Japan" },
+    { label: "Country of origin - transmission", value: "Japan" },
+  ],
+  dealer: { name: "Mazda North American Operations", address: null, city: "Irvine", state: "CA", zip: "92618-2922", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-cx90",
+  barcodePayload: "JM3KKEHC7T1234567",
+  disclaimers: NEW_LABEL_DISCLAIMERS,
+});
+
+// Fixture 2 — CX-90 PHEV: regulatory/phev. 56,950 + 820 + 1,475 = 59,245.
+export const mazdaPhevFixture = (): FactoryStickerRenderData => ({
+  ...mazdaCx90Fixture(),
+  vin: "JM3KKEHA8T1156789",
+  identity: { year: "2026", make: "Mazda", model: "CX-90 PHEV", trim: "PREMIUM PLUS AWD" },
+  pricing: { baseMsrp: 56950, destinationCharge: 1475, optionsTotal: 820, totalMsrp: 59245 },
+  options: [
+    { name: "Rhodium White Premium Paint Charge", code: null, msrp: 595 },
+    { name: "All-Weather Floor Mats", code: null, msrp: 225 },
+  ],
+  portOptions: [],
+  standardEquipment: {
+    mechanical: [
+      "2.5L e-Skyactiv PHEV Powertrain - 323 HP Combined",
+      "Permanent-Magnet Synchronous Drive Motor",
+      "17.8 kWh Lithium-Ion Battery",
+      "8-Speed Automatic Transmission",
+      "i-Activ All-Wheel Drive",
+      "Mi-Drive: EV, Normal, Sport, Off-Road, Towing",
+      "7.2 kW Onboard Charger",
+    ],
+    exterior: [
+      "LED Headlights w/ Auto On/Off",
+      "Power Liftgate w/ Programmable Height",
+      "Panoramic Power Moonroof",
+      "Power-Folding Side Mirrors",
+      "Roof Rails",
+    ],
+    interior: [
+      "Three-Row Seating",
+      "Nappa Leather-Trimmed Seats",
+      "Heated & Ventilated Front Seats",
+      "Three-Zone Automatic Climate Control",
+      "Mazda Connect Infotainment w/ 12.3-Inch Display",
+      "Wireless Apple CarPlay & Android Auto",
+      "Bose Premium Audio - 12 Speakers",
+      "Head-Up Display",
+    ],
+    safety_features: [
+      "i-Activsense Safety Suite",
+      "Smart Brake Support w/ Pedestrian Detection",
+      "Blind Spot Monitoring w/ Rear Cross Traffic Alert",
+      "Mazda Radar Cruise Control w/ Stop & Go",
+      "360-Degree View Monitor",
+      "Front & Rear Parking Sensors",
+    ],
+  },
+  mechanical: { engine: "2.5L I4 PHEV", transmission: "8-SPEED A/T", drivetrain: "i-ACTIV AWD" },
+  stockNumber: "26CX90PHEV89",
+  epa: {
+    city: null, highway: null, combined: 56, annualFuelCost: 2050, ghgScore: 7,
+    rangeMiles: 26, fuelType: "PHEV Gasoline-Electric", smogScore: 7, gallonsPer100Miles: null,
+    fiveYearCostDifference: 500, classNote: null, gasCombinedMpg: 25,
+  },
+  passportUrl: "https://autolabels.io/v/demo-cx90-phev",
+  barcodePayload: "JM3KKEHA8T1156789",
+});
+
+// Fixture 3 — MX-5 Miata RF: short content, long color descriptions.
+// 39,650 + 595 + 1,185 = 41,430.
+export const mazdaMiataFixture = (): FactoryStickerRenderData => ({
+  ...mazdaCx90Fixture(),
+  vin: "JM1NDAM75T0612345",
+  identity: { year: "2026", make: "Mazda", model: "MX-5 Miata RF", trim: "GRAND TOURING" },
+  pricing: { baseMsrp: 39650, destinationCharge: 1185, optionsTotal: 595, totalMsrp: 41430 },
+  options: [
+    { name: "Soul Red Crystal Metallic Paint Charge", code: null, msrp: 595 },
+  ],
+  portOptions: [],
+  standardEquipment: {
+    mechanical: [
+      "2.0L Skyactiv-G I4 Engine - 181 HP",
+      "6-Speed Manual Transmission",
+      "Rear-Wheel Drive",
+      "Limited-Slip Differential",
+      "Sport-Tuned Suspension w/ Bilstein Dampers",
+    ],
+    exterior: [
+      "Power-Retractable Fastback Hardtop",
+      "LED Headlights & Taillights",
+      "17-Inch Dark-Finish Alloy Wheels",
+      "Heated Power Side Mirrors",
+    ],
+    interior: [
+      "Nappa Leather-Trimmed Sport Seats",
+      "Heated Front Seats",
+      "Mazda Connect w/ 8.8-Inch Display",
+      "Wireless Apple CarPlay & Android Auto",
+      "Bose Audio w/ Headrest Speakers - 9 Speakers",
+    ],
+    safety_features: [
+      "Smart Brake Support",
+      "Blind Spot Monitoring w/ Rear Cross Traffic Alert",
+      "Lane Departure Warning",
+      "Traffic Sign Recognition",
+    ],
+  },
+  colors: {
+    exterior: { name: "Soul Red Crystal Metallic", code: "46V" },
+    interior: { name: "Sport Tan Nappa Leather", code: "TAN" },
+  },
+  mechanical: { engine: "2.0L SKYACTIV-G I4", transmission: "6-SPEED M/T", drivetrain: "RWD" },
+  stockNumber: "26MX5RFGT45",
+  epa: {
+    city: 26, highway: 34, combined: 29, annualFuelCost: 1900, ghgScore: 6,
+    rangeMiles: null, fuelType: "Premium Gasoline", smogScore: 6, gallonsPer100Miles: 3.4,
+    fiveYearCostDifference: 250, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-mx5rf",
+  barcodePayload: "JM1NDAM75T0612345",
+});
+
+// Fixture 4 — long-equipment CX-90: forces the deliberate continuation page.
+// 61,325 + 4,720 + 0 (port) + 1,475 = 67,520.
+export const mazdaLongFixture = (): FactoryStickerRenderData => {
+  const base = mazdaCx90Fixture();
+  const std = { ...base.standardEquipment };
+  std.comfort = Array.from({ length: 26 }, (_, i) =>
+    `Cabin Comfort & Convenience Feature ${String(i + 1).padStart(2, "0")} w/ Extended Adjustment Range`);
+  std.technology = Array.from({ length: 24 }, (_, i) =>
+    `Connected Technology Function ${String(i + 1).padStart(2, "0")} w/ Over-the-Air Update Support`);
+  return {
+    ...base,
+    vin: "JM3KKEHC3T1229984",
+    identity: { year: "2026", make: "Mazda", model: "CX-90", trim: "3.3 TURBO S PREMIUM PLUS AWD" },
+    pricing: { baseMsrp: 61325, destinationCharge: 1475, optionsTotal: 4720, totalMsrp: 67520, portOptionsTotal: 0 },
+    standardEquipment: std,
+    stockNumber: "26CX90TS9984",
+    passportUrl: "https://autolabels.io/v/demo-cx90-ts",
+    barcodePayload: "JM3KKEHC3T1229984",
+  };
+};
+
+// ── Subaru fixtures (japanese-factory-technical, subaru-us-2026-v1) ────
+
+// Fixture 1 — Outback Touring XT benchmark. 42,795 + 3,101 + 1,420 = 47,316.
+export const subaruOutbackFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "4S4BTGPD0T3456789",
+  identity: { year: "2026", make: "Subaru", model: "Outback", trim: "TOURING XT AWD" },
+  pricing: { baseMsrp: 42795, destinationCharge: 1420, optionsTotal: 3101, totalMsrp: 47316 },
+  options: [
+    { name: "Optional Package 32", code: "32", msrp: 2060, contents: ["Power Moonroof", "Multimedia Navigation System", "Harman Kardon Premium Audio"] },
+    { name: "Crystal White Pearl", code: "0H1", msrp: 395 },
+    { name: "Auto-Dimming Mirror w/ Compass", code: "OA2", msrp: 285 },
+    { name: "All-Weather Floor Liners", code: "0B1", msrp: 141 },
+    { name: "Rear Seatback Protector", code: "0C1", msrp: 142 },
+    { name: "Cargo Net", code: "0D1", msrp: 78 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "2.4L Turbocharged Subaru Boxer Engine - 260 HP",
+      "Lineartronic CVT w/ Paddle Shifters",
+      "Subaru Symmetrical All-Wheel Drive",
+      "X-MODE w/ Hill Descent Control",
+      "Vehicle Dynamics Control w/ Active Torque Vectoring",
+      "Four-Wheel Independent Suspension",
+    ],
+    exterior: [
+      "LED Steering-Responsive Headlights",
+      "High Beam Assist w/ LED Fog Lights",
+      "Power Rear Gate w/ Height Memory",
+      "Heated Exterior Mirrors",
+      "Windshield-Wiper De-Icer",
+      "Roof Rails w/ Retractable Cross Bars",
+      "18-Inch Machined Alloy Wheels",
+    ],
+    interior: [
+      "Java Brown Nappa Leather-Trimmed Upholstery",
+      "Heated & Ventilated Front Seats",
+      "Heated Rear Outboard Seats",
+      "Heated Steering Wheel",
+      "10-Way Power Driver's Seat w/ Memory",
+      "Dual-Zone Automatic Climate Control",
+      "Keyless Access w/ Push-Button Start",
+      "11.6-Inch Subaru Multimedia Touchscreen",
+      "Wireless Apple CarPlay & Android Auto",
+      "Wireless Device Charging",
+    ],
+    safety_features: [
+      "EyeSight Driver Assist Technology",
+      "Advanced Adaptive Cruise Control w/ Lane Centering",
+      "Pre-Collision Braking & Throttle Management",
+      "Lane Departure & Sway Warning",
+      "Blind-Spot Detection w/ Lane Change Assist",
+      "Rear Cross-Traffic Alert",
+      "Reverse Automatic Braking",
+      "DriverFocus Distraction Mitigation System",
+      "Front View Monitor",
+    ],
+  },
+  colors: {
+    exterior: { name: "Crystal White Pearl", code: "K1X" },
+    interior: { name: "Java Brown Nappa Leather", code: "JBR" },
+  },
+  assembly: { plant: "Subaru of Indiana Automotive", city: "Lafayette, Indiana", country: "USA" },
+  mechanical: { engine: "2.4L TURBO BOXER", transmission: "LINEARTRONIC CVT", drivetrain: "SYMMETRICAL AWD" },
+  stockNumber: "S260145",
+  transportMethod: "RAIL",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: null, dealer: "S4102" },
+  epa: {
+    city: 23, highway: 30, combined: 26, annualFuelCost: 2150, ghgScore: 5,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 6, gallonsPer100Miles: 3.8,
+    fiveYearCostDifference: 500, classNote: null,
+  },
+  safety: null,
+  warranty: {
+    basic: "3-Year/36,000-Mile Basic Limited Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: "5-Year Rust Perforation Limited Warranty",
+    roadside: "3-Year/36,000-Mile Roadside Assistance",
+    emissions: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "50%" },
+    { label: "Major foreign parts content", value: "Japan 30%" },
+    { label: "Final assembly point", value: "Lafayette, Indiana, USA" },
+    { label: "Country of origin - engine", value: "USA" },
+    { label: "Country of origin - transmission", value: "Japan" },
+  ],
+  dealer: { name: "Subaru Distributors Corp.", address: null, city: "Orangeburg", state: "NY", zip: "10962", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-outback",
+  barcodePayload: "4S4BTGPD0T3456789",
+  disclaimers: NEW_LABEL_DISCLAIMERS,
+});
+
+// Fixture 2 — Solterra: regulatory/ev, no gasoline content.
+// 44,995 + 536 + 1,420 = 46,951.
+export const subaruSolterraFixture = (): FactoryStickerRenderData => ({
+  ...subaruOutbackFixture(),
+  vin: "JTMABABA5TA098765",
+  identity: { year: "2026", make: "Subaru", model: "Solterra", trim: "LIMITED AWD" },
+  pricing: { baseMsrp: 44995, destinationCharge: 1420, optionsTotal: 536, totalMsrp: 46951 },
+  options: [
+    { name: "Harbor Mist Gray Pearl", code: "0H2", msrp: 395 },
+    { name: "All-Weather Floor Liners", code: "0B1", msrp: 141 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Electric Motors - 338 HP",
+      "74.7 kWh Lithium-Ion Battery",
+      "StarDrive Symmetrical All-Wheel Drive",
+      "DC Fast Charging up to 150 kW",
+      "11 kW Onboard Charger",
+      "X-MODE w/ Grip Control & Downhill Assist",
+      "Regenerative Braking Paddles",
+    ],
+    exterior: [
+      "LED Headlights w/ Auto High Beam",
+      "Power Rear Gate",
+      "Roof Rails",
+      "20-Inch Dark Metallic Alloy Wheels",
+      "Heated Exterior Mirrors",
+    ],
+    interior: [
+      "SofTex-Trimmed Upholstery",
+      "Heated & Ventilated Front Seats",
+      "Heated Steering Wheel",
+      "14-Inch Multimedia Touchscreen",
+      "Wireless Apple CarPlay & Android Auto",
+      "Harman Kardon Premium Audio",
+      "Wireless Device Charging",
+      "Digital Rearview Mirror",
+    ],
+    safety_features: [
+      "Advanced Adaptive Cruise Control w/ Lane Centering",
+      "Pre-Collision Braking w/ Intersection Support",
+      "Blind-Spot Detection w/ Lane Change Assist",
+      "Rear Cross-Traffic Alert",
+      "360-Degree Surround View Monitor",
+      "Front & Rear Parking Sensors w/ Automatic Braking",
+    ],
+  },
+  colors: {
+    exterior: { name: "Harbor Mist Gray Pearl", code: "0H2" },
+    interior: { name: "Black SofTex", code: "BLK" },
+  },
+  assembly: { plant: "Motomachi", city: "Toyota City", country: "Japan" },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "1-SPEED REDUCTION", drivetrain: "STARDRIVE AWD" },
+  stockNumber: "S260322",
+  transportMethod: "OCEAN",
+  epa: {
+    city: 111, highway: 93, combined: 102, annualFuelCost: 700, ghgScore: 10,
+    rangeMiles: 227, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 4000, classNote: null,
+  },
+  warranty: {
+    basic: "3-Year/36,000-Mile Basic Limited Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: null,
+    roadside: "3-Year/36,000-Mile Roadside Assistance",
+    emissions: "8-Year/100,000-Mile High-Voltage Battery Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "0%" },
+    { label: "Major foreign parts content", value: "Japan 90%" },
+    { label: "Final assembly point", value: "Toyota City, Japan" },
+    { label: "Country of origin - motors", value: "Japan" },
+    { label: "Country of origin - battery", value: "Japan" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-solterra",
+  barcodePayload: "JTMABABA5TA098765",
+});
+
+// Fixture 3 — long-equipment Ascent: forces the deliberate continuation page.
+// 48,995 + 2,240 + 1,420 = 52,655.
+export const subaruAscentLongFixture = (): FactoryStickerRenderData => {
+  const base = subaruOutbackFixture();
+  const std = { ...base.standardEquipment };
+  std.comfort = Array.from({ length: 26 }, (_, i) =>
+    `Three-Row Comfort & Convenience Feature ${String(i + 1).padStart(2, "0")} w/ Extended Adjustment Range`);
+  std.technology = Array.from({ length: 24 }, (_, i) =>
+    `Subaru Connected Technology Function ${String(i + 1).padStart(2, "0")} w/ Over-the-Air Update Support`);
+  return {
+    ...base,
+    vin: "4S4WMAWD1T3123456",
+    identity: { year: "2026", make: "Subaru", model: "Ascent", trim: "TOURING AWD" },
+    pricing: { baseMsrp: 48995, destinationCharge: 1420, optionsTotal: 2240, totalMsrp: 52655 },
+    options: [
+      { name: "Optional Package 23", code: "23", msrp: 1845, contents: ["Panoramic Moonroof", "Cabin Air Filtration"] },
+      { name: "Crystal White Pearl", code: "0H1", msrp: 395 },
+    ],
+    standardEquipment: std,
+    stockNumber: "S260488",
+    passportUrl: "https://autolabels.io/v/demo-ascent",
+    barcodePayload: "4S4WMAWD1T3123456",
+  };
+};
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

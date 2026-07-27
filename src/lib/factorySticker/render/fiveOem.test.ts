@@ -15,6 +15,13 @@ import {
   kiaTellurideFixture,
   kiaTellurideLongFixture,
   lexusFixture,
+  mazdaCx90Fixture,
+  mazdaLongFixture,
+  mazdaMiataFixture,
+  mazdaPhevFixture,
+  subaruAscentLongFixture,
+  subaruOutbackFixture,
+  subaruSolterraFixture,
   themeFor,
   toyotaFixture,
 } from "./__fixtures__/renderData";
@@ -223,5 +230,153 @@ describe("Kia profile (kia-us-2026-v1)", () => {
     expect(fills.has("#05141f")).toBe(false);  // retired dark Kia header
     expect(fills.has("#002c5f")).toBe(false);  // never Hyundai navy
     expect(fills.has("#9a7448")).toBe(false);  // never Genesis bronze
+  });
+});
+
+describe("Mazda profile (mazda-us-2026-v1)", () => {
+  it("resolves Mazda into the japanese-factory-technical family, model-year aware", () => {
+    const m = resolveThemeProfile("Mazda", 2026);
+    expect(m.profile.themeVersion).toBe("mazda-us-2026-v1");
+    expect(m.profile.layoutFamily).toBe("japanese-factory-technical");
+    expect(m.profile.status).toBe("draft");
+    expect(m.theme.templateFamilyId).toBe("JAPANESE_FACTORY");
+    expect(resolveThemeProfile("Mazda", 2021).profile.status).toBe("fallback");
+  });
+
+  it("CX-90 benchmark reconciles base + options + port + destination on one page", () => {
+    const data = mazdaCx90Fixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$60,595.00");
+    expect(model.drawnStrings).toContain("JM3KKEHC7T1234567");
+    expect(page1.some((s) => s.includes("PORT OF ENTRY OPTIONS"))).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
+    const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
+    expect(qrs.some((q) => q.kind === "qr" && q.payload === data.passportUrl)).toBe(true);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("renders parts content, warranty, ship-to and the MSRP footnote from verified data", () => {
+    const model = buildRenderLayout(mazdaCx90Fixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
+    expect(page1.some((s) => s.includes("HIROSHIMA, JAPAN"))).toBe(true);
+    expect(page1.some((s) => s.includes("NEW VEHICLE LIMITED WARRANTY"))).toBe(true);
+    expect(page1.some((s) => s.includes("3-YEAR/36,000-MILE BASIC LIMITED WARRANTY"))).toBe(true);
+    expect(page1.some((s) => s.includes("SHIP TO: 00000"))).toBe(true);
+    expect(page1.some((s) => s.includes("MAZDA NORTH AMERICAN OPERATIONS"))).toBe(true);
+    expect(page1.some((s) => s.includes("MSRP does not include taxes"))).toBe(true);
+    expect(page1.some((s) => s.includes("Digitally prepared by AutoLabels.io"))).toBe(true);
+  });
+
+  it("uses factory red for rules only, never as a background fill", () => {
+    const model = buildRenderLayout(mazdaCx90Fixture(), themeFor(null));
+    const prims = model.pages[0].primitives;
+    const redRules = prims.filter((p) => p.kind === "rule" && p.color === "#c8102e");
+    const redRects = prims.filter((p) => p.kind === "rect" && p.fill === "#c8102e");
+    expect(redRules.length).toBeGreaterThan(0);
+    expect(redRects.length).toBe(0);
+    const rects = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(rects.has("#0d0d0d")).toBe(true); // black header band
+  });
+
+  it("CX-90 PHEV uses the plug-in module, never gasoline-only or EV-only language", () => {
+    const model = buildRenderLayout(mazdaPhevFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPG gasoline only"))).toBe(true);
+    expect(page1.some((s) => s.includes("Plug-In Hybrid"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+  });
+
+  it("MX-5 short-content build keeps the factory structure on one page", () => {
+    const data = mazdaMiataFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    expect(model.pages.length).toBe(1);
+    expect(pageStrings(model, 0)).toContain("$41,430.00");
+    expect(model.drawnStrings).toContain("JM1NDAM75T0612345");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("long-equipment CX-90 produces a deliberate continuation page", () => {
+    const model = buildRenderLayout(mazdaLongFixture(), themeFor(null));
+    expect(model.pages.length).toBe(2);
+    expect(pageStrings(model, 0)).toContain("$67,520.00");
+    const page2 = pageStrings(model, 1);
+    expect(page2).toContain("FACTORY EQUIPMENT CONTINUATION");
+    expect(page2).toContain("PAGE 2 OF 2");
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Subaru profile (subaru-us-2026-v1)", () => {
+  it("resolves Subaru into the japanese-factory-technical family with its own version", () => {
+    const s = resolveThemeProfile("Subaru", 2026);
+    const m = resolveThemeProfile("Mazda", 2026);
+    expect(s.profile.themeVersion).toBe("subaru-us-2026-v1");
+    expect(s.profile.layoutFamily).toBe("japanese-factory-technical");
+    expect(s.profile.status).toBe("draft");
+    expect(s.profile.themeVersion).not.toBe(m.profile.themeVersion);
+    expect(resolveThemeProfile("Subaru", 2021).profile.status).toBe("fallback");
+  });
+
+  it("Outback Touring XT reconciles 42,795 + 3,101 + 1,420 with coded options", () => {
+    const data = subaruOutbackFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$47,316.00");
+    expect(model.drawnStrings).toContain("4S4BTGPD0T3456789");
+    expect(page1).toContain("32");
+    expect(page1).toContain("0H1");
+    expect(page1.some((s) => s.includes("SHIP TO: S4102"))).toBe(true);
+    expect(page1.some((s) => s.includes("SUBARU DISTRIBUTORS CORP."))).toBe(true);
+    expect(page1.some((s) => s.includes("LAFAYETTE, INDIANA, USA"))).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Solterra uses the EV module with no gasoline content", () => {
+    const model = buildRenderLayout(subaruSolterraFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("Electric Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+    expect(page1.some((s) => s.includes("8-YEAR/100,000-MILE HIGH-VOLTAGE BATTERY LIMITED WARRANTY"))).toBe(true);
+  });
+
+  it("Ascent long-equipment produces a deliberate continuation page", () => {
+    const model = buildRenderLayout(subaruAscentLongFixture(), themeFor(null));
+    expect(model.pages.length).toBe(2);
+    expect(pageStrings(model, 0)).toContain("$52,655.00");
+    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expectMinFontRespected(model);
+  });
+
+  it("Mazda and Subaru outputs stay visibly distinct: band fills and keylines differ", () => {
+    const paint = (fixture: () => ReturnType<typeof mazdaCx90Fixture>) => {
+      const model = buildRenderLayout(fixture(), themeFor(null));
+      const prims = model.pages[0].primitives;
+      return {
+        fills: new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : ""))),
+        rules: new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : ""))),
+      };
+    };
+    const mazda = paint(mazdaCx90Fixture);
+    const subaru = paint(subaruOutbackFixture);
+    expect(mazda.rules.has("#c8102e")).toBe(true);    // Mazda red keyline
+    expect(subaru.rules.has("#c8102e")).toBe(false);
+    expect(subaru.fills.has("#003b70")).toBe(true);   // Subaru blue band
+    expect(mazda.fills.has("#003b70")).toBe(false);
   });
 });

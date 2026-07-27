@@ -44,9 +44,13 @@ export interface FactoryStickerRenderData {
     destinationCharge: number | null;
     optionsTotal: number | null;
     totalMsrp: number | null;
+    /** Port-installed accessory total; participates in reconciliation when present. */
+    portOptionsTotal?: number | null;
   };
   packages: Array<{ name: string; code: string | null; msrp: number | null; contents: string[] }>;
   options: Array<{ name: string; code: string | null; msrp: number | null; contents?: string[] }>;
+  /** Port-installed accessories: separate from factory options; never dealer-installed items. */
+  portOptions?: Array<{ name: string; code: string | null; msrp: number | null }>;
   standardEquipment: Record<string, string[]>;
   keyFeatures: Record<string, string[]>;
   colors: {
@@ -98,6 +102,16 @@ export interface FactoryStickerRenderData {
     zip: string | null;
     phone: string | null;
   };
+  /** Verified factory warranty summary lines; omit entirely when unverified. */
+  warranty?: {
+    basic: string | null;
+    powertrain: string | null;
+    corrosion: string | null;
+    roadside: string | null;
+    emissions: string | null;
+  } | null;
+  /** Verified AALA parts-content disclosures; omit entirely when unverified. */
+  partsContent?: Array<{ label: string; value: string }> | null;
   /** QR payload — MUST equal the canonical passport URL. */
   passportUrl: string;
   /** Barcode payload — MUST equal the VIN. */
@@ -169,7 +183,8 @@ function reconcile(pricing: FactoryStickerRenderData["pricing"]): {
   status: ReconciliationStatus;
 } {
   if (pricing.baseMsrp === null) return { calculated: undefined, status: "INSUFFICIENT_DATA" };
-  const calculated = pricing.baseMsrp + (pricing.optionsTotal ?? 0) + (pricing.destinationCharge ?? 0);
+  const calculated = pricing.baseMsrp + (pricing.optionsTotal ?? 0) +
+    (pricing.portOptionsTotal ?? 0) + (pricing.destinationCharge ?? 0);
   if (pricing.totalMsrp === null) return { calculated, status: "INSUFFICIENT_DATA" };
   const diff = Math.abs(calculated - pricing.totalMsrp);
   const status: ReconciliationStatus =
@@ -195,6 +210,12 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
     ...(o.msrp !== null ? { price: o.msrp } : {}),
     priceStatus: o.msrp !== null ? "PRICED" : "UNAVAILABLE",
     ...(o.contents && o.contents.length ? { features: o.contents } : {}),
+  }));
+  const portInstalled: StickerOption[] = (d.portOptions ?? []).map((o) => ({
+    ...(o.code !== null ? { code: o.code } : {}),
+    name: o.name,
+    ...(o.msrp !== null ? { price: o.msrp } : {}),
+    priceStatus: o.msrp === null ? "UNAVAILABLE" : o.msrp === 0 ? "NO_CHARGE" : "PRICED",
   }));
 
   const opt = <T>(key: string, value: T | null | undefined): Record<string, T> =>
@@ -222,11 +243,13 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       standard: groupStandardEquipment([d.standardEquipment, d.keyFeatures]),
       packages,
       options,
+      ...(portInstalled.length ? { portInstalled } : {}),
     },
     pricing: {
       currency: "USD",
       ...opt("baseMsrp", d.pricing.baseMsrp),
       ...opt("factoryInstalledTotal", d.pricing.optionsTotal),
+      ...opt("portOptionsTotal", d.pricing.portOptionsTotal ?? null),
       ...opt("destinationCharge", d.pricing.destinationCharge),
       ...opt("calculatedTotalMsrp", calculated),
       ...opt("sourceReportedTotalMsrp", d.pricing.totalMsrp),
@@ -276,7 +299,22 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       ...opt("emissionsCode", d.factoryCodes?.emissions ?? null),
       ...opt("locationCode", d.factoryCodes?.location ?? null),
       ...opt("transportMethod", d.transportMethod ?? null),
+      ...(d.partsContent && d.partsContent.length
+        ? { partsContent: d.partsContent.map((e) => ({ label: e.label, value: e.value, sourceVerified: true })) }
+        : {}),
     },
+    ...(d.warranty && [d.warranty.basic, d.warranty.powertrain, d.warranty.corrosion, d.warranty.roadside, d.warranty.emissions].some((v) => v)
+      ? {
+          warranty: {
+            ...opt("basic", d.warranty.basic),
+            ...opt("powertrain", d.warranty.powertrain),
+            ...opt("corrosion", d.warranty.corrosion),
+            ...opt("roadside", d.warranty.roadside),
+            ...opt("emissions", d.warranty.emissions),
+            sourceVerified: true,
+          },
+        }
+      : {}),
     dealer: {
       tenantId: "",
       name: d.dealer.name ?? "",
