@@ -42,6 +42,10 @@ import {
   hyundaiLongFixture,
   hyundaiPalisadeFixture,
   hyundaiTucsonHybridFixture,
+  lincolnHybridFixture,
+  lincolnLongFixture,
+  lincolnNautilusFixture,
+  lincolnPhevFixture,
   mazdaCx90Fixture,
   mazdaLongFixture,
   mazdaMiataFixture,
@@ -255,6 +259,19 @@ const FIXTURE_SCENARIOS = {
       const d = hyundaiPalisadeFixture();
       d.pricing = { ...d.pricing, destinationCharge: null };
       d.barcodePayload = "KM8R7DGE8TU999999";
+      return d;
+    },
+  },
+  lincoln: { label: "Lincoln Nautilus", data: lincolnNautilusFixture },
+  lincolnhev: { label: "Lincoln Nautilus HEV", data: lincolnHybridFixture },
+  lincolnphev: { label: "Lincoln Corsair GT PHEV", data: lincolnPhevFixture },
+  lincolnlong: { label: "Lincoln Navigator (2-page)", data: lincolnLongFixture },
+  lincolnqa: {
+    label: "Lincoln QA blocked",
+    data: () => {
+      const d = lincolnNautilusFixture();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      d.barcodePayload = "5LMPJ8K85TJ999999";
       return d;
     },
   },

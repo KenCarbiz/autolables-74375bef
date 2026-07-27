@@ -2410,6 +2410,259 @@ export const hyundaiLongFixture = (): FactoryStickerRenderData => {
   };
 };
 
+// ── Lincoln fixtures (luxury-factory composition, lincoln-us-2026-v1) ──
+
+// Benchmark Nautilus Reserve: equipment-group pricing + Co-Pilot360.
+// 53,890 + 3,800 (202A + paint) + 1,595 = 59,285.
+export const lincolnNautilusFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "5LMPJ8K85TJ801234",
+  identity: { year: "2026", make: "Lincoln", model: "Nautilus", trim: "RESERVE AWD" },
+  pricing: { baseMsrp: 53890, destinationCharge: 1595, optionsTotal: 3800, totalMsrp: 59285 },
+  options: [
+    { name: "Equipment Group 202A", code: "202A", msrp: 3105, contents: ["Illuminated Lincoln Star Grille", "Revel Audio - 14 Speakers"] },
+    { name: "Premium Paint - Chroma Caviar", code: "PP", msrp: 695 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "2.0L Turbocharged I4 Engine - 250 HP",
+      "8-Speed Automatic Transmission",
+      "Intelligent All-Wheel Drive",
+      "Adaptive Suspension w/ Road Preview",
+      "Drive Modes w/ Lincoln Dynamic Handling",
+      "Auto Hold w/ Electric Park Brake",
+      "Active Noise Control",
+    ],
+    safety_features: [
+      "Lincoln Co-Pilot360 2.4",
+      "Pre-Collision Assist w/ Automatic Emergency Braking",
+      "Pedestrian Detection & Forward Collision Warning",
+      "Blind Spot Information System w/ Cross-Traffic Alert",
+      "Lane-Keeping System w/ Lane Centering",
+      "Intelligent Adaptive Cruise Control",
+      "Evasive Steering Assist",
+      "Reverse Brake Assist & Rear Parking Sensors",
+      "360-Degree Camera",
+      "BlueCruise Capability w/ 4-Year Service Period",
+    ],
+    interior: [
+      "Perfect Position 24-Way Front Seats w/ Massage",
+      "Heated & Ventilated Front Seats",
+      "Heated Second-Row Outboard Seats",
+      "48-Inch Panoramic Display",
+      "Lincoln Digital Experience w/ Google Built-In",
+      "Wireless Apple CarPlay & Android Auto",
+      "Phone As A Key",
+      "Wireless Charging Pad",
+      "Four-Zone Automatic Climate Control",
+      "Heated Steering Wheel",
+      "Ambient Lighting w/ Lincoln Embrace",
+    ],
+    exterior: [
+      "21-Inch Bright-Machined Alloy Wheels",
+      "Adaptive LED Headlamps w/ Lincoln Signature Lighting",
+      "Panoramic Vista Roof",
+      "Hands-Free Power Liftgate",
+      "Power-Folding Heated Mirrors",
+      "Rain-Sensing Wipers",
+      "Acoustic-Laminate Glass",
+      "Roof Rails",
+    ],
+  },
+  colors: { exterior: { name: "Chroma Caviar", code: "CC" }, interior: { name: "Smoked Truffle", code: "ST" } },
+  assembly: { plant: "Hangzhou", city: "Hangzhou", country: "China" },
+  mechanical: { engine: "2.0L TURBO I4", transmission: "8-SPEED A/T", drivetrain: "INTELLIGENT AWD" },
+  stockNumber: "L2660145",
+  transportMethod: "OCEAN",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: "40012", dealer: "F71204" },
+  epa: {
+    city: 21, highway: 29, combined: 24, annualFuelCost: 2200, ghgScore: 5,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 6, gallonsPer100Miles: 4.2,
+    fiveYearCostDifference: -750, classNote: null,
+  },
+  safety: { overall: 5, frontalDriver: 5, frontalPassenger: 5, sideFront: 5, sideRear: 5, rollover: 4 },
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: "6-Year/70,000-Mile Powertrain Limited Warranty",
+    corrosion: "5-Year/Unlimited-Mile Corrosion Coverage",
+    roadside: "6-Year/70,000-Mile Roadside Assistance",
+    emissions: "Lincoln Pickup & Delivery - 4-Year Service Period",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "5%" },
+    { label: "Major foreign parts content", value: "China 55%" },
+    { label: "Final assembly point", value: "Hangzhou, China" },
+    { label: "Country of origin - engine", value: "China" },
+    { label: "Country of origin - transmission", value: "China" },
+  ],
+  dealer: { name: "Lincoln of South Miami", address: "10001 S Dixie Hwy", city: "Miami", state: "FL", zip: "33156", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-nautilus",
+  barcodePayload: "5LMPJ8K85TJ801234",
+  disclaimers: [
+    "Vehicle information compiled from verified manufacturer, regulatory and dealer data. This document may not be the original manufacturer-issued label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
+// Nautilus Hybrid: gasoline-shape module under the Hybrid Vehicle tag.
+// 55,390 + 0 + 1,595 = 56,985.
+export const lincolnHybridFixture = (): FactoryStickerRenderData => ({
+  ...lincolnNautilusFixture(),
+  vin: "5LMPJ9K46TJ755443",
+  identity: { year: "2026", make: "Lincoln", model: "Nautilus Hybrid", trim: "RESERVE AWD" },
+  pricing: { baseMsrp: 55390, destinationCharge: 1595, optionsTotal: null, totalMsrp: 56985 },
+  options: [],
+  standardEquipment: {
+    mechanical: [
+      "2.0L Turbocharged I4 Hybrid - 310 HP Combined",
+      "Permanent-Magnet Drive Motor",
+      "1.5 kWh Lithium-Ion Battery",
+      "Electronic CVT",
+      "Intelligent All-Wheel Drive",
+      "Regenerative Braking",
+      "Active Noise Control",
+    ],
+    safety_features: [
+      "Lincoln Co-Pilot360 2.4",
+      "Pre-Collision Assist w/ Automatic Emergency Braking",
+      "Blind Spot Information System w/ Cross-Traffic Alert",
+      "Lane-Keeping System w/ Lane Centering",
+      "Intelligent Adaptive Cruise Control",
+      "Reverse Brake Assist & Rear Parking Sensors",
+      "360-Degree Camera",
+    ],
+    interior: [
+      "Perfect Position 24-Way Front Seats",
+      "Heated & Ventilated Front Seats",
+      "48-Inch Panoramic Display",
+      "Lincoln Digital Experience w/ Google Built-In",
+      "Phone As A Key",
+      "Four-Zone Automatic Climate Control",
+      "Heated Steering Wheel",
+    ],
+    exterior: [
+      "20-Inch Alloy Wheels",
+      "Adaptive LED Headlamps w/ Lincoln Signature Lighting",
+      "Panoramic Vista Roof",
+      "Hands-Free Power Liftgate",
+      "Power-Folding Heated Mirrors",
+    ],
+  },
+  mechanical: { engine: "2.0L HYBRID I4", transmission: "E-CVT", drivetrain: "INTELLIGENT AWD" },
+  stockNumber: "L2660233",
+  epa: {
+    city: 31, highway: 28, combined: 30, annualFuelCost: 1750, ghgScore: 7,
+    rangeMiles: null, fuelType: "Hybrid Gasoline-Electric", smogScore: 7, gallonsPer100Miles: 3.3,
+    fiveYearCostDifference: 1000, classNote: null,
+  },
+  safety: null,
+  passportUrl: "https://autolabels.io/v/demo-nautilus-hev",
+  barcodePayload: "5LMPJ9K46TJ755443",
+});
+
+// Corsair Grand Touring: regulatory/phev. 54,480 + 695 + 1,595 = 56,770.
+export const lincolnPhevFixture = (): FactoryStickerRenderData => ({
+  ...lincolnNautilusFixture(),
+  vin: "5LMTJ3KP2TUL09876",
+  identity: { year: "2026", make: "Lincoln", model: "Corsair", trim: "GRAND TOURING AWD" },
+  pricing: { baseMsrp: 54480, destinationCharge: 1595, optionsTotal: 695, totalMsrp: 56770 },
+  options: [
+    { name: "Premium Paint - Whisper Blue", code: "PP", msrp: 695 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "2.5L Atkinson-Cycle I4 Plug-In Hybrid - 266 HP Combined",
+      "Dual Electric Motors",
+      "14.4 kWh Lithium-Ion Battery",
+      "3.3 kW Onboard Charger",
+      "Electronic CVT",
+      "Intelligent All-Wheel Drive",
+      "Preserve EV / Pure EV / Normal Drive Modes",
+    ],
+    safety_features: [
+      "Lincoln Co-Pilot360 2.0",
+      "Pre-Collision Assist w/ Automatic Emergency Braking",
+      "Blind Spot Information System w/ Cross-Traffic Alert",
+      "Lane-Keeping System",
+      "Intelligent Adaptive Cruise Control",
+      "Reverse Brake Assist",
+      "360-Degree Camera",
+    ],
+    interior: [
+      "Perfect Position 24-Way Front Seats",
+      "Heated & Ventilated Front Seats",
+      "13.2-Inch Center Touchscreen w/ SYNC 4",
+      "Wireless Apple CarPlay & Android Auto",
+      "Phone As A Key",
+      "Heated Steering Wheel",
+      "Wireless Charging Pad",
+    ],
+    exterior: [
+      "20-Inch Alloy Wheels",
+      "Adaptive LED Headlamps",
+      "Panoramic Vista Roof",
+      "Hands-Free Power Liftgate",
+      "Power-Folding Heated Mirrors",
+    ],
+  },
+  colors: { exterior: { name: "Whisper Blue", code: "WB" }, interior: { name: "Sandstone", code: "SS" } },
+  assembly: { plant: "Louisville", city: "Louisville, Kentucky", country: "USA" },
+  mechanical: { engine: "2.5L PHEV I4", transmission: "E-CVT", drivetrain: "INTELLIGENT AWD" },
+  stockNumber: "L2660322",
+  transportMethod: "RAIL",
+  epa: {
+    city: null, highway: null, combined: 78, annualFuelCost: 1350, ghgScore: 9,
+    rangeMiles: 27, fuelType: "PHEV Gasoline-Electric", smogScore: 7, gallonsPer100Miles: null,
+    fiveYearCostDifference: 2000, classNote: null, gasCombinedMpg: 33,
+  },
+  safety: null,
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: "6-Year/70,000-Mile Powertrain Limited Warranty",
+    corrosion: "5-Year/Unlimited-Mile Corrosion Coverage",
+    roadside: "6-Year/70,000-Mile Roadside Assistance",
+    emissions: "8-Year/100,000-Mile High-Voltage Battery Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "40%" },
+    { label: "Major foreign parts content", value: "Mexico 20%" },
+    { label: "Final assembly point", value: "Louisville, Kentucky, USA" },
+    { label: "Country of origin - engine", value: "Spain" },
+    { label: "Country of origin - transmission", value: "USA" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-corsair-gt",
+  barcodePayload: "5LMTJ3KP2TUL09876",
+});
+
+// Long-equipment Navigator: forces the deliberate continuation page.
+// 101,990 + 4,150 + 1,995 = 108,135.
+export const lincolnLongFixture = (): FactoryStickerRenderData => {
+  const base = lincolnNautilusFixture();
+  const std = { ...base.standardEquipment };
+  std.comfort = Array.from({ length: 26 }, (_, i) =>
+    `First-Class Comfort Feature ${String(i + 1).padStart(2, "0")} w/ Extended Adjustment Range`);
+  std.technology = Array.from({ length: 24 }, (_, i) =>
+    `Lincoln Connect Technology Function ${String(i + 1).padStart(2, "0")} w/ Over-the-Air Update Support`);
+  return {
+    ...base,
+    vin: "5LMJJ3TT8TEL44321",
+    identity: { year: "2026", make: "Lincoln", model: "Navigator", trim: "RESERVE 4X4" },
+    pricing: { baseMsrp: 101990, destinationCharge: 1995, optionsTotal: 4150, totalMsrp: 108135 },
+    options: [
+      { name: "Equipment Group 202A", code: "202A", msrp: 3455, contents: ["Luxury Package", "28-Speaker Revel Ultima 3D Audio"] },
+      { name: "Premium Paint - Chroma Molten Magenta", code: "PP", msrp: 695 },
+    ],
+    standardEquipment: std,
+    assembly: { plant: "Kentucky Truck", city: "Louisville, Kentucky", country: "USA" },
+    mechanical: { engine: "3.5L TT V6", transmission: "10-SPEED A/T", drivetrain: "4X4" },
+    stockNumber: "L2660671",
+    passportUrl: "https://autolabels.io/v/demo-navigator",
+    barcodePayload: "5LMJJ3TT8TEL44321",
+  };
+};
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

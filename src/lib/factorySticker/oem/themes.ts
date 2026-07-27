@@ -538,7 +538,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     totalMsrpText: "#ffffff",
   }, { totalLabel: "TOTAL VEHICLE PRICE" }),
   FORD: theme("FORD", "AMERICAN_MAINSTREAM", palette({ header: "#003478", accent: "#1e4f91" })),
-  LINCOLN: theme("LINCOLN", "MODERN_LUXURY", palette({ header: "#17150f", accent: "#a08d5f" })),
+  // Lincoln factory treatment (lincoln-us-2026-v1): white wordmark block,
+  // dark-navy band and keyline as the only brand identifier — quiet
+  // luxury, overwhelmingly black and white, distinct from Ford.
+  LINCOLN: theme("LINCOLN", "LUXURY_FACTORY", {
+    headerBackground: "#172536",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#111111",
+    mutedText: "#55595e",
+    accent: "#172536",
+    divider: "#d7dce2",
+    sectionHeadingText: "#111111",
+    totalMsrpBackground: "#101010",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL MSRP" }),
   CHEVROLET: theme("CHEVROLET", "AMERICAN_MAINSTREAM", palette({
     header: "#c9daea", headerText: "#101418", accent: "#1a2c47", sectionHeading: "#1a2c47",
     totalBg: "#1a2c47", totalText: "#ffffff",

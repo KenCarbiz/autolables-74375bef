@@ -28,6 +28,10 @@ import {
   kiaTellurideFixture,
   kiaTellurideLongFixture,
   lexusFixture,
+  lincolnHybridFixture,
+  lincolnLongFixture,
+  lincolnNautilusFixture,
+  lincolnPhevFixture,
   mazdaCx90Fixture,
   mazdaLongFixture,
   mazdaMiataFixture,
@@ -678,6 +682,84 @@ describe("Hyundai profile (hyundai-us-2026-v2)", () => {
     const model = buildRenderLayout(hyundaiLongFixture(), themeFor(null));
     expect(model.pages.length).toBe(2);
     expect(pageStrings(model, 0)).toContain("$57,205.00");
+    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Lincoln profile (lincoln-us-2026-v1)", () => {
+  it("resolves Lincoln distinctly from Ford, model-year aware", () => {
+    const l = resolveThemeProfile("Lincoln", 2026);
+    const f = resolveThemeProfile("Ford", 2026);
+    expect(l.profile.themeVersion).toBe("lincoln-us-2026-v1");
+    expect(l.profile.layoutFamily).toBe("luxury-factory-technical");
+    expect(l.profile.status).toBe("draft");
+    expect(l.theme.templateFamilyId).not.toBe(f.theme.templateFamilyId);
+    expect(l.profile.layoutFamily).not.toBe(f.profile.layoutFamily);
+    expect(resolveThemeProfile("Lincoln", 2021).profile.status).toBe("fallback");
+  });
+
+  it("Nautilus benchmark reconciles equipment-group pricing with the full panel set", () => {
+    const data = lincolnNautilusFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$59,285.00");
+    expect(model.drawnStrings).toContain("5LMPJ8K85TJ801234");
+    expect(page1).toContain("TOTAL MSRP");
+    expect(page1).toContain("202A");
+    expect(page1.join(" ")).toContain("BlueCruise Capability w/ 4-Year Service Period");
+    expect(page1.some((s) => s.includes("MSRP INCLUDES"))).toBe(true);
+    expect(page1.join(" ")).toContain("6-YEAR/70,000-MILE POWERTRAIN LIMITED WARRANTY");
+    expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
+    expect(page1.some((s) => s.includes("HANGZHOU, CHINA"))).toBe(true);
+    expect(page1.some((s) => s.includes("GOVERNMENT 5-STAR SAFETY RATINGS"))).toBe(true);
+    expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
+    expect(page1.some((s) => s === "auto")).toBe(true);
+    expect(page1.some((s) => s === "(LABELS)")).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
+    const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
+    expect(qrs.some((q) => q.kind === "qr" && q.payload === data.passportUrl)).toBe(true);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("uses navy as the only brand color: band and keyline, never Ford blue", () => {
+    const model = buildRenderLayout(lincolnNautilusFixture(), themeFor(null));
+    const prims = model.pages[0].primitives;
+    const fills = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    const rules = new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(fills.has("#172536")).toBe(true);   // Lincoln navy band
+    expect(rules.has("#172536")).toBe(true);   // navy keyline
+    expect(fills.has("#003478")).toBe(false);  // never Ford blue
+    expect(fills.has("#101010")).toBe(true);   // black total band
+  });
+
+  it("Nautilus Hybrid keeps the gasoline regulatory shape under the Hybrid Vehicle tag", () => {
+    const model = buildRenderLayout(lincolnHybridFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1.some((s) => s.includes("Hybrid Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPGe"))).toBe(false);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+  });
+
+  it("Corsair Grand Touring uses the plug-in module with battery warranty", () => {
+    const model = buildRenderLayout(lincolnPhevFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPG gasoline only"))).toBe(true);
+    expect(page1.some((s) => s.includes("Plug-In Hybrid"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.join(" ")).toContain("8-YEAR/100,000-MILE HIGH-VOLTAGE BATTERY LIMITED WARRANTY");
+    expect(page1.some((s) => s.includes("LOUISVILLE, KENTUCKY, USA"))).toBe(true);
+  });
+
+  it("long-equipment Navigator produces a deliberate continuation page", () => {
+    const model = buildRenderLayout(lincolnLongFixture(), themeFor(null));
+    expect(model.pages.length).toBe(2);
+    expect(pageStrings(model, 0)).toContain("$108,135.00");
     expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
     expectMinFontRespected(model);
   });
