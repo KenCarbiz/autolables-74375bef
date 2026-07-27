@@ -2914,6 +2914,86 @@ export type Database = {
           },
         ]
       }
+      document_assets: {
+        Row: {
+          asset_type: string
+          byte_size: number | null
+          checksum: string | null
+          created_at: string
+          document_id: string
+          document_type: string
+          document_version: number
+          id: string
+          mime_type: string
+          storage_bucket: string
+          storage_path: string
+          tenant_id: string
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          asset_type: string
+          byte_size?: number | null
+          checksum?: string | null
+          created_at?: string
+          document_id: string
+          document_type: string
+          document_version?: number
+          id?: string
+          mime_type: string
+          storage_bucket: string
+          storage_path: string
+          tenant_id: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          asset_type?: string
+          byte_size?: number | null
+          checksum?: string | null
+          created_at?: string
+          document_id?: string
+          document_type?: string
+          document_version?: number
+          id?: string
+          mime_type?: string
+          storage_bucket?: string
+          storage_path?: string
+          tenant_id?: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_assets_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "generated_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_assets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_assets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_assets_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_lifecycle_events: {
         Row: {
           actor_id: string | null
@@ -8484,6 +8564,18 @@ export type Database = {
         Returns: string
       }
       get_pdi_for_token: { Args: { _token: string }; Returns: Json }
+      get_published_document_asset: {
+        Args: { _asset_type: string; _document_type: string; _slug: string }
+        Returns: {
+          checksum: string
+          document_id: string
+          document_version: number
+          mime_type: string
+          published_at: string
+          storage_bucket: string
+          storage_path: string
+        }[]
+      }
       get_published_documents_public: {
         Args: { p_slug: string }
         Returns: {
