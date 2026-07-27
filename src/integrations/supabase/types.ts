@@ -1842,6 +1842,54 @@ export type Database = {
           },
         ]
       }
+      description_budget_overrides: {
+        Row: {
+          actor_role: string | null
+          actor_user_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          reason: string
+          scope: string
+          tenant_id: string
+        }
+        Insert: {
+          actor_role?: string | null
+          actor_user_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          reason: string
+          scope?: string
+          tenant_id: string
+        }
+        Update: {
+          actor_role?: string | null
+          actor_user_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          reason?: string
+          scope?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "description_budget_overrides_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_budget_overrides_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       description_cases: {
         Row: {
           archived_at: string | null
@@ -1971,15 +2019,75 @@ export type Database = {
           },
         ]
       }
+      description_channel_policies: {
+        Row: {
+          active: boolean
+          change_reason: string | null
+          channel: string
+          created_at: string
+          id: string
+          last_reviewed: string | null
+          policy_json: Json
+          policy_version: string | null
+          reviewed_by: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          change_reason?: string | null
+          channel: string
+          created_at?: string
+          id?: string
+          last_reviewed?: string | null
+          policy_json?: Json
+          policy_version?: string | null
+          reviewed_by?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          change_reason?: string | null
+          channel?: string
+          created_at?: string
+          id?: string
+          last_reviewed?: string | null
+          policy_json?: Json
+          policy_version?: string | null
+          reviewed_by?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "description_channel_policies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_channel_policies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       description_channel_versions: {
         Row: {
           channel: string
+          channel_policy_version: string | null
           character_count: number | null
           character_limit: number | null
           content: string
           created_at: string
           description_case_id: string
           id: string
+          language: string
+          locale: string
           lock_reason: string | null
           locked: boolean
           locked_at: string | null
@@ -1988,20 +2096,28 @@ export type Database = {
           master_version_id: string
           meta_description: string | null
           potentially_stale: boolean
+          quality_score: number | null
+          read_time_seconds: number | null
+          repair_json: Json | null
+          score_breakdown_json: Json | null
           seo_title: string | null
           tenant_id: string
           updated_at: string
           validation_status: string
           vehicle_id: string
+          word_count: number | null
         }
         Insert: {
           channel: string
+          channel_policy_version?: string | null
           character_count?: number | null
           character_limit?: number | null
           content: string
           created_at?: string
           description_case_id: string
           id?: string
+          language?: string
+          locale?: string
           lock_reason?: string | null
           locked?: boolean
           locked_at?: string | null
@@ -2010,20 +2126,28 @@ export type Database = {
           master_version_id: string
           meta_description?: string | null
           potentially_stale?: boolean
+          quality_score?: number | null
+          read_time_seconds?: number | null
+          repair_json?: Json | null
+          score_breakdown_json?: Json | null
           seo_title?: string | null
           tenant_id: string
           updated_at?: string
           validation_status?: string
           vehicle_id: string
+          word_count?: number | null
         }
         Update: {
           channel?: string
+          channel_policy_version?: string | null
           character_count?: number | null
           character_limit?: number | null
           content?: string
           created_at?: string
           description_case_id?: string
           id?: string
+          language?: string
+          locale?: string
           lock_reason?: string | null
           locked?: boolean
           locked_at?: string | null
@@ -2032,11 +2156,16 @@ export type Database = {
           master_version_id?: string
           meta_description?: string | null
           potentially_stale?: boolean
+          quality_score?: number | null
+          read_time_seconds?: number | null
+          repair_json?: Json | null
+          score_breakdown_json?: Json | null
           seo_title?: string | null
           tenant_id?: string
           updated_at?: string
           validation_status?: string
           vehicle_id?: string
+          word_count?: number | null
         }
         Relationships: [
           {
@@ -2337,6 +2466,7 @@ export type Database = {
           excluded_claims_json: Json
           fact_confidence: number | null
           facts_json: Json
+          features_json: Json
           id: string
           market_context_json: Json
           source_data_version: string
@@ -2351,6 +2481,7 @@ export type Database = {
           excluded_claims_json?: Json
           fact_confidence?: number | null
           facts_json?: Json
+          features_json?: Json
           id?: string
           market_context_json?: Json
           source_data_version: string
@@ -2365,6 +2496,7 @@ export type Database = {
           excluded_claims_json?: Json
           fact_confidence?: number | null
           facts_json?: Json
+          features_json?: Json
           id?: string
           market_context_json?: Json
           source_data_version?: string
@@ -2391,6 +2523,182 @@ export type Database = {
             foreignKeyName: "description_fact_snapshots_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      description_feature_selections: {
+        Row: {
+          aliases_seen: string[]
+          canonical_feature_id: string
+          category: string
+          confidence: number | null
+          conflict: boolean
+          created_at: string
+          description_case_id: string
+          description_eligible: boolean
+          display_name: string
+          id: string
+          origin: string
+          package_id: string | null
+          package_name: string | null
+          priority_rank: number | null
+          priority_score: number | null
+          public_eligible: boolean
+          selected: boolean
+          selection_actor: string
+          selection_reason: string | null
+          selection_user_id: string | null
+          source: string | null
+          tenant_id: string
+          vehicle_id: string
+          version_id: string | null
+        }
+        Insert: {
+          aliases_seen?: string[]
+          canonical_feature_id: string
+          category: string
+          confidence?: number | null
+          conflict?: boolean
+          created_at?: string
+          description_case_id: string
+          description_eligible?: boolean
+          display_name: string
+          id?: string
+          origin: string
+          package_id?: string | null
+          package_name?: string | null
+          priority_rank?: number | null
+          priority_score?: number | null
+          public_eligible?: boolean
+          selected?: boolean
+          selection_actor?: string
+          selection_reason?: string | null
+          selection_user_id?: string | null
+          source?: string | null
+          tenant_id: string
+          vehicle_id: string
+          version_id?: string | null
+        }
+        Update: {
+          aliases_seen?: string[]
+          canonical_feature_id?: string
+          category?: string
+          confidence?: number | null
+          conflict?: boolean
+          created_at?: string
+          description_case_id?: string
+          description_eligible?: boolean
+          display_name?: string
+          id?: string
+          origin?: string
+          package_id?: string | null
+          package_name?: string | null
+          priority_rank?: number | null
+          priority_score?: number | null
+          public_eligible?: boolean
+          selected?: boolean
+          selection_actor?: string
+          selection_reason?: string | null
+          selection_user_id?: string | null
+          source?: string | null
+          tenant_id?: string
+          vehicle_id?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "description_feature_selections_description_case_id_fkey"
+            columns: ["description_case_id"]
+            isOneToOne: false
+            referencedRelation: "description_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_feature_selections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_feature_selections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_feature_selections_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "description_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      description_generation_budgets: {
+        Row: {
+          created_at: string
+          currency: string
+          daily_generation_limit: number | null
+          hard_stop_pct: number
+          max_channels_per_batch: number
+          max_cost_per_generation: number | null
+          max_repair_attempts: number
+          monthly_generation_budget: number | null
+          monthly_preview_budget: number | null
+          per_user_daily_limit: number | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          warning_threshold_pct: number
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          daily_generation_limit?: number | null
+          hard_stop_pct?: number
+          max_channels_per_batch?: number
+          max_cost_per_generation?: number | null
+          max_repair_attempts?: number
+          monthly_generation_budget?: number | null
+          monthly_preview_budget?: number | null
+          per_user_daily_limit?: number | null
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          warning_threshold_pct?: number
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          daily_generation_limit?: number | null
+          hard_stop_pct?: number
+          max_channels_per_batch?: number
+          max_cost_per_generation?: number | null
+          max_repair_attempts?: number
+          monthly_generation_budget?: number | null
+          monthly_preview_budget?: number | null
+          per_user_daily_limit?: number | null
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          warning_threshold_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "description_generation_budgets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_generation_budgets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -2474,6 +2782,211 @@ export type Database = {
           },
           {
             foreignKeyName: "description_jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      description_model_executions: {
+        Row: {
+          attempt_number: number
+          cached_input_tokens: number | null
+          channel: string | null
+          completed_at: string | null
+          correlation_id: string | null
+          cost_amount: number | null
+          cost_may_have_occurred: boolean
+          cost_state: string
+          created_at: string
+          currency: string
+          description_case_id: string | null
+          error_category: string | null
+          error_code: string | null
+          execution_kind: string
+          id: string
+          input_tokens: number | null
+          is_preview: boolean
+          job_id: string | null
+          latency_ms: number | null
+          model: string
+          outcome: string
+          output_tokens: number | null
+          pricing_version: string | null
+          prompt_checksum: string | null
+          prompt_policy_version: string | null
+          provider: string
+          reasoning_tokens: number | null
+          requested_by: string | null
+          started_at: string
+          tenant_id: string
+          vehicle_id: string | null
+          version_id: string | null
+        }
+        Insert: {
+          attempt_number?: number
+          cached_input_tokens?: number | null
+          channel?: string | null
+          completed_at?: string | null
+          correlation_id?: string | null
+          cost_amount?: number | null
+          cost_may_have_occurred?: boolean
+          cost_state?: string
+          created_at?: string
+          currency?: string
+          description_case_id?: string | null
+          error_category?: string | null
+          error_code?: string | null
+          execution_kind?: string
+          id?: string
+          input_tokens?: number | null
+          is_preview?: boolean
+          job_id?: string | null
+          latency_ms?: number | null
+          model: string
+          outcome?: string
+          output_tokens?: number | null
+          pricing_version?: string | null
+          prompt_checksum?: string | null
+          prompt_policy_version?: string | null
+          provider: string
+          reasoning_tokens?: number | null
+          requested_by?: string | null
+          started_at?: string
+          tenant_id: string
+          vehicle_id?: string | null
+          version_id?: string | null
+        }
+        Update: {
+          attempt_number?: number
+          cached_input_tokens?: number | null
+          channel?: string | null
+          completed_at?: string | null
+          correlation_id?: string | null
+          cost_amount?: number | null
+          cost_may_have_occurred?: boolean
+          cost_state?: string
+          created_at?: string
+          currency?: string
+          description_case_id?: string | null
+          error_category?: string | null
+          error_code?: string | null
+          execution_kind?: string
+          id?: string
+          input_tokens?: number | null
+          is_preview?: boolean
+          job_id?: string | null
+          latency_ms?: number | null
+          model?: string
+          outcome?: string
+          output_tokens?: number | null
+          pricing_version?: string | null
+          prompt_checksum?: string | null
+          prompt_policy_version?: string | null
+          provider?: string
+          reasoning_tokens?: number | null
+          requested_by?: string | null
+          started_at?: string
+          tenant_id?: string
+          vehicle_id?: string | null
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "description_model_executions_description_case_id_fkey"
+            columns: ["description_case_id"]
+            isOneToOne: false
+            referencedRelation: "description_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_model_executions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "description_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_model_executions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_model_executions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_model_executions_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "description_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      description_preflight_results: {
+        Row: {
+          blocking_codes: string[]
+          channel: string | null
+          created_at: string
+          description_case_id: string | null
+          findings_json: Json
+          id: string
+          passed: boolean
+          requested_by: string | null
+          summary: string | null
+          tenant_id: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          blocking_codes?: string[]
+          channel?: string | null
+          created_at?: string
+          description_case_id?: string | null
+          findings_json?: Json
+          id?: string
+          passed: boolean
+          requested_by?: string | null
+          summary?: string | null
+          tenant_id: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          blocking_codes?: string[]
+          channel?: string | null
+          created_at?: string
+          description_case_id?: string | null
+          findings_json?: Json
+          id?: string
+          passed?: boolean
+          requested_by?: string | null
+          summary?: string | null
+          tenant_id?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "description_preflight_results_description_case_id_fkey"
+            columns: ["description_case_id"]
+            isOneToOne: false
+            referencedRelation: "description_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_preflight_results_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_preflight_results_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2592,6 +3105,71 @@ export type Database = {
           },
         ]
       }
+      description_validation_overrides: {
+        Row: {
+          actor_role: string | null
+          actor_user_id: string
+          created_at: string
+          description_case_id: string
+          id: string
+          reason: string
+          tenant_id: string
+          validator_codes: string[]
+          version_id: string | null
+        }
+        Insert: {
+          actor_role?: string | null
+          actor_user_id: string
+          created_at?: string
+          description_case_id: string
+          id?: string
+          reason: string
+          tenant_id: string
+          validator_codes: string[]
+          version_id?: string | null
+        }
+        Update: {
+          actor_role?: string | null
+          actor_user_id?: string
+          created_at?: string
+          description_case_id?: string
+          id?: string
+          reason?: string
+          tenant_id?: string
+          validator_codes?: string[]
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "description_validation_overrides_description_case_id_fkey"
+            columns: ["description_case_id"]
+            isOneToOne: false
+            referencedRelation: "description_cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_validation_overrides_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_validation_overrides_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_validation_overrides_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "description_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       description_validation_results: {
         Row: {
           blocking: boolean
@@ -2690,9 +3268,13 @@ export type Database = {
           approval_status: string
           approved_at: string | null
           approved_by: string | null
+          candidate_json: Json | null
+          channel_policy_version: string | null
           character_count: number | null
+          compliance_review_state: string
           configuration_version: string | null
           content: string
+          correlation_id: string | null
           created_at: string
           created_by_type: string
           created_by_user_id: string | null
@@ -2701,25 +3283,45 @@ export type Database = {
           fact_snapshot_id: string | null
           generation_model: string | null
           id: string
+          input_checksum: string | null
+          language: string
+          locale: string
           manual_edit: boolean
+          model_execution_id: string | null
           parent_version_id: string | null
+          pipeline_stage: string | null
+          prompt_checksum: string | null
           prompt_version: string | null
           quality_score: number | null
+          read_time_seconds: number | null
+          readability_json: Json | null
+          repair_json: Json | null
+          score_breakdown_json: Json | null
+          score_version: string | null
+          selected_feature_checksum: string | null
+          seo_targeting_json: Json | null
           source_data_version: string | null
           tenant_id: string
+          tone: string | null
+          uniqueness_json: Json | null
           validation_status: string
           vehicle_id: string
           version_number: number
           version_type: string
+          voice_profile_version: string | null
           word_count: number | null
         }
         Insert: {
           approval_status?: string
           approved_at?: string | null
           approved_by?: string | null
+          candidate_json?: Json | null
+          channel_policy_version?: string | null
           character_count?: number | null
+          compliance_review_state?: string
           configuration_version?: string | null
           content: string
+          correlation_id?: string | null
           created_at?: string
           created_by_type?: string
           created_by_user_id?: string | null
@@ -2728,25 +3330,45 @@ export type Database = {
           fact_snapshot_id?: string | null
           generation_model?: string | null
           id?: string
+          input_checksum?: string | null
+          language?: string
+          locale?: string
           manual_edit?: boolean
+          model_execution_id?: string | null
           parent_version_id?: string | null
+          pipeline_stage?: string | null
+          prompt_checksum?: string | null
           prompt_version?: string | null
           quality_score?: number | null
+          read_time_seconds?: number | null
+          readability_json?: Json | null
+          repair_json?: Json | null
+          score_breakdown_json?: Json | null
+          score_version?: string | null
+          selected_feature_checksum?: string | null
+          seo_targeting_json?: Json | null
           source_data_version?: string | null
           tenant_id: string
+          tone?: string | null
+          uniqueness_json?: Json | null
           validation_status?: string
           vehicle_id: string
           version_number: number
           version_type?: string
+          voice_profile_version?: string | null
           word_count?: number | null
         }
         Update: {
           approval_status?: string
           approved_at?: string | null
           approved_by?: string | null
+          candidate_json?: Json | null
+          channel_policy_version?: string | null
           character_count?: number | null
+          compliance_review_state?: string
           configuration_version?: string | null
           content?: string
+          correlation_id?: string | null
           created_at?: string
           created_by_type?: string
           created_by_user_id?: string | null
@@ -2755,16 +3377,32 @@ export type Database = {
           fact_snapshot_id?: string | null
           generation_model?: string | null
           id?: string
+          input_checksum?: string | null
+          language?: string
+          locale?: string
           manual_edit?: boolean
+          model_execution_id?: string | null
           parent_version_id?: string | null
+          pipeline_stage?: string | null
+          prompt_checksum?: string | null
           prompt_version?: string | null
           quality_score?: number | null
+          read_time_seconds?: number | null
+          readability_json?: Json | null
+          repair_json?: Json | null
+          score_breakdown_json?: Json | null
+          score_version?: string | null
+          selected_feature_checksum?: string | null
+          seo_targeting_json?: Json | null
           source_data_version?: string | null
           tenant_id?: string
+          tone?: string | null
+          uniqueness_json?: Json | null
           validation_status?: string
           vehicle_id?: string
           version_number?: number
           version_type?: string
+          voice_profile_version?: string | null
           word_count?: number | null
         }
         Relationships: [
@@ -2783,6 +3421,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "description_versions_model_execution_id_fkey"
+            columns: ["model_execution_id"]
+            isOneToOne: false
+            referencedRelation: "description_model_executions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "description_versions_parent_version_id_fkey"
             columns: ["parent_version_id"]
             isOneToOne: false
@@ -2798,6 +3443,75 @@ export type Database = {
           },
           {
             foreignKeyName: "description_versions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      description_voice_profiles: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_claims: string[]
+          change_reason: string | null
+          city: string | null
+          created_at: string
+          created_by: string | null
+          dealer_name: string | null
+          id: string
+          profile_json: Json
+          state: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_claims?: string[]
+          change_reason?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          dealer_name?: string | null
+          id?: string
+          profile_json?: Json
+          state?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_claims?: string[]
+          change_reason?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          dealer_name?: string | null
+          id?: string
+          profile_json?: Json
+          state?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "description_voice_profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "description_voice_profiles_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -8778,6 +9492,10 @@ export type Database = {
         }
         Returns: Json
       }
+      description_generation_spend: {
+        Args: { p_tenant_id: string }
+        Returns: Json
+      }
       description_publish_allowed: {
         Args: { p_case_id: string; p_version_id: string }
         Returns: Json
@@ -9378,6 +10096,15 @@ export type Database = {
         }
         Returns: string
       }
+      record_description_output_use: {
+        Args: {
+          p_action: string
+          p_channel: string
+          p_destination?: string
+          p_version_id: string
+        }
+        Returns: Json
+      }
       record_evidence_receipt: {
         Args: {
           _chain_root: string
@@ -9458,6 +10185,16 @@ export type Database = {
         Args: { p_request_id: string; p_response: string }
         Returns: Json
       }
+      save_description_channel_policy: {
+        Args: {
+          p_active?: boolean
+          p_channel: string
+          p_policy: Json
+          p_reason?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       save_description_channel_version: {
         Args: {
           p_case_id: string
@@ -9469,12 +10206,26 @@ export type Database = {
         }
         Returns: Json
       }
+      save_description_generation_budget: {
+        Args: { p_budget: Json; p_tenant_id: string }
+        Returns: Json
+      }
       save_description_manual_version: {
         Args: { p_case_id: string; p_content: string; p_reason?: string }
         Returns: Json
       }
       save_description_settings: {
         Args: { p_settings: Json; p_tenant_id: string }
+        Returns: Json
+      }
+      save_description_voice_profile: {
+        Args: {
+          p_approve?: boolean
+          p_profile: Json
+          p_reason?: string
+          p_tenant_id: string
+          p_version: string
+        }
         Returns: Json
       }
       save_inspection_draft: {
