@@ -8,6 +8,9 @@ import {
   audiEtronFixture,
   audiPhevFixture,
   audiQ5Fixture,
+  landRoverDefenderFixture,
+  landRoverPhevFixture,
+  landRoverSportFixture,
   porsche911Fixture,
   porscheGuzzlerFixture,
   porscheMacanEvFixture,
@@ -1428,6 +1431,107 @@ describe("Porsche profile (porsche-us-2026-v1, sport-factory-technical)", () => 
     expect(joined).toContain("Premium Package");
     expect(joined).toContain("Ventilated Front Seats");
     expect(page1.filter((s) => s === "3,300.00").length).toBe(1);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Land Rover profile (land-rover-us-2026-v1, british-factory-technical)", () => {
+  it("JLR names resolve to Land Rover; Jaguar, Rover and styling qualifiers never do", () => {
+    for (const alias of ["Land Rover", "LAND ROVER", "LandRover", "Jaguar Land Rover", "JLR", "Range Rover"]) {
+      const r = resolveThemeProfile(alias, 2026);
+      expect(r.theme.oemId, alias).toBe("LAND_ROVER");
+      expect(r.profile.themeVersion, alias).toBe("land-rover-us-2026-v1");
+    }
+    const lr = resolveThemeProfile("Land Rover", 2026);
+    expect(lr.profile.status).toBe("draft");
+    expect(lr.profile.layoutFamily).toBe("british-factory-technical");
+    expect(lr.theme.templateFamilyId).toBe("BRITISH_FACTORY");
+    // Jaguar shares JLR but is a separate marque; Rover alone is ambiguous;
+    // compatibility and styling qualifiers describe aftermarket goods.
+    for (const excluded of [
+      "Jaguar", "Rover", "MG Rover", "Austin Rover",
+      "Land Rover-compatible", "Range Rover-style", "Defender", "Discovery", "Evoque",
+    ]) {
+      const r = resolveThemeProfile(excluded, 2026);
+      expect(r.theme.oemId, excluded).not.toBe("LAND_ROVER");
+      expect(r.resolution, excluded).toBe("FALLBACK");
+    }
+    expect(resolveThemeProfile("Land Rover", 2019).profile.status).toBe("fallback");
+  });
+
+  it("renders the owner's Range Rover Sport reference reconciled to $99,150", () => {
+    const model = buildRenderLayout(landRoverSportFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$99,150.00");
+    expect(page1).toContain("$92,175.00");
+    // Land Rover is the manufacturer; Range Rover Sport is the model name.
+    expect(joined).toContain("2026 LAND ROVER RANGE ROVER SPORT");
+    expect(joined).toContain("P400 DYNAMIC SE");
+    // MHEV is a 48V mild hybrid: gasoline EPA layout, no plug-in content.
+    expect(page1).toContain("MPG");
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(false);
+    expect(page1).not.toContain("MPGe");
+    expect(joined).toContain("MHEV");
+    // Cold Climate Pack members sit beneath the parent and price once.
+    expect(joined).toContain("Cold Climate Pack");
+    expect(joined).toContain("Heated Windshield");
+    expect(page1.filter((s) => s === "1,150.00").length).toBe(1);
+    expect(joined).toContain("SOLIHULL, UNITED KINGDOM");
+    expect(joined).toContain("UNITED KINGDOM 60%");
+    expect(joined).toContain("PARTS CONTENT INFORMATION");
+    expect(joined).toContain("has not been rated");
+    expect(joined).toContain("Not an original Land Rover-issued Monroney label");
+    // Deep-navy band with the restrained Land Rover green keyline.
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#0b1c2c")).toBe(true);
+    const rules = new Set(model.pages[0].primitives.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(rules.has("#005a2b")).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("SAL1L9FUXSA123456");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Range Rover SV LWB uses the PHEV module and stays distinct from the Sport", () => {
+    const model = buildRenderLayout(landRoverPhevFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$201,725.00");
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPG gasoline only"))).toBe(true);
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(false);
+    // Long-wheelbase SV is its own model line, not Range Rover Sport.
+    expect(joined).toContain("2026 LAND ROVER RANGE ROVER");
+    expect(joined).toContain("P550E SV LWB");
+    expect(joined).not.toContain("RANGE ROVER SPORT");
+    // SV Bespoke equipment is priced from the record; the no-cost ceramic
+    // controls read INCLUDED rather than as a priced line.
+    expect(joined).toContain("SV Bespoke Premium Palette Paint");
+    expect(page1.filter((s) => s === "INCLUDED").length).toBe(1);
+    expect(joined).toContain("HIGH-VOLTAGE BATTERY LIMITED WARRANTY");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Defender 130 keeps its own body length, plant and EPA record", () => {
+    const model = buildRenderLayout(landRoverDefenderFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$88,425.00");
+    expect(joined).toContain("DEFENDER 130");
+    expect(joined).not.toContain("DEFENDER 110");
+    expect(joined).not.toContain("RANGE ROVER");
+    // Built in Nitra, not the Range Rover's Solihull.
+    expect(joined).toContain("NITRA, SLOVAKIA");
+    expect(joined).not.toContain("SOLIHULL");
+    expect(joined).toContain("SLOVAKIA 45%");
     expectWithinBounds(model);
     expectMinFontRespected(model);
   });

@@ -17,6 +17,7 @@ export type TemplateFamilyId =
   | "SCANDINAVIAN_FACTORY"
   | "COMMERCIAL_FACTORY"
   | "SPORT_FACTORY"
+  | "BRITISH_FACTORY"
   | "MINIMAL_FACTORY"
   | "PERFORMANCE"
   | "AUTOLABELS_FALLBACK";
@@ -35,6 +36,7 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "SCANDINAVIAN_FACTORY",
   "COMMERCIAL_FACTORY",
   "SPORT_FACTORY",
+  "BRITISH_FACTORY",
   "MINIMAL_FACTORY",
   "PERFORMANCE",
   "AUTOLABELS_FALLBACK",
@@ -263,6 +265,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.04em",
     uppercaseSectionHeadings: true,
   },
+  // Land Rover's factory-document voice: humanist grotesque, medium
+  // headings, restrained tracking — technical with British reserve.
+  BRITISH_FACTORY: {
+    headingFont: '"Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    bodyFont: '"Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif',
+    numericFont: '"Helvetica Neue", "Arial Narrow", Arial, sans-serif',
+    headingWeight: 600,
+    bodyWeight: 400,
+    labelWeight: 700,
+    letterSpacing: "0.01em",
+    headingLetterSpacing: "0.09em",
+    uppercaseSectionHeadings: true,
+  },
   // Porsche's engineering-document voice: neutral grotesque, medium
   // headings, tight tracking — precise and dense rather than ornamental.
   SPORT_FACTORY: {
@@ -414,6 +429,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  BRITISH_FACTORY: {
+    headerVariant: "BANDED",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "14pt",
+    borderWeight: "0.75pt",
+    cornerTreatment: "SQUARE",
+  },
   SPORT_FACTORY: {
     headerVariant: "BLOCK",
     pricingVariant: "UNDERLINED",
@@ -484,6 +509,7 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
   GERMAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.18em" },
   SCANDINAVIAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.3em" },
+  BRITISH_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.16em" },
   SPORT_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
   MINIMAL_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.34em" },
   COMMERCIAL_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.04em" },
@@ -778,7 +804,22 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     totalMsrpBackground: "#101010",
     totalMsrpText: "#ffffff",
   }, { totalLabel: "TOTAL MSRP" }),
-  LAND_ROVER: theme("LAND_ROVER", "PREMIUM_LUXURY", palette({ header: "#0c3c26", accent: "#b49b57", sectionHeading: "#0c3c26" })),
+  // Land Rover factory treatment (land-rover-us-2026-v1): white identity
+  // block against a deep-navy model band, restrained Land Rover green on
+  // the accent keyline only. Land Rover stays the canonical manufacturer;
+  // Range Rover is a consumer-facing model name, never the make.
+  LAND_ROVER: theme("LAND_ROVER", "BRITISH_FACTORY", {
+    headerBackground: "#0b1c2c",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#141414",
+    mutedText: "#55595e",
+    accent: "#005a2b",
+    divider: "#d0d2d4",
+    sectionHeadingText: "#0b1c2c",
+    totalMsrpBackground: "#0b1c2c",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL MSRP" }),
   // Porsche factory treatment (porsche-us-2026-v1): black masthead block
   // carrying the reversed PORSCHE wordmark over a paper model band, with
   // Porsche red confined to the single accent keyline.

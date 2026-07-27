@@ -97,6 +97,12 @@ const ALIASES: Record<string, OemId> = {
   benz: "MERCEDES_BENZ",
   mercedesamg: "MERCEDES_BENZ",
   rangerover: "LAND_ROVER",
+  jaguarlandrover: "LAND_ROVER",
+  jaguarlandroverlimited: "LAND_ROVER",
+  jaguarlandrovernorthamerica: "LAND_ROVER",
+  jaguarlandrovernorthamericallc: "LAND_ROVER",
+  jlr: "LAND_ROVER",
+  landrovernorthamerica: "LAND_ROVER",
   infinity: "INFINITI",
   datsun: "NISSAN",
   scion: "TOYOTA",
@@ -134,6 +140,23 @@ const unresolved = (reason: string): OemResolution => ({
   fallbackReason: reason,
 });
 
+// Compatibility / styling qualifiers: "Land Rover-compatible" and
+// "Range Rover-style" describe an aftermarket relationship to a brand, not
+// the brand itself, and must never select that brand's template.
+const QUALIFIER_TOKENS = [
+  "compatible", "style", "styled", "styling", "replica", "inspired",
+  "lookalike", "aftermarket", "tribute", "clone", "conversion",
+];
+
+// Standalone words that are a substring of a real make but are not that
+// make on their own ("Rover" is not Land Rover; MG Rover and Austin Rover
+// are unrelated marques). These resolve to review rather than a guess.
+const AMBIGUOUS_STANDALONE = new Set(["rover", "range", "land"]);
+
+// Sibling marques with no template of their own. Jaguar shares JLR with
+// Land Rover but is a separate brand and must never inherit its template.
+const SIBLING_MARQUES = new Set(["jaguar", "jaguarcars", "jaguarlandroverjaguar"]);
+
 // Commercial-truck marques that would otherwise fuzzy-match a passenger
 // brand (e.g. "Volvo Trucks" contains "volvo"). These must never receive
 // a passenger-car template — they resolve to review instead of guessing.
@@ -153,6 +176,17 @@ export function resolveOem(rawMake: string, modelYear?: number): OemResolution {
   if (!key) return unresolved(`make "${raw}" has no resolvable characters`);
   if (NON_PASSENGER_MAKES.has(key)) {
     return unresolved(`make "${raw}" is a commercial-truck marque, not a passenger brand`);
+  }
+  if (SIBLING_MARQUES.has(key)) {
+    return unresolved(`make "${raw}" is a separate marque without its own template`);
+  }
+  if (AMBIGUOUS_STANDALONE.has(key)) {
+    return unresolved(`make "${raw}" is ambiguous on its own and needs an explicit brand`);
+  }
+  for (const token of QUALIFIER_TOKENS) {
+    if (key.includes(token)) {
+      return unresolved(`make "${raw}" is a compatibility/styling qualifier, not a manufacturer`);
+    }
   }
 
   // Ram was a Dodge nameplate until the 2011 brand split.

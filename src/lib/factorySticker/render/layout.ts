@@ -348,6 +348,7 @@ const FAMILY_STYLES: Record<string, FamilyStyle> = {
   LUXURY_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true },
   GERMAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, passportBrandLine: true },
   MINIMAL_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
+  BRITISH_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, passportBrandLine: true },
   SPORT_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
   COMMERCIAL_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, passportBrandLine: true },
   SCANDINAVIAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, passportBrandLine: true },
@@ -657,8 +658,10 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
     // Model + trim inside the band; auto-fit, never truncated.
     const primaryI = [v.year > 0 ? String(v.year) : "", v.make, v.model].filter(Boolean).join(" ").toUpperCase();
     const modelMax = dx - bandX - 24;
+    // Floor low enough that long make + consumer-model combinations
+    // ("LAND ROVER RANGE ROVER SPORT") shrink rather than truncate.
     let primaryISize = 17;
-    while (primaryISize > 11 && measureText(primaryI, "bold", primaryISize) > modelMax) primaryISize -= 0.5;
+    while (primaryISize > 8.5 && measureText(primaryI, "bold", primaryISize) > modelMax) primaryISize -= 0.5;
     p.text(ellipsize(primaryI, "bold", primaryISize, modelMax), bandX + 12, bandTop + 24.5, primaryISize, "bold", bandInk);
     if (v.trim) {
       p.text(ellipsize(v.trim.toUpperCase(), "bold", 8.5, modelMax), bandX + 12, bandTop + 38.5, 8.5, "bold", bandInk, { charSpacing: 0.5 });
