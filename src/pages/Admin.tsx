@@ -792,6 +792,7 @@ const Admin = () => {
             { icon: ScanLine, title: "Scan VIN", subtitle: "Camera on phone/tablet, QR hand-off on desktop", onClick: openScan },
             { icon: FileSignature, title: "Build Addendum", subtitle: "Create a signable addendum", onClick: () => navigate("/addendum") },
             { icon: Sparkles, title: "New Car Sticker", subtitle: "Monroney-style window label", onClick: () => navigate("/new-car-sticker") },
+            { icon: Sparkles, title: "Window Sticker Studio", subtitle: "VIN-specific OEM window stickers", onClick: () => navigate("/window-sticker-studio") },
             { icon: Car, title: "Used Car Sticker", subtitle: "Addendum for used inventory", onClick: () => navigate("/used-car-sticker") },
             { icon: ShieldCheck, title: "Compliance Center", subtitle: "Audit trail and regs", onClick: () => navigate("/compliance") },
           ];

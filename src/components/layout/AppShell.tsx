@@ -194,6 +194,7 @@ const AppShell = ({ children }: AppShellProps) => {
     "/saved": { title: "Deals", subtitle: "Review saved addendums, signatures, and delivery status." },
     "/addendum": { title: "New Addendum", subtitle: "Create compliant addendum labels and forms." },
     "/new-car-sticker": { title: "New Car Sticker", subtitle: "Generate new vehicle window labels." },
+    "/window-sticker-studio": { title: "Window Sticker Studio", subtitle: "Create, validate and publish VIN-specific OEM window stickers." },
     "/used-car-sticker": { title: "Used Car Sticker", subtitle: "Generate used vehicle buyer-facing labels." },
     "/sticker-studio": { title: "Sticker Studio", subtitle: "Build and customize label templates." },
     "/compliance": { title: "Compliance", subtitle: "Track dealership forms, rules, and audit items." },

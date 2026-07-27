@@ -401,8 +401,14 @@ const GEN_STATUS_TONE: Record<string, Tone> = {
   SUPERSEDED: "off", ARCHIVED: "off",
 };
 
-export default function FactoryStickerWorkspace({ fixture = false }: { fixture?: boolean }) {
-  const { vehicleId } = useParams();
+export default function FactoryStickerWorkspace({
+  fixture = false, vehicleId: vehicleIdProp, embedded = false,
+}: { fixture?: boolean; vehicleId?: string; embedded?: boolean }) {
+  // The Window Sticker Studio embeds this same workspace rather than
+  // reimplementing steps 2-4, so a sticker built in the Studio and one
+  // opened from a Vehicle File run identical logic.
+  const params = useParams();
+  const vehicleId = vehicleIdProp ?? params.vehicleId;
   const { isAdmin } = useAuth();
   const entitlements = useEntitlements();
   const manager = fixture ? false : hasDealerCapability(entitlements.member?.role, "can_approve_print", isAdmin);
@@ -591,8 +597,8 @@ export default function FactoryStickerWorkspace({ fixture = false }: { fixture?:
   }
 
   return (
-    <div className={fixture ? "min-h-screen bg-slate-100 p-4 md:p-6" : "p-4 md:p-6"}>
-      <div className="max-w-[1600px] mx-auto space-y-4">
+    <div className={fixture ? "min-h-screen bg-slate-100 p-4 md:p-6" : embedded ? "" : "p-4 md:p-6"}>
+      <div className={embedded ? "space-y-4" : "max-w-[1600px] mx-auto space-y-4"}>
         {fixture && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 space-y-2">
             <p className="text-[12px] font-semibold text-amber-800">
@@ -620,7 +626,7 @@ export default function FactoryStickerWorkspace({ fixture = false }: { fixture?:
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0">
-            {!fixture && vehicle && (
+            {!fixture && !embedded && vehicle && (
               <Link
                 to={`/vehicle-file/${vehicle.id}`}
                 className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border bg-card text-xs font-semibold hover:bg-muted/40 shrink-0"

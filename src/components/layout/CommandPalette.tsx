@@ -188,6 +188,9 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
             <FileText className="w-4 h-4 mr-2" />
             New Car Sticker
           </CommandItem>
+          <CommandItem onSelect={() => go("/window-sticker-studio")}>
+            Window Sticker Studio
+          </CommandItem>
           <CommandItem onSelect={() => go("/cpo-sheet")}>
             <Award className="w-4 h-4 mr-2" />
             New CPO Sheet

@@ -121,6 +121,7 @@ const DevSaturdayPreview = lazy(() => import("./pages/DevSaturdayPreview"));
 const DevConnecticutSmokeTest = lazy(() => import("./pages/DevConnecticutSmokeTest"));
 const DevPrepMobilePreview = lazy(() => import("./pages/DevPrepMobilePreview"));
 const FactoryStickerWorkspace = lazy(() => import("./pages/FactoryStickerWorkspace"));
+const WindowStickerStudio = lazy(() => import("./pages/WindowStickerStudio"));
 const ThemeLab = lazy(() => import("./pages/ThemeLab"));
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
@@ -279,6 +280,7 @@ const App = () => (
                         <Route path="/dashboard-legacy" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/vehicle-file/:id" element={<VehicleFile />} />
                         <Route path="/factory-sticker/:vehicleId" element={<FactoryStickerWorkspace />} />
+                        <Route path="/window-sticker-studio" element={<WindowStickerStudio />} />
                         <Route path="/admin" element={<Admin />} />
                         <Route path="/admin/smoke-test" element={<AdminSmokeTest />} />
                         <Route path="/admin/design-system/addendum-icons" element={<AddendumIconLibrary />} />
