@@ -1125,6 +1125,8 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
         tenantId={vehicle.tenant_id}
         condition={vehicle.condition}
         oemStickerUrl={(vehicle as unknown as { oem_sticker_url?: string | null }).oem_sticker_url ?? null}
+        vin={vehicle.vin}
+        vehicleLabel={vehicle.ymm}
       />
       {/* OEM brochure link — auto-harvested from the manufacturer's own site */}
       <BrochureFinderRow vehicle={vehicle} />

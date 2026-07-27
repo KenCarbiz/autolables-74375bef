@@ -51,6 +51,19 @@ const MAX_RETRYABLE_ATTEMPTS = 3;
 
 const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
 
+// Regeneration is always a recorded decision. "other" additionally demands a
+// written explanation so the version history never says only "regenerated".
+const REGENERATION_REASONS = new Set([
+  "vehicle_information_corrected",
+  "additional_source_data_available",
+  "options_or_packages_corrected",
+  "msrp_corrected",
+  "wrong_template_selected",
+  "pdf_or_layout_problem",
+  "qr_or_passport_link_changed",
+  "other",
+]);
+
 // Decision authority mirrors generate-vehicle-forms MANAGER_ROLES.
 const MANAGER_ROLES = new Set([
   "owner", "general_manager", "gsm", "admin", "manager",
@@ -134,8 +147,8 @@ async function loadOrCreateRecord(admin: Admin, tenantId: string, vehicleId: str
 async function fileStickerDocument(
   admin: Admin, tenantId: string, vehicleId: string, vin: string,
   pdfBytes: Uint8Array, previewSvg: string, snapExtra: Record<string, unknown>,
-  publish: boolean, profileFamily: string,
-): Promise<{ documentId: string | null; version: number; pdfUrl: string; previewUrl: string | null }> {
+  publish: boolean, profileFamily: string, preservePublished = true,
+): Promise<{ documentId: string | null; version: number; pdfUrl: string; previewUrl: string | null; supersededPublished: boolean }> {
   const hash = await sha256Hex(pdfBytes);
 
   const { data: all } = await admin.from("generated_documents")
@@ -146,7 +159,15 @@ async function fileStickerDocument(
   const RETIRED = new Set(["superseded", "archived", "rejected"]);
   const MUTABLE = new Set(["draft", "pending_approval"]);
   const liveRows = rows.filter((r) => !RETIRED.has(r.document_status));
-  const current = liveRows[0];
+  // A published version stays public until an authorized user approves its
+  // replacement: an unreviewed draft never supersedes what customers can
+  // already see on the passport.
+  const holdPublished = preservePublished && !publish;
+  const publishedRows = liveRows.filter((r) => r.document_status === "published");
+  const supersedable = holdPublished
+    ? liveRows.filter((r) => r.document_status !== "published")
+    : liveRows;
+  const current = supersedable[0];
   const nextVersion = rows.reduce((m, r) => Math.max(m, r.version || 0), 0) + 1;
   const version = current && MUTABLE.has(current.document_status) ? current.version : nextVersion;
 
@@ -187,18 +208,21 @@ async function fileStickerDocument(
       document_status: targetStatus, updated_at: new Date().toISOString(),
       ...(publish ? { published_at: new Date().toISOString() } : {}),
     }).eq("id", current.id);
-    const extras = liveRows.slice(1).map((r) => r.id);
+    const extras = supersedable.slice(1).map((r) => r.id);
     if (extras.length) {
       await admin.from("generated_documents")
         .update({ document_status: "superseded", superseded_by: current.id, updated_at: new Date().toISOString() })
         .in("id", extras);
     }
-    return { documentId: current.id, version, pdfUrl: url, previewUrl };
+    return { documentId: current.id, version, pdfUrl: url, previewUrl, supersededPublished: false };
   }
 
-  if (current && (current.data_snapshot as { content_hash?: string } | null)?.content_hash === hash) {
-    await admin.from("generated_documents").update({ online_url: url, pdf_url: url, updated_at: new Date().toISOString() }).eq("id", current.id);
-    return { documentId: current.id, version: current.version, pdfUrl: url, previewUrl };
+  const identical = [current, ...publishedRows].find(
+    (r) => r && (r.data_snapshot as { content_hash?: string } | null)?.content_hash === hash,
+  );
+  if (identical) {
+    await admin.from("generated_documents").update({ online_url: url, pdf_url: url, updated_at: new Date().toISOString() }).eq("id", identical.id);
+    return { documentId: identical.id, version: identical.version, pdfUrl: url, previewUrl, supersededPublished: false };
   }
 
   const { data: inserted, error: insErr } = await admin.from("generated_documents").insert({
@@ -209,18 +233,27 @@ async function fileStickerDocument(
   }).select("id").maybeSingle();
   if (insErr) throw new Error(`generated_documents insert failed: ${insErr.message}`);
   const newId = (inserted as { id?: string } | null)?.id ?? null;
-  if (newId && liveRows.length) {
+  if (newId && supersedable.length) {
     await admin.from("generated_documents")
       .update({ document_status: "superseded", superseded_by: newId, updated_at: new Date().toISOString() })
-      .in("id", liveRows.map((r) => r.id));
+      .in("id", supersedable.map((r) => r.id));
   }
-  return { documentId: newId, version: nextVersion, pdfUrl: url, previewUrl };
+  return {
+    documentId: newId, version: nextVersion, pdfUrl: url, previewUrl,
+    supersededPublished: !holdPublished && publishedRows.length > 0,
+  };
 }
 
 // ── The pipeline for a single vehicle ────────────────────────────────
 async function orchestrateVehicle(
   admin: Admin, req: Request, tenantId: string, vehicleId: string,
-  opts: { force?: boolean; reason?: string; appBase?: string } = {},
+  opts: {
+    force?: boolean; reason?: string; appBase?: string;
+    regeneration?: {
+      reasonCode: string; reasonNotes: string | null;
+      dataSource: "reuse" | "refresh"; userId: string | null;
+    };
+  } = {},
 ): Promise<Record<string, unknown>> {
   const { data: listing } = await admin.from("vehicle_listings").select("*").eq("id", vehicleId).maybeSingle();
   if (!listing) return { vehicle_id: vehicleId, skipped: "listing_not_found" };
@@ -580,11 +613,25 @@ async function orchestrateVehicle(
         renderer_version: FACTORY_STICKER_RENDERER_VERSION,
         oem_theme_id: theme.oemThemeId, generation_fingerprint: fingerprint,
         reconciliation_status: reconciliationStatus, confidence_level: normalized.confidence,
+        template_key: selection.templateKey, selection_status: selection.selectionStatus,
+        selection_confidence: selection.confidence,
+        generated_by: opts.regeneration ? "user" : "system",
+        generated_by_user_id: opts.regeneration?.userId ?? null,
+        ...(opts.regeneration
+          ? {
+            regeneration_reason_code: opts.regeneration.reasonCode,
+            regeneration_reason_notes: opts.regeneration.reasonNotes,
+            regeneration_data_source: opts.regeneration.dataSource,
+          }
+          : {}),
         ...(oemOriginalUrl ? { oem_original_url: oemOriginalUrl } : {}),
       }, autoPublish, profileFamily);
 
-    await audit(admin, tenantId, "factory_sticker.generated", record.id,
-      { vin, document_id: filed.documentId, version: filed.version, auto_publish: autoPublish });
+    await audit(admin, tenantId, "factory_sticker.generated", record.id, {
+      vin, document_id: filed.documentId, version: filed.version, auto_publish: autoPublish,
+      generated_by: opts.regeneration ? "user" : "system",
+      ...(opts.regeneration ? { reason_code: opts.regeneration.reasonCode } : {}),
+    });
 
     const finalStatus = autoPublish ? "PUBLISHED" : "REVIEW_REQUIRED";
     await setRecord(admin, record.id, {
@@ -686,12 +733,93 @@ serve(async (req) => {
       // A forced run overrides review decisions and terminal states — that is
       // a manager decision, not a membership privilege.
       if (force && !isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+
+      let reasonCode: string | null = null;
+      let reasonNotes: string | null = null;
+      let dataSource: "reuse" | "refresh" = "reuse";
+      let refresh: Record<string, unknown> | null = null;
+
+      if (action === "regenerate") {
+        // An operator-initiated regeneration is a recorded decision: the
+        // reason travels with the version so the history explains itself.
+        reasonCode = String(body.reason_code || "").trim();
+        reasonNotes = String(body.reason_notes || "").trim() || null;
+        if (!REGENERATION_REASONS.has(reasonCode)) {
+          return json({ error: "reason_required", allowed: [...REGENERATION_REASONS] }, 400);
+        }
+        if (reasonCode === "other" && !reasonNotes) {
+          return json({ error: "reason_notes_required" }, 400);
+        }
+        dataSource = body.data_source === "refresh" ? "refresh" : "reuse";
+
+        const { data: priorRecord } = await admin.from("factory_sticker_records")
+          .select("id, vin, current_document_id").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+        let priorVersion: number | null = null;
+        if (priorRecord?.current_document_id) {
+          const { data: pd } = await admin.from("generated_documents")
+            .select("version").eq("id", priorRecord.current_document_id).maybeSingle();
+          priorVersion = (pd as { version?: number } | null)?.version ?? null;
+        }
+        if (priorRecord?.id) {
+          await audit(admin, tenantId, "factory_sticker.regeneration_requested", priorRecord.id, {
+            vin: priorRecord.vin, reason_code: reasonCode, reason_notes: reasonNotes,
+            data_source: dataSource, prior_version: priorVersion, user_id: callerUserId,
+          });
+        }
+
+        // Refreshing provider data is a separate, explicitly authorized act:
+        // it may incur a charge, so it never happens implicitly on a
+        // presentation-only regeneration.
+        if (dataSource === "refresh") {
+          if (!isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+          const { data: veh } = await admin.from("vehicle_listings")
+            .select("vin").eq("id", vehicleId).eq("tenant_id", tenantId).maybeSingle();
+          const refreshVin = String((veh as { vin?: string } | null)?.vin || "").toUpperCase().trim();
+          if (!VIN_RE.test(refreshVin)) return json({ error: "invalid_vin_for_refresh" }, 400);
+          if (priorRecord?.id) {
+            await audit(admin, tenantId, "factory_sticker.neovin_refresh_authorized", priorRecord.id, {
+              vin: refreshVin, user_id: callerUserId, reason_code: reasonCode,
+            });
+          }
+          try {
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/marketcheck-specs`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+              body: JSON.stringify({ vin: refreshVin, tenant_id: tenantId, vehicle_id: vehicleId }),
+            });
+            const payload = await res.json().catch(() => ({}));
+            refresh = { ok: res.ok && payload?.ok !== false, detail: payload?.error ?? null };
+          } catch (e) {
+            refresh = { ok: false, detail: String((e as Error)?.message || e).slice(0, 200) };
+          }
+          if (priorRecord?.id) {
+            await audit(admin, tenantId, "factory_sticker.neovin_refresh_completed", priorRecord.id,
+              { vin: refreshVin, ...(refresh || {}) });
+          }
+        } else {
+          const { data: pr } = await admin.from("factory_sticker_records")
+            .select("id, vin").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+          if (pr?.id) {
+            await audit(admin, tenantId, "factory_sticker.stored_source_reused", pr.id,
+              { vin: pr.vin, user_id: callerUserId, reason_code: reasonCode });
+          }
+        }
+      }
+
       const result = await orchestrateVehicle(admin, req, tenantId, vehicleId, {
         force,
-        reason: action === "regenerate" ? "manual_regenerate" : String(body.reason || "ingest"),
+        reason: action === "regenerate" ? `manual_regenerate:${reasonCode}` : String(body.reason || "ingest"),
         appBase: body.app_base ? String(body.app_base) : undefined,
+        regeneration: action === "regenerate"
+          ? { reasonCode: reasonCode as string, reasonNotes, dataSource, userId: callerUserId }
+          : undefined,
       });
-      return json({ success: !result.error, generated: !result.error && !result.skipped && !result.reused, ...result });
+      return json({
+        success: !result.error,
+        generated: !result.error && !result.skipped && !result.reused,
+        ...(refresh ? { source_refresh: refresh } : {}),
+        ...result,
+      });
     }
 
     if (action === "approve_publish") {
@@ -702,6 +830,24 @@ serve(async (req) => {
       if (!record) return json({ error: "record_not_found" }, 404);
       if (!record.current_document_id) return json({ error: "nothing_to_publish" }, 409);
       const now = new Date().toISOString();
+      // The approved draft supersedes whichever version was public — the
+      // prior version is retired, never deleted, and stays readable to
+      // authorized users through the version history.
+      const { data: priorPublished } = await admin.from("generated_documents")
+        .select("id, version")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+        .eq("document_type", "factory_sticker").eq("document_status", "published")
+        .neq("id", record.current_document_id);
+      const priorIds = ((priorPublished || []) as { id: string }[]).map((r) => r.id);
+      if (priorIds.length) {
+        await admin.from("generated_documents").update({
+          document_status: "superseded", superseded_by: record.current_document_id, updated_at: now,
+        }).in("id", priorIds);
+        await audit(admin, tenantId, "factory_sticker.version_superseded", record.id, {
+          vin: record.vin, superseded_ids: priorIds,
+          superseded_by: record.current_document_id, user_id: callerUserId,
+        });
+      }
       await admin.from("generated_documents").update({
         document_status: "published", published_at: now, updated_at: now,
       }).eq("id", record.current_document_id);
@@ -713,6 +859,101 @@ serve(async (req) => {
       await audit(admin, tenantId, "factory_sticker.published", record.id,
         { vin: record.vin, document_id: record.current_document_id, mode: "manual", user_id: callerUserId });
       return json({ success: true, record_id: record.id, document_id: record.current_document_id, status: "PUBLISHED" });
+    }
+
+    if (action === "version_history") {
+      const { data: record } = await admin.from("factory_sticker_records")
+        .select("id, vin, current_document_id").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+      const { data: versions } = await admin.from("generated_documents")
+        .select("id, version, document_status, pdf_url, online_url, published_at, created_at, updated_at, superseded_by, data_snapshot")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("document_type", "factory_sticker")
+        .order("version", { ascending: false });
+      const rows = ((versions || []) as Array<Record<string, unknown>>).map((r) => {
+        const snap = (r.data_snapshot || {}) as Record<string, unknown>;
+        return {
+          id: r.id, version: r.version, status: r.document_status,
+          pdf_url: r.pdf_url ?? r.online_url ?? null,
+          published_at: r.published_at, created_at: r.created_at, updated_at: r.updated_at,
+          superseded_by: r.superseded_by,
+          generated_by: snap.generated_by ?? "system",
+          generated_by_user_id: snap.generated_by_user_id ?? null,
+          reason_code: snap.regeneration_reason_code ?? null,
+          reason_notes: snap.regeneration_reason_notes ?? null,
+          data_source: snap.regeneration_data_source ?? null,
+          template_key: snap.template_key ?? null,
+          template_family_id: snap.template_family_id ?? null,
+          template_version: snap.template_version ?? null,
+          renderer_version: snap.renderer_version ?? null,
+          content_hash: snap.content_hash ?? null,
+          reconciliation_status: snap.reconciliation_status ?? null,
+        };
+      });
+      return json({
+        success: true, record_id: record?.id ?? null,
+        current_document_id: record?.current_document_id ?? null, versions: rows,
+      });
+    }
+
+    if (action === "restore_version") {
+      if (!isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+      const documentId = String(body.document_id || "");
+      if (!documentId) return json({ error: "document_id required" }, 400);
+      const { data: record } = await admin.from("factory_sticker_records")
+        .select("id, vin, current_document_id").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+      if (!record) return json({ error: "record_not_found" }, 404);
+      const { data: target } = await admin.from("generated_documents")
+        .select("id, version, document_status")
+        .eq("id", documentId).eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+        .eq("document_type", "factory_sticker").maybeSingle();
+      if (!target) return json({ error: "version_not_found" }, 404);
+      const now = new Date().toISOString();
+      // Restoring reactivates a preserved version as the draft awaiting
+      // approval. It does not republish on its own — the publish decision
+      // stays a separate, audited act.
+      await admin.from("generated_documents").update({
+        document_status: "pending_approval", superseded_by: null, updated_at: now,
+      }).eq("id", documentId);
+      await setRecord(admin, record.id, {
+        current_document_id: documentId,
+        generation_status: "REVIEW_REQUIRED",
+        review_required: true,
+        review_reason: `restored_version_${(target as { version?: number }).version ?? "?"}`,
+      });
+      await audit(admin, tenantId, "factory_sticker.version_restored", record.id, {
+        vin: record.vin, document_id: documentId,
+        version: (target as { version?: number }).version ?? null,
+        previous_current: record.current_document_id, user_id: callerUserId,
+      });
+      return json({ success: true, record_id: record.id, document_id: documentId, status: "REVIEW_REQUIRED" });
+    }
+
+    if (action === "document_assets") {
+      // Fresh signed URLs for a filed version. The thumbnail is the vector
+      // first page of the SAME immutable snapshot the PDF was realized
+      // from — never a stock graphic and never another vehicle's document.
+      const documentId = String(body.document_id || "");
+      if (!documentId) return json({ error: "document_id required" }, 400);
+      const { data: doc } = await admin.from("generated_documents")
+        .select("id, version, document_status, data_snapshot")
+        .eq("id", documentId).eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+        .eq("document_type", "factory_sticker").maybeSingle();
+      if (!doc) return json({ error: "document_not_found" }, 404);
+      const snap = ((doc as { data_snapshot?: Record<string, unknown> }).data_snapshot || {}) as Record<string, unknown>;
+      const bucket = String(snap.storage_bucket || BUCKET);
+      const sign = async (path: unknown): Promise<string | null> => {
+        if (typeof path !== "string" || !path) return null;
+        const { data } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 60);
+        return (data as { signedUrl?: string } | null)?.signedUrl ?? null;
+      };
+      const pdfUrl = await sign(snap.storage_path);
+      const previewUrl = await sign(snap.preview_path);
+      return json({
+        success: true, document_id: documentId,
+        version: (doc as { version?: number }).version ?? null,
+        status: (doc as { document_status?: string }).document_status ?? null,
+        pdf_url: pdfUrl, preview_url: previewUrl,
+        content_hash: snap.content_hash ?? null,
+      });
     }
 
     if (action === "unpublish") {

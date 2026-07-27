@@ -6,8 +6,11 @@ import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { toast } from "sonner";
 import {
-  AlertTriangle, Download, ExternalLink, FileText, Loader2, RefreshCw, ShieldCheck,
+  AlertTriangle, Download, ExternalLink, FileText, History, Loader2, RefreshCw, ShieldCheck,
 } from "lucide-react";
+import RegenerateStickerDrawer from "./RegenerateStickerDrawer";
+import StickerVersionHistory from "./StickerVersionHistory";
+import { useWindowSticker } from "@/hooks/useWindowSticker";
 
 // Factory Build Record card for the Vehicle File's Documents tab. Reads the
 // per-vehicle factory_sticker_records row plus its current generated_documents
@@ -97,11 +100,15 @@ const VERIFICATION_LABEL: Record<string, { label: string; tone: keyof typeof PIL
 
 const humanize = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
 
-export default function FactoryStickerCard({ vehicleId, tenantId, condition, oemStickerUrl }: {
+export default function FactoryStickerCard({
+  vehicleId, tenantId, condition, oemStickerUrl, vin, vehicleLabel,
+}: {
   vehicleId: string;
   tenantId: string | null;
   condition: "new" | "used" | "cpo" | null;
   oemStickerUrl: string | null;
+  vin?: string | null;
+  vehicleLabel?: string | null;
 }) {
   const { isAdmin } = useAuth();
   const { member } = useEntitlements();
@@ -112,6 +119,10 @@ export default function FactoryStickerCard({ vehicleId, tenantId, condition, oem
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [regenOpen, setRegenOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const { documentAssets } = useWindowSticker();
 
   const load = useCallback(async () => {
     if (!tenantId) { setLoading(false); return; }
@@ -145,6 +156,21 @@ export default function FactoryStickerCard({ vehicleId, tenantId, condition, oem
   }, [tenantId, vehicleId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // The card thumbnail is the first page of THIS vehicle's own filed
+  // document, rendered from the same immutable snapshot as its PDF.
+  useEffect(() => {
+    let cancelled = false;
+    setThumbUrl(null);
+    if (!tenantId || !doc?.id) return;
+    (async () => {
+      try {
+        const assets = await documentAssets(tenantId, vehicleId, doc.id);
+        if (!cancelled) setThumbUrl(assets.preview_url);
+      } catch { /* the card stands without a thumbnail */ }
+    })();
+    return () => { cancelled = true; };
+  }, [tenantId, vehicleId, doc?.id, documentAssets]);
 
   const regenerate = async (action: "regenerate" | "orchestrate") => {
     if (!tenantId) { toast.error("Vehicle has no tenant"); return; }
@@ -203,10 +229,19 @@ export default function FactoryStickerCard({ vehicleId, tenantId, condition, oem
           >
             <ExternalLink className="w-3 h-3" /> Open workspace
           </Link>
+          {record && (
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted/40"
+            >
+              <History className="w-3 h-3" /> Versions
+            </button>
+          )}
           {manager && record && (
             <button
               type="button"
-              onClick={() => regenerate("regenerate")}
+              onClick={() => setRegenOpen(true)}
               disabled={busy}
               className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted/40 disabled:opacity-50"
             >
@@ -247,6 +282,21 @@ export default function FactoryStickerCard({ vehicleId, tenantId, condition, oem
         </div>
       ) : (
         <div className="rounded-xl border border-border bg-background p-3.5 space-y-2">
+          {thumbUrl && (
+            <a
+              href={fileUrl || thumbUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block rounded-lg border border-border overflow-hidden bg-white hover:border-blue-600 transition-colors"
+            >
+              <img
+                src={thumbUrl}
+                alt={`First page of the ${title.toLowerCase()} for this VIN`}
+                className="w-full max-w-[280px] h-auto"
+                loading="lazy"
+              />
+            </a>
+          )}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-foreground">{title}</span>
             {doc && <span className="text-[11px] text-muted-foreground">v{doc.version}</span>}
@@ -316,6 +366,31 @@ export default function FactoryStickerCard({ vehicleId, tenantId, condition, oem
             )}
           </div>
         </div>
+      )}
+
+      {regenOpen && tenantId && (
+        <RegenerateStickerDrawer
+          tenantId={tenantId}
+          vehicleId={vehicleId}
+          vehicleLabel={vehicleLabel || title}
+          vin={vin || ""}
+          currentVersion={doc?.version ?? null}
+          currentStatus={doc?.document_status ?? null}
+          templateLabel={record?.detected_make_value || record?.canonical_oem_id || null}
+          sourceRetrievedAt={record?.updated_at ?? null}
+          onClose={() => setRegenOpen(false)}
+          onDone={load}
+        />
+      )}
+
+      {historyOpen && tenantId && (
+        <StickerVersionHistory
+          tenantId={tenantId}
+          vehicleId={vehicleId}
+          canRestore={manager}
+          onClose={() => setHistoryOpen(false)}
+          onChanged={load}
+        />
       )}
 
       {oemStickerUrl && (
