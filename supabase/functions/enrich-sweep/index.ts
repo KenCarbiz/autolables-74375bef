@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 
 // ──────────────────────────────────────────────────────────────
 // enrich-sweep — the nightly self-chaining enrichment sweep.
@@ -60,18 +61,51 @@ async function runSweep(sweepStart: string, depth: number) {
           .eq("tenant_id", r.tenant_id).eq("vin", r.vin).maybeSingle();
         // deno-lint-ignore no-explicit-any
         const mc = (lrow?.mc_attributes ?? {}) as Record<string, any>;
-        const hasSpecs = (Array.isArray(mc.options) && mc.options.length > 0) ||
-          (Array.isArray(mc.features) && mc.features.length > 0);
-        if (!hasSpecs && Date.now() < deadline) {
-          const sres = await fetch(`${SUPABASE_URL}/functions/v1/marketcheck-specs`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
-            body: JSON.stringify({ tenant_id: r.tenant_id, vin: r.vin }),
-            signal: AbortSignal.timeout(45000),
-          });
-          if (!sres.ok) failures++;
+        // What "decoded" means, precisely. The equipment lists alone are not
+        // enough: the OEM window sticker needs the structured build sheet
+        // (packages, option codes, factory pricing, colors, assembly), and a
+        // VIN decoded before that extractor existed has options/features but
+        // no build_sheet. Testing only the lists marked those vehicles done
+        // forever and left their stickers permanently unbuildable.
+        // One VIN, one decode. shouldDecodeVin is the single tested rule:
+        // a vehicle that keeps its build sheet is never re-pulled on a later
+        // scrape, and a VIN the provider cannot decode stops costing money
+        // after the attempt cap.
+        const decision = shouldDecodeVin(mc, MAX_SPEC_ATTEMPTS);
+        const attempts = decision.attempts;
+        if (decision.decode && Date.now() < deadline) {
+          let ok = false;
+          try {
+            const sres = await fetch(`${SUPABASE_URL}/functions/v1/marketcheck-specs`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+              body: JSON.stringify({ tenant_id: r.tenant_id, vin: r.vin }),
+              signal: AbortSignal.timeout(45000),
+            });
+            ok = sres.ok;
+            if (!ok) failures++;
+          } catch { failures++; }
+          // Stamp the attempt from here, not from the decoder: the decoder
+          // returns early on a no-match without writing anything, so a
+          // stamp written there would never land for exactly the VINs that
+          // need the cap.
+          try {
+            const { data: after } = await admin
+              .from("vehicle_listings").select("mc_attributes")
+              .eq("tenant_id", r.tenant_id).eq("vin", r.vin).maybeSingle();
+            // deno-lint-ignore no-explicit-any
+            const fresh = (after?.mc_attributes ?? mc) as Record<string, any>;
+            await admin.from("vehicle_listings").update({
+              mc_attributes: {
+                ...fresh,
+                specs_attempts: attempts + 1,
+                specs_attempted_at: new Date().toISOString(),
+                ...(ok && !fresh.build_sheet ? { specs_no_build_sheet: true } : {}),
+              },
+            }).eq("tenant_id", r.tenant_id).eq("vin", r.vin);
+          } catch { /* stamping is best-effort; the cap is the backstop */ }
         }
-      } catch { failures++; /* specs retried next sweep */ }
+      } catch { failures++; /* specs retried next sweep, within the cap */ }
       // Liveness guard: stamp enriched_at no matter the outcome so this VIN drops
       // out of next_enrich_batch FOR THIS SWEEP. vehicle-enrich already stamps on
       // its normal path, but its early returns (no MarketCheck key, invalid VIN,
