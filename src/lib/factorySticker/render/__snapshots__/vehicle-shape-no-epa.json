@@ -1,0 +1,61 @@
+{
+  "pages": 1,
+  "geometry": "792x612",
+  "mode": "DENSE",
+  "fonts": "\"Segoe UI\", \"Helvetica Neue\", Arial, sans-serif | \"Segoe UI\", \"Helvetica Neue\", Arial, sans-serif | \"Segoe UI\", Arial, sans-serif",
+  "primitivesByKind": {
+    "barcode": 1,
+    "path": 65,
+    "qr": 1,
+    "rect": 16,
+    "rule": 9,
+    "text": 195
+  },
+  "fills": [
+    "#191c20",
+    "#d3121a",
+    "#e8e9ea"
+  ],
+  "ruleColors": [
+    "#0d0d0d",
+    "#b30f16",
+    "#b6b9bd",
+    "#d3121a"
+  ],
+  "textColors": [
+    "#0b1f3a",
+    "#0d0d0d",
+    "#4c5157",
+    "#ffffff"
+  ],
+  "fontSizes": [
+    5.4,
+    5.5,
+    6,
+    6.2,
+    6.4,
+    6.5,
+    6.6,
+    6.8,
+    7.5,
+    7.6,
+    8,
+    8.5,
+    9,
+    11,
+    13.5,
+    18,
+    20,
+    21
+  ],
+  "regions": {
+    "barcode": "21,517.5 227.15x23",
+    "qr": "594,78.1 96",
+    "totalMsrp": "481,585 @18"
+  },
+  "headings": [],
+  "totalBand": "$95,695.00",
+  "svgDigest": [
+    "c36c6799"
+  ]
+}

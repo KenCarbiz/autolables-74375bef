@@ -1,0 +1,78 @@
+{
+  "pages": 1,
+  "geometry": "792x612",
+  "mode": "STANDARD",
+  "fonts": "\"Helvetica Neue\", \"Segoe UI\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", \"Arial Narrow\", Arial, sans-serif",
+  "primitivesByKind": {
+    "barcode": 1,
+    "path": 43,
+    "qr": 2,
+    "rect": 31,
+    "rule": 15,
+    "text": 221
+  },
+  "fills": [
+    "#0a0a0a",
+    "#0d0d0d",
+    "#141414",
+    "#4a4f55",
+    "#b7d9f1",
+    "#ffffff"
+  ],
+  "ruleColors": [
+    "#0d0d0d",
+    "#8b8f94",
+    "#9a9da1",
+    "#b6b9bd",
+    "#c3c6c9",
+    "#d5001c"
+  ],
+  "textColors": [
+    "#0b1f3a",
+    "#0d0d0d",
+    "#2563eb",
+    "#4c5157",
+    "#55595e",
+    "#ffffff"
+  ],
+  "fontSizes": [
+    5.2,
+    5.4,
+    5.5,
+    5.6,
+    5.8,
+    6,
+    6.2,
+    6.4,
+    6.5,
+    6.6,
+    6.8,
+    7,
+    7.2,
+    7.5,
+    7.6,
+    8,
+    8.5,
+    9,
+    9.5,
+    10,
+    10.5,
+    13,
+    13.5,
+    16,
+    17,
+    18,
+    27
+  ],
+  "regions": {
+    "barcode": "21,517.5 227.15x23",
+    "qr": "755.5,198.4 17",
+    "qr2": "612.6,410 58.8",
+    "totalMsrp": "481,585 @18"
+  },
+  "headings": [],
+  "totalBand": "$182,785.00",
+  "svgDigest": [
+    "4ed2dc34"
+  ]
+}
