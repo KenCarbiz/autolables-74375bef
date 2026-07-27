@@ -15,6 +15,8 @@ import { packetVisible } from "@/lib/packetModules";
 import { buildPassportActionPath } from "@/lib/passportReturn";
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
+import PassportWindowStickerCard from "@/components/passport/PassportWindowStickerCard";
+import { usePublishedWindowSticker } from "@/hooks/usePublishedWindowSticker";
 import VehiclePriceBreakdown from "@/components/passport/VehiclePriceBreakdown";
 import AutoLabelsVerifiedCard from "@/components/passport/AutoLabelsVerifiedCard";
 import { buildPassportSaleCard } from "@/lib/passport/saleCard";
@@ -281,6 +283,9 @@ export default function VehiclePassportGoverned() {
   // unchanged — V3 CTAs never re-implement them as drawers.
   const go = (section: string) =>
     navigate(buildPassportActionPath(listing.slug || rawSlug, section, location.pathname, isPreview));
+  // Published window sticker only: a draft or review-required record is
+  // never surfaced to a shopper, and the card is simply absent.
+  const { sticker: windowSticker } = usePublishedWindowSticker(listing.slug || rawSlug, !isPreview);
   const openPanel = (k: PassportPanelKey) => { setActivePanel(k); };
   // Governed V3 action surfaces — reserve / test-drive / trade / contact /
   // payment / availability open a V3 drawer and NEVER navigate into the V2
@@ -798,6 +803,18 @@ export default function VehiclePassportGoverned() {
             </section>
           )}
 
+          {/* Window Sticker entry point — published versions only. */}
+          {windowSticker && (
+            <div className="px-4 pt-6" data-module="window-sticker">
+              <PassportWindowStickerCard
+                sticker={windowSticker}
+                vehicleLabel={listing.ymm || "vehicle"}
+                onAllDocuments={() => go("documents")}
+                variant="mobile"
+              />
+            </div>
+          )}
+
           {/* 14 — Factory Warranty */}
           {showWarranty && (
             <section className="px-4 pt-6" data-module="warranty">
@@ -1163,6 +1180,17 @@ export default function VehiclePassportGoverned() {
                     <p className="mt-3 text-[13px]" style={{ color: SUB }}>Market comparison temporarily unavailable. Vehicle information and dealer pricing remain available.</p>
                   )}
                 </section>
+
+                {/* Window Sticker entry point — published versions only. */}
+                {windowSticker && (
+                  <div data-module="window-sticker">
+                    <PassportWindowStickerCard
+                      sticker={windowSticker}
+                      vehicleLabel={listing.ymm || "vehicle"}
+                      onAllDocuments={() => go("documents")}
+                    />
+                  </div>
+                )}
 
                 {/* Progressive detail row — each opens a V3 drawer (not a V2 page). */}
                 <section className="grid grid-cols-4 gap-4" aria-label="Vehicle details">

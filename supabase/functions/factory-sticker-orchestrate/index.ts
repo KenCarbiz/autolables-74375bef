@@ -204,7 +204,7 @@ async function fileStickerDocument(
 
   if (current && MUTABLE.has(current.document_status)) {
     await admin.from("generated_documents").update({
-      online_url: url, pdf_url: url, data_snapshot: snap,
+      online_url: url, pdf_url: url, png_url: previewUrl, data_snapshot: snap,
       document_status: targetStatus, updated_at: new Date().toISOString(),
       ...(publish ? { published_at: new Date().toISOString() } : {}),
     }).eq("id", current.id);
@@ -221,14 +221,14 @@ async function fileStickerDocument(
     (r) => r && (r.data_snapshot as { content_hash?: string } | null)?.content_hash === hash,
   );
   if (identical) {
-    await admin.from("generated_documents").update({ online_url: url, pdf_url: url, updated_at: new Date().toISOString() }).eq("id", identical.id);
+    await admin.from("generated_documents").update({ online_url: url, pdf_url: url, png_url: previewUrl, updated_at: new Date().toISOString() }).eq("id", identical.id);
     return { documentId: identical.id, version: identical.version, pdfUrl: url, previewUrl, supersededPublished: false };
   }
 
   const { data: inserted, error: insErr } = await admin.from("generated_documents").insert({
     tenant_id: tenantId, vehicle_id: vehicleId, template_id: profileFamily,
     document_type: "factory_sticker", document_status: targetStatus, version: nextVersion,
-    template_version: 1, online_url: url, pdf_url: url, data_snapshot: snap,
+    template_version: 1, online_url: url, pdf_url: url, png_url: previewUrl, data_snapshot: snap,
     ...(publish ? { published_at: new Date().toISOString() } : {}),
   }).select("id").maybeSingle();
   if (insErr) throw new Error(`generated_documents insert failed: ${insErr.message}`);
