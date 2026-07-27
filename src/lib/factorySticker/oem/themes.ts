@@ -107,6 +107,9 @@ export interface OemStickerTheme {
    *  default is TOTAL FACTORY MSRP. Used documents always read
    *  TOTAL ORIGINAL MSRP. */
   totalLabel?: string;
+  /** Governed multi-segment identity rule drawn beneath the wordmark
+   *  (Cadillac's crest colour bar). Never a recreated emblem. */
+  accentSegments?: string[];
 }
 
 const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
@@ -497,6 +500,7 @@ const theme = (
     layout?: Partial<OemLayoutSpec>;
     logo?: Partial<Omit<OemLogoSpec, "assetId">>;
     totalLabel?: string;
+    accentSegments?: string[];
   },
 ): OemStickerTheme => ({
   oemId,
@@ -512,6 +516,7 @@ const theme = (
   typography: { ...FAMILY_TYPOGRAPHY[family], ...overrides?.typography },
   layout: { ...FAMILY_LAYOUT[family], ...overrides?.layout },
   ...(overrides?.totalLabel ? { totalLabel: overrides.totalLabel } : {}),
+  ...(overrides?.accentSegments ? { accentSegments: overrides.accentSegments } : {}),
 });
 
 export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
@@ -592,11 +597,13 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     header: "#1c1c1c", accent: "#c8102e", totalBg: "#1c1c1c", totalText: "#ffffff",
   }), { totalLabel: "TOTAL VEHICLE PRICE" }),
   BUICK: theme("BUICK", "AMERICAN_MAINSTREAM", palette({ header: "#3a4750", accent: "#b02a30" })),
-  // Cadillac factory treatment (cadillac-us-2026-v1): white wordmark block,
-  // near-black band, restrained gold keyline, GM's TOTAL VEHICLE PRICE.
+  // Cadillac factory treatment (cadillac-us-2026-v2): white header with the
+  // CADILLAC wordmark over the governed four-segment crest colour bar, fine
+  // neutral rules, restrained gold keyline, GM's TOTAL VEHICLE PRICE. The
+  // segment bar is a colour rule, never a recreated crest.
   CADILLAC: theme("CADILLAC", "LUXURY_FACTORY", {
-    headerBackground: "#101014",
-    headerText: "#ffffff",
+    headerBackground: "#ffffff",
+    headerText: "#111111",
     background: "#ffffff",
     bodyText: "#111111",
     mutedText: "#55595e",
@@ -605,7 +612,10 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     sectionHeadingText: "#111111",
     totalMsrpBackground: "#101014",
     totalMsrpText: "#ffffff",
-  }, { totalLabel: "TOTAL VEHICLE PRICE" }),
+  }, {
+    totalLabel: "TOTAL VEHICLE PRICE",
+    accentSegments: ["#b3922f", "#96222d", "#1b3f73", "#a9adb2"],
+  }),
   JEEP: theme("JEEP", "PERFORMANCE", palette({
     header: "#101010", accent: "#5f6538", sectionHeading: "#3f432a",
     totalBg: "#565b33", totalText: "#ffffff",

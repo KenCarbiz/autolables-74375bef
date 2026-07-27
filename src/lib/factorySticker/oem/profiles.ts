@@ -222,7 +222,7 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     market: "US",
     modelYearStart: 2022,
     modelYearEnd: 2027,
-    themeVersion: "cadillac-us-2026-v1",
+    themeVersion: "cadillac-us-2026-v2",
     layoutFamily: "luxury-factory-technical",
     status: "draft",
     logoAuthorized: false,

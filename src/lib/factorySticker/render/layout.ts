@@ -619,10 +619,20 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
         wmSize -= 0.5;
         wmSp = Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * wmSize, 1.1);
       }
-      p.text(theme.logo.wordmarkText, LX + blockW / 2, bandTop + bandH / 2 + wmSize * 0.35, wmSize, "heading", blockInk, {
+      const wmBase = bandTop + bandH / 2 + wmSize * 0.35;
+      p.text(theme.logo.wordmarkText, LX + blockW / 2, wmBase, wmSize, "heading", blockInk, {
         align: "center",
         charSpacing: wmSp,
       });
+      // Governed identity rule: equal colour segments beneath the wordmark
+      // (Cadillac's crest bar). A colour rule only — never a recreated crest.
+      const segs = theme.accentSegments;
+      if (segs && segs.length) {
+        const segW = (blockW - 16) / segs.length;
+        segs.forEach((color, i) => {
+          p.rule(LX + 8 + i * segW, wmBase + 5.5, segW - 2, 3, color);
+        });
+      }
     }
     // Compact vehicle-detail block on the band's right side.
     const detailW = 172;

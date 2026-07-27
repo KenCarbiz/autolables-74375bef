@@ -866,7 +866,7 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
   });
 });
 
-describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v1)", () => {
+describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v2)", () => {
   it("GMC resolves distinctly from Chevrolet with GM total wording", () => {
     const g = resolveThemeProfile("GMC", 2026);
     const c = resolveThemeProfile("Chevrolet", 2026);
@@ -896,18 +896,55 @@ describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v1)", (
     expect(page1.join(" ")).toContain("8-YEAR/100,000-MILE PROPULSION BATTERY LIMITED WARRANTY");
   });
 
-  it("Escalade renders the luxury-factory panel set with Super Cruise service wording", () => {
+  it("Cadillac resolves apart from every other GM division", () => {
+    const c = resolveThemeProfile("Cadillac", 2026);
+    expect(c.profile.themeVersion).toBe("cadillac-us-2026-v2");
+    expect(c.profile.status).toBe("draft");
+    for (const alias of ["CADILLAC", "Cadillac Motor Car Division", "GM Cadillac"]) {
+      expect(resolveThemeProfile(alias, 2026).theme.oemId, alias).toBe("CADILLAC");
+    }
+    for (const division of ["Chevrolet", "Buick", "GMC"]) {
+      const other = resolveThemeProfile(division, 2026);
+      expect(other.theme.oemId, division).not.toBe("CADILLAC");
+      expect(other.profile.themeVersion, division).not.toBe("cadillac-us-2026-v2");
+    }
+    // Discontinued/other GM marques never inherit the Cadillac template.
+    for (const marque of ["Hummer", "Oldsmobile", "Pontiac", "Saturn", "BrightDrop"]) {
+      expect(resolveThemeProfile(marque, 2026).theme.oemId, marque).not.toBe("CADILLAC");
+    }
+    expect(resolveThemeProfile("Cadillac", 2021).profile.status).toBe("fallback");
+  });
+
+  it("renders the owner's Escalade reference reconciled to $109,335 with the crest segment rule", () => {
     const data = cadillacEscaladeFixture();
     const model = buildRenderLayout(data, themeFor(null));
     const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
-    expect(page1).toContain("$105,180.00");
+    expect(page1).toContain("$109,335.00");
+    expect(page1).toContain("$93,795.00");
     expect(page1).toContain("TOTAL VEHICLE PRICE");
-    expect(page1.some((s) => s.includes("Super Cruise w/ 3-Year Service Period"))).toBe(true);
-    expect(page1.some((s) => s.includes("MSRP INCLUDES"))).toBe(true);
-    expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
+    // The no-charge colour and interior carry zero, exactly as the reference
+    // prints them — this is what closes its arithmetic on its stated total.
+    expect(page1.filter((s) => s === "0.00").length).toBe(2);
+    expect(joined).toContain("Black Raven");
+    // Package membership listed beneath the parent and priced once.
+    expect(joined).toContain("Touring Package");
+    expect(joined).toContain("Night Vision");
+    expect(page1.filter((s) => s === "4,600.00").length).toBe(1);
+    // Governed four-segment crest colour bar beneath the wordmark.
+    const rules = new Set(model.pages[0].primitives.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    for (const seg of ["#b3922f", "#96222d", "#1b3f73", "#a9adb2"]) {
+      expect(rules.has(seg), seg).toBe(true);
+    }
+    // White header treatment, distinct from the GMC near-black band.
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#1c1c1c")).toBe(false);
+    expect(joined).toContain("MSRP INCLUDES");
+    expect(joined).toContain("PARTS CONTENT INFORMATION");
     expect(page1.some((s) => s.includes("ARLINGTON, TEXAS, USA"))).toBe(true);
     expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
+    expect(joined).toContain("not affiliated with or endorsed by General Motors Company or Cadillac");
     const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
     expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
     expectWithinBounds(model);
