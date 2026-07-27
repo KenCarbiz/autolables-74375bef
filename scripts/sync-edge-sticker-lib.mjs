@@ -17,6 +17,16 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const SOURCE_DIR = join(root, "src/lib/factorySticker");
 export const TARGET_DIR = join(root, "supabase/functions/_shared/factorySticker/lib");
 
+// The truth layer is a sibling of the engine in src/ and imports across to
+// it (`../factorySticker/fingerprint.ts`). The mirror flattens the engine
+// into lib/, so the copy lands one level down as lib/vehicleTruth/ and its
+// cross-imports are rewritten to `../` — the same modules, one directory
+// closer. Rewriting on copy keeps src/ readable as ordinary sibling
+// imports instead of contorting it to suit the mirror's shape.
+export const TRUTH_SOURCE_DIR = join(root, "src/lib/vehicleTruth");
+export const TRUTH_PREFIX = "vehicleTruth/";
+const rewriteTruthImports = (body) => body.replace(/from "\.\.\/factorySticker\//g, 'from "../');
+
 const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__"]);
 const isCopyable = (name) => name.endsWith(".ts") && !name.endsWith(".test.ts");
 
@@ -45,6 +55,17 @@ export function collect(dir, base = dir, out = new Map(), withHeader = true) {
   return out;
 }
 
+/** Every file the mirror should contain: the engine, plus the truth layer. */
+export function collectAll() {
+  const out = collect(SOURCE_DIR);
+  const truth = collect(TRUTH_SOURCE_DIR, TRUTH_SOURCE_DIR, new Map(), false);
+  for (const [rel, body] of truth) {
+    const key = TRUTH_PREFIX + rel;
+    out.set(key, HEADER.replace("{rel}", `../vehicleTruth/${rel}`) + rewriteTruthImports(body));
+  }
+  return out;
+}
+
 export function readMirror() {
   const out = new Map();
   try {
@@ -56,7 +77,7 @@ export function readMirror() {
 }
 
 function main() {
-  const source = collect(SOURCE_DIR);
+  const source = collectAll();
   rmSync(TARGET_DIR, { recursive: true, force: true });
   for (const [rel, body] of source) {
     const dest = join(TARGET_DIR, rel);

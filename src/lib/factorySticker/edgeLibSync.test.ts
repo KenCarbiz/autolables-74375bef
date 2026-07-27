@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collect, readMirror, SOURCE_DIR } from "../../../scripts/sync-edge-sticker-lib.mjs";
+import { collectAll, readMirror, TRUTH_PREFIX } from "../../../scripts/sync-edge-sticker-lib.mjs";
 
 // Supabase ships only supabase/functions/ to the edge runtime, so the
 // orchestrator cannot import the engine out of src/ — a deploy fails
@@ -12,13 +12,22 @@ import { collect, readMirror, SOURCE_DIR } from "../../../scripts/sync-edge-stic
 // renders from current code.
 
 describe("edge factory-sticker mirror", () => {
-  const source = collect(SOURCE_DIR);
+  const source = collectAll();
   const mirror = readMirror();
 
   it("mirrors every pure engine module", () => {
     expect(source.size).toBeGreaterThan(15);
     const missing = [...source.keys()].filter((k) => !mirror.has(k));
     expect(missing, `run: bun run sync:edge-sticker`).toEqual([]);
+  });
+
+  it("mirrors the truth layer the orchestrator resolves vehicles with", () => {
+    const truth = [...source.keys()].filter((k) => k.startsWith(TRUTH_PREFIX));
+    expect(truth).toContain(`${TRUTH_PREFIX}snapshot.ts`);
+    expect(truth).toContain(`${TRUTH_PREFIX}precedence.ts`);
+    expect(truth).toContain(`${TRUTH_PREFIX}ingest.ts`);
+    // Rewritten on copy: inside lib/vehicleTruth the engine is one level up.
+    expect(mirror.get(`${TRUTH_PREFIX}snapshot.ts`)).not.toContain("../factorySticker/");
   });
 
   it("carries no file the source no longer has", () => {

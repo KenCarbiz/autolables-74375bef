@@ -30,6 +30,7 @@ import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
 import FactoryStickerCard from "@/components/vehicle/FactoryStickerCard";
+import VehicleTruthCard from "@/components/vehicle/VehicleTruthCard";
 import MerchandisingContentSection from "@/components/vehicle/MerchandisingContentSection";
 import DealFlowPanel from "@/components/vehicle/DealFlowPanel";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
@@ -1119,6 +1120,8 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
         title="Documents"
         description="Files available to shoppers and dealership staff — upload PDFs, links, brochures, reports, and warranty paperwork."
       />
+      {/* The resolved vehicle every document below is generated from */}
+      <VehicleTruthCard tenantId={vehicle.tenant_id} vehicleId={vehicle.id} />
       {/* Generated factory build record + the provider's actual OEM sticker */}
       <FactoryStickerCard
         vehicleId={vehicle.id}

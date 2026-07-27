@@ -35,6 +35,7 @@ import {
   listCompatibleTemplates, validateTemplateOverride, checkRenderedCompleteness,
 } from "../_shared/factorySticker/render.ts";
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
+import { recordSourcePayload, refreshVehicleTruth } from "./truth.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -453,6 +454,39 @@ async function orchestrateVehicle(
       return { vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA", skipped: "no_build_sheet" };
     }
 
+    // ── Shared truth snapshot ────────────────────────────────────────
+    // Resolved BEFORE the sticker is normalized, so the sticker, the
+    // description and the Passport all describe the same vehicle rather
+    // than each re-deriving it from the same blob. A vehicle that has not
+    // materially changed reuses its current snapshot and costs nothing.
+    let truth: Awaited<ReturnType<typeof refreshVehicleTruth>> | null = null;
+    try {
+      const sourceKind = String(mc.specs_source || "") === "neovin" ? "neovin" : "marketcheck";
+      const sourceRecordId = await recordSourcePayload(admin, {
+        tenantId, vehicleId, vin,
+        sourceKind,
+        sourceName: sourceKind === "neovin" ? "neovin_build_sheet" : "marketcheck_listing",
+        payload: mc,
+        billable: !!opts.allowSourceFetch,
+        requestReason: opts.reason || "ingest",
+      });
+      truth = await refreshVehicleTruth(admin, tenantId, listing, {
+        sourceRecordIds: sourceRecordId ? { [sourceKind]: sourceRecordId } : {},
+      });
+      if (truth.created) {
+        await audit(admin, tenantId, "vehicle_truth.snapshot_recorded", record.id, {
+          vin, version: truth.version, reason: truth.reason,
+          affected_families: truth.affected_families,
+        });
+      }
+    } catch (e) {
+      // The truth layer informs generation; it does not gate it. A failure
+      // here must not stop a dealer getting a sticker off data we already
+      // hold, so it is recorded and the pipeline continues.
+      await audit(admin, tenantId, "vehicle_truth.snapshot_failed", record.id,
+        { vin, error: String((e as Error)?.message || e).slice(0, 300) });
+    }
+
     const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
     const dealerSettings = (prof?.settings || {}) as Record<string, unknown>;
 
@@ -836,6 +870,7 @@ async function orchestrateVehicle(
       vehicle_id: vehicleId, record_id: record.id, document_id: filed.documentId,
       status: finalStatus, version: filed.version, qa: qaChecks,
       reconciliation: reconciliationStatus, confidence: normalized.confidence, published: autoPublish,
+      truth,
     };
   } catch (e) {
     const msg = String((e as Error)?.message || e).slice(0, 500);
@@ -1159,6 +1194,44 @@ serve(async (req) => {
         pdf_url: pdfUrl, preview_url: previewUrl,
         content_hash: snap.content_hash ?? null,
       });
+    }
+
+    // The shared read contract, surfaced to the client. Every generator and
+    // every panel reads the vehicle from here rather than assembling its own
+    // view of mc_attributes, which is what keeps one VIN from printing
+    // different truth on different documents.
+    if (action === "vehicle_truth") {
+      const { data: snap } = await admin.from("vehicle_snapshots")
+        .select("id, snapshot_version, snapshot_json, content_checksum, material_changes, affected_families, source_kinds, has_unresolved_conflicts, created_at")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+        .order("snapshot_version", { ascending: false }).limit(1).maybeSingle();
+      const { data: facts } = await admin.from("vehicle_facts")
+        .select("fact_key, fact_value, source_kind, confidence, authority, usable_in_copy, evidence, observed_at, overridden_by")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId);
+      const { data: conflicts } = await admin.from("vehicle_fact_conflicts")
+        .select("id, fact_key, authority, candidates, status, blocks_generation, created_at")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("status", "open");
+      const { data: sources } = await admin.from("vehicle_source_records")
+        .select("id, source_kind, source_name, retrieved_at, billable")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+        .order("retrieved_at", { ascending: false }).limit(20);
+      return json({
+        success: true,
+        snapshot: snap ?? null,
+        facts: facts ?? [],
+        conflicts: conflicts ?? [],
+        sources: sources ?? [],
+      });
+    }
+
+    if (action === "refresh_truth") {
+      const { data: listing } = await admin.from("vehicle_listings")
+        .select("*").eq("tenant_id", tenantId).eq("id", vehicleId).maybeSingle();
+      if (!listing) return json({ error: "listing_not_found" }, 404);
+      // Reads what is already saved; it never calls a provider, so it can
+      // never spend money.
+      const result = await refreshVehicleTruth(admin, tenantId, listing);
+      return json({ success: true, ...result });
     }
 
     if (action === "template_options") {
