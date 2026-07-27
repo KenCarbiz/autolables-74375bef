@@ -70,6 +70,29 @@ const MANAGER_ROLES = new Set([
   "sales_manager", "used_car_manager", "inventory_manager",
 ]);
 
+// Granular window-sticker authority, mirroring
+// src/lib/permissions/windowStickerPermissions.ts. The UI hides what a
+// role cannot do; this table is what actually enforces it. Requesting a
+// regeneration is deliberately separated from authorizing a billable
+// provider pull and from publishing to the customer passport.
+const VIEWER_PERMS = ["view", "download"];
+const REQUESTER_PERMS = [...VIEWER_PERMS, "view_history", "regenerate"];
+const OPERATOR_PERMS = [
+  ...REQUESTER_PERMS, "create", "edit_permitted_fields", "refresh_neovin",
+  "approve", "publish", "unpublish", "restore_version",
+];
+const FULL_PERMS = [...OPERATOR_PERMS, "override_source_data"];
+
+const STICKER_ROLE_PERMS: Record<string, string[]> = {
+  owner: FULL_PERMS, admin: FULL_PERMS, general_manager: FULL_PERMS, gsm: FULL_PERMS,
+  manager: OPERATOR_PERMS, used_car_manager: OPERATOR_PERMS, inventory_manager: OPERATOR_PERMS,
+  sales_manager: REQUESTER_PERMS,
+  salesperson: VIEWER_PERMS, finance: VIEWER_PERMS, office: VIEWER_PERMS,
+  compliance: [...VIEWER_PERMS, "view_history"], biller: VIEWER_PERMS, readonly: VIEWER_PERMS,
+  service_manager: VIEWER_PERMS, service_advisor: VIEWER_PERMS,
+  detail: [], third_party_vendor: [],
+};
+
 // Same resolveAppBase pattern as generate-vehicle-forms: caller app_base →
 // browser Origin → APP_BASE_URL secret → app host. The canonical passport
 // URL (the QR payload) is derived from this.
@@ -713,6 +736,14 @@ serve(async (req) => {
     const allowed = (t: string) => !callerTenants || callerIsPlatformAdmin || callerTenants.includes(t);
     const isManager = (t: string) =>
       !callerTenants || callerIsPlatformAdmin || MANAGER_ROLES.has((callerRoles.get(t) || "").trim().toLowerCase());
+    const can = (t: string, permission: string): boolean => {
+      // Service role and cron run the pipeline itself; a platform admin has
+      // full authority. Everyone else is bound by the table above.
+      if (!callerTenants || callerIsPlatformAdmin) return true;
+      const role = (callerRoles.get(t) || "").trim().toLowerCase();
+      const perms = STICKER_ROLE_PERMS[role] ?? VIEWER_PERMS;
+      return perms.includes(permission);
+    };
 
     const tenantId = String(body.tenant_id || "");
     if (!tenantId) return json({ error: "tenant_id required" }, 400);
@@ -732,7 +763,7 @@ serve(async (req) => {
       const force = action === "regenerate" || !!body.force;
       // A forced run overrides review decisions and terminal states — that is
       // a manager decision, not a membership privilege.
-      if (force && !isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+      if (force && !can(tenantId, "regenerate")) return json({ error: "insufficient_permission" }, 403);
 
       let reasonCode: string | null = null;
       let reasonNotes: string | null = null;
@@ -771,7 +802,7 @@ serve(async (req) => {
         // it may incur a charge, so it never happens implicitly on a
         // presentation-only regeneration.
         if (dataSource === "refresh") {
-          if (!isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+          if (!can(tenantId, "refresh_neovin")) return json({ error: "insufficient_permission" }, 403);
           const { data: veh } = await admin.from("vehicle_listings")
             .select("vin").eq("id", vehicleId).eq("tenant_id", tenantId).maybeSingle();
           const refreshVin = String((veh as { vin?: string } | null)?.vin || "").toUpperCase().trim();
@@ -823,7 +854,9 @@ serve(async (req) => {
     }
 
     if (action === "approve_publish") {
-      if (!isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+      if (!can(tenantId, "approve") || !can(tenantId, "publish")) {
+        return json({ error: "insufficient_permission" }, 403);
+      }
       const { data: record } = await admin.from("factory_sticker_records")
         .select("id, generation_status, current_document_id, vin")
         .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
@@ -862,6 +895,7 @@ serve(async (req) => {
     }
 
     if (action === "version_history") {
+      if (!can(tenantId, "view_history")) return json({ error: "insufficient_permission" }, 403);
       const { data: record } = await admin.from("factory_sticker_records")
         .select("id, vin, current_document_id").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
       const { data: versions } = await admin.from("generated_documents")
@@ -895,7 +929,7 @@ serve(async (req) => {
     }
 
     if (action === "restore_version") {
-      if (!isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+      if (!can(tenantId, "restore_version")) return json({ error: "insufficient_permission" }, 403);
       const documentId = String(body.document_id || "");
       if (!documentId) return json({ error: "document_id required" }, 400);
       const { data: record } = await admin.from("factory_sticker_records")
@@ -957,7 +991,7 @@ serve(async (req) => {
     }
 
     if (action === "unpublish") {
-      if (!isManager(tenantId)) return json({ error: "insufficient_permission" }, 403);
+      if (!can(tenantId, "unpublish")) return json({ error: "insufficient_permission" }, 403);
       const { data: record } = await admin.from("factory_sticker_records")
         .select("id, generation_status, current_document_id, vin")
         .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();

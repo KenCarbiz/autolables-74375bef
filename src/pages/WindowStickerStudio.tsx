@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { hasWindowStickerPermission } from "@/lib/permissions/windowStickerPermissions";
 import { useWindowSticker } from "@/hooks/useWindowSticker";
 import FactoryStickerWorkspace from "./FactoryStickerWorkspace";
 
@@ -107,7 +107,8 @@ export default function WindowStickerStudio() {
   const { tenant } = useTenant();
   const { isAdmin } = useAuth();
   const { member } = useEntitlements();
-  const manager = hasDealerCapability(member?.role, "can_approve_print", isAdmin);
+  const canCreate = hasWindowStickerPermission(member?.role, "window_sticker.create", isAdmin);
+  const canPublish = hasWindowStickerPermission(member?.role, "window_sticker.publish", isAdmin);
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
   const { generate, busy } = useWindowSticker();
 
@@ -408,15 +409,20 @@ export default function WindowStickerStudio() {
                   <button
                     type="button"
                     onClick={startFromVin}
-                    disabled={!vinValid || busy}
+                    disabled={!vinValid || busy || !canCreate}
                     className="w-full h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
                     {vinDuplicate ? "Open existing vehicle" : "Continue"}
                   </button>
-                  {!manager && (
+                  {!canCreate && (
                     <p className="text-[11px] text-muted-foreground">
-                      Approving and publishing need manager authority — you can still review the draft.
+                      Starting a sticker from a VIN needs manager authority. You can still open an existing vehicle.
+                    </p>
+                  )}
+                  {canCreate && !canPublish && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Publishing to the customer passport needs manager authority — you can still review the draft.
                     </p>
                   )}
                 </div>

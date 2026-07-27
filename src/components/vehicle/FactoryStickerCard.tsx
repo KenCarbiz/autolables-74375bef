@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { hasWindowStickerPermission } from "@/lib/permissions/windowStickerPermissions";
 import { toast } from "sonner";
 import {
   AlertTriangle, Download, ExternalLink, FileText, History, Loader2, RefreshCw, ShieldCheck,
@@ -112,7 +112,12 @@ export default function FactoryStickerCard({
 }) {
   const { isAdmin } = useAuth();
   const { member } = useEntitlements();
-  const manager = hasDealerCapability(member?.role, "can_approve_print", isAdmin);
+  const role = member?.role;
+  const canRegenerate = hasWindowStickerPermission(role, "window_sticker.regenerate", isAdmin);
+  const canHistory = hasWindowStickerPermission(role, "window_sticker.view_history", isAdmin);
+  const canRestore = hasWindowStickerPermission(role, "window_sticker.restore_version", isAdmin);
+  const canCreate = hasWindowStickerPermission(role, "window_sticker.create", isAdmin);
+  const manager = canRegenerate;
 
   const [record, setRecord] = useState<StickerRecord | null>(null);
   const [doc, setDoc] = useState<StickerDoc | null>(null);
@@ -229,7 +234,7 @@ export default function FactoryStickerCard({
           >
             <ExternalLink className="w-3 h-3" /> Open workspace
           </Link>
-          {record && (
+          {record && canHistory && (
             <button
               type="button"
               onClick={() => setHistoryOpen(true)}
@@ -238,7 +243,7 @@ export default function FactoryStickerCard({
               <History className="w-3 h-3" /> Versions
             </button>
           )}
-          {manager && record && (
+          {canRegenerate && record && (
             <button
               type="button"
               onClick={() => setRegenOpen(true)}
@@ -268,7 +273,7 @@ export default function FactoryStickerCard({
           <p className="text-[11px] text-muted-foreground mt-0.5">
             One is created automatically when this vehicle's factory build data arrives at ingest.
           </p>
-          {manager && (
+          {canCreate && (
             <button
               type="button"
               onClick={() => regenerate("orchestrate")}
@@ -387,7 +392,7 @@ export default function FactoryStickerCard({
         <StickerVersionHistory
           tenantId={tenantId}
           vehicleId={vehicleId}
-          canRestore={manager}
+          canRestore={canRestore}
           onClose={() => setHistoryOpen(false)}
           onChanged={load}
         />
