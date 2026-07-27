@@ -30,6 +30,7 @@ import {
   type DocumentFamilyKey,
   type FieldChange,
 } from "./materialChange.ts";
+import { EMPTY_AUTHORITY, type TenantAuthority } from "./tenantAuthority.ts";
 
 /**
  * A single resolved fact.
@@ -220,6 +221,7 @@ export interface BuiltSnapshot {
 export function buildVehicleSnapshot(
   vin: string,
   candidates: Array<CandidateFact & { sourceRecordId?: string; overriddenBy?: string }>,
+  authority: TenantAuthority = EMPTY_AUTHORITY,
 ): BuiltSnapshot {
   const snapshot = emptySnapshot(vin);
   const facts: Record<string, TruthFact> = {};
@@ -235,11 +237,18 @@ export function buildVehicleSnapshot(
   }
 
   for (const [key, bucket] of byKey) {
-    const resolved = resolveFact(bucket.map((candidate) => ({ ...candidate, factKey: key })));
+    const resolved = resolveFact(
+      bucket.map((candidate) => ({ ...candidate, factKey: key })),
+      {
+        configuredOrder: authority.orderByFact.get(key) ?? null,
+        conflictBehavior: authority.blockingFacts.has(key) ? "block_generation"
+          : authority.ignoredFacts.has(key) ? "ignore" : "warn",
+      },
+    );
     if (!resolved) continue;
     if (resolved.value === null || resolved.value === undefined) continue;
 
-    const authority = factAuthority(key);
+    const factAuthorityOf = factAuthority(key);
     const winner = bucket.find(
       (candidate) => candidate.source === resolved.source && candidate.value === resolved.value,
     );
@@ -248,7 +257,7 @@ export function buildVehicleSnapshot(
       value: resolved.value,
       source: resolved.source,
       confidence: resolved.confidence,
-      authority,
+      authority: factAuthorityOf,
       status: factStatus(resolved.source, resolved.confidence, resolved.disputed),
       observedAt: winner?.sourceTimestamp ?? null,
       // An inferred value may inform a person; it may not become copy.
@@ -267,14 +276,17 @@ export function buildVehicleSnapshot(
     if (resolved.disputed) {
       conflicts.push({
         factKey: key,
-        authority,
+        authority: factAuthorityOf,
         candidates: bucket.map((candidate) => ({
           value: candidate.value,
           sourceKind: candidate.source,
           confidence: capConfidence(candidate.source, candidate.confidence),
           observedAt: candidate.sourceTimestamp ?? null,
         })),
-        blocksGeneration: authority === "manufacturer",
+        // A manufacturer fact blocks its own document by default; a tenant
+        // may additionally mark a field blocking on the Source Authority
+        // screen, and that choice is honoured on any fact.
+        blocksGeneration: factAuthorityOf === "manufacturer" || resolved.blocking,
       });
     }
   }

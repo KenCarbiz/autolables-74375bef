@@ -21,6 +21,11 @@ import {
   type VehicleTruthSnapshot,
 } from "../_shared/factorySticker/lib/vehicleTruth/snapshot.ts";
 import { contentChecksum } from "../_shared/factorySticker/lib/vehicleTruth/materialChange.ts";
+import {
+  compileTenantAuthority,
+  EMPTY_AUTHORITY,
+  type SourceAuthorityRule,
+} from "../_shared/factorySticker/lib/vehicleTruth/tenantAuthority.ts";
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -94,7 +99,22 @@ export async function refreshVehicleTruth(
     retrievedAt: opts.retrievedAt ?? new Date().toISOString(),
     sourceRecordIds: opts.sourceRecordIds,
   });
-  const built = buildVehicleSnapshot(vin, candidates);
+
+  // The dealership's own Source Authority configuration decides who wins
+  // per field. Resolving without it would silently ignore a setting the
+  // dealer can see and edit, which is worse than not offering the setting.
+  let authority = EMPTY_AUTHORITY;
+  try {
+    const { data: rules } = await admin.from("source_authority_rules")
+      .select("field_key, primary_source, secondary_source, conflict_behavior")
+      .eq("tenant_id", tenantId);
+    if (rules?.length) authority = compileTenantAuthority(rules as SourceAuthorityRule[]);
+  } catch {
+    // A tenant that never opened the settings screen has no rules; the
+    // built-in ordering is the documented default, not a failure.
+  }
+
+  const built = buildVehicleSnapshot(vin, candidates, authority);
 
   const { data: currentRow } = await admin.from("vehicle_snapshots")
     .select("id, snapshot_version, snapshot_json")

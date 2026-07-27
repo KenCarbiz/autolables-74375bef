@@ -124,7 +124,20 @@ export function precedenceFor(factKey: string): SourceKind[] {
   return [...DEFAULT_ORDER];
 }
 
-export function sourceRank(factKey: string, source: SourceKind): number {
+export function sourceRank(
+  factKey: string,
+  source: SourceKind,
+  configuredOrder?: SourceKind[] | null,
+): number {
+  // A dealership that configured "MSRP comes from the VIN decoder" on the
+  // Source Authority screen means it. A source the tenant did not rank
+  // falls in behind every source it did, rather than jumping the queue on
+  // the built-in ordering.
+  if (configuredOrder?.length) {
+    const idx = configuredOrder.indexOf(source);
+    if (idx >= 0) return idx;
+    return configuredOrder.length + precedenceFor(factKey).indexOf(source);
+  }
   const order = precedenceFor(factKey);
   const idx = order.indexOf(source);
   return idx < 0 ? order.length : idx;
@@ -179,6 +192,18 @@ export interface ResolvedFact<T = unknown> {
   conflicting: Array<CandidateFact<T>>;
   /** True when a disagreement needs a human, not just a ranking. */
   disputed: boolean;
+  /** The tenant configured this disagreement to stop generation. */
+  blocking: boolean;
+}
+
+export interface ResolveOptions {
+  /**
+   * Source order the tenant configured for this fact, best first, from
+   * `source_authority_rules` via `compileTenantAuthority`.
+   */
+  configuredOrder?: SourceKind[] | null;
+  /** The tenant's configured behaviour when sources disagree. */
+  conflictBehavior?: "warn" | "block_generation" | "ignore";
 }
 
 const sameValue = (a: unknown, b: unknown): boolean =>
@@ -191,12 +216,17 @@ const sameValue = (a: unknown, b: unknown): boolean =>
  * BOTH allowed to verify the fact is not settled by ranking alone — that
  * is a real conflict and is marked disputed so a person decides.
  */
-export function resolveFact<T>(candidates: Array<CandidateFact<T>>): ResolvedFact<T> | null {
+export function resolveFact<T>(
+  candidates: Array<CandidateFact<T>>,
+  options: ResolveOptions = {},
+): ResolvedFact<T> | null {
   if (!candidates.length) return null;
   const factKey = candidates[0].factKey;
+  const configuredOrder = options.configuredOrder ?? null;
 
   const ranked = [...candidates].sort((a, b) => {
-    const byRank = sourceRank(factKey, a.source) - sourceRank(factKey, b.source);
+    const byRank = sourceRank(factKey, a.source, configuredOrder)
+      - sourceRank(factKey, b.source, configuredOrder);
     if (byRank !== 0) return byRank;
     // Same source rank: prefer the stronger confidence, then the newer.
     const byConf = CONFIDENCE_ORDER.indexOf(capConfidence(a.source, a.confidence))
@@ -209,12 +239,15 @@ export function resolveFact<T>(candidates: Array<CandidateFact<T>>): ResolvedFac
   const conflicting = ranked.slice(1).filter((c) => !sameValue(c.value, winner.value));
 
   // Two sources that may both verify this fact, disagreeing, is a dispute
-  // rather than a ranking outcome.
-  const disputed = conflicting.some((c) =>
+  // rather than a ranking outcome. A tenant may raise that to a blocker or
+  // silence it entirely through the Source Authority screen, but may never
+  // turn a non-disagreement into one.
+  const naturallyDisputed = conflicting.some((c) =>
     canProduceVerifiedFact(c.source)
     && canProduceVerifiedFact(winner.source)
     && capConfidence(c.source, c.confidence) === "VERIFIED"
     && capConfidence(winner.source, winner.confidence) === "VERIFIED");
+  const disputed = options.conflictBehavior === "ignore" ? false : naturallyDisputed;
 
   return {
     factKey,
@@ -223,5 +256,8 @@ export function resolveFact<T>(candidates: Array<CandidateFact<T>>): ResolvedFac
     confidence: capConfidence(winner.source, winner.confidence),
     conflicting,
     disputed,
+    // "block_generation" only bites on a fact that is actually disputed;
+    // configuring it does not stop a vehicle whose sources agree.
+    blocking: disputed && options.conflictBehavior === "block_generation",
   };
 }
