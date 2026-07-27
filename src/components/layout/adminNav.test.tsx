@@ -17,6 +17,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  Radar,
   Store,
   Tag,
   Users,
@@ -93,7 +94,8 @@ describe("buildAdminNavSections — structure preserved", () => {
       "Print Center",
       "Leads",
       "Create",
-      "Window Sticker Studio",
+      "OEM Window Sticker Studio",
+      "Inventory Intelligence",
       "Description Operations",
     ]);
     expect(get("getready")).toEqual([
@@ -124,7 +126,8 @@ describe("icon mapping (lucide-react, one distinct icon per destination)", () =>
     Inventory: CarFront,
     Deals: Handshake,
     Create: FilePlus2,
-    "Window Sticker Studio": Tag,
+    "OEM Window Sticker Studio": Tag,
+    "Inventory Intelligence": Radar,
     "Work Queue": ClipboardList,
     Leads: Users,
     "Recon Approvals": BadgeCheck,

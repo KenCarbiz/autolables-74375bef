@@ -683,7 +683,7 @@ const InventoryModern = () => {
             <div className="space-y-2">
               <QuickAction icon={Plus} label="Add Vehicle" onClick={() => setShowAdd(true)} />
               <QuickAction icon={ScanLine} label="Scan VIN" onClick={openScan} />
-              <QuickAction icon={Printer} label="New Car Sticker" onClick={() => navigate("/new-car-sticker")} />
+              <QuickAction icon={Printer} label="OEM Window Sticker" onClick={() => navigate("/window-sticker-studio")} />
               <QuickAction icon={FileSignature} label="New Addendum" onClick={() => navigate("/addendum")} />
               <QuickAction icon={ShieldCheck} label="Check Recalls" onClick={runRecallBatch} />
               <QuickAction icon={CircleDollarSign} label="Check Market Prices" onClick={runMarketBatch} />

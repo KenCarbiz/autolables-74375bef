@@ -184,12 +184,12 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
             <Car className="w-4 h-4 mr-2" />
             New Used Car Sticker
           </CommandItem>
-          <CommandItem onSelect={() => go("/new-car-sticker")}>
-            <FileText className="w-4 h-4 mr-2" />
-            New Car Sticker
-          </CommandItem>
           <CommandItem onSelect={() => go("/window-sticker-studio")}>
-            Window Sticker Studio
+            <FileText className="w-4 h-4 mr-2" />
+            OEM Window Sticker Studio
+          </CommandItem>
+          <CommandItem onSelect={() => go("/inventory-intelligence")}>
+            Inventory Intelligence
           </CommandItem>
           <CommandItem onSelect={() => go("/cpo-sheet")}>
             <Award className="w-4 h-4 mr-2" />

@@ -282,6 +282,8 @@ const HREF_CAPABILITY: { prefix: string; capability: DealerCapability }[] = [
   { prefix: "/description-intelligence", capability: "can_create_documents" },
   { prefix: "/used-car-sticker", capability: "can_create_documents" },
   { prefix: "/new-car-sticker", capability: "can_create_documents" },
+  { prefix: "/window-sticker-studio", capability: "can_create_documents" },
+  { prefix: "/inventory-intelligence", capability: "can_view_inventory" },
   { prefix: "/dashboard", capability: "can_view_dashboard" },
 ];
 

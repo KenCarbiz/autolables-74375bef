@@ -1,6 +1,6 @@
 import { lazy, Suspense, useLayoutEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -122,6 +122,15 @@ const DevConnecticutSmokeTest = lazy(() => import("./pages/DevConnecticutSmokeTe
 const DevPrepMobilePreview = lazy(() => import("./pages/DevPrepMobilePreview"));
 const FactoryStickerWorkspace = lazy(() => import("./pages/FactoryStickerWorkspace"));
 const WindowStickerStudio = lazy(() => import("./pages/WindowStickerStudio"));
+const InventoryIntelligence = lazy(() => import("./pages/InventoryIntelligence"));
+
+// Legacy /new-car-sticker links carried ?vehicleId=; the studio selects with
+// ?vehicle=, so the redirect translates rather than dropping the selection.
+function NewCarStickerRedirect() {
+  const [params] = useSearchParams();
+  const vehicleId = params.get("vehicleId") || params.get("vehicle");
+  return <Navigate to={`/window-sticker-studio${vehicleId ? `?vehicle=${encodeURIComponent(vehicleId)}` : ""}`} replace />;
+}
 const ThemeLab = lazy(() => import("./pages/ThemeLab"));
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
@@ -281,6 +290,13 @@ const App = () => (
                         <Route path="/vehicle-file/:id" element={<VehicleFile />} />
                         <Route path="/factory-sticker/:vehicleId" element={<FactoryStickerWorkspace />} />
                         <Route path="/window-sticker-studio" element={<WindowStickerStudio />} />
+                        <Route path="/inventory-intelligence" element={<InventoryIntelligence />} />
+                        {/* "New Car Sticker" was ambiguous — it could mean a
+                            manufacturer reproduction or a dealer addendum. The
+                            route redirects to the studio that produces the
+                            manufacturer document, carrying any vehicle the
+                            caller had already selected. */}
+                        <Route path="/new-car-sticker" element={<NewCarStickerRedirect />} />
                         <Route path="/admin" element={<Admin />} />
                         <Route path="/admin/smoke-test" element={<AdminSmokeTest />} />
                         <Route path="/admin/design-system/addendum-icons" element={<AddendumIconLibrary />} />
@@ -301,7 +317,9 @@ const App = () => (
                         <Route path="/sticker-studio" element={<StickerStudio />} />
                         <Route path="/sticker-studio/customize/:templateId" element={<StickerStudioCustomize />} />
                         <Route path="/sticker-studio/:templateId" element={<StickerStudioGenerator />} />
-                        <Route path="/new-car-sticker" element={<NewCarSticker />} />
+                        {/* The legacy builder stays reachable so saved work is
+                            never stranded; only its ambiguous name is retired. */}
+                        <Route path="/new-car-sticker-legacy" element={<NewCarSticker />} />
                         <Route path="/cpo-sheet" element={<CpoSheet />} />
                         <Route path="/compliance" element={<ComplianceCenter />} />
                         <Route path="/compliance-center" element={<ComplianceActionCenter />} />

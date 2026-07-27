@@ -20,7 +20,7 @@ interface CreateTool {
   id: string;
   title: string;
   description: string;
-  category: "Compliance & Documents" | "Labels & Stickers" | "AI & Merchandising";
+  category: "Added Equipment" | "Vehicle Stickers" | "Compliance" | "Other Documents" | "AI & Merchandising";
   iconKey: AutoLabelsToolIconKey;
   iconCategory: ToolCategory;
   route: string;
@@ -34,22 +34,31 @@ interface CreateTool {
 }
 
 const TOOLS: CreateTool[] = [
-  { id: "new-addendum", title: "New Addendum", description: "Add-on products + disclosures for a deal.", category: "Compliance & Documents", iconKey: "new-addendum", iconCategory: "document", route: "/addendum", tags: ["addendum", "products", "disclosures", "deal", "compliance"], chip: "Most Used", isQuickStart: true },
+  // Added-equipment documents. New and used are separate families with
+  // different pricing bases and disclosures; the studio asks which first.
+  { id: "new-vehicle-addendum", title: "New Vehicle Addendum", description: "Dealer-installed equipment and adjustments on a new vehicle.", category: "Added Equipment", iconKey: "new-addendum", iconCategory: "document", route: "/addendum?condition=new", tags: ["addendum", "new", "products", "disclosures", "market adjustment", "dealer installed"], chip: "Most Used", isQuickStart: true },
+  { id: "used-vehicle-addendum", title: "Used Vehicle Addendum", description: "Dealer-installed equipment and protection products on a used vehicle.", category: "Added Equipment", iconKey: "new-addendum", iconCategory: "document", route: "/addendum?condition=used", tags: ["addendum", "used", "products", "protection", "dealer installed"] },
   // The FTC Buyers Guide + CT K-208 are generated per-vehicle in the Vehicle
   // File's Deal Flow (off the vehicle's real data), so there are no standalone
   // hub tiles for them anymore — open the vehicle and use Deal Flow.
-  { id: "cpo-sheet", title: "CPO Info Sheet", description: "Certified Pre-Owned program sheet.", category: "Compliance & Documents", iconKey: "cpo-info-sheet", iconCategory: "document", route: "/cpo-sheet", tags: ["cpo", "certified", "program", "warranty"], chip: "Template" },
-  { id: "used-car-sticker", title: "Used Car Sticker", description: "Window sticker for a used vehicle.", category: "Labels & Stickers", iconKey: "used-car-sticker", iconCategory: "sticker", route: "/used-car-sticker", tags: ["sticker", "label", "used", "window"], chip: "Most Used", isQuickStart: true },
-  { id: "new-car-sticker", title: "New Car Sticker", description: "Monroney-style new-car window label.", category: "Labels & Stickers", iconKey: "new-car-sticker", iconCategory: "sticker", route: "/new-car-sticker", tags: ["sticker", "label", "new", "monroney", "window"], chip: "Sticker" },
-  { id: "trade-up-sticker", title: "Trade-Up Sticker", description: "Promotional trade-up sticker.", category: "Labels & Stickers", iconKey: "trade-up-sticker", iconCategory: "sticker", route: "/trade-up", tags: ["sticker", "trade", "trade-up", "promo"], chip: "Template" },
-  { id: "sticker-studio", title: "Sticker Studio", description: "Choose a style & create a sticker template.", category: "Labels & Stickers", iconKey: "sticker-studio", iconCategory: "sticker", route: "/sticker-studio", tags: ["sticker", "studio", "template", "style", "label"], chip: "Template" },
-  { id: "window-sticker-studio", title: "Window Sticker Studio", description: "VIN-specific OEM window stickers — create, validate, version and publish.", category: "Labels & Stickers", iconKey: "new-car-sticker", iconCategory: "sticker", route: "/window-sticker-studio", tags: ["factory", "build", "record", "monroney", "window sticker", "msrp", "oem", "review", "publish", "studio", "vin"], chip: "Sticker" },
+  { id: "ftc-buyers-guide", title: "FTC Buyers Guide", description: "Federally required used-vehicle warranty disclosure. Staff often call it the warranty sticker.", category: "Compliance", iconKey: "buyers-guide", iconCategory: "document", route: "/buyers-guide", tags: ["buyers guide", "warranty sticker", "as is", "ftc", "used", "compliance", "16 cfr 455"], chip: "FTC Required" },
+  { id: "cpo-sheet", title: "CPO Info Sheet", description: "Certified Pre-Owned program sheet.", category: "Other Documents", iconKey: "cpo-info-sheet", iconCategory: "document", route: "/cpo-sheet", tags: ["cpo", "certified", "program", "warranty"], chip: "Template" },
+  { id: "used-car-sticker", title: "Used Car Window Sticker", description: "AutoLabels used-vehicle equipment and information summary.", category: "Vehicle Stickers", iconKey: "used-car-sticker", iconCategory: "sticker", route: "/used-car-sticker", tags: ["sticker", "label", "used", "window", "equipment", "merchandising"], chip: "Most Used", isQuickStart: true },
+
+  { id: "trade-up-sticker", title: "Trade-Up Sticker", description: "Promotional trade-up sticker.", category: "Other Documents", iconKey: "trade-up-sticker", iconCategory: "sticker", route: "/trade-up", tags: ["sticker", "trade", "trade-up", "promo"], chip: "Template" },
+  { id: "sticker-studio", title: "Sticker Studio", description: "Choose a style & create a sticker template.", category: "Other Documents", iconKey: "sticker-studio", iconCategory: "sticker", route: "/sticker-studio", tags: ["sticker", "studio", "template", "style", "label"], chip: "Template" },
+  { id: "window-sticker-studio", title: "OEM Window Sticker Studio", description: "VIN-specific manufacturer-style reproduction — create, validate, version and publish.", category: "Vehicle Stickers", iconKey: "new-car-sticker", iconCategory: "sticker", route: "/window-sticker-studio", tags: ["factory", "build", "record", "monroney", "window sticker", "msrp", "oem", "review", "publish", "studio", "vin", "new car sticker"], chip: "Sticker" },
   { id: "description-writer", title: "Description Operations", description: "Automated listing copy — review only the exceptions.", category: "AI & Merchandising", iconKey: "description-writer", iconCategory: "ai", route: "/description-operations", tags: ["ai", "description", "copy", "listing", "marketplace", "merchandising", "seo", "operations"], chip: "AI Tool", isQuickStart: true },
 ];
 
+// Grouped by document family, because the families are not
+// interchangeable: an added-equipment addendum is not a manufacturer
+// reproduction, and neither one satisfies the FTC Buyers Guide.
 const CATEGORIES: { name: CreateTool["category"]; sub: string }[] = [
-  { name: "Compliance & Documents", sub: "Required programs, disclosures, and vehicle documentation." },
-  { name: "Labels & Stickers", sub: "Window labels, promotional stickers, and custom templates." },
+  { name: "Added Equipment", sub: "Dealer-installed equipment and adjustments — never mixed into a manufacturer document." },
+  { name: "Vehicle Stickers", sub: "Manufacturer-style reproductions and AutoLabels used-vehicle stickers." },
+  { name: "Compliance", sub: "Federally and state-required vehicle disclosures." },
+  { name: "Other Documents", sub: "Program sheets, promotional labels, and custom templates." },
   { name: "AI & Merchandising", sub: "Verified AI-assisted content for dealership listings." },
 ];
 

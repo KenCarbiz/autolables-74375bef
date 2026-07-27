@@ -791,8 +791,8 @@ const Admin = () => {
           const quickActions: { icon: typeof FileText; title: string; subtitle: string; onClick: () => void }[] = [
             { icon: ScanLine, title: "Scan VIN", subtitle: "Camera on phone/tablet, QR hand-off on desktop", onClick: openScan },
             { icon: FileSignature, title: "Build Addendum", subtitle: "Create a signable addendum", onClick: () => navigate("/addendum") },
-            { icon: Sparkles, title: "New Car Sticker", subtitle: "Monroney-style window label", onClick: () => navigate("/new-car-sticker") },
-            { icon: Sparkles, title: "Window Sticker Studio", subtitle: "VIN-specific OEM window stickers", onClick: () => navigate("/window-sticker-studio") },
+            { icon: Sparkles, title: "OEM Window Sticker Studio", subtitle: "Manufacturer-style reproduction", onClick: () => navigate("/window-sticker-studio") },
+            { icon: Sparkles, title: "Inventory Intelligence", subtitle: "Pipeline state per document family", onClick: () => navigate("/inventory-intelligence") },
             { icon: Car, title: "Used Car Sticker", subtitle: "Addendum for used inventory", onClick: () => navigate("/used-car-sticker") },
             { icon: ShieldCheck, title: "Compliance Center", subtitle: "Audit trail and regs", onClick: () => navigate("/compliance") },
           ];

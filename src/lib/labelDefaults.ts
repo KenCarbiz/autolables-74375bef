@@ -29,7 +29,7 @@ export const formatLabelRef = (r: LabelRef): string => `${r.kind}:${r.key}`;
 // The dedicated builders that can serve as a slot target.
 export const LABEL_BUILDERS: Record<string, { key: string; label: string; path: string; kind: LabelKind; conditions: LabelCondition[] }> = {
   "used-car-sticker": { key: "used-car-sticker", label: "Used Car Window Sticker (classic builder)", path: "/used-car-sticker", kind: "window", conditions: ["used"] },
-  "new-car-sticker": { key: "new-car-sticker", label: "New Car Monroney + Addendum (classic builder)", path: "/new-car-sticker", kind: "window", conditions: ["new"] },
+  "new-car-sticker": { key: "new-car-sticker", label: "New Car Monroney + Addendum (classic builder)", path: "/new-car-sticker-legacy", kind: "window", conditions: ["new"] },
   "deal-addendum": { key: "deal-addendum", label: "Deal Addendum builder (products + disclosures)", path: "/addendum", kind: "addendum", conditions: ["used", "new"] },
 };
 

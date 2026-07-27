@@ -1313,7 +1313,7 @@ const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const dealFlow = `/vehicle-file/${vehicle.id}?tab=deal`;
   const links: LabelLink[] = vehicle.condition === "new"
     ? [
-        { path: "/new-car-sticker", label: "New-car Monroney + Addendum", desc: "Factory-style sticker with dealer-installed accessories and doc fee.", ready: hasCore, note: hasCore ? "Ready to generate" : "Decode VIN first" },
+        { path: "/new-car-sticker-legacy", label: "New-car Monroney + Addendum (classic builder)", desc: "Legacy combined sticker. The OEM Window Sticker Studio produces the manufacturer document; the addendum studio produces dealer-added equipment.", ready: hasCore, note: hasCore ? "Ready to generate" : "Decode VIN first" },
         { path: "ftc-buyers-guide",    label: "FTC Buyers Guide", desc: "Official As-Is / Implied form, English or Spanish — filled in Deal Flow.", ready: hasCore, note: "Managed in Deal Flow", to: dealFlow },
       ]
     : [
