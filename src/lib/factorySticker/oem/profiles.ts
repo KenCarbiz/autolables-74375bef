@@ -95,14 +95,16 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     status: "reviewed",
     logoAuthorized: false,
   },
+  // v2 supersedes the reviewed 2025 mainstream treatment per the owner's
+  // 2026-07-27 Hyundai factory-template directive.
   {
     oemId: "HYUNDAI",
     market: "US",
     modelYearStart: 2020,
     modelYearEnd: null,
-    themeVersion: "hyundai-us-2025-v1",
-    layoutFamily: "mainstream-structured",
-    status: "reviewed",
+    themeVersion: "hyundai-us-2026-v2",
+    layoutFamily: "luxury-factory-technical",
+    status: "draft",
     logoAuthorized: false,
   },
   {
@@ -195,7 +197,6 @@ const FAMILY_BY_TEMPLATE: Record<string, string> = {
   JAPANESE_FACTORY: "japanese-factory-technical",
   PREMIUM_FACTORY: "premium-factory-technical",
   LUXURY_FACTORY: "luxury-factory-technical",
-  KOREAN_MODERN: "mainstream-structured",
   AMERICAN_MAINSTREAM: "american-utility",
   PERFORMANCE: "adventure-performance",
   COMMERCIAL: "adventure-performance",

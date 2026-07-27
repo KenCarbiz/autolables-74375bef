@@ -38,6 +38,10 @@ import {
   hondaLongFixture,
   hondaPilotFixture,
   hondaPrologueFixture,
+  hyundaiIoniq5Fixture,
+  hyundaiLongFixture,
+  hyundaiPalisadeFixture,
+  hyundaiTucsonHybridFixture,
   mazdaCx90Fixture,
   mazdaLongFixture,
   mazdaMiataFixture,
@@ -238,6 +242,19 @@ const FIXTURE_SCENARIOS = {
       const d = hondaCrvHybridFixture();
       d.pricing = { ...d.pricing, destinationCharge: null };
       d.barcodePayload = "7FARS6H93TE999999";
+      return d;
+    },
+  },
+  hyundai: { label: "Hyundai Palisade", data: hyundaiPalisadeFixture },
+  hyundaiev: { label: "Hyundai IONIQ 5", data: hyundaiIoniq5Fixture },
+  hyundaihev: { label: "Hyundai Tucson HEV", data: hyundaiTucsonHybridFixture },
+  hyundailong: { label: "Hyundai Palisade (2-page)", data: hyundaiLongFixture },
+  hyundaiqa: {
+    label: "Hyundai QA blocked",
+    data: () => {
+      const d = hyundaiPalisadeFixture();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      d.barcodePayload = "KM8R7DGE8TU999999";
       return d;
     },
   },

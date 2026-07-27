@@ -350,7 +350,6 @@ const FAMILY_STYLES: Record<string, FamilyStyle> = {
   MODERN_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
   EUROPEAN_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: false, boxedZones: true, equipmentColumns: 3 },
   JAPANESE_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
-  KOREAN_MODERN: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
   AMERICAN_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 2 },
   PERFORMANCE: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: true, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
   COMMERCIAL: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: true, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
@@ -877,9 +876,12 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
       ly += 2;
       p.text("MSRP INCLUDES", LX, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
       for (const line of includeLines) {
-        ly += 9;
-        bulletDot(p, LX + 1.5, ly, 6.8, BLACK);
-        p.text(ellipsize(line.toUpperCase(), "body", 6.8, leftW - 12), LX + 6, ly, 6.8, "body", BLACK);
+        const wrapped = wrapText(line.toUpperCase(), "body", 6.8, leftW - 12);
+        wrapped.forEach((seg, si) => {
+          ly += si === 0 ? 9 : 7.6;
+          if (si === 0) bulletDot(p, LX + 1.5, ly, 6.8, BLACK);
+          p.text(seg, LX + 6, ly, 6.8, "body", BLACK);
+        });
       }
     }
   }

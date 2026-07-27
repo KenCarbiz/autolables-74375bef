@@ -2153,6 +2153,263 @@ export const infinitiQx80NewFixture = (): FactoryStickerRenderData => ({
   ],
 });
 
+// ── Hyundai fixtures (luxury-factory composition, hyundai-us-2026-v2) ──
+
+// Benchmark Palisade: SmartSense terminology, port accessories, full
+// panel set. 53,945 + 0 factory + 445 port + 1,415 = 55,805.
+export const hyundaiPalisadeFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "KM8R7DGE8TU612345",
+  identity: { year: "2026", make: "Hyundai", model: "Palisade", trim: "CALLIGRAPHY AWD" },
+  pricing: { baseMsrp: 53945, destinationCharge: 1415, optionsTotal: null, totalMsrp: 55805, portOptionsTotal: 445 },
+  options: [],
+  portOptions: [
+    { name: "Carpeted Floor Mats", code: "FM", msrp: 225 },
+    { name: "Cargo Cover", code: "CC", msrp: 190 },
+    { name: "First Aid Kit", code: "FA", msrp: 30 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.5L GDI V6 Engine - 287 HP",
+      "8-Speed Automatic Transmission",
+      "HTRAC All Wheel Drive w/ Drive Mode Select",
+      "Idle Stop & Go",
+      "Electronic Parking Brake w/ Auto Hold",
+      "Self-Leveling Rear Suspension",
+    ],
+    safety_features: [
+      "Hyundai SmartSense",
+      "Forward Collision-Avoidance Assist w/ Junction Turning",
+      "Blind-Spot Collision-Avoidance Assist",
+      "Blind-Spot View Monitor",
+      "Highway Driving Assist 2",
+      "Navigation-Based Smart Cruise Control",
+      "Lane Keeping Assist & Lane Following Assist",
+      "Driver Attention Warning",
+      "Safe Exit Assist w/ Rear Occupant Alert",
+      "Rear Cross-Traffic Collision-Avoidance Assist",
+      "Remote Smart Parking Assist",
+      "Surround View Monitor",
+    ],
+    interior: [
+      "Quilted Nappa Leather Seating",
+      "Heated & Ventilated Front and Second-Row Seats",
+      "Second-Row Captain's Chairs w/ Wing-Out Headrests",
+      "Power-Folding Third Row",
+      "Ergo Motion Driver's Seat w/ Memory",
+      "Heated Steering Wheel",
+      "Tri-Zone Automatic Climate Control",
+      "12.3-Inch Digital Cluster + 12.3-Inch Navigation",
+      "Bose Premium Audio - 12 Speakers",
+      "Wireless Apple CarPlay & Android Auto",
+      "Digital Key 2 w/ Fingerprint Reader",
+      "Wireless Device Charging - Front & Second Row",
+      "Head-Up Display",
+    ],
+    exterior: [
+      "21-Inch Machined Alloy Wheels",
+      "LED Projection Headlamps w/ Signature DRLs",
+      "Panoramic Sunroof w/ Power Sunshade",
+      "Hands-Free Smart Liftgate",
+      "Power-Folding Heated Mirrors",
+      "Rain-Sensing Wipers",
+      "Acoustic Laminated Front Glass",
+      "Roof Rails",
+    ],
+  },
+  colors: { exterior: { name: "Moonlight Cloud", code: "UB7" }, interior: { name: "Pecan Brown Nappa", code: "PBN" } },
+  assembly: { plant: "Ulsan", city: "Ulsan", country: "South Korea" },
+  mechanical: { engine: "3.5L GDI V6", transmission: "8-SPEED A/T", drivetrain: "HTRAC AWD" },
+  stockNumber: "H2660145",
+  transportMethod: "OCEAN",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: null, dealer: "FL044" },
+  epa: {
+    city: 19, highway: 26, combined: 21, annualFuelCost: 2500, ghgScore: 4,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 6, gallonsPer100Miles: 4.8,
+    fiveYearCostDifference: -1500, classNote: null,
+  },
+  safety: { overall: 5, frontalDriver: 5, frontalPassenger: 5, sideFront: 5, sideRear: 5, rollover: 4 },
+  warranty: {
+    basic: "5-Year/60,000-Mile New Vehicle Limited Warranty",
+    powertrain: "10-Year/100,000-Mile Powertrain Limited Warranty",
+    corrosion: "7-Year/Unlimited-Mile Anti-Perforation Warranty",
+    roadside: "5-Year/Unlimited-Mile Roadside Assistance",
+    emissions: "3-Year/36,000-Mile Complimentary Maintenance",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "1%" },
+    { label: "Major foreign parts content", value: "Korea 85%" },
+    { label: "Final assembly point", value: "Ulsan, South Korea" },
+    { label: "Country of origin - engine", value: "Korea" },
+    { label: "Country of origin - transmission", value: "Korea" },
+  ],
+  dealer: { name: "Hyundai of North Miami", address: "16600 NW 2nd Ave", city: "Miami", state: "FL", zip: "33169", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-palisade",
+  barcodePayload: "KM8R7DGE8TU612345",
+  disclaimers: [
+    "Vehicle information compiled from verified manufacturer, regulatory and dealer data. This document may not be the original manufacturer-issued label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
+// IONIQ 5: regulatory/ev, no gasoline content. 55,400 + 210 port + 1,415 = 57,025.
+export const hyundaiIoniq5Fixture = (): FactoryStickerRenderData => ({
+  ...hyundaiPalisadeFixture(),
+  vin: "KM8KRDDF8TU098765",
+  identity: { year: "2026", make: "Hyundai", model: "IONIQ 5", trim: "LIMITED AWD" },
+  pricing: { baseMsrp: 55400, destinationCharge: 1415, optionsTotal: null, totalMsrp: 57025, portOptionsTotal: 210 },
+  portOptions: [
+    { name: "Carpeted Floor Mats", code: "FM", msrp: 210 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Electric Motors - 320 HP",
+      "84 kWh Lithium-Ion Battery",
+      "800V Architecture w/ DC Fast Charging up to 350 kW",
+      "10.9 kW Onboard Charger",
+      "HTRAC e-AWD",
+      "Vehicle-to-Load (V2L) Power Supply",
+      "i-Pedal One-Pedal Driving",
+    ],
+    safety_features: [
+      "Hyundai SmartSense",
+      "Forward Collision-Avoidance Assist 2",
+      "Highway Driving Assist 2",
+      "Blind-Spot View Monitor",
+      "Surround View Monitor",
+      "Remote Smart Parking Assist 2",
+      "Safe Exit Assist",
+    ],
+    interior: [
+      "Eco-Processed Leather Seating",
+      "Heated & Ventilated Front Seats",
+      "Sliding Universal Island Console",
+      "Dual 12.3-Inch Panoramic Displays",
+      "Bose Premium Audio - 8 Speakers",
+      "Digital Key 2",
+      "Wireless Apple CarPlay & Android Auto",
+      "Wireless Device Charging",
+      "Head-Up Display w/ Augmented Reality",
+    ],
+    exterior: [
+      "20-Inch Aero Alloy Wheels",
+      "Pixel LED Headlamps & Taillamps",
+      "Vision Roof (Fixed Glass)",
+      "Hands-Free Smart Liftgate",
+      "Flush Door Handles",
+      "Power-Folding Heated Mirrors",
+    ],
+  },
+  colors: { exterior: { name: "Digital Teal Pearl", code: "DTG" }, interior: { name: "Obsidian Black", code: "OBK" } },
+  assembly: { plant: "HMGMA", city: "Ellabell, Georgia", country: "USA" },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "1-SPEED REDUCTION", drivetrain: "HTRAC e-AWD" },
+  stockNumber: "H2660322",
+  transportMethod: "TRUCK",
+  epa: {
+    city: 110, highway: 92, combined: 101, annualFuelCost: 700, ghgScore: 10,
+    rangeMiles: 260, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 4000, classNote: null,
+  },
+  safety: null,
+  warranty: {
+    basic: "5-Year/60,000-Mile New Vehicle Limited Warranty",
+    powertrain: "10-Year/100,000-Mile Powertrain Limited Warranty",
+    corrosion: "7-Year/Unlimited-Mile Anti-Perforation Warranty",
+    roadside: "5-Year/Unlimited-Mile Roadside Assistance",
+    emissions: "10-Year/100,000-Mile High-Voltage Battery Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "35%" },
+    { label: "Major foreign parts content", value: "Korea 45%" },
+    { label: "Final assembly point", value: "Ellabell, Georgia, USA" },
+    { label: "Country of origin - motors", value: "Korea" },
+    { label: "Country of origin - battery", value: "USA" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-ioniq5",
+  barcodePayload: "KM8KRDDF8TU098765",
+});
+
+// Tucson Hybrid: gasoline-shape module under the Hybrid Vehicle tag.
+// 42,590 + 210 port + 1,395 = 44,195.
+export const hyundaiTucsonHybridFixture = (): FactoryStickerRenderData => ({
+  ...hyundaiPalisadeFixture(),
+  vin: "KM8JFCD1XTU443210",
+  identity: { year: "2026", make: "Hyundai", model: "Tucson Hybrid", trim: "LIMITED AWD" },
+  pricing: { baseMsrp: 42590, destinationCharge: 1395, optionsTotal: null, totalMsrp: 44195, portOptionsTotal: 210 },
+  portOptions: [
+    { name: "Carpeted Floor Mats", code: "FM", msrp: 210 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "1.6L Turbocharged GDI I4 Hybrid - 231 HP Combined",
+      "Permanent-Magnet Synchronous Drive Motor",
+      "1.49 kWh Lithium-Ion Polymer Battery",
+      "6-Speed Automatic Transmission",
+      "HTRAC All Wheel Drive",
+      "Regenerative Braking w/ Drive Mode Select",
+    ],
+    safety_features: [
+      "Hyundai SmartSense",
+      "Forward Collision-Avoidance Assist w/ Junction Turning",
+      "Highway Driving Assist 2",
+      "Blind-Spot View Monitor",
+      "Surround View Monitor",
+      "Remote Smart Parking Assist",
+      "Safe Exit Warning",
+    ],
+    interior: [
+      "Leather Seating Surfaces",
+      "Heated & Ventilated Front Seats",
+      "Panoramic Curved Display w/ 12.3-Inch Navigation",
+      "Bose Premium Audio",
+      "Heated Steering Wheel",
+      "Digital Key 2",
+      "Wireless Apple CarPlay & Android Auto",
+    ],
+    exterior: [
+      "19-Inch Alloy Wheels",
+      "LED Projection Headlamps",
+      "Panoramic Sunroof",
+      "Hands-Free Smart Liftgate",
+      "Power-Folding Heated Mirrors",
+    ],
+  },
+  colors: { exterior: { name: "Amazon Gray", code: "A5G" }, interior: { name: "Black", code: "BLK" } },
+  assembly: { plant: "Ulsan", city: "Ulsan", country: "South Korea" },
+  mechanical: { engine: "1.6L T-GDI HYBRID", transmission: "6-SPEED A/T", drivetrain: "HTRAC AWD" },
+  stockNumber: "H2660488",
+  epa: {
+    city: 38, highway: 38, combined: 38, annualFuelCost: 1300, ghgScore: 8,
+    rangeMiles: null, fuelType: "Hybrid Gasoline-Electric", smogScore: 7, gallonsPer100Miles: 2.6,
+    fiveYearCostDifference: 2250, classNote: null,
+  },
+  safety: null,
+  passportUrl: "https://autolabels.io/v/demo-tucson-hev",
+  barcodePayload: "KM8JFCD1XTU443210",
+});
+
+// Long-equipment Palisade: forces the deliberate continuation page.
+export const hyundaiLongFixture = (): FactoryStickerRenderData => {
+  const base = hyundaiPalisadeFixture();
+  const std = { ...base.standardEquipment };
+  std.comfort = Array.from({ length: 26 }, (_, i) =>
+    `Three-Row Comfort & Convenience Feature ${String(i + 1).padStart(2, "0")} w/ Extended Adjustment Range`);
+  std.technology = Array.from({ length: 24 }, (_, i) =>
+    `Bluelink Connected Technology Function ${String(i + 1).padStart(2, "0")} w/ Over-the-Air Update Support`);
+  return {
+    ...base,
+    vin: "KM8R7DGE1TU559876",
+    identity: { year: "2026", make: "Hyundai", model: "Palisade", trim: "CALLIGRAPHY NIGHT EDITION AWD" },
+    pricing: { baseMsrp: 55345, destinationCharge: 1415, optionsTotal: null, totalMsrp: 57205, portOptionsTotal: 445 },
+    standardEquipment: std,
+    stockNumber: "H2660671",
+    passportUrl: "https://autolabels.io/v/demo-palisade-ne",
+    barcodePayload: "KM8R7DGE1TU559876",
+  };
+};
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

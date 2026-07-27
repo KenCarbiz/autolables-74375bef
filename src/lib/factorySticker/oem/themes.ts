@@ -14,7 +14,6 @@ export type TemplateFamilyId =
   | "JAPANESE_FACTORY"
   | "PREMIUM_FACTORY"
   | "LUXURY_FACTORY"
-  | "KOREAN_MODERN"
   | "PERFORMANCE"
   | "EV_TECHNICAL"
   | "COMMERCIAL"
@@ -31,7 +30,6 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "JAPANESE_FACTORY",
   "PREMIUM_FACTORY",
   "LUXURY_FACTORY",
-  "KOREAN_MODERN",
   "PERFORMANCE",
   "EV_TECHNICAL",
   "COMMERCIAL",
@@ -226,17 +224,6 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.1em",
     uppercaseSectionHeadings: true,
   },
-  KOREAN_MODERN: {
-    headingFont: '"Segoe UI", "Malgun Gothic", Arial, sans-serif',
-    bodyFont: '"Segoe UI", "Malgun Gothic", Arial, sans-serif',
-    numericFont: '"Segoe UI", Arial, sans-serif',
-    headingWeight: 500,
-    bodyWeight: 400,
-    labelWeight: 600,
-    letterSpacing: "0.02em",
-    headingLetterSpacing: "0.08em",
-    uppercaseSectionHeadings: false,
-  },
   PERFORMANCE: {
     headingFont: '"Arial Black", "Franklin Gothic Heavy", Arial, sans-serif',
     bodyFont: "Arial, Helvetica, sans-serif",
@@ -384,16 +371,6 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "0.75pt",
     cornerTreatment: "SQUARE",
   },
-  KOREAN_MODERN: {
-    headerVariant: "MINIMAL",
-    pricingVariant: "BOXED",
-    barcodeVariant: "CODE128",
-    qrVariant: "ROUNDED",
-    footerVariant: "MINIMAL",
-    columnGap: "16pt",
-    borderWeight: "0.75pt",
-    cornerTreatment: "ROUNDED_SM",
-  },
   PERFORMANCE: {
     headerVariant: "BLOCK",
     pricingVariant: "BANDED",
@@ -447,7 +424,6 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   AMERICAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.08em" },
   EUROPEAN_TECHNICAL: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
   JAPANESE_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
-  KOREAN_MODERN: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.16em" },
   PERFORMANCE: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 190, maxHeightPx: 50, alignment: "LEFT", wordmarkLetterSpacing: "0.04em" },
   EV_TECHNICAL: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 40, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
   COMMERCIAL: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.06em" },
@@ -604,7 +580,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     totalMsrpBackground: "#101010",
     totalMsrpText: "#ffffff",
   }),
-  HYUNDAI: theme("HYUNDAI", "KOREAN_MODERN", palette({ header: "#002c5f", accent: "#7d9bc1", sectionHeading: "#002c5f" })),
+  // Hyundai factory treatment (hyundai-us-2026-v2): white emblem block,
+  // Hyundai-blue band and keyline used sparingly, black total band —
+  // predominantly black and white, distinct from Genesis and Kia.
+  HYUNDAI: theme("HYUNDAI", "LUXURY_FACTORY", {
+    headerBackground: "#002c5f",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#111111",
+    mutedText: "#55595e",
+    accent: "#002c5f",
+    divider: "#d7dce2",
+    sectionHeadingText: "#111111",
+    totalMsrpBackground: "#101010",
+    totalMsrpText: "#ffffff",
+  }),
   GENESIS: theme("GENESIS", "KOREAN_PREMIUM", palette({
     header: "#111111", accent: "#9a7448", sectionHeading: "#4b4b4b",
     totalBg: "#141414", totalText: "#ffffff",

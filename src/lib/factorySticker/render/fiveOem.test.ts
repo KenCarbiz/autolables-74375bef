@@ -20,6 +20,10 @@ import {
   hondaLongFixture,
   hondaPilotFixture,
   hondaPrologueFixture,
+  hyundaiIoniq5Fixture,
+  hyundaiLongFixture,
+  hyundaiPalisadeFixture,
+  hyundaiTucsonHybridFixture,
   infinitiBenchmark,
   kiaTellurideFixture,
   kiaTellurideLongFixture,
@@ -111,7 +115,7 @@ describe("Genesis profile (genesis-us-2025-v1)", () => {
     expect(g.profile.themeVersion).toBe("genesis-us-2025-v1");
     expect(g.profile.layoutFamily).toBe("korean-premium-factory");
     expect(g.profile.status).toBe("draft");
-    expect(h.profile.themeVersion).toBe("hyundai-us-2025-v1");
+    expect(h.profile.themeVersion).toBe("hyundai-us-2026-v2");
     expect(g.theme.templateFamilyId).not.toBe(h.theme.templateFamilyId);
     // Outside the approved 2023-2026 range: honest fallback, generation preserved.
     expect(resolveThemeProfile("Genesis", 2021).profile.status).toBe("fallback");
@@ -595,6 +599,83 @@ describe("INFINITI profile (infiniti-us-2026-v2)", () => {
     expect(pageStrings(model, 0)).toContain("$95,695.00");
     expect(model.drawnStrings).toContain(infinitiBenchmark().vin);
     expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Hyundai profile (hyundai-us-2026-v2)", () => {
+  it("resolves Hyundai to v2, distinct from Genesis and Kia", () => {
+    const h = resolveThemeProfile("Hyundai", 2026);
+    const g = resolveThemeProfile("Genesis", 2026);
+    const k = resolveThemeProfile("Kia", 2026);
+    expect(h.profile.themeVersion).toBe("hyundai-us-2026-v2");
+    expect(h.profile.layoutFamily).toBe("luxury-factory-technical");
+    expect(h.profile.status).toBe("draft");
+    expect(h.theme.templateFamilyId).not.toBe(g.theme.templateFamilyId);
+    expect(h.theme.templateFamilyId).not.toBe(k.theme.templateFamilyId);
+  });
+
+  it("Palisade benchmark reconciles 53,945 + 445 port + 1,415 with the full panel set", () => {
+    const data = hyundaiPalisadeFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$55,805.00");
+    expect(model.drawnStrings).toContain("KM8R7DGE8TU612345");
+    expect(page1.some((s) => s.includes("PORT OF ENTRY OPTIONS"))).toBe(true);
+    expect(page1.some((s) => s.includes("MSRP INCLUDES"))).toBe(true);
+    expect(page1.join(" ")).toContain("10-YEAR/100,000-MILE POWERTRAIN LIMITED WARRANTY");
+    expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
+    expect(page1.some((s) => s.includes("ULSAN, SOUTH KOREA"))).toBe(true);
+    expect(page1.some((s) => s.includes("GOVERNMENT 5-STAR SAFETY RATINGS"))).toBe(true);
+    expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
+    expect(page1.some((s) => s === "auto")).toBe(true);
+    expect(page1.some((s) => s === "(LABELS)")).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
+    const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
+    expect(qrs.some((q) => q.kind === "qr" && q.payload === data.passportUrl)).toBe(true);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("uses Hyundai blue sparingly: band and keyline only, never Genesis bronze or Kia treatment", () => {
+    const model = buildRenderLayout(hyundaiPalisadeFixture(), themeFor(null));
+    const prims = model.pages[0].primitives;
+    const fills = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    const rules = new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(fills.has("#002c5f")).toBe(true);   // blue model band
+    expect(rules.has("#002c5f")).toBe(true);   // blue keyline
+    expect(fills.has("#9a7448")).toBe(false);  // never Genesis bronze
+    expect(fills.has("#f1f1f1")).toBe(false);  // never Kia heading fills
+    expect(fills.has("#101010")).toBe(true);   // black total band
+  });
+
+  it("IONIQ 5 uses the EV module with no gasoline content and the battery warranty line", () => {
+    const model = buildRenderLayout(hyundaiIoniq5Fixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("Electric Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+    expect(page1.join(" ")).toContain("10-YEAR/100,000-MILE HIGH-VOLTAGE BATTERY LIMITED WARRANTY");
+    expect(page1.some((s) => s.includes("ELLABELL, GEORGIA, USA"))).toBe(true);
+  });
+
+  it("Tucson Hybrid keeps the gasoline regulatory shape under the Hybrid Vehicle tag", () => {
+    const model = buildRenderLayout(hyundaiTucsonHybridFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1.some((s) => s.includes("Hybrid Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPGe"))).toBe(false);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+  });
+
+  it("long-equipment Palisade produces a deliberate continuation page", () => {
+    const model = buildRenderLayout(hyundaiLongFixture(), themeFor(null));
+    expect(model.pages.length).toBe(2);
+    expect(pageStrings(model, 0)).toContain("$57,205.00");
+    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
     expectMinFontRespected(model);
   });
 });
