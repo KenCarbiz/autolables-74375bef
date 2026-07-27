@@ -86,9 +86,9 @@ describe("INFINITI theme — pinned tokens", () => {
     expect(t.colors.headerBackground).toBe("#000000");
     expect(t.colors.headerText).toBe("#ffffff");
     expect(t.colors.bodyText).toBe("#2b2b2b");
-    expect(t.colors.accent).toBe("#0b1f3a");
-    expect(t.colors.sectionHeadingText).toBe("#0b1f3a");
-    expect(t.colors.totalMsrpBackground).toBe("#0b1f3a");
+    expect(t.colors.accent).toBe("#141414");
+    expect(t.colors.sectionHeadingText).toBe("#1a1a1a");
+    expect(t.colors.totalMsrpBackground).toBe("#161616");
     expect(t.colors.totalMsrpText).toBe("#ffffff");
   });
 

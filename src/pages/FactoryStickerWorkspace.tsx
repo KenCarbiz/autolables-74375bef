@@ -14,6 +14,7 @@ import {
   infinitiBenchmark,
   longEquipmentFixture,
   newConditionBenchmark,
+  noEpaFixture,
   themeFor,
 } from "@/lib/factorySticker/render/__fixtures__/renderData.ts";
 import { toast } from "sonner";
@@ -137,6 +138,31 @@ const FIXTURE_SCENARIOS = {
   new: { label: "New vehicle", data: newConditionBenchmark },
   generic: { label: "Generic decode", data: genericDecodeFixture },
   twopage: { label: "Two-page overflow", data: longEquipmentFixture },
+  noepa: { label: "Missing EPA", data: noEpaFixture },
+  msrpvar: {
+    label: "MSRP discrepancy",
+    data: () => {
+      const d = infinitiBenchmark();
+      d.pricing = { ...d.pricing, totalMsrp: 96500 };
+      return d;
+    },
+  },
+  nodest: {
+    label: "Missing destination",
+    data: () => {
+      const d = infinitiBenchmark();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      return d;
+    },
+  },
+  qamismatch: {
+    label: "Passport mismatch (blocked)",
+    data: () => {
+      const d = infinitiBenchmark();
+      d.barcodePayload = "JN8AZ3NE5S9999999";
+      return d;
+    },
+  },
 } as const;
 
 const GEN_STATUS_TONE: Record<string, Tone> = {
@@ -161,6 +187,8 @@ export default function FactoryStickerWorkspace({ fixture = false }: { fixture?:
   const [pageIdx, setPageIdx] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [scenario, setScenario] = useState<keyof typeof FIXTURE_SCENARIOS>("used");
+  const [zoom, setZoom] = useState<"fit" | number>("fit");
+  const [fullscreen, setFullscreen] = useState(false);
 
   const load = useCallback(async () => {
     if (fixture || !vehicleId) return;
@@ -467,43 +495,95 @@ export default function FactoryStickerWorkspace({ fixture = false }: { fixture?:
           </div>
 
           {/* CENTER — large live document preview */}
-          <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <p className="text-[11px] text-muted-foreground">
-                Live render · landscape Letter (11 × 8.5 in) · renderer v{record?.renderer_version || "1.0.0"} — the
-                identical layout model the PDF is produced from.
+          <div className={fullscreen
+            ? "fixed inset-0 z-50 bg-slate-900/95 p-6 overflow-auto"
+            : "rounded-2xl border border-border bg-card p-4 space-y-3"}>
+            <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
+              <p className={`text-[11px] ${fullscreen ? "text-slate-300" : "text-muted-foreground"}`}>
+                Landscape Letter (11 × 8.5 in) · renderer v{record?.renderer_version || "1.0.0"} — the identical
+                layout model the PDF is produced from. Page edge = trim boundary.
               </p>
-              {model && model.pages.length > 1 && (
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {([
+                  ["Fit", "fit"],
+                  ["Actual print size", 1],
+                ] as Array<[string, "fit" | number]>).map(([label, z]) => (
                   <button
+                    key={label}
                     type="button"
-                    onClick={() => setPageIdx((i) => Math.max(0, i - 1))}
-                    disabled={pageIdx === 0}
-                    className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-muted/40 disabled:opacity-40"
-                    aria-label="Previous page"
+                    onClick={() => setZoom(z)}
+                    className={`h-7 px-2.5 rounded-md border text-[11px] font-semibold ${
+                      zoom === z
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"
+                    }`}
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    {label}
                   </button>
-                  <span className="text-[11px] font-semibold text-foreground tabular-nums">
-                    Page {pageIdx + 1} / {model.pages.length}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPageIdx((i) => Math.min(model.pages.length - 1, i + 1))}
-                    disabled={pageIdx >= model.pages.length - 1}
-                    className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-muted/40 disabled:opacity-40"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.max(0.5, (z === "fit" ? 1 : z) - 0.25))}
+                  className={`w-7 h-7 rounded-md border text-sm font-bold ${fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"}`}
+                  aria-label="Zoom out"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.min(3, (z === "fit" ? 1 : z) + 0.25))}
+                  className={`w-7 h-7 rounded-md border text-sm font-bold ${fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"}`}
+                  aria-label="Zoom in"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFullscreen((f) => !f)}
+                  className={`h-7 px-2.5 rounded-md border text-[11px] font-semibold ${fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"}`}
+                >
+                  {fullscreen ? "Exit full screen" : "Full screen"}
+                </button>
+                {model && model.pages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setPageIdx((i) => Math.max(0, i - 1))}
+                      disabled={pageIdx === 0}
+                      className={`w-7 h-7 rounded-md border flex items-center justify-center disabled:opacity-40 ${fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"}`}
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className={`text-[11px] font-semibold tabular-nums ${fullscreen ? "text-slate-200" : "text-foreground"}`}>
+                      Page {pageIdx + 1} / {model.pages.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPageIdx((i) => Math.min(model.pages.length - 1, i + 1))}
+                      disabled={pageIdx >= model.pages.length - 1}
+                      className={`w-7 h-7 rounded-md border flex items-center justify-center disabled:opacity-40 ${fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"}`}
+                      aria-label="Next page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             {pageSvg ? (
-              <div
-                className="rounded-lg border border-border overflow-hidden bg-white shadow-sm [&>svg]:w-full [&>svg]:h-auto [&>svg]:block"
-                dangerouslySetInnerHTML={{ __html: pageSvg }}
-              />
+              <div className={zoom === "fit" ? "" : "overflow-auto"}>
+                <div
+                  className="border border-border bg-white shadow-sm [&>svg]:block [&>svg]:h-auto"
+                  // Actual print size: 11in at CSS 96dpi = 1056px page width.
+                  style={zoom === "fit" ? undefined : { width: 1056 * (zoom as number) }}
+                  dangerouslySetInnerHTML={{
+                    __html: zoom === "fit"
+                      ? pageSvg.replace("<svg ", '<svg style="width:100%" ')
+                      : pageSvg.replace("<svg ", `<svg style="width:${1056 * (zoom as number)}px" `),
+                  }}
+                />
+              </div>
             ) : (
               <div className="rounded-lg border border-dashed border-border bg-muted/20 aspect-[792/612] flex flex-col items-center justify-center gap-2 text-center p-6">
                 <FileText className="w-8 h-8 text-muted-foreground/50" />
@@ -587,19 +667,19 @@ export default function FactoryStickerWorkspace({ fixture = false }: { fixture?:
                 value={fixture ? "Fixture VIN" : vinMatch == null ? "Not run" : vinMatch ? "Matched" : "Mismatch"}
               />
               <StatusRow
-                label="Barcode = VIN"
+                label="Barcode payload = VIN (pre-render identity)"
                 tone={fixture ? (fixtureChecks?.barcode_is_vin ? "pass" : "fail") : qaTone(record?.barcode_identity_qa_status)}
-                value={fixture ? (fixtureChecks?.barcode_is_vin ? "Verified now" : "Failed") : qaLabel(record?.barcode_identity_qa_status)}
+                value={fixture ? (fixtureChecks?.barcode_is_vin ? "Payload match" : "Mismatch - publication blocked") : qaLabel(record?.barcode_identity_qa_status)}
               />
               <StatusRow
-                label="Passport QR identity"
+                label="Passport QR payload (pre-render identity)"
                 tone={fixture ? (fixtureChecks?.qr_is_passport ? "pass" : "fail") : qaTone(record?.qr_identity_qa_status)}
-                value={fixture ? (fixtureChecks?.qr_is_passport ? "Verified now" : "Failed") : qaLabel(record?.qr_identity_qa_status)}
+                value={fixture ? (fixtureChecks?.qr_is_passport ? "Payload match" : "Mismatch") : qaLabel(record?.qr_identity_qa_status)}
               />
               <StatusRow
-                label="Layout QA"
+                label="Layout model (bounds, min font, VIN drawn)"
                 tone={fixture ? (fixtureChecks?.vin_drawn && fixtureChecks?.page_count_ok ? "pass" : "fail") : qaTone(record?.visual_qa_status)}
-                value={fixture ? (fixtureChecks?.vin_drawn && fixtureChecks?.page_count_ok ? "Verified now" : "Failed") : qaLabel(record?.visual_qa_status)}
+                value={fixture ? (fixtureChecks?.vin_drawn && fixtureChecks?.page_count_ok ? "Checks passed" : "Failed") : qaLabel(record?.visual_qa_status)}
               />
               <StatusRow
                 label="EPA data"

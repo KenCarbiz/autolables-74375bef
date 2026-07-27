@@ -47,8 +47,8 @@ describe("renderFactorySticker (orchestrator contract)", () => {
   it("labels generic decodes instead of asserting them", async () => {
     const result = await renderFactorySticker(genericDecodeFixture(), themeFor("infiniti"));
     expect(result.layout.drawnStrings.some((s) => s.includes("TYPICAL FACTORY CONFIGURATION"))).toBe(true);
-    expect(result.layout.drawnStrings.some((s) => s.includes("VERIFIED BY AUTOLABELS"))).toBe(false);
-    expect(result.layout.drawnStrings.some((s) => s.includes("COMPILED BY AUTOLABELS"))).toBe(true);
+    expect(result.layout.drawnStrings.some((s) => s.includes("saved VIN-specific factory-build data"))).toBe(false);
+    expect(result.layout.drawnStrings.some((s) => s.includes("typical factory-configuration data"))).toBe(true);
   });
 
   it("falls back to the AutoLabels theme for unknown makes", async () => {

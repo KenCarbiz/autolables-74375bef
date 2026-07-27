@@ -139,7 +139,7 @@ export function normalizeForSticker(
   const disclaimers: string[] = [];
   if (condition !== "new") {
     disclaimers.push(
-      "Reconstructed factory build record for reference. Not the original manufacturer window sticker.",
+      "AutoLabels-generated Factory Build & Original MSRP Record created from VIN-specific vehicle data. This is not the original manufacturer Monroney label and is not a replacement for any federally required label on a new motor vehicle.",
     );
   }
   if (generic) {
