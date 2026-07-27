@@ -172,6 +172,19 @@ const CORPORATE_PARENTS = new Set([
   "volkswagengroup", "vwgroup", "tatamotors", "geely", "bmwgroup",
   "mercedesbenzgroup", "hondamotor", "toyotamotor", "nissanmotor",
   "cdjr", "chryslerdodgejeepram",
+  // Long-form corporate names decoders emit. Each owns two or more
+  // brands, so none of them can pick a template on its own.
+  "generalmotorsllc", "generalmotorscompany", "generalmotorscorporation",
+  "toyotamotorcorporation", "toyotamotornorthamerica",
+  "hondamotorco", "hondamotorcompany", "hondamotorcoltd",
+  "nissanmotorco", "nissanmotorcompany", "nissanmotorcorporation",
+  "fordmotorcompany", "fordmotorco",
+  "hyundaimotorcompany", "hyundaimotorcorporation",
+  "volkswagenag", "volkswagenaktiengesellschaft",
+  "bayerischemotorenwerke", "bmwag",
+  "daimler", "daimlerag", "mercedesbenzag",
+  "tatamotorslimited", "jaguarlandroverautomotive",
+  "renaultnissanmitsubishi", "hondaacura",
 ]);
 
 // Sibling marques with no template of their own. Jaguar shares JLR with

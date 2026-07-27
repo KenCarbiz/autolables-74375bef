@@ -103,6 +103,10 @@ const defaultStickerTemplates = (): Record<StickerDocType, StickerPrintTemplate>
 // default to auto-publish, new-car records default to manager review.
 export interface FactoryStickerSettings {
   enabled: boolean;
+  /** Manufacturer-style reproductions for used/CPO inventory. Off until the
+   *  dealership explicitly opts in: used cars stay in the Used Car Sticker
+   *  workflow, and the reproduction never replaces the Buyers Guide. */
+  used_reproduction: boolean;
   auto_publish_used: boolean;
   auto_publish_new: boolean;
   show_on_passport: boolean;
@@ -111,6 +115,7 @@ export interface FactoryStickerSettings {
 
 export const DEFAULT_FACTORY_STICKER_SETTINGS: FactoryStickerSettings = {
   enabled: true,
+  used_reproduction: false,
   auto_publish_used: true,
   auto_publish_new: false,
   show_on_passport: true,

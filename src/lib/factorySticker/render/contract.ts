@@ -137,7 +137,13 @@ export interface FactoryStickerRenderData {
 export interface FactoryStickerRenderResult {
   pdfBytes: Uint8Array;
   previewSvg: string;
-  layout: { pages: number; drawnStrings: string[] };
+  layout: {
+    pages: number;
+    drawnStrings: string[];
+    /** Actual page geometry, validated against the template registry. */
+    widthPt: number;
+    heightPt: number;
+  };
 }
 
 const categoryForHint = (hint: string): EquipmentCategory => {
@@ -405,6 +411,11 @@ export async function runRenderPipeline(
   return {
     pdfBytes,
     previewSvg,
-    layout: { pages: model.pages.length, drawnStrings: model.drawnStrings },
+    layout: {
+      pages: model.pages.length,
+      drawnStrings: model.drawnStrings,
+      widthPt: model.width,
+      heightPt: model.height,
+    },
   };
 }

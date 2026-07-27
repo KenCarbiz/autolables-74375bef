@@ -37,6 +37,27 @@ export type {
 export const FACTORY_STICKER_RENDERER_VERSION = RENDERER_VERSION;
 export { resolveRenderProfile };
 
+// The decision layer travels with the renderer so the orchestrator can
+// never select a template the renderer would not produce, or publish a
+// page whose geometry the registry does not declare.
+export {
+  getTemplateDefinition,
+  listTemplateDefinitions,
+  selectOemTemplate,
+  validatePageGeometry,
+} from "../../../../src/lib/factorySticker/oem/selection.ts";
+export type {
+  OemTemplateDefinition,
+  OemTemplateSelectionResult,
+} from "../../../../src/lib/factorySticker/oem/selection.ts";
+export {
+  classifyCondition,
+  evaluateStickerEligibility,
+} from "../../../../src/lib/factorySticker/oem/eligibility.ts";
+export type {
+  StickerEligibilityResult,
+} from "../../../../src/lib/factorySticker/oem/eligibility.ts";
+
 export async function renderFactorySticker(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,

@@ -84,6 +84,7 @@ type RowAction = "approve_publish" | "unpublish" | "regenerate";
 
 const SETTING_ROWS: { key: keyof FactoryStickerSettings; title: string; detail: string }[] = [
   { key: "enabled", title: "Generate factory build records", detail: "Create a VIN-specific factory build record automatically when a vehicle's build data arrives at ingest." },
+  { key: "used_reproduction", title: "Manufacturer-style records for used and CPO vehicles", detail: "Off by default: used inventory stays in the Used Car Sticker workflow. Turning this on produces a clearly disclosed AutoLabels reproduction alongside — never instead of — the Buyers Guide." },
   { key: "auto_publish_used", title: "Auto-publish for used and CPO vehicles", detail: "Publish a clean, fully reconciled record to the passport without a manager decision." },
   { key: "auto_publish_new", title: "Auto-publish for new vehicles", detail: "New-car records normally wait for manager review before publishing." },
   { key: "show_on_passport", title: "Show on the customer passport", detail: "List the published record on the vehicle's Documents page for shoppers." },

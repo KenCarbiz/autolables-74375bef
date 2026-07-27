@@ -31,6 +31,7 @@ import {
   renderFactorySticker, FACTORY_STICKER_RENDERER_VERSION,
   type FactoryStickerRenderResult, type FactoryStickerTheme,
   resolveRenderProfile,
+  selectOemTemplate, validatePageGeometry, evaluateStickerEligibility,
 } from "../_shared/factorySticker/render.ts";
 
 const cors = {
@@ -308,10 +309,99 @@ async function orchestrateVehicle(
     await audit(admin, tenantId, "factory_sticker.normalized", record.id,
       { vin, confidence: normalized.confidence, missing: normalized.missing });
 
+    // ── Eligibility: should a manufacturer-style document exist at all?
+    // Used and CPO inventory stays in the Used Car Sticker workflow unless
+    // the dealership explicitly enabled reproductions. An ineligible
+    // vehicle is parked, never rendered — a document that should not exist
+    // is not a failure to retry.
+    const stickerSettings = (dealerSettings.factory_sticker || {}) as Record<string, unknown>;
+    const eligibility = evaluateStickerEligibility({
+      condition: condRaw,
+      corroboratingConditions: [
+        typeof (mc as Record<string, unknown>).condition === "string"
+          ? String((mc as Record<string, unknown>).condition) : null,
+      ],
+      settings: {
+        enabled: stickerSettings.enabled !== false,
+        used_reproduction: stickerSettings.used_reproduction === true,
+      },
+      hasVinSpecificBuildData: !normalized.data.generic,
+      hasManufacturerPricing: !!normalized.baseMsrp && !!normalized.statedTotalMsrp,
+    });
+    if (!eligibility.eligible) {
+      await setRecord(admin, record.id, {
+        generation_status: "REVIEW_REQUIRED",
+        review_required: true,
+        review_reason: `${eligibility.status}: ${eligibility.reasons.join("; ") || "not eligible"}`,
+        last_error: null,
+        qa_metadata: {
+          ...(record.qa_metadata || {}),
+          eligibility: {
+            status: eligibility.status,
+            condition_class: eligibility.conditionClass,
+            blocker_code: eligibility.blockerCode,
+            reasons: eligibility.reasons,
+          },
+        },
+      });
+      await audit(admin, tenantId, "factory_sticker.ineligible", record.id,
+        { vin, status: eligibility.status, blocker: eligibility.blockerCode, reasons: eligibility.reasons });
+      return {
+        vehicle_id: vehicleId, record_id: record.id, status: "REVIEW_REQUIRED",
+        eligibility: eligibility.status, blocker: eligibility.blockerCode,
+        reasons: eligibility.reasons,
+      };
+    }
+
     // ── OEM resolution: model-year-aware versioned theme profile. The
     // profile pins the visual identity for this brand + model year so
     // regenerating older documents never adopts a future brand identity.
     const make = normalized.data.identity.make;
+    const modelYearNum = Number(normalized.data.identity.year);
+    // The selection engine is the only thing allowed to name a template.
+    // A corporate parent, a dealer name or a description never selects;
+    // disagreement between trusted sources blocks outright.
+    const selection = selectOemTemplate({
+      vin,
+      modelYear: Number.isFinite(modelYearNum) ? modelYearNum : null,
+      canonicalMake: make,
+      canonicalManufacturer: typeof sheet.manufacturer === "string" ? sheet.manufacturer : null,
+      canonicalModel: normalized.data.identity.model,
+      market: "US",
+      condition: condRaw,
+      corroboratingMakes: [
+        typeof (mc as Record<string, unknown>).make === "string"
+          ? String((mc as Record<string, unknown>).make) : null,
+      ],
+    });
+    await audit(admin, tenantId, "factory_sticker.template_selected", record.id, {
+      vin, template_key: selection.templateKey, status: selection.selectionStatus,
+      confidence: selection.confidence, reasons: selection.reasons,
+      conflicting_fields: selection.conflictingFields,
+    });
+    if (selection.selectionStatus === "unsupported" || selection.selectionStatus === "conflict") {
+      const code = selection.selectionStatus === "conflict"
+        ? "OEM_TEMPLATE_CONFLICT" : "OEM_TEMPLATE_UNSUPPORTED";
+      const reason = `${code}: ${selection.reasons.join("; ") || "no registered template for this vehicle"}`;
+      await setRecord(admin, record.id, {
+        generation_status: "REVIEW_REQUIRED",
+        review_required: true, review_reason: reason, last_error: null,
+        detected_make_value: make || null,
+        oem_resolution_confidence: selection.selectionStatus.toUpperCase(),
+        qa_metadata: {
+          ...(record.qa_metadata || {}),
+          selection: {
+            status: selection.selectionStatus, confidence: selection.confidence,
+            reasons: selection.reasons, conflicting_fields: selection.conflictingFields,
+          },
+        },
+      });
+      await audit(admin, tenantId, "factory_sticker.review_required", record.id, { vin, reason });
+      return {
+        vehicle_id: vehicleId, record_id: record.id, status: "REVIEW_REQUIRED",
+        selection: selection.selectionStatus, reasons: selection.reasons,
+      };
+    }
     const canonicalOemId = make ? make.toLowerCase().replace(/[^a-z0-9]+/g, "-") : null;
     const profile = resolveRenderProfile(normalized.data);
     const profileFamily = profile.profile.layoutFamily;
@@ -383,7 +473,9 @@ async function orchestrateVehicle(
       normalized_data_json: normalized.data,
       canonical_oem_id: canonicalOemId,
       detected_make_value: make || null,
-      oem_resolution_confidence: canonicalOemId ? "EXACT" : "UNKNOWN",
+      oem_resolution_confidence: selection.selectionStatus === "selected"
+        ? (selection.confidence >= 1 ? "EXACT" : "ALIAS")
+        : selection.selectionStatus.toUpperCase(),
       oem_theme_id: theme.oemThemeId,
       oem_theme_version: theme.oemThemeVersion,
       template_family_id: profileFamily,
@@ -438,24 +530,49 @@ async function orchestrateVehicle(
     // ── QA: identity invariants the sticker must never violate.
     await setRecord(admin, record.id, { generation_status: "RUNNING_QA" });
     const drawn = rendered.layout?.drawnStrings || [];
+    // Page geometry is checked against the template's own declared format,
+    // not a shared assumption: a portrait template must never pass because
+    // the landscape one would have.
+    const geometry = selection.definition
+      ? validatePageGeometry(selection.definition.pageFormat, {
+        widthPt: Number(rendered.layout?.widthPt ?? 0),
+        heightPt: Number(rendered.layout?.heightPt ?? 0),
+        pageCount: Number(rendered.layout?.pages ?? 0),
+      })
+      : { pass: true, code: "OK" as const, reasons: [] };
     const qaChecks = {
       vin_drawn: drawn.includes(vin),
       barcode_is_vin: normalized.data.barcodePayload === vin,
       qr_is_canonical_passport: !!canonicalPassportUrl && normalized.data.passportUrl === canonicalPassportUrl,
-      page_count_ok: Number(rendered.layout?.pages) >= 1 && Number(rendered.layout?.pages) <= 2,
+      page_count_ok: geometry.pass,
     };
     const qaPass = Object.values(qaChecks).every(Boolean);
     const qaPatch = {
       qr_identity_qa_status: qaChecks.qr_is_canonical_passport ? "PASS" : "FAIL",
       barcode_identity_qa_status: qaChecks.barcode_is_vin ? "PASS" : "FAIL",
       visual_qa_status: qaChecks.vin_drawn && qaChecks.page_count_ok ? "PASS" : "FAIL",
-      qa_metadata: { ...(basePatch.qa_metadata as Record<string, unknown>), checks: qaChecks, pages: rendered.layout?.pages ?? null },
+      qa_metadata: {
+        ...(basePatch.qa_metadata as Record<string, unknown>),
+        checks: qaChecks,
+        pages: rendered.layout?.pages ?? null,
+        geometry: {
+          code: geometry.code, reasons: geometry.reasons,
+          width_pt: rendered.layout?.widthPt ?? null,
+          height_pt: rendered.layout?.heightPt ?? null,
+        },
+        selection: {
+          status: selection.selectionStatus, confidence: selection.confidence,
+          template_key: selection.templateKey, reasons: selection.reasons,
+        },
+      },
     };
     await audit(admin, tenantId, qaPass ? "factory_sticker.qa_passed" : "factory_sticker.qa_failed",
       record.id, { vin, checks: qaChecks });
 
     // ── File + publish decision: auto-publish ONLY on a fully clean run.
-    const autoPublish = qaPass && reconciliationStatus === "MATCHED" && normalized.confidence === "HIGH" && !reviewRequired;
+    const autoPublish = qaPass && reconciliationStatus === "MATCHED"
+      && normalized.confidence === "HIGH" && !reviewRequired
+      && selection.selectionStatus === "selected";
     const filed = await fileStickerDocument(admin, tenantId, vehicleId, vin,
       rendered.pdfBytes, rendered.previewSvg, {
         title, condition: normalized.data.condition, vin,
@@ -476,7 +593,11 @@ async function orchestrateVehicle(
       current_document_id: filed.documentId,
       review_required: !autoPublish,
       review_reason: autoPublish ? null : (reviewReason
-        || (!qaPass ? "qa_failed" : reconciliationStatus !== "MATCHED" ? `reconciliation_${reconciliationStatus.toLowerCase()}` : `confidence_${normalized.confidence.toLowerCase()}`)),
+        || (!geometry.pass ? `${geometry.code.toLowerCase()}: ${geometry.reasons.join("; ")}`
+          : !qaPass ? "qa_failed"
+          : selection.selectionStatus !== "selected" ? `template_${selection.selectionStatus}: ${selection.reasons.join("; ")}`
+          : reconciliationStatus !== "MATCHED" ? `reconciliation_${reconciliationStatus.toLowerCase()}`
+          : `confidence_${normalized.confidence.toLowerCase()}`)),
       attempt_count: 0, last_error: null,
       ...(autoPublish ? { published_at: new Date().toISOString(), approved_at: new Date().toISOString() } : {}),
     });
