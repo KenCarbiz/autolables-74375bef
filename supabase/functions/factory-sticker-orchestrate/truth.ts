@@ -26,6 +26,12 @@ import {
   EMPTY_AUTHORITY,
   type SourceAuthorityRule,
 } from "../_shared/factorySticker/lib/vehicleTruth/tenantAuthority.ts";
+import {
+  conflictException,
+  documentTypesForFamily,
+  staleFlagsForFamily,
+  TRUTH_CONFLICT_EXCEPTION_TYPE,
+} from "../_shared/factorySticker/lib/vehicleTruth/existingQueues.ts";
 
 // deno-lint-ignore no-explicit-any
 type Admin = any;
@@ -162,6 +168,11 @@ export async function refreshVehicleTruth(
       status: "open",
     }, { onConflict: "vehicle_id,fact_key", ignoreDuplicates: true });
   }
+  // The same conflicts also reach the Command Center queue a manager
+  // actually watches. Without this the truth layer would know a vehicle was
+  // in dispute while the exception list said nothing.
+  await syncConflictException(admin, tenantId, vehicleId, listing, built.conflicts,
+    current ? current.snapshot_version : 1);
 
   if (!decision.createVersion && current) {
     return {
@@ -207,6 +218,11 @@ export async function refreshVehicleTruth(
     };
   }
 
+  // A new version means documents built from the previous one may now be
+  // out of date. That belongs on stale_document_flags, which the nav badges
+  // and Vehicle Compliance already read, not on a second surface.
+  await flagStaleDocuments(admin, tenantId, vehicleId, decision.changes, decision.nextVersion);
+
   return {
     snapshot_id: (inserted as { id?: string } | null)?.id ?? null,
     version: decision.nextVersion,
@@ -216,4 +232,104 @@ export async function refreshVehicleTruth(
     conflicts: built.conflicts.length,
     blocking_conflicts: blocking.length,
   };
+}
+
+/**
+ * Raise stale flags on the documents a snapshot change invalidates.
+ *
+ * Scoped to documents that were actually issued — a draft is regenerated
+ * from current data anyway, so flagging it would fill the queue with work
+ * nobody needs to do.
+ */
+async function flagStaleDocuments(
+  admin: Admin,
+  tenantId: string,
+  vehicleId: string,
+  // deno-lint-ignore no-explicit-any
+  changes: any[],
+  snapshotVersion: number,
+): Promise<void> {
+  if (!changes.length) return;
+  try {
+    const { data: docs } = await admin.from("generated_documents")
+      .select("id, document_type")
+      .eq("vehicle_id", vehicleId)
+      .in("document_status", ["approved", "printed", "published"]);
+    if (!docs?.length) return;
+
+    for (const doc of docs as Array<{ id: string; document_type: string }>) {
+      const type = String(doc.document_type || "").toLowerCase();
+      const rows = FAMILY_KEYS
+        .filter((family) => documentTypesForFamily(family).includes(type))
+        .flatMap((family) => staleFlagsForFamily(family, changes, snapshotVersion));
+      if (!rows.length) continue;
+
+      // Same refresh contract staleDetection already uses: clear this
+      // document's OPEN flags, re-insert current ones, leave reviewed rows
+      // alone as an audit trail.
+      await admin.from("stale_document_flags").delete()
+        .eq("generated_document_id", doc.id).eq("status", "open");
+      await admin.from("stale_document_flags").insert(rows.map((row) => ({
+        tenant_id: tenantId,
+        vehicle_id: vehicleId,
+        generated_document_id: doc.id,
+        status: "open",
+        ...row,
+      })));
+    }
+  } catch {
+    // Queue bookkeeping must never fail a generation that otherwise worked.
+  }
+}
+
+const FAMILY_KEYS = [
+  "oem_window_sticker_reproduction",
+  "new_vehicle_addendum",
+  "used_vehicle_addendum",
+  "ftc_buyers_guide",
+  "used_vehicle_window_sticker",
+] as const;
+
+/** Keep exactly one open truth-conflict exception per vehicle. */
+async function syncConflictException(
+  admin: Admin,
+  tenantId: string,
+  vehicleId: string,
+  listing: Record<string, unknown>,
+  // deno-lint-ignore no-explicit-any
+  conflicts: any[],
+  snapshotVersion: number,
+): Promise<void> {
+  try {
+    const { data: open } = await admin.from("vehicle_exceptions")
+      .select("id").eq("tenant_id", tenantId).eq("vehicle_listing_id", vehicleId)
+      .eq("exception_type", TRUTH_CONFLICT_EXCEPTION_TYPE)
+      .in("status", ["open", "in_progress"]).maybeSingle();
+    const existing = (open || null) as { id: string } | null;
+
+    const row = conflictException(conflicts, snapshotVersion);
+    if (!row) {
+      // Every dispute resolved itself — close the row rather than leaving a
+      // manager chasing a conflict that no longer exists.
+      if (existing) {
+        await admin.from("vehicle_exceptions")
+          .update({ status: "resolved", resolved_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      }
+      return;
+    }
+
+    const payload = {
+      tenant_id: tenantId,
+      vehicle_listing_id: vehicleId,
+      vin: String(listing.vin || "").toUpperCase().trim(),
+      stock_number: (listing.stock_number as string | null) ?? null,
+      status: "open",
+      ...row,
+    };
+    if (existing) await admin.from("vehicle_exceptions").update(payload).eq("id", existing.id);
+    else await admin.from("vehicle_exceptions").insert(payload);
+  } catch {
+    // Same rule: the queue is a convenience, not a gate on generation.
+  }
 }
