@@ -8,6 +8,9 @@ import {
   audiEtronFixture,
   audiPhevFixture,
   audiQ5Fixture,
+  dodgeChargerEvFixture,
+  dodgeDurangoFixture,
+  dodgeHornetPhevFixture,
   chryslerPacificaFixture,
   chryslerPhevFixture,
   chryslerVoyagerFixture,
@@ -1634,6 +1637,108 @@ describe("Chrysler profile (chrysler-us-2026-v1, american-factory-technical)", (
     expect(joined).not.toContain("PACIFICA");
     // Its own parts-content record, not Pacifica's.
     expect(joined).toContain("MEXICO 24%");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Dodge profile (dodge-us-2026-v1, muscle-factory-technical)", () => {
+  it("Dodge resolves alone and keeps its own family, distinct from Jeep and Ram", () => {
+    for (const alias of ["Dodge", "DODGE", "Dodge Division"]) {
+      const r = resolveThemeProfile(alias, 2026);
+      expect(r.theme.oemId, alias).toBe("DODGE");
+      expect(r.profile.themeVersion, alias).toBe("dodge-us-2026-v1");
+    }
+    const d = resolveThemeProfile("Dodge", 2026);
+    expect(d.profile.status).toBe("draft");
+    expect(d.profile.layoutFamily).toBe("muscle-factory-technical");
+    expect(d.theme.templateFamilyId).toBe("MUSCLE_FACTORY");
+    // Dodge left the family it shared with Jeep, and every sibling brand
+    // keeps its own template.
+    for (const sibling of ["Jeep", "Ram", "Chrysler"]) {
+      const s = resolveThemeProfile(sibling, 2026);
+      expect(s.theme.oemId, sibling).not.toBe("DODGE");
+      expect(s.theme.templateFamilyId, sibling).not.toBe("MUSCLE_FACTORY");
+    }
+    for (const noise of [
+      "FCA US LLC", "Stellantis", "CDJR", "Chrysler Dodge Jeep Ram",
+      "Mopar", "Mopar accessory", "Fiat",
+    ]) {
+      const r = resolveThemeProfile(noise, 2026);
+      expect(r.theme.oemId, noise).not.toBe("DODGE");
+      expect(r.resolution, noise).toBe("FALLBACK");
+    }
+    // A pre-2011 "Ram" is a Dodge nameplate and still resolves to Dodge.
+    expect(resolveThemeProfile("Ram", 2009).theme.oemId).toBe("DODGE");
+    expect(resolveThemeProfile("Dodge", 2019).profile.status).toBe("fallback");
+  });
+
+  it("renders the Durango R/T Plus reference reconciled to $63,575 with black section bars", () => {
+    const model = buildRenderLayout(dodgeDurangoFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$63,575.00");
+    expect(page1).toContain("$57,995.00");
+    expect(page1).toContain("TOTAL MSRP");
+    // Dodge option codes with package members beneath the parent.
+    for (const code of ["ADG", "ERC", "PX8"]) {
+      expect(page1, code).toContain(code);
+    }
+    expect(joined).toContain("Blacktop Package");
+    expect(joined).toContain("Gloss Black Wheels");
+    expect(page1.filter((s) => s === "1,995.00").length).toBe(3); // package + destination line + rollup
+    // Gasoline V8: gasoline EPA layout, no electrified content.
+    expect(page1).toContain("MPG");
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expect(page1).not.toContain("MPGe");
+    expect(joined).toContain("DETROIT, MICHIGAN, USA");
+    expect(joined).toContain("Not an original Dodge-issued Monroney label");
+    // Black section-heading bars with reversed ink, plus the Dodge-red
+    // keyline — never Jeep's olive accent.
+    const fills = model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : ""));
+    expect(fills.filter((f) => f === "#0a0a0a").length).toBeGreaterThan(2);
+    const rules = new Set(model.pages[0].primitives.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(rules.has("#ba0c2f")).toBe(true);
+    expect(rules.has("#5f6538")).toBe(false);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("1C4SDJCT5SC123456");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Charger Daytona uses the EV module and never the gasoline Charger's data", () => {
+    const model = buildRenderLayout(dodgeChargerEvFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$64,080.00");
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+    expect(joined).toContain("CHARGER DAYTONA");
+    expect(joined).toContain("HIGH-VOLTAGE BATTERY LIMITED WARRANTY");
+    // Built in Windsor, not the Durango's Detroit plant.
+    expect(joined).toContain("WINDSOR, ONTARIO, CANADA");
+    expect(joined).not.toContain("DETROIT, MICHIGAN");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Hornet R/T uses the PHEV module and stays distinct from the gasoline GT", () => {
+    const model = buildRenderLayout(dodgeHornetPhevFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$50,885.00");
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPG gasoline only"))).toBe(true);
+    expect(joined).toContain("R/T PLUS PLUG-IN HYBRID AWD");
+    // Its own Italian assembly, not the Durango's US plant.
+    expect(joined).toContain("ITALY");
+    expect(joined).not.toContain("DETROIT, MICHIGAN");
     expectWithinBounds(model);
     expectMinFontRespected(model);
   });

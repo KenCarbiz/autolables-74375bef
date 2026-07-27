@@ -113,6 +113,8 @@ const ALIASES: Record<string, OemId> = {
   ramtruck: "RAM",
   ramtrucks: "RAM",
   dodgeram: "RAM",
+  dodgedivision: "DODGE",
+  dodgebrand: "DODGE",
   ramdivision: "RAM",
   ramcommercial: "RAM",
   fcausram: "RAM",

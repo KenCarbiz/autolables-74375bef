@@ -19,6 +19,7 @@ export type TemplateFamilyId =
   | "SPORT_FACTORY"
   | "BRITISH_FACTORY"
   | "AMERICAN_FACTORY"
+  | "MUSCLE_FACTORY"
   | "MINIMAL_FACTORY"
   | "PERFORMANCE"
   | "AUTOLABELS_FALLBACK";
@@ -39,6 +40,7 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "SPORT_FACTORY",
   "BRITISH_FACTORY",
   "AMERICAN_FACTORY",
+  "MUSCLE_FACTORY",
   "MINIMAL_FACTORY",
   "PERFORMANCE",
   "AUTOLABELS_FALLBACK",
@@ -267,6 +269,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.04em",
     uppercaseSectionHeadings: true,
   },
+  // Dodge's performance-label voice: heavy grotesque headings on black
+  // bars, compact body text — assertive but still a factory document.
+  MUSCLE_FACTORY: {
+    headingFont: '"Franklin Gothic Medium", "Helvetica Neue", Arial, sans-serif',
+    bodyFont: "Arial, Helvetica, sans-serif",
+    numericFont: '"Arial Narrow", Arial, sans-serif',
+    headingWeight: 700,
+    bodyWeight: 400,
+    labelWeight: 700,
+    letterSpacing: "0em",
+    headingLetterSpacing: "0.05em",
+    uppercaseSectionHeadings: true,
+  },
   // Chrysler's dense window-label voice: neutral grotesque, heavy labels,
   // compact leading — built for long minivan equipment lists.
   AMERICAN_FACTORY: {
@@ -444,6 +459,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  MUSCLE_FACTORY: {
+    headerVariant: "BLOCK",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "12pt",
+    borderWeight: "1pt",
+    cornerTreatment: "SQUARE",
+  },
   AMERICAN_FACTORY: {
     headerVariant: "BANDED",
     pricingVariant: "UNDERLINED",
@@ -534,6 +559,7 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
   GERMAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.18em" },
   SCANDINAVIAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.3em" },
+  MUSCLE_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
   AMERICAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.22em" },
   BRITISH_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.16em" },
   SPORT_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
@@ -702,7 +728,22 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     header: "#101010", accent: "#5f6538", sectionHeading: "#3f432a",
     totalBg: "#565b33", totalText: "#ffffff",
   })),
-  DODGE: theme("DODGE", "PERFORMANCE", palette({ header: "#000000", accent: "#ba0c2f" })),
+  // Dodge factory treatment (dodge-us-2026-v1): black DODGE masthead block
+  // over a paper model band, black section bars, Dodge red confined to the
+  // accent keyline. Text wordmark only — no fabricated Fratzog, SRT,
+  // Hellcat or Scat Pack emblem.
+  DODGE: theme("DODGE", "MUSCLE_FACTORY", {
+    headerBackground: "#0a0a0a",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#141414",
+    mutedText: "#55595e",
+    accent: "#ba0c2f",
+    divider: "#c9ccd0",
+    sectionHeadingText: "#141414",
+    totalMsrpBackground: "#0a0a0a",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL MSRP" }),
   // Ram factory treatment (ram-us-2026-v2): black RAM masthead block over a
   // paper model band, Ram red used only for the accent keyline. Heavy-duty
   // and chassis-cab documents share it; regulatory panels stay federal.

@@ -5062,6 +5062,267 @@ export const chryslerVoyagerFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "2C4RC1CG5TR311204",
 });
 
+// Owner's reference benchmark (2026-07-27 Dodge directive). It reconciles
+// exactly as printed: 57,995 + 3,585 + 1,995 = 63,575. The reference marks
+// its EPA, safety, warranty and parts-content fields "VIN-SPECIFIC DATA
+// REQUIRED"; this fixture supplies demonstration values instead of
+// carrying that placeholder text onto a rendered document.
+export const dodgeDurangoFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "1C4SDJCT5SC123456",
+  identity: { year: "2025", make: "Dodge", model: "Durango", trim: "R/T PLUS AWD" },
+  pricing: { baseMsrp: 57995, destinationCharge: 1995, optionsTotal: 3585, totalMsrp: 63575 },
+  options: [
+    {
+      name: "Blacktop Package", code: "ADG", msrp: 1995,
+      contents: [
+        "20-Inch x 9.0-Inch Gloss Black Wheels",
+        "Gloss Black Badges",
+        "Gloss Black Exterior Mirrors",
+        "Premium Black Headlamp Bezels",
+        "Black Roof Rails",
+        "Black Interior Accents",
+      ],
+    },
+    {
+      name: "Red Tow Hook Package", code: "ERC", msrp: 995,
+      contents: ["Red Front Tow Hooks", "Red Rear Tow Hook", "Trailer Brake Control"],
+    },
+    { name: "DB Black Clear-Coat", code: "PX8", msrp: 595 },
+  ],
+  standardEquipment: {
+    safety_features: [
+      "Advanced Multistage Front Air Bags",
+      "Supplemental Front Seat-Mounted Side Air Bags",
+      "Driver Inflatable Knee-Bolster Air Bag",
+      "ParkView Rear Back-Up Camera",
+      "Blind Spot Monitoring w/ Rear Cross Path Detection",
+      "Full-Speed Forward Collision Warning Plus",
+      "Active Lane Management System",
+      "Adaptive Cruise Control w/ Stop",
+      "Electronic Stability Control",
+      "Trailer Sway Damping",
+      "Hill Start Assist",
+      "Tire Pressure Monitoring Display",
+    ],
+    mechanical: [
+      "5.7L V8 HEMI MDS VVT Engine",
+      "8-Speed Automatic 8HP70 Transmission",
+      "All-Wheel Drive",
+      "Dodge Performance Pages",
+      "Selec-Terrain Traction Management System",
+      "Anti-Lock 4-Wheel Disc Performance Brakes",
+      "Ready Alert Braking",
+    ],
+    exterior: [
+      "20-Inch x 9.0-Inch Fine Silver Wheels",
+      "265/50R20 BSW All-Season LRR Tires",
+      "Bi-Function HID Projector Headlamps",
+      "LED Racetrack Taillamps",
+      "LED Daytime Running Lamps",
+      "Fog Lamps",
+      "Power Liftgate",
+      "Body-Color Fascias",
+      "Deep Tint Sunscreen Glass",
+      "Roof Rails",
+      "Bright Dual Exhaust Tips",
+    ],
+    interior: [
+      "Uconnect 5 w/ 10.1-Inch Touchscreen Display",
+      "SiriusXM w/ 360L (Trial Included)",
+      "Wireless Apple CarPlay",
+      "Wireless Android Auto",
+      "6 Premium Speakers",
+      "Heated Front Seats",
+      "8-Way Power Driver Seat",
+      "4-Way Power Front Passenger Seat",
+      "Leather-Wrapped Steering Wheel",
+      "Dual-Zone Automatic Temperature Control",
+      "Power 60/40 Split-Folding Third-Row Seat",
+      "Second-Row 60/40 Fold and Tumble Captain Chairs",
+      "Auto-Dimming Rearview Mirror",
+      "Remote Start System",
+      "Universal Garage Door Opener",
+    ],
+  },
+  colors: { exterior: { name: "DB Black Clear-Coat", code: "PX8" }, interior: { name: "Black", code: "D5C" } },
+  assembly: { plant: "Jefferson North", city: "Detroit, Michigan", country: "USA" },
+  mechanical: { engine: "5.7L V8 HEMI MDS VVT", transmission: "8-SPEED AUTOMATIC 8HP70", drivetrain: "AWD" },
+  stockNumber: "DG260123",
+  transportMethod: "TRUCK",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: "DGDVJ5", dealer: "12345" },
+  epa: {
+    city: 14, highway: 22, combined: 17, annualFuelCost: 3100, ghgScore: 3,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 5, gallonsPer100Miles: 5.9,
+    fiveYearCostDifference: -5000, classNote: null,
+  },
+  safety: null,
+  nhtsaNotRated: true,
+  warranty: {
+    basic: "3-Year/36,000-Mile Basic Limited Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: null,
+    roadside: "5-Year/60,000-Mile Roadside Assistance",
+    emissions: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "58%" },
+    { label: "Major sources of foreign parts content", value: "Mexico 20%" },
+    { label: "Final assembly point", value: "Detroit, Michigan, USA" },
+    { label: "Country of origin - engine / transmission", value: "United States / United States" },
+  ],
+  dealer: { name: "Lakeview Dodge", address: "1234 Performance Way", city: "Detroit", state: "MI", zip: "48201", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-durango",
+  barcodePayload: "1C4SDJCT5SC123456",
+  disclaimers: [
+    "AutoLabels manufacturer-style reproduction generated from verified vehicle data. Not an original Dodge-issued Monroney label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
+// Charger Daytona R/T: battery-electric, a distinct model line from the
+// gasoline Charger and never given its EPA record or warranty terms.
+// 59,595 + 2,490 + 1,995 = 64,080.
+export const dodgeChargerEvFixture = (): FactoryStickerRenderData => ({
+  ...dodgeDurangoFixture(),
+  vin: "2C3CDAEG7SH204567",
+  identity: { year: "2025", make: "Dodge", model: "Charger Daytona", trim: "R/T AWD" },
+  pricing: { baseMsrp: 59595, destinationCharge: 1995, optionsTotal: 2490, totalMsrp: 64080 },
+  options: [
+    { name: "Track Package", code: "AMT", msrp: 1995, contents: ["Adaptive Damping Suspension", "Brembo Front Brakes"] },
+    { name: "Peel Out Premium Paint", code: "PY1", msrp: 495 },
+    { name: "Black Interior", code: "D5C", msrp: null, included: true },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Electric Drive Modules - 496 HP",
+      "100.5 kWh Lithium-Ion Battery",
+      "400V Architecture w/ DC Fast Charging",
+      "All-Wheel Drive w/ Power Shot",
+      "Fratzonic Chambered Exhaust",
+      "Regenerative Braking w/ One-Pedal Drive",
+    ],
+    safety_features: [
+      "Advanced Multistage Front Air Bags",
+      "Blind Spot Monitoring w/ Rear Cross Path Detection",
+      "Full-Speed Forward Collision Warning Plus",
+      "Electronic Stability Control",
+      "Tire Pressure Monitoring Display",
+    ],
+    exterior: [
+      "R-Wing Front Aperture",
+      "LED Racetrack Taillamps",
+      "20-Inch Aluminum Wheels",
+      "Frameless Door Glass",
+      "Charge Port - Left Front Fender",
+    ],
+    interior: [
+      "Uconnect 5 w/ 12.3-Inch Touchscreen",
+      "16-Inch Digital Cluster",
+      "Heated & Ventilated Front Seats",
+      "Wireless Apple CarPlay & Android Auto",
+      "Dual-Zone Automatic Temperature Control",
+    ],
+  },
+  colors: { exterior: { name: "Peel Out", code: "PY1" }, interior: { name: "Black", code: "D5C" } },
+  mechanical: { engine: "DUAL ELECTRIC DRIVE MODULES", transmission: "SINGLE-SPEED", drivetrain: "AWD" },
+  stockNumber: "DG260204",
+  factoryCodes: { location: null, emissions: "ZEV", sequence: null, order: "DGCDR7", dealer: "12345" },
+  epa: {
+    city: 86, highway: 71, combined: 79, annualFuelCost: 900, ghgScore: 10,
+    rangeMiles: 241, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 4250, classNote: null,
+  },
+  warranty: {
+    basic: "3-Year/36,000-Mile Basic Limited Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: null,
+    roadside: "5-Year/60,000-Mile Roadside Assistance",
+    emissions: "8-Year/100,000-Mile High-Voltage Battery Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "45%" },
+    { label: "Major sources of foreign parts content", value: "Canada 40%" },
+    { label: "Final assembly point", value: "Windsor, Ontario, Canada" },
+    { label: "Country of origin - drive modules / battery", value: "United States / United States" },
+  ],
+  assembly: { plant: "Windsor", city: "Windsor, Ontario", country: "Canada" },
+  passportUrl: "https://autolabels.io/v/demo-charger-daytona",
+  barcodePayload: "2C3CDAEG7SH204567",
+});
+
+// Hornet R/T Plus: plug-in hybrid, deliberately distinct from the gasoline
+// Hornet GT — its own EPA record, transaxle and battery coverage.
+// 46,400 + 2,890 + 1,595 = 50,885.
+export const dodgeHornetPhevFixture = (): FactoryStickerRenderData => ({
+  ...dodgeDurangoFixture(),
+  vin: "ZACNDFCU5SP311204",
+  identity: { year: "2025", make: "Dodge", model: "Hornet", trim: "R/T PLUS PLUG-IN HYBRID AWD" },
+  pricing: { baseMsrp: 46400, destinationCharge: 1595, optionsTotal: 2890, totalMsrp: 50885 },
+  options: [
+    { name: "Track Pack", code: "AWT", msrp: 2245, contents: ["Alcantara Seats", "Dual-Stage Valve Suspension", "Brembo Brakes"] },
+    { name: "8-Ball Premium Paint", code: "PXJ", msrp: 645 },
+    { name: "Black Interior", code: "D5C", msrp: null, included: true },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "1.3L Turbocharged I4 Plug-In Hybrid",
+      "15.5 kWh Lithium-Ion Battery",
+      "6-Speed Automatic Transmission w/ Rear Electric Drive",
+      "All-Wheel Drive (Electric Rear Axle)",
+      "7.4 kW Onboard Charger",
+      "PowerShot Boost",
+    ],
+    safety_features: [
+      "Advanced Multistage Front Air Bags",
+      "Blind Spot Monitoring w/ Rear Cross Path Detection",
+      "Full-Speed Forward Collision Warning Plus",
+      "Active Lane Management System",
+      "Tire Pressure Monitoring Display",
+    ],
+    exterior: [
+      "LED Headlamps w/ Daytime Running Lamps",
+      "18-Inch Aluminum Wheels",
+      "Dual Exhaust Tips",
+      "Charge Port - Right Rear Fender",
+    ],
+    interior: [
+      "Uconnect 5 w/ 10.25-Inch Touchscreen",
+      "10.25-Inch Digital Cluster",
+      "Heated Front Seats & Steering Wheel",
+      "Wireless Apple CarPlay & Android Auto",
+      "Dual-Zone Automatic Temperature Control",
+    ],
+  },
+  colors: { exterior: { name: "8-Ball", code: "PXJ" }, interior: { name: "Black Alcantara", code: "D5C" } },
+  mechanical: { engine: "1.3L TURBO I4 PLUG-IN HYBRID", transmission: "6-SPEED AUTOMATIC", drivetrain: "AWD" },
+  stockNumber: "DG260311",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: "DGHRT9", dealer: "12345" },
+  epa: {
+    city: null, highway: null, combined: 77, annualFuelCost: 1250, ghgScore: 9,
+    rangeMiles: 33, fuelType: "PHEV Gasoline-Electric", smogScore: 7, gallonsPer100Miles: null,
+    fiveYearCostDifference: 2750, classNote: null, gasCombinedMpg: 29,
+  },
+  warranty: {
+    basic: "3-Year/36,000-Mile Basic Limited Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: null,
+    roadside: "5-Year/60,000-Mile Roadside Assistance",
+    emissions: "10-Year/150,000-Mile High-Voltage Battery Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "2%" },
+    { label: "Major sources of foreign parts content", value: "Italy 55%" },
+    { label: "Final assembly point", value: "Pomigliano d'Arco, Italy" },
+    { label: "Country of origin - engine / transmission", value: "Italy / Italy" },
+  ],
+  assembly: { plant: "Pomigliano d'Arco", city: "Pomigliano d'Arco", country: "Italy" },
+  passportUrl: "https://autolabels.io/v/demo-hornet-rt",
+  barcodePayload: "ZACNDFCU5SP311204",
+});
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

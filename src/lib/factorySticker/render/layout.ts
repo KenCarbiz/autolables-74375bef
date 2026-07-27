@@ -324,6 +324,8 @@ interface FamilyStyle {
   equipmentColumns: number;
   /** Overrides the neutral gray fill behind sectionHeadingBar headings. */
   headingBarFill?: string;
+  /** Ink for headings sitting on a dark headingBarFill. */
+  headingBarInk?: string;
   /** Structural rules stay ink-black even when the header band is paper-white. */
   inkStructure?: boolean;
   /** Ship-to dealer block beside the VIN barcode (factory allocation style). */
@@ -348,6 +350,7 @@ const FAMILY_STYLES: Record<string, FamilyStyle> = {
   LUXURY_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true },
   GERMAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, passportBrandLine: true },
   MINIMAL_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
+  MUSCLE_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: true, headingBarAccent: false, headingBarFill: "#0a0a0a", headingBarInk: "#ffffff", trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
   AMERICAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, passportBrandLine: true },
   BRITISH_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, passportBrandLine: true },
   SPORT_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
@@ -1575,6 +1578,7 @@ function flowColumns(
         const fill = fs.headingBarAccent ? ctx.theme.colors.accent : (fs.headingBarFill ?? "#e8e9ea");
         p.rect(colX(), cy - density.item - 1.5, colW, density.item + 4.5, fill);
         if (fs.headingBarAccent) headColor = "#ffffff";
+        else if (fs.headingBarInk) headColor = fs.headingBarInk;
       }
       if (fs.trackedHeadings) {
         p.text(pendingHeading, colX(), cy, density.item + 0.3, "bold", headColor, { charSpacing: 1.1 });
