@@ -269,6 +269,10 @@ interface Density {
 // Print-legibility floor per the approved document standard: equipment body
 // never drops below 6.5pt — overflow goes to a deliberate continuation page
 // instead of shrinking.
+// Package member lists wrap to at most this many lines before the row
+// gives up; beyond it a single package can displace the equipment block.
+const MAX_PACKAGE_FEATURE_LINES = 2;
+
 const DENSITY_LARGE: Density = { mode: "STANDARD", item: 7.2, itemLh: 9.2, row: 7.6, rowLh: 10.4, head: 9 };
 const DENSITY_STANDARD: Density = { mode: "STANDARD", item: 6.8, itemLh: 8.6, row: 7.2, rowLh: 9.8, head: 8.5 };
 const DENSITY_DENSE: Density = { mode: "DENSE", item: 6.5, itemLh: 7.9, row: 7, rowLh: 9.4, head: 8.5 };
@@ -326,6 +330,9 @@ interface FamilyStyle {
   headingBarFill?: string;
   /** Ink for headings sitting on a dark headingBarFill. */
   headingBarInk?: string;
+  /** Draw category headings in the theme's section-heading colour rather
+   *  than black (Buick's burgundy category rules). */
+  sectionHeadingTint?: boolean;
   /** Structural rules stay ink-black even when the header band is paper-white. */
   inkStructure?: boolean;
   /** Ship-to dealer block beside the VIN barcode (factory allocation style). */
@@ -350,6 +357,7 @@ const FAMILY_STYLES: Record<string, FamilyStyle> = {
   LUXURY_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true },
   GERMAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, passportBrandLine: true },
   MINIMAL_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
+  REFINED_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true, sectionHeadingTint: true },
   MUSCLE_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: true, headingBarAccent: false, headingBarFill: "#0a0a0a", headingBarInk: "#ffffff", trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
   AMERICAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, passportBrandLine: true },
   BRITISH_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, passportBrandLine: true },
@@ -512,6 +520,10 @@ interface BuildContext {
   input: StickerLayoutInput;
   theme: OemStickerTheme;
   density: Density;
+  // Package member lists wrap to a second line when the page has room for
+  // it; the final single-page attempt turns wrapping off so a long package
+  // never costs the equipment block its page.
+  wrapFeatures: boolean;
 }
 
 // ── Top strip: factory administrative codes across the full width ─────
@@ -936,11 +948,20 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
       p.text(ellipsize(opt.name, "body", size, rightW - codeW - 10), nameX, ry, size, "body", BLACK);
       ry += density.itemLh;
       let fx = nameX + 6;
+      let featureLines = 1;
       const fxLimit = rightX + rightW - 78;
       for (const feature of opt.features) {
         const shown = ellipsize(sanitize(feature), "body", density.item, rightW - codeW - 60);
         const w = 4 + measureText(shown, "body", density.item) + 9;
-        if (fx + w > fxLimit) break;
+        // Package members wrap onto a continuation line rather than being
+        // dropped on the first overflow. The cap keeps a content-heavy
+        // package from pushing the equipment block onto a second page.
+        if (fx > nameX + 6 && fx + w > fxLimit) {
+          if (!ctx.wrapFeatures || featureLines >= MAX_PACKAGE_FEATURE_LINES) break;
+          featureLines += 1;
+          ry += density.itemLh;
+          fx = nameX + 6;
+        }
         bulletDot(p, fx, ry, density.item, BLACK);
         p.text(shown, fx + 4, ry, density.item, "body", BLACK);
         fx += w;
@@ -1573,7 +1594,7 @@ function flowColumns(
     if (pendingHeading !== null) {
       cy += density.itemLh + 0.5;
       const fs = familyStyle(ctx.theme);
-      let headColor = BLACK;
+      let headColor = fs.sectionHeadingTint ? ctx.theme.colors.sectionHeadingText : BLACK;
       if (fs.sectionHeadingBar) {
         const fill = fs.headingBarAccent ? ctx.theme.colors.accent : (fs.headingBarFill ?? "#e8e9ea");
         p.rect(colX(), cy - density.item - 1.5, colW, density.item + 4.5, fill);
@@ -1683,8 +1704,9 @@ function buildAttempt(
   theme: OemStickerTheme,
   density: Density,
   allowContinuation: boolean,
+  wrapFeatures = true,
 ): LayoutModel | null {
-  const ctx: BuildContext = { input, theme, density };
+  const ctx: BuildContext = { input, theme, density, wrapFeatures };
   const drawn: string[] = [];
   const p = new Painter(drawn);
 
@@ -1792,13 +1814,16 @@ function buildAttempt(
 }
 
 export function buildStickerLayout(input: StickerLayoutInput, theme: OemStickerTheme): LayoutModel {
-  const large = buildAttempt(input, theme, DENSITY_LARGE, false);
-  if (large) return large;
-  const standard = buildAttempt(input, theme, DENSITY_STANDARD, false);
-  if (standard) return standard;
-  const dense = buildAttempt(input, theme, DENSITY_DENSE, false);
-  if (dense) return dense;
-  const floor = buildAttempt(input, theme, DENSITY_FLOOR, true);
+  const densities = [DENSITY_LARGE, DENSITY_STANDARD, DENSITY_DENSE, DENSITY_FLOOR];
+  for (const density of densities) {
+    // Wrapped package members first, then the same density unwrapped, so a
+    // long package never costs the page a font-size step.
+    for (const wrapFeatures of [true, false]) {
+      const attempt = buildAttempt(input, theme, density, false, wrapFeatures);
+      if (attempt) return attempt;
+    }
+  }
+  const floor = buildAttempt(input, theme, DENSITY_FLOOR, true, false);
   if (!floor) throw new Error("layout_failed: content cannot fit even with continuation");
   return floor;
 }

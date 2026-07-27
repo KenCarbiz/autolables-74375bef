@@ -20,6 +20,7 @@ export type TemplateFamilyId =
   | "BRITISH_FACTORY"
   | "AMERICAN_FACTORY"
   | "MUSCLE_FACTORY"
+  | "REFINED_FACTORY"
   | "MINIMAL_FACTORY"
   | "PERFORMANCE"
   | "AUTOLABELS_FALLBACK";
@@ -41,6 +42,7 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "BRITISH_FACTORY",
   "AMERICAN_FACTORY",
   "MUSCLE_FACTORY",
+  "REFINED_FACTORY",
   "MINIMAL_FACTORY",
   "PERFORMANCE",
   "AUTOLABELS_FALLBACK",
@@ -269,6 +271,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.04em",
     uppercaseSectionHeadings: true,
   },
+  // Buick's quiet-premium voice: humanist grotesque, medium headings,
+  // open leading — refined rather than assertive.
+  REFINED_FACTORY: {
+    headingFont: '"Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    bodyFont: '"Segoe UI", "Helvetica Neue", Arial, sans-serif',
+    numericFont: '"Segoe UI", "Helvetica Neue", Arial, sans-serif',
+    headingWeight: 600,
+    bodyWeight: 400,
+    labelWeight: 600,
+    letterSpacing: "0.01em",
+    headingLetterSpacing: "0.05em",
+    uppercaseSectionHeadings: true,
+  },
   // Dodge's performance-label voice: heavy grotesque headings on black
   // bars, compact body text — assertive but still a factory document.
   MUSCLE_FACTORY: {
@@ -459,6 +474,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  REFINED_FACTORY: {
+    headerVariant: "MINIMAL",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "13pt",
+    borderWeight: "0.5pt",
+    cornerTreatment: "SQUARE",
+  },
   MUSCLE_FACTORY: {
     headerVariant: "BLOCK",
     pricingVariant: "UNDERLINED",
@@ -559,6 +584,7 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
   GERMAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.18em" },
   SCANDINAVIAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.3em" },
+  REFINED_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.12em" },
   MUSCLE_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
   AMERICAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.22em" },
   BRITISH_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.16em" },
@@ -704,7 +730,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
   GMC: theme("GMC", "AMERICAN_MAINSTREAM", palette({
     header: "#1c1c1c", accent: "#c8102e", totalBg: "#1c1c1c", totalText: "#ffffff",
   }), { totalLabel: "TOTAL VEHICLE PRICE" }),
-  BUICK: theme("BUICK", "AMERICAN_MAINSTREAM", palette({ header: "#3a4750", accent: "#b02a30" })),
+  // Buick factory treatment (buick-us-2026-v1): white masthead carrying
+  // the BUICK wordmark, burgundy category headings and keyline, black
+  // total band. Text wordmark only — the tri-shield is never recreated.
+  BUICK: theme("BUICK", "REFINED_FACTORY", {
+    headerBackground: "#ffffff",
+    headerText: "#111111",
+    background: "#ffffff",
+    bodyText: "#1a1a1a",
+    mutedText: "#55595e",
+    accent: "#7c2434",
+    divider: "#d5d7da",
+    sectionHeadingText: "#7c2434",
+    totalMsrpBackground: "#111111",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL VEHICLE PRICE" }),
   // Cadillac factory treatment (cadillac-us-2026-v2): white header with the
   // CADILLAC wordmark over the governed four-segment crest colour bar, fine
   // neutral rules, restrained gold keyline, GM's TOTAL VEHICLE PRICE. The

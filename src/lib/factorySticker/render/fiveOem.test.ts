@@ -8,6 +8,9 @@ import {
   audiEtronFixture,
   audiPhevFixture,
   audiQ5Fixture,
+  buickEnclaveFixture,
+  buickEnvisionFixture,
+  buickEnvistaFixture,
   dodgeChargerEvFixture,
   dodgeDurangoFixture,
   dodgeHornetPhevFixture,
@@ -1637,6 +1640,126 @@ describe("Chrysler profile (chrysler-us-2026-v1, american-factory-technical)", (
     expect(joined).not.toContain("PACIFICA");
     // Its own parts-content record, not Pacifica's.
     expect(joined).toContain("MEXICO 24%");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Buick profile (buick-us-2026-v1, refined-factory-technical)", () => {
+  it("Buick resolves alone and never inherits another GM division", () => {
+    for (const alias of ["Buick", "BUICK", "Buick Motor Division", "Buick Division"]) {
+      const r = resolveThemeProfile(alias, 2026);
+      expect(r.theme.oemId, alias).toBe("BUICK");
+      expect(r.profile.themeVersion, alias).toBe("buick-us-2026-v1");
+    }
+    const b = resolveThemeProfile("Buick", 2026);
+    expect(b.profile.status).toBe("draft");
+    expect(b.profile.layoutFamily).toBe("refined-factory-technical");
+    expect(b.theme.templateFamilyId).toBe("REFINED_FACTORY");
+    // Sibling GM divisions keep their own templates.
+    for (const sibling of ["Chevrolet", "GMC", "Cadillac"]) {
+      const s = resolveThemeProfile(sibling, 2026);
+      expect(s.theme.oemId, sibling).not.toBe("BUICK");
+      expect(s.theme.templateFamilyId, sibling).not.toBe("REFINED_FACTORY");
+    }
+    // A GM corporate name, a finance arm, a dealer group or an in-car
+    // service brand is never enough to assign the Buick template.
+    for (const noise of [
+      "General Motors", "General Motors LLC", "GM", "GM Financial",
+      "Buick GMC dealership", "Buick-certified dealer", "OnStar",
+      "Buick style", "ACDelco",
+    ]) {
+      const r = resolveThemeProfile(noise, 2026);
+      expect(r.theme.oemId, noise).not.toBe("BUICK");
+      expect(r.resolution, noise).toBe("FALLBACK");
+    }
+    expect(resolveThemeProfile("Buick", 2019).profile.status).toBe("fallback");
+  });
+
+  it("renders the Envision Avenir reference reconciled to $53,195 with burgundy headings", () => {
+    const model = buildRenderLayout(buickEnvisionFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$53,195.00");
+    expect(page1).toContain("$47,595.00");
+    expect(page1).toContain("TOTAL VEHICLE PRICE");
+    // GM RPO codes, with the package priced once and its members listed
+    // beneath the parent rather than repriced.
+    for (const rpo of ["G7Q", "APF", "CF5", "RIA"]) {
+      expect(page1, rpo).toContain(rpo);
+    }
+    expect(joined).toContain("Avenir Technology Package");
+    // Package members print beneath the parent; a content-heavy package
+    // shows as many as the row has room for and is never repriced.
+    expect(joined).toContain("HD Surround Vision");
+    expect(page1.filter((s) => s === "1,965.00").length).toBe(1);
+    expect(page1.filter((s) => s === "4,205.00").length).toBe(1);
+    // Gasoline turbo four: gasoline EPA shape, nothing electrified.
+    expect(page1).toContain("MPG");
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expect(page1).not.toContain("MPGe");
+    expect(joined).toContain("Small SUVs range from 14 to 125 MPG.");
+    // NHTSA supplied real ratings, so the star rows render rather than the
+    // unrated statement.
+    expect(joined).toContain("Overall Score");
+    expect(joined).toContain("Rollover");
+    expect(joined).not.toContain("Not Rated");
+    expect(model.pages[0].primitives.filter((p) => p.kind === "path").length).toBeGreaterThanOrEqual(29);
+    expect(joined).toContain("SAN LUIS POTOSI, MEXICO");
+    expect(joined).toContain("UNITED STATES / JAPAN");
+    expect(joined).toContain("Not an original Buick-issued Monroney label");
+    // Burgundy category headings and keyline; no filled heading bars and
+    // never Cadillac's or Chevrolet's accent.
+    const heads = model.pages[0].primitives.filter(
+      (p) => p.kind === "text" && p.color === "#7c2434",
+    );
+    expect(heads.length).toBeGreaterThan(2);
+    const rules = new Set(model.pages[0].primitives.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(rules.has("#7c2434")).toBe(true);
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#111111")).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("LRBFZSE41SD012345");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Envista stays a distinct model line from Envision", () => {
+    const model = buildRenderLayout(buickEnvistaFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$27,880.00");
+    expect(page1).toContain("$25,195.00");
+    expect(joined).toContain("2025 BUICK ENVISTA");
+    expect(joined).not.toContain("ENVISION");
+    expect(joined).toContain("SPORT TOURING FWD");
+    // Its own powertrain, EPA record and assembly point.
+    expect(joined).toContain("1.2L Turbocharged 3-Cylinder Engine");
+    expect(joined).toContain("BUPYEONG, SOUTH KOREA");
+    expect(joined).not.toContain("SAN LUIS POTOSI");
+    // Unrated by NHTSA: the compact statement, never borrowed stars.
+    expect(joined).toContain("Not Rated");
+    expect(joined).not.toContain("Overall Score");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Enclave keeps its own base price, V6 record and US assembly", () => {
+    const model = buildRenderLayout(buickEnclaveFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$63,980.00");
+    expect(page1).toContain("$59,195.00");
+    expect(joined).toContain("2025 BUICK ENCLAVE");
+    expect(joined).not.toContain("ENVISION");
+    expect(joined).toContain("3.0L Turbocharged V6 Engine");
+    expect(joined).toContain("Midsize SUVs range from 15 to 111 MPG.");
+    expect(joined).toContain("LANSING, MICHIGAN, USA");
+    expect(page1).toContain("UKL");
+    expect(joined).toContain("Super Cruise Driver Assistance");
     expectWithinBounds(model);
     expectMinFontRespected(model);
   });
