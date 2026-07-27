@@ -254,6 +254,13 @@ export default function VehiclePassportGoverned() {
 
   usePassportEngagement(listing?.slug || rawSlug, activePanel, true);
 
+  // Published window sticker only: a draft or review-required record is
+  // never surfaced to a shopper, and the card is simply absent. This must
+  // stay above the loading/not-found returns below — a hook called after an
+  // early return changes the hook order between renders and crashes the
+  // whole passport.
+  const { sticker: windowSticker } = usePublishedWindowSticker(listing?.slug || rawSlug, !isPreview);
+
   // Sticky header context: reveal once the hero scrolls out of view.
   useEffect(() => {
     const el = heroRef.current;
@@ -283,9 +290,6 @@ export default function VehiclePassportGoverned() {
   // unchanged — V3 CTAs never re-implement them as drawers.
   const go = (section: string) =>
     navigate(buildPassportActionPath(listing.slug || rawSlug, section, location.pathname, isPreview));
-  // Published window sticker only: a draft or review-required record is
-  // never surfaced to a shopper, and the card is simply absent.
-  const { sticker: windowSticker } = usePublishedWindowSticker(listing.slug || rawSlug, !isPreview);
   const openPanel = (k: PassportPanelKey) => { setActivePanel(k); };
   // Governed V3 action surfaces — reserve / test-drive / trade / contact /
   // payment / availability open a V3 drawer and NEVER navigate into the V2
