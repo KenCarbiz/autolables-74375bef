@@ -15,6 +15,7 @@ import {
   type GeneratedDocument,
 } from "@/lib/stickerStudio/documentWorkflow";
 import { realTenantId } from "@/lib/tenant/realTenantId";
+import { promptRegenerationReason } from "@/lib/factorySticker/regenerationReason";
 import { vinKey, vinKeys } from "@/lib/vinKeys";
 import { documentLabel, fmtDate, humanize } from "@/lib/commandCenter/format";
 import {
