@@ -170,9 +170,21 @@ export function candidatesFromListing(
     const recordId = ids[sheetSource];
 
     push(out, "manufacturer", str(sheet.manufacturer) ?? str(mc.manufacturer), sheetSource, confidence, sheetAt, recordId);
-    push(out, "base_msrp", posNum(mc.base_msrp ?? mc.msrp), sheetSource, confidence, sheetAt, recordId);
-    push(out, "destination_charge", posNum(mc.delivery_charges ?? mc.destination_charge), sheetSource, confidence, sheetAt, recordId);
-    push(out, "total_msrp", posNum(mc.total_msrp ?? mc.sticker_total_msrp), sheetSource, confidence, sheetAt, recordId);
+
+    // The decoder writes extracted Monroney pricing to `build_sheet.pricing`,
+    // while the rest of the system reads it from the top level of
+    // mc_attributes. Reading both recovers pricing already retrieved and
+    // stored — without it a vehicle can hold a complete base/destination/
+    // total set and still print no MSRP.
+    const sheetPricing = (sheet.pricing && typeof sheet.pricing === "object"
+      ? sheet.pricing
+      : {}) as Record<string, unknown>;
+    push(out, "base_msrp",
+      posNum(mc.base_msrp ?? sheetPricing.base_msrp ?? mc.msrp), sheetSource, confidence, sheetAt, recordId);
+    push(out, "destination_charge",
+      posNum(mc.delivery_charges ?? mc.destination_charge ?? sheetPricing.destination_charge), sheetSource, confidence, sheetAt, recordId);
+    push(out, "total_msrp",
+      posNum(mc.total_msrp ?? mc.sticker_total_msrp ?? sheetPricing.total_msrp), sheetSource, confidence, sheetAt, recordId);
 
     const packages = (Array.isArray(sheet.packages) ? sheet.packages : []) as Array<Record<string, unknown>>;
     const opts = (Array.isArray(sheet.options) ? sheet.options : []) as Array<Record<string, unknown>>;

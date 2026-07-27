@@ -162,3 +162,52 @@ describe("end to end from a stored row", () => {
     expect(facts.make.status).toBe("feed_provided");
   });
 });
+
+describe("recovering pricing the decoder filed out of reach", () => {
+  // marketcheck-specs writes extracted Monroney pricing to
+  // build_sheet.pricing; every consumer reads the top level of
+  // mc_attributes. Real production VIN JN1FV7AR5KM800521 held a complete
+  // base/destination/total set that nothing could see.
+  const sheetPricingOnly = {
+    specs_source: "neovin",
+    build_sheet: {
+      source: "neovin",
+      pricing: { base_msrp: 53350, destination_charge: 1025, total_msrp: 61875 },
+      packages: [], options: [],
+      key_features: { Interior: ["Leather Seats"] },
+    },
+  };
+
+  it("reads MSRP from the build sheet when the top level is empty", () => {
+    const c = candidatesFromListing(listing({ mc_attributes: sheetPricingOnly }));
+    expect(find(c, "base_msrp")[0].value).toBe(53350);
+    expect(find(c, "destination_charge")[0].value).toBe(1025);
+    expect(find(c, "total_msrp")[0].value).toBe(61875);
+    expect(find(c, "base_msrp")[0].source).toBe("neovin");
+  });
+
+  it("prefers the top level when both are present", () => {
+    const c = candidatesFromListing(listing({
+      mc_attributes: { ...sheetPricingOnly, base_msrp: 54000 },
+    }));
+    expect(find(c, "base_msrp")[0].value).toBe(54000);
+  });
+
+  it("still emits nothing when neither carries pricing", () => {
+    const c = candidatesFromListing(listing({
+      mc_attributes: { specs_source: "neovin", build_sheet: { source: "neovin", packages: [], options: [] } },
+    }));
+    expect(find(c, "base_msrp")).toEqual([]);
+    expect(find(c, "total_msrp")).toEqual([]);
+  });
+
+  it("produces a complete Monroney set on the real Q50 payload", () => {
+    const { snapshot } = buildVehicleSnapshot(
+      "JN1FV7AR5KM800521",
+      candidatesFromListing(listing({ vin: "JN1FV7AR5KM800521", mc_attributes: sheetPricingOnly })),
+    );
+    expect(snapshot.pricing.baseMsrp).toBe(53350);
+    expect(snapshot.pricing.destinationCharge).toBe(1025);
+    expect(snapshot.pricing.totalMsrp).toBe(61875);
+  });
+});
