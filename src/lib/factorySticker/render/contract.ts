@@ -48,7 +48,15 @@ export interface FactoryStickerRenderData {
     portOptionsTotal?: number | null;
   };
   packages: Array<{ name: string; code: string | null; msrp: number | null; contents: string[] }>;
-  options: Array<{ name: string; code: string | null; msrp: number | null; contents?: string[] }>;
+  options: Array<{
+    name: string;
+    code: string | null;
+    msrp: number | null;
+    contents?: string[];
+    /** No-cost configuration item carried at zero on the manufacturer price
+     *  record — rendered INCLUDED, never as an unpriced/unknown line. */
+    included?: boolean;
+  }>;
   /** Port-installed accessories: separate from factory options; never dealer-installed items. */
   portOptions?: Array<{ name: string; code: string | null; msrp: number | null }>;
   standardEquipment: Record<string, string[]>;
@@ -94,6 +102,9 @@ export interface FactoryStickerRenderData {
     sideRear: number | null;
     rollover: number | null;
   } | null;
+  /** Tested-but-unrated / not-applicable NHTSA state. Renders the honest
+   *  not-rated panel; stars are never fabricated to fill it. */
+  nhtsaNotRated?: boolean;
   dealer: {
     name: string | null;
     address: string | null;
@@ -208,7 +219,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
     ...(o.code !== null ? { code: o.code } : {}),
     name: o.name,
     ...(o.msrp !== null ? { price: o.msrp } : {}),
-    priceStatus: o.msrp !== null ? "PRICED" : "UNAVAILABLE",
+    priceStatus: o.included ? "INCLUDED" : o.msrp !== null ? "PRICED" : "UNAVAILABLE",
     ...(o.contents && o.contents.length ? { features: o.contents } : {}),
   }));
   const portInstalled: StickerOption[] = (d.portOptions ?? []).map((o) => ({
@@ -282,7 +293,9 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("sideRearRating", d.safety.sideRear),
             ...opt("rolloverRating", d.safety.rollover),
           }
-        : { nhtsaStatus: "UNAVAILABLE" as const }),
+        : d.nhtsaNotRated
+          ? { nhtsaStatus: "NOT_RATED" as const }
+          : { nhtsaStatus: "UNAVAILABLE" as const }),
     },
     factory: {
       ...opt("assemblyPlant", d.assembly.plant),

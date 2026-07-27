@@ -347,6 +347,7 @@ const FAMILY_STYLES: Record<string, FamilyStyle> = {
   PREMIUM_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true },
   LUXURY_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true },
   GERMAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, passportBrandLine: true },
+  MINIMAL_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, passportBrandLine: true },
   COMMERCIAL_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, passportBrandLine: true },
   SCANDINAVIAN_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, passportBrandLine: true },
   PREMIUM_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
@@ -354,7 +355,6 @@ const FAMILY_STYLES: Record<string, FamilyStyle> = {
   JAPANESE_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
   AMERICAN_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 2 },
   PERFORMANCE: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: true, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
-  EV_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: true, equipmentColumns: 3 },
   AUTOLABELS_FALLBACK: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
 };
 

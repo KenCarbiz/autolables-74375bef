@@ -4141,6 +4141,186 @@ export const volvoEvFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "YV4M12RC2T1345678",
 });
 
+// Owner's reference benchmark (2026-07-27 Tesla directive). It reconciles
+// exactly as printed: 48,990 + 1,000 + 1,390 + 250 = 51,630. The no-cost
+// interior and wheels render INCLUDED rather than as priced lines.
+export const teslaModelYFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "7SAYGDEE6TF123456",
+  identity: { year: "2026", make: "Tesla", model: "Model Y", trim: "LONG RANGE ALL-WHEEL DRIVE" },
+  pricing: { baseMsrp: 48990, destinationCharge: 1390, optionsTotal: 1000, totalMsrp: 51630 },
+  options: [
+    { name: "Pearl White Multi-Coat", code: null, msrp: 1000 },
+    { name: "Black Premium Interior", code: null, msrp: null, included: true },
+    { name: "19-Inch Crossflow Wheels", code: null, msrp: null, included: true },
+  ],
+  standardEquipment: {
+    safety_features: [
+      "Active Safety Features",
+      "Automatic Emergency Braking",
+      "Blind Spot Collision Warning",
+      "Lane Departure Avoidance",
+      "Forward Collision Warning",
+      "Side Collision Avoidance",
+      "Eight Cameras",
+      "Front & Rear Parking Sensors",
+      "Child Safety Locks & Manual Rear Door Locks",
+      "Sentry Mode",
+      "Electronic Stability Control",
+      "Traction Control",
+    ],
+    mechanical: [
+      "Dual Motor All-Wheel Drive",
+      "Long Range Battery",
+      "Regenerative Braking System",
+      "Sport Mode",
+    ],
+    exterior: [
+      "LED Headlights",
+      "LED Taillights & Side Markers",
+      "Power Folding, Heated Side Mirrors",
+      "Flush Door Handles",
+      "Front Trunk",
+      "Acoustic Glass",
+      "Rain-Sensing Windshield Wipers",
+      "UV & Infrared Protection Glass",
+    ],
+    interior: [
+      "15.4-Inch Center Touchscreen",
+      "8-Inch Rear Touchscreen",
+      "Premium Seating Surfaces",
+      "Heated Front Seats",
+      "12-Way Power Adjustable Front Seats",
+      "60/40 Split Folding Rear Seats",
+      "Dual-Zone Climate Control",
+      "Heated Steering Wheel",
+      "Power Liftgate",
+      "Auto-Dimming Mirrors",
+      "Ambient Interior Lighting",
+      "Premium Audio System",
+      "Wi-Fi Connectivity",
+      "USB-C Ports (Front & Rear)",
+      "Wireless Phone Charging",
+      "Over-the-Air Software Updates",
+      "Mobile Connector",
+      "Access to Tesla Supercharger Network",
+    ],
+  },
+  colors: { exterior: { name: "Pearl White Multi-Coat", code: null }, interior: { name: "Black Premium", code: null } },
+  assembly: { plant: "Fremont", city: "Fremont, California", country: "USA" },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "SINGLE-SPEED", drivetrain: "ALL-WHEEL DRIVE" },
+  stockNumber: "T260184",
+  transportMethod: "TRUCK",
+  factoryCodes: { location: null, emissions: "ZEV", sequence: null, order: null, dealer: null },
+  epa: {
+    city: 125, highway: 109, combined: 117, annualFuelCost: 550, ghgScore: 10,
+    rangeMiles: 320, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 5250, classNote: null,
+  },
+  // Not rated by NHTSA for this exact configuration: the engine prints the
+  // honest not-rated treatment and draws no stars.
+  safety: null,
+  nhtsaNotRated: true,
+  warranty: {
+    basic: "4-Year/50,000-Mile Basic Vehicle Limited Warranty",
+    powertrain: "8-Year/120,000-Mile Battery & Drive Unit Limited Warranty",
+    corrosion: "12-Year/Unlimited-Mile Corrosion Limited Warranty",
+    roadside: "4-Year/50,000-Mile Roadside Assistance",
+    emissions: "5-Year/60,000-Mile Safety Restraint System Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "50%" },
+    { label: "Major foreign parts content", value: "Mexico 20%" },
+    { label: "Final assembly point", value: "Fremont, California, USA" },
+    { label: "Country of origin - motor assembly", value: "United States" },
+    { label: "Country of origin - battery cells", value: "United States" },
+  ],
+  dealer: { name: "Tesla Motors, Inc.", address: "1234 Tesla Road", city: "Fremont", state: "CA", zip: "94538", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-modely",
+  barcodePayload: "7SAYGDEE6TF123456",
+  disclaimers: [
+    "AutoLabels manufacturer-style reproduction generated from verified vehicle data. Not an original Tesla-issued Monroney label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
+// Cybertruck All-Wheel Drive: a distinct model line, never given Model X
+// data. Its own EPA record, its own assembly plant, its own coverage.
+// 79,990 + 3,500 + 1,390 = 84,880.
+export const teslaCybertruckFixture = (): FactoryStickerRenderData => ({
+  ...teslaModelYFixture(),
+  vin: "7G2CEHED4RA012345",
+  identity: { year: "2026", make: "Tesla", model: "Cybertruck", trim: "ALL-WHEEL DRIVE" },
+  pricing: { baseMsrp: 79990, destinationCharge: 1390, optionsTotal: 3500, totalMsrp: 84880 },
+  options: [
+    { name: "Full Self-Driving (Supervised) - Purchased", code: null, msrp: 2500 },
+    { name: "20-Inch Cyber Wheels w/ All-Terrain Tires", code: null, msrp: 1000 },
+    { name: "Stainless Steel Exterior", code: null, msrp: null, included: true },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Motor All-Wheel Drive",
+      "Adaptive Air Suspension",
+      "Steer-by-Wire w/ Rear-Wheel Steering",
+      "Locking Differentials",
+      "Regenerative Braking System",
+      "Off-Road & Tow Drive Modes",
+    ],
+    safety_features: [
+      "Automatic Emergency Braking",
+      "Blind Spot Collision Warning",
+      "Lane Departure Avoidance",
+      "Forward Collision Warning",
+      "Sentry Mode",
+      "Electronic Stability Control",
+    ],
+    exterior: [
+      "Ultra-Hard Stainless Steel Exoskeleton",
+      "Armor Glass",
+      "Powered Tonneau Cover",
+      "Power Frunk",
+      "Onboard Power Outlets - 120V & 240V",
+      "LED Light Bar",
+    ],
+    interior: [
+      "18.5-Inch Center Touchscreen",
+      "9.4-Inch Rear Touchscreen",
+      "Heated & Ventilated Front Seats",
+      "Heated Rear Seats",
+      "Dual-Zone Climate Control",
+      "Wireless Phone Charging",
+      "Over-the-Air Software Updates",
+    ],
+  },
+  colors: { exterior: { name: "Stainless Steel", code: null }, interior: { name: "Black & White", code: null } },
+  assembly: { plant: "Austin", city: "Austin, Texas", country: "USA" },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "SINGLE-SPEED", drivetrain: "ALL-WHEEL DRIVE" },
+  stockNumber: "T260455",
+  epa: {
+    city: 52, highway: 47, combined: 49, annualFuelCost: 1300, ghgScore: 10,
+    rangeMiles: 325, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 3500, classNote: null,
+  },
+  safety: null,
+  warranty: {
+    basic: "4-Year/50,000-Mile Basic Vehicle Limited Warranty",
+    powertrain: "8-Year/150,000-Mile Battery & Drive Unit Limited Warranty",
+    corrosion: "12-Year/Unlimited-Mile Corrosion Limited Warranty",
+    roadside: "4-Year/50,000-Mile Roadside Assistance",
+    emissions: "5-Year/60,000-Mile Safety Restraint System Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "65%" },
+    { label: "Final assembly point", value: "Austin, Texas, USA" },
+    { label: "Country of origin - motor assembly", value: "United States" },
+    { label: "Country of origin - battery cells", value: "United States" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-cybertruck",
+  barcodePayload: "7G2CEHED4RA012345",
+});
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

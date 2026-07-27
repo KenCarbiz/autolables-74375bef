@@ -16,8 +16,8 @@ export type TemplateFamilyId =
   | "GERMAN_FACTORY"
   | "SCANDINAVIAN_FACTORY"
   | "COMMERCIAL_FACTORY"
+  | "MINIMAL_FACTORY"
   | "PERFORMANCE"
-  | "EV_TECHNICAL"
   | "AUTOLABELS_FALLBACK";
 
 export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
@@ -33,8 +33,8 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "GERMAN_FACTORY",
   "SCANDINAVIAN_FACTORY",
   "COMMERCIAL_FACTORY",
+  "MINIMAL_FACTORY",
   "PERFORMANCE",
-  "EV_TECHNICAL",
   "AUTOLABELS_FALLBACK",
 ];
 
@@ -261,6 +261,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.04em",
     uppercaseSectionHeadings: true,
   },
+  // Tesla's digital-first factory voice: neutral geometric grotesque, light
+  // heading weight, wide tracking — minimal rather than industrial.
+  MINIMAL_FACTORY: {
+    headingFont: '"Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    bodyFont: '"Segoe UI", "Helvetica Neue", Arial, sans-serif',
+    numericFont: '"Segoe UI", "Helvetica Neue", Arial, sans-serif',
+    headingWeight: 600,
+    bodyWeight: 400,
+    labelWeight: 600,
+    letterSpacing: "0.01em",
+    headingLetterSpacing: "0.06em",
+    uppercaseSectionHeadings: true,
+  },
   PERFORMANCE: {
     headingFont: '"Arial Black", "Franklin Gothic Heavy", Arial, sans-serif',
     bodyFont: "Arial, Helvetica, sans-serif",
@@ -270,17 +283,6 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     labelWeight: 700,
     letterSpacing: "-0.01em",
     headingLetterSpacing: "0.02em",
-    uppercaseSectionHeadings: true,
-  },
-  EV_TECHNICAL: {
-    headingFont: 'Montserrat, "Century Gothic", "Segoe UI", sans-serif',
-    bodyFont: '"Segoe UI", Helvetica, Arial, sans-serif',
-    numericFont: '"Segoe UI", Arial, sans-serif',
-    headingWeight: 600,
-    bodyWeight: 400,
-    labelWeight: 500,
-    letterSpacing: "0.01em",
-    headingLetterSpacing: "0.12em",
     uppercaseSectionHeadings: true,
   },
   AUTOLABELS_FALLBACK: {
@@ -397,6 +399,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  MINIMAL_FACTORY: {
+    headerVariant: "MINIMAL",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "16pt",
+    borderWeight: "0.5pt",
+    cornerTreatment: "SQUARE",
+  },
   COMMERCIAL_FACTORY: {
     headerVariant: "BLOCK",
     pricingVariant: "UNDERLINED",
@@ -427,16 +439,6 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1.5pt",
     cornerTreatment: "SQUARE",
   },
-  EV_TECHNICAL: {
-    headerVariant: "MINIMAL",
-    pricingVariant: "RIGHT_RAIL",
-    barcodeVariant: "NONE",
-    qrVariant: "ROUNDED",
-    footerVariant: "MINIMAL",
-    columnGap: "20pt",
-    borderWeight: "0.5pt",
-    cornerTreatment: "ROUNDED_MD",
-  },
   AUTOLABELS_FALLBACK: {
     headerVariant: "BANDED",
     pricingVariant: "BOXED",
@@ -457,13 +459,13 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
   GERMAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.18em" },
   SCANDINAVIAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.3em" },
+  MINIMAL_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.34em" },
   COMMERCIAL_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.04em" },
   PREMIUM_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 200, maxHeightPx: 56, alignment: "CENTER", wordmarkLetterSpacing: "0.3em" },
   AMERICAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.08em" },
   EUROPEAN_TECHNICAL: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
   JAPANESE_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
   PERFORMANCE: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 190, maxHeightPx: 50, alignment: "LEFT", wordmarkLetterSpacing: "0.04em" },
-  EV_TECHNICAL: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 40, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
   AUTOLABELS_FALLBACK: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.12em" },
 };
 
@@ -752,7 +754,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
   }, { totalLabel: "TOTAL MSRP" }),
   LAND_ROVER: theme("LAND_ROVER", "PREMIUM_LUXURY", palette({ header: "#0c3c26", accent: "#b49b57", sectionHeading: "#0c3c26" })),
   PORSCHE: theme("PORSCHE", "PERFORMANCE", palette({ header: "#000000", accent: "#d5001c" })),
-  TESLA: theme("TESLA", "EV_TECHNICAL", palette({ header: "#171a20", accent: "#e82127" })),
+  // Tesla factory treatment (tesla-us-2026-v1): white masthead carrying the
+  // red TESLA wordmark, black model band ink, fine grey rules. Direct-sales
+  // identity: no franchise dealer block, delivery entity instead.
+  TESLA: theme("TESLA", "MINIMAL_FACTORY", {
+    headerBackground: "#ffffff",
+    headerText: "#e82127",
+    background: "#ffffff",
+    bodyText: "#171a20",
+    mutedText: "#5c5e62",
+    accent: "#171a20",
+    divider: "#d0d1d2",
+    sectionHeadingText: "#171a20",
+    totalMsrpBackground: "#171a20",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL MSRP" }),
   AUTOLABELS_FALLBACK: theme("AUTOLABELS_FALLBACK", "AUTOLABELS_FALLBACK", palette({
     header: "#14161a",
     accent: "#6e7681",

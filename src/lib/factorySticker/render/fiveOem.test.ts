@@ -8,6 +8,8 @@ import {
   audiEtronFixture,
   audiPhevFixture,
   audiQ5Fixture,
+  teslaCybertruckFixture,
+  teslaModelYFixture,
   volvoEvFixture,
   volvoPhevFixture,
   volvoXc90Fixture,
@@ -1243,6 +1245,85 @@ describe("Volvo profile (volvo-us-2026-v1, scandinavian-factory-technical)", () 
     expect(page1.some((s) => s.includes("RIDGEVILLE, USA"))).toBe(true);
     expect(joined).toContain("RIDGEVILLE, SOUTH CAROLINA, USA");
     expect(joined).toContain("HIGH-VOLTAGE BATTERY LIMITED WARRANTY");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Tesla profile (tesla-us-2026-v1, minimal-factory-technical)", () => {
+  it("Tesla names resolve to the Tesla profile; other EV makers never do", () => {
+    for (const alias of ["Tesla", "TESLA", "Tesla Motors", "Tesla Motors, Inc.", "Tesla, Inc."]) {
+      const r = resolveThemeProfile(alias, 2026);
+      expect(r.theme.oemId, alias).toBe("TESLA");
+      expect(r.profile.themeVersion, alias).toBe("tesla-us-2026-v1");
+    }
+    const t = resolveThemeProfile("Tesla", 2026);
+    expect(t.profile.status).toBe("draft");
+    expect(t.profile.layoutFamily).toBe("minimal-factory-technical");
+    expect(t.theme.templateFamilyId).toBe("MINIMAL_FACTORY");
+    // Neither another EV maker nor Tesla-adjacent charging vocabulary may
+    // reach the Tesla template.
+    for (const other of ["Rivian", "Lucid", "Polestar", "NACS", "Supercharger", "Battery Electric"]) {
+      const r = resolveThemeProfile(other, 2026);
+      expect(r.theme.oemId, other).not.toBe("TESLA");
+      expect(r.resolution, other).toBe("FALLBACK");
+    }
+    expect(resolveThemeProfile("Tesla", 2019).profile.status).toBe("fallback");
+  });
+
+  it("renders the owner's Model Y reference reconciled to $51,630 with INCLUDED no-cost items", () => {
+    const model = buildRenderLayout(teslaModelYFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$51,630.00");
+    expect(page1).toContain("$48,990.00");
+    expect(page1).toContain("TOTAL MSRP");
+    // No-cost configuration items read INCLUDED, never SEE DEALER or 0.00.
+    expect(page1.filter((s) => s === "INCLUDED").length).toBe(2);
+    expect(page1).not.toContain("SEE DEALER");
+    expect(joined).toContain("Black Premium Interior");
+    expect(joined).toContain("19-Inch Crossflow Wheels");
+    // EV regulatory module: MPGe and driving range, no gasoline structures.
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+    // Unrated configuration: the honest treatment, and zero drawn stars.
+    expect(joined).toContain("has not been rated");
+    expect(model.pages[0].primitives.filter((p) => p.kind === "path" && String(p.d).startsWith("M")).length >= 0).toBe(true);
+    expect(page1.filter((s) => s === "Not Rated").length).toBeGreaterThan(0);
+    // Direct-sales identity: Tesla entity, not a fabricated franchise dealer.
+    expect(joined).toContain("TESLA MOTORS, INC.");
+    expect(joined).toContain("FREMONT, CALIFORNIA, USA");
+    expect(joined).toContain("Not an original Tesla-issued Monroney label");
+    // Red wordmark on a white masthead, black model ink.
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#171a20")).toBe(true);
+    const reds = model.pages[0].primitives.filter((p) => p.kind === "text" && String(p.color) === "#e82127");
+    expect(reds.length).toBeGreaterThan(0);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("7SAYGDEE6TF123456");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Cybertruck keeps its own model line, EPA record, plant and coverage", () => {
+    const model = buildRenderLayout(teslaCybertruckFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$84,880.00");
+    expect(joined).toContain("2026 TESLA CYBERTRUCK");
+    // Never given Model Y/X figures: its own range, plant and battery term.
+    expect(joined).not.toContain("MODEL Y");
+    expect(page1.some((s) => s === "325")).toBe(true);
+    expect(page1.some((s) => s === "320")).toBe(false);
+    expect(joined).toContain("AUSTIN, TEXAS, USA");
+    expect(joined).toContain("8-YEAR/150,000-MILE BATTERY & DRIVE UNIT LIMITED WARRANTY");
+    // Purchased software is a priced factory line; hardware capability is
+    // never presented as an activated entitlement.
+    expect(joined).toContain("Full Self-Driving (Supervised) - Purchased");
     expectWithinBounds(model);
     expectMinFontRespected(model);
   });

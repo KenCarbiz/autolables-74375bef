@@ -121,6 +121,8 @@ const ALIASES: Record<string, OemId> = {
   porscheag: "PORSCHE",
   volvocars: "VOLVO",
   teslamotors: "TESLA",
+  teslamotorsinc: "TESLA",
+  teslainc: "TESLA",
 };
 
 const unresolved = (reason: string): OemResolution => ({

@@ -248,6 +248,16 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     logoAuthorized: false,
   },
   {
+    oemId: "TESLA",
+    market: "US",
+    modelYearStart: 2022,
+    modelYearEnd: 2027,
+    themeVersion: "tesla-us-2026-v1",
+    layoutFamily: "minimal-factory-technical",
+    status: "draft",
+    logoAuthorized: false,
+  },
+  {
     oemId: "VOLVO",
     market: "US",
     modelYearStart: 2022,
@@ -281,11 +291,11 @@ const FAMILY_BY_TEMPLATE: Record<string, string> = {
   GERMAN_FACTORY: "german-factory-technical",
   SCANDINAVIAN_FACTORY: "scandinavian-factory-technical",
   COMMERCIAL_FACTORY: "commercial-factory-technical",
+  MINIMAL_FACTORY: "minimal-factory-technical",
   AMERICAN_MAINSTREAM: "american-utility",
   PERFORMANCE: "adventure-performance",
   KOREAN_PREMIUM: "korean-premium-factory",
   KOREAN_MAINSTREAM: "korean-mainstream-factory",
-  EV_TECHNICAL: "ev-forward",
   AUTOLABELS_FALLBACK: "premium-minimalist",
 };
 

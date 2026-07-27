@@ -115,7 +115,7 @@ describe("INFINITI theme — pinned tokens", () => {
 describe("getTheme", () => {
   it("returns the brand theme for known ids", () => {
     expect(getTheme("TESLA").oemId).toBe("TESLA");
-    expect(getTheme("TESLA").templateFamilyId).toBe("EV_TECHNICAL");
+    expect(getTheme("TESLA").templateFamilyId).toBe("MINIMAL_FACTORY");
   });
 
   it("falls back to a complete AUTOLABELS_FALLBACK theme for unknown ids", () => {
