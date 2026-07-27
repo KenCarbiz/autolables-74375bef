@@ -179,12 +179,18 @@ export default function FactoryStickerCard({
 
   const regenerate = async (action: "regenerate" | "orchestrate") => {
     if (!tenantId) { toast.error("Vehicle has no tenant"); return; }
+    let reason: ReturnType<typeof promptRegenerationReason> = null;
+    if (action === "regenerate") {
+      reason = promptRegenerationReason();
+      if (!reason) { toast.info("Regeneration cancelled — a reason is required."); return; }
+    }
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("factory-sticker-orchestrate", {
         body: {
           action, tenant_id: tenantId, vehicle_id: vehicleId,
           app_base: typeof window !== "undefined" ? window.location.origin : undefined,
+          ...(reason ? { reason_code: reason.reason_code, reason_notes: reason.reason_notes } : {}),
         },
       });
       const payload = (data || {}) as { success?: boolean; error?: string; status?: string };
