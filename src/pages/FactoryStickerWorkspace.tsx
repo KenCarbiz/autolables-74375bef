@@ -8,6 +8,7 @@ import { hasWindowStickerPermission } from "@/lib/permissions/windowStickerPermi
 import TemplateOverrideControl from "@/components/vehicle/TemplateOverrideControl";
 import StickerBlockersPanel from "@/components/vehicle/StickerBlockersPanel";
 import { buildStickerBlockers } from "@/lib/factorySticker/blockers";
+import { promptRegenerationReason } from "@/lib/factorySticker/regenerationReason";
 import { listingHero } from "@/lib/photos";
 import { buildRenderLayout } from "@/lib/factorySticker/render/contract.ts";
 import type { FactoryStickerRenderData, FactoryStickerTheme } from "@/lib/factorySticker/render/contract.ts";
