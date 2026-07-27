@@ -757,6 +757,150 @@ export const bmwFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "WBA53FJ05SCT44821",
 });
 
+
+// ── Genesis fixtures (korean-premium-factory, genesis-us-2025-v1) ──────
+
+// Fixture 1 — premium gasoline SUV benchmark. 74,700 + 3,050 + 1,395 = 79,145.
+export const genesisGv80Fixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  vin: "KMUHCESC5SU301992",
+  identity: { year: "2025", make: "Genesis", model: "GV80", trim: "3.5T PRESTIGE AWD" },
+  pricing: { baseMsrp: 74700, destinationCharge: 1395, optionsTotal: 3050, totalMsrp: 79145 },
+  options: [
+    { name: "Matte Paint - Brooklyn Brown", code: "MT", msrp: 1500 },
+    { name: "22-Inch Dark Multi-Spoke Wheels", code: "W22", msrp: 1050 },
+    { name: "Second-Row Side Window Blinds", code: "SB", msrp: 500 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.5L Twin-Turbocharged V6 - 375 HP",
+      "8-Speed Automatic Transmission w/ Paddle Shifters",
+      "HTRAC All-Wheel Drive w/ Multi-Terrain Modes",
+      "Electronically Controlled Suspension w/ Road Preview",
+      "Launch Control",
+    ],
+    safety_features: [
+      "Forward Collision-Avoidance Assist 2 w/ Junction and Lane-Change",
+      "Highway Driving Assist II",
+      "Blind-Spot View Monitor",
+      "Surround View Monitor w/ 3D",
+      "Remote Smart Parking Assist",
+      "10 Airbags Incl. Center Side Airbag",
+      "Safe Exit Assist",
+    ],
+    interior: [
+      "Nappa Leather Seating Surfaces",
+      "Ergo Motion Driver Seat w/ Massage",
+      "Heated and Ventilated Front and Second-Row Seats",
+      "27-Inch OLED Integrated Display",
+      "Bang & Olufsen 3D Premium Audio - 18 Speakers",
+      "Mood Curator w/ Fragrance Diffusion",
+      "Three-Zone Automatic Climate Control",
+      "Heated Wood-and-Leather Steering Wheel",
+    ],
+    exterior: [
+      "Two-Line Quad Headlamps w/ Adaptive Beam",
+      "Crest Grille w/ G-Matrix Pattern",
+      "20-Inch Machined Alloy Wheels",
+      "Power Panoramic Sunroof",
+      "Hands-Free Smart Power Liftgate",
+      "Acoustic Laminated Glass",
+    ],
+  },
+  colors: { exterior: { name: "Vik Black", code: "NBB" }, interior: { name: "Vanilla Beige", code: "VNE" } },
+  assembly: { plant: "Ulsan", city: "Ulsan", country: "South Korea" },
+  mechanical: { engine: "3.5L TT V6", transmission: "8-SPEED A/T", drivetrain: "AWD" },
+  stockNumber: "25GV80PR1992",
+  epa: {
+    city: 16, highway: 22, combined: 18, annualFuelCost: 3100, ghgScore: 3,
+    rangeMiles: null, fuelType: "Premium Gasoline", smogScore: 5, gallonsPer100Miles: 5.6,
+    fiveYearCostDifference: -4250, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-gv80",
+  barcodePayload: "KMUHCESC5SU301992",
+});
+
+// Fixture 2 — long-equipment G90: forces the deliberate continuation page.
+export const genesisG90LongFixture = (): FactoryStickerRenderData => {
+  const base = genesisGv80Fixture();
+  const std = { ...base.standardEquipment };
+  std.comfort = Array.from({ length: 26 }, (_, i) =>
+    `Rear Executive Comfort Feature ${String(i + 1).padStart(2, "0")} w/ Extended Adjustment Range`);
+  std.technology = Array.from({ length: 24 }, (_, i) =>
+    `Connected Technology Function ${String(i + 1).padStart(2, "0")} w/ Over-the-Air Update Support`);
+  return {
+    ...base,
+    vin: "KMTFC4SD3SU022761",
+    identity: { year: "2025", make: "Genesis", model: "G90", trim: "5.0 ULTIMATE RWD" },
+    pricing: { baseMsrp: 91750, destinationCharge: 1395, optionsTotal: 4400, totalMsrp: 97545 },
+    options: [
+      { name: "Rear Executive Package", code: "REP", msrp: 3300, contents: ["Power Reclining Rear Seats", "Rear Entertainment Displays", "Rear Refrigerated Console"] },
+      { name: "Matte Paint - Makalu Gray", code: "MT", msrp: 1100 },
+    ],
+    standardEquipment: std,
+    mechanical: { engine: "5.0L V8", transmission: "8-SPEED A/T", drivetrain: "RWD" },
+    stockNumber: "25G90ULT2761",
+    passportUrl: "https://autolabels.io/v/demo-g90",
+    barcodePayload: "KMTFC4SD3SU022761",
+  };
+};
+
+// Fixture 3 — Electrified GV70: regulatory/ev module, no gasoline content.
+export const genesisEvFixture = (): FactoryStickerRenderData => ({
+  ...genesisGv80Fixture(),
+  vin: "KMUKCDTB5SU115530",
+  identity: { year: "2025", make: "Genesis", model: "Electrified GV70", trim: "ADVANCED AWD" },
+  pricing: { baseMsrp: 66450, destinationCharge: 1395, optionsTotal: 1650, totalMsrp: 69495 },
+  options: [
+    { name: "Matte Paint - Matterhorn White", code: "MT", msrp: 1500 },
+    { name: "Cargo Package", code: "CP", msrp: 150, contents: ["Cargo Net", "Cargo Cover"] },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Electric Motors - 429 HP (483 HP w/ Boost Mode)",
+      "e-AWD w/ Disconnector Actuator System",
+      "77.4 kWh Lithium-Ion Battery",
+      "800V DC Fast Charging up to 240 kW",
+      "10.9 kW Onboard Charger",
+      "Vehicle-to-Load (V2L) Power Supply",
+      "i-Pedal One-Pedal Driving",
+    ],
+    safety_features: [
+      "Forward Collision-Avoidance Assist 2",
+      "Highway Driving Assist II",
+      "Blind-Spot View Monitor",
+      "Surround View Monitor",
+      "Remote Smart Parking Assist",
+      "10 Airbags",
+    ],
+    interior: [
+      "Leatherette Seating w/ Recycled Materials",
+      "Heated and Ventilated Front Seats",
+      "14.5-Inch Infotainment Display",
+      "Digital Key 2 w/ Fingerprint Authentication",
+      "Bang & Olufsen Premium Audio",
+      "Dual-Zone Climate w/ After-Blow",
+    ],
+    exterior: [
+      "Two-Line Headlamps",
+      "Crest Grille - Closed EV Design",
+      "20-Inch Aerodynamic Alloy Wheels",
+      "Power Panoramic Sunroof",
+      "Hands-Free Power Liftgate",
+    ],
+  },
+  colors: { exterior: { name: "Matterhorn White Matte", code: "M2W" }, interior: { name: "Obsidian Black", code: "OBK" } },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "1-SPEED REDUCTION", drivetrain: "e-AWD" },
+  stockNumber: "25EGV70AD5530",
+  epa: {
+    city: 98, highway: 87, combined: 93, annualFuelCost: 950, ghgScore: 10,
+    rangeMiles: 236, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 4750, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-egv70",
+  barcodePayload: "KMUKCDTB5SU115530",
+});
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

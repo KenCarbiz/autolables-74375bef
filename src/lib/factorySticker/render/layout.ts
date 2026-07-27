@@ -323,6 +323,7 @@ interface FamilyStyle {
 }
 
 const FAMILY_STYLES: Record<string, FamilyStyle> = {
+  KOREAN_PREMIUM: { headerComposition: "BANDED", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: true, accentKeyline: true, equipmentColumns: 3 },
   PREMIUM_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
   MODERN_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
   EUROPEAN_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: false, boxedZones: true, equipmentColumns: 3 },
@@ -549,6 +550,12 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
       p.path(path.d, x, top, m.width, m.height, path.fill,
         path.stroke, path.strokeWidth);
     }
+    for (const t of m.texts ?? []) {
+      p.text(t.str, x + t.x, top + t.y, Math.max(t.size, MIN_BODY_FONT_SIZE), "bold", t.color, {
+        align: "center",
+        ...(t.charSpacing ? { charSpacing: t.charSpacing } : {}),
+      });
+    }
     return x + m.width + m.height * emblem.clearSpaceRatio;
   };
   if (banded) {
@@ -693,7 +700,7 @@ function paintStandardEquipment(
 
   const colTop = cursor;
   // Reserve the footnote + closing rule (~14pt) that follow this section.
-  const colBudget = Math.max(0, budget - (cursor - y) - 14);
+  const colBudget = Math.max(0, budget - (cursor - y) - (familyStyle(ctx.theme).boxedZones ? 21 : 14));
   const { leftover, usedHeight } = flowColumns(p, entries, LX, colTop, LW, colBudget, columns, ctx);
 
   for (let col = 1; col < columns; col++) {
@@ -701,10 +708,11 @@ function paintStandardEquipment(
     p.rule(sx, colTop + 3, 0.5, Math.max(0, usedHeight - 2), "#b6b9bd");
   }
 
-  if (familyStyle(ctx.theme).boxedZones) {
+  const boxed = familyStyle(ctx.theme).boxedZones;
+  if (boxed) {
     p.rect(LX - 3, colTop - 2, LW + 6, usedHeight + 6, null, "#3a3d42", 0.75);
   }
-  let end = colTop + usedHeight + 7;
+  let end = colTop + usedHeight + (boxed ? 13 : 7);
   p.text(
     "* See Owner's Manual for complete details, limitations and exclusions.",
     LX + LW / 2, end, 5.5, "body", "#4c5157", { align: "center" },

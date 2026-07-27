@@ -4,6 +4,9 @@ import { resolveThemeProfile } from "../oem/profiles";
 import {
   bmwFixture,
   chevroletFixture,
+  genesisEvFixture,
+  genesisG90LongFixture,
+  genesisGv80Fixture,
   jeep4xeFixture,
   jeepFixture,
   lexusFixture,
@@ -77,5 +80,50 @@ describe("five-OEM design system", () => {
     expect(chevy.has("#c9daea")).toBe(true);     // steel-blue identity band
     expect(toyota.has("#565b33")).toBe(false);
     expect(chevy.has("#d3121a")).toBe(false);
+  });
+});
+
+describe("Genesis profile (genesis-us-2025-v1)", () => {
+  it("resolves Genesis distinctly from Hyundai, model-year aware", () => {
+    const g = resolveThemeProfile("Genesis", 2025);
+    const h = resolveThemeProfile("Hyundai", 2025);
+    expect(g.profile.themeVersion).toBe("genesis-us-2025-v1");
+    expect(g.profile.layoutFamily).toBe("korean-premium-factory");
+    expect(g.profile.status).toBe("draft");
+    expect(h.profile.themeVersion).toBe("hyundai-us-2025-v1");
+    expect(g.theme.templateFamilyId).not.toBe(h.theme.templateFamilyId);
+    // Outside the approved 2023-2026 range: honest fallback, generation preserved.
+    expect(resolveThemeProfile("Genesis", 2021).profile.status).toBe("fallback");
+  });
+
+  it("GV80 gasoline benchmark renders reconciled on one page", () => {
+    const model = buildRenderLayout(genesisGv80Fixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$79,145.00");
+    expect(model.drawnStrings).toContain("KMUHCESC5SU301992");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Electrified GV70 uses the EV module with no gasoline content", () => {
+    const model = buildRenderLayout(genesisEvFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("Electric Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+  });
+
+  it("G90 long-equipment produces a deliberate continuation page", () => {
+    const model = buildRenderLayout(genesisG90LongFixture(), themeFor(null));
+    expect(model.pages.length).toBe(2);
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("$97,545.00");
+    const page2 = pageStrings(model, 1);
+    expect(page2).toContain("FACTORY EQUIPMENT CONTINUATION");
+    expect(page2).toContain("PAGE 2 OF 2");
+    expectMinFontRespected(model);
   });
 });

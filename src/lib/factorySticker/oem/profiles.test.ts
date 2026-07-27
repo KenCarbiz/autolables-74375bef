@@ -52,7 +52,7 @@ describe("OEM theme profiles", () => {
 describe("governed logo assets", () => {
   it("serves recreated emblems for Chevrolet, BMW and Lexus pending authorization", async () => {
     const { getLogoAsset } = await import("./logoAssets");
-    for (const id of ["CHEVROLET", "BMW", "LEXUS"]) {
+    for (const id of ["CHEVROLET", "BMW", "LEXUS", "FORD", "NISSAN", "INFINITI", "HYUNDAI"]) {
       const asset = getLogoAsset(id);
       expect(asset).not.toBeNull();
       expect(asset!.status).toBe("recreated_pending_authorization");

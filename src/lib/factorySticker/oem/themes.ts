@@ -4,6 +4,7 @@ import type { OemId } from "./identity.ts";
 import { OEM_REGISTRY } from "./identity.ts";
 
 export type TemplateFamilyId =
+  | "KOREAN_PREMIUM"
   | "PREMIUM_LUXURY"
   | "MODERN_LUXURY"
   | "AMERICAN_MAINSTREAM"
@@ -16,6 +17,7 @@ export type TemplateFamilyId =
   | "AUTOLABELS_FALLBACK";
 
 export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
+  "KOREAN_PREMIUM",
   "PREMIUM_LUXURY",
   "MODERN_LUXURY",
   "AMERICAN_MAINSTREAM",
@@ -96,6 +98,19 @@ export interface OemStickerTheme {
 }
 
 const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
+  // Production-safe substitute for Genesis' proprietary type, recorded per
+  // the theme registry rules (no decorative approximation of brand fonts).
+  KOREAN_PREMIUM: {
+    headingFont: '"Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif',
+    bodyFont: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+    numericFont: '"Helvetica Neue", Arial, sans-serif',
+    headingWeight: 500,
+    bodyWeight: 400,
+    labelWeight: 600,
+    letterSpacing: "0.02em",
+    headingLetterSpacing: "0.18em",
+    uppercaseSectionHeadings: true,
+  },
   PREMIUM_LUXURY: {
     headingFont: '"Avenir Next", "Century Gothic", "Segoe UI", Helvetica, Arial, sans-serif',
     bodyFont: '"Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -209,6 +224,16 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
 };
 
 const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
+  KOREAN_PREMIUM: {
+    headerVariant: "BANDED",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "14pt",
+    borderWeight: "0.5pt",
+    cornerTreatment: "SQUARE",
+  },
   PREMIUM_LUXURY: {
     headerVariant: "BANDED",
     pricingVariant: "BOXED",
@@ -312,6 +337,7 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
 };
 
 const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> = {
+  KOREAN_PREMIUM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 200, maxHeightPx: 50, alignment: "LEFT", wordmarkLetterSpacing: "0.26em" },
   PREMIUM_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 200, maxHeightPx: 56, alignment: "CENTER", wordmarkLetterSpacing: "0.3em" },
   MODERN_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 190, maxHeightPx: 52, alignment: "CENTER", wordmarkLetterSpacing: "0.22em" },
   AMERICAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.08em" },
@@ -417,7 +443,10 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
   SUBARU: theme("SUBARU", "JAPANESE_MAINSTREAM", palette({ header: "#013c74", accent: "#6ba3d6", sectionHeading: "#013c74" })),
   MAZDA: theme("MAZDA", "JAPANESE_MAINSTREAM", palette({ header: "#101010", accent: "#910a2d" })),
   HYUNDAI: theme("HYUNDAI", "KOREAN_MODERN", palette({ header: "#002c5f", accent: "#7d9bc1", sectionHeading: "#002c5f" })),
-  GENESIS: theme("GENESIS", "PREMIUM_LUXURY", palette({ header: "#000000", accent: "#9d8156", sectionHeading: "#5a4a31" })),
+  GENESIS: theme("GENESIS", "KOREAN_PREMIUM", palette({
+    header: "#111111", accent: "#9a7448", sectionHeading: "#4b4b4b",
+    totalBg: "#141414", totalText: "#ffffff",
+  })),
   KIA: theme("KIA", "KOREAN_MODERN", palette({ header: "#05141f", accent: "#9ea1a2", sectionHeading: "#05141f" })),
   VOLVO: theme("VOLVO", "MODERN_LUXURY", palette({ header: "#003057", accent: "#7fa0bd", sectionHeading: "#003057" })),
   LAND_ROVER: theme("LAND_ROVER", "PREMIUM_LUXURY", palette({ header: "#0c3c26", accent: "#b49b57", sectionHeading: "#0c3c26" })),

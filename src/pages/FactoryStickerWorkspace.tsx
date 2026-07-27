@@ -22,6 +22,9 @@ import {
   newConditionBenchmark,
   nissanBenchmark,
   noEpaFixture,
+  genesisEvFixture,
+  genesisG90LongFixture,
+  genesisGv80Fixture,
   themeFor,
   toyotaFixture,
 } from "@/lib/factorySticker/render/__fixtures__/renderData.ts";
@@ -153,6 +156,18 @@ const FIXTURE_SCENARIOS = {
   lexus: { label: "Lexus", data: lexusFixture },
   chevrolet: { label: "Chevrolet", data: chevroletFixture },
   bmw: { label: "BMW", data: bmwFixture },
+  genesis: { label: "Genesis GV80", data: genesisGv80Fixture },
+  genesisev: { label: "Genesis Electrified GV70", data: genesisEvFixture },
+  genesislong: { label: "Genesis G90 (2-page)", data: genesisG90LongFixture },
+  genesisqa: {
+    label: "Genesis QA blocked",
+    data: () => {
+      const d = genesisGv80Fixture();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      d.barcodePayload = "KMUHCESC5SU999999";
+      return d;
+    },
+  },
   ev: { label: "EV (Ariya)", data: evFixture },
   noepa: { label: "Missing EPA", data: noEpaFixture },
   msrpvar: {
