@@ -6,6 +6,8 @@ import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { hasWindowStickerPermission } from "@/lib/permissions/windowStickerPermissions";
 import TemplateOverrideControl from "@/components/vehicle/TemplateOverrideControl";
+import StickerBlockersPanel from "@/components/vehicle/StickerBlockersPanel";
+import { buildStickerBlockers } from "@/lib/factorySticker/blockers";
 import { listingHero } from "@/lib/photos";
 import { buildRenderLayout } from "@/lib/factorySticker/render/contract.ts";
 import type { FactoryStickerRenderData, FactoryStickerTheme } from "@/lib/factorySticker/render/contract.ts";
@@ -555,6 +557,19 @@ export default function FactoryStickerWorkspace({
   // retrieved. Rebuilding from saved data cannot fix that — the studio has
   // to offer to go and get it.
   const needsSourceData = !fixture && !!vehicle && !buildSheet;
+  // The stored pipeline state, read back as something a person can act on.
+  const blockers = fixture ? [] : buildStickerBlockers({
+    generationStatus: record?.generation_status ?? null,
+    reviewRequired: record?.review_required ?? null,
+    reviewReason: record?.review_reason ?? null,
+    lastError: record?.last_error ?? null,
+    reconciliationStatus: record?.reconciliation_status ?? null,
+    reconciliationDifference: record?.reconciliation_difference ?? null,
+    sourceProvider: record?.source_provider ?? null,
+    sourceRetrievedAt: record?.updated_at ?? null,
+    qaMetadata: record?.qa_metadata ?? null,
+    missingSourceData: needsSourceData,
+  });
   const stockNo = (mc.stock_no as string)
     || ((vehicle?.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string)
     || null;
@@ -896,6 +911,17 @@ export default function FactoryStickerWorkspace({
                 value={fixture ? "Fixture" : record?.verification_status ? humanize(record.verification_status) : "Not run"}
               />
             </div>
+
+            {!fixture && (
+              <StickerBlockersPanel
+                blockers={blockers}
+                role={entitlements.member?.role}
+                isPlatformAdmin={isAdmin}
+                busy={!!busy}
+                onRegenerate={() => act(record ? "regenerate" : "orchestrate")}
+                onRetrieveSourceData={() => act("orchestrate", { allowSourceFetch: true })}
+              />
+            )}
 
             {!fixture && vehicle?.tenant_id && vehicleId && record && (
               <div className="rounded-2xl border border-border bg-card p-4">
