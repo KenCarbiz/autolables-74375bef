@@ -1,15 +1,15 @@
 {
   "pages": 1,
   "geometry": "792x612",
-  "mode": "STANDARD",
+  "mode": "DENSE",
   "fonts": "\"Helvetica Neue\", \"Segoe UI\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 45,
+    "path": 55,
     "qr": 2,
     "rect": 29,
     "rule": 11,
-    "text": 223
+    "text": 231
   },
   "fills": [
     "#0d0d0d",
@@ -45,10 +45,11 @@
     6.4,
     6.5,
     6.6,
+    6.7,
     6.8,
     7.2,
+    7.5,
     7.6,
-    7.8,
     8,
     8.5,
     9,
@@ -96,6 +97,6 @@
   ],
   "totalBand": "$61,640.00",
   "svgDigest": [
-    "56a297bd"
+    "d29952ed"
   ]
 }

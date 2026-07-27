@@ -1,4 +1,4 @@
-import type { PriceStatus, StickerPricing } from "./types";
+import type { PriceStatus, StickerPricing } from "./types.ts";
 
 export class PricingInputError extends Error {
   constructor(message: string) {

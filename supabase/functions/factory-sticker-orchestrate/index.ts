@@ -32,7 +32,7 @@ import {
   type FactoryStickerRenderResult, type FactoryStickerTheme,
   resolveRenderProfile,
   selectOemTemplate, validatePageGeometry, evaluateStickerEligibility,
-  listCompatibleTemplates, validateTemplateOverride,
+  listCompatibleTemplates, validateTemplateOverride, checkRenderedCompleteness,
 } from "../_shared/factorySticker/render.ts";
 
 const cors = {
@@ -659,8 +659,21 @@ async function orchestrateVehicle(
         pageCount: Number(rendered.layout?.pages ?? 0),
       })
       : { pass: true, code: "OK" as const, reasons: [] };
+    // Fit is never trusted. The manifest states everything the document is
+    // required to print — every option, every package member the buyer is
+    // charged for, both MSRP anchors, the parts content and the
+    // disclosure — and the render is checked against it.
+    const completeness = checkRenderedCompleteness(normalized.data, {
+      width: Number(rendered.layout?.widthPt ?? 0),
+      height: Number(rendered.layout?.heightPt ?? 0),
+      mode: "STANDARD",
+      pages: [],
+      drawnStrings: drawn,
+      fontFamilies: { heading: "", body: "", numeric: "" },
+    });
     const qaChecks = {
       vin_drawn: drawn.includes(vin),
+      content_complete: completeness.pass,
       barcode_is_vin: normalized.data.barcodePayload === vin,
       qr_is_canonical_passport: !!canonicalPassportUrl && normalized.data.passportUrl === canonicalPassportUrl,
       page_count_ok: geometry.pass,
@@ -674,6 +687,12 @@ async function orchestrateVehicle(
         ...(basePatch.qa_metadata as Record<string, unknown>),
         checks: qaChecks,
         pages: rendered.layout?.pages ?? null,
+        completeness: {
+          code: completeness.code,
+          checked: completeness.checked,
+          missing: completeness.missing.map((m) => ({ label: m.label, category: m.category })),
+          miscounted: completeness.miscounted,
+        },
         geometry: {
           code: geometry.code, reasons: geometry.reasons,
           width_pt: rendered.layout?.widthPt ?? null,
@@ -726,7 +745,12 @@ async function orchestrateVehicle(
       current_document_id: filed.documentId,
       review_required: !autoPublish,
       review_reason: autoPublish ? null : (reviewReason
-        || (!geometry.pass ? `${geometry.code.toLowerCase()}: ${geometry.reasons.join("; ")}`
+        || (!completeness.pass
+          ? `${completeness.code.toLowerCase()}: ${[
+            ...completeness.missing.map((m) => `missing ${m.label}`),
+            ...completeness.miscounted.map((m) => `${m.label} appeared ${m.actualCount}x`),
+          ].slice(0, 6).join("; ")}`
+          : !geometry.pass ? `${geometry.code.toLowerCase()}: ${geometry.reasons.join("; ")}`
           : !qaPass ? "qa_failed"
           : selection.selectionStatus !== "selected" ? `template_${selection.selectionStatus}: ${selection.reasons.join("; ")}`
           : reconciliationStatus !== "MATCHED" ? `reconciliation_${reconciliationStatus.toLowerCase()}`

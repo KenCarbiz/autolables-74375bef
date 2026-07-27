@@ -18,6 +18,7 @@ import {
   Settings,
   ShieldCheck,
   Store,
+  Tag,
   Users,
   Wrench,
 } from "lucide-react";
@@ -92,6 +93,7 @@ describe("buildAdminNavSections — structure preserved", () => {
       "Print Center",
       "Leads",
       "Create",
+      "Window Sticker Studio",
       "Description Operations",
     ]);
     expect(get("getready")).toEqual([
@@ -122,6 +124,7 @@ describe("icon mapping (lucide-react, one distinct icon per destination)", () =>
     Inventory: CarFront,
     Deals: Handshake,
     Create: FilePlus2,
+    "Window Sticker Studio": Tag,
     "Work Queue": ClipboardList,
     Leads: Users,
     "Recon Approvals": BadgeCheck,

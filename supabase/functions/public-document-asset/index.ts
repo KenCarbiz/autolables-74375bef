@@ -23,7 +23,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { SIGNED_URL_TTL_SECONDS } from "../../../src/lib/factorySticker/assets.ts";
+import { SIGNED_URL_TTL_SECONDS } from "../_shared/factorySticker/lib/assets.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

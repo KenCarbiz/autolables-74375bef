@@ -938,7 +938,10 @@ describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v2)", (
     const model = buildRenderLayout(data, themeFor(null));
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
-    expect(model.pages.length).toBe(1);
+    // Every member of this build's packages now prints. The page can no
+    // longer hold all of it, so the template's approved continuation page
+    // carries the overflow rather than paid equipment being hidden.
+    expect(model.pages.length).toBeLessThanOrEqual(2);
     expect(page1).toContain("$109,335.00");
     expect(page1).toContain("$93,795.00");
     expect(page1).toContain("TOTAL VEHICLE PRICE");
@@ -1004,7 +1007,10 @@ describe("Ram profile (ram-us-2026-v2, commercial-factory-technical)", () => {
     const model = buildRenderLayout(ramFixture(), themeFor(null));
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
-    expect(model.pages.length).toBe(1);
+    // Every member of this build's packages now prints. The page can no
+    // longer hold all of it, so the template's approved continuation page
+    // carries the overflow rather than paid equipment being hidden.
+    expect(model.pages.length).toBeLessThanOrEqual(2);
     expect(page1).toContain("$72,845.00");
     expect(page1).toContain("$61,645.00");
     expect(page1).toContain("TOTAL PRICE");

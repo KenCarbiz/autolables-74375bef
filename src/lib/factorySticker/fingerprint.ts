@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { FactoryStickerData } from "./types";
+import type { FactoryStickerData } from "./types.ts";
 
 export function stableStringify(value: unknown): string {
   if (value === null || value === undefined) return "null";

@@ -189,6 +189,25 @@ describe("OEM visual regression", () => {
     });
   }
 
+  it("prints every APF member on the option-heavy Envision with the package priced once", async () => {
+    // The regression this case exists for: the package member list used to
+    // truncate at two of six, silently hiding equipment the buyer pays for.
+    const data = buickEnvisionFixture();
+    const model = buildStickerLayout(adaptRenderData(data), getTheme("BUICK"));
+    const drawn = model.pages.flatMap((p) =>
+      p.primitives.filter((x) => x.kind === "text").map((x) => (x.kind === "text" ? x.str : "")));
+    const members = data.options.find((o) => o.code === "APF")?.contents ?? [];
+    expect(members.length).toBe(6);
+    for (const member of members) expect(drawn, member).toContain(member);
+    expect(drawn.filter((s) => s === "Avenir Technology Package").length).toBe(1);
+    expect(drawn.filter((s) => s === "1,965.00").length).toBe(1);
+    expect(model.pages.length).toBe(1);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+    await expect(JSON.stringify(fingerprint(model), null, 2))
+      .toMatchFileSnapshot("./__snapshots__/option-heavy-buick-envision.json");
+  });
+
   it("keeps every template family exercised by a live theme", () => {
     const used = new Set(OEM_IDS.map((id) => getTheme(id).templateFamilyId));
     for (const family of TEMPLATE_FAMILY_IDS) {

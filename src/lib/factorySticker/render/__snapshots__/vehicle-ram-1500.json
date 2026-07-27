@@ -1,15 +1,15 @@
 {
-  "pages": 1,
+  "pages": 2,
   "geometry": "792x612",
-  "mode": "DENSE",
+  "mode": "CONTINUATION_REQUIRED",
   "fonts": "\"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", Arial, sans-serif | \"Arial Narrow\", \"Roboto Condensed\", Arial, sans-serif | \"Arial Narrow\", \"Roboto Condensed\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 48,
+    "path": 49,
     "qr": 2,
     "rect": 30,
     "rule": 11,
-    "text": 225
+    "text": 224
   },
   "fills": [
     "#0d0d0d",
@@ -95,6 +95,7 @@
   ],
   "totalBand": "$72,845.00",
   "svgDigest": [
-    "2aaccb1d"
+    "27510153",
+    "96ccba30"
   ]
 }

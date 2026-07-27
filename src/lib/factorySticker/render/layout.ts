@@ -269,10 +269,6 @@ interface Density {
 // Print-legibility floor per the approved document standard: equipment body
 // never drops below 6.5pt — overflow goes to a deliberate continuation page
 // instead of shrinking.
-// Package member lists wrap to at most this many lines before the row
-// gives up; beyond it a single package can displace the equipment block.
-const MAX_PACKAGE_FEATURE_LINES = 2;
-
 const DENSITY_LARGE: Density = { mode: "STANDARD", item: 7.2, itemLh: 9.2, row: 7.6, rowLh: 10.4, head: 9 };
 const DENSITY_STANDARD: Density = { mode: "STANDARD", item: 6.8, itemLh: 8.6, row: 7.2, rowLh: 9.8, head: 8.5 };
 const DENSITY_DENSE: Density = { mode: "DENSE", item: 6.5, itemLh: 7.9, row: 7, rowLh: 9.4, head: 8.5 };
@@ -520,10 +516,10 @@ interface BuildContext {
   input: StickerLayoutInput;
   theme: OemStickerTheme;
   density: Density;
-  // Package member lists wrap to a second line when the page has room for
-  // it; the final single-page attempt turns wrapping off so a long package
-  // never costs the equipment block its page.
-  wrapFeatures: boolean;
+  // Package member grids tighten (smaller type, tighter leading, more
+  // columns) on the retry pass. Members are never dropped — only the
+  // spacing changes, so the semantic content is identical either way.
+  compactPackages: boolean;
 }
 
 // ── Top strip: factory administrative codes across the full width ─────
@@ -943,36 +939,28 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
     if (code) p.text(code, rightX, ry, size, "body", BLACK);
     const nameX = rightX + (code ? codeW : 0);
     if (opt.features && opt.features.length) {
-      // Package rows put the price leader on the contents line, as on the
-      // OEM reference ("Cargo Package" / "• Cargo Net ... 250.00").
-      p.text(ellipsize(opt.name, "body", size, rightW - codeW - 10), nameX, ry, size, "body", BLACK);
-      ry += density.itemLh;
-      let fx = nameX + 6;
-      let featureLines = 1;
-      const fxLimit = rightX + rightW - 78;
-      for (const feature of opt.features) {
-        const shown = ellipsize(sanitize(feature), "body", density.item, rightW - codeW - 60);
-        const w = 4 + measureText(shown, "body", density.item) + 9;
-        // Package members wrap onto a continuation line rather than being
-        // dropped on the first overflow. The cap keeps a content-heavy
-        // package from pushing the equipment block onto a second page.
-        if (fx > nameX + 6 && fx + w > fxLimit) {
-          if (!ctx.wrapFeatures || featureLines >= MAX_PACKAGE_FEATURE_LINES) break;
-          featureLines += 1;
-          ry += density.itemLh;
-          fx = nameX + 6;
-        }
-        bulletDot(p, fx, ry, density.item, BLACK);
-        p.text(shown, fx + 4, ry, density.item, "body", BLACK);
-        fx += w;
+      // A priced package is charged once and every member it contains must
+      // print. The price therefore sits on the package's own leader row,
+      // and the members follow beneath in a compact grid whose column
+      // count is chosen from the widest member — never truncated, never
+      // repriced, never silently dropped.
+      leaderRow(p, nameX, rightX + rightW, ry, opt.name, priceLabel(opt, true), size, "body", BLACK, BLACK);
+      // Members indent under the option code column, not under the name,
+      // so the grid gets the full column width to solve in.
+      const memberX = rightX + 6;
+      const availW = rightX + rightW - memberX;
+      const shown = opt.features.map((f) => sanitize(f));
+      const grid = packageMemberGrid(shown, availW, density.item, ctx.compactPackages);
+      const memberLh = ctx.compactPackages ? grid.size + 1.2 : grid.size + 1.9;
+      for (let i = 0; i < shown.length; i++) {
+        const col = i % grid.cols;
+        const rowIdx = Math.floor(i / grid.cols);
+        const mx = memberX + col * (availW / grid.cols);
+        const my = ry + (rowIdx + 1) * memberLh;
+        bulletDot(p, mx, my, grid.size, BLACK);
+        p.text(shown[i], mx + 4, my, grid.size, "body", BLACK);
       }
-      const price = priceLabel(opt, true);
-      const priceW = measureText(price, "body", density.item);
-      const dotW = measureText(".", "body", density.item);
-      const dotStart = fx - 6;
-      const dots = Math.floor((rightX + rightW - priceW - 3 - dotStart) / dotW);
-      if (dots > 0) p.text(".".repeat(dots), dotStart, ry, density.item, "body", BLACK);
-      p.text(price, rightX + rightW, ry, density.item, "body", BLACK, { align: "right" });
+      ry += grid.rows * memberLh;
     } else {
       leaderRow(p, nameX, rightX + rightW, ry, opt.name, priceLabel(opt, true), size, "body", BLACK, BLACK);
     }
@@ -1334,6 +1322,44 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   const boxBottom = fy + bandH;
   p.rect(RX, boxTop, RW, boxBottom - boxTop, null, BLACK, 1.4);
   return boxBottom;
+}
+
+// Package member grid.
+//
+// Every member of a priced package must print in full — truncating one
+// hides equipment the buyer is being charged for. So the grid is solved
+// rather than clipped: try the widest column count first and, for each,
+// find the largest type size at which the LONGEST member still fits its
+// cell whole. Fewer rows wins; a larger size breaks ties. Nothing here
+// can drop, abbreviate or clip a member, and the size never goes below
+// the registered minimum.
+function packageMemberGrid(
+  members: string[],
+  availW: number,
+  preferredSize: number,
+  compact: boolean,
+): { cols: number; rows: number; size: number } {
+  const gap = compact ? 8 : 10;
+  const step = 0.1;
+  let best: { cols: number; rows: number; size: number } | null = null;
+  for (const cols of [3, 2, 1]) {
+    if (cols > members.length) continue;
+    const cellW = availW / cols - gap;
+    for (let size = preferredSize; size >= MIN_BODY_FONT_SIZE - 1e-9; size -= step) {
+      const rounded = Math.round(size * 10) / 10;
+      const fits = members.every((m) => measureText(m, "body", rounded) <= cellW);
+      if (!fits) continue;
+      const rows = Math.ceil(members.length / cols);
+      if (!best || rows < best.rows || (rows === best.rows && rounded > best.size)) {
+        best = { cols, rows, size: rounded };
+      }
+      break;
+    }
+  }
+  // A member too long for even a full-width cell at the minimum size still
+  // prints: one per row at the minimum, overflowing the cell rather than
+  // being cut. The completeness check catches it as a layout problem.
+  return best ?? { cols: 1, rows: members.length, size: MIN_BODY_FONT_SIZE };
 }
 
 // ── Right column: Government 5-Star Safety Ratings ────────────────────
@@ -1704,9 +1730,9 @@ function buildAttempt(
   theme: OemStickerTheme,
   density: Density,
   allowContinuation: boolean,
-  wrapFeatures = true,
+  compactPackages = false,
 ): LayoutModel | null {
-  const ctx: BuildContext = { input, theme, density, wrapFeatures };
+  const ctx: BuildContext = { input, theme, density, compactPackages };
   const drawn: string[] = [];
   const p = new Painter(drawn);
 
@@ -1816,14 +1842,15 @@ function buildAttempt(
 export function buildStickerLayout(input: StickerLayoutInput, theme: OemStickerTheme): LayoutModel {
   const densities = [DENSITY_LARGE, DENSITY_STANDARD, DENSITY_DENSE, DENSITY_FLOOR];
   for (const density of densities) {
-    // Wrapped package members first, then the same density unwrapped, so a
-    // long package never costs the page a font-size step.
-    for (const wrapFeatures of [true, false]) {
-      const attempt = buildAttempt(input, theme, density, false, wrapFeatures);
+    // Roomy package grids first, then the same density compacted, so a
+    // content-heavy package never costs the page a font-size step. Both
+    // passes print every member; only the spacing differs.
+    for (const compactPackages of [false, true]) {
+      const attempt = buildAttempt(input, theme, density, false, compactPackages);
       if (attempt) return attempt;
     }
   }
-  const floor = buildAttempt(input, theme, DENSITY_FLOOR, true, false);
+  const floor = buildAttempt(input, theme, DENSITY_FLOOR, true, true);
   if (!floor) throw new Error("layout_failed: content cannot fit even with continuation");
   return floor;
 }

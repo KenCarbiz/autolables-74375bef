@@ -5,11 +5,11 @@
   "fonts": "\"Helvetica Neue\", Arial, \"Segoe UI\", sans-serif | Arial, Helvetica, sans-serif | \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 52,
+    "path": 59,
     "qr": 2,
     "rect": 31,
     "rule": 11,
-    "text": 219
+    "text": 222
   },
   "fills": [
     "#0a0a0a",
@@ -42,6 +42,7 @@
     5.8,
     6,
     6.2,
+    6.3,
     6.4,
     6.5,
     6.6,
@@ -50,8 +51,8 @@
     7.2,
     7.5,
     7.6,
+    7.8,
     8,
-    8.2,
     8.5,
     9,
     9.5,
@@ -99,6 +100,6 @@
   ],
   "totalBand": "$60,220.00",
   "svgDigest": [
-    "a3aaf469"
+    "c0b518aa"
   ]
 }

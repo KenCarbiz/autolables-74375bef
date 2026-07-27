@@ -4,7 +4,7 @@ import type {
   StandardEquipmentGroup,
   StickerOption,
   StickerPackage,
-} from "./types";
+} from "./types.ts";
 
 export const CATEGORY_ORDER: EquipmentCategory[] = [
   "EXTERIOR",

@@ -5,6 +5,7 @@
 
 import {
   Sparkles,
+  Tag,
   BadgeCheck,
   BadgeDollarSign,
   BarChart3,
@@ -113,6 +114,11 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
         { label: "Print Center", path: "/print-center", icon: Printer, capability: "can_view_print_queue", match: underSegment("/print-center") },
         { label: "Leads", path: "/leads", icon: Users, capability: "can_view_leads", featureKey: "feature_lead_capture", badge: badgeOrUndefined(badges.leads), match: underSegment("/leads") },
         { label: "Create", path: "/create", icon: FilePlus2, capability: "can_create_documents", match: underSegment("/create") },
+        // VIN-specific OEM window stickers are generated nightly but reviewed,
+        // regenerated and published by hand, so the Studio earns its own row
+        // rather than living only behind the Create hub.
+        { label: "Window Sticker Studio", path: "/window-sticker-studio", icon: Tag, capability: "can_create_documents",
+          match: (p: string) => p.startsWith("/window-sticker-studio") || p.startsWith("/factory-sticker") },
         // Description work is exception-driven and visited daily, so it earns a
         // row of its own rather than living only behind the Create hub.
         { label: "Description Operations", path: "/description-operations", icon: Sparkles, capability: "can_create_documents",

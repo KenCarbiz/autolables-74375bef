@@ -18,19 +18,19 @@ import {
   RENDERER_VERSION,
   resolveRenderProfile,
   runRenderPipeline,
-} from "../../../../src/lib/factorySticker/render/contract.ts";
+} from "./lib/render/contract.ts";
 import type {
   FactoryStickerRenderData,
   FactoryStickerRenderResult,
   FactoryStickerTheme,
-} from "../../../../src/lib/factorySticker/render/contract.ts";
-import type { PdfLibModule } from "../../../../src/lib/factorySticker/render/toPdf.ts";
+} from "./lib/render/contract.ts";
+import type { PdfLibModule } from "./lib/render/toPdf.ts";
 
 export type {
   FactoryStickerRenderData,
   FactoryStickerRenderResult,
   FactoryStickerTheme,
-} from "../../../../src/lib/factorySticker/render/contract.ts";
+} from "./lib/render/contract.ts";
 
 // Bumped on every layout-affecting change; part of the generation
 // fingerprint, so a bump regenerates stale stickers.
@@ -47,18 +47,23 @@ export {
   validatePageGeometry,
   listCompatibleTemplates,
   validateTemplateOverride,
-} from "../../../../src/lib/factorySticker/oem/selection.ts";
+} from "./lib/oem/selection.ts";
 export type {
   OemTemplateDefinition,
   OemTemplateSelectionResult,
-} from "../../../../src/lib/factorySticker/oem/selection.ts";
+} from "./lib/oem/selection.ts";
+export {
+  checkRenderedCompleteness,
+  buildContentManifest,
+} from "./lib/render/completeness.ts";
+export type { CompletenessReport, ManifestItem } from "./lib/render/completeness.ts";
 export {
   classifyCondition,
   evaluateStickerEligibility,
-} from "../../../../src/lib/factorySticker/oem/eligibility.ts";
+} from "./lib/oem/eligibility.ts";
 export type {
   StickerEligibilityResult,
-} from "../../../../src/lib/factorySticker/oem/eligibility.ts";
+} from "./lib/oem/eligibility.ts";
 
 export async function renderFactorySticker(
   data: FactoryStickerRenderData,

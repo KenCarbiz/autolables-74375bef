@@ -5,11 +5,11 @@
   "fonts": "\"Franklin Gothic Medium\", \"Arial Narrow\", Arial, sans-serif | Arial, Helvetica, sans-serif | \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 34,
+    "path": 35,
     "qr": 2,
     "rect": 33,
     "rule": 10,
-    "text": 181
+    "text": 182
   },
   "fills": [
     "#0d0d0d",
@@ -99,6 +99,6 @@
   ],
   "totalBand": "$55,720.00",
   "svgDigest": [
-    "32fea0ff"
+    "45f0e1a5"
   ]
 }

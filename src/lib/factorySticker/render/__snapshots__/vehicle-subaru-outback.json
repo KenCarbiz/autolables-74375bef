@@ -5,11 +5,11 @@
   "fonts": "\"Helvetica Neue\", \"Segoe UI\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 36,
+    "path": 37,
     "qr": 2,
     "rect": 29,
     "rule": 11,
-    "text": 202
+    "text": 203
   },
   "fills": [
     "#003b70",
@@ -94,6 +94,6 @@
   ],
   "totalBand": "$47,316.00",
   "svgDigest": [
-    "b09c6a03"
+    "24e44b52"
   ]
 }

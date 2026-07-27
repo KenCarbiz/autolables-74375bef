@@ -5,10 +5,10 @@ import type {
   StickerWarranty,
   VehicleCondition,
   VerificationStatus,
-} from "./types";
-import { vinNormalize } from "./validate";
-import { buildEquipment, type RawOptionInput, type RawPackageInput, type RawStandardItem } from "./equipment";
-import { derivePriceStatus, reconcileMsrp } from "./pricing";
+} from "./types.ts";
+import { vinNormalize } from "./validate.ts";
+import { buildEquipment, type RawOptionInput, type RawPackageInput, type RawStandardItem } from "./equipment.ts";
+import { derivePriceStatus, reconcileMsrp } from "./pricing.ts";
 
 export class VinMismatchError extends Error {
   readonly listingVin: string;
