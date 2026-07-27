@@ -493,9 +493,17 @@ function leaderRow(
 ): void {
   const priceW = measureText(price, "bold", size);
   const nameMax = rowRight - x - priceW - 10;
-  const shown = ellipsize(name, nameFont, size, nameMax);
-  p.text(shown, x, y, size, nameFont, color);
-  const nameW = measureText(shown, nameFont, size);
+  // An option or package name states what the buyer is being charged for,
+  // so it shrinks to fit rather than being cut off. Only a name too long
+  // even at the minimum size is ellipsized, and the completeness check
+  // catches that as missing content.
+  let nameSize = size;
+  while (nameSize > MIN_BODY_FONT_SIZE && measureText(name, nameFont, nameSize) > nameMax) {
+    nameSize -= 0.1;
+  }
+  const shown = ellipsize(name, nameFont, nameSize, nameMax);
+  p.text(shown, x, y, nameSize, nameFont, color);
+  const nameW = measureText(shown, nameFont, nameSize);
   const dotW = measureText(".", "body", size);
   const gapStart = x + nameW + 2;
   const gapEnd = rowRight - priceW - 3;
@@ -667,16 +675,37 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
       );
       dy += 10.4;
     }
-    // Model + trim inside the band; auto-fit, never truncated.
-    const primaryI = [v.year > 0 ? String(v.year) : "", v.make, v.model].filter(Boolean).join(" ").toUpperCase();
+    // Model + trim inside the band. The vehicle's own name is never
+    // truncated: it shrinks to fit, and when even the floor size will not
+    // hold it on one line the prefix moves to its own line so the model
+    // gets the full width. An ellipsis here would hide part of the name of
+    // the car the document describes.
+    const prefixI = [v.year > 0 ? String(v.year) : "", v.make].filter(Boolean).join(" ").toUpperCase();
+    const modelI = String(v.model || "").toUpperCase();
+    const primaryI = [prefixI, modelI].filter(Boolean).join(" ");
     const modelMax = dx - bandX - 24;
+    const fit = (text: string, from: number, floor: number): number => {
+      let size = from;
+      while (size > floor && measureText(text, "bold", size) > modelMax) size -= 0.5;
+      return size;
+    };
     // Floor low enough that long make + consumer-model combinations
-    // ("LAND ROVER RANGE ROVER SPORT") shrink rather than truncate.
-    let primaryISize = 17;
-    while (primaryISize > 8.5 && measureText(primaryI, "bold", primaryISize) > modelMax) primaryISize -= 0.5;
-    p.text(ellipsize(primaryI, "bold", primaryISize, modelMax), bandX + 12, bandTop + 24.5, primaryISize, "bold", bandInk);
+    // ("LAND ROVER RANGE ROVER SPORT") shrink rather than wrap.
+    const oneLineSize = fit(primaryI, 17, 8.5);
+    let trimY = bandTop + 38.5;
+    if (measureText(primaryI, "bold", oneLineSize) <= modelMax || !modelI) {
+      p.text(primaryI, bandX + 12, bandTop + 24.5, oneLineSize, "bold", bandInk);
+    } else {
+      // Two lines: prefix small above, model at the largest size that fits.
+      const prefixSize = fit(prefixI, 9, 6);
+      const modelSize = fit(modelI, 15, 7);
+      p.text(prefixI, bandX + 12, bandTop + 15, prefixSize, "bold", bandInk, { charSpacing: 0.4 });
+      p.text(modelI, bandX + 12, bandTop + 29, modelSize, "bold", bandInk);
+      trimY = bandTop + 41;
+    }
     if (v.trim) {
-      p.text(ellipsize(v.trim.toUpperCase(), "bold", 8.5, modelMax), bandX + 12, bandTop + 38.5, 8.5, "bold", bandInk, { charSpacing: 0.5 });
+      const trimSize = fit(v.trim.toUpperCase(), 8.5, 6);
+      p.text(v.trim.toUpperCase(), bandX + 12, trimY, trimSize, "bold", bandInk, { charSpacing: 0.5 });
     }
     const keylineY = bandTop + bandH + 1.5;
     p.rule(LX, keylineY, LW, 2.5, theme.colors.accent);
@@ -722,12 +751,32 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
   // Row 2 — primary vehicle identity with a deliberate identification block.
   // The model name never truncates: the size steps down (to a floor) to fit.
   const modelTop = y + 33;
-  const primary = [v.year > 0 ? String(v.year) : "", v.make, v.model].filter(Boolean).join(" ").toUpperCase();
-  let primarySize = 21;
-  while (primarySize > 14 && measureText(primary, "bold", primarySize) > LW * 0.55) primarySize -= 0.5;
-  p.text(ellipsize(primary, "bold", primarySize, LW * 0.55), LX, modelTop + 20, primarySize, "bold", BLACK);
+  const headPrefix = [v.year > 0 ? String(v.year) : "", v.make].filter(Boolean).join(" ").toUpperCase();
+  const headModel = String(v.model || "").toUpperCase();
+  const primary = [headPrefix, headModel].filter(Boolean).join(" ");
+  const headMax = LW * 0.55;
+  const fitHead = (text: string, from: number, floor: number): number => {
+    let size = from;
+    while (size > floor && measureText(text, "bold", size) > headMax) size -= 0.5;
+    return size;
+  };
+  let primarySize = fitHead(primary, 21, 14);
+  let trimTop = modelTop + 34;
+  if (measureText(primary, "bold", primarySize) <= headMax || !headModel) {
+    p.text(primary, LX, modelTop + 20, primarySize, "bold", BLACK);
+  } else {
+    // The model gets its own line rather than an ellipsis — the name of the
+    // vehicle the document describes is never partially printed.
+    const prefixSize = fitHead(headPrefix, 11, 7);
+    primarySize = fitHead(headModel, 19, 10);
+    p.text(headPrefix, LX, modelTop + 10, prefixSize, "bold", BLACK, { charSpacing: 0.4 });
+    p.text(headModel, LX, modelTop + 26, primarySize, "bold", BLACK);
+    trimTop = modelTop + 38;
+  }
   if (v.trim) {
-    p.text(ellipsize(v.trim.toUpperCase(), "bold", 11, LW * 0.5), LX, modelTop + 34, 11, "bold", BLACK, { charSpacing: 0.6 });
+    let trimSize = 11;
+    while (trimSize > 7 && measureText(v.trim.toUpperCase(), "bold", trimSize) > LW * 0.5) trimSize -= 0.5;
+    p.text(v.trim.toUpperCase(), LX, trimTop, trimSize, "bold", BLACK, { charSpacing: 0.6 });
   }
 
   const idX = LX + LW * 0.56;

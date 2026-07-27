@@ -1,0 +1,8 @@
+{
+  "minimum_content": "1p STANDARD 00aaccbd",
+  "maximum_content": "2p CONTINUATION_REQUIRED 6f80a1c7",
+  "option_heavy": "2p CONTINUATION_REQUIRED 9613ce0d",
+  "long_model_trim": "1p STANDARD 7debf47c",
+  "long_package_name": "1p STANDARD 0bd0e384",
+  "electrified": "2p CONTINUATION_REQUIRED 4084e09b"
+}
