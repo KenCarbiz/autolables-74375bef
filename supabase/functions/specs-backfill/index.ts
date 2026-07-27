@@ -20,12 +20,21 @@ async function run(depth: number) {
   const deadline = Date.now() + BUDGET_MS;
   let decoded = 0, failed = 0;
   while (Date.now() < deadline) {
-    // Published vehicles whose equipment never decoded (options is null/absent).
+    // Published vehicles that still need a decode. Two populations qualify:
+    // those that never decoded at all, and those holding a GENERIC sheet that
+    // was never asked for its own build — every sheet decoded before the
+    // strict-first request shipped is generic, so selecting only on "no build
+    // sheet" would leave them permanently stuck on typical-for-trim data with
+    // no real MSRP. `specs_strict_attempted` drops a VIN out of this set once
+    // it has been asked properly, so the retry happens once, not every sweep.
     const { data: rows } = await admin
       .from("vehicle_listings")
       .select("tenant_id, vin, mc_attributes")
       .eq("status", "published")
-      .is("mc_attributes->>build_sheet", null)
+      .or([
+        "mc_attributes->>build_sheet.is.null",
+        "and(mc_attributes->build_sheet->>generic.eq.true,mc_attributes->>specs_strict_attempted.is.null)",
+      ].join(","))
       .limit(4);
     // Same rule the nightly sweep uses. This path used to select purely on
     // "options is null" and ignore the attempt cap, so a VIN the provider

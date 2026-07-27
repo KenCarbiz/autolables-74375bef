@@ -254,11 +254,19 @@ Deno.serve(async (req) => {
   // actually has options/features; otherwise keep it as a fallback and try the
   // next endpoint, settling for the specs-only payload only if nothing better answers.
   const endpoints = specEndpoints(vin);
+  // Whether this VIN was actually asked for its OWN build. A timeout is not
+  // an answer, so it does not count — otherwise a slow call would retire the
+  // VIN to the generic fallback permanently.
+  let strictAttempted = false;
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];
+    const isNeovin = url.includes("/neovin/");
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(i === 0 ? 30000 : 12000) });
+      // Both NeoVIN calls are the slow, heavy ones; only the basic decoder
+      // fallbacks get the short timeout.
+      const res = await fetch(url, { signal: AbortSignal.timeout(isNeovin ? 30000 : 12000) });
       tried.push({ url: redact(url), status: res.status });
+      if (i === 0) strictAttempted = true;
       if (!res.ok) continue;
       const data = await res.json().catch(() => null);
       if (data == null) continue;
@@ -350,6 +358,10 @@ Deno.serve(async (req) => {
           // Records which decoder answered, so a generic match is never later
           // mistaken for manufacturer build data.
           ...(neovinAnswered ? { specs_source: "neovin" } : {}),
+          // Records that this VIN was asked for its own build. Without it a
+          // generic sheet would be re-decoded on every sweep forever; with
+          // it, the retry happens exactly once.
+          ...(strictAttempted ? { specs_strict_attempted: true } : {}),
           specs_decoded_at: new Date().toISOString(),
         };
         await admin.from("vehicle_listings").update({ mc_attributes: merged }).eq("id", row.id);
