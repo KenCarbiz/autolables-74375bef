@@ -185,21 +185,23 @@ describe("sticker eligibility", () => {
     expect(r.requiresReproductionDisclosure).toBe(true);
   });
 
-  it("keeps used inventory in the Used Car Sticker workflow by default", () => {
-    const r = evaluateStickerEligibility({ condition: "used", ...complete });
-    expect(r.eligible).toBe(false);
-    expect(r.status).toBe("ineligible_used");
-    const cpo = evaluateStickerEligibility({ condition: "cpo", ...complete });
-    expect(cpo.eligible).toBe(false);
+  it("permits a supplemental used or CPO reproduction by default", () => {
+    for (const condition of ["used", "cpo"]) {
+      const r = evaluateStickerEligibility({ condition, ...complete });
+      expect(r.eligible, condition).toBe(true);
+      expect(r.status, condition).toBe("eligible_used_reproduction");
+      // Supplemental never means undisclosed.
+      expect(r.requiresReproductionDisclosure, condition).toBe(true);
+    }
   });
 
-  it("permits a used reproduction only on an explicit tenant opt-in", () => {
+  it("honours a dealership switching used reproductions off", () => {
     const r = evaluateStickerEligibility({
-      condition: "used", settings: { used_reproduction: true }, ...complete,
+      condition: "used", settings: { used_reproduction: false }, ...complete,
     });
-    expect(r.eligible).toBe(true);
-    expect(r.status).toBe("eligible_used_reproduction");
-    expect(r.requiresReproductionDisclosure).toBe(true);
+    expect(r.eligible).toBe(false);
+    expect(r.status).toBe("ineligible_used");
+    expect(r.reasons.join(" ")).toContain("turned off");
   });
 
   it("blocks when trusted sources disagree on condition", () => {

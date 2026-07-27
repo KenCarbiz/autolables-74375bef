@@ -512,12 +512,22 @@ export default function FactoryStickerWorkspace({
     };
   }, [fixture, model, renderInput]);
 
-  const act = async (action: "approve_publish" | "unpublish" | "regenerate" | "orchestrate") => {
+  const act = async (
+    action: "approve_publish" | "unpublish" | "regenerate" | "orchestrate",
+    opts: { allowSourceFetch?: boolean } = {},
+  ) => {
     if (fixture || !vehicle?.tenant_id || !vehicleId) return;
     setBusy(action);
     try {
       const { data, error } = await supabase.functions.invoke("factory-sticker-orchestrate", {
-        body: { action, tenant_id: vehicle.tenant_id, vehicle_id: vehicleId, app_base: window.location.origin },
+        body: {
+          action, tenant_id: vehicle.tenant_id, vehicle_id: vehicleId,
+          app_base: window.location.origin,
+          // Retrieving provider data for a vehicle that has none is the one
+          // case where generation must reach outside saved data, so it is
+          // asked for explicitly rather than happening by surprise.
+          ...(opts.allowSourceFetch ? { allow_source_fetch: true } : {}),
+        },
       });
       const payload = (data || {}) as { success?: boolean; error?: string; status?: string };
       if (error || payload.success !== true) {
@@ -541,6 +551,10 @@ export default function FactoryStickerWorkspace({
   const data = renderInput?.data ?? null;
   const mc = (vehicle?.mc_attributes || {}) as Record<string, unknown>;
   const buildSheet = mc.build_sheet as Record<string, unknown> | undefined;
+  // The vehicle exists but its factory equipment breakout was never
+  // retrieved. Rebuilding from saved data cannot fix that — the studio has
+  // to offer to go and get it.
+  const needsSourceData = !fixture && !!vehicle && !buildSheet;
   const stockNo = (mc.stock_no as string)
     || ((vehicle?.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string)
     || null;
@@ -827,23 +841,40 @@ export default function FactoryStickerWorkspace({
               <div className="rounded-lg border border-dashed border-border bg-muted/20 aspect-[792/612] flex flex-col items-center justify-center gap-2 text-center p-6">
                 <FileText className="w-8 h-8 text-muted-foreground/50" />
                 <p className="text-xs font-semibold text-foreground">
-                  {record ? "No normalized build data on this record yet." : "No factory sticker record for this vehicle yet."}
+                  {needsSourceData
+                    ? "This vehicle has no saved build data yet."
+                    : record ? "No normalized build data on this record yet." : "No factory sticker record for this vehicle yet."}
                 </p>
                 <p className="text-[11px] text-muted-foreground max-w-sm">
-                  {record
-                    ? "The preview appears once the pipeline has normalized the saved NeoVIN build sheet. Regenerate to run it now."
-                    : "Generate one from the saved factory build data for this VIN."}
+                  {needsSourceData
+                    ? "The inventory feed brought in the vehicle but not its factory equipment breakout. Retrieving it decodes the VIN with the provider — this may incur a provider charge."
+                    : record
+                      ? "The preview appears once the pipeline has normalized the saved build sheet. Regenerate to run it now."
+                      : "Generate one from the saved factory build data for this VIN."}
                 </p>
                 {manager && (
-                  <button
-                    type="button"
-                    onClick={() => act(record ? "regenerate" : "orchestrate")}
-                    disabled={!!busy}
-                    className="mt-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50"
-                  >
-                    {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                    Generate now
-                  </button>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap justify-center">
+                    <button
+                      type="button"
+                      onClick={() => act(record ? "regenerate" : "orchestrate")}
+                      disabled={!!busy}
+                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted/40 disabled:opacity-50"
+                    >
+                      {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      Build from saved data
+                    </button>
+                    {needsSourceData && (
+                      <button
+                        type="button"
+                        onClick={() => act("orchestrate", { allowSourceFetch: true })}
+                        disabled={!!busy}
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50"
+                      >
+                        {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                        Retrieve vehicle data &amp; generate
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}

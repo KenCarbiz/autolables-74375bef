@@ -4,9 +4,10 @@
 // Separate from template selection on purpose. Selection answers "which
 // design", eligibility answers "should any customer-facing manufacturer
 // document exist for this record". A new vehicle with a registered
-// template is eligible; a used vehicle is not, unless the dealer has
-// explicitly turned on manufacturer-style reproductions for used
-// inventory and the record carries enough VIN-specific manufacturer data.
+// template is eligible; a used or CPO vehicle gets a SUPPLEMENTAL
+// reproduction when the record carries enough VIN-specific manufacturer
+// data, always disclosed as a reproduction and never in place of the FTC
+// Buyers Guide, the Used Car Sticker or any other required disclosure.
 
 export type VehicleConditionClass = "new" | "used" | "cpo" | "unknown";
 
@@ -125,18 +126,20 @@ export function evaluateStickerEligibility(
     };
   }
 
-  // Used and CPO stay in the Used Car Sticker workflow unless the dealer
-  // has explicitly opted into manufacturer-style reproductions. The
-  // reproduction never replaces the Buyers Guide or any other required
-  // compliance document — it is an additional, clearly disclosed record.
-  if (input.settings?.used_reproduction !== true) {
+  // A used or CPO reproduction is supplemental original-equipment history:
+  // permitted by default when the data supports it, always carrying the
+  // reproduction disclosure, and never replacing the FTC Buyers Guide, the
+  // Used Car Sticker or any other required disclosure. A dealership can
+  // switch it off, but the absence of an opt-in is not a reason to withhold
+  // a document the vehicle qualifies for.
+  if (input.settings?.used_reproduction === false) {
     return {
       eligible: false,
       status: "ineligible_used",
       conditionClass,
       requiresReproductionDisclosure: true,
       reasons: [
-        "used inventory stays in the Used Car Sticker workflow until the dealership enables manufacturer-style reproductions",
+        "this dealership has turned off manufacturer-style reproductions for used and CPO inventory",
       ],
       blockerCode: null,
     };

@@ -34,6 +34,7 @@ import {
   selectOemTemplate, validatePageGeometry, evaluateStickerEligibility,
   listCompatibleTemplates, validateTemplateOverride, checkRenderedCompleteness,
 } from "../_shared/factorySticker/render.ts";
+import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -304,11 +305,38 @@ async function recordAssets(
   }
 }
 
+
+// Year + make from the trusted vehicle record, for the case where the
+// pipeline has not normalized yet. The listing's own year/make/model come
+// from the structured inventory feed, not from dealer prose, so they are a
+// legitimate selector — and without this the studio can only ever offer the
+// neutral template on a vehicle whose build sheet has not arrived.
+async function identityFromListing(
+  admin: Admin, tenantId: string, vehicleId: string,
+): Promise<{ make: string | null; year: number | null }> {
+  const { data } = await admin.from("vehicle_listings")
+    .select("ymm, mc_attributes").eq("tenant_id", tenantId).eq("id", vehicleId).maybeSingle();
+  const row = (data || {}) as { ymm?: string | null; mc_attributes?: Record<string, unknown> | null };
+  const mc = (row.mc_attributes || {}) as Record<string, unknown>;
+  const mcMake = typeof mc.make === "string" ? mc.make : null;
+  const mcYear = Number(mc.year);
+  const parsed = parseYmm(row.ymm);
+  const year = Number(parsed.year);
+  return {
+    make: mcMake || parsed.make || null,
+    year: Number.isFinite(mcYear) && mcYear > 1900
+      ? mcYear
+      : (Number.isFinite(year) && year > 1900 ? year : null),
+  };
+}
+
 // ── The pipeline for a single vehicle ────────────────────────────────
 async function orchestrateVehicle(
   admin: Admin, req: Request, tenantId: string, vehicleId: string,
   opts: {
     force?: boolean; reason?: string; appBase?: string;
+    /** Permission-gated: retrieve provider data when none is saved. */
+    allowSourceFetch?: boolean;
     regeneration?: {
       reasonCode: string; reasonNotes: string | null;
       dataSource: "reuse" | "refresh"; userId: string | null;
@@ -373,13 +401,54 @@ async function orchestrateVehicle(
   }
 
   try {
-    // ── Load SAVED data only. No provider calls, ever.
-    const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
-    const sheet = (mc.build_sheet || null) as Record<string, unknown> | null;
+    // ── Load SAVED data. The nightly path never calls a provider; an
+    // operator pressing Generate on a vehicle that has no build sheet is
+    // the one case where fetching is the only way forward, and that is an
+    // explicit, permissioned, audited request rather than an implicit one.
+    let mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+    let sheet = (mc.build_sheet || null) as Record<string, unknown> | null;
+    if (!sheet && opts.allowSourceFetch) {
+      await setRecord(admin, record.id, { generation_status: "PENDING_DATA", last_error: null });
+      await audit(admin, tenantId, "factory_sticker.source_fetch_requested", record.id,
+        { vin, reason: "no_build_sheet", user_id: opts.regeneration?.userId ?? null });
+      let fetchDetail: string | null = null;
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/marketcheck-specs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({ vin, tenant_id: tenantId, vehicle_id: vehicleId }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        fetchDetail = res.ok && payload?.ok !== false ? null : String(payload?.error || `http_${res.status}`);
+      } catch (e) {
+        fetchDetail = String((e as Error)?.message || e).slice(0, 200);
+      }
+      await audit(admin, tenantId, "factory_sticker.source_fetch_completed", record.id,
+        { vin, ok: fetchDetail === null, detail: fetchDetail });
+      // Re-read: marketcheck-specs writes the decode back onto the listing.
+      const { data: refreshed } = await admin.from("vehicle_listings")
+        .select("mc_attributes").eq("id", vehicleId).maybeSingle();
+      mc = ((refreshed as { mc_attributes?: Record<string, unknown> } | null)?.mc_attributes || {}) as Record<string, unknown>;
+      sheet = (mc.build_sheet || null) as Record<string, unknown> | null;
+      if (!sheet) {
+        const reason = fetchDetail
+          ? `source_fetch_failed: ${fetchDetail}`
+          : "source_fetch_returned_no_build_sheet: the provider had no equipment breakout for this VIN";
+        await setRecord(admin, record.id, {
+          generation_status: "PENDING_DATA", last_error: reason,
+          review_required: true, review_reason: reason,
+        });
+        return {
+          vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA",
+          skipped: "no_build_sheet", source_fetch: { ok: false, detail: fetchDetail },
+        };
+      }
+      listing.mc_attributes = mc;
+    }
     if (!sheet) {
       await setRecord(admin, record.id, {
         generation_status: "PENDING_DATA",
-        last_error: "awaiting_build_sheet: no saved NeoVIN build sheet on this listing yet",
+        last_error: "awaiting_build_sheet: no saved NeoVIN build sheet on this listing yet. Use Generate to retrieve it.",
       });
       return { vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA", skipped: "no_build_sheet" };
     }
@@ -924,8 +993,16 @@ serve(async (req) => {
         }
       }
 
+      // Fetching provider data is opt-in per request and needs the same
+      // permission a refresh does. The nightly sweep never sets it.
+      const allowSourceFetch = body.allow_source_fetch === true
+        || (action === "regenerate" && dataSource === "refresh");
+      if (allowSourceFetch && !can(tenantId, "refresh_neovin")) {
+        return json({ error: "insufficient_permission", detail: "retrieving provider data needs manager authority" }, 403);
+      }
       const result = await orchestrateVehicle(admin, req, tenantId, vehicleId, {
         force,
+        allowSourceFetch,
         reason: action === "regenerate" ? `manual_regenerate:${reasonCode}` : String(body.reason || "ingest"),
         appBase: body.app_base ? String(body.app_base) : undefined,
         regeneration: action === "regenerate"
@@ -1089,10 +1166,14 @@ serve(async (req) => {
         .select("id, canonical_oem_id, normalized_data_json, qa_metadata")
         .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
       const normalized = (record?.normalized_data_json || {}) as { identity?: { make?: string; year?: string } };
-      const year = Number(normalized.identity?.year);
+      // Fall back to the vehicle record when the pipeline has not normalized
+      // yet, so a vehicle awaiting its build sheet still shows its real brand.
+      const fallback = await identityFromListing(admin, tenantId, vehicleId);
+      const normalizedYear = Number(normalized.identity?.year);
+      const year = Number.isFinite(normalizedYear) ? normalizedYear : fallback.year;
       const sel = selectOemTemplate({
-        canonicalMake: normalized.identity?.make ?? null,
-        modelYear: Number.isFinite(year) ? year : null,
+        canonicalMake: normalized.identity?.make ?? fallback.make,
+        modelYear: year ?? null,
       });
       const meta = (record?.qa_metadata || {}) as Record<string, unknown>;
       return json({
@@ -1100,7 +1181,8 @@ serve(async (req) => {
         canonical_make: sel.canonicalMake,
         automatic_template_key: sel.templateKey,
         current_override: (meta.template_override as Record<string, unknown> | undefined) ?? null,
-        options: listCompatibleTemplates(sel.canonicalMake, Number.isFinite(year) ? year : null),
+        options: listCompatibleTemplates(sel.canonicalMake, year ?? null),
+        resolved_from: normalized.identity?.make ? "normalized_data" : "vehicle_record",
       });
     }
 
@@ -1114,9 +1196,13 @@ serve(async (req) => {
         .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
       if (!record) return json({ error: "record_not_found" }, 404);
       const normalized = (record.normalized_data_json || {}) as { identity?: { make?: string; year?: string } };
-      const year = Number(normalized.identity?.year);
-      const modelYear = Number.isFinite(year) ? year : null;
-      const sel = selectOemTemplate({ canonicalMake: normalized.identity?.make ?? null, modelYear });
+      const fallbackIdentity = await identityFromListing(admin, tenantId, vehicleId);
+      const normalizedYear = Number(normalized.identity?.year);
+      const modelYear = Number.isFinite(normalizedYear) ? normalizedYear : fallbackIdentity.year;
+      const sel = selectOemTemplate({
+        canonicalMake: normalized.identity?.make ?? fallbackIdentity.make,
+        modelYear,
+      });
       // The canonical make governs, never the operator's pick: a request
       // for another manufacturer's template is refused here, server-side,
       // regardless of what the UI offered.

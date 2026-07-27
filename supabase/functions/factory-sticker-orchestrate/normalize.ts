@@ -4,6 +4,7 @@
 // on vehicle_listings (mc_attributes.build_sheet, epa_economy) and
 // dealer_profiles.settings. It performs NO provider calls and invents no
 // facts: missing fields stay null and lower the confidence grade.
+import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 
 import type { FactoryStickerRenderData } from "../_shared/factorySticker/render.ts";
 
@@ -56,11 +57,14 @@ export function normalizeForSticker(
   const condition: "new" | "used" | "cpo" =
     condRaw === "new" ? "new" : (condRaw === "cpo" || condRaw === "certified") ? "cpo" : "used";
 
-  const ymmParts = String(listing.ymm || "").trim().split(/\s+/);
+  // vehicle_listings has no make/model columns — identity comes out of the
+  // free-text ymm. parseYmm knows the multi-word brands; a positional split
+  // turned "Land Rover Defender" into make "Land" and lost the template.
+  const parsed = parseYmm(listing.ymm as string | null | undefined);
   const identity = {
-    year: ymmParts[0] || "",
-    make: ymmParts[1] || "",
-    model: ymmParts.slice(2).join(" ") || "",
+    year: parsed.year,
+    make: parsed.make,
+    model: parsed.model,
     trim: str(listing.trim),
   };
   if (!identity.year || !identity.make || !identity.model) missing.push("identity");
