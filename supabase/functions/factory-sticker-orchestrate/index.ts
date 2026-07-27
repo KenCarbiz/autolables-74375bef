@@ -30,6 +30,7 @@ import { normalizeForSticker } from "./normalize.ts";
 import {
   renderFactorySticker, FACTORY_STICKER_RENDERER_VERSION,
   type FactoryStickerRenderResult, type FactoryStickerTheme,
+  resolveRenderProfile,
 } from "../_shared/factorySticker/render.ts";
 
 const cors = {
@@ -44,9 +45,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
 
 const BUCKET = "vehicle-docs";
-const TEMPLATE_FAMILY_ID = "factory-sticker-standard";
 const TEMPLATE_VERSION = "1.0.0";
-const OEM_THEME_VERSION = "1";
 const MAX_RETRYABLE_ATTEMPTS = 3;
 
 const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
@@ -134,7 +133,7 @@ async function loadOrCreateRecord(admin: Admin, tenantId: string, vehicleId: str
 async function fileStickerDocument(
   admin: Admin, tenantId: string, vehicleId: string, vin: string,
   pdfBytes: Uint8Array, previewSvg: string, snapExtra: Record<string, unknown>,
-  publish: boolean,
+  publish: boolean, profileFamily: string,
 ): Promise<{ documentId: string | null; version: number; pdfUrl: string; previewUrl: string | null }> {
   const hash = await sha256Hex(pdfBytes);
 
@@ -202,7 +201,7 @@ async function fileStickerDocument(
   }
 
   const { data: inserted, error: insErr } = await admin.from("generated_documents").insert({
-    tenant_id: tenantId, vehicle_id: vehicleId, template_id: TEMPLATE_FAMILY_ID,
+    tenant_id: tenantId, vehicle_id: vehicleId, template_id: profileFamily,
     document_type: "factory_sticker", document_status: targetStatus, version: nextVersion,
     template_version: 1, online_url: url, pdf_url: url, data_snapshot: snap,
     ...(publish ? { published_at: new Date().toISOString() } : {}),
@@ -309,14 +308,18 @@ async function orchestrateVehicle(
     await audit(admin, tenantId, "factory_sticker.normalized", record.id,
       { vin, confidence: normalized.confidence, missing: normalized.missing });
 
-    // ── OEM resolution (theme identity; the renderer maps the id to a theme)
+    // ── OEM resolution: model-year-aware versioned theme profile. The
+    // profile pins the visual identity for this brand + model year so
+    // regenerating older documents never adopts a future brand identity.
     const make = normalized.data.identity.make;
     const canonicalOemId = make ? make.toLowerCase().replace(/[^a-z0-9]+/g, "-") : null;
+    const profile = resolveRenderProfile(normalized.data);
+    const profileFamily = profile.profile.layoutFamily;
     const theme: FactoryStickerTheme = {
       oemThemeId: canonicalOemId ? `oem-${canonicalOemId}` : "oem-neutral",
-      oemThemeVersion: OEM_THEME_VERSION,
+      oemThemeVersion: profile.profile.themeVersion,
       canonicalOemId,
-      templateFamilyId: TEMPLATE_FAMILY_ID,
+      templateFamilyId: profile.profile.layoutFamily,
       templateVersion: TEMPLATE_VERSION,
       logoAssetId: String(dealerSettings.dealer_logo_url ?? dealerSettings.logo_url ?? "").trim() || null,
       logoAssetVersion: null,
@@ -357,7 +360,7 @@ async function orchestrateVehicle(
     // ── Fingerprint: stable inputs + every version knob + the passport URL.
     const fingerprint = await sha256Hex(JSON.stringify({
       data: normalized.data,
-      template_family_id: TEMPLATE_FAMILY_ID,
+      template_family_id: profileFamily,
       template_version: TEMPLATE_VERSION,
       renderer_version: FACTORY_STICKER_RENDERER_VERSION,
       oem_theme_id: theme.oemThemeId,
@@ -383,7 +386,7 @@ async function orchestrateVehicle(
       oem_resolution_confidence: canonicalOemId ? "EXACT" : "UNKNOWN",
       oem_theme_id: theme.oemThemeId,
       oem_theme_version: theme.oemThemeVersion,
-      template_family_id: TEMPLATE_FAMILY_ID,
+      template_family_id: profileFamily,
       template_version: TEMPLATE_VERSION,
       renderer_version: FACTORY_STICKER_RENDERER_VERSION,
       logo_asset_id: theme.logoAssetId,
@@ -456,12 +459,12 @@ async function orchestrateVehicle(
     const filed = await fileStickerDocument(admin, tenantId, vehicleId, vin,
       rendered.pdfBytes, rendered.previewSvg, {
         title, condition: normalized.data.condition, vin,
-        template_family_id: TEMPLATE_FAMILY_ID, template_version: TEMPLATE_VERSION,
+        template_family_id: profileFamily, template_version: TEMPLATE_VERSION,
         renderer_version: FACTORY_STICKER_RENDERER_VERSION,
         oem_theme_id: theme.oemThemeId, generation_fingerprint: fingerprint,
         reconciliation_status: reconciliationStatus, confidence_level: normalized.confidence,
         ...(oemOriginalUrl ? { oem_original_url: oemOriginalUrl } : {}),
-      }, autoPublish);
+      }, autoPublish, profileFamily);
 
     await audit(admin, tenantId, "factory_sticker.generated", record.id,
       { vin, document_id: filed.documentId, version: filed.version, auto_publish: autoPublish });

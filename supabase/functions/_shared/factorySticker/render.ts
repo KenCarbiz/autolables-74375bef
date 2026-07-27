@@ -16,6 +16,7 @@
 import * as pdfLib from "https://esm.sh/pdf-lib@1.17.1";
 import {
   RENDERER_VERSION,
+  resolveRenderProfile,
   runRenderPipeline,
 } from "../../../../src/lib/factorySticker/render/contract.ts";
 import type {
@@ -34,6 +35,7 @@ export type {
 // Bumped on every layout-affecting change; part of the generation
 // fingerprint, so a bump regenerates stale stickers.
 export const FACTORY_STICKER_RENDERER_VERSION = RENDERER_VERSION;
+export { resolveRenderProfile };
 
 export async function renderFactorySticker(
   data: FactoryStickerRenderData,

@@ -13,7 +13,9 @@ import {
   genericDecodeFixture,
   infinitiBenchmark,
   longEquipmentFixture,
+  evFixture,
   newConditionBenchmark,
+  nissanBenchmark,
   noEpaFixture,
   themeFor,
 } from "@/lib/factorySticker/render/__fixtures__/renderData.ts";
@@ -138,6 +140,8 @@ const FIXTURE_SCENARIOS = {
   new: { label: "New vehicle", data: newConditionBenchmark },
   generic: { label: "Generic decode", data: genericDecodeFixture },
   twopage: { label: "Two-page overflow", data: longEquipmentFixture },
+  nissan: { label: "Nissan profile", data: nissanBenchmark },
+  ev: { label: "EV (Ariya)", data: evFixture },
   noepa: { label: "Missing EPA", data: noEpaFixture },
   msrpvar: {
     label: "MSRP discrepancy",

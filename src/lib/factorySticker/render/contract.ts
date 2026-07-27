@@ -17,6 +17,7 @@ import type {
 } from "../types.ts";
 import { resolveOem } from "../oem/identity.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
+import { resolveThemeProfile, type ResolvedThemeProfile } from "../oem/profiles.ts";
 import { buildStickerLayout, type LayoutModel, type StickerLayoutInput } from "./layout.ts";
 import { realizePdf, type PdfLibModule } from "./toPdf.ts";
 import { layoutToSvg } from "./previewSvg.ts";
@@ -240,6 +241,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("annualFuelCost", d.epa.annualFuelCost),
             ...opt("greenhouseGasRating", d.epa.ghgScore),
             ...opt("smogRating", d.epa.smogScore ?? null),
+            ...opt("evRangeMiles", d.epa.rangeMiles),
             ...opt("gallonsPer100Miles", d.epa.gallonsPer100Miles ?? null),
             ...opt("fiveYearCostDifference", d.epa.fiveYearCostDifference ?? null),
             ...opt("epaClassNote", d.epa.classNote ?? null),
@@ -316,6 +318,16 @@ export function resolveRenderTheme(
     return getTheme(theme.canonicalOemId.toUpperCase().replace(/-/g, "_"));
   }
   return getTheme("AUTOLABELS_FALLBACK");
+}
+
+/**
+ * Model-year-aware profile resolution for the orchestrator: make + model
+ * year select a versioned OEM theme profile, so regenerating an older
+ * document never silently adopts a future brand identity.
+ */
+export function resolveRenderProfile(data: FactoryStickerRenderData): ResolvedThemeProfile {
+  const year = Number(data.identity.year);
+  return resolveThemeProfile(data.identity.make, Number.isFinite(year) ? year : null);
 }
 
 export function buildRenderLayout(

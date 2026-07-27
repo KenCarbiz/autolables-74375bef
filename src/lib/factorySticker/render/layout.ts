@@ -299,6 +299,39 @@ const SECTION_GAP = 5;
 const BLACK = "#0d0d0d";
 const EPA_TAG_BLUE = "#b7d9f1";
 
+// ── Layout families ───────────────────────────────────────────────────
+// Behavioral differences per family — one engine, several controlled
+// presentations. Families change composition; they never change data,
+// arithmetic, machine-readables, or publication behavior.
+
+interface FamilyStyle {
+  /** WORDMARK_RULE: black wordmark on white over a heavy rule (premium).
+   *  BANDED: filled manufacturer band with reversed wordmark + accent keyline. */
+  headerComposition: "WORDMARK_RULE" | "BANDED";
+  /** Filled bar behind equipment category headings (mainstream/utility). */
+  sectionHeadingBar: boolean;
+  /** Brand-accent keyline under the header band and above the total band. */
+  accentKeyline: boolean;
+  equipmentColumns: number;
+}
+
+const FAMILY_STYLES: Record<string, FamilyStyle> = {
+  PREMIUM_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: false, equipmentColumns: 3 },
+  MODERN_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: false, equipmentColumns: 3 },
+  EUROPEAN_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: true, equipmentColumns: 3 },
+  JAPANESE_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 3 },
+  KOREAN_MODERN: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 3 },
+  AMERICAN_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 2 },
+  PERFORMANCE: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 3 },
+  COMMERCIAL: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 3 },
+  EV_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: true, equipmentColumns: 3 },
+  AUTOLABELS_FALLBACK: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: false, equipmentColumns: 3 },
+};
+
+function familyStyle(theme: OemStickerTheme): FamilyStyle {
+  return FAMILY_STYLES[theme.templateFamilyId] ?? FAMILY_STYLES.AUTOLABELS_FALLBACK;
+}
+
 class Painter {
   primitives: LayoutPrimitive[] = [];
   constructor(private drawn: string[] | null) {}
@@ -489,28 +522,54 @@ function paintTopStrip(p: Painter, ctx: BuildContext): number {
 function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
   const { theme, input } = ctx;
   const v = input.data.vehicle;
+  const style = familyStyle(theme);
 
-  // Row 1 — manufacturer wordmark (dominant) with the document title block
-  // right-aligned beside it.
-  const wordmarkSize = 26;
-  const spacing = Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * wordmarkSize, wordmarkSize * 0.3);
-  p.text(theme.logo.wordmarkText, LX, y + 27, wordmarkSize, "heading", BLACK, {
-    charSpacing: spacing,
-  });
+  // Row 1 — manufacturer identity with the document title block beside it.
+  // Premium families run the wordmark dark on white over a heavy rule;
+  // mainstream/utility families reverse it out of a manufacturer band with
+  // a brand-accent keyline.
+  const banded = style.headerComposition === "BANDED";
+  const wordmarkSize = banded ? 20 : 26;
+  const spacing = Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * wordmarkSize, wordmarkSize * (banded ? 0.18 : 0.3));
   const bx = LX + LW;
-  p.text(input.title.toUpperCase(), bx, y + 16, 8.5, "bold", BLACK, { align: "right" });
-  const subtitle = v.condition === "NEW"
-    ? "FACTORY CONFIGURATION & MSRP"
-    : "VIN-SPECIFIC FACTORY CONFIGURATION WHEN NEW";
-  p.text(subtitle, bx, y + 25, 6, "body", BLACK, { align: "right" });
-  if (ctx.input.generic) {
-    p.text("TYPICAL FACTORY CONFIGURATION FOR THIS TRIM - NOT VIN-SPECIFIC", bx, y + 33.5, 5.5, "bold", "#7a5c10", { align: "right" });
+  if (banded) {
+    const bandH = 30;
+    p.rect(LX, y + 1, LW, bandH, theme.colors.headerBackground);
+    if (style.accentKeyline) {
+      p.rule(LX, y + 1 + bandH, LW, 2.2, theme.colors.accent);
+    }
+    p.text(theme.logo.wordmarkText, LX + 8, y + 22, wordmarkSize, "heading", theme.colors.headerText, {
+      charSpacing: spacing,
+    });
+    p.text(input.title.toUpperCase(), bx - 8, y + 14.5, 7.5, "bold", theme.colors.headerText, { align: "right" });
+    const subtitleB = v.condition === "NEW"
+      ? "FACTORY CONFIGURATION & MSRP"
+      : "VIN-SPECIFIC FACTORY CONFIGURATION WHEN NEW";
+    p.text(subtitleB, bx - 8, y + 23.5, 5.5, "body", theme.colors.headerText, { align: "right" });
+    if (ctx.input.generic) {
+      p.text("TYPICAL FACTORY CONFIGURATION FOR THIS TRIM - NOT VIN-SPECIFIC", bx, y + 40.5, 5.5, "bold", "#7a5c10", { align: "right" });
+    }
+  } else {
+    p.text(theme.logo.wordmarkText, LX, y + 27, wordmarkSize, "heading", BLACK, {
+      charSpacing: spacing,
+    });
+    p.text(input.title.toUpperCase(), bx, y + 16, 8.5, "bold", BLACK, { align: "right" });
+    const subtitle = v.condition === "NEW"
+      ? "FACTORY CONFIGURATION & MSRP"
+      : "VIN-SPECIFIC FACTORY CONFIGURATION WHEN NEW";
+    p.text(subtitle, bx, y + 25, 6, "body", BLACK, { align: "right" });
+    if (ctx.input.generic) {
+      p.text("TYPICAL FACTORY CONFIGURATION FOR THIS TRIM - NOT VIN-SPECIFIC", bx, y + 33.5, 5.5, "bold", "#7a5c10", { align: "right" });
+    }
   }
 
   // Row 2 — primary vehicle identity with a deliberate identification block.
+  // The model name never truncates: the size steps down (to a floor) to fit.
   const modelTop = y + 33;
   const primary = [v.year > 0 ? String(v.year) : "", v.make, v.model].filter(Boolean).join(" ").toUpperCase();
-  p.text(ellipsize(primary, "bold", 21, LW * 0.55), LX, modelTop + 20, 21, "bold", BLACK);
+  let primarySize = 21;
+  while (primarySize > 14 && measureText(primary, "bold", primarySize) > LW * 0.55) primarySize -= 0.5;
+  p.text(ellipsize(primary, "bold", primarySize, LW * 0.55), LX, modelTop + 20, primarySize, "bold", BLACK);
   if (v.trim) {
     p.text(ellipsize(v.trim.toUpperCase(), "bold", 11, LW * 0.5), LX, modelTop + 34, 11, "bold", BLACK, { charSpacing: 0.6 });
   }
@@ -541,7 +600,7 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
   });
 
   const ruleY = modelTop + 34;
-  p.rule(LX, ruleY, LW, 2, BLACK);
+  p.rule(LX, ruleY, LW, 2, banded ? theme.colors.headerBackground : BLACK);
   return ruleY + 5;
 }
 
@@ -598,7 +657,7 @@ function paintStandardEquipment(
 ): { yEnd: number; leftover: FlowEntry[] } {
   const { density } = ctx;
   const gap = 13;
-  const columns = 3;
+  const columns = familyStyle(ctx.theme).equipmentColumns;
   const colW = (LW - gap * (columns - 1)) / columns;
   const entries = equipmentEntries(ctx, colW);
   if (!entries.length) return { yEnd: y, leftover: [] };
@@ -648,8 +707,10 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   // whose value is already inside Base MSRP is labeled so the visible rows
   // can never read as double-counted against the reconciliation.
   let ly = y + 10;
-  p.text("INCLUDED FACTORY PACKAGES", LX, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
-  p.text("(MSRP)", LX + leftW - 2, ly, 6, "body", "#4c5157", { align: "right" });
+  if (input.data.equipment.packages.length) {
+    p.text("INCLUDED FACTORY PACKAGES", LX, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
+    p.text("(MSRP)", LX + leftW - 2, ly, 6, "body", "#4c5157", { align: "right" });
+  }
   ly += 2;
   const pricing0 = input.data.pricing;
   const optTotal = pricing0.factoryInstalledTotal ??
@@ -831,9 +892,10 @@ function paintTotalBand(p: Painter, y: number, ctx: BuildContext): number {
   const condition = input.data.vehicle.condition;
   const label = condition === "NEW" ? "TOTAL FACTORY MSRP" : "TOTAL ORIGINAL MSRP";
   const total = pricing.sourceReportedTotalMsrp ?? pricing.calculatedTotalMsrp;
-  // The total concludes the factory-pricing section: a strong upper rule and
-  // a restrained charcoal band with generous vertical breathing room.
-  p.rule(LX, y, LW, 2, BLACK);
+  // The total concludes the factory-pricing section: a strong upper rule
+  // (brand accent for keyline families) and a restrained band.
+  const style = familyStyle(theme);
+  p.rule(LX, y, LW, 2, style.accentKeyline ? theme.colors.accent : BLACK);
   const bandH = 40;
   const bandTop = y + 2.5;
   p.rect(LX, bandTop, LW, bandH, theme.colors.totalMsrpBackground);
@@ -915,20 +977,25 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   p.rule(RX + 21, boxTop + 4, 0.5, headH - 8, "#8b8f94");
   p.text("Fuel Economy & Environment", RX + 26, boxTop + 13.5, 10, "bold", headerText);
 
+  // Powertrain-aware module: electric vehicles use MPGe/range language and
+  // never inherit gasoline-only structures; hybrids keep the gasoline shape
+  // under a Hybrid Vehicle tag. Only verified fields are drawn.
+  const fuel = (input.data.vehicle.fuelType || "").toLowerCase();
+  const isEv = /electric|\bev\b/.test(fuel) && !/hybrid|phev/.test(fuel);
   const tagW = 70;
   let cy = bodyTop + 12;
   p.text("Fuel Economy", RX + 6, cy, 8.5, "bold", BLACK);
   p.rect(RX + RW - tagW - 5, cy - 8, tagW, 11, EPA_TAG_BLUE);
   p.text(fuelCategoryLabel(input.data.vehicle.fuelType), RX + RW - tagW / 2 - 5, cy, 6.2, "bold", BLACK, { align: "center" });
 
-  // MPG block: number, city/highway, class note.
+  // MPG/MPGe block: number, city/highway, class note.
   const mpgTop = cy + 5;
   const combined = reg.combinedMpg;
   let numW = 0;
   if (combined !== undefined) {
     p.text(String(combined), RX + 6, mpgTop + 24, 27, "bold", BLACK);
     numW = measureText(String(combined), "bold", 27);
-    p.text("MPG", RX + 10 + numW, mpgTop + 12, 10, "bold", BLACK);
+    p.text(isEv ? "MPGe" : "MPG", RX + 10 + numW, mpgTop + 12, 10, "bold", BLACK);
     p.text("combined city/hwy", RX + 6, mpgTop + 31, 5.5, "body", BLACK);
     let colX = RX + 62;
     if (reg.cityMpg !== undefined) {
@@ -940,7 +1007,12 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
       p.text(String(reg.highwayMpg), colX, mpgTop + 24, 9.5, "bold", BLACK);
       p.text("highway", colX, mpgTop + 31, 5.5, "body", BLACK);
     }
-    if (reg.gallonsPer100Miles !== undefined) {
+    if (isEv) {
+      if (input.data.regulatory.evRangeMiles !== undefined) {
+        p.text(String(input.data.regulatory.evRangeMiles), RX + 6, mpgTop + 42, 8, "bold", BLACK);
+        p.text("miles driving range", RX + 9 + measureText(String(input.data.regulatory.evRangeMiles), "bold", 8), mpgTop + 42, 5.5, "body", BLACK);
+      }
+    } else if (reg.gallonsPer100Miles !== undefined) {
       p.text(String(reg.gallonsPer100Miles), RX + 6, mpgTop + 42, 8, "bold", BLACK);
       p.text("gallons per 100 miles", RX + 9 + measureText(String(reg.gallonsPer100Miles), "bold", 8), mpgTop + 42, 5.5, "body", BLACK);
     }
@@ -965,8 +1037,9 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   const costBoxH = 40;
   if (reg.annualFuelCost !== undefined) {
     p.rect(RX + 5, subTop, costBoxW, costBoxH, null, BLACK, 0.9);
-    p.text("Annual fuel", RX + 10, subTop + 12, 8, "body", BLACK);
-    p.text("cost", RX + 10 + measureText("Annual fuel ", "body", 8), subTop + 12, 9, "bold", BLACK);
+    const costLabel = isEv ? "Annual energy" : "Annual fuel";
+    p.text(costLabel, RX + 10, subTop + 12, 8, "body", BLACK);
+    p.text("cost", RX + 10 + measureText(`${costLabel} `, "body", 8), subTop + 12, 9, "bold", BLACK);
     p.text(formatMoney(reg.annualFuelCost).replace(/\.00$/, ""), RX + 10, subTop + 32, 17, "bold", BLACK);
   }
   const sliderX = RX + costBoxW + 15;
@@ -1175,7 +1248,10 @@ function flowColumns(
     }
     if (pendingHeading !== null) {
       cy += density.itemLh + 0.5;
-      p.text(pendingHeading, colX(), cy, density.item + 1, "bold", BLACK, { charSpacing: 0.35 });
+      if (familyStyle(ctx.theme).sectionHeadingBar) {
+        p.rect(colX(), cy - density.item - 1.5, colW, density.item + 4.5, "#e8e9ea");
+      }
+      p.text(pendingHeading, colX() + (familyStyle(ctx.theme).sectionHeadingBar ? 3 : 0), cy, density.item + 1, "bold", BLACK, { charSpacing: 0.35 });
       cy += 3;
       pendingHeading = null;
     }

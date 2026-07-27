@@ -93,6 +93,7 @@ export interface StickerRegulatory {
   fiveYearCostDifference?: number;
   greenhouseGasRating?: number;
   smogRating?: number;
+  evRangeMiles?: number;
   epaClassNote?: string;
   epaSourceReference?: string;
   nhtsaStatus: NhtsaStatus;

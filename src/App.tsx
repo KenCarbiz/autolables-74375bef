@@ -121,6 +121,7 @@ const DevSaturdayPreview = lazy(() => import("./pages/DevSaturdayPreview"));
 const DevConnecticutSmokeTest = lazy(() => import("./pages/DevConnecticutSmokeTest"));
 const DevPrepMobilePreview = lazy(() => import("./pages/DevPrepMobilePreview"));
 const FactoryStickerWorkspace = lazy(() => import("./pages/FactoryStickerWorkspace"));
+const ThemeLab = lazy(() => import("./pages/ThemeLab"));
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -258,6 +259,7 @@ const App = () => (
                       <Route path="/dev/connecticut-smoke-test" element={<DevConnecticutSmokeTest />} />
                       <Route path="/dev/prep-mobile-preview" element={<DevPrepMobilePreview />} />
                       <Route path="/dev/factory-sticker-preview" element={<FactoryStickerWorkspace fixture />} />
+                      <Route path="/dev/theme-lab" element={<ThemeLab />} />
                       <Route path="/q/:token" element={<QrRedirect />} />
 
                       <Route element={<GatedLayout />}>
