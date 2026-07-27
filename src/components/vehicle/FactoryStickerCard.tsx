@@ -11,6 +11,7 @@ import {
 import RegenerateStickerDrawer from "./RegenerateStickerDrawer";
 import StickerVersionHistory from "./StickerVersionHistory";
 import { useWindowSticker } from "@/hooks/useWindowSticker";
+import { promptRegenerationReason } from "@/lib/factorySticker/regenerationReason";
 
 // Factory Build Record card for the Vehicle File's Documents tab. Reads the
 // per-vehicle factory_sticker_records row plus its current generated_documents
