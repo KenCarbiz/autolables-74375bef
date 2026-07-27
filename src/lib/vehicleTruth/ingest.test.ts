@@ -211,3 +211,46 @@ describe("recovering pricing the decoder filed out of reach", () => {
     expect(snapshot.pricing.totalMsrp).toBe(61875);
   });
 });
+
+describe("never inventing a manufacturer price", () => {
+  // Real production data: on the 2019 Q50 JN1FV7AR5KM800521 the feed's
+  // `msrp` field reads 27,887 — the current used-car market figure — while
+  // the vehicle's actual base MSRP was 53,350. Treating the feed value as a
+  // manufacturer price would print a fabricated Base MSRP on a compliance
+  // document.
+  it("does not treat the feed's msrp as a manufacturer base MSRP", () => {
+    const c = candidatesFromListing(listing({
+      mc_attributes: {
+        specs_source: "neovin",
+        msrp: 27887,
+        build_sheet: { source: "neovin", packages: [], options: [] },
+      },
+    }));
+    expect(find(c, "base_msrp")).toEqual([]);
+  });
+
+  it("uses the decoded base MSRP and ignores the feed figure entirely", () => {
+    const c = candidatesFromListing(listing({
+      mc_attributes: {
+        specs_source: "neovin",
+        msrp: 27887,
+        build_sheet: {
+          source: "neovin", packages: [], options: [],
+          pricing: { base_msrp: 53350, destination_charge: 1025, total_msrp: 61875 },
+        },
+      },
+    }));
+    expect(find(c, "base_msrp")[0].value).toBe(53350);
+  });
+
+  it("leaves the sticker's base MSRP unknown rather than guessing it", () => {
+    const { snapshot } = buildVehicleSnapshot("JN1FV7AR5KM800521", candidatesFromListing(listing({
+      mc_attributes: {
+        specs_source: "neovin", msrp: 27887,
+        build_sheet: { source: "neovin", generic: true, packages: [], options: [] },
+      },
+    })));
+    expect(snapshot.pricing.baseMsrp).toBeNull();
+    expect(snapshot.pricing.totalMsrp).toBeNull();
+  });
+});

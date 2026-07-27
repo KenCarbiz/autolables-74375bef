@@ -179,8 +179,14 @@ export function candidatesFromListing(
     const sheetPricing = (sheet.pricing && typeof sheet.pricing === "object"
       ? sheet.pricing
       : {}) as Record<string, unknown>;
+    // Deliberately NOT falling back to `mc.msrp`. That field is the feed's
+    // current asking/market figure, not a manufacturer price: on the real
+    // 2019 Q50 (JN1FV7AR5KM800521) it reads 27,887 while the vehicle's
+    // actual base MSRP was 53,350. Printing the former as "Base MSRP" would
+    // put a fabricated manufacturer price on a compliance document, so an
+    // unknown base MSRP stays unknown.
     push(out, "base_msrp",
-      posNum(mc.base_msrp ?? sheetPricing.base_msrp ?? mc.msrp), sheetSource, confidence, sheetAt, recordId);
+      posNum(mc.base_msrp ?? sheetPricing.base_msrp), sheetSource, confidence, sheetAt, recordId);
     push(out, "destination_charge",
       posNum(mc.delivery_charges ?? mc.destination_charge ?? sheetPricing.destination_charge), sheetSource, confidence, sheetAt, recordId);
     push(out, "total_msrp",

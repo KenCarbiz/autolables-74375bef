@@ -205,7 +205,13 @@ export function normalizeNeovin(input: NormalizeNeovinInput): FactoryStickerData
     : {}) as Record<string, unknown>;
 
   const pricing = reconcileMsrp({
-    baseMsrp: posNum(mc.base_msrp ?? sheetPricing.base_msrp ?? mc.msrp),
+    // `mc.msrp` is deliberately absent here. It is the feed's current
+    // asking/market figure, not a manufacturer price: on the real 2019 Q50
+    // (JN1FV7AR5KM800521) it reads 27,887 against an actual base MSRP of
+    // 53,350. Printing it as "Base MSRP" would put a fabricated
+    // manufacturer price on the reproduction, so an unknown base stays
+    // unknown and the reconciler reports the gap instead.
+    baseMsrp: posNum(mc.base_msrp ?? sheetPricing.base_msrp),
     destinationCharge: posNum(mc.delivery_charges ?? mc.destination_charge ?? sheetPricing.destination_charge),
     sourceReportedTotalMsrp: posNum(mc.total_msrp ?? mc.sticker_total_msrp ?? sheetPricing.total_msrp),
     // A negative price can only have survived derivePriceStatus via an explicit
