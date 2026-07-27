@@ -20,6 +20,7 @@ import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { supabase } from "@/integrations/supabase/client";
+import { isSignedUrlUsable } from "@/lib/factorySticker/assets";
 import { requestPassportDocumentDelivery } from "@/lib/passport/passportDocumentDelivery";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import { CARD } from "@/lib/passportTokens";
@@ -359,6 +360,20 @@ const VehiclePassportDocuments = () => {
           .filter((r) => r.document_type === "factory_sticker" && (r.pdf_url || r.online_url))
           .sort((a, b) => (b.version || 0) - (a.version || 0))[0] || null;
         if (cancelled) return;
+        if (doc) {
+          // Stored asset URLs are signed and expire; re-mint unless the
+          // cached credential is provably still valid.
+          const cached = doc.pdf_url || doc.online_url || null;
+          if (!isSignedUrlUsable(cached, Date.now())) {
+            try {
+              const { data: asset } = await supabase.functions.invoke("public-document-asset", {
+                body: { slug: s, document_type: "factory_sticker", asset_type: "pdf" },
+              });
+              const payload = (asset || {}) as { success?: boolean; url?: string };
+              if (payload.success === true && payload.url) doc.pdf_url = payload.url;
+            } catch { /* the card falls back to the stored URL */ }
+          }
+        }
         setFactoryDoc(doc);
         if (doc && listing?.id) {
           // Verification detail is tenant-RLS'd: signed-in dealership staff see

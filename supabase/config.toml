@@ -16,3 +16,11 @@ verify_jwt = false
 # server-side from the harvested cache, never from the caller).
 [functions.save-owners-manual]
 verify_jwt = false
+
+# public-document-asset mints a short-lived signed URL for one asset of one
+# currently PUBLISHED vehicle document. Shoppers on /v/:slug are anonymous,
+# so JWT verification is off; the function guards itself (slug is the only
+# caller-supplied key, and the RPC returns nothing for drafts, pending or
+# superseded versions).
+[functions.public-document-asset]
+verify_jwt = false

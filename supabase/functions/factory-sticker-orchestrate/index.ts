@@ -238,6 +238,7 @@ async function fileStickerDocument(
         .update({ document_status: "superseded", superseded_by: current.id, updated_at: new Date().toISOString() })
         .in("id", extras);
     }
+    await recordAssets(admin, tenantId, vehicleId, current.id, version, pdfPath, svgPath, BUCKET, hash, pdfBytes.length);
     return { documentId: current.id, version, pdfUrl: url, previewUrl, supersededPublished: false };
   }
 
@@ -246,6 +247,7 @@ async function fileStickerDocument(
   );
   if (identical) {
     await admin.from("generated_documents").update({ online_url: url, pdf_url: url, png_url: previewUrl, updated_at: new Date().toISOString() }).eq("id", identical.id);
+    await recordAssets(admin, tenantId, vehicleId, identical.id, identical.version, pdfPath, svgPath, BUCKET, hash, pdfBytes.length);
     return { documentId: identical.id, version: identical.version, pdfUrl: url, previewUrl, supersededPublished: false };
   }
 
@@ -262,10 +264,44 @@ async function fileStickerDocument(
       .update({ document_status: "superseded", superseded_by: newId, updated_at: new Date().toISOString() })
       .in("id", supersedable.map((r) => r.id));
   }
+  await recordAssets(admin, tenantId, vehicleId, newId, nextVersion, pdfPath, svgPath, BUCKET, hash, pdfBytes.length);
   return {
     documentId: newId, version: nextVersion, pdfUrl: url, previewUrl,
     supersededPublished: !holdPublished && publishedRows.length > 0,
   };
+}
+
+// The durable address of every filed asset. Signed URLs expire; these
+// coordinates do not, so a published document keeps working long after
+// the URL that was minted alongside it has died.
+async function recordAssets(
+  admin: Admin, tenantId: string, vehicleId: string, documentId: string | null,
+  version: number, pdfPath: string, previewPath: string, bucket: string,
+  checksum: string, byteSize: number,
+): Promise<void> {
+  if (!documentId) return;
+  try {
+    await admin.from("document_assets").upsert([
+      {
+        tenant_id: tenantId, vehicle_id: vehicleId, document_id: documentId,
+        document_type: "factory_sticker", document_version: version,
+        asset_type: "pdf", storage_bucket: bucket, storage_path: pdfPath,
+        mime_type: "application/pdf", checksum, byte_size: byteSize,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        tenant_id: tenantId, vehicle_id: vehicleId, document_id: documentId,
+        document_type: "factory_sticker", document_version: version,
+        asset_type: "thumbnail", storage_bucket: bucket, storage_path: previewPath,
+        mime_type: "image/svg+xml", checksum, byte_size: null,
+        updated_at: new Date().toISOString(),
+      },
+    ], { onConflict: "document_id,asset_type" });
+  } catch (e) {
+    // Asset bookkeeping must never fail a filed document; the backfill
+    // in the migration and the next regeneration both repair it.
+    console.error("document_assets upsert failed", String((e as Error)?.message || e));
+  }
 }
 
 // ── The pipeline for a single vehicle ────────────────────────────────
@@ -1000,14 +1036,21 @@ serve(async (req) => {
         .eq("document_type", "factory_sticker").maybeSingle();
       if (!doc) return json({ error: "document_not_found" }, 404);
       const snap = ((doc as { data_snapshot?: Record<string, unknown> }).data_snapshot || {}) as Record<string, unknown>;
-      const bucket = String(snap.storage_bucket || BUCKET);
+      // Prefer the durable asset rows; fall back to the snapshot for
+      // documents filed before document_assets existed.
+      const { data: assetRows } = await admin.from("document_assets")
+        .select("asset_type, storage_bucket, storage_path")
+        .eq("tenant_id", tenantId).eq("document_id", documentId);
+      const byType = new Map(((assetRows || []) as Array<{ asset_type: string; storage_bucket: string; storage_path: string }>)
+        .map((r) => [r.asset_type, r]));
+      const bucket = String(byType.get("pdf")?.storage_bucket || snap.storage_bucket || BUCKET);
       const sign = async (path: unknown): Promise<string | null> => {
         if (typeof path !== "string" || !path) return null;
         const { data } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 60);
         return (data as { signedUrl?: string } | null)?.signedUrl ?? null;
       };
-      const pdfUrl = await sign(snap.storage_path);
-      const previewUrl = await sign(snap.preview_path);
+      const pdfUrl = await sign(byType.get("pdf")?.storage_path ?? snap.storage_path);
+      const previewUrl = await sign(byType.get("thumbnail")?.storage_path ?? snap.preview_path);
       return json({
         success: true, document_id: documentId,
         version: (doc as { version?: number }).version ?? null,
