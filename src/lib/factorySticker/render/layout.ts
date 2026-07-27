@@ -330,12 +330,21 @@ interface FamilyStyle {
   shipToBlock?: boolean;
   /** Factory footnote under the MSRP rollup (taxes/title/license exclusion). */
   msrpFootnote?: boolean;
+  /** Emblem block carries the filled masthead; the model band stays paper. */
+  emblemBlockFilled?: boolean;
+  /** Verified warranty renders as "MSRP INCLUDES" inside the pricing column. */
+  msrpIncludes?: boolean;
+  /** Parts content renders in the left column's slack zone, not the right rail. */
+  leftPartsPanel?: boolean;
+  /** Compact Passport panel: "VEHICLE PASSPORT" + Powered by AutoLabels line. */
+  passportBrandLine?: boolean;
 }
 
 const FAMILY_STYLES: Record<string, FamilyStyle> = {
   KOREAN_PREMIUM: { headerComposition: "BANDED", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: true, accentKeyline: true, equipmentColumns: 3 },
   KOREAN_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, headingBarFill: "#f1f1f1", inkStructure: true },
   JAPANESE_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true },
+  PREMIUM_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true },
   PREMIUM_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
   MODERN_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
   EUROPEAN_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: false, boxedZones: true, equipmentColumns: 3 },
@@ -583,12 +592,19 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
     const bandH = 54;
     const blockW = 92;
     const bandX = LX + blockW;
-    p.rect(bandX, bandTop, LX + LW - bandX, bandH, theme.colors.headerBackground);
-    // White identity block: governed wordmark treatment only — no
-    // fabricated emblem artwork.
+    // Masthead polarity: JAPANESE_FACTORY fills the model band; the premium
+    // variant fills the emblem block instead and keeps the band on paper.
+    const blockFilled = !!style.emblemBlockFilled;
+    const bandFill = blockFilled ? theme.colors.background : theme.colors.headerBackground;
+    const bandInk = blockFilled ? BLACK : theme.colors.headerText;
+    const blockInk = blockFilled ? theme.colors.headerText : BLACK;
+    if (blockFilled) p.rect(LX, bandTop, blockW, bandH, theme.colors.headerBackground);
+    p.rect(bandX, bandTop, LX + LW - bandX, bandH, bandFill);
+    // Identity block: governed wordmark treatment only — no fabricated
+    // emblem artwork.
     const emblemI = emblem ? drawEmblem(LX + 8, bandTop + (bandH - 26) / 2, 26) : 0;
     if (!emblemI) {
-      p.text(theme.logo.wordmarkText, LX + blockW / 2, bandTop + bandH / 2 + 4.5, 13, "heading", BLACK, {
+      p.text(theme.logo.wordmarkText, LX + blockW / 2, bandTop + bandH / 2 + 4.5, 13, "heading", blockInk, {
         align: "center",
         charSpacing: Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * 13, 2.2),
       });
@@ -605,10 +621,10 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
     let dy = bandTop + 13.5;
     for (const [label, value] of detail) {
       if (!value) continue;
-      p.text(label, dx, dy, 5.4, "bold", theme.colors.headerText);
+      p.text(label, dx, dy, 5.4, "bold", bandInk);
       p.text(
         ellipsize(value.toUpperCase(), "body", 6, detailW - measureText(`${label} `, "bold", 5.4) - 12),
-        dx + measureText(`${label} `, "bold", 5.4) + 2, dy, 6, "body", theme.colors.headerText,
+        dx + measureText(`${label} `, "bold", 5.4) + 2, dy, 6, "body", bandInk,
       );
       dy += 11;
     }
@@ -617,9 +633,9 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
     const modelMax = dx - bandX - 24;
     let primaryISize = 17;
     while (primaryISize > 11 && measureText(primaryI, "bold", primaryISize) > modelMax) primaryISize -= 0.5;
-    p.text(ellipsize(primaryI, "bold", primaryISize, modelMax), bandX + 12, bandTop + 26, primaryISize, "bold", theme.colors.headerText);
+    p.text(ellipsize(primaryI, "bold", primaryISize, modelMax), bandX + 12, bandTop + 26, primaryISize, "bold", bandInk);
     if (v.trim) {
-      p.text(ellipsize(v.trim.toUpperCase(), "bold", 8.5, modelMax), bandX + 12, bandTop + 41, 8.5, "bold", theme.colors.headerText, { charSpacing: 0.5 });
+      p.text(ellipsize(v.trim.toUpperCase(), "bold", 8.5, modelMax), bandX + 12, bandTop + 41, 8.5, "bold", bandInk, { charSpacing: 0.5 });
     }
     const keylineY = bandTop + bandH + 1.5;
     p.rule(LX, keylineY, LW, 2.5, theme.colors.accent);
@@ -838,6 +854,24 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
         ly += density.itemLh;
         if (li === 0) bulletDot(p, LX + 4, ly, density.item, BLACK);
         p.text(line, LX + 9, ly, density.item, "body", BLACK);
+      }
+    }
+  }
+  // Premium-factory variant: verified warranty summarizes what the MSRP
+  // includes, inside the pricing column rather than a right-rail panel.
+  const fsSplit = familyStyle(ctx.theme);
+  if (fsSplit.msrpIncludes && !input.data.equipment.packages.length) {
+    const w = input.data.warranty;
+    const includeLines = w && w.sourceVerified
+      ? [w.basic, w.powertrain, w.corrosion, w.roadside, w.emissions].filter((s): s is string => Boolean(s && s.trim()))
+      : [];
+    if (includeLines.length) {
+      ly += 2;
+      p.text("MSRP INCLUDES", LX, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
+      for (const line of includeLines) {
+        ly += 9;
+        bulletDot(p, LX + 1.5, ly, 6.8, BLACK);
+        p.text(ellipsize(line.toUpperCase(), "body", 6.8, leftW - 12), LX + 6, ly, 6.8, "body", BLACK);
       }
     }
   }
@@ -1287,33 +1321,33 @@ function paintSafetyPanel(p: Painter, y: number, ctx: BuildContext): number {
 
 // ── Right column: AALA parts content + factory warranty (data-gated) ──
 
-function paintPartsContentPanel(p: Painter, y: number, ctx: BuildContext): number {
+function paintPartsContentPanel(p: Painter, y: number, ctx: BuildContext, x: number = RX, w: number = RW): number {
   const entries = ctx.input.data.factory.partsContent;
   if (!entries || !entries.length || !entries.every((e) => e.sourceVerified)) return y;
   const headH = 14;
-  p.text("PARTS CONTENT INFORMATION", RX + RW / 2, y + 10, 7.2, "bold", BLACK, { align: "center", charSpacing: 0.4 });
-  p.rule(RX, y + headH, RW, 0.7, BLACK);
+  p.text("PARTS CONTENT INFORMATION", x + w / 2, y + 10, 7.2, "bold", BLACK, { align: "center", charSpacing: 0.4 });
+  p.rule(x, y + headH, w, 0.7, BLACK);
   let cy = y + headH + 8.5;
   for (const e of entries) {
     const value = e.value.toUpperCase();
     const valueW = measureText(value, "bold", 6);
     p.text(
-      ellipsize(e.label.toUpperCase(), "bold", 5.2, RW - 12 - valueW - 8),
-      RX + 6, cy, 5.2, "bold", BLACK,
+      ellipsize(e.label.toUpperCase(), "bold", 5.2, w - 12 - valueW - 8),
+      x + 6, cy, 5.2, "bold", BLACK,
     );
-    p.text(value, RX + RW - 6, cy, 6, "bold", BLACK, { align: "right" });
+    p.text(value, x + w - 6, cy, 6, "bold", BLACK, { align: "right" });
     cy += 7.4;
   }
   let ny = cy + 1.5;
   for (const line of wrapText(
     "NOTE: Parts content does not include final assembly, distribution, or other non-parts costs.",
-    "body", 5.2, RW - 12,
+    "body", 5.2, w - 12,
   )) {
-    p.text(line, RX + 6, ny, 5.2, "body", "#4c5157");
+    p.text(line, x + 6, ny, 5.2, "body", "#4c5157");
     ny += 5.8;
   }
   const bottom = ny;
-  p.rect(RX, y, RW, bottom - y, null, BLACK, 1.2);
+  p.rect(x, y, w, bottom - y, null, BLACK, 1.2);
   return bottom;
 }
 
@@ -1348,12 +1382,18 @@ function paintPassportPanel(p: Painter, y: number, ctx: BuildContext, targetH: n
   const passportUrl = input.data.document.passportUrl.trim();
   if (!passportUrl) return y;
   const navy = "#0b1f3a";
-  const boxH = Math.max(90, Math.min(targetH, 190));
+  const boxH = Math.max(118, Math.min(targetH, 190));
+  const brandLine = !!familyStyle(ctx.theme).passportBrandLine;
 
   let cy = y + 15;
-  p.text("AUTOLABELS VEHICLE PASSPORT", RX + RW / 2, cy, 8.5, "bold", navy, { align: "center", charSpacing: 0.5 });
+  p.text(brandLine ? "VEHICLE PASSPORT" : "AUTOLABELS VEHICLE PASSPORT", RX + RW / 2, cy, 8.5, "bold", navy, { align: "center", charSpacing: 0.5 });
   cy += 9;
-  p.text("Scan to view this exact vehicle's verified Passport", RX + RW / 2, cy, 6.2, "body", BLACK, { align: "center" });
+  p.text(
+    brandLine
+      ? "Scan for verified vehicle details, documents & history"
+      : "Scan to view this exact vehicle's verified Passport",
+    RX + RW / 2, cy, 6.2, "body", BLACK, { align: "center" },
+  );
 
   const tailH = 26;
   const qrSize = Math.min(96, Math.max(48, y + boxH - tailH - cy - 14));
@@ -1361,11 +1401,27 @@ function paintPassportPanel(p: Painter, y: number, ctx: BuildContext, targetH: n
   p.qr(RX + (RW - qrSize) / 2, qrTop, qrSize, passportUrl, BLACK);
 
   let ty = y + boxH - tailH + 6;
-  p.text("Factory build information, verified vehicle data and available", RX + RW / 2, ty, 5.5, "body", "#4c5157", { align: "center" });
-  ty += 6.2;
-  p.text("documents for this VIN.", RX + RW / 2, ty, 5.5, "body", "#4c5157", { align: "center" });
-  ty += 7.5;
-  p.text(passportUrl.replace(/^https?:\/\//i, ""), RX + RW / 2, ty, 6.8, "bold", BLACK, { align: "center" });
+  if (brandLine) {
+    ty += 2;
+    p.text(passportUrl.replace(/^https?:\/\//i, ""), RX + RW / 2, ty, 6.8, "bold", BLACK, { align: "center" });
+    ty += 9;
+    const t1 = "Powered by ";
+    const t2 = "auto";
+    const t3 = "(LABELS)";
+    const total = measureText(t1, "body", 5.6) + measureText(t2, "bold", 5.8) + measureText(t3, "bold", 5.8);
+    let bx2 = RX + (RW - total) / 2;
+    p.text(t1, bx2, ty, 5.6, "body", "#55595e");
+    bx2 += measureText(t1, "body", 5.6);
+    p.text(t2, bx2, ty, 5.8, "bold", "#2563eb");
+    bx2 += measureText(t2, "bold", 5.8);
+    p.text(t3, bx2, ty, 5.8, "bold", navy);
+  } else {
+    p.text("Factory build information, verified vehicle data and available", RX + RW / 2, ty, 5.5, "body", "#4c5157", { align: "center" });
+    ty += 6.2;
+    p.text("documents for this VIN.", RX + RW / 2, ty, 5.5, "body", "#4c5157", { align: "center" });
+    ty += 7.5;
+    p.text(passportUrl.replace(/^https?:\/\//i, ""), RX + RW / 2, ty, 6.8, "bold", BLACK, { align: "center" });
+  }
   p.rect(RX, y, RW, boxH, null, navy, 1.2);
   return y + boxH;
 }
@@ -1595,10 +1651,17 @@ function buildAttempt(
     (sp, sy) => paintTotalBand(sp, sy, ctx),
   ]);
   const pricingH = measureStack([(sp, sy) => paintPricingSplit(sp, sy, ctx) + SECTION_GAP]);
+  // The left parts panel reserves its height out of the equipment budget so
+  // it always fits between the pricing split and the spec grid.
+  const fsAll = familyStyle(theme);
+  const leftPartsW = LW * 0.62;
+  const leftPartsH = fsAll.leftPartsPanel
+    ? measureStack([(sp, sy) => paintPartsContentPanel(sp, sy, ctx, LX, leftPartsW)])
+    : 0;
 
   const hasStandard = input.data.equipment.standard.some((g) => g.items.length > 0);
   const stdBudget = hasStandard
-    ? Math.max(40, CONTENT_BOTTOM - y - bottomH - pricingH - SECTION_GAP)
+    ? Math.max(40, CONTENT_BOTTOM - y - bottomH - pricingH - (leftPartsH > 0 ? leftPartsH + 6 : 0) - SECTION_GAP)
     : 0;
 
   let leftover: FlowEntry[] = [];
@@ -1612,6 +1675,11 @@ function buildAttempt(
   y = paintPricingSplit(p, y + 3, ctx);
   const bottomTop = CONTENT_BOTTOM - bottomH;
   if (y + SECTION_GAP > bottomTop + 0.5) return null;
+  // Premium-factory variant: verified parts content occupies the reserved
+  // zone between the pricing split and the spec grid.
+  if (leftPartsH > 0 && y + 6 + leftPartsH <= bottomTop - 2) {
+    paintPartsContentPanel(p, y + 6, ctx, LX, leftPartsW);
+  }
   y = paintSpecGrid(p, bottomTop, ctx);
   y = paintVinBarcode(p, y, ctx) + SECTION_GAP;
   paintTotalBand(p, y, ctx);
@@ -1631,9 +1699,15 @@ function buildAttempt(
   const bottomBlockTop = CONTENT_BOTTOM - footerH - noticeH - verifyH - 8;
   // Verified parts-content and warranty panels render only when their data
   // exists AND the Passport panel keeps its minimum height below them.
-  for (const panel of [paintPartsContentPanel, paintWarrantyPanel]) {
+  // Families that place parts on the left or warranty in the pricing
+  // column skip the corresponding rail panel.
+  const railPanels = [
+    ...(fsAll.leftPartsPanel ? [] : [paintPartsContentPanel]),
+    ...(fsAll.msrpIncludes ? [] : [paintWarrantyPanel]),
+  ];
+  for (const panel of railPanels) {
     const panelH = measureStack([(sp, sy) => panel(sp, sy, ctx)]);
-    if (panelH > 0 && ry + panelH + 7 + 90 <= bottomBlockTop - 6) {
+    if (panelH > 0 && ry + panelH + 7 + 118 <= bottomBlockTop - 6) {
       ry = panel(p, ry, ctx) + 7;
     }
   }

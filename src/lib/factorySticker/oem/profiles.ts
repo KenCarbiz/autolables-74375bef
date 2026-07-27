@@ -172,6 +172,16 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     status: "draft",
     logoAuthorized: false,
   },
+  {
+    oemId: "ACURA",
+    market: "US",
+    modelYearStart: 2022,
+    modelYearEnd: 2027,
+    themeVersion: "acura-us-2026-v1",
+    layoutFamily: "premium-factory-technical",
+    status: "draft",
+    logoAuthorized: false,
+  },
 ];
 
 const FAMILY_BY_TEMPLATE: Record<string, string> = {
@@ -180,6 +190,7 @@ const FAMILY_BY_TEMPLATE: Record<string, string> = {
   EUROPEAN_TECHNICAL: "german-technical",
   JAPANESE_MAINSTREAM: "mainstream-structured",
   JAPANESE_FACTORY: "japanese-factory-technical",
+  PREMIUM_FACTORY: "premium-factory-technical",
   KOREAN_MODERN: "mainstream-structured",
   AMERICAN_MAINSTREAM: "american-utility",
   PERFORMANCE: "adventure-performance",

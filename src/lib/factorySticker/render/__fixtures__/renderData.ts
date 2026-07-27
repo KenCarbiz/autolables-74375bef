@@ -1871,6 +1871,195 @@ export const hondaLongFixture = (): FactoryStickerRenderData => {
   };
 };
 
+// ── Acura fixtures (premium-factory-technical, acura-us-2026-v1) ───────
+
+// Fixture 1 — RDX benchmark. 50,800 + 4,650 + 1,195 = 56,645.
+export const acuraRdxFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "5J8TC2H86SL007905",
+  identity: { year: "2025", make: "Acura", model: "RDX", trim: "SH-AWD A-SPEC ADVANCE" },
+  pricing: { baseMsrp: 50800, destinationCharge: 1195, optionsTotal: 4650, totalMsrp: 56645 },
+  options: [
+    { name: "Urban Gray Pearl", code: null, msrp: 600 },
+    { name: "A-Spec Advance Package", code: "ASA", msrp: 2600, contents: ["20-Inch Alloy Wheels", "Performance Tires"] },
+    { name: "Technology Package", code: "TEC", msrp: 1200 },
+    { name: "Door Sill Trim", code: null, msrp: 250 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "272-HP 2.0-Liter Direct Injection VTEC Turbo 4-Cylinder Engine",
+      "10-Speed Automatic Transmission w/ Paddle Shifters",
+      "Super Handling All-Wheel Drive (SH-AWD)",
+      "Electric Power Steering",
+      "Immobilizer Theft-Deterrent System",
+    ],
+    safety_features: [
+      "Driver's & Front Passenger's Airbags",
+      "Side Curtain Airbags w/ Rollover Sensor",
+      "Vehicle Stability Assist (VSA)",
+      "Anti-Lock Braking System (ABS)",
+      "Tire Pressure Monitoring System",
+      "AcuraWatch: Collision Mitigation Braking System",
+      "AcuraWatch: Adaptive Cruise Control",
+      "AcuraWatch: Lane Keeping Assist System",
+      "AcuraWatch: Road Departure Mitigation",
+    ],
+    interior: [
+      "Driver Information Memory System",
+      "Heated Front Seats",
+      "Perforated Leather-Trimmed Sport Seats w/ Piping",
+      "16-Way Power Seats",
+      "High Resolution Center Display w/ True Touchpad Interface",
+      "Blind Spot Information (BSI)",
+      "AcuraLink Connected Services",
+      "Acura ELS Studio 3D Premium Audio - 16 Speakers",
+      "Dual-Zone Automatic Climate Control w/ Air Filtration",
+      "Wireless Phone Charger",
+    ],
+    exterior: [
+      "Jewel Eye LED Headlights",
+      "LED Daytime Running Lights & Taillights",
+      "Panoramic Moonroof w/ Tilt & Slide",
+      "Hands-Free Access Power Tailgate",
+      "Heated Power Door Mirrors w/ Turn Indicators",
+      "Keyless Access System w/ Smart Entry",
+    ],
+  },
+  colors: { exterior: { name: "Urban Gray Pearl", code: "NH-912P" }, interior: { name: "Red", code: "RD" } },
+  assembly: { plant: "East Liberty", city: "East Liberty, Ohio", country: "USA" },
+  mechanical: { engine: "2.0L VTEC TURBO", transmission: "10-SPEED A/T", drivetrain: "SH-AWD" },
+  stockNumber: "A250790",
+  transportMethod: "TRUCK",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: null, dealer: "251578" },
+  epa: {
+    city: 21, highway: 26, combined: 23, annualFuelCost: 2750, ghgScore: 5,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 5, gallonsPer100Miles: 4.3,
+    fiveYearCostDifference: -4250, classNote: null,
+  },
+  safety: { overall: 5, frontalDriver: 5, frontalPassenger: 5, sideFront: 5, sideRear: 5, rollover: 5 },
+  warranty: {
+    basic: "4-Year/50,000-Mile Limited Vehicle Warranty",
+    powertrain: "6-Year/70,000-Mile Powertrain Warranty",
+    corrosion: null,
+    roadside: "Full Tank of Fuel",
+    emissions: "SiriusXM 3-Month Trial",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "60%" },
+    { label: "Major foreign parts content", value: "Japan 35%" },
+    { label: "Final assembly point", value: "East Liberty, Ohio, USA" },
+    { label: "Country of origin - engine", value: "USA" },
+    { label: "Country of origin - transmission", value: "USA" },
+  ],
+  dealer: { name: "Miami Acura", address: "16601 S. Dixie Highway", city: "Miami", state: "FL", zip: "33157", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-rdx",
+  barcodePayload: "5J8TC2H86SL007905",
+  disclaimers: [
+    "Vehicle information compiled from verified manufacturer, regulatory, and dealer data. Not an original manufacturer-issued label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
+// Fixture 2 — ZDX: regulatory/ev, no gasoline content. 64,500 + 600 + 1,395 = 66,495.
+export const acuraZdxFixture = (): FactoryStickerRenderData => ({
+  ...acuraRdxFixture(),
+  vin: "5J8YD8H37SL201456",
+  identity: { year: "2025", make: "Acura", model: "ZDX", trim: "A-SPEC AWD" },
+  pricing: { baseMsrp: 64500, destinationCharge: 1395, optionsTotal: 600, totalMsrp: 66495 },
+  options: [
+    { name: "Double Apex Blue Pearl", code: null, msrp: 600 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Electric Motors - 490 HP",
+      "102 kWh Lithium-Ion Battery",
+      "DC Fast Charging up to 190 kW",
+      "11.5 kW Onboard Charger",
+      "All-Wheel Drive w/ Regenerative Braking Control",
+      "One-Pedal Driving",
+    ],
+    safety_features: [
+      "AcuraWatch 360",
+      "Collision Mitigation Braking System",
+      "Blind Spot Information w/ Rear Cross Traffic Monitor",
+      "Adaptive Cruise Control",
+      "Lane Keeping Assist System",
+      "Front & Rear Parking Sensors",
+    ],
+    interior: [
+      "Perforated Leather-Trimmed Sport Seats",
+      "Heated & Ventilated Front Seats",
+      "11.3-Inch Center Display w/ Google Built-In",
+      "Wireless Apple CarPlay & Android Auto",
+      "Bang & Olufsen Premium Audio - 18 Speakers",
+      "Dual-Zone Automatic Climate Control",
+      "Wireless Phone Charger",
+      "Head-Up Display",
+    ],
+    exterior: [
+      "22-Inch Alloy Wheels",
+      "Jewel Eye LED Headlights",
+      "Panoramic Fixed Glass Roof",
+      "Hands-Free Access Power Tailgate",
+      "Heated Power Door Mirrors",
+      "Flush Door Handles",
+    ],
+  },
+  colors: { exterior: { name: "Double Apex Blue Pearl", code: "B-627P" }, interior: { name: "Orchid", code: "OR" } },
+  assembly: { plant: "Ramos Arizpe", city: "Ramos Arizpe", country: "Mexico" },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "1-SPEED REDUCTION", drivetrain: "AWD" },
+  stockNumber: "A250912",
+  epa: {
+    city: 90, highway: 82, combined: 86, annualFuelCost: 900, ghgScore: 10,
+    rangeMiles: 278, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 3250, classNote: null,
+  },
+  safety: null,
+  warranty: {
+    basic: "4-Year/50,000-Mile Limited Vehicle Warranty",
+    powertrain: "6-Year/70,000-Mile Powertrain Warranty",
+    corrosion: null,
+    roadside: "8-Year/100,000-Mile High-Voltage Battery Limited Warranty",
+    emissions: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "15%" },
+    { label: "Major foreign parts content", value: "Mexico 60%" },
+    { label: "Final assembly point", value: "Ramos Arizpe, Mexico" },
+    { label: "Country of origin - motors", value: "Mexico" },
+    { label: "Country of origin - battery", value: "USA" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-zdx",
+  barcodePayload: "5J8YD8H37SL201456",
+});
+
+// Fixture 3 — long-equipment MDX: forces the deliberate continuation page.
+// 74,950 + 3,200 + 1,195 = 79,345.
+export const acuraLongFixture = (): FactoryStickerRenderData => {
+  const base = acuraRdxFixture();
+  const std = { ...base.standardEquipment };
+  std.comfort = Array.from({ length: 26 }, (_, i) =>
+    `Cabin Comfort & Convenience Feature ${String(i + 1).padStart(2, "0")} w/ Extended Adjustment Range`);
+  std.technology = Array.from({ length: 24 }, (_, i) =>
+    `AcuraLink Technology Function ${String(i + 1).padStart(2, "0")} w/ Over-the-Air Update Support`);
+  return {
+    ...base,
+    vin: "5J8YE1H09SL033721",
+    identity: { year: "2025", make: "Acura", model: "MDX", trim: "TYPE S ADVANCE SH-AWD" },
+    pricing: { baseMsrp: 74950, destinationCharge: 1195, optionsTotal: 3200, totalMsrp: 79345 },
+    options: [
+      { name: "Urban Gray Pearl", code: null, msrp: 600 },
+      { name: "Advance Package", code: "ADV", msrp: 2600, contents: ["Surround View Camera", "16-Way Power Seats"] },
+    ],
+    standardEquipment: std,
+    stockNumber: "A250337",
+    passportUrl: "https://autolabels.io/v/demo-mdx",
+    barcodePayload: "5J8YE1H09SL033721",
+  };
+};
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

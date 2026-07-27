@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { buildRenderLayout } from "./contract";
 import { resolveThemeProfile } from "../oem/profiles";
 import {
+  acuraLongFixture,
+  acuraRdxFixture,
+  acuraZdxFixture,
   bmwFixture,
   chevroletFixture,
   genesisEvFixture,
@@ -460,6 +463,79 @@ describe("Honda profile (honda-us-2026-v1)", () => {
     const model = buildRenderLayout(hondaLongFixture(), themeFor(null));
     expect(model.pages.length).toBe(2);
     expect(pageStrings(model, 0)).toContain("$58,670.00");
+    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Acura profile (acura-us-2026-v1)", () => {
+  it("resolves Acura into the premium-factory-technical family, distinct from Honda", () => {
+    const a = resolveThemeProfile("Acura", 2025);
+    const h = resolveThemeProfile("Honda", 2025);
+    expect(a.profile.themeVersion).toBe("acura-us-2026-v1");
+    expect(a.profile.layoutFamily).toBe("premium-factory-technical");
+    expect(a.profile.status).toBe("draft");
+    expect(a.theme.templateFamilyId).not.toBe(h.theme.templateFamilyId);
+    expect(resolveThemeProfile("Acura", 2021).profile.status).toBe("fallback");
+  });
+
+  it("RDX benchmark reconciles 50,800 + 4,650 + 1,195 on one page", () => {
+    const data = acuraRdxFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$56,645.00");
+    expect(model.drawnStrings).toContain("5J8TC2H86SL007905");
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("renders MSRP Includes, rated 5-star panel, parts content and the Passport brand line", () => {
+    const data = acuraRdxFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1.some((s) => s.includes("MSRP INCLUDES"))).toBe(true);
+    expect(page1.some((s) => s.includes("6-YEAR/70,000-MILE POWERTRAIN WARRANTY"))).toBe(true);
+    expect(page1.some((s) => s.includes("GOVERNMENT 5-STAR SAFETY RATINGS"))).toBe(true);
+    expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
+    expect(page1.some((s) => s.includes("EAST LIBERTY, OHIO, USA"))).toBe(true);
+    expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
+    expect(page1.some((s) => s.includes("Scan for verified vehicle details"))).toBe(true);
+    expect(page1.some((s) => s === "auto")).toBe(true);
+    expect(page1.some((s) => s === "(LABELS)")).toBe(true);
+    // Rated vehicle: stars render, never "Not Rated".
+    expect(page1.some((s) => s.includes("Not Rated"))).toBe(false);
+    // Passport QR still present and distinct from the EPA QR.
+    const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
+    const payloads = qrs.map((q) => (q.kind === "qr" ? q.payload : ""));
+    expect(payloads).toContain(data.passportUrl);
+    expect(payloads).toContain("https://fueleconomy.gov");
+  });
+
+  it("fills the masthead block black with a paper model band", () => {
+    const model = buildRenderLayout(acuraRdxFixture(), themeFor(null));
+    const rects = model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill === "#000000");
+    expect(rects.length).toBeGreaterThan(0);
+    const block = rects.find((r) => r.kind === "rect" && r.w < 100 && r.h > 40);
+    expect(block).toBeTruthy();
+  });
+
+  it("ZDX uses the EV module with no gasoline content", () => {
+    const model = buildRenderLayout(acuraZdxFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("Electric Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+  });
+
+  it("long-equipment MDX produces a deliberate continuation page", () => {
+    const model = buildRenderLayout(acuraLongFixture(), themeFor(null));
+    expect(model.pages.length).toBe(2);
+    expect(pageStrings(model, 0)).toContain("$79,345.00");
     expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
     expectMinFontRespected(model);
   });

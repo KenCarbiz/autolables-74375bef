@@ -30,6 +30,9 @@ import {
   kiaPhevFixture,
   kiaTellurideFixture,
   kiaTellurideLongFixture,
+  acuraLongFixture,
+  acuraRdxFixture,
+  acuraZdxFixture,
   hondaCrvHybridFixture,
   hondaLongFixture,
   hondaPilotFixture,
@@ -233,6 +236,18 @@ const FIXTURE_SCENARIOS = {
       const d = hondaCrvHybridFixture();
       d.pricing = { ...d.pricing, destinationCharge: null };
       d.barcodePayload = "7FARS6H93TE999999";
+      return d;
+    },
+  },
+  acura: { label: "Acura RDX", data: acuraRdxFixture },
+  acuraev: { label: "Acura ZDX", data: acuraZdxFixture },
+  acuralong: { label: "Acura MDX (2-page)", data: acuraLongFixture },
+  acuraqa: {
+    label: "Acura QA blocked",
+    data: () => {
+      const d = acuraRdxFixture();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      d.barcodePayload = "5J8TC2H86SL999999";
       return d;
     },
   },
