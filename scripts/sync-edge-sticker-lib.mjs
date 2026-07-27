@@ -25,6 +25,8 @@ export const TARGET_DIR = join(root, "supabase/functions/_shared/factorySticker/
 // imports instead of contorting it to suit the mirror's shape.
 export const TRUTH_SOURCE_DIR = join(root, "src/lib/vehicleTruth");
 export const TRUTH_PREFIX = "vehicleTruth/";
+export const DOCUMENTS_SOURCE_DIR = join(root, "src/lib/documents");
+export const DOCUMENTS_PREFIX = "documents/";
 const rewriteTruthImports = (body) => body.replace(/from "\.\.\/factorySticker\//g, 'from "../');
 
 const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__"]);
