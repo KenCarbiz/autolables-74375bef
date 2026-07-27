@@ -519,6 +519,11 @@ export default function FactoryStickerWorkspace({
     opts: { allowSourceFetch?: boolean } = {},
   ) => {
     if (fixture || !vehicle?.tenant_id || !vehicleId) return;
+    let reason: ReturnType<typeof promptRegenerationReason> = null;
+    if (action === "regenerate") {
+      reason = promptRegenerationReason();
+      if (!reason) { toast.info("Regeneration cancelled — a reason is required."); return; }
+    }
     setBusy(action);
     try {
       const { data, error } = await supabase.functions.invoke("factory-sticker-orchestrate", {
@@ -529,6 +534,7 @@ export default function FactoryStickerWorkspace({
           // case where generation must reach outside saved data, so it is
           // asked for explicitly rather than happening by surprise.
           ...(opts.allowSourceFetch ? { allow_source_fetch: true } : {}),
+          ...(reason ? { reason_code: reason.reason_code, reason_notes: reason.reason_notes } : {}),
         },
       });
       const payload = (data || {}) as { success?: boolean; error?: string; status?: string };
