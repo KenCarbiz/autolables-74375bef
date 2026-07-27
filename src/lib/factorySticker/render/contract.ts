@@ -75,6 +75,7 @@ export interface FactoryStickerRenderData {
     rangeMiles: number | null;
     fuelType: string | null;
     smogScore?: number | null;
+    gasCombinedMpg?: number | null;
     gallonsPer100Miles?: number | null;
     /** Positive = saves vs average new vehicle over 5 years; negative = spends more. */
     fiveYearCostDifference?: number | null;
@@ -242,6 +243,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("greenhouseGasRating", d.epa.ghgScore),
             ...opt("smogRating", d.epa.smogScore ?? null),
             ...opt("evRangeMiles", d.epa.rangeMiles),
+            ...opt("gasolineCombinedMpg", d.epa.gasCombinedMpg ?? null),
             ...opt("gallonsPer100Miles", d.epa.gallonsPer100Miles ?? null),
             ...opt("fiveYearCostDifference", d.epa.fiveYearCostDifference ?? null),
             ...opt("epaClassNote", d.epa.classNote ?? null),

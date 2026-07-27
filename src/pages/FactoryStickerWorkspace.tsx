@@ -10,14 +10,20 @@ import type { FactoryStickerRenderData, FactoryStickerTheme } from "@/lib/factor
 import { layoutToSvg } from "@/lib/factorySticker/render/previewSvg.ts";
 import type { LayoutModel } from "@/lib/factorySticker/render/layout.ts";
 import {
+  bmwFixture,
+  chevroletFixture,
+  evFixture,
   genericDecodeFixture,
   infinitiBenchmark,
+  jeep4xeFixture,
+  jeepFixture,
+  lexusFixture,
   longEquipmentFixture,
-  evFixture,
   newConditionBenchmark,
   nissanBenchmark,
   noEpaFixture,
   themeFor,
+  toyotaFixture,
 } from "@/lib/factorySticker/render/__fixtures__/renderData.ts";
 import { toast } from "sonner";
 import {
@@ -141,6 +147,12 @@ const FIXTURE_SCENARIOS = {
   generic: { label: "Generic decode", data: genericDecodeFixture },
   twopage: { label: "Two-page overflow", data: longEquipmentFixture },
   nissan: { label: "Nissan profile", data: nissanBenchmark },
+  jeep: { label: "Jeep Wrangler", data: jeepFixture },
+  jeep4xe: { label: "Jeep 4xe PHEV", data: jeep4xeFixture },
+  toyota: { label: "Toyota", data: toyotaFixture },
+  lexus: { label: "Lexus", data: lexusFixture },
+  chevrolet: { label: "Chevrolet", data: chevroletFixture },
+  bmw: { label: "BMW", data: bmwFixture },
   ev: { label: "EV (Ariya)", data: evFixture },
   noepa: { label: "Missing EPA", data: noEpaFixture },
   msrpvar: {

@@ -377,6 +377,386 @@ export const evFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "JN1AF0BB5SM731209",
 });
 
+// ── Five-OEM design-system fixtures (shared engine, versioned profiles) ──
+
+const oemBase = (): FactoryStickerRenderData => ({
+  ...infinitiBenchmark(),
+  packages: [],
+  keyFeatures: {},
+  safety: { overall: null, frontalDriver: null, frontalPassenger: null, sideFront: null, sideRear: null, rollover: null },
+});
+
+// Jeep — approved adventure-performance benchmark (gasoline Wrangler).
+export const jeepFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  vin: "1C4HJXFG5SW551234",
+  identity: { year: "2025", make: "Jeep", model: "Wrangler", trim: "RUBICON 4-DOOR 4x4" },
+  pricing: { baseMsrp: 51095, destinationCharge: 1895, optionsTotal: 3215, totalMsrp: 56205 },
+  options: [
+    { name: "Sky One-Touch Power Top", code: "HT1", msrp: 2075 },
+    { name: "Integrated Off-Road Camera", code: "XNP", msrp: 595 },
+    { name: "All-Weather Slush Mats", code: "CWA", msrp: 170 },
+    { name: "Trailer Hitch Zoom", code: "XFJ", msrp: 375 },
+  ],
+  standardEquipment: {
+    functional: [
+      "3.6L Pentastar V6 Engine w/ ESS",
+      "8-Speed Automatic Transmission",
+      "Rock-Trac Full-Time 4WD w/ 4:1 Transfer Case",
+      "Tru-Lok Front and Rear Locking Differentials",
+      "Electronic Front Sway-Bar Disconnect",
+      "4.10 Rear Axle Ratio",
+      "Heavy-Duty Dana 44 Front and Rear Axles",
+      "Skid Plates - Transfer Case and Fuel Tank",
+      "Off-Road+ Drive Mode",
+    ],
+    exterior: [
+      "33-Inch All-Terrain Tires on 17-Inch Wheels",
+      "Steel Rock Rails",
+      "LED Headlights and Fog Lights",
+      "Removable Full Doors",
+      "Fold-Down Windshield",
+      "Tow Hooks - 2 Front / 1 Rear",
+    ],
+    interior: [
+      "Heated Front Seats and Steering Wheel",
+      "12.3-Inch Uconnect 5 Touchscreen",
+      "Wireless Apple CarPlay and Android Auto",
+      "Wash-Out Interior w/ Drain Plugs",
+      "115V Auxiliary Power Outlet",
+    ],
+    safety_security: [
+      "Automatic Emergency Braking",
+      "Blind Spot Monitoring w/ Rear Cross Path",
+      "Adaptive Cruise Control",
+      "Electronic Roll Mitigation",
+      "Hill Start Assist and Hill Descent Control",
+      "Tire Pressure Monitoring Display",
+    ],
+  },
+  colors: { exterior: { name: "Firecracker Red", code: "PRC" }, interior: { name: "Black", code: "A7X9" } },
+  assembly: { plant: "Toledo", city: "Toledo", country: "OH USA" },
+  mechanical: { engine: "3.6L V6", transmission: "8-SPEED A/T", drivetrain: "4x4" },
+  stockNumber: "25WRRUB1234",
+  epa: {
+    city: 17, highway: 23, combined: 19, annualFuelCost: 2900, ghgScore: 4,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 5, gallonsPer100Miles: 5.3,
+    fiveYearCostDifference: -3250, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-wrangler",
+  barcodePayload: "1C4HJXFG5SW551234",
+});
+
+// Jeep 4xe — PHEV regulatory module proof (regulatory/phev).
+export const jeep4xeFixture = (): FactoryStickerRenderData => ({
+  ...jeepFixture(),
+  vin: "1C4RJYB65SC663421",
+  identity: { year: "2026", make: "Jeep", model: "Grand Cherokee", trim: "TRAILHAWK 4xe" },
+  pricing: { baseMsrp: 65480, destinationCharge: 1995, optionsTotal: 5475, totalMsrp: 72950 },
+  options: [
+    { name: "Advanced ProTech Group IV", code: "AJY", msrp: 2385 },
+    { name: "Rear Seat Entertainment Group", code: "AXN", msrp: 2090 },
+    { name: "Trailer Tow Package", code: "AHX", msrp: 1000 },
+  ],
+  standardEquipment: {
+    functional: [
+      "2.0L Turbocharged I4 PHEV Powertrain",
+      "Dual Electric Motor Generators",
+      "17.3 kWh Lithium-Ion Battery Pack",
+      "8-Speed TorqueFlite Automatic Transmission",
+      "Quadra-Trac II 4x4 w/ 2-Speed Transfer Case",
+      "Quadra-Lift Air Suspension",
+      "Selec-Terrain Drive Modes - Auto/Sport/Rock/Snow/Mud-Sand",
+      "Electric Limited-Slip Rear Differential",
+      "Skid Plates - Underbody Protection Group",
+      "7.2 kW Onboard Charger",
+    ],
+    exterior: [
+      "18-Inch Off-Road Wheels w/ All-Terrain Tires",
+      "Anti-Glare Hood Decal",
+      "Red Front Tow Hooks",
+      "LED Headlights w/ Auto High Beam",
+      "Power Liftgate",
+    ],
+    interior: [
+      "Ventilated Front Seats w/ Suede Inserts",
+      "10.1-Inch Uconnect 5 NAV Display",
+      "Digital Cluster w/ Off-Road Pages",
+      "Heated Steering Wheel",
+      "Wireless Charging Pad",
+    ],
+    safety_security: [
+      "Automatic Emergency Braking w/ Pedestrian Detection",
+      "Active Lane Management",
+      "Adaptive Cruise Control w/ Stop & Go",
+      "Blind Spot Monitoring",
+      "Surround View Camera",
+      "Intersection Collision Assist",
+    ],
+  },
+  colors: { exterior: { name: "Hydro Blue", code: "PBJ" }, interior: { name: "Global Black", code: "X7" } },
+  mechanical: { engine: "2.0L I4 PHEV", transmission: "8-SPEED A/T", drivetrain: "4x4" },
+  stockNumber: "26GC4XE3421",
+  epa: {
+    city: null, highway: null, combined: 56, annualFuelCost: 2700, ghgScore: 7,
+    rangeMiles: 26, fuelType: "PHEV Gasoline-Electric", smogScore: 5, gallonsPer100Miles: null,
+    fiveYearCostDifference: -250, classNote: null, gasCombinedMpg: 23,
+  },
+  passportUrl: "https://autolabels.io/v/demo-gc4xe",
+  barcodePayload: "1C4RJYB65SC663421",
+});
+
+// Toyota — mainstream-structured (red identity band only).
+export const toyotaFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  vin: "5TDAAAB52SS091877",
+  identity: { year: "2025", make: "Toyota", model: "Grand Highlander", trim: "XLE AWD" },
+  pricing: { baseMsrp: 45020, destinationCharge: 1450, optionsTotal: 1950, totalMsrp: 48420 },
+  options: [
+    { name: "Premium Audio w/ JBL and NAV", code: "PJ", msrp: 1050 },
+    { name: "Panoramic Moonroof", code: "PR", msrp: 500 },
+    { name: "50-State Emissions", code: "FE", msrp: 0 },
+    { name: "Carpet Mat Package", code: "CF", msrp: 400 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "2.4L Turbocharged 4-Cylinder Engine",
+      "8-Speed Automatic Transmission",
+      "Dynamic Torque Vectoring AWD",
+      "Drive Mode Select - ECO/Normal/Sport",
+      "Trailering Prep - 5,000 lb Rating",
+    ],
+    safety_features: [
+      "Toyota Safety Sense 3.0",
+      "Pre-Collision w/ Pedestrian Detection",
+      "Full-Speed Dynamic Radar Cruise Control",
+      "Lane Departure Alert w/ Steering Assist",
+      "Blind Spot Monitor w/ Rear Cross Traffic Alert",
+      "Proactive Driving Assist",
+      "8 Airbags",
+    ],
+    exterior: [
+      "18-Inch Machined Alloy Wheels",
+      "LED Projector Headlights",
+      "Power Liftgate w/ Kick Sensor",
+      "Roof Rails",
+      "Heated Power Outside Mirrors",
+    ],
+    interior: [
+      "Heated Front Seats - SofTex Trim",
+      "12.3-Inch Toyota Audio Multimedia Touchscreen",
+      "Wireless Apple CarPlay and Android Auto",
+      "Tri-Zone Automatic Climate Control",
+      "Smart Key w/ Push Button Start",
+      "7 USB Ports",
+    ],
+  },
+  colors: { exterior: { name: "Wind Chill Pearl", code: "089" }, interior: { name: "Graphite", code: "FB20" } },
+  assembly: { plant: "Princeton", city: "Princeton", country: "IN USA" },
+  mechanical: { engine: "2.4L TURBO I4", transmission: "8-SPEED A/T", drivetrain: "AWD" },
+  stockNumber: "25GHXLE1877",
+  epa: {
+    city: 20, highway: 26, combined: 22, annualFuelCost: 2350, ghgScore: 5,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 6, gallonsPer100Miles: 4.5,
+    fiveYearCostDifference: -1750, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-grandhighlander",
+  barcodePayload: "5TDAAAB52SS091877",
+});
+
+// Lexus — premium-minimalist monochrome (must not read as Toyota re-badged).
+export const lexusFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  vin: "JTJAM7BX4S5334120",
+  identity: { year: "2025", make: "Lexus", model: "GX 550", trim: "LUXURY+" },
+  pricing: { baseMsrp: 81250, destinationCharge: 1350, optionsTotal: 3190, totalMsrp: 85790 },
+  options: [
+    { name: "Mark Levinson 21-Speaker Audio", code: "ML", msrp: 1140 },
+    { name: "Head-Up Display", code: "HU", msrp: 900 },
+    { name: "Cool Box Console", code: "CB", msrp: 170 },
+    { name: "Illuminated Door Sills", code: "DS", msrp: 450 },
+    { name: "22-Inch Dark Finish Wheels", code: "W22", msrp: 530 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.4L Twin-Turbo V6 Engine",
+      "10-Speed Direct-Shift Automatic Transmission",
+      "Full-Time 4WD w/ Torsen Limited-Slip Center Differential",
+      "Adaptive Variable Suspension",
+      "Multi-Terrain Select",
+    ],
+    interior: [
+      "Semi-Aniline Leather Seating",
+      "Heated and Ventilated Front and Second-Row Seats",
+      "Massaging Driver Seat",
+      "14-Inch Lexus Interface Touchscreen",
+      "Mark Levinson-Ready Acoustic Glass",
+      "64-Color Ambient Illumination",
+      "Heated Wood-Trimmed Steering Wheel",
+    ],
+    exterior: [
+      "20-Inch Machined-Finish Alloy Wheels",
+      "Triple-Beam LED Headlights",
+      "Power Moonroof",
+      "Hands-Free Power Rear Door",
+      "Roof Rails",
+    ],
+    safety_features: [
+      "Lexus Safety System+ 3.0",
+      "Pre-Collision w/ Intersection Support",
+      "All-Speed Dynamic Radar Cruise Control",
+      "Lane Tracing Assist",
+      "Panoramic View Monitor",
+      "Advanced Park",
+    ],
+  },
+  colors: { exterior: { name: "Incognito", code: "1L2" }, interior: { name: "Saddle Tan", code: "4A60" } },
+  assembly: { plant: "Tahara", city: "Tahara", country: "Japan" },
+  mechanical: { engine: "3.4L TT V6", transmission: "10-SPEED A/T", drivetrain: "4WD" },
+  stockNumber: "25GX550LX4120",
+  epa: {
+    city: 15, highway: 21, combined: 17, annualFuelCost: 3250, ghgScore: 3,
+    rangeMiles: null, fuelType: "Premium Gasoline", smogScore: 5, gallonsPer100Miles: 5.9,
+    fiveYearCostDifference: -5000, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-gx550",
+  barcodePayload: "JTJAM7BX4S5334120",
+});
+
+// Chevrolet — american-utility: capability packages with long descriptions.
+export const chevroletFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  vin: "3GCUDDED5SG412209",
+  identity: { year: "2025", make: "Chevrolet", model: "Silverado 1500", trim: "LT CREW CAB 4WD" },
+  pricing: { baseMsrp: 48600, destinationCharge: 1995, optionsTotal: 5125, totalMsrp: 55720 },
+  packages: [],
+  options: [
+    {
+      name: "All Star Edition",
+      code: "PCV",
+      msrp: 1395,
+      contents: ["Dual-Zone Climate", "10-Way Power Driver Seat", "Trailering w/ Hitch Guidance"],
+    },
+    {
+      name: "Z71 Off-Road and Protection Package",
+      code: "Z71",
+      msrp: 995,
+      contents: ["Rancho Twin-Tube Shocks", "Hill Descent Control", "Skid Plates", "All-Weather Floor Liners"],
+    },
+    {
+      name: "Trailering Package w/ Integrated Brake Controller",
+      code: "Z82",
+      msrp: 1195,
+    },
+    { name: "20-Inch Gloss Black Painted Wheels", code: "RD5", msrp: 995 },
+    { name: "Spray-On Bedliner", code: "CGN", msrp: 545 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "2.7L Turbo High-Output Engine - 310 HP / 430 lb-ft",
+      "8-Speed Automatic Transmission",
+      "Autotrac Single-Speed Transfer Case",
+      "9.5-Inch Rear Axle",
+      "Automatic Stop/Start w/ Disable",
+      "Trailer Brake Controller Prewiring",
+      "700-Amp Battery",
+    ],
+    exterior: [
+      "17-Inch Bright Silver Painted Aluminum Wheels",
+      "LED Reflector Headlights",
+      "CornerStep Rear Bumper",
+      "EZ Lift Power Lock and Release Tailgate",
+      "12 Fixed Cargo Tie-Downs",
+      "Deep-Tinted Glass",
+    ],
+    interior: [
+      "Cloth 40/20/40 Front Bench Seat",
+      "13.4-Inch Diagonal Color Touchscreen",
+      "Wireless Apple CarPlay and Android Auto",
+      "12.3-Inch Digital Driver Information Center",
+      "Steering Column - Manual Tilt and Telescoping",
+    ],
+    safety_features: [
+      "Automatic Emergency Braking",
+      "Front Pedestrian Braking",
+      "Forward Collision Alert",
+      "Following Distance Indicator",
+      "Lane Keep Assist w/ Lane Departure Warning",
+      "IntelliBeam Auto High Beams",
+      "HD Rear Vision Camera",
+    ],
+  },
+  colors: { exterior: { name: "Summit White", code: "GAZ" }, interior: { name: "Jet Black", code: "H0U" } },
+  assembly: { plant: "Fort Wayne", city: "Fort Wayne", country: "IN USA" },
+  mechanical: { engine: "2.7L TURBO I4", transmission: "8-SPEED A/T", drivetrain: "4WD" },
+  stockNumber: "25SILLT2209",
+  epa: {
+    city: 19, highway: 21, combined: 20, annualFuelCost: 2600, ghgScore: 4,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 5, gallonsPer100Miles: 5.0,
+    fiveYearCostDifference: -2500, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-silverado",
+  barcodePayload: "3GCUDDED5SG412209",
+});
+
+// BMW — german-technical: option codes as secondary technical information.
+export const bmwFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  vin: "WBA53FJ05SCT44821",
+  identity: { year: "2025", make: "BMW", model: "530i xDrive", trim: "SEDAN (G60)" },
+  pricing: { baseMsrp: 62200, destinationCharge: 1175, optionsTotal: 4350, totalMsrp: 67725 },
+  packages: [],
+  options: [
+    { name: "Premium Package", code: "ZPP", msrp: 1700, contents: ["Heated Steering Wheel", "Head-Up Display", "Parking Assistant Plus"] },
+    { name: "Driving Assistance Professional", code: "ZDP", msrp: 1700 },
+    { name: "M Sport Brakes w/ Blue Calipers", code: "2NH", msrp: 650 },
+    { name: "Harman Kardon Surround Sound", code: "688", msrp: 300 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "2.0L TwinPower Turbo I4 - 255 HP",
+      "8-Speed Sport Automatic Transmission",
+      "xDrive Intelligent All-Wheel Drive",
+      "Adaptive M Suspension Compatibility",
+      "Brake Energy Regeneration",
+    ],
+    exterior: [
+      "19-Inch V-Spoke Bicolor Wheels (Code 872)",
+      "Adaptive LED Headlights (Code 5A1)",
+      "Illuminated Kidney Grille - Iconic Glow",
+      "Power Folding Heated Mirrors",
+      "Flush Door Handles",
+    ],
+    interior: [
+      "Veganza Perforated Upholstery",
+      "BMW Curved Display - 12.3 + 14.9 Inch",
+      "BMW Operating System 8.5",
+      "Ambient Lighting w/ Interaction Bar",
+      "Sport Seats w/ Memory (Code 481)",
+      "Automatic Climate Control - 4 Zone",
+    ],
+    safety_features: [
+      "Active Guard w/ Frontal Collision Warning",
+      "Active Blind Spot Detection",
+      "Lane Departure Warning",
+      "Parking Assistant w/ Reversing Assistant",
+      "Attentiveness Assistant",
+      "Tire Pressure Monitor",
+    ],
+  },
+  colors: { exterior: { name: "Phytonic Blue Metallic", code: "C1M" }, interior: { name: "Cognac Veganza", code: "VACQ" } },
+  assembly: { plant: "Dingolfing", city: "Dingolfing", country: "Germany" },
+  mechanical: { engine: "2.0L TURBO I4", transmission: "8-SPEED A/T", drivetrain: "xDRIVE AWD" },
+  stockNumber: "25530IX4821",
+  epa: {
+    city: 26, highway: 34, combined: 29, annualFuelCost: 1900, ghgScore: 6,
+    rangeMiles: null, fuelType: "Premium Gasoline", smogScore: 7, gallonsPer100Miles: 3.4,
+    fiveYearCostDifference: 250, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-530i",
+  barcodePayload: "WBA53FJ05SCT44821",
+});
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

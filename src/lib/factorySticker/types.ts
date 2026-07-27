@@ -94,6 +94,7 @@ export interface StickerRegulatory {
   greenhouseGasRating?: number;
   smogRating?: number;
   evRangeMiles?: number;
+  gasolineCombinedMpg?: number;
   epaClassNote?: string;
   epaSourceReference?: string;
   nhtsaStatus: NhtsaStatus;

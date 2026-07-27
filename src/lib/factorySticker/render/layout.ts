@@ -310,22 +310,28 @@ interface FamilyStyle {
   headerComposition: "WORDMARK_RULE" | "BANDED";
   /** Filled bar behind equipment category headings (mainstream/utility). */
   sectionHeadingBar: boolean;
+  /** Heading bars fill with the brand accent + reversed text (adventure). */
+  headingBarAccent: boolean;
+  /** Premium families: letterspaced headings over a hairline rule. */
+  trackedHeadings: boolean;
+  /** German-technical: thin boxed rules around equipment and pricing zones. */
+  boxedZones: boolean;
   /** Brand-accent keyline under the header band and above the total band. */
   accentKeyline: boolean;
   equipmentColumns: number;
 }
 
 const FAMILY_STYLES: Record<string, FamilyStyle> = {
-  PREMIUM_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: false, equipmentColumns: 3 },
-  MODERN_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: false, equipmentColumns: 3 },
-  EUROPEAN_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: true, equipmentColumns: 3 },
-  JAPANESE_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 3 },
-  KOREAN_MODERN: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 3 },
-  AMERICAN_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 2 },
-  PERFORMANCE: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 3 },
-  COMMERCIAL: { headerComposition: "BANDED", sectionHeadingBar: true, accentKeyline: true, equipmentColumns: 3 },
-  EV_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: true, equipmentColumns: 3 },
-  AUTOLABELS_FALLBACK: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, accentKeyline: false, equipmentColumns: 3 },
+  PREMIUM_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
+  MODERN_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
+  EUROPEAN_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: false, boxedZones: true, equipmentColumns: 3 },
+  JAPANESE_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
+  KOREAN_MODERN: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
+  AMERICAN_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 2 },
+  PERFORMANCE: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: true, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
+  COMMERCIAL: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: true, accentKeyline: true, trackedHeadings: false, boxedZones: false, equipmentColumns: 3 },
+  EV_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: true, trackedHeadings: false, boxedZones: true, equipmentColumns: 3 },
+  AUTOLABELS_FALLBACK: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
 };
 
 function familyStyle(theme: OemStickerTheme): FamilyStyle {
@@ -680,6 +686,9 @@ function paintStandardEquipment(
     p.rule(sx, colTop + 3, 0.5, Math.max(0, usedHeight - 2), "#b6b9bd");
   }
 
+  if (familyStyle(ctx.theme).boxedZones) {
+    p.rect(LX - 3, colTop - 2, LW + 6, usedHeight + 6, null, "#3a3d42", 0.75);
+  }
   let end = colTop + usedHeight + 7;
   p.text(
     "* See Owner's Manual for complete details, limitations and exclusions.",
@@ -756,12 +765,14 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
       p.text(ellipsize(opt.name, "body", size, rightW - codeW - 10), nameX, ry, size, "body", BLACK);
       ry += density.itemLh;
       let fx = nameX + 6;
+      const fxLimit = rightX + rightW - 78;
       for (const feature of opt.features) {
         const shown = ellipsize(sanitize(feature), "body", density.item, rightW - codeW - 60);
+        const w = 4 + measureText(shown, "body", density.item) + 9;
+        if (fx + w > fxLimit) break;
         bulletDot(p, fx, ry, density.item, BLACK);
         p.text(shown, fx + 4, ry, density.item, "body", BLACK);
-        fx += 4 + measureText(shown, "body", density.item) + 9;
-        if (fx > rightX + rightW - 70) break;
+        fx += w;
       }
       const price = priceLabel(opt, true);
       const priceW = measureText(price, "body", density.item);
@@ -911,8 +922,9 @@ function paintTotalBand(p: Painter, y: number, ctx: BuildContext): number {
 
 function fuelCategoryLabel(fuelType: string | undefined): string {
   const f = (fuelType || "").toLowerCase();
-  if (/electric|ev\b/.test(f)) return "Electric Vehicle";
-  if (/hybrid|phev/.test(f)) return "Hybrid Vehicle";
+  if (/phev|plug/.test(f)) return "Plug-In Hybrid";
+  if (/hybrid/.test(f)) return "Hybrid Vehicle";
+  if (/electric|\bev\b/.test(f)) return "Electric Vehicle";
   if (/diesel/.test(f)) return "Diesel Vehicle";
   return "Gasoline Vehicle";
 }
@@ -963,8 +975,9 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   const { theme, input } = ctx;
   const reg = input.data.regulatory;
   if (reg.epaStatus !== "VERIFIED") return y;
-  const header = theme.colors.headerBackground;
-  const headerText = theme.colors.headerText;
+  // Regulatory modules stay neutral: the OEM profile never restyles them.
+  const header = "#141414";
+  const headerText = "#ffffff";
 
   const boxTop = y;
   const headH = 20;
@@ -981,7 +994,8 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   // never inherit gasoline-only structures; hybrids keep the gasoline shape
   // under a Hybrid Vehicle tag. Only verified fields are drawn.
   const fuel = (input.data.vehicle.fuelType || "").toLowerCase();
-  const isEv = /electric|\bev\b/.test(fuel) && !/hybrid|phev/.test(fuel);
+  const isPhev = /phev|plug/.test(fuel);
+  const isEv = /electric|\bev\b/.test(fuel) && !/hybrid|phev/.test(fuel) && !isPhev;
   const tagW = 70;
   let cy = bodyTop + 12;
   p.text("Fuel Economy", RX + 6, cy, 8.5, "bold", BLACK);
@@ -995,7 +1009,7 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   if (combined !== undefined) {
     p.text(String(combined), RX + 6, mpgTop + 24, 27, "bold", BLACK);
     numW = measureText(String(combined), "bold", 27);
-    p.text(isEv ? "MPGe" : "MPG", RX + 10 + numW, mpgTop + 12, 10, "bold", BLACK);
+    p.text(isEv || isPhev ? "MPGe" : "MPG", RX + 10 + numW, mpgTop + 12, 10, "bold", BLACK);
     p.text("combined city/hwy", RX + 6, mpgTop + 31, 5.5, "body", BLACK);
     let colX = RX + 62;
     if (reg.cityMpg !== undefined) {
@@ -1007,10 +1021,15 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
       p.text(String(reg.highwayMpg), colX, mpgTop + 24, 9.5, "bold", BLACK);
       p.text("highway", colX, mpgTop + 31, 5.5, "body", BLACK);
     }
-    if (isEv) {
-      if (input.data.regulatory.evRangeMiles !== undefined) {
-        p.text(String(input.data.regulatory.evRangeMiles), RX + 6, mpgTop + 42, 8, "bold", BLACK);
-        p.text("miles driving range", RX + 9 + measureText(String(input.data.regulatory.evRangeMiles), "bold", 8), mpgTop + 42, 5.5, "body", BLACK);
+    if (isEv || isPhev) {
+      if (reg.evRangeMiles !== undefined) {
+        p.text(String(reg.evRangeMiles), RX + 6, mpgTop + 42, 8, "bold", BLACK);
+        p.text(isPhev ? "miles electric range" : "miles driving range", RX + 9 + measureText(String(reg.evRangeMiles), "bold", 8), mpgTop + 42, 5.5, "body", BLACK);
+      }
+      if (isPhev && reg.gasolineCombinedMpg !== undefined) {
+        const gx = RX + 92;
+        p.text(String(reg.gasolineCombinedMpg), gx, mpgTop + 42, 8, "bold", BLACK);
+        p.text("MPG gasoline only", gx + 3 + measureText(String(reg.gasolineCombinedMpg), "bold", 8), mpgTop + 42, 5.5, "body", BLACK);
       }
     } else if (reg.gallonsPer100Miles !== undefined) {
       p.text(String(reg.gallonsPer100Miles), RX + 6, mpgTop + 42, 8, "bold", BLACK);
@@ -1037,7 +1056,7 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   const costBoxH = 40;
   if (reg.annualFuelCost !== undefined) {
     p.rect(RX + 5, subTop, costBoxW, costBoxH, null, BLACK, 0.9);
-    const costLabel = isEv ? "Annual energy" : "Annual fuel";
+    const costLabel = isEv || isPhev ? "Annual energy" : "Annual fuel";
     p.text(costLabel, RX + 10, subTop + 12, 8, "body", BLACK);
     p.text("cost", RX + 10 + measureText(`${costLabel} `, "body", 8), subTop + 12, 9, "bold", BLACK);
     p.text(formatMoney(reg.annualFuelCost).replace(/\.00$/, ""), RX + 10, subTop + 32, 17, "bold", BLACK);
@@ -1051,7 +1070,7 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   // Fine print with the computed CO2 line (8,887 g CO2 per gallon of
   // gasoline at the verified combined MPG — derived, never asserted).
   let fy = subTop + 62;
-  const isGas = !/electric|ev\b/.test((input.data.vehicle.fuelType || "").toLowerCase());
+  const isGas = !isEv && !isPhev;
   const co2 = combined !== undefined && combined > 0 && isGas ? Math.round(8887 / combined) : null;
   const finePrint =
     (co2 !== null ? `This vehicle emits ${co2} grams CO2 per mile (tailpipe only). ` : "") +
@@ -1085,8 +1104,8 @@ function paintSafetyPanel(p: Painter, y: number, ctx: BuildContext): number {
   if (reg.nhtsaStatus === "UNAVAILABLE") return y;
   const rated = reg.nhtsaStatus === "VERIFIED";
   const headH = 15;
-  p.rect(RX, y, RW, headH, theme.colors.headerBackground);
-  p.text("GOVERNMENT 5-STAR SAFETY RATINGS", RX + RW / 2, y + 10, 7, "bold", theme.colors.headerText, { align: "center" });
+  p.rect(RX, y, RW, headH, "#141414");
+  p.text("GOVERNMENT 5-STAR SAFETY RATINGS", RX + RW / 2, y + 10, 7, "bold", "#ffffff", { align: "center" });
   let cy = y + headH + 11;
   const valueX = RX + RW - 7;
   const anyRating = [reg.overallRating, reg.frontalDriverRating, reg.frontalPassengerRating,
@@ -1118,9 +1137,9 @@ function paintSafetyPanel(p: Painter, y: number, ctx: BuildContext): number {
   }
   cy += 1;
   const srcH = 16;
-  p.rect(RX, cy, RW, srcH, theme.colors.headerBackground);
-  p.text("Star ratings range from 1 to 5 stars, with 5 being the highest.", RX + RW / 2, cy + 6.8, 5.2, "bold", theme.colors.headerText, { align: "center" });
-  p.text("Source: NHTSA - www.safercar.gov or 1-888-327-4236", RX + RW / 2, cy + 12.8, 5.2, "bold", theme.colors.headerText, { align: "center" });
+  p.rect(RX, cy, RW, srcH, "#141414");
+  p.text("Star ratings range from 1 to 5 stars, with 5 being the highest.", RX + RW / 2, cy + 6.8, 5.2, "bold", "#ffffff", { align: "center" });
+  p.text("Source: NHTSA - www.safercar.gov or 1-888-327-4236", RX + RW / 2, cy + 12.8, 5.2, "bold", "#ffffff", { align: "center" });
   const bottom = cy + srcH;
   p.rect(RX, y, RW, bottom - y, null, BLACK, 1.4);
   return bottom;
@@ -1248,11 +1267,21 @@ function flowColumns(
     }
     if (pendingHeading !== null) {
       cy += density.itemLh + 0.5;
-      if (familyStyle(ctx.theme).sectionHeadingBar) {
-        p.rect(colX(), cy - density.item - 1.5, colW, density.item + 4.5, "#e8e9ea");
+      const fs = familyStyle(ctx.theme);
+      let headColor = BLACK;
+      if (fs.sectionHeadingBar) {
+        const fill = fs.headingBarAccent ? ctx.theme.colors.accent : "#e8e9ea";
+        p.rect(colX(), cy - density.item - 1.5, colW, density.item + 4.5, fill);
+        if (fs.headingBarAccent) headColor = "#ffffff";
       }
-      p.text(pendingHeading, colX() + (familyStyle(ctx.theme).sectionHeadingBar ? 3 : 0), cy, density.item + 1, "bold", BLACK, { charSpacing: 0.35 });
-      cy += 3;
+      if (fs.trackedHeadings) {
+        p.text(pendingHeading, colX(), cy, density.item + 0.3, "bold", headColor, { charSpacing: 1.1 });
+        p.rule(colX(), cy + 2, colW, 0.5, "#9a9da1");
+        cy += 4;
+      } else {
+        p.text(pendingHeading, colX() + (fs.sectionHeadingBar ? 3 : 0), cy, density.item + 1, "bold", headColor, { charSpacing: 0.35 });
+        cy += 3;
+      }
       pendingHeading = null;
     }
     cy = paintEntryLines(p, entry, colX(), cy, density, BLACK);

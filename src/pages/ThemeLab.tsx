@@ -6,7 +6,13 @@ import { getTheme, THEME_REGISTRY } from "@/lib/factorySticker/oem/themes.ts";
 import type { OemId } from "@/lib/factorySticker/oem/identity.ts";
 import { listProfiles } from "@/lib/factorySticker/oem/profiles.ts";
 import {
+  bmwFixture,
+  chevroletFixture,
   evFixture,
+  jeep4xeFixture,
+  jeepFixture,
+  lexusFixture,
+  toyotaFixture,
   genericDecodeFixture,
   infinitiBenchmark,
   longEquipmentFixture,
@@ -23,6 +29,12 @@ import {
 const LAB_FIXTURES = {
   used: { label: "Used (QX80 data)", data: infinitiBenchmark },
   nissan: { label: "Nissan Pathfinder", data: nissanBenchmark },
+  jeep: { label: "Jeep Wrangler", data: jeepFixture },
+  jeep4xe: { label: "Jeep 4xe PHEV", data: jeep4xeFixture },
+  toyota: { label: "Toyota Grand Highlander", data: toyotaFixture },
+  lexus: { label: "Lexus GX 550", data: lexusFixture },
+  chevrolet: { label: "Chevrolet Silverado", data: chevroletFixture },
+  bmw: { label: "BMW 530i", data: bmwFixture },
   ev: { label: "EV (Ariya)", data: evFixture },
   new: { label: "New vehicle", data: newConditionBenchmark },
   generic: { label: "Generic decode", data: genericDecodeFixture },
