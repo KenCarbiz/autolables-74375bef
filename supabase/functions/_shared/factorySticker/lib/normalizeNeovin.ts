@@ -2,6 +2,7 @@
 // Mirror of src/lib/factorySticker/normalizeNeovin.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
+import { parseYmm } from "./ymm.ts";
 import type {
   ConfidenceLevel,
   FactoryStickerData,
@@ -80,19 +81,16 @@ const numAny = (v: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const MULTI_WORD_MAKES = new Set(["land rover", "mercedes benz", "alfa romeo", "aston martin", "rolls royce"]);
-
-function parseYmm(ymm: string): { year: number; make: string; model: string } {
-  const tokens = ymm.trim().split(/\s+/);
-  const year = Number(tokens[0]);
-  if (!Number.isInteger(year) || year < 1950 || year > 2100 || tokens.length < 3) {
+// One parser, not two. This module used to carry its own copy that knew
+// five multi-word makes and no sub-brand remap, so the same ymm could
+// resolve to a different make here than in the renderer.
+function parseYmmStrict(ymm: string): { year: number; make: string; model: string } {
+  const parsed = parseYmm(ymm);
+  const year = Number(parsed.year);
+  if (!Number.isInteger(year) || year < 1950 || year > 2100 || !parsed.make || !parsed.model) {
     throw new NeovinNormalizeError(`cannot parse year/make/model from ymm "${ymm}"`);
   }
-  const twoWord = `${tokens[1]} ${tokens[2]}`.toLowerCase().replace(/-/g, " ");
-  if (MULTI_WORD_MAKES.has(twoWord) && tokens.length >= 4) {
-    return { year, make: `${tokens[1]} ${tokens[2]}`, model: tokens.slice(3).join(" ") };
-  }
-  return { year, make: tokens[1], model: tokens.slice(2).join(" ") };
+  return { year, make: parsed.make, model: parsed.model };
 }
 
 const mapCondition = (raw: string | null | undefined): VehicleCondition => {
@@ -145,7 +143,7 @@ export function normalizeNeovin(input: NormalizeNeovinInput): FactoryStickerData
 
   const ymm = str(listing.ymm);
   if (!ymm) throw new NeovinNormalizeError("listing.ymm is required to establish vehicle identity");
-  const { year, make, model } = parseYmm(ymm);
+  const { year, make, model } = parseYmmStrict(ymm);
 
   const sheet = (mc.build_sheet && typeof mc.build_sheet === "object" ? mc.build_sheet : null) as
     | ({ packages?: unknown; options?: unknown; key_features?: unknown; standard?: unknown; generic?: unknown; source?: unknown } & Record<string, unknown>)

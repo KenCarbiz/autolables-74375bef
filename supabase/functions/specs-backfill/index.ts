@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 import { adminClient, SERVICE_KEY, SUPABASE_URL, isServiceOrCron } from "../_shared/supabase.ts";
 import { preflight, json } from "../_shared/http.ts";
 
@@ -22,11 +23,19 @@ async function run(depth: number) {
     // Published vehicles whose equipment never decoded (options is null/absent).
     const { data: rows } = await admin
       .from("vehicle_listings")
-      .select("tenant_id, vin")
+      .select("tenant_id, vin, mc_attributes")
       .eq("status", "published")
-      .is("mc_attributes->>options", null)
+      .is("mc_attributes->>build_sheet", null)
       .limit(4);
-    const batch = (rows as { tenant_id: string; vin: string }[] | null) || [];
+    // Same rule the nightly sweep uses. This path used to select purely on
+    // "options is null" and ignore the attempt cap, so a VIN the provider
+    // cannot decode was re-paid on every backfill chain.
+    const batch = ((rows as { tenant_id: string; vin: string; mc_attributes: Record<string, unknown> | null }[] | null) || [])
+      .filter((r) => shouldDecodeVin(r.mc_attributes, MAX_SPEC_ATTEMPTS).decode);
+    if (batch.length === 0 && (rows || []).length > 0) {
+      console.log("specs-backfill: remaining rows are all at the attempt cap; stopping");
+      return;
+    }
     if (batch.length === 0) { console.log(`specs-backfill: done (decoded ${decoded}, failed ${failed})`); return; }
     for (const r of batch) {
       if (Date.now() >= deadline) break;
@@ -43,6 +52,21 @@ async function run(depth: number) {
         // (all endpoints failed) is simply retried on the next chain.
         await res.json().catch(() => ({}));
         if (res.ok) decoded++; else failed++;
+        // Stamp the attempt from here: marketcheck-specs returns early
+        // without writing on a no-match, which is exactly the case the cap
+        // exists for.
+        try {
+          const { data: after } = await admin.from("vehicle_listings")
+            .select("mc_attributes").eq("tenant_id", r.tenant_id).eq("vin", r.vin).maybeSingle();
+          const fresh = ((after?.mc_attributes ?? r.mc_attributes) || {}) as Record<string, unknown>;
+          await admin.from("vehicle_listings").update({
+            mc_attributes: {
+              ...fresh,
+              specs_attempts: (Number(fresh.specs_attempts) || 0) + 1,
+              specs_attempted_at: new Date().toISOString(),
+            },
+          }).eq("tenant_id", r.tenant_id).eq("vin", r.vin);
+        } catch { /* the cap is the backstop */ }
       } catch { failed++; }
     }
   }
