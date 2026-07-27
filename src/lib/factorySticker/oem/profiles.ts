@@ -247,6 +247,16 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     status: "draft",
     logoAuthorized: false,
   },
+  {
+    oemId: "VOLVO",
+    market: "US",
+    modelYearStart: 2022,
+    modelYearEnd: 2027,
+    themeVersion: "volvo-us-2026-v1",
+    layoutFamily: "scandinavian-factory-technical",
+    status: "draft",
+    logoAuthorized: false,
+  },
   // v2 supersedes the same-day v1 draft per the owner's 2026-07-27 formal
   // Audi factory-template directive (white monochrome factory treatment).
   {
@@ -263,13 +273,13 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
 
 const FAMILY_BY_TEMPLATE: Record<string, string> = {
   PREMIUM_LUXURY: "premium-minimalist",
-  MODERN_LUXURY: "premium-minimalist",
   EUROPEAN_TECHNICAL: "german-technical",
   JAPANESE_MAINSTREAM: "mainstream-structured",
   JAPANESE_FACTORY: "japanese-factory-technical",
   PREMIUM_FACTORY: "premium-factory-technical",
   LUXURY_FACTORY: "luxury-factory-technical",
   GERMAN_FACTORY: "german-factory-technical",
+  SCANDINAVIAN_FACTORY: "scandinavian-factory-technical",
   AMERICAN_MAINSTREAM: "american-utility",
   PERFORMANCE: "adventure-performance",
   COMMERCIAL: "adventure-performance",

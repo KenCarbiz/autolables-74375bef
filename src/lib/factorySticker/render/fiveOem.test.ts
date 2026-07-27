@@ -8,6 +8,9 @@ import {
   audiEtronFixture,
   audiPhevFixture,
   audiQ5Fixture,
+  volvoEvFixture,
+  volvoPhevFixture,
+  volvoXc90Fixture,
   cadillacEscaladeFixture,
   cadillacLyriqFixture,
   gmcEvFixture,
@@ -1047,5 +1050,96 @@ describe("Audi profile (audi-us-2026-v2, german-factory-technical)", () => {
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
     expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
     expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+  });
+});
+
+describe("Volvo profile (volvo-us-2026-v1, scandinavian-factory-technical)", () => {
+  it("Volvo makes resolve to the Volvo profile; truck marques and Polestar never do", () => {
+    for (const alias of ["Volvo", "VOLVO", "Volvo Cars", "VOLVO CARS"]) {
+      const r = resolveThemeProfile(alias, 2026);
+      expect(r.profile.themeVersion, alias).toBe("volvo-us-2026-v1");
+      expect(r.profile.status).toBe("draft");
+      expect(r.profile.layoutFamily).toBe("scandinavian-factory-technical");
+      expect(r.theme.templateFamilyId).toBe("SCANDINAVIAN_FACTORY");
+    }
+    for (const excluded of ["Polestar", "Volvo Trucks", "Mack"]) {
+      const r = resolveThemeProfile(excluded, 2026);
+      expect(r.resolution, excluded).toBe("FALLBACK");
+      expect(r.profile.themeVersion, excluded).not.toBe("volvo-us-2026-v1");
+    }
+    // Out-of-range model years never silently restyle onto the 2026 profile.
+    expect(resolveThemeProfile("Volvo", 2018).profile.status).toBe("fallback");
+  });
+
+  it("renders the XC90 B5 mild hybrid benchmark reconciled to $64,185 on the gasoline layout", () => {
+    const model = buildRenderLayout(volvoXc90Fixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$64,185.00");
+    expect(page1).toContain("$60,550.00");
+    expect(page1).toContain("TOTAL MSRP");
+    // 48V mild hybrid keeps the gasoline EPA module — never a plug-in layout.
+    expect(page1).toContain("MPG");
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(false);
+    expect(joined).toContain("48V Mild-Hybrid");
+    // Package membership beneath the parent, priced once.
+    expect(joined).toContain("Climate Package");
+    expect(joined).toContain("Heated Steering Wheel");
+    expect(page1.filter((s) => s === "595.00").length).toBe(1);
+    // Factory panels, ship-to, passport branding, Swedish assembly.
+    expect(joined).toContain("NEW VEHICLE LIMITED WARRANTY");
+    expect(joined).toContain("PARTS CONTENT");
+    expect(joined).toContain("SWEDEN 44%");
+    expect(page1.some((s) => s.includes("GOTHENBURG, SWEDEN"))).toBe(true);
+    expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
+    expect(page1.some((s) => s.includes("Powered by"))).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("YV4L12PE9T1234567");
+    // Restrained Scandinavian identity: white band, no VW/BMW blues, the
+    // Volvo-blue keyline is the only brand color on the page.
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#001e50")).toBe(false);
+    expect(fills.has("#000000")).toBe(false);
+    const rules = new Set(model.pages[0].primitives.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(rules.has("#003057")).toBe(true);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("XC60 T8 uses the PHEV module and stays distinct from battery electric", () => {
+    const model = buildRenderLayout(volvoPhevFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$74,090.00");
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPG gasoline only"))).toBe(true);
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(false);
+    expect(joined).toContain("T8 AWD PLUG-IN HYBRID ULTRA");
+    expect(joined).toContain("Hybrid Battery Limited Warranty".toUpperCase());
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("EX90 uses the EV module with US assembly matched per vehicle", () => {
+    const model = buildRenderLayout(volvoEvFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$81,985.00");
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+    // Assembly is vehicle-specific: EX90 is built in South Carolina, and
+    // the Volvo profile never assumes Sweden from the make.
+    expect(page1.some((s) => s.includes("RIDGEVILLE, USA"))).toBe(true);
+    expect(joined).toContain("RIDGEVILLE, SOUTH CAROLINA, USA");
+    expect(joined).toContain("HIGH-VOLTAGE BATTERY LIMITED WARRANTY");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
   });
 });

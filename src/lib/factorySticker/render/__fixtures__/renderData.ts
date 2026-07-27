@@ -3747,6 +3747,250 @@ export const audiEtronFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "WA1QMBFZ8TA204567",
 });
 
+// Volvo XC90 B5 mild hybrid: benchmark for volvo-us-2026-v1. The 48V
+// mild-hybrid B5 keeps the gasoline EPA layout — it is never presented
+// as a plug-in vehicle. 60,550 + 2,340 + 1,295 = 64,185.
+export const volvoXc90Fixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "YV4L12PE9T1234567",
+  identity: { year: "2026", make: "Volvo", model: "XC90", trim: "B5 AWD PLUS 7-SEAT" },
+  pricing: { baseMsrp: 60550, destinationCharge: 1295, optionsTotal: 2340, totalMsrp: 64185 },
+  options: [
+    {
+      name: "Climate Package", code: "001", msrp: 595,
+      contents: [
+        "Heated Steering Wheel",
+        "Heated Rear Seats",
+        "Heated Windshield Washer Nozzles",
+      ],
+    },
+    { name: "21-Inch 5-Multi Spoke Diamond-Cut Wheels", code: "R790", msrp: 800 },
+    { name: "Crystal White Pearl Metallic", code: "707", msrp: 695 },
+    { name: "Integrated Booster Cushion - Second Row", code: "C101", msrp: 250 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "2.0L Turbocharged I4 B5 Engine - 247 HP",
+      "48V Mild-Hybrid Starter-Generator System",
+      "8-Speed Geartronic Automatic Transmission",
+      "All-Wheel Drive",
+      "Drive Mode Settings",
+      "Hill Start Assist & Hill Descent Control",
+    ],
+    safety_features: [
+      "Pilot Assist w/ Adaptive Cruise Control",
+      "Lane Keeping Aid",
+      "Blind Spot Information System w/ Cross Traffic Alert",
+      "Collision Avoidance w/ Pedestrian & Cyclist Detection",
+      "Road Sign Information",
+      "Driver Alert Control",
+      "360° Camera w/ Park Assist Front & Rear",
+      "Integrated Whiplash Protection Front Seats",
+    ],
+    interior: [
+      "Heated Front Seats w/ 4-Way Power Lumbar",
+      "Quilted Nordico Upholstery",
+      "Driftwood Deco Inlays",
+      "Four-Zone Automatic Climate Control",
+      "12.3-Inch Digital Driver Display",
+      "9-Inch Center Display w/ Google Built-In",
+      "Apple CarPlay",
+      "Harman Kardon Premium Sound",
+      "Wireless Phone Charging",
+      "Power Tailgate w/ Hands-Free Opening",
+    ],
+    exterior: [
+      "Thor's Hammer LED Headlights w/ Active Bending",
+      "LED Taillights",
+      "Panoramic Roof w/ Power Sunshade",
+      "Roof Rails",
+      "Heated Power-Retractable Exterior Mirrors",
+      "Rain Sensor w/ Tunnel Detection",
+    ],
+  },
+  colors: { exterior: { name: "Crystal White Pearl Metallic", code: "707" }, interior: { name: "Charcoal Nordico", code: "R100" } },
+  assembly: { plant: "Torslanda", city: "Gothenburg", country: "Sweden" },
+  mechanical: { engine: "2.0L TURBO I4 B5", transmission: "8-SPEED GEARTRONIC", drivetrain: "AWD" },
+  stockNumber: "V26XC90118",
+  transportMethod: "OCEAN",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: "VCC260118", dealer: "072A" },
+  epa: {
+    city: 22, highway: 27, combined: 24, annualFuelCost: 2200, ghgScore: 5,
+    rangeMiles: null, fuelType: "Premium Gasoline", smogScore: 6, gallonsPer100Miles: 4.2,
+    fiveYearCostDifference: -1500, classNote: null,
+  },
+  safety: null,
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: "4-Year/50,000-Mile Powertrain Coverage",
+    corrosion: "12-Year/Unlimited-Mile Corrosion Perforation Warranty",
+    roadside: "4-Year/Unlimited-Mile Roadside Assistance",
+    emissions: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "1%" },
+    { label: "Major foreign parts content", value: "Sweden 44%" },
+    { label: "Additional foreign parts content", value: "Germany 12%" },
+    { label: "Final assembly point", value: "Gothenburg, Sweden" },
+    { label: "Country of origin - engine", value: "Sweden" },
+    { label: "Country of origin - transmission", value: "Japan" },
+  ],
+  dealer: { name: "Volvo Cars Palo Alto", address: "4190 El Camino Real", city: "Palo Alto", state: "CA", zip: "94306", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-xc90",
+  barcodePayload: "YV4L12PE9T1234567",
+  disclaimers: [
+    "Vehicle information compiled from verified manufacturer, regulatory and dealer data. This document may not be the original manufacturer-issued label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
+// XC60 T8 plug-in hybrid: regulatory/phev. The T8 is a plug-in hybrid —
+// never battery electric, and never collapsed into "Recharge" branding.
+// 71,500 + 1,295 + 1,295 = 74,090.
+export const volvoPhevFixture = (): FactoryStickerRenderData => ({
+  ...volvoXc90Fixture(),
+  vin: "YV4H60DL5T1567890",
+  identity: { year: "2026", make: "Volvo", model: "XC60", trim: "T8 AWD PLUG-IN HYBRID ULTRA" },
+  pricing: { baseMsrp: 71500, destinationCharge: 1295, optionsTotal: 1295, totalMsrp: 74090 },
+  options: [
+    { name: "Onyx Black Metallic", code: "717", msrp: 695 },
+    { name: "21-Inch 5-Double Spoke Black Diamond-Cut Wheels", code: "R791", msrp: 600 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "2.0L Turbocharged I4 Plug-In Hybrid - 455 HP Combined",
+      "18.8 kWh Lithium-Ion Battery",
+      "8-Speed Geartronic Automatic Transmission",
+      "Electric All-Wheel Drive (Rear Electric Motor)",
+      "6.4 kW Onboard Charger",
+      "Pure, Hybrid & Power Drive Modes w/ Battery Hold",
+    ],
+    safety_features: [
+      "Pilot Assist w/ Adaptive Cruise Control",
+      "Lane Keeping Aid",
+      "Blind Spot Information System w/ Cross Traffic Alert",
+      "Collision Avoidance w/ Pedestrian & Cyclist Detection",
+      "Road Sign Information",
+      "360° Camera w/ Park Assist Front & Rear",
+    ],
+    interior: [
+      "Ventilated Nappa Leather Front Seats w/ Massage",
+      "Heated Front & Rear Seats",
+      "Heated Steering Wheel",
+      "Four-Zone Automatic Climate Control",
+      "12.3-Inch Digital Driver Display",
+      "Head-Up Display",
+      "9-Inch Center Display w/ Google Built-In",
+      "Bowers & Wilkins Premium Sound",
+      "Wireless Phone Charging",
+    ],
+    exterior: [
+      "Thor's Hammer Pixel LED Headlights",
+      "Panoramic Roof w/ Power Sunshade",
+      "Power Tailgate w/ Hands-Free Opening",
+      "Heated Power-Retractable Exterior Mirrors",
+      "Charge Port Door - Left Front Fender",
+    ],
+  },
+  colors: { exterior: { name: "Onyx Black Metallic", code: "717" }, interior: { name: "Charcoal Nappa Leather", code: "RC00" } },
+  assembly: { plant: "Torslanda", city: "Gothenburg", country: "Sweden" },
+  mechanical: { engine: "2.0L PHEV I4 T8", transmission: "8-SPEED GEARTRONIC", drivetrain: "eAWD" },
+  stockNumber: "V26XC60455",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: "VCC260455", dealer: "072A" },
+  epa: {
+    city: null, highway: null, combined: 63, annualFuelCost: 1350, ghgScore: 8,
+    rangeMiles: 35, fuelType: "PHEV Gasoline-Electric", smogScore: 7, gallonsPer100Miles: null,
+    fiveYearCostDifference: 1000, classNote: null, gasCombinedMpg: 28,
+  },
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: "4-Year/50,000-Mile Powertrain Coverage",
+    corrosion: "12-Year/Unlimited-Mile Corrosion Perforation Warranty",
+    roadside: "4-Year/Unlimited-Mile Roadside Assistance",
+    emissions: "8-Year/100,000-Mile Hybrid Battery Limited Warranty",
+  },
+  passportUrl: "https://autolabels.io/v/demo-xc60-t8",
+  barcodePayload: "YV4H60DL5T1567890",
+});
+
+// EX90 Twin Motor: regulatory/ev, assembled in South Carolina — the
+// fixture set deliberately spans Sweden and US plants so assembly is
+// matched per vehicle, never inferred from the make.
+// 79,995 + 695 + 1,295 = 81,985.
+export const volvoEvFixture = (): FactoryStickerRenderData => ({
+  ...volvoXc90Fixture(),
+  vin: "YV4M12RC2T1345678",
+  identity: { year: "2026", make: "Volvo", model: "EX90", trim: "TWIN MOTOR AWD PLUS 7-SEAT" },
+  pricing: { baseMsrp: 79995, destinationCharge: 1295, optionsTotal: 695, totalMsrp: 81985 },
+  options: [
+    { name: "Vapour Grey Premium Paint", code: "728", msrp: 695 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Twin Motor All-Wheel Drive - 402 HP",
+      "111 kWh Lithium-Ion Battery",
+      "DC Fast Charging up to 250 kW",
+      "11 kW Onboard Charger",
+      "Heat Pump",
+      "One-Pedal Drive w/ Adjustable Regeneration",
+    ],
+    safety_features: [
+      "Pilot Assist w/ Adaptive Cruise Control",
+      "Lane Keeping Aid",
+      "Blind Spot Information System w/ Cross Traffic Alert",
+      "Collision Avoidance w/ Pedestrian & Cyclist Detection",
+      "360° Camera w/ Park Assist Front & Rear",
+      "Driver Understanding System",
+    ],
+    interior: [
+      "Heated Front Seats w/ 4-Way Power Lumbar",
+      "Quilted Nordico Upholstery",
+      "Four-Zone Automatic Climate Control",
+      "14.5-Inch Center Display w/ Google Built-In",
+      "8-Inch Digital Driver Display",
+      "Digital Key",
+      "Wireless Phone Charging",
+      "Power Tailgate w/ Hands-Free Opening",
+    ],
+    exterior: [
+      "Pixel LED Headlights",
+      "Panoramic Roof",
+      "Flush Door Handles",
+      "Heated Power-Retractable Exterior Mirrors",
+      "20-Inch Aero 5-Spoke Wheels",
+    ],
+  },
+  colors: { exterior: { name: "Vapour Grey", code: "728" }, interior: { name: "Charcoal Nordico", code: "R100" } },
+  assembly: { plant: "Ridgeville", city: "Ridgeville", country: "USA" },
+  mechanical: { engine: "TWIN ELECTRIC MOTORS", transmission: "1-SPEED REDUCTION", drivetrain: "AWD" },
+  stockNumber: "V26EX90233",
+  transportMethod: "TRUCK",
+  factoryCodes: { location: null, emissions: "ZEV", sequence: null, order: "VCC260233", dealer: "072A" },
+  epa: {
+    city: 92, highway: 82, combined: 87, annualFuelCost: 850, ghgScore: 10,
+    rangeMiles: 310, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 3750, classNote: null,
+  },
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: "4-Year/50,000-Mile Powertrain Coverage",
+    corrosion: "12-Year/Unlimited-Mile Corrosion Perforation Warranty",
+    roadside: "4-Year/Unlimited-Mile Roadside Assistance",
+    emissions: "8-Year/100,000-Mile High-Voltage Battery Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "20%" },
+    { label: "Major foreign parts content", value: "Sweden 25%" },
+    { label: "Final assembly point", value: "Ridgeville, South Carolina, USA" },
+    { label: "Country of origin - motors", value: "Sweden" },
+    { label: "Country of origin - battery", value: "USA" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-ex90",
+  barcodePayload: "YV4M12RC2T1345678",
+});
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

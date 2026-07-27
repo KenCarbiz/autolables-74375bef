@@ -120,11 +120,26 @@ const unresolved = (reason: string): OemResolution => ({
   fallbackReason: reason,
 });
 
+// Commercial-truck marques that would otherwise fuzzy-match a passenger
+// brand (e.g. "Volvo Trucks" contains "volvo"). These must never receive
+// a passenger-car template — they resolve to review instead of guessing.
+const NON_PASSENGER_MAKES = new Set([
+  "volvotrucks",
+  "volvotruck",
+  "volvogroup",
+  "abvolvo",
+  "macktrucks",
+  "mack",
+]);
+
 export function resolveOem(rawMake: string, modelYear?: number): OemResolution {
   const raw = String(rawMake ?? "").trim();
   if (!raw) return unresolved("empty make");
   const key = makeKey(raw);
   if (!key) return unresolved(`make "${raw}" has no resolvable characters`);
+  if (NON_PASSENGER_MAKES.has(key)) {
+    return unresolved(`make "${raw}" is a commercial-truck marque, not a passenger brand`);
+  }
 
   // Ram was a Dodge nameplate until the 2011 brand split.
   if (key === "ram" && modelYear !== undefined && modelYear <= 2010) {

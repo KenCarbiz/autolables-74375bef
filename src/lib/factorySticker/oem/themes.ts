@@ -7,7 +7,6 @@ export type TemplateFamilyId =
   | "KOREAN_PREMIUM"
   | "KOREAN_MAINSTREAM"
   | "PREMIUM_LUXURY"
-  | "MODERN_LUXURY"
   | "AMERICAN_MAINSTREAM"
   | "EUROPEAN_TECHNICAL"
   | "JAPANESE_MAINSTREAM"
@@ -15,6 +14,7 @@ export type TemplateFamilyId =
   | "PREMIUM_FACTORY"
   | "LUXURY_FACTORY"
   | "GERMAN_FACTORY"
+  | "SCANDINAVIAN_FACTORY"
   | "PERFORMANCE"
   | "EV_TECHNICAL"
   | "COMMERCIAL"
@@ -24,7 +24,6 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "KOREAN_PREMIUM",
   "KOREAN_MAINSTREAM",
   "PREMIUM_LUXURY",
-  "MODERN_LUXURY",
   "AMERICAN_MAINSTREAM",
   "EUROPEAN_TECHNICAL",
   "JAPANESE_MAINSTREAM",
@@ -32,6 +31,7 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "PREMIUM_FACTORY",
   "LUXURY_FACTORY",
   "GERMAN_FACTORY",
+  "SCANDINAVIAN_FACTORY",
   "PERFORMANCE",
   "EV_TECHNICAL",
   "COMMERCIAL",
@@ -147,17 +147,6 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.14em",
     uppercaseSectionHeadings: true,
   },
-  MODERN_LUXURY: {
-    headingFont: 'Optima, Candara, "Segoe UI", Helvetica, sans-serif',
-    bodyFont: '"Segoe UI", Helvetica, Arial, sans-serif',
-    numericFont: '"Segoe UI", Arial, sans-serif',
-    headingWeight: 500,
-    bodyWeight: 400,
-    labelWeight: 600,
-    letterSpacing: "0.01em",
-    headingLetterSpacing: "0.1em",
-    uppercaseSectionHeadings: true,
-  },
   AMERICAN_MAINSTREAM: {
     headingFont: '"Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif',
     bodyFont: "Arial, Helvetica, sans-serif",
@@ -243,6 +232,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.04em",
     uppercaseSectionHeadings: true,
   },
+  // Volvo's Scandinavian factory voice: clean grotesque, medium-weight
+  // headings with generous tracking — spacious restraint over density.
+  SCANDINAVIAN_FACTORY: {
+    headingFont: '"Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    bodyFont: '"Segoe UI", "Helvetica Neue", Arial, sans-serif',
+    numericFont: '"Segoe UI", "Arial Narrow", Arial, sans-serif',
+    headingWeight: 600,
+    bodyWeight: 400,
+    labelWeight: 600,
+    letterSpacing: "0.01em",
+    headingLetterSpacing: "0.08em",
+    uppercaseSectionHeadings: true,
+  },
   PERFORMANCE: {
     headingFont: '"Arial Black", "Franklin Gothic Heavy", Arial, sans-serif',
     bodyFont: "Arial, Helvetica, sans-serif",
@@ -320,16 +322,6 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "0.5pt",
     cornerTreatment: "SQUARE",
   },
-  MODERN_LUXURY: {
-    headerVariant: "RULED",
-    pricingVariant: "BOXED",
-    barcodeVariant: "CODE128",
-    qrVariant: "ROUNDED",
-    footerVariant: "SPLIT",
-    columnGap: "16pt",
-    borderWeight: "0.5pt",
-    cornerTreatment: "ROUNDED_SM",
-  },
   AMERICAN_MAINSTREAM: {
     headerVariant: "BLOCK",
     pricingVariant: "BANDED",
@@ -400,6 +392,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  SCANDINAVIAN_FACTORY: {
+    headerVariant: "BANDED",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "15pt",
+    borderWeight: "0.75pt",
+    cornerTreatment: "SQUARE",
+  },
   PERFORMANCE: {
     headerVariant: "BLOCK",
     pricingVariant: "BANDED",
@@ -449,8 +451,8 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   PREMIUM_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
   LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
   GERMAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.18em" },
+  SCANDINAVIAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.3em" },
   PREMIUM_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 200, maxHeightPx: 56, alignment: "CENTER", wordmarkLetterSpacing: "0.3em" },
-  MODERN_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 190, maxHeightPx: 52, alignment: "CENTER", wordmarkLetterSpacing: "0.22em" },
   AMERICAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.08em" },
   EUROPEAN_TECHNICAL: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
   JAPANESE_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
@@ -707,7 +709,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     totalMsrpBackground: "#111111",
     totalMsrpText: "#ffffff",
   }),
-  VOLVO: theme("VOLVO", "MODERN_LUXURY", palette({ header: "#003057", accent: "#7fa0bd", sectionHeading: "#003057" })),
+  // Volvo factory treatment (volvo-us-2026-v1): white identity block and
+  // band, charcoal ink, fine neutral rules — Volvo blue appears only on
+  // the single accent keyline, never on backgrounds or pricing.
+  VOLVO: theme("VOLVO", "SCANDINAVIAN_FACTORY", {
+    headerBackground: "#ffffff",
+    headerText: "#111111",
+    background: "#ffffff",
+    bodyText: "#1a1d21",
+    mutedText: "#55595e",
+    accent: "#003057",
+    divider: "#d3d6da",
+    sectionHeadingText: "#111111",
+    totalMsrpBackground: "#101010",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL MSRP" }),
   LAND_ROVER: theme("LAND_ROVER", "PREMIUM_LUXURY", palette({ header: "#0c3c26", accent: "#b49b57", sectionHeading: "#0c3c26" })),
   PORSCHE: theme("PORSCHE", "PERFORMANCE", palette({ header: "#000000", accent: "#d5001c" })),
   TESLA: theme("TESLA", "EV_TECHNICAL", palette({ header: "#171a20", accent: "#e82127" })),

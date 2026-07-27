@@ -93,6 +93,18 @@ describe("resolveOem — brand distinctions stay distinct", () => {
     expect(resolveOem("Nissan").identity.id).toBe("NISSAN");
   });
 
+  it("Volvo Cars resolves; Polestar, Volvo Trucks and Mack never do", () => {
+    expect(resolveOem("Volvo").identity.id).toBe("VOLVO");
+    expect(resolveOem("VOLVO").identity.id).toBe("VOLVO");
+    expect(resolveOem("Volvo Cars").identity.id).toBe("VOLVO");
+    expect(resolveOem("VOLVO CARS").identity.id).toBe("VOLVO");
+    for (const truck of ["Polestar", "Volvo Trucks", "Volvo Truck", "Volvo Group", "AB Volvo", "Mack", "Mack Trucks"]) {
+      const res = resolveOem(truck);
+      expect(res.confidence, truck).toBe("UNRESOLVED");
+      expect(res.identity.id, truck).toBe("AUTOLABELS_FALLBACK");
+    }
+  });
+
   it("GM brands resolve individually", () => {
     expect(resolveOem("Chevrolet").identity.id).toBe("CHEVROLET");
     expect(resolveOem("GMC").identity.id).toBe("GMC");
