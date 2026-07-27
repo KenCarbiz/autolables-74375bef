@@ -410,3 +410,55 @@ GRANT EXECUTE ON FUNCTION public.record_description_output_use(uuid, text, text,
 -- an equipment statement true or false. The canonical set lives alongside it.
 ALTER TABLE public.description_fact_snapshots
   ADD COLUMN IF NOT EXISTS features_json jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+-- ── 8. Remaining Description V3 record fields ────────────────────────
+-- language/locale: copy is English-only today, but the column has to exist
+-- before a Spanish Buyers-Guide market makes it urgent, and a version must
+-- record which language it WAS written in rather than having it inferred.
+-- repair_json: the exact deletions the deterministic repair pass made, so a
+-- reviewer can see what was cut and why without diffing two blobs.
+ALTER TABLE public.description_versions
+  ADD COLUMN IF NOT EXISTS language        text NOT NULL DEFAULT 'en',
+  ADD COLUMN IF NOT EXISTS locale          text NOT NULL DEFAULT 'en-US',
+  ADD COLUMN IF NOT EXISTS repair_json     jsonb,
+  ADD COLUMN IF NOT EXISTS compliance_review_state text NOT NULL DEFAULT 'not_required'
+    CHECK (compliance_review_state IN ('not_required','pending','cleared','rejected')),
+  -- Pipeline linkage: the ledger already owns the case, but a version needs to
+  -- name the stage that produced it for the §3 traceability chain to close.
+  ADD COLUMN IF NOT EXISTS pipeline_stage  text;
+
+ALTER TABLE public.description_channel_versions
+  ADD COLUMN IF NOT EXISTS repair_json     jsonb,
+  ADD COLUMN IF NOT EXISTS language        text NOT NULL DEFAULT 'en',
+  ADD COLUMN IF NOT EXISTS locale          text NOT NULL DEFAULT 'en-US';
+
+-- Validation overrides are their own record, never a mutation of the finding.
+-- A cleared finding must stay visible with the human's name on it.
+CREATE TABLE IF NOT EXISTS public.description_validation_overrides (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  description_case_id uuid NOT NULL REFERENCES public.description_cases(id) ON DELETE CASCADE,
+  version_id          uuid REFERENCES public.description_versions(id) ON DELETE CASCADE,
+  validator_codes     text[] NOT NULL,
+  reason              text NOT NULL,
+  actor_user_id       uuid NOT NULL REFERENCES auth.users(id),
+  actor_role          text,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT description_validation_overrides_reason_len CHECK (char_length(reason) >= 10)
+);
+CREATE INDEX IF NOT EXISTS idx_description_validation_overrides_version
+  ON public.description_validation_overrides (version_id, created_at DESC);
+
+ALTER TABLE public.description_validation_overrides ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
+                 AND tablename='description_validation_overrides' AND policyname='tenant_members_read') THEN
+    CREATE POLICY "tenant_members_read" ON public.description_validation_overrides
+      FOR SELECT TO authenticated
+      USING (tenant_id IN (SELECT tenant_id FROM public.tenant_members
+                           WHERE user_id = (SELECT auth.uid()) AND accepted_at IS NOT NULL));
+  END IF;
+END $$;
+REVOKE INSERT, UPDATE, DELETE ON public.description_validation_overrides FROM authenticated;
+GRANT SELECT ON public.description_validation_overrides TO authenticated;

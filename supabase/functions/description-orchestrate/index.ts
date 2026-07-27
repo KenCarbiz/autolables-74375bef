@@ -24,6 +24,8 @@ import {
   type DescriptionPacket, type ChannelPolicy, type ComparisonDoc, type SeoTargeting,
   type ToneKey, type VoiceProfile,
 } from "../_shared/description-core.ts";
+import { repairContent, hasRepairableFindings } from "../_shared/description-repair.ts";
+import { can } from "../_shared/description-permissions.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -467,15 +469,45 @@ async function orchestrateVehicle(
 
     await saveFeatureSelections(admin, tenantId, vehicleId, caseId, version.id, packet);
 
-    // 4 ── validate + score the master against real comparisons
+    // 4 ── validate → repair → revalidate
     await setCase(admin, caseId, { status: "VALIDATING" });
-    const findings: Finding[] = validateContentV3(masterText, snap, settings, packet);
+    let masterFinal = masterText;
+    let findings: Finding[] = validateContentV3(masterFinal, snap, settings, packet);
+    let repairLog: Record<string, unknown> | null = null;
+
+    // Repair only ever DELETES the offending sentence, trims, or appends the
+    // dealer's own disclosure. It never rewrites a claim and never calls the
+    // model again — a generative "fix" is a second chance to hallucinate.
+    if (hasRepairableFindings(findings)) {
+      const repaired = repairContent(masterFinal, findings, masterPolicy, voice.requiredDisclosures);
+      if (repaired.changed) {
+        const after = validateContentV3(repaired.content, snap, settings, packet);
+        const before = findings.filter((f) => f.blocking).length;
+        // Keep the repair only if it strictly reduces blocking findings.
+        // A repair that trades one blocker for another is not an improvement.
+        if (after.filter((f) => f.blocking).length < before) {
+          masterFinal = repaired.content;
+          findings = after;
+          repairLog = { applied: repaired.applied, unrepairable: repaired.unrepairable,
+                        blocking_before: before, blocking_after: after.filter((f) => f.blocking).length };
+          await admin.from("description_versions").update({
+            content: masterFinal,
+            word_count: masterFinal.split(/\s+/).filter(Boolean).length,
+            character_count: masterFinal.length,
+            repair_json: repairLog,
+          }).eq("id", version.id);
+          await audit(admin, tenantId, "description_repair_applied", caseId,
+            { vin: listing.vin, version_id: version.id, ...repairLog });
+        }
+      }
+    }
+    const masterText2 = masterFinal;
     // The comparison set is built AFTER the version row exists but excludes it,
     // because the prior-version query orders by version_number and this run's
     // own copy would otherwise score as its own duplicate.
     const comparisons = (await buildComparisonSet(admin, tenantId, vehicleId, caseId, listing))
       .filter((d) => d.id !== version.id);
-    const masterScore = scoreVersion({ text: masterText, packet, findings, comparisons });
+    const masterScore = scoreVersion({ text: masterText2, packet, findings, comparisons });
     const quality = masterScore.total;
 
     if (findings.length) {
@@ -531,7 +563,7 @@ async function orchestrateVehicle(
 
       try {
         const raw = await callGenerator(
-          buildChannelPromptV3(masterText, policy, channelPacket), settings.generation_model);
+          buildChannelPromptV3(masterText2, policy, channelPacket), settings.generation_model);
         let content = raw, seoTitle: string | null = null, metaDesc: string | null = null;
         if (policy.seoFields) {
           try {
@@ -541,7 +573,26 @@ async function orchestrateVehicle(
             metaDesc = parsed.meta_description ? String(parsed.meta_description) : null;
           } catch { /* fall back to raw text */ }
         }
-        const cFindings = validateContentV3(content, snap, settings, channelPacket, policy);
+        let cFindings = validateContentV3(content, snap, settings, channelPacket, policy);
+        let cRepair: Record<string, unknown> | null = null;
+        // Same removal-only repair per channel. A channel variant is the most
+        // common place a length or formatting rule bites, and those are the
+        // repairs that are unambiguously safe.
+        if (hasRepairableFindings(cFindings) || cFindings.some((f) =>
+            ["CHANNEL_LENGTH_EXCEEDED", "CHANNEL_FORMAT_INVALID", "CHANNEL_EMOJI_NOT_ALLOWED"]
+              .includes(f.validator_code))) {
+          const r = repairContent(content, cFindings, policy, policy.requiredDisclosures);
+          if (r.changed) {
+            const after = validateContentV3(r.content, snap, settings, channelPacket, policy);
+            const beforeBlocking = cFindings.filter((f) => f.blocking).length;
+            const afterBlocking = after.filter((f) => f.blocking).length;
+            if (afterBlocking <= beforeBlocking && after.length < cFindings.length) {
+              content = r.content;
+              cFindings = after;
+              cRepair = { applied: r.applied, unrepairable: r.unrepairable };
+            }
+          }
+        }
         const cStatus = cFindings.some((f) => f.blocking) ? "blocked"
           : cFindings.some((f) => f.severity === "warning") ? "warning" : "passed";
 
@@ -551,7 +602,7 @@ async function orchestrateVehicle(
         const cScore = scoreVersion({
           text: content, packet: channelPacket, findings: cFindings, policy,
           comparisons: [
-            { id: version.id, label: "master description", scope: "cross_channel", content: masterText },
+            { id: version.id, label: "master description", scope: "cross_channel", content: masterText2 },
             ...channelTexts.map((t) => ({
               id: `${version.id}:${t.channel}`, label: `${t.label} variant`,
               scope: "cross_channel" as const, content: t.content,
@@ -569,6 +620,7 @@ async function orchestrateVehicle(
           word_count: cScore.readability.words,
           read_time_seconds: Math.max(10, Math.round((cScore.readability.words / 200) * 60)),
           channel_policy_version: policyVersion, score_breakdown_json: cScore,
+          repair_json: cRepair,
           quality_score: cScore.total,
           validation_status: cStatus, potentially_stale: false,
         }, { onConflict: "master_version_id,channel" }).select("id").single();
