@@ -14,6 +14,7 @@ export type TemplateFamilyId =
   | "JAPANESE_FACTORY"
   | "PREMIUM_FACTORY"
   | "LUXURY_FACTORY"
+  | "GERMAN_FACTORY"
   | "PERFORMANCE"
   | "EV_TECHNICAL"
   | "COMMERCIAL"
@@ -30,6 +31,7 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "JAPANESE_FACTORY",
   "PREMIUM_FACTORY",
   "LUXURY_FACTORY",
+  "GERMAN_FACTORY",
   "PERFORMANCE",
   "EV_TECHNICAL",
   "COMMERCIAL",
@@ -228,6 +230,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.1em",
     uppercaseSectionHeadings: true,
   },
+  // Audi's factory allocation voice: neutral grotesque, tight bold
+  // headings, monochrome hierarchy — technical, never promotional.
+  GERMAN_FACTORY: {
+    headingFont: '"Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif',
+    bodyFont: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+    numericFont: '"Helvetica Neue", "Arial Narrow", Arial, sans-serif',
+    headingWeight: 700,
+    bodyWeight: 400,
+    labelWeight: 700,
+    letterSpacing: "0em",
+    headingLetterSpacing: "0.04em",
+    uppercaseSectionHeadings: true,
+  },
   PERFORMANCE: {
     headingFont: '"Arial Black", "Franklin Gothic Heavy", Arial, sans-serif',
     bodyFont: "Arial, Helvetica, sans-serif",
@@ -375,6 +390,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "0.75pt",
     cornerTreatment: "SQUARE",
   },
+  GERMAN_FACTORY: {
+    headerVariant: "BANDED",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "13pt",
+    borderWeight: "1pt",
+    cornerTreatment: "SQUARE",
+  },
   PERFORMANCE: {
     headerVariant: "BLOCK",
     pricingVariant: "BANDED",
@@ -423,6 +448,7 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   JAPANESE_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.24em" },
   PREMIUM_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
   LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
+  GERMAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.18em" },
   PREMIUM_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 200, maxHeightPx: 56, alignment: "CENTER", wordmarkLetterSpacing: "0.3em" },
   MODERN_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 190, maxHeightPx: 52, alignment: "CENTER", wordmarkLetterSpacing: "0.22em" },
   AMERICAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.08em" },
@@ -586,7 +612,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
   RAM: theme("RAM", "COMMERCIAL", palette({ header: "#4a4f54", accent: "#a6192e" })),
   CHRYSLER: theme("CHRYSLER", "AMERICAN_MAINSTREAM", palette({ header: "#003a70", accent: "#b9c0c7", sectionHeading: "#003a70" })),
   VOLKSWAGEN: theme("VOLKSWAGEN", "EUROPEAN_TECHNICAL", palette({ header: "#001e50", accent: "#00b1eb", sectionHeading: "#001e50" })),
-  AUDI: theme("AUDI", "EUROPEAN_TECHNICAL", palette({ header: "#000000", accent: "#bb0a30" })),
+  // Audi factory treatment (audi-us-2026-v2): white identity block and
+  // band, fully monochrome black rules and keyline per the owner's
+  // reference — Audi red is deliberately withheld until asked for.
+  AUDI: theme("AUDI", "GERMAN_FACTORY", {
+    headerBackground: "#ffffff",
+    headerText: "#111111",
+    background: "#ffffff",
+    bodyText: "#111111",
+    mutedText: "#55595e",
+    accent: "#0d0d0d",
+    divider: "#d7d7d7",
+    sectionHeadingText: "#111111",
+    totalMsrpBackground: "#101010",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL MSRP" }),
   BMW: theme("BMW", "EUROPEAN_TECHNICAL", palette({ header: "#262626", accent: "#0066b1" })),
   // Mercedes-Benz factory treatment (mercedes-benz-us-2026-v1): white
   // header with the auto-fit wordmark block, restrained silver keyline,

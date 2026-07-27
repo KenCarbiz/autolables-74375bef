@@ -247,13 +247,15 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     status: "draft",
     logoAuthorized: false,
   },
+  // v2 supersedes the same-day v1 draft per the owner's 2026-07-27 formal
+  // Audi factory-template directive (white monochrome factory treatment).
   {
     oemId: "AUDI",
     market: "US",
     modelYearStart: 2022,
     modelYearEnd: 2027,
-    themeVersion: "audi-us-2026-v1",
-    layoutFamily: "german-technical",
+    themeVersion: "audi-us-2026-v2",
+    layoutFamily: "german-factory-technical",
     status: "draft",
     logoAuthorized: false,
   },
@@ -267,6 +269,7 @@ const FAMILY_BY_TEMPLATE: Record<string, string> = {
   JAPANESE_FACTORY: "japanese-factory-technical",
   PREMIUM_FACTORY: "premium-factory-technical",
   LUXURY_FACTORY: "luxury-factory-technical",
+  GERMAN_FACTORY: "german-factory-technical",
   AMERICAN_MAINSTREAM: "american-utility",
   PERFORMANCE: "adventure-performance",
   COMMERCIAL: "adventure-performance",

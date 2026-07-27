@@ -6,6 +6,7 @@ import {
   acuraRdxFixture,
   acuraZdxFixture,
   audiEtronFixture,
+  audiPhevFixture,
   audiQ5Fixture,
   cadillacEscaladeFixture,
   cadillacLyriqFixture,
@@ -938,22 +939,16 @@ describe("Ram profile (ram-us-2026-v1)", () => {
   });
 });
 
-describe("Volkswagen and Audi profiles (german-technical)", () => {
-  it("VW and Audi resolve to distinct versions on the shared family, distinct from BMW", () => {
+describe("Volkswagen profile (german-technical)", () => {
+  it("VW resolves distinctly from BMW on the shared family", () => {
     const v = resolveThemeProfile("Volkswagen", 2026);
-    const a = resolveThemeProfile("Audi", 2026);
     const b = resolveThemeProfile("BMW", 2026);
     expect(v.profile.themeVersion).toBe("volkswagen-us-2026-v1");
-    expect(a.profile.themeVersion).toBe("audi-us-2026-v1");
-    expect(new Set([v.profile.themeVersion, a.profile.themeVersion, b.profile.themeVersion]).size).toBe(3);
-    // Same behavioral family, distinct band fills.
-    const fillsOf = (fx: () => ReturnType<typeof vwAtlasFixture>) => {
-      const model = buildRenderLayout(fx(), themeFor(null));
-      return new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
-    };
-    expect(fillsOf(vwAtlasFixture).has("#001e50")).toBe(true);   // VW dark blue band
-    expect(fillsOf(audiQ5Fixture).has("#000000")).toBe(true);    // Audi black band
-    expect(fillsOf(audiQ5Fixture).has("#001e50")).toBe(false);
+    expect(v.theme.templateFamilyId).toBe(b.theme.templateFamilyId);
+    expect(v.profile.themeVersion).not.toBe(b.profile.themeVersion);
+    const model = buildRenderLayout(vwAtlasFixture(), themeFor(null));
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#001e50")).toBe(true);   // VW dark blue band
   });
 
   it("Atlas renders reconciled with rated NHTSA rows", () => {
@@ -967,18 +962,90 @@ describe("Volkswagen and Audi profiles (german-technical)", () => {
     expectMinFontRespected(model);
   });
 
-  it("ID.4 and Q6 e-tron use the EV module; Q5 keeps S line as appearance equipment", () => {
-    for (const fx of [vwId4Fixture, audiEtronFixture]) {
-      const model = buildRenderLayout(fx(), themeFor(null));
-      const page1 = pageStrings(model, 0);
-      expect(page1).toContain("MPGe");
-      expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
-      expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+  it("ID.4 uses the EV module", () => {
+    const model = buildRenderLayout(vwId4Fixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+  });
+});
+
+describe("Audi profile (audi-us-2026-v2, german-factory-technical)", () => {
+  it("resolves to the factory family, distinct from VW, BMW and Porsche handling", () => {
+    const a = resolveThemeProfile("Audi", 2026);
+    const v = resolveThemeProfile("Volkswagen", 2026);
+    const b = resolveThemeProfile("BMW", 2026);
+    expect(a.profile.themeVersion).toBe("audi-us-2026-v2");
+    expect(a.profile.status).toBe("draft");
+    expect(a.profile.layoutFamily).toBe("german-factory-technical");
+    expect(a.theme.templateFamilyId).toBe("GERMAN_FACTORY");
+    expect(a.theme.templateFamilyId).not.toBe(v.theme.templateFamilyId);
+    expect(a.theme.templateFamilyId).not.toBe(b.theme.templateFamilyId);
+    expect(a.theme.totalLabel).toBe("TOTAL MSRP");
+    // Alias normalization: corporate and performance-arm names resolve to
+    // the same Audi profile, never a VW or Porsche counterpart.
+    for (const alias of ["AUDI", "Audi AG", "audi"]) {
+      expect(resolveThemeProfile(alias, 2026).profile.themeVersion).toBe("audi-us-2026-v2");
     }
-    const q5 = buildRenderLayout(audiQ5Fixture(), themeFor(null));
-    const p1 = pageStrings(q5, 0);
-    expect(p1).toContain("$56,545.00");
-    expect(p1.some((s) => s.includes("S line Exterior Package"))).toBe(true);
-    expect(p1.some((s) => s.includes("2026 AUDI Q5"))).toBe(true);
+  });
+
+  it("renders the owner's Q5 reference reconciled to $61,640 with coded package membership", () => {
+    const model = buildRenderLayout(audiQ5Fixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$61,640.00");
+    expect(page1).toContain("$52,800.00");
+    expect(page1).toContain("1,295.00");
+    // Coded options with package membership: member content renders under
+    // the package row, never as duplicate priced lines.
+    expect(page1).toContain("WBP");
+    expect(page1).toContain("PXD");
+    expect(page1).toContain("9VS");
+    expect(joined).toContain("Premium Plus Package");
+    expect(joined).toContain("Black Optic Package");
+    expect(joined).toContain("Black Exterior Mirror Housings");
+    // Monochrome white-header treatment: no black or VW-blue header band.
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#001e50")).toBe(false);
+    expect(fills.has("#000000")).toBe(false);
+    // Factory panels + passport branding from the reference.
+    expect(joined).toContain("NEW VEHICLE LIMITED WARRANTY");
+    expect(joined).toContain("PARTS CONTENT");
+    expect(joined).toContain("GERMANY 57%");
+    expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
+    expect(page1.some((s) => s.includes("Powered by"))).toBe(true);
+    expect(page1).toContain("(LABELS)");
+    expect(page1.some((s) => s.includes("SAN JOSE CHIAPA"))).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("WA1E2AFP4TA123456");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Q5 55 TFSI e uses the PHEV module and S line stays appearance equipment", () => {
+    const model = buildRenderLayout(audiPhevFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPG gasoline only"))).toBe(true);
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(false);
+    // TFSI e is a plug-in hybrid, never an e-tron EV; S line trim never
+    // escalates the model to an Audi S.
+    expect(joined).toContain("55 TFSI E QUATTRO S LINE");
+    expect(joined).not.toContain("SQ5");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Q6 e-tron keeps the EV module with no gasoline content", () => {
+    const model = buildRenderLayout(audiEtronFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
   });
 });
