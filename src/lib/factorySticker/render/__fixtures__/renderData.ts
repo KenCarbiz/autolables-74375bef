@@ -2060,6 +2060,99 @@ export const acuraLongFixture = (): FactoryStickerRenderData => {
   };
 };
 
+// ── INFINITI new-vehicle fixture (luxury-factory-technical, v2) ────────
+
+// New QX80: full factory panel set. 109,900 + 1,150 + 1,995 = 113,045.
+export const infinitiQx80NewFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "JN8AZ3DC0T9500123",
+  identity: { year: "2026", make: "INFINITI", model: "QX80", trim: "AUTOGRAPH 4WD" },
+  pricing: { baseMsrp: 109900, destinationCharge: 1995, optionsTotal: 1150, totalMsrp: 113045 },
+  options: [
+    { name: "Premium Paint - Dynamic Metal", code: "PP", msrp: 650 },
+    { name: "Illuminated Kick Plates", code: "IKP", msrp: 500 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.5L Twin-Turbocharged V6 - 450 HP",
+      "9-Speed Automatic Transmission",
+      "Intelligent 4WD w/ Drive Mode Selector",
+      "Electronic Air Suspension w/ Dynamic Damping",
+      "Hill Start Assist & Trailer Sway Control",
+    ],
+    safety_features: [
+      "INFINITI Safety Shield",
+      "Automatic Emergency Braking w/ Pedestrian Detection",
+      "Blind Spot Warning & Blind Spot Intervention",
+      "Lane Departure Warning & Lane Departure Prevention",
+      "Intelligent Cruise Control",
+      "Around View Monitor w/ Moving Object Detection",
+      "Traffic Sign Recognition",
+      "Rear Automatic Braking",
+    ],
+    interior: [
+      "Semi-Aniline Leather-Appointed Seating",
+      "Massaging Front Seats w/ Heating & Ventilation",
+      "Heated Second-Row Captain's Chairs",
+      "Biometric Cooling - Second Row",
+      "14.3-Inch Dual Infiniti InTouch Displays",
+      "Klipsch Reference Premiere Audio - 24 Speakers",
+      "Tri-Zone Automatic Climate Control",
+      "Heated Steering Wheel w/ Memory",
+      "Head-Up Display",
+      "Wireless Apple CarPlay & Android Auto",
+      "Wireless Phone Charger",
+    ],
+    exterior: [
+      "22-Inch Forged Aluminum-Alloy Wheels",
+      "Adaptive LED Headlights w/ Signature DRLs",
+      "Power Panoramic Moonroof",
+      "Hands-Free Power Liftgate",
+      "Power-Folding Heated Mirrors w/ Reverse Tilt",
+      "Rain-Sensing Wipers",
+      "Dark Chrome Exterior Accents",
+    ],
+  },
+  colors: {
+    exterior: { name: "Dynamic Metal", code: "KBY" },
+    interior: { name: "Graphite and Burgundy", code: "GBR" },
+  },
+  assembly: { plant: "Yukuhashi", city: "Yukuhashi, Fukuoka", country: "Japan" },
+  mechanical: { engine: "3.5L TT V6", transmission: "9-SPEED A/T", drivetrain: "4WD" },
+  stockNumber: "IN2650123",
+  transportMethod: "OCEAN",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: null, dealer: "10472" },
+  epa: {
+    city: 16, highway: 19, combined: 17, annualFuelCost: 3350, ghgScore: 3,
+    rangeMiles: null, fuelType: "Premium Gasoline", smogScore: 5, gallonsPer100Miles: 5.9,
+    fiveYearCostDifference: -5250, classNote: null,
+  },
+  safety: { overall: 5, frontalDriver: 5, frontalPassenger: 5, sideFront: 5, sideRear: 5, rollover: 4 },
+  warranty: {
+    basic: "4-Year/60,000-Mile Basic Limited Warranty",
+    powertrain: "6-Year/70,000-Mile Powertrain Limited Warranty",
+    corrosion: "7-Year/Unlimited-Mile Corrosion Coverage",
+    roadside: "4-Year/Unlimited-Mile Roadside Assistance",
+    emissions: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "0%" },
+    { label: "Major foreign parts content", value: "Japan 75%" },
+    { label: "Final assembly point", value: "Yukuhashi, Fukuoka, Japan" },
+    { label: "Country of origin - engine", value: "Japan" },
+    { label: "Country of origin - transmission", value: "Japan" },
+  ],
+  dealer: { name: "INFINITI of Coral Gables", address: "4152 Ponce de Leon Blvd", city: "Coral Gables", state: "FL", zip: "33146", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-qx80-new",
+  barcodePayload: "JN8AZ3DC0T9500123",
+  disclaimers: [
+    "Vehicle information compiled from verified manufacturer, regulatory and dealer data. This document may not be the original manufacturer-issued label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

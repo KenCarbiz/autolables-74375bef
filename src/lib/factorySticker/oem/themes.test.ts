@@ -75,36 +75,38 @@ describe("theme registry coverage", () => {
   });
 });
 
+// Pinned per the 2026-07-27 Infiniti factory-template directive (v2):
+// charcoal band, muted burgundy accent, luxury-factory composition.
 describe("INFINITI theme — pinned tokens", () => {
   const t = THEME_REGISTRY.INFINITI;
 
-  it("is PREMIUM_LUXURY", () => {
-    expect(t.templateFamilyId).toBe("PREMIUM_LUXURY");
+  it("is LUXURY_FACTORY", () => {
+    expect(t.templateFamilyId).toBe("LUXURY_FACTORY");
   });
 
-  it("uses the approved black / white / charcoal / deep-navy palette", () => {
-    expect(t.colors.headerBackground).toBe("#000000");
+  it("uses the charcoal / white palette with the muted burgundy accent", () => {
+    expect(t.colors.headerBackground).toBe("#171717");
     expect(t.colors.headerText).toBe("#ffffff");
     expect(t.colors.bodyText).toBe("#2b2b2b");
-    expect(t.colors.accent).toBe("#141414");
+    expect(t.colors.accent).toBe("#8a1538");
     expect(t.colors.sectionHeadingText).toBe("#1a1a1a");
     expect(t.colors.totalMsrpBackground).toBe("#161616");
     expect(t.colors.totalMsrpText).toBe("#ffffff");
   });
 
-  it("uses generous letter spacing and uppercase section headings", () => {
-    expect(t.typography.headingLetterSpacing).toBe("0.14em");
+  it("uses tracked uppercase section headings", () => {
+    expect(t.typography.headingLetterSpacing).toBe("0.1em");
     expect(t.typography.uppercaseSectionHeadings).toBe(true);
-    expect(t.logo.wordmarkLetterSpacing).toBe("0.3em");
+    expect(t.logo.wordmarkLetterSpacing).toBe("0.28em");
   });
 
   it("uses thin rules and square corners", () => {
-    expect(t.layout.borderWeight).toBe("0.5pt");
+    expect(t.layout.borderWeight).toBe("0.75pt");
     expect(t.layout.cornerTreatment).toBe("SQUARE");
   });
 
-  it("keeps the wordmark treatment centered until logo assets are approved", () => {
-    expect(t.logo.placement).toBe("TOP_CENTER");
+  it("keeps the governed wordmark treatment until logo assets are approved", () => {
+    expect(t.logo.placement).toBe("TOP_LEFT");
     expect(t.logo.wordmarkText).toBe("INFINITI");
     expect(t.logo.usageAuthorized).toBe(false);
   });

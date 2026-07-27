@@ -21,6 +21,7 @@ import {
   acuraLongFixture,
   acuraRdxFixture,
   acuraZdxFixture,
+  infinitiQx80NewFixture,
   hondaCrvHybridFixture,
   hondaLongFixture,
   hondaPilotFixture,
@@ -50,6 +51,7 @@ import {
 
 const LAB_FIXTURES = {
   used: { label: "Used (QX80 data)", data: infinitiBenchmark },
+  infinitinew: { label: "INFINITI QX80 new", data: infinitiQx80NewFixture },
   nissan: { label: "Nissan Pathfinder", data: nissanBenchmark },
   jeep: { label: "Jeep Wrangler", data: jeepFixture },
   jeep4xe: { label: "Jeep 4xe PHEV", data: jeep4xeFixture },

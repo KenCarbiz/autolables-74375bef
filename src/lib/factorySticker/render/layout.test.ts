@@ -45,7 +45,7 @@ describe("layout: INFINITI benchmark", () => {
   it("draws the passport QR with the canonical URL and scan caption", () => {
     const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
     expect(qrs.some((q) => q.kind === "qr" && q.payload === "https://autolabels.io/v/demo-qx80")).toBe(true);
-    expect(page1).toContain("AUTOLABELS VEHICLE PASSPORT");
+    expect(page1).toContain("VEHICLE PASSPORT");
     expect(page1).toContain("autolabels.io/v/demo-qx80");
   });
 

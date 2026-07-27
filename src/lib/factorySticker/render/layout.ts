@@ -345,6 +345,7 @@ const FAMILY_STYLES: Record<string, FamilyStyle> = {
   KOREAN_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, headingBarFill: "#f1f1f1", inkStructure: true },
   JAPANESE_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true },
   PREMIUM_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, emblemBlockFilled: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true },
+  LUXURY_FACTORY: { headerComposition: "IDENTITY_BLOCK", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, inkStructure: true, shipToBlock: true, msrpFootnote: true, msrpIncludes: true, leftPartsPanel: true, passportBrandLine: true },
   PREMIUM_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
   MODERN_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
   EUROPEAN_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: false, boxedZones: true, equipmentColumns: 3 },
@@ -588,8 +589,8 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
       ? "FACTORY CONFIGURATION & MSRP"
       : "VIN-SPECIFIC FACTORY CONFIGURATION WHEN NEW";
     p.text(subtitleI, LX + LW, y + 13, 5.2, "body", "#4c5157", { align: "right" });
-    const bandTop = y + 16;
-    const bandH = 54;
+    const bandTop = y + 15;
+    const bandH = 50;
     const blockW = 92;
     const bandX = LX + blockW;
     // Masthead polarity: JAPANESE_FACTORY fills the model band; the premium
@@ -600,10 +601,17 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
     const blockInk = blockFilled ? theme.colors.headerText : BLACK;
     if (blockFilled) p.rect(LX, bandTop, blockW, bandH, theme.colors.headerBackground);
     p.rect(bandX, bandTop, LX + LW - bandX, bandH, bandFill);
-    // Identity block: governed wordmark treatment only — no fabricated
-    // emblem artwork.
-    const emblemI = emblem ? drawEmblem(LX + 8, bandTop + (bandH - 26) / 2, 26) : 0;
-    if (!emblemI) {
+    // Identity block: governed emblem (when a recreated asset exists)
+    // stacked over the wordmark; otherwise the wordmark treatment alone.
+    // No fabricated emblem artwork.
+    if (emblem && !blockFilled) {
+      const m0 = emblem.render(Math.max(20, emblem.minHeightPt));
+      drawEmblem(LX + Math.max(4, (blockW - m0.width) / 2), bandTop + 5, 20);
+      p.text(theme.logo.wordmarkText, LX + blockW / 2, bandTop + bandH - 9, 7.5, "heading", blockInk, {
+        align: "center",
+        charSpacing: 1.6,
+      });
+    } else {
       p.text(theme.logo.wordmarkText, LX + blockW / 2, bandTop + bandH / 2 + 4.5, 13, "heading", blockInk, {
         align: "center",
         charSpacing: Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * 13, 2.2),
@@ -618,7 +626,7 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
       ["VIN:", v.vin],
       ["STOCK #:", v.stockNumber],
     ];
-    let dy = bandTop + 13.5;
+    let dy = bandTop + 12.5;
     for (const [label, value] of detail) {
       if (!value) continue;
       p.text(label, dx, dy, 5.4, "bold", bandInk);
@@ -626,16 +634,16 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
         ellipsize(value.toUpperCase(), "body", 6, detailW - measureText(`${label} `, "bold", 5.4) - 12),
         dx + measureText(`${label} `, "bold", 5.4) + 2, dy, 6, "body", bandInk,
       );
-      dy += 11;
+      dy += 10.4;
     }
     // Model + trim inside the band; auto-fit, never truncated.
     const primaryI = [v.year > 0 ? String(v.year) : "", v.make, v.model].filter(Boolean).join(" ").toUpperCase();
     const modelMax = dx - bandX - 24;
     let primaryISize = 17;
     while (primaryISize > 11 && measureText(primaryI, "bold", primaryISize) > modelMax) primaryISize -= 0.5;
-    p.text(ellipsize(primaryI, "bold", primaryISize, modelMax), bandX + 12, bandTop + 26, primaryISize, "bold", bandInk);
+    p.text(ellipsize(primaryI, "bold", primaryISize, modelMax), bandX + 12, bandTop + 24.5, primaryISize, "bold", bandInk);
     if (v.trim) {
-      p.text(ellipsize(v.trim.toUpperCase(), "bold", 8.5, modelMax), bandX + 12, bandTop + 41, 8.5, "bold", bandInk, { charSpacing: 0.5 });
+      p.text(ellipsize(v.trim.toUpperCase(), "bold", 8.5, modelMax), bandX + 12, bandTop + 38.5, 8.5, "bold", bandInk, { charSpacing: 0.5 });
     }
     const keylineY = bandTop + bandH + 1.5;
     p.rule(LX, keylineY, LW, 2.5, theme.colors.accent);
@@ -643,7 +651,7 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
       p.text("TYPICAL FACTORY CONFIGURATION FOR THIS TRIM - NOT VIN-SPECIFIC", LX + LW, keylineY + 9, 5.5, "bold", "#7a5c10", { align: "right" });
       return keylineY + 13;
     }
-    return keylineY + 7;
+    return keylineY + 5.5;
   }
   if (banded) {
     const bandH = 30;
@@ -956,7 +964,9 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
     ry += lh;
     leaderRow(p, rightX, rightX + rightW, ry, label, dollar ? formatMoney(amount) : formatPlain(amount), size, "body", BLACK, BLACK);
   }
-  if (familyStyle(ctx.theme).msrpFootnote) {
+  // The taxes/title/license footnote belongs to new-vehicle MSRP documents;
+  // the used reconstruction record states its provenance in the footer.
+  if (familyStyle(ctx.theme).msrpFootnote && input.data.vehicle.condition === "NEW") {
     ry += lh;
     p.text("MSRP does not include taxes, title, license fees, or options", rightX, ry, 5.5, "body", "#4c5157");
     ry += 6.3;

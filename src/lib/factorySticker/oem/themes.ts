@@ -13,6 +13,7 @@ export type TemplateFamilyId =
   | "JAPANESE_MAINSTREAM"
   | "JAPANESE_FACTORY"
   | "PREMIUM_FACTORY"
+  | "LUXURY_FACTORY"
   | "KOREAN_MODERN"
   | "PERFORMANCE"
   | "EV_TECHNICAL"
@@ -29,6 +30,7 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "JAPANESE_MAINSTREAM",
   "JAPANESE_FACTORY",
   "PREMIUM_FACTORY",
+  "LUXURY_FACTORY",
   "KOREAN_MODERN",
   "PERFORMANCE",
   "EV_TECHNICAL",
@@ -211,6 +213,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.05em",
     uppercaseSectionHeadings: true,
   },
+  // INFINITI's premium factory voice: condensed grotesque with generous
+  // tracking on headings — technical restraint over luxury ornament.
+  LUXURY_FACTORY: {
+    headingFont: '"Roboto Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif',
+    bodyFont: '"Roboto Condensed", "Arial Narrow", Arial, sans-serif',
+    numericFont: '"Roboto Condensed", "Arial Narrow", Arial, sans-serif',
+    headingWeight: 700,
+    bodyWeight: 400,
+    labelWeight: 700,
+    letterSpacing: "0.01em",
+    headingLetterSpacing: "0.1em",
+    uppercaseSectionHeadings: true,
+  },
   KOREAN_MODERN: {
     headingFont: '"Segoe UI", "Malgun Gothic", Arial, sans-serif',
     bodyFont: '"Segoe UI", "Malgun Gothic", Arial, sans-serif',
@@ -359,6 +374,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  LUXURY_FACTORY: {
+    headerVariant: "BANDED",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "14pt",
+    borderWeight: "0.75pt",
+    cornerTreatment: "SQUARE",
+  },
   KOREAN_MODERN: {
     headerVariant: "MINIMAL",
     pricingVariant: "BOXED",
@@ -416,6 +441,7 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   KOREAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.22em" },
   JAPANESE_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.24em" },
   PREMIUM_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
+  LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
   PREMIUM_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 200, maxHeightPx: 56, alignment: "CENTER", wordmarkLetterSpacing: "0.3em" },
   MODERN_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 190, maxHeightPx: 52, alignment: "CENTER", wordmarkLetterSpacing: "0.22em" },
   AMERICAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.08em" },
@@ -479,14 +505,17 @@ const theme = (
 });
 
 export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
-  INFINITI: theme("INFINITI", "PREMIUM_LUXURY", {
-    headerBackground: "#000000",
+  // INFINITI factory treatment (infiniti-us-2026-v2): white emblem block
+  // carrying the governed horizon mark + wordmark, charcoal model band,
+  // muted burgundy keyline — the only warm accent on the document.
+  INFINITI: theme("INFINITI", "LUXURY_FACTORY", {
+    headerBackground: "#171717",
     headerText: "#ffffff",
     background: "#ffffff",
     bodyText: "#2b2b2b",
     mutedText: "#6b6f76",
-    accent: "#141414",
-    divider: "#d8dadd",
+    accent: "#8a1538",
+    divider: "#d6d8db",
     sectionHeadingText: "#1a1a1a",
     totalMsrpBackground: "#161616",
     totalMsrpText: "#ffffff",

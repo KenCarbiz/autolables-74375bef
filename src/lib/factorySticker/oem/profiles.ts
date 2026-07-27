@@ -32,14 +32,17 @@ export interface OemThemeProfile {
 // generated "fallback" profile so the engine always resolves, while the
 // approval workflow stays honest about what has actually been reviewed.
 const AUTHORED_PROFILES: OemThemeProfile[] = [
+  // v2 supersedes the approved 2025 wordmark-led treatment per the owner's
+  // 2026-07-27 Infiniti factory-template directive; documents stamped with
+  // infiniti-us-2025-v1 keep their recorded version.
   {
     oemId: "INFINITI",
     market: "US",
     modelYearStart: 2020,
     modelYearEnd: null,
-    themeVersion: "infiniti-us-2025-v1",
-    layoutFamily: "premium-minimalist",
-    status: "approved",
+    themeVersion: "infiniti-us-2026-v2",
+    layoutFamily: "luxury-factory-technical",
+    status: "draft",
     logoAuthorized: false,
   },
   {
@@ -191,6 +194,7 @@ const FAMILY_BY_TEMPLATE: Record<string, string> = {
   JAPANESE_MAINSTREAM: "mainstream-structured",
   JAPANESE_FACTORY: "japanese-factory-technical",
   PREMIUM_FACTORY: "premium-factory-technical",
+  LUXURY_FACTORY: "luxury-factory-technical",
   KOREAN_MODERN: "mainstream-structured",
   AMERICAN_MAINSTREAM: "american-utility",
   PERFORMANCE: "adventure-performance",

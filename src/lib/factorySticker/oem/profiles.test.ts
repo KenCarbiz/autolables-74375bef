@@ -3,12 +3,12 @@ import { listProfiles, resolveThemeProfile } from "./profiles";
 import { THEME_REGISTRY } from "./themes";
 
 describe("OEM theme profiles", () => {
-  it("resolves INFINITI 2025 to the approved versioned profile", () => {
+  it("resolves INFINITI 2025 to the v2 luxury-factory profile", () => {
     const r = resolveThemeProfile("INFINITI", 2025);
     expect(r.resolution).toBe("EXACT");
-    expect(r.profile.themeVersion).toBe("infiniti-us-2025-v1");
-    expect(r.profile.layoutFamily).toBe("premium-minimalist");
-    expect(r.profile.status).toBe("approved");
+    expect(r.profile.themeVersion).toBe("infiniti-us-2026-v2");
+    expect(r.profile.layoutFamily).toBe("luxury-factory-technical");
+    expect(r.profile.status).toBe("draft");
     expect(r.theme.oemId).toBe("INFINITI");
   });
 

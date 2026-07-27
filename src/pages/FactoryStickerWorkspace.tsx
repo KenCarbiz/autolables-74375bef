@@ -33,6 +33,7 @@ import {
   acuraLongFixture,
   acuraRdxFixture,
   acuraZdxFixture,
+  infinitiQx80NewFixture,
   hondaCrvHybridFixture,
   hondaLongFixture,
   hondaPilotFixture,
@@ -165,6 +166,7 @@ const StatusRow = ({ label, value, tone }: { label: string; value: React.ReactNo
 
 const FIXTURE_SCENARIOS = {
   used: { label: "Used QX80", data: infinitiBenchmark },
+  infinitinew: { label: "INFINITI QX80 (new)", data: infinitiQx80NewFixture },
   new: { label: "New vehicle", data: newConditionBenchmark },
   generic: { label: "Generic decode", data: genericDecodeFixture },
   twopage: { label: "Two-page overflow", data: longEquipmentFixture },

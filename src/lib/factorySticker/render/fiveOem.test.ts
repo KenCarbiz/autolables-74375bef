@@ -5,6 +5,7 @@ import {
   acuraLongFixture,
   acuraRdxFixture,
   acuraZdxFixture,
+  infinitiQx80NewFixture,
   bmwFixture,
   chevroletFixture,
   genesisEvFixture,
@@ -19,6 +20,7 @@ import {
   hondaLongFixture,
   hondaPilotFixture,
   hondaPrologueFixture,
+  infinitiBenchmark,
   kiaTellurideFixture,
   kiaTellurideLongFixture,
   lexusFixture,
@@ -537,6 +539,62 @@ describe("Acura profile (acura-us-2026-v1)", () => {
     expect(model.pages.length).toBe(2);
     expect(pageStrings(model, 0)).toContain("$79,345.00");
     expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expectMinFontRespected(model);
+  });
+});
+
+describe("INFINITI profile (infiniti-us-2026-v2)", () => {
+  it("resolves INFINITI to v2, distinct from Nissan", () => {
+    const i = resolveThemeProfile("INFINITI", 2026);
+    const nis = resolveThemeProfile("Nissan", 2026);
+    expect(i.profile.themeVersion).toBe("infiniti-us-2026-v2");
+    expect(i.profile.layoutFamily).toBe("luxury-factory-technical");
+    expect(i.profile.status).toBe("draft");
+    expect(i.theme.templateFamilyId).not.toBe(nis.theme.templateFamilyId);
+    expect(i.profile.layoutFamily).not.toBe(nis.profile.layoutFamily);
+  });
+
+  it("new QX80 reconciles 109,900 + 1,150 + 1,995 with the full panel set", () => {
+    const data = infinitiQx80NewFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$113,045.00");
+    expect(model.drawnStrings).toContain("JN8AZ3DC0T9500123");
+    expect(page1.some((s) => s.includes("MSRP INCLUDES"))).toBe(true);
+    expect(page1.some((s) => s.includes("6-YEAR/70,000-MILE POWERTRAIN LIMITED WARRANTY"))).toBe(true);
+    expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
+    expect(page1.some((s) => s.includes("YUKUHASHI, FUKUOKA, JAPAN"))).toBe(true);
+    expect(page1.some((s) => s.includes("GOVERNMENT 5-STAR SAFETY RATINGS"))).toBe(true);
+    expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
+    expect(page1.some((s) => s === "auto")).toBe(true);
+    expect(page1.some((s) => s === "(LABELS)")).toBe(true);
+    expect(page1.some((s) => s.includes("SHIP TO: 10472"))).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
+    const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
+    expect(qrs.some((q) => q.kind === "qr" && q.payload === data.passportUrl)).toBe(true);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("carries the charcoal band, burgundy keyline and governed emblem paths", () => {
+    const model = buildRenderLayout(infinitiQx80NewFixture(), themeFor(null));
+    const prims = model.pages[0].primitives;
+    const fills = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    const rules = new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(fills.has("#171717")).toBe(true);   // charcoal model band
+    expect(rules.has("#8a1538")).toBe(true);   // muted burgundy keyline
+    expect(prims.some((p) => p.kind === "rect" && p.fill === "#8a1538")).toBe(false);
+    // Governed horizon-mark recreation renders as stroked paths in the block.
+    expect(prims.some((p) => p.kind === "path" && p.x < 110 && p.stroke === "#1a1a1e")).toBe(true);
+  });
+
+  it("keeps the used-record QX80 rendering reconciled on the same engine", () => {
+    const model = buildRenderLayout(infinitiBenchmark(), themeFor(null));
+    expect(pageStrings(model, 0)).toContain("$95,695.00");
+    expect(model.drawnStrings).toContain(infinitiBenchmark().vin);
+    expectWithinBounds(model);
     expectMinFontRespected(model);
   });
 });
