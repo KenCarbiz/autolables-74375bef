@@ -5,6 +5,7 @@ import { OEM_REGISTRY } from "./identity.ts";
 
 export type TemplateFamilyId =
   | "KOREAN_PREMIUM"
+  | "KOREAN_MAINSTREAM"
   | "PREMIUM_LUXURY"
   | "MODERN_LUXURY"
   | "AMERICAN_MAINSTREAM"
@@ -18,6 +19,7 @@ export type TemplateFamilyId =
 
 export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "KOREAN_PREMIUM",
+  "KOREAN_MAINSTREAM",
   "PREMIUM_LUXURY",
   "MODERN_LUXURY",
   "AMERICAN_MAINSTREAM",
@@ -109,6 +111,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     labelWeight: 600,
     letterSpacing: "0.02em",
     headingLetterSpacing: "0.18em",
+    uppercaseSectionHeadings: true,
+  },
+  // Kia's dense black-and-white factory treatment: neutral grotesque set,
+  // heavy heading weight, modest tracking — density over ornament.
+  KOREAN_MAINSTREAM: {
+    headingFont: '"Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif',
+    bodyFont: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+    numericFont: '"Helvetica Neue", "Arial Narrow", Arial, sans-serif',
+    headingWeight: 700,
+    bodyWeight: 400,
+    labelWeight: 700,
+    letterSpacing: "0.01em",
+    headingLetterSpacing: "0.06em",
     uppercaseSectionHeadings: true,
   },
   PREMIUM_LUXURY: {
@@ -234,6 +249,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "0.5pt",
     cornerTreatment: "SQUARE",
   },
+  KOREAN_MAINSTREAM: {
+    headerVariant: "RULED",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "12pt",
+    borderWeight: "1pt",
+    cornerTreatment: "SQUARE",
+  },
   PREMIUM_LUXURY: {
     headerVariant: "BANDED",
     pricingVariant: "BOXED",
@@ -338,6 +363,7 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
 
 const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> = {
   KOREAN_PREMIUM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 200, maxHeightPx: 50, alignment: "LEFT", wordmarkLetterSpacing: "0.26em" },
+  KOREAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.22em" },
   PREMIUM_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 200, maxHeightPx: 56, alignment: "CENTER", wordmarkLetterSpacing: "0.3em" },
   MODERN_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 190, maxHeightPx: 52, alignment: "CENTER", wordmarkLetterSpacing: "0.22em" },
   AMERICAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.08em" },
@@ -447,7 +473,22 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     header: "#111111", accent: "#9a7448", sectionHeading: "#4b4b4b",
     totalBg: "#141414", totalText: "#ffffff",
   })),
-  KIA: theme("KIA", "KOREAN_MODERN", palette({ header: "#05141f", accent: "#9ea1a2", sectionHeading: "#05141f" })),
+  // Kia factory treatment (kia-us-2026-v1): white header carrying the black
+  // KIA wordmark, ink #111111, strong black structural rules, subtle #f1f1f1
+  // heading fills. Regulatory modules keep the engine's federal-neutral
+  // styling — the OEM identity never restyles EPA/NHTSA content.
+  KIA: theme("KIA", "KOREAN_MAINSTREAM", {
+    headerBackground: "#ffffff",
+    headerText: "#111111",
+    background: "#ffffff",
+    bodyText: "#111111",
+    mutedText: "#5a5a5a",
+    accent: "#111111",
+    divider: "#5a5a5a",
+    sectionHeadingText: "#111111",
+    totalMsrpBackground: "#111111",
+    totalMsrpText: "#ffffff",
+  }),
   VOLVO: theme("VOLVO", "MODERN_LUXURY", palette({ header: "#003057", accent: "#7fa0bd", sectionHeading: "#003057" })),
   LAND_ROVER: theme("LAND_ROVER", "PREMIUM_LUXURY", palette({ header: "#0c3c26", accent: "#b49b57", sectionHeading: "#0c3c26" })),
   PORSCHE: theme("PORSCHE", "PERFORMANCE", palette({ header: "#000000", accent: "#d5001c" })),

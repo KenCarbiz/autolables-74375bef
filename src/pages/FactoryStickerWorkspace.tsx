@@ -25,6 +25,11 @@ import {
   genesisEvFixture,
   genesisG90LongFixture,
   genesisGv80Fixture,
+  kiaEvFixture,
+  kiaHybridFixture,
+  kiaPhevFixture,
+  kiaTellurideFixture,
+  kiaTellurideLongFixture,
   themeFor,
   toyotaFixture,
 } from "@/lib/factorySticker/render/__fixtures__/renderData.ts";
@@ -165,6 +170,20 @@ const FIXTURE_SCENARIOS = {
       const d = genesisGv80Fixture();
       d.pricing = { ...d.pricing, destinationCharge: null };
       d.barcodePayload = "KMUHCESC5SU999999";
+      return d;
+    },
+  },
+  kia: { label: "Kia Telluride", data: kiaTellurideFixture },
+  kiahybrid: { label: "Kia Sportage HEV", data: kiaHybridFixture },
+  kiaphev: { label: "Kia Sportage PHEV", data: kiaPhevFixture },
+  kiaev: { label: "Kia EV9", data: kiaEvFixture },
+  kialong: { label: "Kia X-Pro (2-page)", data: kiaTellurideLongFixture },
+  kiaqa: {
+    label: "Kia QA blocked",
+    data: () => {
+      const d = kiaTellurideFixture();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      d.barcodePayload = "5XYP5DGC0TG999999";
       return d;
     },
   },

@@ -132,6 +132,16 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     status: "reviewed",
     logoAuthorized: false,
   },
+  {
+    oemId: "KIA",
+    market: "US",
+    modelYearStart: 2022,
+    modelYearEnd: 2027,
+    themeVersion: "kia-us-2026-v1",
+    layoutFamily: "korean-mainstream-factory",
+    status: "draft",
+    logoAuthorized: false,
+  },
 ];
 
 const FAMILY_BY_TEMPLATE: Record<string, string> = {
@@ -144,6 +154,7 @@ const FAMILY_BY_TEMPLATE: Record<string, string> = {
   PERFORMANCE: "adventure-performance",
   COMMERCIAL: "adventure-performance",
   KOREAN_PREMIUM: "korean-premium-factory",
+  KOREAN_MAINSTREAM: "korean-mainstream-factory",
   EV_TECHNICAL: "ev-forward",
   AUTOLABELS_FALLBACK: "premium-minimalist",
 };

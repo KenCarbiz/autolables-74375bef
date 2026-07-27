@@ -9,6 +9,11 @@ import {
   genesisGv80Fixture,
   jeep4xeFixture,
   jeepFixture,
+  kiaEvFixture,
+  kiaHybridFixture,
+  kiaPhevFixture,
+  kiaTellurideFixture,
+  kiaTellurideLongFixture,
   lexusFixture,
   themeFor,
   toyotaFixture,
@@ -125,5 +130,98 @@ describe("Genesis profile (genesis-us-2025-v1)", () => {
     expect(page2).toContain("FACTORY EQUIPMENT CONTINUATION");
     expect(page2).toContain("PAGE 2 OF 2");
     expectMinFontRespected(model);
+  });
+});
+
+describe("Kia profile (kia-us-2026-v1)", () => {
+  it("resolves Kia distinctly from Hyundai and Genesis, model-year aware", () => {
+    const k = resolveThemeProfile("Kia", 2026);
+    const h = resolveThemeProfile("Hyundai", 2026);
+    const g = resolveThemeProfile("Genesis", 2026);
+    expect(k.profile.themeVersion).toBe("kia-us-2026-v1");
+    expect(k.profile.layoutFamily).toBe("korean-mainstream-factory");
+    expect(k.profile.status).toBe("draft");
+    expect(k.theme.templateFamilyId).not.toBe(h.theme.templateFamilyId);
+    expect(k.theme.templateFamilyId).not.toBe(g.theme.templateFamilyId);
+    expect(k.profile.themeVersion).not.toBe(h.profile.themeVersion);
+    expect(k.profile.themeVersion).not.toBe(g.profile.themeVersion);
+    // Outside the approved 2022-2027 range: honest fallback.
+    expect(resolveThemeProfile("Kia", 2021).profile.status).toBe("fallback");
+    expect(resolveThemeProfile("Kia", 2027).profile.themeVersion).toBe("kia-us-2026-v1");
+  });
+
+  const RECONCILED = [
+    { name: "Telluride SX AWD", fixture: kiaTellurideFixture, vin: "5XYP5DGC0TG482915", total: "$48,870.00" },
+    { name: "Sportage Hybrid", fixture: kiaHybridFixture, vin: "KNDPUDDF3T7420117", total: "$40,740.00" },
+    { name: "Sportage PHEV", fixture: kiaPhevFixture, vin: "KNDPVEDF6T7355208", total: "$46,825.00" },
+    { name: "EV9 Land AWD", fixture: kiaEvFixture, vin: "KNDADFS56T6104472", total: "$71,840.00" },
+  ];
+  for (const c of RECONCILED) {
+    it(`${c.name} renders reconciled on one page with identity payloads`, () => {
+      const data = c.fixture();
+      const model = buildRenderLayout(data, themeFor(null));
+      const page1 = pageStrings(model, 0);
+      expect(model.pages.length).toBe(1);
+      expect(page1).toContain(c.total);
+      expect(model.drawnStrings).toContain(c.vin);
+      const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+      expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(c.vin);
+      const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
+      expect(qrs.some((q) => q.kind === "qr" && q.payload === data.passportUrl)).toBe(true);
+      expectWithinBounds(model);
+      expectMinFontRespected(model);
+    });
+  }
+
+  it("Sportage Hybrid keeps the gasoline regulatory shape under the Hybrid Vehicle tag", () => {
+    const model = buildRenderLayout(kiaHybridFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1.some((s) => s.includes("Hybrid Vehicle"))).toBe(true);
+    expect(page1).toContain("MPG");
+    expect(page1.some((s) => s.includes("MPGe"))).toBe(false);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(true);
+  });
+
+  it("Sportage PHEV uses the plug-in module, never gasoline-only or EV-only language", () => {
+    const model = buildRenderLayout(kiaPhevFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPG gasoline only"))).toBe(true);
+    expect(page1.some((s) => s.includes("Plug-In Hybrid"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+  });
+
+  it("EV9 uses the EV module with no gasoline content", () => {
+    const model = buildRenderLayout(kiaEvFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("Electric Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+  });
+
+  it("Telluride X-Pro long-equipment produces a deliberate continuation page", () => {
+    const model = buildRenderLayout(kiaTellurideLongFixture(), themeFor(null));
+    expect(model.pages.length).toBe(2);
+    expect(pageStrings(model, 0)).toContain("$57,180.00");
+    const page2 = pageStrings(model, 1);
+    expect(page2).toContain("FACTORY EQUIPMENT CONTINUATION");
+    expect(page2).toContain("PAGE 2 OF 2");
+    expectMinFontRespected(model);
+  });
+
+  it("renders the white-header treatment: no dark header band, ink total band, subtle heading fills", () => {
+    const model = buildRenderLayout(kiaTellurideFixture(), themeFor(null));
+    const rects = model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null);
+    const fills = new Set(rects.map((r) => (r.kind === "rect" ? String(r.fill) : "")));
+    expect(fills.has("#111111")).toBe(true);   // ink total band
+    expect(fills.has("#f1f1f1")).toBe(true);   // subtle heading fills
+    expect(fills.has("#05141f")).toBe(false);  // retired dark Kia header
+    expect(fills.has("#002c5f")).toBe(false);  // never Hyundai navy
+    expect(fills.has("#9a7448")).toBe(false);  // never Genesis bronze
   });
 });

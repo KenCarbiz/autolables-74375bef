@@ -320,10 +320,15 @@ interface FamilyStyle {
   /** Brand-accent keyline under the header band and above the total band. */
   accentKeyline: boolean;
   equipmentColumns: number;
+  /** Overrides the neutral gray fill behind sectionHeadingBar headings. */
+  headingBarFill?: string;
+  /** Structural rules stay ink-black even when the header band is paper-white. */
+  inkStructure?: boolean;
 }
 
 const FAMILY_STYLES: Record<string, FamilyStyle> = {
   KOREAN_PREMIUM: { headerComposition: "BANDED", sectionHeadingBar: false, headingBarAccent: false, trackedHeadings: true, boxedZones: true, accentKeyline: true, equipmentColumns: 3 },
+  KOREAN_MAINSTREAM: { headerComposition: "BANDED", sectionHeadingBar: true, headingBarAccent: false, trackedHeadings: false, boxedZones: false, accentKeyline: true, equipmentColumns: 3, headingBarFill: "#f1f1f1", inkStructure: true },
   PREMIUM_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
   MODERN_LUXURY: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
   EUROPEAN_TECHNICAL: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: false, boxedZones: true, equipmentColumns: 3 },
@@ -628,7 +633,7 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
   });
 
   const ruleY = modelTop + 34;
-  p.rule(LX, ruleY, LW, 2, banded ? theme.colors.headerBackground : BLACK);
+  p.rule(LX, ruleY, LW, 2, banded && !style.inkStructure ? theme.colors.headerBackground : BLACK);
   return ruleY + 5;
 }
 
@@ -1293,7 +1298,7 @@ function flowColumns(
       const fs = familyStyle(ctx.theme);
       let headColor = BLACK;
       if (fs.sectionHeadingBar) {
-        const fill = fs.headingBarAccent ? ctx.theme.colors.accent : "#e8e9ea";
+        const fill = fs.headingBarAccent ? ctx.theme.colors.accent : (fs.headingBarFill ?? "#e8e9ea");
         p.rect(colX(), cy - density.item - 1.5, colW, density.item + 4.5, fill);
         if (fs.headingBarAccent) headColor = "#ffffff";
       }

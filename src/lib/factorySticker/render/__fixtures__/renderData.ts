@@ -901,6 +901,273 @@ export const genesisEvFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "KMUKCDTB5SU115530",
 });
 
+// ── Kia fixtures (korean-mainstream-factory, kia-us-2026-v1) ───────────
+
+// Fixture 1 — gasoline AWD benchmark. 46,110 + 1,365 + 1,395 = 48,870.
+export const kiaTellurideFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  vin: "5XYP5DGC0TG482915",
+  identity: { year: "2026", make: "Kia", model: "Telluride", trim: "SX AWD" },
+  pricing: { baseMsrp: 46110, destinationCharge: 1395, optionsTotal: 1365, totalMsrp: 48870 },
+  options: [
+    { name: "Tow Hitch w/ Wiring Harness", code: "TH", msrp: 795 },
+    { name: "Roof Rack Cross Bars", code: "RB", msrp: 360 },
+    { name: "Carpeted Floor Mats", code: "FM", msrp: 210 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.8L GDI V6 Engine - 291 HP",
+      "8-Speed Automatic Transmission",
+      "Active On-Demand AWD w/ Center Locking Differential",
+      "Drive Mode Select w/ Snow Mode",
+      "Trailer Sway Control and Pre-Wiring",
+      "Self-Leveling Rear Suspension",
+    ],
+    safety_features: [
+      "Forward Collision-Avoidance Assist w/ Pedestrian, Cyclist & Junction",
+      "Highway Driving Assist",
+      "Blind-Spot View Monitor",
+      "Rear Cross-Traffic Collision-Avoidance Assist",
+      "Lane Keeping Assist & Lane Following Assist",
+      "Driver Attention Warning w/ Leading Vehicle Departure Alert",
+      "Safe Exit Assist w/ Rear Occupant Alert",
+      "Tire Pressure Monitoring System (TPMS)",
+    ],
+    interior: [
+      "Nappa Leather Seat Trim",
+      "Heated & Ventilated Front Seats",
+      "Heated Second-Row Outboard Seats",
+      "Dual 12.3-Inch Panoramic Curved Display",
+      "Harman Kardon Premium Audio - 10 Speakers",
+      "Dual-Zone Automatic Climate Control w/ Rear Controls",
+      "Smart Key w/ Remote Start",
+      "Wireless Phone Charger",
+    ],
+    exterior: [
+      "20-Inch Machined Alloy Wheels",
+      "LED Projection Headlights w/ Auto High Beam",
+      "Panoramic Sunroof w/ Power Sunshade",
+      "Smart Power Liftgate w/ Auto Open",
+      "Power-Folding Outside Mirrors w/ LED Turn Signals",
+      "Rain-Sensing Front Wipers",
+    ],
+  },
+  colors: { exterior: { name: "Dark Moss", code: "DML" }, interior: { name: "Black", code: "BLK" } },
+  assembly: { plant: "West Point", city: "West Point, Georgia", country: "USA" },
+  mechanical: { engine: "3.8L GDI V6", transmission: "8-SPEED A/T", drivetrain: "AWD" },
+  stockNumber: "26TELSX2915",
+  epa: {
+    city: 18, highway: 24, combined: 20, annualFuelCost: 2600, ghgScore: 4,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 6, gallonsPer100Miles: 5.0,
+    fiveYearCostDifference: -2750, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-telluride",
+  barcodePayload: "5XYP5DGC0TG482915",
+});
+
+// Fixture 2 — Sportage Hybrid: regulatory/hybrid keeps the gasoline shape
+// under the Hybrid Vehicle tag. 38,990 + 325 + 1,425 = 40,740.
+export const kiaHybridFixture = (): FactoryStickerRenderData => ({
+  ...kiaTellurideFixture(),
+  vin: "KNDPUDDF3T7420117",
+  identity: { year: "2026", make: "Kia", model: "Sportage Hybrid", trim: "SX-PRESTIGE AWD" },
+  pricing: { baseMsrp: 38990, destinationCharge: 1425, optionsTotal: 325, totalMsrp: 40740 },
+  options: [
+    { name: "Carpeted Floor Mats", code: "FM", msrp: 210 },
+    { name: "Cargo Mat", code: "CM", msrp: 115 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "1.6L Turbocharged GDI I4 Hybrid - 231 HP Combined",
+      "Permanent-Magnet Synchronous Drive Motor",
+      "1.49 kWh Lithium-Ion Polymer Battery",
+      "6-Speed Automatic Transmission",
+      "Active AWD w/ Center Locking Differential",
+      "Regenerative Braking w/ Drive Mode Select",
+    ],
+    safety_features: [
+      "Forward Collision-Avoidance Assist w/ Pedestrian, Cyclist & Junction",
+      "Highway Driving Assist 2",
+      "Navigation-Based Smart Cruise Control w/ Stop & Go",
+      "Blind-Spot View Monitor",
+      "360-Degree Surround View Monitor",
+      "Remote Smart Parking Assist (RSPA)",
+      "Forward & Reverse Parking Collision-Avoidance Assist",
+      "Safe Exit Warning",
+    ],
+    interior: [
+      "SynTex Seat Trim w/ Heated & Ventilated Front Seats",
+      "Panoramic Curved Display w/ 12.3-Inch Touchscreen Navigation",
+      "Harman Kardon Premium Audio",
+      "Meridian-Pattern Premium Interior Trim",
+      "Ambient Lighting (64 Colors)",
+      "Heated Steering Wheel",
+      "Smart Key w/ Push Button Start & Remote Start",
+      "Wireless Apple CarPlay & Android Auto",
+    ],
+    exterior: [
+      "19-Inch Machined-Finish Alloy Wheels w/ Gloss Black Accents",
+      "LED Projection Headlights w/ Front LED Fog Lights",
+      "Panoramic Sunroof w/ Power Sunshade",
+      "Gloss Black Exterior Accents & Roof Rails",
+      "Smart Power Liftgate w/ Auto Open",
+      "Metal Door Scuff Plates",
+    ],
+  },
+  colors: { exterior: { name: "Wolf Gray", code: "WG2" }, interior: { name: "Black", code: "BLK" } },
+  assembly: { plant: "Gwangju", city: "Gwangju", country: "South Korea" },
+  mechanical: { engine: "1.6L T-GDI HYBRID", transmission: "6-SPEED A/T", drivetrain: "AWD" },
+  stockNumber: "26SPHSX0117",
+  epa: {
+    city: 42, highway: 44, combined: 43, annualFuelCost: 1150, ghgScore: 8,
+    rangeMiles: null, fuelType: "Hybrid Gasoline-Electric", smogScore: 7, gallonsPer100Miles: 2.3,
+    fiveYearCostDifference: 3000, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-sportage-hev",
+  barcodePayload: "KNDPUDDF3T7420117",
+});
+
+// Fixture 3 — Sportage Plug-In Hybrid: regulatory/phev. 45,190 + 210 + 1,425 = 46,825.
+export const kiaPhevFixture = (): FactoryStickerRenderData => ({
+  ...kiaHybridFixture(),
+  vin: "KNDPVEDF6T7355208",
+  identity: { year: "2026", make: "Kia", model: "Sportage Plug-In Hybrid", trim: "X-LINE PRESTIGE AWD" },
+  pricing: { baseMsrp: 45190, destinationCharge: 1425, optionsTotal: 210, totalMsrp: 46825 },
+  options: [
+    { name: "Carpeted Floor Mats", code: "FM", msrp: 210 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "1.6L Turbocharged GDI I4 Plug-In Hybrid - 261 HP Combined",
+      "66.9 kW Permanent-Magnet Drive Motor",
+      "13.8 kWh Lithium-Ion Polymer Battery",
+      "7.2 kW Onboard Charger",
+      "6-Speed Automatic Transmission",
+      "Active AWD w/ Center Locking Differential",
+      "EV / HEV / Automatic Drive Modes",
+    ],
+    safety_features: [
+      "Forward Collision-Avoidance Assist w/ Pedestrian, Cyclist & Junction",
+      "Highway Driving Assist 2",
+      "Blind-Spot View Monitor",
+      "360-Degree Surround View Monitor",
+      "Forward & Reverse Parking Collision-Avoidance Assist",
+      "Safe Exit Warning",
+    ],
+    interior: [
+      "SynTex Seat Trim w/ Heated & Ventilated Front Seats",
+      "Panoramic Curved Display w/ 12.3-Inch Touchscreen Navigation",
+      "Harman Kardon Premium Audio",
+      "Heated Steering Wheel",
+      "Smart Key w/ Push Button Start & Remote Start",
+      "Wireless Apple CarPlay & Android Auto",
+    ],
+    exterior: [
+      "19-Inch X-Line Alloy Wheels",
+      "LED Projection Headlights w/ Front LED Fog Lights",
+      "Raised X-Line Roof Rails & Gloss Black Accents",
+      "Panoramic Sunroof w/ Power Sunshade",
+      "Smart Power Liftgate w/ Auto Open",
+    ],
+  },
+  mechanical: { engine: "1.6L T-GDI PHEV", transmission: "6-SPEED A/T", drivetrain: "AWD" },
+  stockNumber: "26SPPHEV5208",
+  epa: {
+    city: null, highway: null, combined: 84, annualFuelCost: 1300, ghgScore: 9,
+    rangeMiles: 34, fuelType: "PHEV Gasoline-Electric", smogScore: 7, gallonsPer100Miles: null,
+    fiveYearCostDifference: 2250, classNote: null, gasCombinedMpg: 35,
+  },
+  passportUrl: "https://autolabels.io/v/demo-sportage-phev",
+  barcodePayload: "KNDPVEDF6T7355208",
+});
+
+// Fixture 4 — EV9: regulatory/ev, no gasoline content. 69,900 + 445 + 1,495 = 71,840.
+export const kiaEvFixture = (): FactoryStickerRenderData => ({
+  ...kiaTellurideFixture(),
+  vin: "KNDADFS56T6104472",
+  identity: { year: "2026", make: "Kia", model: "EV9", trim: "LAND AWD" },
+  pricing: { baseMsrp: 69900, destinationCharge: 1495, optionsTotal: 445, totalMsrp: 71840 },
+  options: [
+    { name: "Carpeted Floor Mats", code: "FM", msrp: 250 },
+    { name: "Cargo Cover", code: "CC", msrp: 195 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Electric Motors - 379 HP",
+      "99.8 kWh Lithium-Ion Battery",
+      "800V Architecture w/ DC Fast Charging up to 230 kW",
+      "11 kW Onboard Charger",
+      "e-AWD w/ Torque Vectoring",
+      "Vehicle-to-Load (V2L) Power Supply",
+      "i-Pedal One-Pedal Driving",
+    ],
+    safety_features: [
+      "Forward Collision-Avoidance Assist 2 w/ Junction & Lane-Change",
+      "Highway Driving Assist 2",
+      "Blind-Spot View Monitor",
+      "360-Degree Surround View Monitor",
+      "Remote Smart Parking Assist 2",
+      "Ten Airbags Incl. Front Center Side Airbag",
+      "Safe Exit Assist w/ Rear Occupant Alert",
+    ],
+    interior: [
+      "Relaxation Front Seats w/ Heating & Ventilation",
+      "Second-Row Captain's Chairs",
+      "Triple-Panel Panoramic Display w/ Dual 12.3-Inch Screens",
+      "Meridian Premium Audio - 14 Speakers",
+      "Digital Key 2 w/ Fingerprint Authentication",
+      "Tri-Zone Automatic Climate Control",
+      "Wireless Phone Charger",
+    ],
+    exterior: [
+      "20-Inch Aerodynamic Alloy Wheels",
+      "Digital Tiger Face w/ Star Map LED Lighting",
+      "Digital Pattern Lighting Grille",
+      "Flush Door Handles",
+      "Dual Sunroof w/ Power Sunshade",
+      "Smart Power Liftgate",
+    ],
+  },
+  colors: { exterior: { name: "Ocean Blue Matte", code: "OBM" }, interior: { name: "Gray", code: "GRY" } },
+  assembly: { plant: "West Point", city: "West Point, Georgia", country: "USA" },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "1-SPEED REDUCTION", drivetrain: "e-AWD" },
+  stockNumber: "26EV9LND4472",
+  epa: {
+    city: 88, highway: 77, combined: 83, annualFuelCost: 850, ghgScore: 10,
+    rangeMiles: 280, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 3750, classNote: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-ev9",
+  barcodePayload: "KNDADFS56T6104472",
+});
+
+// Fixture 5 — long-equipment X-Pro: forces the deliberate continuation page.
+// 55,335 + 450 + 1,395 = 57,180.
+export const kiaTellurideLongFixture = (): FactoryStickerRenderData => {
+  const base = kiaTellurideFixture();
+  const std = { ...base.standardEquipment };
+  std.comfort = Array.from({ length: 26 }, (_, i) =>
+    `Cabin Comfort & Convenience Feature ${String(i + 1).padStart(2, "0")} w/ Extended Adjustment Range`);
+  std.technology = Array.from({ length: 24 }, (_, i) =>
+    `Kia Connect Technology Function ${String(i + 1).padStart(2, "0")} w/ Over-the-Air Update Support`);
+  return {
+    ...base,
+    vin: "5XYPHDHC2TG519306",
+    identity: { year: "2026", make: "Kia", model: "Telluride", trim: "SX PRESTIGE X-PRO AWD" },
+    pricing: { baseMsrp: 55335, destinationCharge: 1395, optionsTotal: 450, totalMsrp: 57180 },
+    options: [
+      { name: "Carpeted Floor Mats", code: "FM", msrp: 210 },
+      { name: "Cargo Tray", code: "CT", msrp: 120 },
+      { name: "Wheel Locks", code: "WL", msrp: 85 },
+      { name: "First Aid Kit", code: "FA", msrp: 35 },
+    ],
+    standardEquipment: std,
+    stockNumber: "26TELXPRO9306",
+    passportUrl: "https://autolabels.io/v/demo-telluride-xpro",
+    barcodePayload: "5XYPHDHC2TG519306",
+  };
+};
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,
