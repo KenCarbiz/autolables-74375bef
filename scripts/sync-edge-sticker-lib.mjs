@@ -57,13 +57,18 @@ export function collect(dir, base = dir, out = new Map(), withHeader = true) {
   return out;
 }
 
-/** Every file the mirror should contain: the engine, plus the truth layer. */
+/** Every file the mirror should contain: the engine, the truth layer, and shared document primitives. */
 export function collectAll() {
   const out = collect(SOURCE_DIR);
   const truth = collect(TRUTH_SOURCE_DIR, TRUTH_SOURCE_DIR, new Map(), false);
   for (const [rel, body] of truth) {
     const key = TRUTH_PREFIX + rel;
     out.set(key, HEADER.replace("{src}", `src/lib/vehicleTruth/${rel}`) + rewriteTruthImports(body));
+  }
+  const documents = collect(DOCUMENTS_SOURCE_DIR, DOCUMENTS_SOURCE_DIR, new Map(), false);
+  for (const [rel, body] of documents) {
+    const key = DOCUMENTS_PREFIX + rel;
+    out.set(key, HEADER.replace("{src}", `src/lib/documents/${rel}`) + body);
   }
   return out;
 }
