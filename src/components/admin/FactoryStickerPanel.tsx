@@ -10,6 +10,7 @@ import {
   type FactoryStickerSettings,
 } from "@/contexts/DealerSettingsContext";
 import { toast } from "sonner";
+import { promptRegenerationReason } from "@/lib/factorySticker/regenerationReason";
 import {
   AlertTriangle, CheckCircle2, ExternalLink, Globe, Loader2, RefreshCw,
 } from "lucide-react";
