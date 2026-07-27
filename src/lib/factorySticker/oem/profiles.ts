@@ -162,6 +162,16 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     status: "draft",
     logoAuthorized: false,
   },
+  {
+    oemId: "HONDA",
+    market: "US",
+    modelYearStart: 2022,
+    modelYearEnd: 2027,
+    themeVersion: "honda-us-2026-v1",
+    layoutFamily: "japanese-factory-technical",
+    status: "draft",
+    logoAuthorized: false,
+  },
 ];
 
 const FAMILY_BY_TEMPLATE: Record<string, string> = {

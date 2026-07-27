@@ -1599,6 +1599,278 @@ export const subaruAscentLongFixture = (): FactoryStickerRenderData => {
   };
 };
 
+// ── Honda fixtures (japanese-factory-technical, honda-us-2026-v1) ──────
+
+// Fixture 1 — CR-V Hybrid benchmark: Honda Genuine Accessories are
+// port-installed items. 37,750 + 0 factory + 925 port + 1,395 = 40,070.
+export const hondaCrvHybridFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "7FARS6H93TE123456",
+  identity: { year: "2026", make: "Honda", model: "CR-V Hybrid", trim: "SPORT TOURING AWD" },
+  pricing: { baseMsrp: 37750, destinationCharge: 1395, optionsTotal: null, totalMsrp: 40070, portOptionsTotal: 925 },
+  options: [],
+  portOptions: [
+    { name: "All-Season Floor Mats", code: "08P17", msrp: 200 },
+    { name: "Cargo Tray", code: "08U45", msrp: 150 },
+    { name: "Door Edge Guard Film", code: "08P20", msrp: 175 },
+    { name: "Rear Bumper Applique", code: "08P48", msrp: 125 },
+    { name: "Wheel Locks", code: "08W42", msrp: 125 },
+    { name: "Wireless Phone Charger", code: "08U58", msrp: 150 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "204-HP 2.0-Liter Atkinson-Cycle 4-Cylinder Engine",
+      "Two-Motor Hybrid System",
+      "Real Time AWD w/ Intelligent Control System",
+      "4-Mode Drive System (ECON / Normal / Sport / Snow)",
+      "Regenerative Braking System",
+      "MacPherson Strut Front / Multi-Link Rear Suspension",
+      "Hill Descent Control",
+    ],
+    exterior: [
+      "19-Inch Alloy Wheels w/ 235/55R19 All-Season Tires",
+      "Power Moonroof w/ Tilt Feature",
+      "Hands-Free Access Power Tailgate",
+      "LED Headlights w/ Auto On/Off",
+      "LED Fog Lights & Daytime Running Lights",
+      "Power-Folding Heated Side Mirrors w/ Integrated Turn Indicators",
+      "Roof Rails",
+      "Rear Privacy Glass",
+    ],
+    interior: [
+      "Leather-Trimmed Seats",
+      "Heated & Ventilated Front Seats",
+      "Power Driver's Seat w/ 2-Position Memory",
+      "60/40 Split Fold-Down Rear Seat",
+      "Leather-Wrapped Heated Steering Wheel",
+      "Dual-Zone Automatic Climate Control w/ Humidity Control",
+      "12.3-Inch Color Touchscreen",
+      "Wireless Apple CarPlay & Android Auto Compatibility",
+      "Premium Audio System - 12 Speakers",
+      "USB Type-C Ports (Front & Rear)",
+      "Wireless Phone Charger",
+      "Multi-View Rear Camera w/ Dynamic Guidelines",
+    ],
+    safety_features: [
+      "Honda Sensing Suite",
+      "Collision Mitigation Braking System",
+      "Road Departure Mitigation System",
+      "Adaptive Cruise Control w/ Low-Speed Follow",
+      "Lane Keeping Assist System",
+      "Traffic Sign Recognition",
+      "Blind Spot Information System w/ Cross Traffic Monitor",
+      "LED Daytime Running Lights",
+      "Tire Pressure Monitoring System w/ Location & Pressure Indicators",
+    ],
+  },
+  colors: { exterior: { name: "Platinum White Pearl", code: "NH-883P" }, interior: { name: "Black Leather", code: "BK" } },
+  assembly: { plant: "East Liberty", city: "East Liberty, Ohio", country: "USA" },
+  mechanical: { engine: "2.0L HYBRID I4", transmission: "E-CVT", drivetrain: "REAL TIME AWD" },
+  stockNumber: "524-1000",
+  transportMethod: "TRUCK",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: null, dealer: "524100" },
+  epa: {
+    city: 43, highway: 36, combined: 40, annualFuelCost: 1300, ghgScore: 8,
+    rangeMiles: null, fuelType: "Hybrid Gasoline-Electric", smogScore: 7, gallonsPer100Miles: 2.5,
+    fiveYearCostDifference: 2500, classNote: null,
+  },
+  safety: null,
+  warranty: {
+    basic: "3-Year/36,000-Mile Limited Vehicle Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: "10-Year/Unlimited-Mile Corrosion Perforation Warranty",
+    roadside: "5-Year/60,000-Mile Hybrid System Limited Warranty",
+    emissions: "7-Year/100,000-Mile Emissions System Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "55%" },
+    { label: "Major foreign parts content", value: "Japan 20%" },
+    { label: "Final assembly point", value: "East Liberty, Ohio, USA" },
+    { label: "Country of origin - engine", value: "USA" },
+    { label: "Country of origin - transmission", value: "USA" },
+  ],
+  dealer: { name: "ABC Honda", address: "123 Main Street", city: "Alpharetta", state: "GA", zip: "30009", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-crv-hybrid",
+  barcodePayload: "7FARS6H93TE123456",
+  disclaimers: NEW_LABEL_DISCLAIMERS,
+});
+
+// Fixture 2 — Pilot gasoline. 54,580 + 0 factory + 695 port + 1,395 = 56,670.
+export const hondaPilotFixture = (): FactoryStickerRenderData => ({
+  ...hondaCrvHybridFixture(),
+  vin: "5FNYG1H8XTB000184",
+  identity: { year: "2026", make: "Honda", model: "Pilot", trim: "ELITE AWD" },
+  pricing: { baseMsrp: 54580, destinationCharge: 1395, optionsTotal: null, totalMsrp: 56670, portOptionsTotal: 695 },
+  portOptions: [
+    { name: "All-Season Floor Mats", code: "08P17", msrp: 245 },
+    { name: "Cargo Tray", code: "08U45", msrp: 195 },
+    { name: "Roof Rack Cross Bars", code: "08L04", msrp: 255 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "285-HP 3.5-Liter V6 Engine",
+      "10-Speed Automatic Transmission",
+      "Intelligent Variable Torque Management AWD",
+      "Drive-Mode Selection - 7 Modes",
+      "Hill Descent Control",
+      "MacPherson Strut Front / Multi-Link Rear Suspension",
+    ],
+    exterior: [
+      "20-Inch Alloy Wheels",
+      "One-Touch Power Moonroof",
+      "Hands-Free Access Power Tailgate",
+      "LED Headlights w/ Auto High Beams",
+      "Power-Folding Heated Side Mirrors",
+      "Rain-Sensing Windshield Wipers",
+      "Roof Rails",
+    ],
+    interior: [
+      "Leather-Trimmed Seating - 7 Passenger w/ Captain's Chairs",
+      "Heated & Ventilated Front Seats",
+      "Heated Second-Row Seats",
+      "Driver-Seat Memory",
+      "Tri-Zone Automatic Climate Control",
+      "9-Inch Color Touchscreen",
+      "Wireless Apple CarPlay & Android Auto",
+      "Bose Premium Audio - 12 Speakers",
+      "Wireless Phone Charger",
+      "CabinWatch & CabinTalk",
+    ],
+    safety_features: [
+      "Honda Sensing Suite",
+      "Collision Mitigation Braking System",
+      "Road Departure Mitigation System",
+      "Adaptive Cruise Control w/ Low-Speed Follow",
+      "Lane Keeping Assist System",
+      "Blind Spot Information System w/ Cross Traffic Monitor",
+      "Multi-Angle Rearview Camera",
+      "Front & Rear Parking Sensors",
+    ],
+  },
+  colors: { exterior: { name: "Platinum White Pearl", code: "NH-883P" }, interior: { name: "Black Leather", code: "BK" } },
+  assembly: { plant: "Lincoln", city: "Lincoln, Alabama", country: "USA" },
+  mechanical: { engine: "3.5L V6", transmission: "10-SPEED A/T", drivetrain: "i-VTM4 AWD" },
+  stockNumber: "H260184",
+  epa: {
+    city: 19, highway: 25, combined: 21, annualFuelCost: 2450, ghgScore: 4,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 5, gallonsPer100Miles: 4.8,
+    fiveYearCostDifference: -1500, classNote: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "60%" },
+    { label: "Major foreign parts content", value: "Japan 15%" },
+    { label: "Final assembly point", value: "Lincoln, Alabama, USA" },
+    { label: "Country of origin - engine", value: "USA" },
+    { label: "Country of origin - transmission", value: "USA" },
+  ],
+  warranty: {
+    basic: "3-Year/36,000-Mile Limited Vehicle Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: "5-Year/Unlimited-Mile Corrosion Perforation Warranty",
+    roadside: "3-Year/36,000-Mile Roadside Assistance",
+    emissions: null,
+  },
+  passportUrl: "https://autolabels.io/v/demo-pilot",
+  barcodePayload: "5FNYG1H8XTB000184",
+});
+
+// Fixture 3 — Prologue: regulatory/ev, no gasoline content.
+// 59,750 + 0 factory + 350 port + 1,450 = 61,550.
+export const hondaPrologueFixture = (): FactoryStickerRenderData => ({
+  ...hondaCrvHybridFixture(),
+  vin: "5FNYD3H37TB012908",
+  identity: { year: "2026", make: "Honda", model: "Prologue", trim: "ELITE AWD" },
+  pricing: { baseMsrp: 59750, destinationCharge: 1450, optionsTotal: null, totalMsrp: 61550, portOptionsTotal: 350 },
+  portOptions: [
+    { name: "All-Season Floor Mats", code: "08P17", msrp: 200 },
+    { name: "Wheel Locks", code: "08W42", msrp: 150 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Electric Motors - 288 HP",
+      "85 kWh Lithium-Ion Battery",
+      "DC Fast Charging up to 155 kW",
+      "11.5 kW Onboard Charger",
+      "All-Wheel Drive w/ Regenerative Braking Control",
+      "One-Pedal Driving",
+    ],
+    exterior: [
+      "21-Inch Alloy Wheels",
+      "Panoramic Roof",
+      "Hands-Free Access Power Tailgate",
+      "LED Headlights w/ Auto High Beams",
+      "Power-Folding Heated Side Mirrors",
+      "Roof Rails",
+    ],
+    interior: [
+      "Perforated Leather-Trimmed Seats",
+      "Heated & Ventilated Front Seats",
+      "Heated Steering Wheel",
+      "11.3-Inch Color Touchscreen w/ Google Built-In",
+      "Wireless Apple CarPlay & Android Auto",
+      "Bose Premium Audio - 12 Speakers",
+      "Wireless Phone Charger",
+      "Head-Up Display",
+    ],
+    safety_features: [
+      "Honda Sensing Suite",
+      "Collision Mitigation Braking System",
+      "Blind Spot Information System w/ Cross Traffic Monitor",
+      "Adaptive Cruise Control",
+      "Lane Keeping Assist System",
+      "Multi-Angle Rearview Camera",
+      "Front & Rear Parking Sensors",
+    ],
+  },
+  colors: { exterior: { name: "North Shore Pearl", code: "NSP" }, interior: { name: "Gray Leather", code: "GRY" } },
+  assembly: { plant: "Ramos Arizpe", city: "Ramos Arizpe", country: "Mexico" },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "1-SPEED REDUCTION", drivetrain: "AWD" },
+  stockNumber: "H260322",
+  epa: {
+    city: 99, highway: 90, combined: 95, annualFuelCost: 750, ghgScore: 10,
+    rangeMiles: 273, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 3500, classNote: null,
+  },
+  warranty: {
+    basic: "3-Year/36,000-Mile Limited Vehicle Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: "5-Year/Unlimited-Mile Corrosion Perforation Warranty",
+    roadside: "3-Year/36,000-Mile Roadside Assistance",
+    emissions: "8-Year/100,000-Mile High-Voltage Battery Limited Warranty",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "20%" },
+    { label: "Major foreign parts content", value: "Mexico 55%" },
+    { label: "Final assembly point", value: "Ramos Arizpe, Mexico" },
+    { label: "Country of origin - motors", value: "Mexico" },
+    { label: "Country of origin - battery", value: "USA" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-prologue",
+  barcodePayload: "5FNYD3H37TB012908",
+});
+
+// Fixture 4 — long-equipment Pilot: forces the deliberate continuation page.
+export const hondaLongFixture = (): FactoryStickerRenderData => {
+  const base = hondaPilotFixture();
+  const std = { ...base.standardEquipment };
+  std.comfort = Array.from({ length: 26 }, (_, i) =>
+    `Three-Row Comfort & Convenience Feature ${String(i + 1).padStart(2, "0")} w/ Extended Adjustment Range`);
+  std.technology = Array.from({ length: 24 }, (_, i) =>
+    `HondaLink Technology Function ${String(i + 1).padStart(2, "0")} w/ Over-the-Air Update Support`);
+  return {
+    ...base,
+    vin: "5FNYG1H84TB055671",
+    identity: { year: "2026", make: "Honda", model: "Pilot", trim: "BLACK EDITION AWD" },
+    pricing: { baseMsrp: 56580, destinationCharge: 1395, optionsTotal: null, totalMsrp: 58670, portOptionsTotal: 695 },
+    standardEquipment: std,
+    stockNumber: "H260671",
+    passportUrl: "https://autolabels.io/v/demo-pilot-be",
+    barcodePayload: "5FNYG1H84TB055671",
+  };
+};
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

@@ -12,6 +12,10 @@ import {
   kiaEvFixture,
   kiaHybridFixture,
   kiaPhevFixture,
+  hondaCrvHybridFixture,
+  hondaLongFixture,
+  hondaPilotFixture,
+  hondaPrologueFixture,
   kiaTellurideFixture,
   kiaTellurideLongFixture,
   lexusFixture,
@@ -378,5 +382,85 @@ describe("Subaru profile (subaru-us-2026-v1)", () => {
     expect(subaru.rules.has("#c8102e")).toBe(false);
     expect(subaru.fills.has("#003b70")).toBe(true);   // Subaru blue band
     expect(mazda.fills.has("#003b70")).toBe(false);
+  });
+});
+
+describe("Honda profile (honda-us-2026-v1)", () => {
+  it("resolves Honda into the japanese-factory-technical family, model-year aware", () => {
+    const h = resolveThemeProfile("Honda", 2026);
+    expect(h.profile.themeVersion).toBe("honda-us-2026-v1");
+    expect(h.profile.layoutFamily).toBe("japanese-factory-technical");
+    expect(h.profile.status).toBe("draft");
+    expect(resolveThemeProfile("Honda", 2021).profile.status).toBe("fallback");
+  });
+
+  it("CR-V Hybrid benchmark reconciles accessories as port items on one page", () => {
+    const data = hondaCrvHybridFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$40,070.00");
+    expect(model.drawnStrings).toContain("7FARS6H93TE123456");
+    expect(page1.some((s) => s.includes("PORT OF ENTRY OPTIONS"))).toBe(true);
+    // Accessory-only build: no empty FACTORY OPTIONS heading.
+    expect(page1.some((s) => s === "FACTORY OPTIONS")).toBe(false);
+    expect(page1.some((s) => s.includes("Hybrid Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPGe"))).toBe(false);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("keeps the Passport QR and the EPA QR separate with distinct payloads", () => {
+    const data = hondaCrvHybridFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
+    const payloads = qrs.map((q) => (q.kind === "qr" ? q.payload : ""));
+    expect(payloads).toContain(data.passportUrl);
+    expect(payloads).toContain("https://fueleconomy.gov");
+    expect(new Set(payloads).size).toBe(payloads.length);
+    const page1 = pageStrings(model, 0);
+    expect(page1.some((s) => s.includes("AUTOLABELS VEHICLE PASSPORT"))).toBe(true);
+  });
+
+  it("renders Honda parts content, warranty, ship-to street address and red rules only", () => {
+    const model = buildRenderLayout(hondaCrvHybridFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
+    expect(page1.some((s) => s.includes("EAST LIBERTY, OHIO, USA"))).toBe(true);
+    expect(page1.some((s) => s.includes("NEW VEHICLE LIMITED WARRANTY"))).toBe(true);
+    expect(page1.some((s) => s.includes("10-YEAR/UNLIMITED-MILE CORROSION PERFORATION WARRANTY"))).toBe(true);
+    expect(page1.some((s) => s.includes("SHIP TO: 524100"))).toBe(true);
+    expect(page1.some((s) => s.includes("ABC HONDA"))).toBe(true);
+    expect(page1.some((s) => s.includes("123 MAIN STREET"))).toBe(true);
+    const prims = model.pages[0].primitives;
+    expect(prims.some((p) => p.kind === "rule" && p.color === "#cc0000")).toBe(true);
+    expect(prims.some((p) => p.kind === "rect" && p.fill === "#cc0000")).toBe(false);
+  });
+
+  it("Pilot gasoline build renders reconciled on one page", () => {
+    const model = buildRenderLayout(hondaPilotFixture(), themeFor(null));
+    expect(model.pages.length).toBe(1);
+    expect(pageStrings(model, 0)).toContain("$56,670.00");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Prologue uses the EV module with no gasoline content", () => {
+    const model = buildRenderLayout(hondaPrologueFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("Electric Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+  });
+
+  it("long-equipment Pilot produces a deliberate continuation page", () => {
+    const model = buildRenderLayout(hondaLongFixture(), themeFor(null));
+    expect(model.pages.length).toBe(2);
+    expect(pageStrings(model, 0)).toContain("$58,670.00");
+    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expectMinFontRespected(model);
   });
 });

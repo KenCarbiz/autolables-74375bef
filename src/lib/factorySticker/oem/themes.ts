@@ -470,7 +470,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     header: "#d3121a", accent: "#b30f16", totalBg: "#191c20", totalText: "#ffffff",
   })),
   LEXUS: theme("LEXUS", "PREMIUM_LUXURY", palette({ header: "#0c0c0c", accent: "#8a8d8f", sectionHeading: "#2b2b2b" })),
-  HONDA: theme("HONDA", "JAPANESE_MAINSTREAM", palette({ header: "#0d0d0d", accent: "#cc0000" })),
+  // Honda factory treatment (honda-us-2026-v1): white header carrying the
+  // black HONDA wordmark over a restrained Honda-red rule; red never fills
+  // a background. Ink body, black total band.
+  HONDA: theme("HONDA", "JAPANESE_FACTORY", {
+    headerBackground: "#ffffff",
+    headerText: "#111111",
+    background: "#ffffff",
+    bodyText: "#1a1a1a",
+    mutedText: "#55595e",
+    accent: "#cc0000",
+    divider: "#c9ccd0",
+    sectionHeadingText: "#141414",
+    totalMsrpBackground: "#101010",
+    totalMsrpText: "#ffffff",
+  }),
   ACURA: theme("ACURA", "MODERN_LUXURY", palette({ header: "#141414", accent: "#8e9296", sectionHeading: "#33373b" })),
   FORD: theme("FORD", "AMERICAN_MAINSTREAM", palette({ header: "#003478", accent: "#1e4f91" })),
   LINCOLN: theme("LINCOLN", "MODERN_LUXURY", palette({ header: "#17150f", accent: "#a08d5f" })),

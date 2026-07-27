@@ -30,6 +30,10 @@ import {
   kiaPhevFixture,
   kiaTellurideFixture,
   kiaTellurideLongFixture,
+  hondaCrvHybridFixture,
+  hondaLongFixture,
+  hondaPilotFixture,
+  hondaPrologueFixture,
   mazdaCx90Fixture,
   mazdaLongFixture,
   mazdaMiataFixture,
@@ -216,6 +220,19 @@ const FIXTURE_SCENARIOS = {
       const d = subaruOutbackFixture();
       d.pricing = { ...d.pricing, destinationCharge: null };
       d.barcodePayload = "4S4BTGPD0T3999999";
+      return d;
+    },
+  },
+  honda: { label: "Honda CR-V Hybrid", data: hondaCrvHybridFixture },
+  hondapilot: { label: "Honda Pilot", data: hondaPilotFixture },
+  hondaev: { label: "Honda Prologue", data: hondaPrologueFixture },
+  hondalong: { label: "Honda Pilot (2-page)", data: hondaLongFixture },
+  hondaqa: {
+    label: "Honda QA blocked",
+    data: () => {
+      const d = hondaCrvHybridFixture();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      d.barcodePayload = "7FARS6H93TE999999";
       return d;
     },
   },

@@ -843,10 +843,17 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   }
 
   // Right half: optional equipment with dot leaders and the MSRP rollup.
+  // Accessory-only builds (port items, no factory options) skip the empty
+  // FACTORY OPTIONS heading rather than printing a vacant section.
+  const hasPortOnly = !input.data.equipment.options.length &&
+    (input.data.equipment.portInstalled?.length ?? 0) > 0;
   let ry = y + 10;
-  p.text("FACTORY OPTIONS", rightX, ry, 8, "bold", BLACK, { charSpacing: 0.4 });
+  if (!hasPortOnly) {
+    p.text("FACTORY OPTIONS", rightX, ry, 8, "bold", BLACK, { charSpacing: 0.4 });
+  }
   p.text("(MSRP)", rightX + rightW, ry, 6, "body", "#4c5157", { align: "right" });
   ry += 2;
+  if (hasPortOnly) ry -= lh + 2;
   for (const opt of input.data.equipment.options) {
     ry += lh;
     const code = opt.code ? `${opt.code}` : "";
@@ -1011,8 +1018,13 @@ function paintVinBarcode(p: Painter, y: number, ctx: BuildContext): number {
     const cityLine = [d.city, [d.state, d.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
     p.text(`SHIP TO: ${f.dealerCode ?? ""}`.trim(), sx, y + 12, 5.4, "bold", BLACK, { align: "right" });
     p.text(ellipsize(d.name.toUpperCase(), "body", 5.4, shipMax), sx, y + 19, 5.4, "body", BLACK, { align: "right" });
+    let sy2 = y + 26;
+    if (d.address) {
+      p.text(ellipsize(d.address.toUpperCase(), "body", 5.4, shipMax), sx, sy2, 5.4, "body", BLACK, { align: "right" });
+      sy2 += 7;
+    }
     if (cityLine) {
-      p.text(ellipsize(cityLine.toUpperCase(), "body", 5.4, shipMax), sx, y + 26, 5.4, "body", BLACK, { align: "right" });
+      p.text(ellipsize(cityLine.toUpperCase(), "body", 5.4, shipMax), sx, sy2, 5.4, "body", BLACK, { align: "right" });
     }
   }
   const meta = [
