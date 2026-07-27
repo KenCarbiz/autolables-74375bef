@@ -25,6 +25,8 @@ import {
   type ToneKey, type VoiceProfile,
 } from "../_shared/description-core.ts";
 import { repairContent, hasRepairableFindings } from "../_shared/description-repair.ts";
+import { preflight, preflightSummary } from "../_shared/description-preflight.ts";
+import { evaluateBudget, DEFAULT_BUDGET } from "../_shared/description-budget.ts";
 import { can } from "../_shared/description-permissions.ts";
 
 const cors = {
@@ -414,6 +416,74 @@ async function orchestrateVehicle(
     });
     const featChecksum = await featureChecksum(packet.selectedFeatureIds);
     const masterPolicy = resolveChannelPolicy("vehicle_passport", channelOverrides.get("vehicle_passport"))!;
+
+    // ── Preflight: refuse a doomed request BEFORE any provider call ──
+    // Everything above this point is free. Everything below spends money, so
+    // a request that was always going to fail must be rejected here rather
+    // than discovered by the model.
+    const { data: budgetRow } = await admin.from("description_generation_budgets")
+      .select("*").eq("tenant_id", tenantId).maybeSingle();
+    const { data: spend } = await admin.rpc("description_generation_spend", { p_tenant_id: tenantId });
+    const budgetCfg = budgetRow ? {
+      ...DEFAULT_BUDGET,
+      monthlyGenerationBudget: budgetRow.monthly_generation_budget,
+      monthlyPreviewBudget: budgetRow.monthly_preview_budget,
+      maxCostPerGeneration: budgetRow.max_cost_per_generation,
+      maxRepairAttempts: budgetRow.max_repair_attempts ?? DEFAULT_BUDGET.maxRepairAttempts,
+      maxChannelsPerBatch: budgetRow.max_channels_per_batch ?? DEFAULT_BUDGET.maxChannelsPerBatch,
+      dailyGenerationLimit: budgetRow.daily_generation_limit,
+      perUserDailyLimit: budgetRow.per_user_daily_limit,
+      warningThresholdPct: budgetRow.warning_threshold_pct ?? DEFAULT_BUDGET.warningThresholdPct,
+      hardStopPct: budgetRow.hard_stop_pct ?? DEFAULT_BUDGET.hardStopPct,
+    } : DEFAULT_BUDGET;
+    const budgetDecision = evaluateBudget(budgetCfg, {
+      monthProductionSpend: Number((spend as any)?.month_production_spend ?? 0),
+      monthPreviewSpend: Number((spend as any)?.month_preview_spend ?? 0),
+      todayGenerationCount: Number((spend as any)?.today_generation_count ?? 0),
+      userTodayGenerationCount: 0,
+    }, { isPreview: false, estimatedCost: null });
+
+    const pf = preflight({
+      authenticated: true,
+      canGenerate: true,
+      listing, tenantId,
+      snapshot: snap,
+      policy: masterPolicy,
+      channelEnabled: true,
+      voice,
+      targeting: packet.targeting,
+      jobInFlight: false,
+      budget: { withinBudget: budgetDecision.withinBudget, reason: budgetDecision.reason },
+      providerConfigured: !!SERVICE_KEY,
+    });
+
+    await admin.from("description_preflight_results").insert({
+      tenant_id: tenantId, vehicle_id: vehicleId, description_case_id: caseId,
+      channel: "master", passed: pf.ok, blocking_codes: pf.blockingCodes,
+      findings_json: pf.findings, summary: preflightSummary(pf),
+    });
+
+    if (!pf.ok) {
+      await admin.from("description_jobs").update({
+        status: "failed_blocked", last_error_code: pf.blockingCodes[0] || "PREFLIGHT_FAILED",
+        last_error_message: preflightSummary(pf), failed_at: new Date().toISOString(),
+      }).eq("id", jobId);
+      await setCase(admin, caseId, {
+        status: "FAILED_BLOCKED", publication_eligibility: "blocked",
+        last_error_message: preflightSummary(pf),
+      });
+      await raiseException(admin, ctx, "GENERATION_BLOCKED", "high", true,
+        "Generation refused before any AI cost", preflightSummary(pf),
+        { blocking_codes: pf.blockingCodes, findings: pf.findings });
+      await audit(admin, tenantId, "generation_preflight_rejected", caseId,
+        { vin: listing.vin, blocking_codes: pf.blockingCodes });
+      return { vehicle_id: vehicleId, case_id: caseId, skipped: "preflight_rejected",
+               blocking_codes: pf.blockingCodes, reason: preflightSummary(pf), cost_incurred: false };
+    }
+    if (budgetDecision.verdict === "warning") {
+      await audit(admin, tenantId, "generation_budget_warning", caseId,
+        { vin: listing.vin, consumed_pct: budgetDecision.consumedPct });
+    }
     const masterPolicyVersion = await computeChannelPolicyVersion(masterPolicy);
     const inputChecksum = await computeInputChecksum({
       tenantId, vehicleId, snapshotChecksum: sdv, channel: "master",
