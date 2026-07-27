@@ -70,7 +70,32 @@
     "qr2": "594,351.2 96",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "ORIGINAL FACTORY BUILD & MSRP RECORD",
+    "2025 JEEP WRANGLER",
+    "RUBICON 4-DOOR 4X4",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,895.00",
+    "1C4HJXFG5SW551234",
+    "TOTAL ORIGINAL MSRP",
+    "$56,205.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "19",
+    "MPG",
+    "17",
+    "23",
+    "5.3",
+    "spend",
+    "$3,250",
+    "cost"
+  ],
   "totalBand": "$56,205.00",
   "svgDigest": [
     "af047c96"

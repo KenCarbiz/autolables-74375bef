@@ -66,7 +66,32 @@
     "qr2": "610.4,399.3 63.2",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 SUBARU OUTBACK",
+    "TOURING XT AWD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,420.00",
+    "4S4BTGPD0T3456789",
+    "TOTAL FACTORY MSRP",
+    "$47,316.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "26",
+    "MPG",
+    "23",
+    "30",
+    "3.8",
+    "save",
+    "$500",
+    "cost",
+    "$2,150"
+  ],
   "totalBand": "$47,316.00",
   "svgDigest": [
     "b09c6a03"

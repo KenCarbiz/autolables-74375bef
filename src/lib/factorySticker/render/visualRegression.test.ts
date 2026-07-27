@@ -76,7 +76,7 @@ function fingerprint(model: LayoutModel): Fingerprint {
     if (p.kind === "text") {
       textColors.add(String(p.color));
       fontSizes.add(round(p.size));
-      if (p.weight === "bold" && p.size >= 7.5) headings.push(p.str);
+      if (p.font === "bold" && p.size >= 7.5) headings.push(p.str);
     }
     if (p.kind === "barcode") {
       regions.barcode = `${round(p.x)},${round(p.y)} ${round(p.w)}x${round(p.h)}`;

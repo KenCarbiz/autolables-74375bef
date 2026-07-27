@@ -72,7 +72,32 @@
     "qr2": "596.05,376.9 91.9",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 LINCOLN NAUTILUS",
+    "RESERVE AWD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "MSRP INCLUDES",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,595.00",
+    "5LMPJ8K85TJ801234",
+    "TOTAL MSRP",
+    "$59,285.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "24",
+    "MPG",
+    "21",
+    "29",
+    "4.2",
+    "spend",
+    "$750",
+    "cost"
+  ],
   "totalBand": "$59,285.00",
   "svgDigest": [
     "432a131e"

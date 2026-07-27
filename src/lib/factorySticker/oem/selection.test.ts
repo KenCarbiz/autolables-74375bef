@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   getTemplateDefinition,
+  listCompatibleTemplates,
   listTemplateDefinitions,
   selectOemTemplate,
   validatePageGeometry,
+  validateTemplateOverride,
 } from "./selection";
 import { evaluateStickerEligibility, classifyCondition } from "./eligibility";
 
@@ -223,5 +225,53 @@ describe("sticker eligibility", () => {
     });
     expect(r.eligible).toBe(false);
     expect(r.status).toBe("ineligible_disabled");
+  });
+});
+
+describe("manual template override", () => {
+  it("offers only the vehicle's own brand and the neutral template", () => {
+    const options = listCompatibleTemplates("BUICK", 2025);
+    expect(options.map((o) => o.templateKey).sort())
+      .toEqual(["oem-autolabels-fallback", "oem-buick"]);
+    expect(options.find((o) => o.templateKey === "oem-buick")?.isAutomatic).toBe(true);
+    expect(options.find((o) => o.neutral)?.templateKey).toBe("oem-autolabels-fallback");
+  });
+
+  it("allows switching to the neutral template", () => {
+    const v = validateTemplateOverride("BUICK", "oem-autolabels-fallback", 2025);
+    expect(v.allowed).toBe(true);
+    expect(v.option?.neutral).toBe(true);
+  });
+
+  it("allows re-applying the brand's own template", () => {
+    expect(validateTemplateOverride("BUICK", "oem-buick", 2025).allowed).toBe(true);
+  });
+
+  it("refuses another manufacturer's template even when a user asks for it", () => {
+    for (const [make, requested] of [
+      ["BUICK", "oem-chevrolet"], ["CHEVROLET", "oem-buick"],
+      ["HONDA", "oem-acura"], ["TOYOTA", "oem-lexus"],
+      ["JEEP", "oem-ram"], ["AUDI", "oem-porsche"],
+    ] as const) {
+      const v = validateTemplateOverride(make, requested, 2026);
+      expect(v.allowed, `${make} -> ${requested}`).toBe(false);
+      expect(v.reason, `${make} -> ${requested}`).toContain("different manufacturer");
+    }
+  });
+
+  it("refuses an unregistered template key", () => {
+    const v = validateTemplateOverride("BUICK", "oem-delorean", 2025);
+    expect(v.allowed).toBe(false);
+    expect(v.reason).toContain("not a registered template");
+  });
+
+  it("offers only the neutral template when the make never resolved", () => {
+    const options = listCompatibleTemplates(null, 2026);
+    expect(options.map((o) => o.templateKey)).toEqual(["oem-autolabels-fallback"]);
+    expect(validateTemplateOverride(null, "oem-buick", 2026).allowed).toBe(false);
+  });
+
+  it("rejects an empty request", () => {
+    expect(validateTemplateOverride("BUICK", "", 2025).allowed).toBe(false);
   });
 });

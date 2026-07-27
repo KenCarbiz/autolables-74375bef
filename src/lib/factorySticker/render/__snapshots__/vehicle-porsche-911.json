@@ -70,7 +70,32 @@
     "qr2": "612.6,410 58.8",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 PORSCHE 911",
+    "CARRERA 4 GTS COUPE",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "MSRP INCLUDES",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,995.00",
+    "WP0AB2A99TS223847",
+    "TOTAL MSRP",
+    "$182,785.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "20",
+    "MPG",
+    "18",
+    "24",
+    "5",
+    "spend",
+    "$14,250",
+    "cost"
+  ],
   "totalBand": "$182,785.00",
   "svgDigest": [
     "4ed2dc34"

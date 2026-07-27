@@ -70,7 +70,32 @@
     "qr2": "610.95,406.7 62.1",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 VOLVO XC90",
+    "B5 AWD PLUS 7-SEAT",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,295.00",
+    "YV4L12PE9T1234567",
+    "TOTAL MSRP",
+    "$64,185.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "24",
+    "MPG",
+    "22",
+    "27",
+    "4.2",
+    "spend",
+    "$1,500",
+    "cost",
+    "$2,200"
+  ],
   "totalBand": "$64,185.00",
   "svgDigest": [
     "f69ed72a"

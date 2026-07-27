@@ -32,6 +32,8 @@ export interface FactoryStickerTheme {
   templateVersion: string;
   logoAssetId: string | null;
   logoAssetVersion: string | null;
+  /** Authorized manual template override; absent means automatic selection. */
+  templateOverrideKey?: string | null;
 }
 
 export interface FactoryStickerRenderData {
@@ -375,6 +377,17 @@ export function resolveRenderTheme(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,
 ): OemStickerTheme {
+  // An authorized template override wins over automatic resolution. The
+  // compatibility gate upstream has already refused anything but this
+  // vehicle's own brand or the neutral AutoLabels template, so honouring
+  // it here can never put one manufacturer's design on another's car.
+  const override = String(theme.templateOverrideKey ?? "").trim().toLowerCase();
+  if (override) {
+    const id = override.replace(/^oem-/, "").toUpperCase().replace(/-/g, "_");
+    if (id === "AUTOLABELS_FALLBACK") return getTheme("AUTOLABELS_FALLBACK");
+    const overridden = resolveOem(id);
+    if (overridden.confidence !== "UNRESOLVED") return getTheme(overridden.identity.id);
+  }
   const resolved = resolveOem(data.identity.make);
   if (resolved.confidence !== "UNRESOLVED") return getTheme(resolved.identity.id);
   if (theme.canonicalOemId) {

@@ -70,7 +70,32 @@
     "qr2": "594,351.2 96",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "ORIGINAL FACTORY BUILD & MSRP RECORD",
+    "2025 TOYOTA GRAND HIGHLANDER",
+    "XLE AWD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,450.00",
+    "5TDAAAB52SS091877",
+    "TOTAL ORIGINAL MSRP",
+    "$48,420.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "22",
+    "MPG",
+    "20",
+    "26",
+    "4.5",
+    "spend",
+    "$1,750",
+    "cost"
+  ],
   "totalBand": "$48,420.00",
   "svgDigest": [
     "0323d5fc"

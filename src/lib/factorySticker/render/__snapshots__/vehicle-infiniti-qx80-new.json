@@ -70,7 +70,32 @@
     "qr2": "596.05,376.9 91.9",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 INFINITI QX80",
+    "AUTOGRAPH 4WD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "MSRP INCLUDES",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,995.00",
+    "JN8AZ3DC0T9500123",
+    "TOTAL FACTORY MSRP",
+    "$113,045.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "17",
+    "MPG",
+    "16",
+    "19",
+    "5.9",
+    "spend",
+    "$5,250",
+    "cost"
+  ],
   "totalBand": "$113,045.00",
   "svgDigest": [
     "790bf74f"

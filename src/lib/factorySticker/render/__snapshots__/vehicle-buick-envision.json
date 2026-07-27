@@ -71,7 +71,32 @@
     "qr2": "596.05,376.9 91.9",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2025 BUICK ENVISION",
+    "AVENIR AWD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "MSRP INCLUDES",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,395.00",
+    "LRBFZSE41SD012345",
+    "TOTAL VEHICLE PRICE",
+    "$53,195.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "25",
+    "MPG",
+    "22",
+    "29",
+    "4",
+    "save",
+    "$1,250",
+    "cost"
+  ],
   "totalBand": "$53,195.00",
   "svgDigest": [
     "3fbc92de"

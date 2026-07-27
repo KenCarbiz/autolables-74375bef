@@ -68,7 +68,32 @@
     "qr2": "610.95,406.7 62.1",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 AUDI Q5",
+    "PREMIUM PLUS QUATTRO",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,295.00",
+    "WA1E2AFP4TA123456",
+    "TOTAL MSRP",
+    "$61,640.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "24",
+    "MPG",
+    "22",
+    "28",
+    "4.2",
+    "spend",
+    "$1,750",
+    "cost",
+    "$2,250"
+  ],
   "totalBand": "$61,640.00",
   "svgDigest": [
     "56a297bd"

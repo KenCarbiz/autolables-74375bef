@@ -65,7 +65,32 @@
     "qr2": "606.7,391.9 70.6",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 MAZDA CX-90",
+    "3.3 TURBO PREMIUM PLUS AWD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "PORT OF ENTRY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,475.00",
+    "JM3KKEHC7T1234567",
+    "TOTAL FACTORY MSRP",
+    "$60,595.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "24",
+    "MPG",
+    "21",
+    "28",
+    "4.2",
+    "save",
+    "$1,750",
+    "cost"
+  ],
   "totalBand": "$60,595.00",
   "svgDigest": [
     "0cd42791"

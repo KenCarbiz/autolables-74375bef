@@ -69,7 +69,32 @@
     "qr2": "594,351.2 96",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "ORIGINAL FACTORY BUILD & MSRP RECORD",
+    "2026 KIA TELLURIDE",
+    "SX AWD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,395.00",
+    "5XYP5DGC0TG482915",
+    "TOTAL ORIGINAL MSRP",
+    "$48,870.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "20",
+    "MPG",
+    "18",
+    "24",
+    "5",
+    "spend",
+    "$2,750",
+    "cost"
+  ],
   "totalBand": "$48,870.00",
   "svgDigest": [
     "4b71da50"

@@ -71,7 +71,32 @@
     "qr2": "612.6,410 58.8",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 CHRYSLER PACIFICA",
+    "LIMITED AWD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "MSRP INCLUDES",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,195.00",
+    "2C4RC3GG6TR188133",
+    "TOTAL PRICE",
+    "$60,220.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "22",
+    "MPG",
+    "19",
+    "28",
+    "4.5",
+    "spend",
+    "$1,750",
+    "cost"
+  ],
   "totalBand": "$60,220.00",
   "svgDigest": [
     "a3aaf469"

@@ -69,7 +69,32 @@
     "qr2": "612.6,410 58.8",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 LAND ROVER RANGE ROVER SPORT",
+    "P400 DYNAMIC SE",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "MSRP INCLUDES",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,475.00",
+    "SAL1L9FUXSA123456",
+    "TOTAL MSRP",
+    "$99,150.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "20",
+    "MPG",
+    "18",
+    "25",
+    "5",
+    "spend",
+    "$5,000",
+    "cost"
+  ],
   "totalBand": "$99,150.00",
   "svgDigest": [
     "24a1c8b7"

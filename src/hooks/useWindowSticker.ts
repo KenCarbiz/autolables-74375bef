@@ -42,6 +42,22 @@ export interface StickerVersion {
   reconciliation_status: string | null;
 }
 
+export interface TemplateOption {
+  templateKey: string;
+  label: string;
+  themeVersion: string;
+  layoutFamily: string;
+  isAutomatic: boolean;
+  neutral: boolean;
+}
+
+export interface TemplateOptions {
+  canonical_make: string | null;
+  automatic_template_key: string | null;
+  current_override: { template_key: string; reason: string } | null;
+  options: TemplateOption[];
+}
+
 export interface DocumentAssets {
   document_id: string;
   version: number | null;
@@ -156,6 +172,26 @@ export function useWindowSticker() {
     }
   }, []);
 
+  const templateOptions = useCallback(async (tenantId: string, vehicleId: string) => {
+    return await invokeOrchestrator<TemplateOptions>({
+      action: "template_options", tenantId, vehicleId,
+    });
+  }, []);
+
+  const setTemplate = useCallback(async (
+    tenantId: string, vehicleId: string, templateKey: string, reasonNotes: string,
+  ) => {
+    setBusy(true);
+    try {
+      return await invokeOrchestrator<{ template_key: string; cleared: boolean; note: string }>({
+        action: "set_template", tenantId, vehicleId,
+        extra: { template_key: templateKey, reason_notes: reasonNotes },
+      });
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const generate = useCallback(async (tenantId: string, vehicleId?: string, vin?: string) => {
     setBusy(true);
     try {
@@ -167,5 +203,8 @@ export function useWindowSticker() {
     }
   }, []);
 
-  return { busy, regenerate, versionHistory, documentAssets, restoreVersion, approvePublish, unpublish, generate };
+  return {
+    busy, regenerate, versionHistory, documentAssets, restoreVersion,
+    approvePublish, unpublish, generate, templateOptions, setTemplate,
+  };
 }

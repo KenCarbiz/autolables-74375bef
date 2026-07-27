@@ -32,6 +32,7 @@ import {
   type FactoryStickerRenderResult, type FactoryStickerTheme,
   resolveRenderProfile,
   selectOemTemplate, validatePageGeometry, evaluateStickerEligibility,
+  listCompatibleTemplates, validateTemplateOverride,
 } from "../_shared/factorySticker/render.ts";
 
 const cors = {
@@ -458,17 +459,42 @@ async function orchestrateVehicle(
         selection: selection.selectionStatus, reasons: selection.reasons,
       };
     }
+    // An authorized manual override replaces the automatic choice, but only
+    // one the compatibility gate still accepts: a stale override naming a
+    // template that is no longer valid for this make is discarded, never
+    // applied.
+    const storedOverride = (record.qa_metadata?.template_override || null) as
+      { template_key?: string; layout_family?: string; theme_version?: string; reason?: string } | null;
+    const overrideVerdict = storedOverride?.template_key
+      ? validateTemplateOverride(
+        selection.canonicalMake,
+        storedOverride.template_key,
+        Number.isFinite(modelYearNum) ? modelYearNum : null,
+      )
+      : null;
+    const appliedOverride = overrideVerdict?.allowed ? overrideVerdict.option : null;
+    if (storedOverride?.template_key && !overrideVerdict?.allowed) {
+      await audit(admin, tenantId, "factory_sticker.template_override_discarded", record.id, {
+        vin, requested: storedOverride.template_key, reason: overrideVerdict?.reason ?? null,
+      });
+    }
+
     const canonicalOemId = make ? make.toLowerCase().replace(/[^a-z0-9]+/g, "-") : null;
     const profile = resolveRenderProfile(normalized.data);
-    const profileFamily = profile.profile.layoutFamily;
+    const profileFamily = appliedOverride && !appliedOverride.isAutomatic
+      ? appliedOverride.layoutFamily
+      : profile.profile.layoutFamily;
     const theme: FactoryStickerTheme = {
       oemThemeId: canonicalOemId ? `oem-${canonicalOemId}` : "oem-neutral",
-      oemThemeVersion: profile.profile.themeVersion,
+      oemThemeVersion: appliedOverride && !appliedOverride.isAutomatic
+        ? appliedOverride.themeVersion : profile.profile.themeVersion,
       canonicalOemId,
-      templateFamilyId: profile.profile.layoutFamily,
+      templateFamilyId: profileFamily,
       templateVersion: TEMPLATE_VERSION,
       logoAssetId: String(dealerSettings.dealer_logo_url ?? dealerSettings.logo_url ?? "").trim() || null,
       logoAssetVersion: null,
+      templateOverrideKey: appliedOverride && !appliedOverride.isAutomatic
+        ? appliedOverride.templateKey : null,
     };
 
     // ── Reconcile MSRP: computed (base + options + destination) vs the
@@ -514,6 +540,7 @@ async function orchestrateVehicle(
       logo_asset_id: theme.logoAssetId,
       logo_asset_version: theme.logoAssetVersion,
       passport_url: canonicalPassportUrl,
+      template_override: appliedOverride?.templateKey ?? null,
     }));
 
     const basePatch: Record<string, unknown> = {
@@ -987,6 +1014,76 @@ serve(async (req) => {
         status: (doc as { document_status?: string }).document_status ?? null,
         pdf_url: pdfUrl, preview_url: previewUrl,
         content_hash: snap.content_hash ?? null,
+      });
+    }
+
+    if (action === "template_options") {
+      const { data: record } = await admin.from("factory_sticker_records")
+        .select("id, canonical_oem_id, normalized_data_json, qa_metadata")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+      const normalized = (record?.normalized_data_json || {}) as { identity?: { make?: string; year?: string } };
+      const year = Number(normalized.identity?.year);
+      const sel = selectOemTemplate({
+        canonicalMake: normalized.identity?.make ?? null,
+        modelYear: Number.isFinite(year) ? year : null,
+      });
+      const meta = (record?.qa_metadata || {}) as Record<string, unknown>;
+      return json({
+        success: true,
+        canonical_make: sel.canonicalMake,
+        automatic_template_key: sel.templateKey,
+        current_override: (meta.template_override as Record<string, unknown> | undefined) ?? null,
+        options: listCompatibleTemplates(sel.canonicalMake, Number.isFinite(year) ? year : null),
+      });
+    }
+
+    if (action === "set_template") {
+      if (!can(tenantId, "edit_permitted_fields")) return json({ error: "insufficient_permission" }, 403);
+      const requested = String(body.template_key || "").trim();
+      const overrideReason = String(body.reason_notes || "").trim();
+      if (!overrideReason) return json({ error: "reason_notes_required" }, 400);
+      const { data: record } = await admin.from("factory_sticker_records")
+        .select("id, vin, canonical_oem_id, normalized_data_json, qa_metadata")
+        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).maybeSingle();
+      if (!record) return json({ error: "record_not_found" }, 404);
+      const normalized = (record.normalized_data_json || {}) as { identity?: { make?: string; year?: string } };
+      const year = Number(normalized.identity?.year);
+      const modelYear = Number.isFinite(year) ? year : null;
+      const sel = selectOemTemplate({ canonicalMake: normalized.identity?.make ?? null, modelYear });
+      // The canonical make governs, never the operator's pick: a request
+      // for another manufacturer's template is refused here, server-side,
+      // regardless of what the UI offered.
+      const verdict = validateTemplateOverride(sel.canonicalMake, requested, modelYear);
+      if (!verdict.allowed) {
+        await audit(admin, tenantId, "factory_sticker.template_override_refused", record.id, {
+          vin: record.vin, requested, reason: verdict.reason, user_id: callerUserId,
+        });
+        return json({ error: "incompatible_template", detail: verdict.reason }, 400);
+      }
+      const isAutomatic = verdict.option?.isAutomatic === true;
+      await setRecord(admin, record.id, {
+        qa_metadata: {
+          ...(record.qa_metadata || {}),
+          // Clearing the override restores automatic selection rather than
+          // pinning the same value forever.
+          template_override: isAutomatic ? null : {
+            template_key: requested,
+            layout_family: verdict.option?.layoutFamily ?? null,
+            theme_version: verdict.option?.themeVersion ?? null,
+            reason: overrideReason,
+            set_by: callerUserId,
+            set_at: new Date().toISOString(),
+          },
+        },
+      });
+      await audit(admin, tenantId, "factory_sticker.template_manually_changed", record.id, {
+        vin: record.vin, requested, automatic_template_key: sel.templateKey,
+        cleared: isAutomatic, reason: overrideReason, user_id: callerUserId,
+      });
+      return json({
+        success: true, record_id: record.id, template_key: requested,
+        cleared: isAutomatic,
+        note: "Regenerate the sticker to apply the template change as a new version.",
       });
     }
 

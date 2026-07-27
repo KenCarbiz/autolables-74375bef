@@ -71,7 +71,32 @@
     "qr2": "596.05,376.9 91.9",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 HYUNDAI PALISADE",
+    "CALLIGRAPHY AWD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "MSRP INCLUDES",
+    "PORT OF ENTRY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,415.00",
+    "KM8R7DGE8TU612345",
+    "TOTAL SUGGESTED RETAIL PRICE",
+    "$55,805.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "21",
+    "MPG",
+    "19",
+    "26",
+    "4.8",
+    "spend",
+    "$1,500",
+    "cost"
+  ],
   "totalBand": "$55,805.00",
   "svgDigest": [
     "540414ef"

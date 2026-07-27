@@ -66,7 +66,32 @@
     "qr2": "596.05,376.9 91.9",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "FACTORY WINDOW STICKER - CONFIGURATION & MSRP",
+    "2026 VOLKSWAGEN ATLAS",
+    "SEL 4MOTION",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,425.00",
+    "1V2FR2CA8TC512345",
+    "TOTAL FACTORY MSRP",
+    "$52,095.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "22",
+    "MPG",
+    "19",
+    "26",
+    "4.5",
+    "spend",
+    "$1,750",
+    "cost"
+  ],
   "totalBand": "$52,095.00",
   "svgDigest": [
     "aecc3512"

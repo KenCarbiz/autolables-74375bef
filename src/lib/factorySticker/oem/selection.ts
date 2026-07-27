@@ -290,6 +290,87 @@ export function selectOemTemplate(
   };
 }
 
+// ── Manual template override ──────────────────────────────────────────
+
+export interface TemplateOverrideOption {
+  templateKey: string;
+  label: string;
+  themeVersion: string;
+  layoutFamily: string;
+  /** True for the template the engine would pick on its own. */
+  isAutomatic: boolean;
+  neutral: boolean;
+}
+
+const NEUTRAL_KEY = "oem-autolabels-fallback";
+
+/**
+ * Templates an authorized user may switch this vehicle to.
+ *
+ * Only the vehicle's own brand and the neutral AutoLabels template
+ * qualify. Another manufacturer's design is never offered, so a Buick
+ * cannot be given the Chevrolet template no matter who asks.
+ */
+export function listCompatibleTemplates(
+  canonicalMake: OemId | null,
+  modelYear?: number | null,
+): TemplateOverrideOption[] {
+  const options: TemplateOverrideOption[] = [];
+  if (canonicalMake && canonicalMake !== "AUTOLABELS_FALLBACK") {
+    const own = getTemplateDefinition(canonicalMake, modelYear ?? null);
+    if (own) {
+      const profile = resolveThemeProfile(OEM_REGISTRY[canonicalMake].displayName, modelYear ?? null);
+      options.push({
+        templateKey: own.key,
+        label: `${own.displayName} OEM Window Sticker`,
+        themeVersion: profile.profile.themeVersion,
+        layoutFamily: own.layoutFamily,
+        isAutomatic: true,
+        neutral: false,
+      });
+    }
+  }
+  options.push({
+    templateKey: NEUTRAL_KEY,
+    label: "AutoLabels neutral template",
+    themeVersion: "autolabels-neutral",
+    layoutFamily: "premium-minimalist",
+    isAutomatic: false,
+    neutral: true,
+  });
+  return options;
+}
+
+export interface TemplateOverrideVerdict {
+  allowed: boolean;
+  reason: string | null;
+  option: TemplateOverrideOption | null;
+}
+
+/**
+ * Server-side gate for a manual template change. A request naming any
+ * other manufacturer's template is refused outright — the canonical make
+ * governs, not the operator's selection.
+ */
+export function validateTemplateOverride(
+  canonicalMake: OemId | null,
+  requestedTemplateKey: string,
+  modelYear?: number | null,
+): TemplateOverrideVerdict {
+  const key = String(requestedTemplateKey || "").trim().toLowerCase();
+  if (!key) return { allowed: false, reason: "no template requested", option: null };
+  const option = listCompatibleTemplates(canonicalMake, modelYear).find((o) => o.templateKey === key);
+  if (option) return { allowed: true, reason: null, option };
+  const owner = (Object.keys(OEM_REGISTRY) as OemId[]).find((id) => templateKeyFor(id) === key);
+  return {
+    allowed: false,
+    option: null,
+    reason: owner
+      ? `${OEM_REGISTRY[owner].displayName} is a different manufacturer's template and cannot be applied to a ${canonicalMake ? OEM_REGISTRY[canonicalMake]?.displayName ?? canonicalMake : "vehicle with no resolved make"}`
+      : `"${requestedTemplateKey}" is not a registered template`,
+  };
+}
+
 // ── Page geometry validation ──────────────────────────────────────────
 
 export interface PageGeometryReport {

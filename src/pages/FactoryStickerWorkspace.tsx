@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { hasWindowStickerPermission } from "@/lib/permissions/windowStickerPermissions";
+import TemplateOverrideControl from "@/components/vehicle/TemplateOverrideControl";
 import { listingHero } from "@/lib/photos";
 import { buildRenderLayout } from "@/lib/factorySticker/render/contract.ts";
 import type { FactoryStickerRenderData, FactoryStickerTheme } from "@/lib/factorySticker/render/contract.ts";
@@ -412,6 +414,8 @@ export default function FactoryStickerWorkspace({
   const { isAdmin } = useAuth();
   const entitlements = useEntitlements();
   const manager = fixture ? false : hasDealerCapability(entitlements.member?.role, "can_approve_print", isAdmin);
+  const canEditTemplate = !fixture
+    && hasWindowStickerPermission(entitlements.member?.role, "window_sticker.edit_permitted_fields", isAdmin);
 
   const [vehicle, setVehicle] = useState<VehicleRow | null>(null);
   const [record, setRecord] = useState<RecordRow | null>(null);
@@ -861,6 +865,17 @@ export default function FactoryStickerWorkspace({
                 value={fixture ? "Fixture" : record?.verification_status ? humanize(record.verification_status) : "Not run"}
               />
             </div>
+
+            {!fixture && vehicle?.tenant_id && vehicleId && record && (
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <TemplateOverrideControl
+                  tenantId={vehicle.tenant_id}
+                  vehicleId={vehicleId}
+                  canEdit={canEditTemplate}
+                  onChanged={load}
+                />
+              </div>
+            )}
 
             <div className="rounded-2xl border border-border bg-card p-4">
               <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">MSRP reconciliation</h2>

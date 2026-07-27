@@ -71,7 +71,32 @@
     "qr2": "594,351.2 96",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "ORIGINAL FACTORY BUILD & MSRP RECORD",
+    "2025 CHEVROLET SILVERADO 1500",
+    "LT CREW CAB 4WD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,995.00",
+    "3GCUDDED5SG412209",
+    "TOTAL ORIGINAL MSRP",
+    "$55,720.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "20",
+    "MPG",
+    "19",
+    "21",
+    "5",
+    "spend",
+    "$2,500",
+    "cost"
+  ],
   "totalBand": "$55,720.00",
   "svgDigest": [
     "32fea0ff"

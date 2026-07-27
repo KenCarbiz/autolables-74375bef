@@ -66,7 +66,32 @@
     "qr2": "594,351.2 96",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "ORIGINAL FACTORY BUILD & MSRP RECORD",
+    "2025 BMW 530I XDRIVE",
+    "SEDAN (G60)",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,175.00",
+    "WBA53FJ05SCT44821",
+    "TOTAL ORIGINAL MSRP",
+    "$67,725.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "29",
+    "MPG",
+    "26",
+    "34",
+    "3.4",
+    "save",
+    "$250",
+    "cost"
+  ],
   "totalBand": "$67,725.00",
   "svgDigest": [
     "bc6cbba1"

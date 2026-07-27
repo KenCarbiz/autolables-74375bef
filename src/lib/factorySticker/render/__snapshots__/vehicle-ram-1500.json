@@ -67,7 +67,32 @@
     "qr2": "603.55,391.9 76.9",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 RAM 1500",
+    "LARAMIE CREW CAB 4X4",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,435.00",
+    "1C6SRFJT7TN123456",
+    "TOTAL PRICE",
+    "$72,845.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "19",
+    "MPG",
+    "17",
+    "22",
+    "5.3",
+    "spend",
+    "$4,750",
+    "cost",
+    "$2,650",
+    "fueleconomy.gov"
+  ],
   "totalBand": "$72,845.00",
   "svgDigest": [
     "2aaccb1d"

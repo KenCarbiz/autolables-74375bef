@@ -71,7 +71,32 @@
     "qr2": "609.4,403.6 65.2",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2026 TESLA MODEL Y",
+    "LONG RANGE ALL-WHEEL DRIVE",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "MSRP INCLUDES",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,390.00",
+    "7SAYGDEE6TF123456",
+    "TOTAL MSRP",
+    "$51,630.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "117",
+    "MPGe",
+    "125",
+    "109",
+    "320",
+    "save",
+    "$5,250",
+    "cost"
+  ],
   "totalBand": "$51,630.00",
   "svgDigest": [
     "5442712e"

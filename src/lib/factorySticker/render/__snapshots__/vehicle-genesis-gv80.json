@@ -68,7 +68,32 @@
     "qr2": "594,351.2 96",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "ORIGINAL FACTORY BUILD & MSRP RECORD",
+    "2025 GENESIS GV80",
+    "3.5T PRESTIGE AWD",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,395.00",
+    "KMUHCESC5SU301992",
+    "TOTAL ORIGINAL MSRP",
+    "$79,145.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "18",
+    "MPG",
+    "16",
+    "22",
+    "5.6",
+    "spend",
+    "$4,250",
+    "cost"
+  ],
   "totalBand": "$79,145.00",
   "svgDigest": [
     "faff4b36"

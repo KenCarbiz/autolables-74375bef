@@ -45,6 +45,8 @@ export {
   listTemplateDefinitions,
   selectOemTemplate,
   validatePageGeometry,
+  listCompatibleTemplates,
+  validateTemplateOverride,
 } from "../../../../src/lib/factorySticker/oem/selection.ts";
 export type {
   OemTemplateDefinition,

@@ -69,7 +69,32 @@
     "qr2": "607.25,399.3 69.5",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "FACTORY WINDOW STICKER - CONFIGURATION & MSRP",
+    "2026 GMC SIERRA 1500",
+    "DENALI 4WD CREW CAB",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "2,095.00",
+    "3GTUUGEL8TG412345",
+    "TOTAL VEHICLE PRICE",
+    "$75,970.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "16",
+    "MPG",
+    "15",
+    "19",
+    "6.3",
+    "spend",
+    "$6,000",
+    "cost"
+  ],
   "totalBand": "$75,970.00",
   "svgDigest": [
     "11ea63d6"

@@ -71,7 +71,32 @@
     "qr2": "596.05,376.9 91.9",
     "totalMsrp": "481,585 @18"
   },
-  "headings": [],
+  "headings": [
+    "2025 ACURA RDX",
+    "SH-AWD A-SPEC ADVANCE",
+    "STANDARD EQUIPMENT",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
+    "PERFORMANCE & MECHANICAL",
+    "SAFETY & DRIVER ASSISTANCE",
+    "MSRP INCLUDES",
+    "FACTORY OPTIONS",
+    "DESTINATION & HANDLING",
+    "1,195.00",
+    "5J8TC2H86SL007905",
+    "TOTAL VEHICLE PRICE",
+    "$56,645.00",
+    "Fuel Economy & Environment",
+    "Fuel Economy",
+    "23",
+    "MPG",
+    "21",
+    "26",
+    "4.3",
+    "spend",
+    "$4,250",
+    "cost"
+  ],
   "totalBand": "$56,645.00",
   "svgDigest": [
     "ffae5f6f"
