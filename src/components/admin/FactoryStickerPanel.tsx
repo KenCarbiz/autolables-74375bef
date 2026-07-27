@@ -10,6 +10,7 @@ import {
   type FactoryStickerSettings,
 } from "@/contexts/DealerSettingsContext";
 import { toast } from "sonner";
+import { promptRegenerationReason } from "@/lib/factorySticker/regenerationReason";
 import {
   AlertTriangle, CheckCircle2, ExternalLink, Globe, Loader2, RefreshCw,
 } from "lucide-react";
@@ -145,12 +146,18 @@ export default function FactoryStickerPanel() {
 
   const act = async (row: RecordRow, action: RowAction) => {
     if (!tenantId) return;
+    let reason: ReturnType<typeof promptRegenerationReason> = null;
+    if (action === "regenerate") {
+      reason = promptRegenerationReason();
+      if (!reason) { toast.info("Regeneration cancelled — a reason is required."); return; }
+    }
     setBusy({ id: row.id, action });
     try {
       const { data, error } = await supabase.functions.invoke("factory-sticker-orchestrate", {
         body: {
           action, tenant_id: tenantId, vehicle_id: row.vehicle_id,
           app_base: typeof window !== "undefined" ? window.location.origin : undefined,
+          ...(reason ? { reason_code: reason.reason_code, reason_notes: reason.reason_notes } : {}),
         },
       });
       const payload = (data || {}) as { success?: boolean; error?: string };

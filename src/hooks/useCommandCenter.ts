@@ -15,6 +15,7 @@ import {
   type GeneratedDocument,
 } from "@/lib/stickerStudio/documentWorkflow";
 import { realTenantId } from "@/lib/tenant/realTenantId";
+import { promptRegenerationReason } from "@/lib/factorySticker/regenerationReason";
 import { vinKey, vinKeys } from "@/lib/vinKeys";
 import { documentLabel, fmtDate, humanize } from "@/lib/commandCenter/format";
 import {
@@ -2138,10 +2139,13 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
       // The factory build record has its own pipeline: factory-sticker-orchestrate
       // rebuilds it from the saved build data (manager authority enforced there).
       if (row.generateKind === "factory_sticker") {
+        const reason = promptRegenerationReason();
+        if (!reason) return { ok: false, error: "Regeneration cancelled — a reason is required." };
         const res = await sb().functions.invoke("factory-sticker-orchestrate", {
           body: {
             action: "regenerate", tenant_id: tenantId, vehicle_id: vehicleId,
             app_base: typeof window !== "undefined" ? window.location.origin : undefined,
+            reason_code: reason.reason_code, reason_notes: reason.reason_notes,
           },
         });
         const payload = (res?.data || {}) as Row;
