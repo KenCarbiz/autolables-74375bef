@@ -702,6 +702,45 @@ export type Database = {
           },
         ]
       }
+      compliance_form_templates: {
+        Row: {
+          content_hash: string
+          created_at: string
+          effective_from: string
+          file_path: string
+          id: string
+          legal_source: string
+          notes: string | null
+          retired_at: string | null
+          template_key: string
+          version: string
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string
+          effective_from: string
+          file_path: string
+          id?: string
+          legal_source: string
+          notes?: string | null
+          retired_at?: string | null
+          template_key: string
+          version: string
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string
+          effective_from?: string
+          file_path?: string
+          id?: string
+          legal_source?: string
+          notes?: string | null
+          retired_at?: string | null
+          template_key?: string
+          version?: string
+        }
+        Relationships: []
+      }
       ct_mvp_certification_runs: {
         Row: {
           certified_at: string
@@ -971,6 +1010,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dealer_automation_settings: {
+        Row: {
+          auto_check_standard_prep: boolean
+          auto_create_print_tasks: boolean
+          auto_create_work_from_scraper: boolean
+          auto_send_new_to_get_ready: boolean
+          auto_send_used_to_get_ready: boolean
+          created_at: string
+          enable_cpo_detection: boolean
+          enable_demo_detection: boolean
+          enable_ev_detection: boolean
+          id: string
+          require_manager_approval_before_passport_publish: boolean
+          require_manager_approval_before_print: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_check_standard_prep?: boolean
+          auto_create_print_tasks?: boolean
+          auto_create_work_from_scraper?: boolean
+          auto_send_new_to_get_ready?: boolean
+          auto_send_used_to_get_ready?: boolean
+          created_at?: string
+          enable_cpo_detection?: boolean
+          enable_demo_detection?: boolean
+          enable_ev_detection?: boolean
+          id?: string
+          require_manager_approval_before_passport_publish?: boolean
+          require_manager_approval_before_print?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_check_standard_prep?: boolean
+          auto_create_print_tasks?: boolean
+          auto_create_work_from_scraper?: boolean
+          auto_send_new_to_get_ready?: boolean
+          auto_send_used_to_get_ready?: boolean
+          created_at?: string
+          enable_cpo_detection?: boolean
+          enable_demo_detection?: boolean
+          enable_ev_detection?: boolean
+          id?: string
+          require_manager_approval_before_passport_publish?: boolean
+          require_manager_approval_before_print?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       dealer_branding: {
         Row: {
@@ -1568,6 +1658,81 @@ export type Database = {
           tenant_id?: string
           updated_at?: string
           used_window_template?: string | null
+        }
+        Relationships: []
+      }
+      dealer_work_items: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          condition: string | null
+          created_at: string
+          department: string
+          description: string | null
+          due_at: string | null
+          id: string
+          metadata: Json
+          priority: string
+          source: string
+          status: string
+          stock: string | null
+          store_id: string | null
+          tenant_id: string | null
+          title: string
+          updated_at: string
+          vehicle_id: string | null
+          vehicle_title: string | null
+          vin: string | null
+          work_type: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          condition?: string | null
+          created_at?: string
+          department?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          priority?: string
+          source?: string
+          status?: string
+          stock?: string | null
+          store_id?: string | null
+          tenant_id?: string | null
+          title: string
+          updated_at?: string
+          vehicle_id?: string | null
+          vehicle_title?: string | null
+          vin?: string | null
+          work_type: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          condition?: string | null
+          created_at?: string
+          department?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          metadata?: Json
+          priority?: string
+          source?: string
+          status?: string
+          stock?: string | null
+          store_id?: string | null
+          tenant_id?: string | null
+          title?: string
+          updated_at?: string
+          vehicle_id?: string | null
+          vehicle_title?: string | null
+          vin?: string | null
+          work_type?: string
         }
         Relationships: []
       }
@@ -2901,6 +3066,173 @@ export type Database = {
           },
         ]
       }
+      factory_sticker_records: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          attempt_count: number
+          barcode_identity_qa_status: string | null
+          barcode_payload: string | null
+          canonical_oem_id: string | null
+          canonical_passport_url: string | null
+          confidence_level: string | null
+          created_at: string
+          current_document_id: string | null
+          detected_make_value: string | null
+          generation_fingerprint: string | null
+          generation_status: string
+          id: string
+          last_error: string | null
+          logo_asset_id: string | null
+          logo_asset_version: string | null
+          normalized_data_json: Json | null
+          oem_resolution_confidence: string | null
+          oem_theme_id: string | null
+          oem_theme_version: string | null
+          passport_slug: string | null
+          published_at: string | null
+          qa_metadata: Json | null
+          qr_identity_qa_status: string | null
+          qr_payload: string | null
+          reconciliation_difference: number | null
+          reconciliation_status: string | null
+          renderer_version: string | null
+          review_reason: string | null
+          review_required: boolean
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_classification: string | null
+          source_provider: string | null
+          template_family_id: string | null
+          template_version: string | null
+          tenant_id: string
+          updated_at: string
+          vehicle_id: string
+          verification_status: string | null
+          vin: string
+          visual_qa_status: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attempt_count?: number
+          barcode_identity_qa_status?: string | null
+          barcode_payload?: string | null
+          canonical_oem_id?: string | null
+          canonical_passport_url?: string | null
+          confidence_level?: string | null
+          created_at?: string
+          current_document_id?: string | null
+          detected_make_value?: string | null
+          generation_fingerprint?: string | null
+          generation_status?: string
+          id?: string
+          last_error?: string | null
+          logo_asset_id?: string | null
+          logo_asset_version?: string | null
+          normalized_data_json?: Json | null
+          oem_resolution_confidence?: string | null
+          oem_theme_id?: string | null
+          oem_theme_version?: string | null
+          passport_slug?: string | null
+          published_at?: string | null
+          qa_metadata?: Json | null
+          qr_identity_qa_status?: string | null
+          qr_payload?: string | null
+          reconciliation_difference?: number | null
+          reconciliation_status?: string | null
+          renderer_version?: string | null
+          review_reason?: string | null
+          review_required?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_classification?: string | null
+          source_provider?: string | null
+          template_family_id?: string | null
+          template_version?: string | null
+          tenant_id: string
+          updated_at?: string
+          vehicle_id: string
+          verification_status?: string | null
+          vin: string
+          visual_qa_status?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attempt_count?: number
+          barcode_identity_qa_status?: string | null
+          barcode_payload?: string | null
+          canonical_oem_id?: string | null
+          canonical_passport_url?: string | null
+          confidence_level?: string | null
+          created_at?: string
+          current_document_id?: string | null
+          detected_make_value?: string | null
+          generation_fingerprint?: string | null
+          generation_status?: string
+          id?: string
+          last_error?: string | null
+          logo_asset_id?: string | null
+          logo_asset_version?: string | null
+          normalized_data_json?: Json | null
+          oem_resolution_confidence?: string | null
+          oem_theme_id?: string | null
+          oem_theme_version?: string | null
+          passport_slug?: string | null
+          published_at?: string | null
+          qa_metadata?: Json | null
+          qr_identity_qa_status?: string | null
+          qr_payload?: string | null
+          reconciliation_difference?: number | null
+          reconciliation_status?: string | null
+          renderer_version?: string | null
+          review_reason?: string | null
+          review_required?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_classification?: string | null
+          source_provider?: string | null
+          template_family_id?: string | null
+          template_version?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vehicle_id?: string
+          verification_status?: string | null
+          vin?: string
+          visual_qa_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "factory_sticker_records_current_document_id_fkey"
+            columns: ["current_document_id"]
+            isOneToOne: false
+            referencedRelation: "generated_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_sticker_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_sticker_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "factory_sticker_records_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generated_documents: {
         Row: {
           approved_at: string | null
@@ -3671,6 +4003,67 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      neovin_snapshots: {
+        Row: {
+          endpoint: string | null
+          fetched_at: string
+          http_status: number | null
+          id: string
+          payload: Json
+          payload_hash: string | null
+          raw_key_count: number | null
+          tenant_id: string | null
+          vehicle_id: string | null
+          vin: string
+        }
+        Insert: {
+          endpoint?: string | null
+          fetched_at?: string
+          http_status?: number | null
+          id?: string
+          payload: Json
+          payload_hash?: string | null
+          raw_key_count?: number | null
+          tenant_id?: string | null
+          vehicle_id?: string | null
+          vin: string
+        }
+        Update: {
+          endpoint?: string | null
+          fetched_at?: string
+          http_status?: number | null
+          id?: string
+          payload?: Json
+          payload_hash?: string | null
+          raw_key_count?: number | null
+          tenant_id?: string | null
+          vehicle_id?: string | null
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "neovin_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "neovin_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "neovin_snapshots_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
             referencedColumns: ["id"]
           },
         ]
@@ -5192,6 +5585,9 @@ export type Database = {
           user_agent: string | null
           vehicle_listing_id: string | null
           vin: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
           ymm: string | null
         }
         Insert: {
@@ -5233,6 +5629,9 @@ export type Database = {
           user_agent?: string | null
           vehicle_listing_id?: string | null
           vin: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
           ymm?: string | null
         }
         Update: {
@@ -5274,6 +5673,9 @@ export type Database = {
           user_agent?: string | null
           vehicle_listing_id?: string | null
           vin?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
           ymm?: string | null
         }
         Relationships: [
@@ -5348,6 +5750,70 @@ export type Database = {
           },
           {
             foreignKeyName: "service_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_request_lines: {
+        Row: {
+          amount: number
+          approved: boolean | null
+          created_at: string
+          decided_at: string | null
+          id: string
+          item: string
+          line_type: string
+          qty: number | null
+          rate: number | null
+          request_id: string
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          approved?: boolean | null
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          item: string
+          line_type?: string
+          qty?: number | null
+          rate?: number | null
+          request_id: string
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          approved?: boolean | null
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          item?: string
+          line_type?: string
+          qty?: number | null
+          rate?: number | null
+          request_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_request_lines_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_request_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_request_lines_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -5696,6 +6162,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      standard_prep_templates: {
+        Row: {
+          active: boolean
+          condition: string
+          created_at: string
+          department: string
+          id: string
+          items: Json
+          name: string
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          condition?: string
+          created_at?: string
+          department?: string
+          id?: string
+          items?: Json
+          name: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          condition?: string
+          created_at?: string
+          department?: string
+          id?: string
+          items?: Json
+          name?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       sticker_template_categories: {
         Row: {
@@ -6756,6 +7258,79 @@ export type Database = {
           },
         ]
       }
+      vehicle_lifecycle: {
+        Row: {
+          authorized_at: string | null
+          authorized_by: string | null
+          created_at: string
+          gate_reason: string | null
+          id: string
+          previous_state: string | null
+          retail_ready_at: string | null
+          state: string
+          state_changed_at: string
+          state_changed_by: string | null
+          tenant_id: string
+          updated_at: string
+          vehicle_id: string
+          vin: string
+        }
+        Insert: {
+          authorized_at?: string | null
+          authorized_by?: string | null
+          created_at?: string
+          gate_reason?: string | null
+          id?: string
+          previous_state?: string | null
+          retail_ready_at?: string | null
+          state?: string
+          state_changed_at?: string
+          state_changed_by?: string | null
+          tenant_id: string
+          updated_at?: string
+          vehicle_id: string
+          vin: string
+        }
+        Update: {
+          authorized_at?: string | null
+          authorized_by?: string | null
+          created_at?: string
+          gate_reason?: string | null
+          id?: string
+          previous_state?: string | null
+          retail_ready_at?: string | null
+          state?: string
+          state_changed_at?: string
+          state_changed_by?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vehicle_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_lifecycle_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_lifecycle_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_lifecycle_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_listings: {
         Row: {
           advertised_price_before_doc: number | null
@@ -7696,6 +8271,10 @@ export type Database = {
         }
         Returns: Json
       }
+      authorize_vehicle_for_get_ready: {
+        Args: { p_note?: string; p_vehicle_id: string }
+        Returns: Json
+      }
       autocurb_cancel_subscription: {
         Args: { p_stripe_subscription_id: string }
         Returns: number
@@ -7788,6 +8367,7 @@ export type Database = {
       decide_service_request: {
         Args: {
           p_decision: string
+          p_line_decisions?: Json
           p_note?: string
           p_request_id: string
           p_spend_limit?: number
@@ -8173,6 +8753,10 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: boolean
       }
+      k208_conduct_allowed: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: boolean
+      }
       k208_record_buyer_signature: {
         Args: {
           _buyer_name: string
@@ -8221,6 +8805,10 @@ export type Database = {
       mark_ready_for_signature: {
         Args: { _addendum_id: string; _version_label: string }
         Returns: undefined
+      }
+      mark_vehicle_retail_ready: {
+        Args: { p_note?: string; p_vehicle_id: string }
+        Returns: Json
       }
       marketcheck_prune_inventory: {
         Args: { _live_vins: string[]; _tenant_id: string }
@@ -8291,6 +8879,10 @@ export type Database = {
       recompute_delivery_clearance: {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: Json
+      }
+      recompute_vehicle_lifecycle: {
+        Args: { p_tenant_id: string; p_vehicle_id: string }
+        Returns: string
       }
       recon_caller_role: { Args: { _tenant: string }; Returns: string }
       recon_confirm_lines_done: {
@@ -8543,6 +9135,10 @@ export type Database = {
       set_tenant_member_role: {
         Args: { p_member_id: string; p_role: string }
         Returns: undefined
+      }
+      set_vehicle_lifecycle_gate: {
+        Args: { p_reason?: string; p_state: string; p_vehicle_id: string }
+        Returns: Json
       }
       sign_deal_token: {
         Args: {
