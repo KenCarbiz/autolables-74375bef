@@ -197,6 +197,16 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     status: "draft",
     logoAuthorized: false,
   },
+  {
+    oemId: "MERCEDES_BENZ",
+    market: "US",
+    modelYearStart: 2022,
+    modelYearEnd: 2027,
+    themeVersion: "mercedes-benz-us-2026-v1",
+    layoutFamily: "luxury-factory-technical",
+    status: "draft",
+    logoAuthorized: false,
+  },
 ];
 
 const FAMILY_BY_TEMPLATE: Record<string, string> = {

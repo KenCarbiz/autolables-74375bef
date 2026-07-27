@@ -46,6 +46,10 @@ import {
   lincolnLongFixture,
   lincolnNautilusFixture,
   lincolnPhevFixture,
+  mercedesAmgLongFixture,
+  mercedesEqFixture,
+  mercedesGleFixture,
+  mercedesPhevFixture,
   mazdaCx90Fixture,
   mazdaLongFixture,
   mazdaMiataFixture,
@@ -272,6 +276,19 @@ const FIXTURE_SCENARIOS = {
       const d = lincolnNautilusFixture();
       d.pricing = { ...d.pricing, destinationCharge: null };
       d.barcodePayload = "5LMPJ8K85TJ999999";
+      return d;
+    },
+  },
+  mercedes: { label: "Mercedes GLE 450", data: mercedesGleFixture },
+  mercedesphev: { label: "Mercedes GLE 450e", data: mercedesPhevFixture },
+  mercedesev: { label: "Mercedes EQE SUV", data: mercedesEqFixture },
+  mercedeslong: { label: "AMG GLE 63 (2-page)", data: mercedesAmgLongFixture },
+  mercedesqa: {
+    label: "Mercedes QA blocked",
+    data: () => {
+      const d = mercedesGleFixture();
+      d.pricing = { ...d.pricing, destinationCharge: null };
+      d.barcodePayload = "4JGFB5KB8TB999999";
       return d;
     },
   },

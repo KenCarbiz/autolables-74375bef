@@ -32,6 +32,10 @@ import {
   lincolnLongFixture,
   lincolnNautilusFixture,
   lincolnPhevFixture,
+  mercedesAmgLongFixture,
+  mercedesEqFixture,
+  mercedesGleFixture,
+  mercedesPhevFixture,
   mazdaCx90Fixture,
   mazdaLongFixture,
   mazdaMiataFixture,
@@ -760,6 +764,90 @@ describe("Lincoln profile (lincoln-us-2026-v1)", () => {
     const model = buildRenderLayout(lincolnLongFixture(), themeFor(null));
     expect(model.pages.length).toBe(2);
     expect(pageStrings(model, 0)).toContain("$108,135.00");
+    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
+  it("resolves Mercedes-Benz and its aliases to the same versioned profile", () => {
+    for (const alias of ["Mercedes-Benz", "Mercedes Benz", "MERCEDES-BENZ", "Mercedes-AMG"]) {
+      const m = resolveThemeProfile(alias, 2026);
+      expect(m.profile.themeVersion).toBe("mercedes-benz-us-2026-v1");
+      expect(m.theme.oemId).toBe("MERCEDES_BENZ");
+    }
+    expect(resolveThemeProfile("Mercedes-Benz", 2026).profile.layoutFamily).toBe("luxury-factory-technical");
+    expect(resolveThemeProfile("Mercedes-Benz", 2021).profile.status).toBe("fallback");
+  });
+
+  it("GLE 450 benchmark reconciles coded packages on one page with the full panel set", () => {
+    const data = mercedesGleFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$79,050.00");
+    expect(model.drawnStrings).toContain("4JGFB5KB8TB123456");
+    expect(page1).toContain("TOTAL MSRP");
+    expect(page1).toContain("P01");
+    expect(page1).toContain("P20");
+    // AMG Line appearance equipment on a non-AMG model: the model line
+    // stays GLE 450 while the option renders by name.
+    expect(page1.some((s) => s.includes("AMG Line Exterior"))).toBe(true);
+    expect(page1.some((s) => s.includes("2026 MERCEDES-BENZ GLE 450"))).toBe(true);
+    expect(page1.some((s) => s.includes("MSRP INCLUDES"))).toBe(true);
+    expect(page1.join(" ")).toContain("12-YEAR/UNLIMITED-MILE CORROSION PERFORATION LIMITED WARRANTY");
+    expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
+    expect(page1.some((s) => s.includes("VANCE, ALABAMA, USA"))).toBe(true);
+    expect(page1.some((s) => s.includes("GOVERNMENT 5-STAR SAFETY RATINGS"))).toBe(true);
+    expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
+    expect(page1.some((s) => s === "auto")).toBe(true);
+    expect(page1.some((s) => s === "(LABELS)")).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
+    const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
+    expect(qrs.some((q) => q.kind === "qr" && q.payload === data.passportUrl)).toBe(true);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("stays monochrome: silver keyline only, no other brand colors", () => {
+    const model = buildRenderLayout(mercedesGleFixture(), themeFor(null));
+    const prims = model.pages[0].primitives;
+    const fills = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    const rules = new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(rules.has("#6e7377")).toBe(true);   // silver keyline
+    expect(fills.has("#101010")).toBe(true);   // black total band
+    expect(fills.has("#8a1538")).toBe(false);  // never INFINITI burgundy
+    expect(fills.has("#172536")).toBe(false);  // never Lincoln navy
+    expect(fills.has("#002c5f")).toBe(false);  // never Hyundai blue
+  });
+
+  it("GLE 450e uses the plug-in module with battery coverage", () => {
+    const model = buildRenderLayout(mercedesPhevFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPG gasoline only"))).toBe(true);
+    expect(page1.some((s) => s.includes("Plug-In Hybrid"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.join(" ")).toContain("6-YEAR/62,000-MILE HIGH-VOLTAGE BATTERY COVERAGE");
+  });
+
+  it("EQE SUV uses the EV module with no gasoline content", () => {
+    const model = buildRenderLayout(mercedesEqFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("Electric Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+    expect(page1.join(" ")).toContain("10-YEAR/155,000-MILE HIGH-VOLTAGE BATTERY CERTIFICATE");
+  });
+
+  it("AMG GLE 63 S long-equipment produces a deliberate continuation page", () => {
+    const model = buildRenderLayout(mercedesAmgLongFixture(), themeFor(null));
+    expect(model.pages.length).toBe(2);
+    expect(pageStrings(model, 0)).toContain("$133,400.00");
     expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
     expectMinFontRespected(model);
   });

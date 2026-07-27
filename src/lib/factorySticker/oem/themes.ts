@@ -570,7 +570,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
   VOLKSWAGEN: theme("VOLKSWAGEN", "EUROPEAN_TECHNICAL", palette({ header: "#001e50", accent: "#00b1eb", sectionHeading: "#001e50" })),
   AUDI: theme("AUDI", "EUROPEAN_TECHNICAL", palette({ header: "#000000", accent: "#bb0a30" })),
   BMW: theme("BMW", "EUROPEAN_TECHNICAL", palette({ header: "#262626", accent: "#0066b1" })),
-  MERCEDES_BENZ: theme("MERCEDES_BENZ", "PREMIUM_LUXURY", palette({ header: "#000000", accent: "#9c9c9c", sectionHeading: "#2b2b2b" })),
+  // Mercedes-Benz factory treatment (mercedes-benz-us-2026-v1): white
+  // header with the auto-fit wordmark block, restrained silver keyline,
+  // black TOTAL MSRP band — overwhelmingly black and white.
+  MERCEDES_BENZ: theme("MERCEDES_BENZ", "LUXURY_FACTORY", {
+    headerBackground: "#ffffff",
+    headerText: "#111111",
+    background: "#ffffff",
+    bodyText: "#111111",
+    mutedText: "#55595e",
+    accent: "#6e7377",
+    divider: "#d7d7d7",
+    sectionHeadingText: "#111111",
+    totalMsrpBackground: "#101010",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL MSRP" }),
   // Subaru factory treatment (subaru-us-2026-v1): white identity block,
   // Subaru-blue header band, blue used with restraint (band, keyline, total).
   SUBARU: theme("SUBARU", "JAPANESE_FACTORY", {

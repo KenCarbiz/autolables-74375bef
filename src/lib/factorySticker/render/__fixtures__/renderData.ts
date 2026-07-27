@@ -2663,6 +2663,260 @@ export const lincolnLongFixture = (): FactoryStickerRenderData => {
   };
 };
 
+// ── Mercedes-Benz fixtures (luxury-factory, mercedes-benz-us-2026-v1) ──
+
+// Benchmark GLE 450 4MATIC: coded packages with contents, AMG Line as
+// appearance equipment on a non-AMG model. 69,500 + 9,350 + 1,350 = 80,200.
+export const mercedesGleFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "4JGFB5KB8TB123456",
+  identity: { year: "2026", make: "Mercedes-Benz", model: "GLE 450", trim: "4MATIC SUV" },
+  pricing: { baseMsrp: 69500, destinationCharge: 1350, optionsTotal: 8200, totalMsrp: 79050 },
+  options: [
+    { name: "Premium Package", code: "P01", msrp: 2150, contents: ["Multicontour Front Seats w/ Massage", "Head-Up Display"] },
+    { name: "Driver Assistance Package Plus", code: "P20", msrp: 2250, contents: ["Active Distance Assist DISTRONIC", "Active Steering Assist"] },
+    { name: "AMG Line Exterior", code: "P31", msrp: 1750 },
+    { name: "Panorama Sliding Sunroof", code: "413", msrp: 1200 },
+    { name: "Burmester Surround Sound System", code: "810", msrp: 850 },
+    { name: "Obsidian Black Metallic", code: "197", msrp: 0 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.0L Inline-6 Turbo Engine w/ EQ Boost - 375 HP",
+      "48V Integrated Starter-Generator",
+      "9G-TRONIC 9-Speed Automatic Transmission",
+      "4MATIC All-Wheel Drive",
+      "DYNAMIC SELECT Drive Modes",
+      "AIRMATIC Suspension",
+      "Electromechanical Power Steering",
+    ],
+    safety_features: [
+      "Active Brake Assist",
+      "Blind Spot Assist",
+      "ATTENTION ASSIST",
+      "PRE-SAFE & PRE-SAFE Sound",
+      "Surround View System",
+      "Electronic Stability Program (ESP)",
+      "LED Headlamps w/ Adaptive Highbeam Assist",
+    ],
+    interior: [
+      "MB-Tex Upholstery",
+      "Heated Front Seats w/ Memory",
+      "40/20/40 Split-Folding Rear Seats",
+      "3-Zone Automatic Climate Control",
+      "Ambient Interior Lighting - 64 Colors",
+      "Heated Steering Wheel",
+      "MBUX Multimedia System w/ 12.3-Inch Display",
+      "12.3-Inch Digital Instrument Cluster",
+      "MBUX Voice Assistant w/ Hey Mercedes",
+      "Wireless Apple CarPlay & Android Auto",
+    ],
+    exterior: [
+      "KEYLESS-GO w/ HANDS-FREE ACCESS",
+      "Panoramic Sliding Sunroof",
+      "Power Liftgate",
+      "Power-Folding Heated Mirrors",
+      "Rain-Sensing Windshield Wipers",
+    ],
+  },
+  colors: { exterior: { name: "Obsidian Black Metallic", code: "197" }, interior: { name: "Black MB-Tex", code: "101A" } },
+  assembly: { plant: "Tuscaloosa", city: "Vance, Alabama", country: "USA" },
+  mechanical: { engine: "3.0L TURBO I6", transmission: "9G-TRONIC", drivetrain: "4MATIC AWD" },
+  stockNumber: "MB260145",
+  transportMethod: "TRUCK",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: "051", order: "0671309876", dealer: "051051" },
+  epa: {
+    city: 19, highway: 26, combined: 22, annualFuelCost: 2300, ghgScore: 4,
+    rangeMiles: null, fuelType: "Premium Gasoline", smogScore: 5, gallonsPer100Miles: 4.5,
+    fiveYearCostDifference: -2000, classNote: null,
+  },
+  safety: { overall: 5, frontalDriver: 4, frontalPassenger: 4, sideFront: 5, sideRear: 5, rollover: 4 },
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: "4-Year/50,000-Mile Powertrain Coverage",
+    corrosion: "12-Year/Unlimited-Mile Corrosion Perforation Limited Warranty",
+    roadside: "4-Year/50,000-Mile Roadside Assistance Program",
+    emissions: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "22%" },
+    { label: "Major foreign parts content", value: "Germany 61%" },
+    { label: "Additional foreign parts content", value: "Mexico 10%" },
+    { label: "Final assembly point", value: "Vance, Alabama, USA" },
+    { label: "Country of origin - engine", value: "Germany" },
+    { label: "Country of origin - transmission", value: "Germany" },
+  ],
+  dealer: { name: "Mercedes-Benz of Coral Gables", address: "300 Almeria Ave", city: "Coral Gables", state: "FL", zip: "33134", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-gle450",
+  barcodePayload: "4JGFB5KB8TB123456",
+  disclaimers: [
+    "Vehicle information compiled from verified manufacturer, regulatory and dealer data. This document may not be the original manufacturer-issued label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
+// GLE 450e: regulatory/phev. 72,600 + 1,050 + 1,350 = 75,000.
+export const mercedesPhevFixture = (): FactoryStickerRenderData => ({
+  ...mercedesGleFixture(),
+  vin: "4JGFB6KB1TB204567",
+  identity: { year: "2026", make: "Mercedes-Benz", model: "GLE 450e", trim: "4MATIC SUV" },
+  pricing: { baseMsrp: 72600, destinationCharge: 1350, optionsTotal: 1050, totalMsrp: 75000 },
+  options: [
+    { name: "MANUFAKTUR Diamond White Metallic", code: "799", msrp: 1050 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "2.0L Turbocharged I4 Plug-In Hybrid - 381 HP Combined",
+      "Permanent-Magnet Synchronous Drive Motor",
+      "23.3 kWh Lithium-Ion Battery",
+      "9G-TRONIC 9-Speed Automatic Transmission",
+      "4MATIC All-Wheel Drive",
+      "DC Fast Charging Capability",
+      "Regenerative Braking",
+    ],
+    safety_features: [
+      "Active Brake Assist",
+      "Blind Spot Assist",
+      "ATTENTION ASSIST",
+      "PRE-SAFE",
+      "Surround View System",
+      "LED Headlamps w/ Adaptive Highbeam Assist",
+    ],
+    interior: [
+      "MB-Tex Upholstery",
+      "Heated Front Seats w/ Memory",
+      "3-Zone Automatic Climate Control",
+      "MBUX Multimedia System w/ 12.3-Inch Display",
+      "Wireless Apple CarPlay & Android Auto",
+      "Wireless Charging",
+    ],
+    exterior: [
+      "KEYLESS-GO w/ HANDS-FREE ACCESS",
+      "Panoramic Sliding Sunroof",
+      "Power Liftgate",
+      "Power-Folding Heated Mirrors",
+    ],
+  },
+  colors: { exterior: { name: "MANUFAKTUR Diamond White Metallic", code: "799" }, interior: { name: "Black MB-Tex", code: "101A" } },
+  mechanical: { engine: "2.0L PHEV I4", transmission: "9G-TRONIC", drivetrain: "4MATIC AWD" },
+  stockNumber: "MB260233",
+  epa: {
+    city: null, highway: null, combined: 58, annualFuelCost: 2100, ghgScore: 8,
+    rangeMiles: 48, fuelType: "PHEV Gasoline-Electric", smogScore: 7, gallonsPer100Miles: null,
+    fiveYearCostDifference: 750, classNote: null, gasCombinedMpg: 23,
+  },
+  safety: null,
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: "4-Year/50,000-Mile Powertrain Coverage",
+    corrosion: "12-Year/Unlimited-Mile Corrosion Perforation Limited Warranty",
+    roadside: "4-Year/50,000-Mile Roadside Assistance Program",
+    emissions: "6-Year/62,000-Mile High-Voltage Battery Coverage",
+  },
+  passportUrl: "https://autolabels.io/v/demo-gle450e",
+  barcodePayload: "4JGFB6KB1TB204567",
+});
+
+// EQE SUV 350 4MATIC: regulatory/ev. 77,900 + 1,050 + 1,350 = 80,300.
+export const mercedesEqFixture = (): FactoryStickerRenderData => ({
+  ...mercedesGleFixture(),
+  vin: "4JGGM2BB8TA098765",
+  identity: { year: "2026", make: "Mercedes-Benz", model: "EQE 350 SUV", trim: "4MATIC" },
+  pricing: { baseMsrp: 77900, destinationCharge: 1350, optionsTotal: 1050, totalMsrp: 80300 },
+  options: [
+    { name: "MANUFAKTUR Alpine Grey", code: "056", msrp: 1050 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "Dual Electric Motors - 288 HP",
+      "90.6 kWh Lithium-Ion Battery",
+      "DC Fast Charging up to 170 kW",
+      "9.6 kW Onboard Charger",
+      "4MATIC All-Wheel Drive",
+      "Adjustable Regenerative Braking",
+    ],
+    safety_features: [
+      "Active Brake Assist",
+      "Blind Spot Assist",
+      "ATTENTION ASSIST",
+      "PRE-SAFE Impulse Side",
+      "Surround View System",
+      "DIGITAL LIGHT LED Headlamps",
+    ],
+    interior: [
+      "MB-Tex Upholstery",
+      "Heated Front Seats w/ Memory",
+      "MBUX Multimedia System w/ 12.8-Inch OLED Display",
+      "Burmester 3D Surround Sound",
+      "Wireless Apple CarPlay & Android Auto",
+      "Wireless Charging",
+      "Multiple USB-C Ports",
+    ],
+    exterior: [
+      "KEYLESS-GO w/ HANDS-FREE ACCESS",
+      "Panoramic Sliding Sunroof",
+      "Power Liftgate",
+      "Power-Folding Heated Mirrors",
+      "Flush Door Handles",
+    ],
+  },
+  colors: { exterior: { name: "MANUFAKTUR Alpine Grey", code: "056" }, interior: { name: "Black MB-Tex", code: "101A" } },
+  assembly: { plant: "Tuscaloosa", city: "Vance, Alabama", country: "USA" },
+  mechanical: { engine: "DUAL ELECTRIC MOTORS", transmission: "1-SPEED REDUCTION", drivetrain: "4MATIC AWD" },
+  stockNumber: "MB260322",
+  epa: {
+    city: 94, highway: 83, combined: 89, annualFuelCost: 800, ghgScore: 10,
+    rangeMiles: 279, fuelType: "Electric", smogScore: 10, gallonsPer100Miles: null,
+    fiveYearCostDifference: 3500, classNote: null,
+  },
+  safety: null,
+  warranty: {
+    basic: "4-Year/50,000-Mile New Vehicle Limited Warranty",
+    powertrain: "4-Year/50,000-Mile Electric Drive Component Coverage",
+    corrosion: "12-Year/Unlimited-Mile Corrosion Perforation Limited Warranty",
+    roadside: "4-Year/50,000-Mile Roadside Assistance Program",
+    emissions: "10-Year/155,000-Mile High-Voltage Battery Certificate",
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "30%" },
+    { label: "Major foreign parts content", value: "Germany 40%" },
+    { label: "Final assembly point", value: "Vance, Alabama, USA" },
+    { label: "Country of origin - motors", value: "Germany" },
+    { label: "Country of origin - battery", value: "USA" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-eqe-suv",
+  barcodePayload: "4JGGM2BB8TA098765",
+});
+
+// Mercedes-AMG GLE 63 S long-equipment continuation.
+// 126,900 + 5,150 + 1,350 = 133,400.
+export const mercedesAmgLongFixture = (): FactoryStickerRenderData => {
+  const base = mercedesGleFixture();
+  const std = { ...base.standardEquipment };
+  std.comfort = Array.from({ length: 26 }, (_, i) =>
+    `AMG Comfort & Convenience Feature ${String(i + 1).padStart(2, "0")} w/ Extended Adjustment Range`);
+  std.technology = Array.from({ length: 24 }, (_, i) =>
+    `Mercedes me connect Function ${String(i + 1).padStart(2, "0")} w/ Over-the-Air Update Support`);
+  return {
+    ...base,
+    vin: "4JGFB8KB3TB335678",
+    identity: { year: "2026", make: "Mercedes-Benz", model: "AMG GLE 63 S", trim: "4MATIC+ SUV" },
+    pricing: { baseMsrp: 126900, destinationCharge: 1350, optionsTotal: 5150, totalMsrp: 133400 },
+    options: [
+      { name: "AMG Night Package", code: "P60", msrp: 750 },
+      { name: "AMG Carbon Fiber Trim", code: "H73", msrp: 2250 },
+      { name: "Premium Package", code: "P01", msrp: 2150, contents: ["Multicontour Front Seats w/ Massage", "Head-Up Display"] },
+    ],
+    standardEquipment: std,
+    mechanical: { engine: "4.0L AMG V8 BITURBO", transmission: "AMG SPEEDSHIFT TCT 9G", drivetrain: "4MATIC+ AWD" },
+    stockNumber: "MB260671",
+    passportUrl: "https://autolabels.io/v/demo-amg-gle63",
+    barcodePayload: "4JGFB8KB3TB335678",
+  };
+};
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

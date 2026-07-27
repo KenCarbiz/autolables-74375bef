@@ -611,9 +611,16 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
         charSpacing: 1.6,
       });
     } else {
-      p.text(theme.logo.wordmarkText, LX + blockW / 2, bandTop + bandH / 2 + 4.5, 13, "heading", blockInk, {
+      // Long wordmarks (MERCEDES-BENZ) auto-fit the block; never truncated.
+      let wmSize = 13;
+      let wmSp = Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * wmSize, 2.2);
+      while (wmSize > 7 && measureText(theme.logo.wordmarkText, "heading", wmSize, wmSp) > blockW - 8) {
+        wmSize -= 0.5;
+        wmSp = Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * wmSize, 1.1);
+      }
+      p.text(theme.logo.wordmarkText, LX + blockW / 2, bandTop + bandH / 2 + wmSize * 0.35, wmSize, "heading", blockInk, {
         align: "center",
-        charSpacing: Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * 13, 2.2),
+        charSpacing: wmSp,
       });
     }
     // Compact vehicle-detail block on the band's right side.
