@@ -5,6 +5,15 @@ import {
   acuraLongFixture,
   acuraRdxFixture,
   acuraZdxFixture,
+  audiEtronFixture,
+  audiQ5Fixture,
+  cadillacEscaladeFixture,
+  cadillacLyriqFixture,
+  gmcEvFixture,
+  gmcSierraFixture,
+  ramFixture,
+  vwAtlasFixture,
+  vwId4Fixture,
   infinitiQx80NewFixture,
   bmwFixture,
   chevroletFixture,
@@ -850,5 +859,126 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
     expect(pageStrings(model, 0)).toContain("$133,400.00");
     expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
     expectMinFontRespected(model);
+  });
+});
+
+describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v1)", () => {
+  it("GMC resolves distinctly from Chevrolet with GM total wording", () => {
+    const g = resolveThemeProfile("GMC", 2026);
+    const c = resolveThemeProfile("Chevrolet", 2026);
+    expect(g.profile.themeVersion).toBe("gmc-us-2026-v1");
+    expect(g.profile.status).toBe("draft");
+    expect(g.profile.themeVersion).not.toBe(c.profile.themeVersion);
+    expect(resolveThemeProfile("GMC", 2021).profile.status).toBe("fallback");
+    const model = buildRenderLayout(gmcSierraFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$75,970.00");
+    expect(page1).toContain("TOTAL VEHICLE PRICE");
+    expect(page1.some((s) => s.includes("FORT WAYNE, INDIANA, USA"))).toBe(true);
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#1c1c1c")).toBe(true);   // GMC near-black band
+    expect(fills.has("#c9daea")).toBe(false);  // never Chevrolet steel blue
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Sierra EV uses the EV module with propulsion battery warranty", () => {
+    const model = buildRenderLayout(gmcEvFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.join(" ")).toContain("8-YEAR/100,000-MILE PROPULSION BATTERY LIMITED WARRANTY");
+  });
+
+  it("Escalade renders the luxury-factory panel set with Super Cruise service wording", () => {
+    const data = cadillacEscaladeFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$105,180.00");
+    expect(page1).toContain("TOTAL VEHICLE PRICE");
+    expect(page1.some((s) => s.includes("Super Cruise w/ 3-Year Service Period"))).toBe(true);
+    expect(page1.some((s) => s.includes("MSRP INCLUDES"))).toBe(true);
+    expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
+    expect(page1.some((s) => s.includes("ARLINGTON, TEXAS, USA"))).toBe(true);
+    expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe(data.vin);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("LYRIQ uses the EV module with no gasoline content", () => {
+    const model = buildRenderLayout(cadillacLyriqFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("Electric Vehicle"))).toBe(true);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+    expect(page1.some((s) => s.includes("SPRING HILL, TENNESSEE, USA"))).toBe(true);
+  });
+});
+
+describe("Ram profile (ram-us-2026-v1)", () => {
+  it("resolves Ram distinctly from Dodge and renders the Laramie reconciled", () => {
+    const r = resolveThemeProfile("Ram", 2026);
+    const d = resolveThemeProfile("Dodge", 2026);
+    expect(r.profile.themeVersion).toBe("ram-us-2026-v1");
+    expect(r.profile.status).toBe("draft");
+    expect(r.theme.templateFamilyId).not.toBe(d.theme.templateFamilyId);
+    const model = buildRenderLayout(ramFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$70,020.00");
+    expect(page1).toContain("AGT");
+    expect(page1.some((s) => s.includes("STERLING HEIGHTS, MICHIGAN, USA"))).toBe(true);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Volkswagen and Audi profiles (german-technical)", () => {
+  it("VW and Audi resolve to distinct versions on the shared family, distinct from BMW", () => {
+    const v = resolveThemeProfile("Volkswagen", 2026);
+    const a = resolveThemeProfile("Audi", 2026);
+    const b = resolveThemeProfile("BMW", 2026);
+    expect(v.profile.themeVersion).toBe("volkswagen-us-2026-v1");
+    expect(a.profile.themeVersion).toBe("audi-us-2026-v1");
+    expect(new Set([v.profile.themeVersion, a.profile.themeVersion, b.profile.themeVersion]).size).toBe(3);
+    // Same behavioral family, distinct band fills.
+    const fillsOf = (fx: () => ReturnType<typeof vwAtlasFixture>) => {
+      const model = buildRenderLayout(fx(), themeFor(null));
+      return new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    };
+    expect(fillsOf(vwAtlasFixture).has("#001e50")).toBe(true);   // VW dark blue band
+    expect(fillsOf(audiQ5Fixture).has("#000000")).toBe(true);    // Audi black band
+    expect(fillsOf(audiQ5Fixture).has("#001e50")).toBe(false);
+  });
+
+  it("Atlas renders reconciled with rated NHTSA rows", () => {
+    const model = buildRenderLayout(vwAtlasFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$52,095.00");
+    expect(page1.some((s) => s.includes("GOVERNMENT 5-STAR SAFETY RATINGS"))).toBe(true);
+    expect(page1.some((s) => s.includes("Not Rated"))).toBe(false);
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("ID.4 and Q6 e-tron use the EV module; Q5 keeps S line as appearance equipment", () => {
+    for (const fx of [vwId4Fixture, audiEtronFixture]) {
+      const model = buildRenderLayout(fx(), themeFor(null));
+      const page1 = pageStrings(model, 0);
+      expect(page1).toContain("MPGe");
+      expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
+      expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    }
+    const q5 = buildRenderLayout(audiQ5Fixture(), themeFor(null));
+    const p1 = pageStrings(q5, 0);
+    expect(p1).toContain("$56,545.00");
+    expect(p1.some((s) => s.includes("S line Exterior Package"))).toBe(true);
+    expect(p1.some((s) => s.includes("2026 AUDI Q5"))).toBe(true);
   });
 });

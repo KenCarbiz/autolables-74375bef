@@ -557,9 +557,27 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     header: "#c9daea", headerText: "#101418", accent: "#1a2c47", sectionHeading: "#1a2c47",
     totalBg: "#1a2c47", totalText: "#ffffff",
   })),
-  GMC: theme("GMC", "AMERICAN_MAINSTREAM", palette({ header: "#1c1c1c", accent: "#c8102e" })),
+  // GMC factory treatment (gmc-us-2026-v1): near-black band with the red
+  // keyline, GM's TOTAL VEHICLE PRICE wording — distinct from Chevrolet's
+  // steel-blue identity band.
+  GMC: theme("GMC", "AMERICAN_MAINSTREAM", palette({
+    header: "#1c1c1c", accent: "#c8102e", totalBg: "#1c1c1c", totalText: "#ffffff",
+  }), { totalLabel: "TOTAL VEHICLE PRICE" }),
   BUICK: theme("BUICK", "AMERICAN_MAINSTREAM", palette({ header: "#3a4750", accent: "#b02a30" })),
-  CADILLAC: theme("CADILLAC", "MODERN_LUXURY", palette({ header: "#101014", accent: "#a37e2c" })),
+  // Cadillac factory treatment (cadillac-us-2026-v1): white wordmark block,
+  // near-black band, restrained gold keyline, GM's TOTAL VEHICLE PRICE.
+  CADILLAC: theme("CADILLAC", "LUXURY_FACTORY", {
+    headerBackground: "#101014",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#111111",
+    mutedText: "#55595e",
+    accent: "#a37e2c",
+    divider: "#d7dce2",
+    sectionHeadingText: "#111111",
+    totalMsrpBackground: "#101014",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL VEHICLE PRICE" }),
   JEEP: theme("JEEP", "PERFORMANCE", palette({
     header: "#101010", accent: "#5f6538", sectionHeading: "#3f432a",
     totalBg: "#565b33", totalText: "#ffffff",
