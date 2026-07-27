@@ -15,9 +15,9 @@ export type TemplateFamilyId =
   | "LUXURY_FACTORY"
   | "GERMAN_FACTORY"
   | "SCANDINAVIAN_FACTORY"
+  | "COMMERCIAL_FACTORY"
   | "PERFORMANCE"
   | "EV_TECHNICAL"
-  | "COMMERCIAL"
   | "AUTOLABELS_FALLBACK";
 
 export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
@@ -32,9 +32,9 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "LUXURY_FACTORY",
   "GERMAN_FACTORY",
   "SCANDINAVIAN_FACTORY",
+  "COMMERCIAL_FACTORY",
   "PERFORMANCE",
   "EV_TECHNICAL",
-  "COMMERCIAL",
   "AUTOLABELS_FALLBACK",
 ];
 
@@ -248,6 +248,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.08em",
     uppercaseSectionHeadings: true,
   },
+  // Ram's truck factory-label voice: condensed grotesque, heavy uppercase
+  // headings, tight tabular pricing — built for dense commercial content.
+  COMMERCIAL_FACTORY: {
+    headingFont: '"Arial Narrow", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif',
+    bodyFont: '"Arial Narrow", "Roboto Condensed", Arial, sans-serif',
+    numericFont: '"Arial Narrow", "Roboto Condensed", Arial, sans-serif',
+    headingWeight: 700,
+    bodyWeight: 400,
+    labelWeight: 700,
+    letterSpacing: "0em",
+    headingLetterSpacing: "0.04em",
+    uppercaseSectionHeadings: true,
+  },
   PERFORMANCE: {
     headingFont: '"Arial Black", "Franklin Gothic Heavy", Arial, sans-serif',
     bodyFont: "Arial, Helvetica, sans-serif",
@@ -268,17 +281,6 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     labelWeight: 500,
     letterSpacing: "0.01em",
     headingLetterSpacing: "0.12em",
-    uppercaseSectionHeadings: true,
-  },
-  COMMERCIAL: {
-    headingFont: '"Arial Narrow", "Roboto Condensed", Arial, sans-serif',
-    bodyFont: "Arial, Helvetica, sans-serif",
-    numericFont: '"Arial Narrow", Arial, sans-serif',
-    headingWeight: 700,
-    bodyWeight: 400,
-    labelWeight: 700,
-    letterSpacing: "0em",
-    headingLetterSpacing: "0.03em",
     uppercaseSectionHeadings: true,
   },
   AUTOLABELS_FALLBACK: {
@@ -395,6 +397,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  COMMERCIAL_FACTORY: {
+    headerVariant: "BLOCK",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "12pt",
+    borderWeight: "1pt",
+    cornerTreatment: "SQUARE",
+  },
   SCANDINAVIAN_FACTORY: {
     headerVariant: "BANDED",
     pricingVariant: "UNDERLINED",
@@ -425,16 +437,6 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "0.5pt",
     cornerTreatment: "ROUNDED_MD",
   },
-  COMMERCIAL: {
-    headerVariant: "BLOCK",
-    pricingVariant: "BANDED",
-    barcodeVariant: "CODE39",
-    qrVariant: "SQUARE",
-    footerVariant: "LEGAL_STRIP",
-    columnGap: "12pt",
-    borderWeight: "1pt",
-    cornerTreatment: "SQUARE",
-  },
   AUTOLABELS_FALLBACK: {
     headerVariant: "BANDED",
     pricingVariant: "BOXED",
@@ -455,13 +457,13 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
   GERMAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.18em" },
   SCANDINAVIAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.3em" },
+  COMMERCIAL_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.04em" },
   PREMIUM_LUXURY: { usageAuthorized: false, placement: "TOP_CENTER", maxWidthPx: 200, maxHeightPx: 56, alignment: "CENTER", wordmarkLetterSpacing: "0.3em" },
   AMERICAN_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.08em" },
   EUROPEAN_TECHNICAL: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
   JAPANESE_MAINSTREAM: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.1em" },
   PERFORMANCE: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 190, maxHeightPx: 50, alignment: "LEFT", wordmarkLetterSpacing: "0.04em" },
   EV_TECHNICAL: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 40, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
-  COMMERCIAL: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.06em" },
   AUTOLABELS_FALLBACK: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 44, alignment: "LEFT", wordmarkLetterSpacing: "0.12em" },
 };
 
@@ -621,7 +623,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     totalBg: "#565b33", totalText: "#ffffff",
   })),
   DODGE: theme("DODGE", "PERFORMANCE", palette({ header: "#000000", accent: "#ba0c2f" })),
-  RAM: theme("RAM", "COMMERCIAL", palette({ header: "#4a4f54", accent: "#a6192e" })),
+  // Ram factory treatment (ram-us-2026-v2): black RAM masthead block over a
+  // paper model band, Ram red used only for the accent keyline. Heavy-duty
+  // and chassis-cab documents share it; regulatory panels stay federal.
+  RAM: theme("RAM", "COMMERCIAL_FACTORY", {
+    headerBackground: "#0d0d0d",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#141414",
+    mutedText: "#55595e",
+    accent: "#a6192e",
+    divider: "#c9ccd0",
+    sectionHeadingText: "#141414",
+    totalMsrpBackground: "#0d0d0d",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL PRICE" }),
   CHRYSLER: theme("CHRYSLER", "AMERICAN_MAINSTREAM", palette({ header: "#003a70", accent: "#b9c0c7", sectionHeading: "#003a70" })),
   VOLKSWAGEN: theme("VOLKSWAGEN", "EUROPEAN_TECHNICAL", palette({ header: "#001e50", accent: "#00b1eb", sectionHeading: "#001e50" })),
   // Audi factory treatment (audi-us-2026-v2): white identity block and

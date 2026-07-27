@@ -107,6 +107,10 @@ const ALIASES: Record<string, OemId> = {
   ramtruck: "RAM",
   ramtrucks: "RAM",
   dodgeram: "RAM",
+  ramdivision: "RAM",
+  ramcommercial: "RAM",
+  fcausram: "RAM",
+  stellantisram: "RAM",
   fordmotorcompany: "FORD",
   // "GM Cadillac" would otherwise fuzzy-match both GMC and CADILLAC and
   // resolve to review; the division names are explicit instead.

@@ -232,8 +232,8 @@ const AUTHORED_PROFILES: OemThemeProfile[] = [
     market: "US",
     modelYearStart: 2022,
     modelYearEnd: 2027,
-    themeVersion: "ram-us-2026-v1",
-    layoutFamily: "adventure-performance",
+    themeVersion: "ram-us-2026-v2",
+    layoutFamily: "commercial-factory-technical",
     status: "draft",
     logoAuthorized: false,
   },
@@ -280,9 +280,9 @@ const FAMILY_BY_TEMPLATE: Record<string, string> = {
   LUXURY_FACTORY: "luxury-factory-technical",
   GERMAN_FACTORY: "german-factory-technical",
   SCANDINAVIAN_FACTORY: "scandinavian-factory-technical",
+  COMMERCIAL_FACTORY: "commercial-factory-technical",
   AMERICAN_MAINSTREAM: "american-utility",
   PERFORMANCE: "adventure-performance",
-  COMMERCIAL: "adventure-performance",
   KOREAN_PREMIUM: "korean-premium-factory",
   KOREAN_MAINSTREAM: "korean-mainstream-factory",
   EV_TECHNICAL: "ev-forward",
@@ -320,7 +320,10 @@ export function resolveThemeProfile(
   modelYear: number | undefined | null,
   market: "US" = "US",
 ): ResolvedThemeProfile {
-  const resolved = resolveOem(make || "");
+  // Model year participates in make resolution, not just profile selection:
+  // a pre-2011 "Ram" is a Dodge nameplate and must never reach the Ram
+  // template.
+  const resolved = resolveOem(make || "", modelYear ?? undefined);
   if (resolved.confidence === "UNRESOLVED") {
     return {
       theme: getTheme("AUTOLABELS_FALLBACK"),

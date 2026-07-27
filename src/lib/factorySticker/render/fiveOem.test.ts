@@ -15,6 +15,7 @@ import {
   cadillacLyriqFixture,
   gmcEvFixture,
   gmcSierraFixture,
+  ramChassisCabFixture,
   ramFixture,
   vwAtlasFixture,
   vwId4Fixture,
@@ -961,19 +962,85 @@ describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v2)", (
   });
 });
 
-describe("Ram profile (ram-us-2026-v1)", () => {
-  it("resolves Ram distinctly from Dodge and renders the Laramie reconciled", () => {
+describe("Ram profile (ram-us-2026-v2, commercial-factory-technical)", () => {
+  it("resolves Ram apart from every other Stellantis brand, model-year aware", () => {
     const r = resolveThemeProfile("Ram", 2026);
-    const d = resolveThemeProfile("Dodge", 2026);
-    expect(r.profile.themeVersion).toBe("ram-us-2026-v1");
+    expect(r.profile.themeVersion).toBe("ram-us-2026-v2");
     expect(r.profile.status).toBe("draft");
-    expect(r.theme.templateFamilyId).not.toBe(d.theme.templateFamilyId);
+    expect(r.profile.layoutFamily).toBe("commercial-factory-technical");
+    expect(r.theme.templateFamilyId).toBe("COMMERCIAL_FACTORY");
+    expect(r.theme.totalLabel).toBe("TOTAL PRICE");
+    for (const alias of ["RAM", "Ram Trucks", "Ram Commercial", "Ram Division", "Stellantis Ram", "FCA US Ram"]) {
+      expect(resolveThemeProfile(alias, 2026).theme.oemId, alias).toBe("RAM");
+    }
+    for (const other of ["Dodge", "Jeep", "Chrysler", "Fiat"]) {
+      const o = resolveThemeProfile(other, 2026);
+      expect(o.theme.oemId, other).not.toBe("RAM");
+      expect(o.theme.templateFamilyId, other).not.toBe("COMMERCIAL_FACTORY");
+    }
+    // A Dodge Ram predating the 2011 brand split stays a Dodge.
+    expect(resolveThemeProfile("Ram", 2009).theme.oemId).toBe("DODGE");
+    expect(resolveThemeProfile("Ram", 2021).profile.status).toBe("fallback");
+  });
+
+  it("renders the owner's 1500 Laramie reference reconciled with coded packages", () => {
     const model = buildRenderLayout(ramFixture(), themeFor(null));
     const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
-    expect(page1).toContain("$70,020.00");
-    expect(page1).toContain("AGT");
-    expect(page1.some((s) => s.includes("STERLING HEIGHTS, MICHIGAN, USA"))).toBe(true);
+    expect(page1).toContain("$72,845.00");
+    expect(page1).toContain("$61,645.00");
+    expect(page1).toContain("TOTAL PRICE");
+    // Stellantis sales codes render with their packages; members appear
+    // beneath the parent and are never priced a second time.
+    for (const code of ["26H", "XAN", "XD6", "GWA", "AJ1", "NAS", "4HC", "4EX", "5N6"]) {
+      expect(page1, code).toContain(code);
+    }
+    expect(joined).toContain("Laramie Level 2 Equipment Group");
+    expect(joined).toContain("Power Running Boards");
+    expect(page1.filter((s) => s === "3,995.00").length).toBe(1);
+    // Zero-cost codes carry zero rather than being dropped or re-priced.
+    expect(page1.filter((s) => s === "0.00").length).toBe(2);
+    // eTorque is a mild-hybrid assist: the gasoline EPA layout is correct.
+    expect(page1).toContain("MPG");
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(false);
+    expect(joined).toContain("WARREN, MICHIGAN, USA");
+    expect(joined).toContain("Not an original Ram or Stellantis-issued Monroney label");
+    // Black masthead block + Ram red keyline, never Jeep's olive accent.
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#0d0d0d")).toBe(true);
+    const rules = new Set(model.pages[0].primitives.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(rules.has("#a6192e")).toBe(true);
+    expect(rules.has("#5f6538")).toBe(false);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("1C6SRFJT7TN123456");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("heavy-duty chassis cab renders no fuel-economy panel instead of invented MPG", () => {
+    const model = buildRenderLayout(ramChassisCabFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$65,320.00");
+    // No applicable light-duty label: the whole EPA module is absent, and
+    // no MPG, MPGe, fuel cost or emissions figure is fabricated.
+    expect(page1.some((s) => s.includes("Fuel Economy"))).toBe(false);
+    expect(page1).not.toContain("MPG");
+    expect(page1).not.toContain("MPGe");
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(false);
+    expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
+    // Chassis cab stays distinct from the 3500 pickup, and the diesel
+    // carries its own powertrain coverage rather than the gasoline terms.
+    expect(joined).toContain("2026 RAM 3500 CHASSIS CAB");
+    expect(joined).toContain("TRADESMAN CREW CAB 4X4 DRW");
+    expect(joined).toContain("CUMMINS DIESEL POWERTRAIN LIMITED WARRANTY");
+    expect(joined).not.toContain("5-YEAR/60,000-MILE POWERTRAIN");
+    // Assembly is matched per vehicle: Saltillo, not the 1500's Warren.
+    expect(joined).toContain("SALTILLO, MEXICO");
+    expect(joined).not.toContain("WARREN, MICHIGAN");
     expectWithinBounds(model);
     expectMinFontRespected(model);
   });
