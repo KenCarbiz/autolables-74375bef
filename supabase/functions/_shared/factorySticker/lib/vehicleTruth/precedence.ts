@@ -1,3 +1,7 @@
+// GENERATED — do not edit.
+// Mirror of src/lib/vehicleTruth/precedence.ts, copied so the edge runtime can
+// bundle the engine (Supabase ships only supabase/functions/). Edit the
+// source file and run `bun run sync:edge-sticker`.
 // Field-aware source precedence.
 //
 // One global provider ranking is wrong, because who is authoritative
