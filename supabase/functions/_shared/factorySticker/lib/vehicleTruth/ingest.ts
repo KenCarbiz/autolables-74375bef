@@ -1,5 +1,5 @@
 // GENERATED — do not edit.
-// Mirror of src/lib/factorySticker/../vehicleTruth/ingest.ts, copied so the edge runtime can
+// Mirror of src/lib/vehicleTruth/ingest.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
 // Turning stored provider data into candidate facts.

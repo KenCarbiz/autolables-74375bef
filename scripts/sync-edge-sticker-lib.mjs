@@ -31,7 +31,7 @@ const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__"]);
 const isCopyable = (name) => name.endsWith(".ts") && !name.endsWith(".test.ts");
 
 const HEADER = `// GENERATED — do not edit.
-// Mirror of src/lib/factorySticker/{rel}, copied so the edge runtime can
+// Mirror of {src}, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run \`bun run sync:edge-sticker\`.
 `;
@@ -50,7 +50,7 @@ export function collect(dir, base = dir, out = new Map(), withHeader = true) {
     if (!isCopyable(entry)) continue;
     const rel = relative(base, full).split("\\").join("/");
     const body = readFileSync(full, "utf8");
-    out.set(rel, withHeader ? HEADER.replace("{rel}", rel) + body : body);
+    out.set(rel, withHeader ? HEADER.replace("{src}", `src/lib/factorySticker/${rel}`) + body : body);
   }
   return out;
 }
@@ -61,7 +61,7 @@ export function collectAll() {
   const truth = collect(TRUTH_SOURCE_DIR, TRUTH_SOURCE_DIR, new Map(), false);
   for (const [rel, body] of truth) {
     const key = TRUTH_PREFIX + rel;
-    out.set(key, HEADER.replace("{rel}", `../vehicleTruth/${rel}`) + rewriteTruthImports(body));
+    out.set(key, HEADER.replace("{src}", `src/lib/vehicleTruth/${rel}`) + rewriteTruthImports(body));
   }
   return out;
 }

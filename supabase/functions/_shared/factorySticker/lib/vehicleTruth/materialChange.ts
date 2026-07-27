@@ -1,5 +1,5 @@
 // GENERATED — do not edit.
-// Mirror of src/lib/factorySticker/../vehicleTruth/materialChange.ts, copied so the edge runtime can
+// Mirror of src/lib/vehicleTruth/materialChange.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
 // Material-change detection.
