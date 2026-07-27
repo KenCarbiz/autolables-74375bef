@@ -48,3 +48,19 @@ describe("OEM theme profiles", () => {
     }
   });
 });
+
+describe("governed logo assets", () => {
+  it("serves recreated emblems for Chevrolet, BMW and Lexus pending authorization", async () => {
+    const { getLogoAsset } = await import("./logoAssets");
+    for (const id of ["CHEVROLET", "BMW", "LEXUS"]) {
+      const asset = getLogoAsset(id);
+      expect(asset).not.toBeNull();
+      expect(asset!.status).toBe("recreated_pending_authorization");
+      const m = asset!.render(24);
+      expect(m.paths.length).toBeGreaterThan(0);
+      expect(m.height).toBeGreaterThanOrEqual(24);
+      for (const p of m.paths) expect(p.d.length).toBeGreaterThan(10);
+    }
+    expect(getLogoAsset("TOYOTA")).toBeNull();
+  });
+});

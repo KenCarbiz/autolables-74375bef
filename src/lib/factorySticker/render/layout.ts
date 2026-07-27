@@ -12,6 +12,7 @@
 
 import type { FactoryStickerData, EquipmentCategory } from "../types.ts";
 import type { OemStickerTheme } from "../oem/themes.ts";
+import { getLogoAsset } from "../oem/logoAssets.ts";
 
 export const PAGE_WIDTH = 792;
 export const PAGE_HEIGHT = 612;
@@ -538,13 +539,26 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
   const wordmarkSize = banded ? 20 : 26;
   const spacing = Math.max(parseEm(theme.logo.wordmarkLetterSpacing) * wordmarkSize, wordmarkSize * (banded ? 0.18 : 0.3));
   const bx = LX + LW;
+  // Governed emblem asset (vector recreation until brand-authorized
+  // artwork replaces it): drawn beside the wordmark with its clear space.
+  const emblem = getLogoAsset(theme.oemId);
+  const drawEmblem = (x: number, top: number, h: number): number => {
+    if (!emblem) return x;
+    const m = emblem.render(Math.max(h, emblem.minHeightPt));
+    for (const path of m.paths) {
+      p.path(path.d, x, top, m.width, m.height, path.fill,
+        path.stroke, path.strokeWidth);
+    }
+    return x + m.width + m.height * emblem.clearSpaceRatio;
+  };
   if (banded) {
     const bandH = 30;
     p.rect(LX, y + 1, LW, bandH, theme.colors.headerBackground);
     if (style.accentKeyline) {
       p.rule(LX, y + 1 + bandH, LW, 2.2, theme.colors.accent);
     }
-    p.text(theme.logo.wordmarkText, LX + 8, y + 22, wordmarkSize, "heading", theme.colors.headerText, {
+    const wmX = drawEmblem(LX + 8, y + 6.5, 19);
+    p.text(theme.logo.wordmarkText, wmX, y + 22, wordmarkSize, "heading", theme.colors.headerText, {
       charSpacing: spacing,
     });
     p.text(input.title.toUpperCase(), bx - 8, y + 14.5, 7.5, "bold", theme.colors.headerText, { align: "right" });
@@ -556,7 +570,8 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
       p.text("TYPICAL FACTORY CONFIGURATION FOR THIS TRIM - NOT VIN-SPECIFIC", bx, y + 40.5, 5.5, "bold", "#7a5c10", { align: "right" });
     }
   } else {
-    p.text(theme.logo.wordmarkText, LX, y + 27, wordmarkSize, "heading", BLACK, {
+    const wmX = drawEmblem(LX, y + 3, 27);
+    p.text(theme.logo.wordmarkText, wmX, y + 27, wordmarkSize, "heading", BLACK, {
       charSpacing: spacing,
     });
     p.text(input.title.toUpperCase(), bx, y + 16, 8.5, "bold", BLACK, { align: "right" });
