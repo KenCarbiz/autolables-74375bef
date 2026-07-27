@@ -146,12 +146,28 @@ const unresolved = (reason: string): OemResolution => ({
 const QUALIFIER_TOKENS = [
   "compatible", "style", "styled", "styling", "replica", "inspired",
   "lookalike", "aftermarket", "tribute", "clone", "conversion",
+  // Finance arms, dealer groups and parts channels carry a brand name but
+  // are not the vehicle's manufacturer ("Chrysler Capital", "Chrysler-
+  // certified dealer", "Mopar accessories").
+  "capital", "financial", "finance", "certified", "dealer", "accessor",
 ];
 
 // Standalone words that are a substring of a real make but are not that
 // make on their own ("Rover" is not Land Rover; MG Rover and Austin Rover
 // are unrelated marques). These resolve to review rather than a guess.
 const AMBIGUOUS_STANDALONE = new Set(["rover", "range", "land"]);
+
+// Corporate parents that build several brands. A record saying "Stellantis"
+// or "FCA US LLC" does not identify which brand the vehicle is, so it must
+// go to review rather than inherit whichever brand fuzzy-matches first.
+const CORPORATE_PARENTS = new Set([
+  "stellantis", "stellantisnorthamerica", "stellantisnv",
+  "fca", "fcaus", "fcausllc", "fiatchrysler", "fiatchryslerautomobiles",
+  "generalmotors", "gm", "gmcorp", "fordmotor", "hyundaimotorgroup",
+  "volkswagengroup", "vwgroup", "tatamotors", "geely", "bmwgroup",
+  "mercedesbenzgroup", "hondamotor", "toyotamotor", "nissanmotor",
+  "cdjr", "chryslerdodgejeepram",
+]);
 
 // Sibling marques with no template of their own. Jaguar shares JLR with
 // Land Rover but is a separate brand and must never inherit its template.
@@ -176,6 +192,9 @@ export function resolveOem(rawMake: string, modelYear?: number): OemResolution {
   if (!key) return unresolved(`make "${raw}" has no resolvable characters`);
   if (NON_PASSENGER_MAKES.has(key)) {
     return unresolved(`make "${raw}" is a commercial-truck marque, not a passenger brand`);
+  }
+  if (CORPORATE_PARENTS.has(key)) {
+    return unresolved(`make "${raw}" is a corporate parent, not a vehicle brand`);
   }
   if (SIBLING_MARQUES.has(key)) {
     return unresolved(`make "${raw}" is a separate marque without its own template`);

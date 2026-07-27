@@ -18,6 +18,7 @@ export type TemplateFamilyId =
   | "COMMERCIAL_FACTORY"
   | "SPORT_FACTORY"
   | "BRITISH_FACTORY"
+  | "AMERICAN_FACTORY"
   | "MINIMAL_FACTORY"
   | "PERFORMANCE"
   | "AUTOLABELS_FALLBACK";
@@ -37,6 +38,7 @@ export const TEMPLATE_FAMILY_IDS: TemplateFamilyId[] = [
   "COMMERCIAL_FACTORY",
   "SPORT_FACTORY",
   "BRITISH_FACTORY",
+  "AMERICAN_FACTORY",
   "MINIMAL_FACTORY",
   "PERFORMANCE",
   "AUTOLABELS_FALLBACK",
@@ -265,6 +267,19 @@ const FAMILY_TYPOGRAPHY: Record<TemplateFamilyId, OemTypographySpec> = {
     headingLetterSpacing: "0.04em",
     uppercaseSectionHeadings: true,
   },
+  // Chrysler's dense window-label voice: neutral grotesque, heavy labels,
+  // compact leading — built for long minivan equipment lists.
+  AMERICAN_FACTORY: {
+    headingFont: '"Helvetica Neue", Arial, "Segoe UI", sans-serif',
+    bodyFont: "Arial, Helvetica, sans-serif",
+    numericFont: '"Arial Narrow", Arial, sans-serif',
+    headingWeight: 700,
+    bodyWeight: 400,
+    labelWeight: 700,
+    letterSpacing: "0em",
+    headingLetterSpacing: "0.03em",
+    uppercaseSectionHeadings: true,
+  },
   // Land Rover's factory-document voice: humanist grotesque, medium
   // headings, restrained tracking — technical with British reserve.
   BRITISH_FACTORY: {
@@ -429,6 +444,16 @@ const FAMILY_LAYOUT: Record<TemplateFamilyId, OemLayoutSpec> = {
     borderWeight: "1pt",
     cornerTreatment: "SQUARE",
   },
+  AMERICAN_FACTORY: {
+    headerVariant: "BANDED",
+    pricingVariant: "UNDERLINED",
+    barcodeVariant: "CODE128",
+    qrVariant: "SQUARE",
+    footerVariant: "LEGAL_STRIP",
+    columnGap: "12pt",
+    borderWeight: "1pt",
+    cornerTreatment: "SQUARE",
+  },
   BRITISH_FACTORY: {
     headerVariant: "BANDED",
     pricingVariant: "UNDERLINED",
@@ -509,6 +534,7 @@ const FAMILY_LOGO: Record<TemplateFamilyId, Omit<OemLogoSpec, "wordmarkText">> =
   LUXURY_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.28em" },
   GERMAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 160, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.18em" },
   SCANDINAVIAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.3em" },
+  AMERICAN_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.22em" },
   BRITISH_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.16em" },
   SPORT_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 180, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.2em" },
   MINIMAL_FACTORY: { usageAuthorized: false, placement: "TOP_LEFT", maxWidthPx: 170, maxHeightPx: 48, alignment: "LEFT", wordmarkLetterSpacing: "0.34em" },
@@ -692,7 +718,21 @@ export const THEME_REGISTRY: Record<OemId, OemStickerTheme> = {
     totalMsrpBackground: "#0d0d0d",
     totalMsrpText: "#ffffff",
   }, { totalLabel: "TOTAL PRICE" }),
-  CHRYSLER: theme("CHRYSLER", "AMERICAN_MAINSTREAM", palette({ header: "#003a70", accent: "#b9c0c7", sectionHeading: "#003a70" })),
+  // Chrysler factory treatment (chrysler-us-2026-v1): white identity block
+  // against a black model band, restrained Chrysler silver-blue keyline.
+  // Text wordmark only — the winged emblem is never recreated.
+  CHRYSLER: theme("CHRYSLER", "AMERICAN_FACTORY", {
+    headerBackground: "#0a0a0a",
+    headerText: "#ffffff",
+    background: "#ffffff",
+    bodyText: "#141414",
+    mutedText: "#55595e",
+    accent: "#6f7c87",
+    divider: "#c9ccd0",
+    sectionHeadingText: "#141414",
+    totalMsrpBackground: "#0a0a0a",
+    totalMsrpText: "#ffffff",
+  }, { totalLabel: "TOTAL PRICE" }),
   VOLKSWAGEN: theme("VOLKSWAGEN", "EUROPEAN_TECHNICAL", palette({ header: "#001e50", accent: "#00b1eb", sectionHeading: "#001e50" })),
   // Audi factory treatment (audi-us-2026-v2): white identity block and
   // band, fully monochrome black rules and keyline per the owner's

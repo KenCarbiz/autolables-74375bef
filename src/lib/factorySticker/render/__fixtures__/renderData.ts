@@ -4810,6 +4810,258 @@ export const landRoverDefenderFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "SALEA7EU4T2148902",
 });
 
+// Owner's reference benchmark (2026-07-27 Chrysler directive). The
+// reference prints Base 51,950 + five options totalling 7,075 + 1,195
+// destination but a Total Price of 55,740 — $4,480 short of its own
+// visible components. It prints no option subtotal, so every printed line
+// item is preserved and the total is corrected to 60,220.
+export const chryslerPacificaFixture = (): FactoryStickerRenderData => ({
+  ...oemBase(),
+  condition: "new",
+  title: "Factory Window Sticker — Configuration & MSRP",
+  vin: "2C4RC3GG6TR188133",
+  identity: { year: "2026", make: "Chrysler", model: "Pacifica", trim: "LIMITED AWD" },
+  pricing: { baseMsrp: 51950, destinationCharge: 1195, optionsTotal: 7075, totalMsrp: 60220 },
+  options: [
+    {
+      name: "Customer Preferred Package 27P", code: "27P", msrp: 995,
+      contents: [
+        "Power 8-Way Front Passenger Seat",
+        "Driver Memory Seat",
+        "Power Adjustable Pedals w/ Memory",
+        "Passenger Seat Back Table",
+      ],
+    },
+    {
+      name: "S Appearance Package", code: "XSP", msrp: 1995,
+      contents: [
+        "20-Inch x 7.5-Inch Black Aluminum Wheels",
+        "Black Grille w/ Black Surround",
+        "Black Badging",
+        "Gloss Black Exterior Accents",
+      ],
+    },
+    { name: "Dual-Pane Panoramic Sunroof", code: "GWJ", msrp: 1595 },
+    {
+      name: "Premium Rear-Seat Entertainment System", code: "RSE", msrp: 1995,
+      contents: ["10-Inch Touch Screens", "Blu-Ray Player", "HDMI & USB Ports"],
+    },
+    { name: "Diamond Black Crystal Pearl-Coat", code: "PXJ", msrp: 495 },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.6L V6 24V VVT Engine w/ Stop/Start",
+      "9-Speed 948TE Automatic Transmission",
+      "All-Wheel Drive (AWD)",
+      "Electric Power Steering",
+      "Touring Suspension",
+    ],
+    safety_features: [
+      "Advanced Multistage Front Air Bags",
+      "Driver Inflatable Knee-Bolster Air Bag",
+      "Supplemental Side-Curtain All Rows Air Bags",
+      "Electronic Stability Control",
+      "Anti-Lock 4-Wheel Disc Brakes",
+      "Adaptive Cruise Control w/ Stop and Go",
+      "Full-Speed Forward-Collision Warning Plus",
+      "Lane Departure Warning w/ Lane Keep Assist",
+      "Blind-Spot Monitoring & Rear Cross-Path Detection",
+      "ParkSense Front and Rear Park Assist w/ Stop",
+      "ParkView Rear Back-Up Camera",
+      "Sentry Key Theft Deterrent System",
+      "Tire Pressure Monitoring Display",
+    ],
+    interior: [
+      "Uconnect 5 Nav w/ 10.1-Inch Touch Screen",
+      "Wireless Apple CarPlay",
+      "Wireless Android Auto",
+      "SiriusXM w/ 360L",
+      "6 Premium Speakers",
+      "Integrated Voice Command w/ Bluetooth",
+      "Tri-Zone Automatic Temperature Control",
+      "Heated Front Seats",
+      "Heated Steering Wheel",
+      "Power 8-Way Driver Seat",
+      "Second-Row Captain's Chairs",
+      "Third-Row 60/40 Stow 'n Go Bench Seat",
+      "Leather-Wrapped Steering Wheel",
+      "7-Inch Driver Information Display",
+      "Auto-Dimming Rearview Mirror",
+    ],
+    exterior: [
+      "LED Reflector Headlamps",
+      "LED Daytime Running Lamps",
+      "LED Fog Lamps",
+      "LED Taillamps",
+      "Power Heated Exterior Mirrors w/ Turn Signals",
+      "Bright Side Roof Rails",
+      "20-Inch x 7.5-Inch Aluminum Wheels",
+      "Deep-Tinted Glass",
+      "Power Sliding Doors",
+      "Hands-Free Power Liftgate",
+      "Acoustic Windshield",
+    ],
+  },
+  colors: { exterior: { name: "Bright White Clear-Coat", code: "PW7" }, interior: { name: "Black Nappa Leather", code: "TLX9" } },
+  assembly: { plant: "Windsor", city: "Windsor, Ontario", country: "Canada" },
+  mechanical: { engine: "3.6L V6 24V VVT", transmission: "9-SPEED 948TE AUTOMATIC", drivetrain: "AWD" },
+  stockNumber: "CH260188",
+  transportMethod: "TRUCK",
+  factoryCodes: { location: null, emissions: "50 STATE", sequence: null, order: "12345", dealer: "12345" },
+  epa: {
+    city: 19, highway: 28, combined: 22, annualFuelCost: 2250, ghgScore: 4,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 5, gallonsPer100Miles: 4.5,
+    fiveYearCostDifference: -1750, classNote: null,
+  },
+  safety: null,
+  nhtsaNotRated: true,
+  warranty: {
+    basic: "3-Year/36,000-Mile Basic Limited Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: null,
+    roadside: null,
+    emissions: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "62%" },
+    { label: "Major sources of foreign parts content", value: "Mexico 22%" },
+    { label: "Final assembly point", value: "Windsor, Ontario, Canada" },
+    { label: "Country of origin - engine", value: "United States" },
+    { label: "Country of origin - transmission", value: "United States" },
+  ],
+  dealer: { name: "Chrysler of Example", address: "123 Main Street", city: "Anytown", state: "MI", zip: "48183", phone: null },
+  passportUrl: "https://autolabels.io/v/demo-pacifica",
+  barcodePayload: "2C4RC3GG6TR188133",
+  disclaimers: [
+    "AutoLabels manufacturer-style reproduction generated from verified vehicle data. Not an original Chrysler-issued Monroney label.",
+    "Digitally prepared by AutoLabels.io",
+  ],
+});
+
+// Pacifica Plug-In Hybrid Select: FWD-only plug-in, its own EPA record and
+// battery coverage. Never given the gasoline AWD Pacifica's figures.
+// 53,795 + 1,890 + 1,195 = 56,880.
+export const chryslerPhevFixture = (): FactoryStickerRenderData => ({
+  ...chryslerPacificaFixture(),
+  vin: "2C4RC1S79TR204567",
+  identity: { year: "2026", make: "Chrysler", model: "Pacifica Plug-In Hybrid", trim: "SELECT FWD" },
+  pricing: { baseMsrp: 53795, destinationCharge: 1195, optionsTotal: 1890, totalMsrp: 56880 },
+  options: [
+    { name: "Fathom Blue Pearl-Coat", code: "PBM", msrp: 495 },
+    { name: "Uconnect Theater Group", code: "XDN", msrp: 1395, contents: ["Rear-Seat Screens", "USB Charging Ports"] },
+    { name: "Bright White Clear-Coat", code: "PW7", msrp: null, included: true },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.6L V6 Plug-In Hybrid Powertrain",
+      "16 kWh Lithium-Ion Battery",
+      "eFlite Electrically Variable Transmission",
+      "Front-Wheel Drive",
+      "Level 1 & Level 2 Charging Capability",
+      "Regenerative Braking",
+    ],
+    safety_features: [
+      "Advanced Multistage Front Air Bags",
+      "Electronic Stability Control",
+      "ParkView Rear Back-Up Camera",
+      "Blind-Spot Monitoring & Rear Cross-Path Detection",
+      "Tire Pressure Monitoring Display",
+    ],
+    interior: [
+      "Uconnect 5 w/ 10.1-Inch Touch Screen",
+      "Wireless Apple CarPlay & Android Auto",
+      "Tri-Zone Automatic Temperature Control",
+      "Second-Row Captain's Chairs",
+      "Third-Row 60/40 Bench Seat",
+      "Heated Front Seats",
+    ],
+    exterior: [
+      "LED Reflector Headlamps",
+      "Power Sliding Doors",
+      "Hands-Free Power Liftgate",
+      "17-Inch Aluminum Wheels",
+      "Charge Port - Left Front Fender",
+    ],
+  },
+  colors: { exterior: { name: "Fathom Blue Pearl-Coat", code: "PBM" }, interior: { name: "Black/Alloy Cloth", code: "TLX9" } },
+  mechanical: { engine: "3.6L V6 PLUG-IN HYBRID", transmission: "EFLITE EVT", drivetrain: "FWD" },
+  stockNumber: "CH260204",
+  epa: {
+    city: null, highway: null, combined: 82, annualFuelCost: 1400, ghgScore: 9,
+    rangeMiles: 32, fuelType: "PHEV Gasoline-Electric", smogScore: 7, gallonsPer100Miles: null,
+    fiveYearCostDifference: 3250, classNote: null, gasCombinedMpg: 30,
+  },
+  warranty: {
+    basic: "3-Year/36,000-Mile Basic Limited Warranty",
+    powertrain: "5-Year/60,000-Mile Powertrain Limited Warranty",
+    corrosion: null,
+    roadside: null,
+    emissions: "10-Year/150,000-Mile High-Voltage Battery Limited Warranty",
+  },
+  passportUrl: "https://autolabels.io/v/demo-pacifica-phev",
+  barcodePayload: "2C4RC1S79TR204567",
+});
+
+// Voyager LX: a distinct model line from Pacifica with its own base price,
+// equipment and EPA record — never merged with Pacifica.
+// 39,995 + 1,590 + 1,195 = 42,780.
+export const chryslerVoyagerFixture = (): FactoryStickerRenderData => ({
+  ...chryslerPacificaFixture(),
+  vin: "2C4RC1CG5TR311204",
+  identity: { year: "2026", make: "Chrysler", model: "Voyager", trim: "LX FWD" },
+  pricing: { baseMsrp: 39995, destinationCharge: 1195, optionsTotal: 1590, totalMsrp: 42780 },
+  options: [
+    { name: "Granite Crystal Metallic", code: "PAU", msrp: 495 },
+    { name: "Trailer Tow Group", code: "AHT", msrp: 1095 },
+    { name: "Black Interior", code: "TLX9", msrp: null, included: true },
+  ],
+  standardEquipment: {
+    mechanical: [
+      "3.6L V6 24V VVT Engine w/ Stop/Start",
+      "9-Speed 948TE Automatic Transmission",
+      "Front-Wheel Drive",
+      "Electric Power Steering",
+    ],
+    safety_features: [
+      "Advanced Multistage Front Air Bags",
+      "Electronic Stability Control",
+      "ParkView Rear Back-Up Camera",
+      "Tire Pressure Monitoring Display",
+    ],
+    interior: [
+      "Uconnect 5 w/ 7-Inch Touch Screen",
+      "Apple CarPlay & Android Auto",
+      "Three-Zone Manual Temperature Control",
+      "Second-Row Stow 'n Go Bucket Seats",
+      "Third-Row 60/40 Stow 'n Go Bench Seat",
+      "Cloth Seating Surfaces",
+    ],
+    exterior: [
+      "Halogen Reflector Headlamps",
+      "Manual Sliding Doors",
+      "17-Inch Steel Wheels w/ Covers",
+      "Black Side Roof Rails",
+    ],
+  },
+  colors: { exterior: { name: "Granite Crystal Metallic", code: "PAU" }, interior: { name: "Black Cloth", code: "TLX9" } },
+  mechanical: { engine: "3.6L V6 24V VVT", transmission: "9-SPEED 948TE AUTOMATIC", drivetrain: "FWD" },
+  stockNumber: "CH260311",
+  epa: {
+    city: 19, highway: 28, combined: 22, annualFuelCost: 2250, ghgScore: 5,
+    rangeMiles: null, fuelType: "Gasoline", smogScore: 5, gallonsPer100Miles: 4.5,
+    fiveYearCostDifference: -1500, classNote: null,
+  },
+  partsContent: [
+    { label: "U.S./Canadian parts content (carline)", value: "60%" },
+    { label: "Major sources of foreign parts content", value: "Mexico 24%" },
+    { label: "Final assembly point", value: "Windsor, Ontario, Canada" },
+    { label: "Country of origin - engine", value: "United States" },
+    { label: "Country of origin - transmission", value: "United States" },
+  ],
+  passportUrl: "https://autolabels.io/v/demo-voyager",
+  barcodePayload: "2C4RC1CG5TR311204",
+});
+
 export const genericDecodeFixture = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   generic: true,

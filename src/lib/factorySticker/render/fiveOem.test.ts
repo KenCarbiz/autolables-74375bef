@@ -8,6 +8,9 @@ import {
   audiEtronFixture,
   audiPhevFixture,
   audiQ5Fixture,
+  chryslerPacificaFixture,
+  chryslerPhevFixture,
+  chryslerVoyagerFixture,
   landRoverDefenderFixture,
   landRoverPhevFixture,
   landRoverSportFixture,
@@ -1532,6 +1535,105 @@ describe("Land Rover profile (land-rover-us-2026-v1, british-factory-technical)"
     expect(joined).toContain("NITRA, SLOVAKIA");
     expect(joined).not.toContain("SOLIHULL");
     expect(joined).toContain("SLOVAKIA 45%");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+});
+
+describe("Chrysler profile (chrysler-us-2026-v1, american-factory-technical)", () => {
+  it("Chrysler resolves alone; sibling Stellantis brands and corporate names never do", () => {
+    for (const alias of ["Chrysler", "CHRYSLER", "Chrysler Group LLC"]) {
+      const r = resolveThemeProfile(alias, 2026);
+      expect(r.theme.oemId, alias).toBe("CHRYSLER");
+      expect(r.profile.themeVersion, alias).toBe("chrysler-us-2026-v1");
+    }
+    const c = resolveThemeProfile("Chrysler", 2026);
+    expect(c.profile.status).toBe("draft");
+    expect(c.profile.layoutFamily).toBe("american-factory-technical");
+    expect(c.theme.templateFamilyId).toBe("AMERICAN_FACTORY");
+    // Sibling Stellantis brands keep their own identities.
+    for (const sibling of ["Dodge", "Jeep", "Ram"]) {
+      expect(resolveThemeProfile(sibling, 2026).theme.oemId, sibling).not.toBe("CHRYSLER");
+    }
+    // A corporate parent does not identify a brand; neither do finance
+    // arms, dealer groups, parts channels or compatibility qualifiers.
+    for (const noise of [
+      "FCA US LLC", "Stellantis", "Stellantis North America", "Fiat Chrysler",
+      "CDJR", "Chrysler Dodge Jeep Ram", "Mopar", "Pacifica-compatible",
+      "Chrysler Capital", "Chrysler-certified dealer",
+    ]) {
+      const r = resolveThemeProfile(noise, 2026);
+      expect(r.theme.oemId, noise).not.toBe("CHRYSLER");
+      expect(r.resolution, noise).toBe("FALLBACK");
+    }
+    expect(resolveThemeProfile("Chrysler", 2019).profile.status).toBe("fallback");
+  });
+
+  it("renders the Pacifica Limited AWD benchmark with coded packages priced once", () => {
+    const model = buildRenderLayout(chryslerPacificaFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    // Corrected total: 51,950 + 7,075 + 1,195.
+    expect(page1).toContain("$60,220.00");
+    expect(page1).toContain("$51,950.00");
+    expect(page1).toContain("TOTAL PRICE");
+    // Chrysler package codes render with their descriptions.
+    for (const code of ["27P", "XSP", "GWJ", "RSE", "PXJ"]) {
+      expect(page1, code).toContain(code);
+    }
+    // Customer Preferred Package members sit beneath the parent, priced once.
+    expect(joined).toContain("Customer Preferred Package 27P");
+    expect(joined).toContain("Power 8-Way Front Passenger Seat");
+    expect(page1.filter((s) => s === "995.00").length).toBe(1);
+    // Gasoline AWD Pacifica: gasoline EPA layout, no plug-in content.
+    expect(page1).toContain("MPG");
+    expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
+    expect(page1).not.toContain("MPGe");
+    expect(joined).toContain("WINDSOR, ONTARIO, CANADA");
+    expect(joined).toContain("has not been rated");
+    expect(joined).toContain("Not an original Chrysler-issued Monroney label");
+    // Black band with the restrained silver-blue keyline, never Ram red.
+    const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
+    expect(fills.has("#0a0a0a")).toBe(true);
+    const rules = new Set(model.pages[0].primitives.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
+    expect(rules.has("#6f7c87")).toBe(true);
+    expect(rules.has("#a6192e")).toBe(false);
+    const barcode = model.pages[0].primitives.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" ? barcode.payload : null).toBe("2C4RC3GG6TR188133");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Pacifica Plug-In Hybrid uses the PHEV module and its own battery coverage", () => {
+    const model = buildRenderLayout(chryslerPhevFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$56,880.00");
+    expect(page1).toContain("MPGe");
+    expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
+    expect(page1.some((s) => s.includes("MPG gasoline only"))).toBe(true);
+    // The plug-in is FWD and must never inherit the gasoline AWD figures.
+    expect(joined).toContain("PACIFICA PLUG-IN HYBRID");
+    expect(joined).toContain("SELECT FWD");
+    expect(page1.some((s) => s === "22")).toBe(false);
+    expect(joined).toContain("HIGH-VOLTAGE BATTERY LIMITED WARRANTY");
+    expectWithinBounds(model);
+    expectMinFontRespected(model);
+  });
+
+  it("Voyager stays a distinct model line from Pacifica", () => {
+    const model = buildRenderLayout(chryslerVoyagerFixture(), themeFor(null));
+    const page1 = pageStrings(model, 0);
+    const joined = page1.join(" ");
+    expect(model.pages.length).toBe(1);
+    expect(page1).toContain("$42,780.00");
+    expect(page1).toContain("$39,995.00");
+    expect(joined).toContain("2026 CHRYSLER VOYAGER");
+    expect(joined).not.toContain("PACIFICA");
+    // Its own parts-content record, not Pacifica's.
+    expect(joined).toContain("MEXICO 24%");
     expectWithinBounds(model);
     expectMinFontRespected(model);
   });
