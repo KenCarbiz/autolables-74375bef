@@ -95,10 +95,25 @@ interface VerifiedTemplate { bytes: ArrayBuffer; version: string; contentHash: s
 
 // deno-lint-ignore no-explicit-any
 async function loadTemplate(admin: any, base: string, name: string): Promise<VerifiedTemplate> {
-  const res = await fetch(`${base}/forms/${name}`);
-  if (!res.ok) throw new Error(`template ${name} ${res.status} from ${base}`);
-  const bytes = await res.arrayBuffer();
+  // Try the resolved base first, then the known template hosts. A dead or
+  // non-serving base must not fail the fill — the drift check below is what
+  // guarantees we only ever fill the exact approved master bytes.
+  const candidates = [base, ...TEMPLATE_HOST_FALLBACKS.filter((h) => h !== base)];
+  let bytes: ArrayBuffer | null = null;
+  const failures: string[] = [];
+  for (const host of candidates) {
+    try {
+      const res = await fetch(`${host}/forms/${name}`);
+      if (!res.ok) { failures.push(`${host} ${res.status}`); continue; }
+      bytes = await res.arrayBuffer();
+      break;
+    } catch (e) {
+      failures.push(`${host} ${String((e as Error)?.message || e)}`);
+    }
+  }
+  if (!bytes) throw new Error(`template ${name} unavailable (${failures.join("; ")})`);
   const contentHash = await sha256Hex(new Uint8Array(bytes));
+
   const key = TEMPLATE_KEYS[name];
   const { data: reg } = await admin.from("compliance_form_templates")
     .select("version, content_hash").eq("template_key", key).is("retired_at", null).maybeSingle();
