@@ -72,7 +72,11 @@ describe("neovin_snapshots — complete raw provider capture (F2)", () => {
 });
 
 describe("marketcheck-specs — capture first, extract second (F3)", () => {
-  const src = readFileSync(join(FUNCTIONS, "marketcheck-specs/index.ts"), "utf8");
+  const src = readFileSync(join(FUNCTIONS, "marketcheck-specs/index.ts"), "utf8")
+    // structuredSheet now lives in _shared/neovinSheet.ts so the sticker
+    // orchestrator can rehydrate from a stored snapshot instead of re-buying
+    // a decode. These assertions follow the code.
+    + readFileSync(join(FUNCTIONS, "_shared/neovinSheet.ts"), "utf8");
 
   it("persists the raw payload into neovin_snapshots BEFORE extraction runs", () => {
     const capture = src.indexOf('from("neovin_snapshots")');

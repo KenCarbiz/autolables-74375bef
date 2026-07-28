@@ -420,7 +420,19 @@ async function fetchSoldStats(ymm: string | null, condition: string, state: stri
       const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, make, model, state, rows: "50", start: "0" });
       if (useYear && year) p.set("year", year);
       const res = await mcFetch(`${MC_BASE}/search/car/recents?${p.toString()}`, 12000);
-      if (!res || !res.ok) return null;
+      // Log the provider's own error body. This ladder has been failing 100%
+      // of the time — 60 x 400 on recents and 30 x 422 on sales in a single
+      // week, ~18% of all metered calls — and `return null` threw away the
+      // response that names the offending parameter, so the fault was
+      // invisible for as long as it has existed. sold_stats has consequently
+      // never once been populated.
+      if (!res || !res.ok) {
+        const body = res ? await res.text().catch(() => "") : "";
+        console.warn(`sold_stats recents ${res?.status ?? "no_response"} ` +
+          `make=${make} model=${model} state=${JSON.stringify(state)} year=${useYear ? year : ""} ` +
+          `body=${body.slice(0, 300)}`);
+        return null;
+      }
       // deno-lint-ignore no-explicit-any
       const b: any = await res.json().catch(() => ({}));
       // deno-lint-ignore no-explicit-any
@@ -439,6 +451,10 @@ async function fetchSoldStats(ymm: string | null, condition: string, state: stri
     // response's *_stats medians directly (this endpoint returns aggregates).
     const sp = new URLSearchParams({ api_key: MC_KEY, car_type: carType, make, state });
     const sres = await mcFetch(`${MC_BASE}/sales/car?${sp.toString()}`, 12000);
+    if (sres && !sres.ok) {
+      const body = await sres.text().catch(() => "");
+      console.warn(`sold_stats sales ${sres.status} make=${make} state=${JSON.stringify(state)} body=${body.slice(0, 300)}`);
+    }
     if (sres && sres.ok) {
       // deno-lint-ignore no-explicit-any
       const sb: any = await sres.json().catch(() => ({}));

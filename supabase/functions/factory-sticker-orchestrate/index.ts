@@ -35,6 +35,8 @@ import {
   listCompatibleTemplates, validateTemplateOverride, checkRenderedCompleteness,
 } from "../_shared/factorySticker/render.ts";
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
+import { structuredSheet } from "../_shared/neovinSheet.ts";
+import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 import { recordSourcePayload, refreshVehicleTruth } from "./truth.ts";
 
 const cors = {
@@ -433,6 +435,44 @@ async function orchestrateVehicle(
     // explicit, permissioned, audited request rather than an implicit one.
     let mc = (listing.mc_attributes || {}) as Record<string, unknown>;
     let sheet = (mc.build_sheet || null) as Record<string, unknown> | null;
+    // Before paying: we already stored the complete raw provider response for
+    // every decode we have ever run, and nothing has ever read it back. A
+    // build sheet missing from mc_attributes does NOT mean we never decoded
+    // this VIN — the nightly feed sync used to delete the key outright. Try
+    // the durable copy first; it costs a select and closes the re-purchase
+    // loop that was re-billing the fleet.
+    if (!sheet) {
+      try {
+        const { data: snap } = await admin.from("neovin_snapshots")
+          .select("payload").eq("tenant_id", tenantId).eq("vin", vin)
+          .order("fetched_at", { ascending: false }).limit(1).maybeSingle();
+        const payload = (snap as { payload?: Record<string, unknown> } | null)?.payload;
+        if (payload) {
+          const rehydrated = structuredSheet(payload);
+          if (rehydrated) {
+            sheet = rehydrated;
+            mc = { ...mc, build_sheet: rehydrated };
+            await admin.from("vehicle_listings")
+              .update({ mc_attributes: mc }).eq("id", vehicleId);
+            listing.mc_attributes = mc;
+            await audit(admin, tenantId, "factory_sticker.source_rehydrated", record.id,
+              { vin, from: "neovin_snapshots" });
+          }
+        }
+      } catch { /* the paid path below is the fallback, not the other way round */ }
+    }
+    // Attempt cap. The two sweeps enforce MAX_SPEC_ATTEMPTS; this path did
+    // not, and never stamped the attempt either, so it was the one way to
+    // re-buy an undecodable VIN indefinitely — four times a night.
+    const decodeDecision = shouldDecodeVin(mc, MAX_SPEC_ATTEMPTS);
+    if (!sheet && opts.allowSourceFetch && !decodeDecision.decode) {
+      await setRecord(admin, record.id, {
+        generation_status: "PENDING_DATA",
+        last_error: `attempt_cap_reached: ${decodeDecision.reason}`,
+        review_required: false, review_reason: null,
+      });
+      return { vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA", skipped: "no_build_sheet" };
+    }
     if (!sheet && opts.allowSourceFetch) {
       await setRecord(admin, record.id, { generation_status: "PENDING_DATA", last_error: null });
       await audit(admin, tenantId, "factory_sticker.source_fetch_requested", record.id,
@@ -449,6 +489,21 @@ async function orchestrateVehicle(
       } catch (e) {
         fetchDetail = String((e as Error)?.message || e).slice(0, 200);
       }
+      // Stamp the attempt from here. marketcheck-specs returns early without
+      // writing on a no-match, which is exactly the case the cap exists for.
+      // A retryable provider refusal is deliberately not counted.
+      try {
+        const { data: after } = await admin.from("vehicle_listings")
+          .select("mc_attributes").eq("id", vehicleId).maybeSingle();
+        const fresh = ((after?.mc_attributes ?? mc) || {}) as Record<string, unknown>;
+        await admin.from("vehicle_listings").update({
+          mc_attributes: {
+            ...fresh,
+            specs_attempts: (Number(fresh.specs_attempts) || 0) + 1,
+            specs_attempted_at: new Date().toISOString(),
+          },
+        }).eq("id", vehicleId);
+      } catch { /* the cap is the backstop */ }
       await audit(admin, tenantId, "factory_sticker.source_fetch_completed", record.id,
         { vin, ok: fetchDetail === null, detail: fetchDetail });
       // Re-read: marketcheck-specs writes the decode back onto the listing.
@@ -1446,7 +1501,10 @@ serve(async (req) => {
                 allowSourceFetch: mayFetch,
                 appBase: body.app_base ? String(body.app_base) : undefined,
               });
-              if (mayFetch && res.skipped !== "no_build_sheet") fetchBudget--;
+              // Decrement on EVERY fetch-enabled pass. Charging the budget only
+              // when a sheet came back exempted precisely the fruitless calls
+              // the budget exists to bound, so fetch_limit bounded nothing.
+              if (mayFetch) fetchBudget--;
               const outcome = String(res.status || res.skipped || (res.error ? "error" : "unknown"));
               statuses[outcome] = (statuses[outcome] || 0) + 1;
               if (res.error) failed++;
