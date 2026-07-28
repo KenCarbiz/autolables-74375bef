@@ -11,6 +11,7 @@
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
 import { flat, structuredSheet } from "../_shared/neovinSheet.ts";
+import { describeShape, detectDrift, shapeHash } from "../_shared/payloadShape.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
@@ -210,6 +211,46 @@ Deno.serve(async (req) => {
   // deno-lint-ignore no-explicit-any
   const build = (payload.build || payload) as any;
   const sheet = structuredSheet(build) ?? structuredSheet(payload);
+
+  // Shape drift alarm. We have always captured the raw response and never
+  // examined it, so the day NeoVIN changed shape we found out from a dealer
+  // asking why a sticker said "no factory build data" for a car the provider
+  // had answered 200 for. This asks the one question that separates the two
+  // cases: did the provider send nothing (a coverage gap — stop retrying), or
+  // did it send something we failed to read (our bug — never re-buy it)?
+  // Best-effort: an alarm must never fail the decode it is watching.
+  try {
+    const shape = describeShape(build);
+    const hash = await shapeHash(shape);
+    const { data: seen } = await admin.rpc("record_provider_payload_shape", {
+      _provider: "marketcheck_neovin",
+      _endpoint: endpoint || "decode-neovin",
+      _shape_hash: hash,
+      _key_names: shape.keys,
+      _dependency_types: shape.dependencyTypes,
+      _findings: [],
+      _parse_failed: !sheet,
+      _sample_vin: vin,
+    });
+    const row = Array.isArray(seen) ? seen[0] as { is_new?: boolean; prior_keys?: string[] } : null;
+    const findings = detectDrift(shape, { parsedSheet: !!sheet, priorKeys: row?.prior_keys ?? null });
+    // Raise once per NEW shape, not once per vehicle — otherwise a schema
+    // change would open one exception per car in the fleet.
+    if (findings.length && row?.is_new && tenantId) {
+      await admin.from("vehicle_exceptions").upsert({
+        tenant_id: tenantId, vin, exception_type: "provider_payload_drift",
+        severity: findings.some((f) => f.kind === "parse_failure") ? "high" : "medium",
+        title: "Provider response shape changed",
+        explanation: "MarketCheck/NeoVIN returned a response shape this decoder has not seen before. "
+          + findings.map((f) => f.detail).join(" · "),
+        source_values: { shape_hash: hash, keys: shape.keys, findings, endpoint },
+        recommended_action: "Compare the stored neovin_snapshots payload for this VIN against the decoder's "
+          + "expected keys. Equipment may be silently missing from window stickers until the decoder is updated.",
+        status: "open",
+      }, { onConflict: "tenant_id,vin,exception_type", ignoreDuplicates: true });
+      console.warn(`payload drift ${hash}: ${findings.map((f) => `${f.kind} — ${f.detail}`).join(" | ")}`);
+    }
+  } catch { /* the alarm is best-effort; it must never break the decode */ }
 
   // Best-effort merge into mc_attributes so the file + sticker pick it up,
   // isolated so a missing column never fails the decode response.
