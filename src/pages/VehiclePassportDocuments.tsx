@@ -20,6 +20,7 @@ import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { listingHero } from "@/lib/photos";
 import { resolveDocumentArtwork, type ArtworkInput } from "@/lib/passport/documentArtwork";
+import { usePublishedWindowSticker } from "@/hooks/usePublishedWindowSticker";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,11 +91,11 @@ const DocumentPreview = ({ input, pageCount, onQuickView }: {
   // 8.5x11 with neutral space either side. Neither is ever stretched to fill,
   // and an official form is never cropped.
   const sheet = art.orientation === "landscape"
-    ? "w-full max-w-[152px] aspect-[11/8.5]"
-    : "h-[102px] sm:h-[112px] aspect-[8.5/11]";
+    ? "w-full max-h-full aspect-[11/8.5]"
+    : "h-full max-h-[112px] aspect-[8.5/11]";
 
   return (
-    <div className="relative h-[112px] sm:h-[132px] w-full sm:w-[176px] sm:flex-[0_0_176px] bg-[#F8FAFC] sm:border-r sm:border-[#E2E8F0] flex items-center justify-center p-2 overflow-hidden">
+    <div className="relative h-[124px] sm:h-[126px] w-full sm:w-[250px] sm:flex-[0_0_250px] bg-[#F8FAFC] sm:border-r sm:border-[#E2E8F0] flex items-center justify-center p-[7px] overflow-hidden">
       {showImage ? (
         <img
           src={art.artworkUrl!}
@@ -309,13 +310,13 @@ const RecordCard = ({ cover, title, source, status, explanation, meta, action, w
 }) => (
   <div className="rounded-xl border border-[#E6E8EC] bg-white overflow-hidden flex flex-col sm:flex-row">
     <div className="shrink-0 sm:self-stretch">{cover}</div>
-    <div className="p-4 sm:p-5 flex-1 min-w-0 flex flex-col">
+    <div className="p-3.5 sm:px-4 sm:py-3 flex-1 min-w-0 flex flex-col justify-center">
       <div><StatusBadge status={status} /></div>
-      <p className="text-[16px] font-bold text-[#0F172A] mt-2 leading-tight">{title}</p>
+      <p className="text-[15px] font-bold text-[#0F172A] mt-1.5 leading-tight">{title}</p>
       <p className="text-[12.5px] text-[#64748B] mt-1">{source}</p>
-      {explanation && <p className="text-[13px] text-[#475569] mt-2 leading-snug">{explanation}</p>}
-      {meta && <div className="mt-2.5 text-[12px] text-[#64748B] flex flex-wrap items-center gap-x-2 gap-y-1">{meta}</div>}
-      <div className="mt-3.5">{action}</div>
+      {explanation && <p className="text-[12.5px] text-[#475569] mt-1 leading-snug line-clamp-2">{explanation}</p>}
+      {meta && <div className="mt-1.5 text-[12px] text-[#64748B] flex flex-wrap items-center gap-x-2 gap-y-1">{meta}</div>}
+      <div className="mt-2.5">{action}</div>
       {why && (
         <details className="mt-2 group">
           <summary className="text-[13px] font-semibold text-[#2563EB] cursor-pointer list-none inline-flex items-center gap-1">Why this matters <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" /></summary>
@@ -360,7 +361,12 @@ const VehiclePassportDocuments = () => {
   const [factoryVerification, setFactoryVerification] = useState<string | null>(null);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
+  // The real page-1 preview asset filed alongside the published PDF. The card
+  // was resolving to a drawn cover only because nothing handed it this URL.
+  const { sticker: publishedSticker } = usePublishedWindowSticker(listing?.slug || null, !isPreview);
+
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   // Server strips excluded docs on live listings; this mirrors it for
@@ -652,7 +658,7 @@ const VehiclePassportDocuments = () => {
                     ))}
                     {factoryDocUrl && factoryDoc && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: isNewCar ? "window_sticker" : "build_sheet", title: isNewCar ? "Window Sticker" : "Build Record" }} />}
+                        cover={<DocumentPreview pageCount={1} input={{ type: isNewCar ? "window_sticker" : "build_sheet", title: isNewCar ? "Window Sticker" : "Build Record", thumbnailUrl: publishedSticker?.thumbnailUrl ?? null }} />}
                         title={factoryTitle}
                         source={factorySubtitle}
                         status="available"
