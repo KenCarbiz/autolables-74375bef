@@ -948,7 +948,7 @@ serve(async (req) => {
         .select("id").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
       vehicleId = String(byVin?.id || "");
     }
-    if (!vehicleId) return json({ error: "vehicle_id or vin required" }, 400);
+    if (!vehicleId && action !== "refresh_truth_sweep") return json({ error: "vehicle_id or vin required" }, 400);
 
     if (action === "orchestrate" || action === "regenerate") {
       const force = action === "regenerate" || !!body.force;
