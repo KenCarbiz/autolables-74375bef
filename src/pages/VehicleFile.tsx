@@ -1009,11 +1009,12 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
     const raw = linkUrl.trim();
     if (!raw) { toast.error("Paste a link first"); return; }
     const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    const next = [...(vehicle.documents || []), { name: linkName.trim() || url, type, url }];
-    const { error } = await (supabase as any)
-      .from("vehicle_listings")
-      .update({ documents: next })
-      .eq("id", vehicle.id);
+    // Append server-side. Building `next` from React state and writing the
+    // whole array back deleted anything attached since this tab loaded.
+    const { error } = await (supabase as any).rpc("append_vehicle_document", {
+      _vehicle_id: vehicle.id,
+      _doc: { name: linkName.trim() || url, type, url },
+    });
     if (error) { toast.error("Failed to add link"); return; }
     setLinkSlot(null); setLinkName(""); setLinkUrl("");
     toast.success("Link added");
@@ -1021,13 +1022,10 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   };
 
   const removeDoc = async (doc: { name: string; url: string; type: string }) => {
-    const next = (vehicle.documents || []).filter(
-      (d) => !(d.name === doc.name && d.url === doc.url && d.type === doc.type),
-    );
-    const { error } = await (supabase as any)
-      .from("vehicle_listings")
-      .update({ documents: next })
-      .eq("id", vehicle.id);
+    // Remove only this entry, server-side, so a concurrent attach survives.
+    const { error } = await (supabase as any).rpc("remove_vehicle_document", {
+      _vehicle_id: vehicle.id, _name: doc.name, _url: doc.url, _type: doc.type,
+    });
     if (error) { toast.error("Failed to remove"); return; }
     toast.success("Removed");
     onReload();
@@ -1061,13 +1059,10 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
     const { data: signed } = await supabase.storage
       .from("vehicle-docs")
       .createSignedUrl(path, 60 * 60 * 24 * 365);
-    const next = [...(vehicle.documents || []), {
-      name: file.name, type, url: signed?.signedUrl || path,
-    }];
-    const { error: updErr } = await (supabase as any)
-      .from("vehicle_listings")
-      .update({ documents: next })
-      .eq("id", vehicle.id);
+    const { error: updErr } = await (supabase as any).rpc("append_vehicle_document", {
+      _vehicle_id: vehicle.id,
+      _doc: { name: file.name, type, url: signed?.signedUrl || path },
+    });
     setUploading(null);
     if (updErr) {
       toast.error("Saved file, but failed to attach to vehicle row");

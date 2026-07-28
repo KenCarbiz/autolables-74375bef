@@ -104,8 +104,13 @@ Deno.serve(async (req) => {
 
   const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 365);
   const name = `${[year, make, model].filter(Boolean).join(" ")} Owner's Manual`.trim() || "Owner's Manual";
-  const next: DocRow[] = [...docs, { name, type: "owners_manual", url: signed?.signedUrl || path }];
-  const { error: updErr } = await admin.from("vehicle_listings").update({ documents: next }).eq("id", listing.id);
+  // Append in one statement. This function reads the array, then spends 45+
+  // seconds fetching and uploading the OEM PDF, then wrote the stale array
+  // back — deleting every document anyone attached during that window.
+  const { error: updErr } = await admin.rpc("append_vehicle_document", {
+    _vehicle_id: listing.id,
+    _doc: { name, type: "owners_manual", url: signed?.signedUrl || path },
+  });
   if (updErr) return json(500, { error: "attach_failed", detail: updErr.message });
 
   return json(200, { ok: true, cached: false, url: signed?.signedUrl || path, name });
