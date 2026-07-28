@@ -84,9 +84,20 @@ export function normalizeForSticker(
 
   if (!sheet) missing.push("build_sheet");
 
-  const baseMsrp = num(pricing.base_msrp);
+  // marketcheck-specs lifts base MSRP to the top level precisely so every
+  // consumer can read it there, and DECODE_OWNED_KEYS preserves that copy
+  // independently of build_sheet. Reading only the nested value threw away
+  // an MSRP we already held.
+  const baseMsrp = num(pricing.base_msrp) ?? num(mc.base_msrp);
   const destinationCharge = num(pricing.destination_charge);
-  const statedTotalMsrp = num(pricing.total_msrp) ?? num(mc.msrp);
+  // Deliberately NOT falling back to `mc.msrp`. That field is the feed's
+  // current asking/market figure, not a manufacturer price: on the real 2019
+  // Q50 (JN1FV7AR5KM800521) it reads 27,887 while the vehicle's actual base
+  // MSRP was 53,350. Printing it as TOTAL MSRP puts a fabricated
+  // manufacturer price on a compliance document. Both sibling normalizers
+  // (vehicleTruth/ingest.ts, normalizeNeovin.ts) already refuse it; this is
+  // the path that actually renders the PDF, so it has to refuse it too.
+  const statedTotalMsrp = num(pricing.total_msrp);
   const itemMsrps = [...packages, ...options].map((x) => x.msrp).filter((n): n is number => n != null);
   const optionsTotal = itemMsrps.length ? itemMsrps.reduce((a, b) => a + b, 0) : null;
   if (!baseMsrp) missing.push("base_msrp");

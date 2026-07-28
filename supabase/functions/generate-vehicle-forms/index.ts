@@ -3,6 +3,7 @@ import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 import { invokeFunction } from "../_shared/invoke.ts";
 import { findVehiclesNeedingForms } from "../_shared/complianceFormsSweep.ts";
+import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // generate-vehicle-forms — fills the EXACT official government forms for a
@@ -526,11 +527,14 @@ Deno.serve(async (req) => {
     .select("id, ymm, condition, mileage").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!listing?.id) return json(404, { error: "vehicle not found" });
   const { data: vf } = await admin.from("vehicle_files").select("year, make, model").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
-  const ymmParts = String(listing.ymm || "").trim().split(/\s+/);
+  // parseYmm, not a positional split. Taking token 1 as the make turns
+  // "2024 Land Rover Defender 110" into make "Land" — printed onto a
+  // federally required FTC Buyers Guide and onto the CT K-208.
+  const parsedYmm = parseYmm(listing.ymm as string | null);
   const vehicle: Vehicle = {
-    year: String(vf?.year || ymmParts[0] || ""),
-    make: vf?.make || ymmParts[1] || "",
-    model: vf?.model || ymmParts.slice(2).join(" ") || "",
+    year: String(vf?.year || parsedYmm.year || ""),
+    make: vf?.make || parsedYmm.make || "",
+    model: vf?.model || parsedYmm.model || "",
     body: "",
     vin,
     mileage: listing.mileage != null ? Number(listing.mileage).toLocaleString("en-US") : "",
