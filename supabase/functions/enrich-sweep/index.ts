@@ -175,7 +175,7 @@ async function runSweep(admin: Admin, sweepStart: string): Promise<boolean> {
           // of only MAX_SPEC_ATTEMPTS paid attempts on an answer we never
           // received, and three throttles would retire a perfectly decodable
           // VIN forever. Leave the counter alone and let the next sweep ask.
-          if (!sres.rateLimited) {
+          if (!sres.rateLimited && !quotaExhausted) {
             try {
               const { data: after } = await admin
                 .from("vehicle_listings").select("mc_attributes")
