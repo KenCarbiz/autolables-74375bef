@@ -2,6 +2,30 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 import { adminClient, SERVICE_KEY, SUPABASE_URL, isServiceOrCron } from "../_shared/supabase.ts";
 import { preflight, json } from "../_shared/http.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Allow a signed-in admin user to trigger the backfill manually from the app.
+// Verifies the caller's JWT, then checks user_roles for the 'admin' role.
+async function isAuthenticatedAdmin(req: Request): Promise<boolean> {
+  try {
+    const auth = req.headers.get("Authorization") || "";
+    if (!auth.toLowerCase().startsWith("bearer ")) return false;
+    const token = auth.slice(7).trim();
+    if (!token || token === SERVICE_KEY) return false;
+    const anon = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    const client = createClient(SUPABASE_URL, anon, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await client.auth.getClaims(token);
+    const uid = data?.claims?.sub;
+    if (error || !uid) return false;
+    const admin = adminClient();
+    const { data: roles } = await admin
+      .from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").limit(1);
+    return !!(roles && roles.length > 0);
+  } catch { return false; }
+}
 
 // ──────────────────────────────────────────────────────────────
 // specs-backfill — decode the NeoVIN equipment breakout for every published
@@ -20,12 +44,21 @@ async function run(depth: number) {
   const deadline = Date.now() + BUDGET_MS;
   let decoded = 0, failed = 0;
   while (Date.now() < deadline) {
-    // Published vehicles whose equipment never decoded (options is null/absent).
+    // Published vehicles that still need a decode. Two populations qualify:
+    // those that never decoded at all, and those holding a GENERIC sheet that
+    // was never asked for its own build — every sheet decoded before the
+    // strict-first request shipped is generic, so selecting only on "no build
+    // sheet" would leave them permanently stuck on typical-for-trim data with
+    // no real MSRP. `specs_strict_attempted` drops a VIN out of this set once
+    // it has been asked properly, so the retry happens once, not every sweep.
     const { data: rows } = await admin
       .from("vehicle_listings")
       .select("tenant_id, vin, mc_attributes")
       .eq("status", "published")
-      .is("mc_attributes->>build_sheet", null)
+      .or([
+        "mc_attributes->>build_sheet.is.null",
+        "and(mc_attributes->build_sheet->>generic.eq.true,mc_attributes->>specs_strict_attempted.is.null)",
+      ].join(","))
       .limit(4);
     // Same rule the nightly sweep uses. This path used to select purely on
     // "options is null" and ignore the attempt cap, so a VIN the provider
@@ -72,8 +105,18 @@ async function run(depth: number) {
   }
   if (depth < MAX_DEPTH) {
     const admin2 = adminClient();
+    // Must ask the SAME question the work loop asks. This used to check
+    // "options is null", which the generic-retry population fails — those
+    // VINs were decoded, so they have options — and the chain would stop
+    // with the retries still outstanding, reporting done while half the
+    // backfill had never run.
     const { data: more } = await admin2.from("vehicle_listings")
-      .select("vin").eq("status", "published").is("mc_attributes->>options", null).limit(1);
+      .select("vin").eq("status", "published")
+      .or([
+        "mc_attributes->>build_sheet.is.null",
+        "and(mc_attributes->build_sheet->>generic.eq.true,mc_attributes->>specs_strict_attempted.is.null)",
+      ].join(","))
+      .limit(1);
     if (((more as unknown[]) || []).length > 0) {
       await fetch(`${SUPABASE_URL}/functions/v1/specs-backfill`, {
         method: "POST",
@@ -88,7 +131,9 @@ async function run(depth: number) {
 serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
-  if (!isServiceOrCron(req)) return json(401, { error: "unauthorized" });
+  if (!isServiceOrCron(req) && !(await isAuthenticatedAdmin(req))) {
+    return json(401, { error: "unauthorized" });
+  }
   const body = await req.json().catch(() => ({})) as { depth?: number };
   const depth = typeof body.depth === "number" ? body.depth : 0;
   const work = run(depth);

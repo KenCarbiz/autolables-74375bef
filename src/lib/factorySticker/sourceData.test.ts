@@ -62,3 +62,43 @@ describe("provider decode decisions", () => {
     expect(shouldDecodeVin({ specs_attempts: -5 }).decode).toBe(true);
   });
 });
+
+describe("re-asking for a generic sheet, exactly once", () => {
+  const generic = (over: Record<string, unknown> = {}) => ({
+    build_sheet: { source: "neovin", generic: true }, ...over,
+  });
+
+  it("re-decodes a generic sheet that was never asked for strictly", () => {
+    // Every sheet in production is generic because the old request always
+    // sent include_generic=true. Those VINs have never been asked for their
+    // own build, so "already decoded" was never true of them.
+    const d = shouldDecodeVin(generic());
+    expect(d.decode).toBe(true);
+    expect(d.reason).toBe("generic_sheet_never_asked_strictly");
+  });
+
+  it("stops once the strict question has actually been asked", () => {
+    // A generic answer to a strict question is the best this VIN has.
+    // Paying to hear it again is the recurring charge this module exists
+    // to prevent.
+    const d = shouldDecodeVin(generic({ specs_strict_attempted: true }));
+    expect(d.decode).toBe(false);
+    expect(d.reason).toBe("already_decoded");
+  });
+
+  it("never re-decodes a real VIN-specific sheet", () => {
+    expect(shouldDecodeVin({ build_sheet: { source: "neovin", generic: false } }).decode).toBe(false);
+    expect(shouldDecodeVin({ build_sheet: { source: "neovin" } }).decode).toBe(false);
+  });
+
+  it("still honours the attempt cap on a generic sheet", () => {
+    const d = shouldDecodeVin(generic({ specs_attempts: 3 }));
+    expect(d.decode).toBe(false);
+    expect(d.reason).toBe("already_decoded");
+  });
+
+  it("treats a malformed sheet as decoded rather than re-paying", () => {
+    expect(shouldDecodeVin({ build_sheet: "not-an-object" }).decode).toBe(false);
+    expect(shouldDecodeVin({ build_sheet: { generic: "true" } }).decode).toBe(false);
+  });
+});

@@ -1224,6 +1224,40 @@ serve(async (req) => {
       });
     }
 
+    // Re-resolve every published vehicle for the tenant. Reads only saved
+    // data — no provider call, so it cannot spend money however often it is
+    // run. Bounded by a wall-clock budget rather than a row count so it
+    // cannot exceed the function timeout on a large inventory; re-invoke
+    // until `remaining` is 0.
+    if (action === "refresh_truth_sweep") {
+      if (!can(tenantId, "regenerate")) return json({ error: "insufficient_permission" }, 403);
+      const deadline = Date.now() + 90_000;
+      const { data: listings } = await admin.from("vehicle_listings")
+        .select("*").eq("tenant_id", tenantId).eq("status", "published")
+        .order("updated_at", { ascending: false }).limit(500);
+      const rows = (listings || []) as Array<Record<string, unknown>>;
+
+      let created = 0, reused = 0, failed = 0, processed = 0;
+      const conflicts: string[] = [];
+      for (const listing of rows) {
+        if (Date.now() >= deadline) break;
+        processed++;
+        try {
+          const res = await refreshVehicleTruth(admin, tenantId, listing);
+          if (res.created) created++; else reused++;
+          if (res.blocking_conflicts > 0) conflicts.push(String(listing.vin || ""));
+        } catch {
+          failed++;
+        }
+      }
+      return json({
+        success: true,
+        total: rows.length, processed, created, reused, failed,
+        remaining: Math.max(0, rows.length - processed),
+        vehicles_with_blocking_conflicts: conflicts,
+      });
+    }
+
     if (action === "refresh_truth") {
       const { data: listing } = await admin.from("vehicle_listings")
         .select("*").eq("tenant_id", tenantId).eq("id", vehicleId).maybeSingle();

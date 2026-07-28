@@ -170,9 +170,27 @@ export function candidatesFromListing(
     const recordId = ids[sheetSource];
 
     push(out, "manufacturer", str(sheet.manufacturer) ?? str(mc.manufacturer), sheetSource, confidence, sheetAt, recordId);
-    push(out, "base_msrp", posNum(mc.base_msrp ?? mc.msrp), sheetSource, confidence, sheetAt, recordId);
-    push(out, "destination_charge", posNum(mc.delivery_charges ?? mc.destination_charge), sheetSource, confidence, sheetAt, recordId);
-    push(out, "total_msrp", posNum(mc.total_msrp ?? mc.sticker_total_msrp), sheetSource, confidence, sheetAt, recordId);
+
+    // The decoder writes extracted Monroney pricing to `build_sheet.pricing`,
+    // while the rest of the system reads it from the top level of
+    // mc_attributes. Reading both recovers pricing already retrieved and
+    // stored — without it a vehicle can hold a complete base/destination/
+    // total set and still print no MSRP.
+    const sheetPricing = (sheet.pricing && typeof sheet.pricing === "object"
+      ? sheet.pricing
+      : {}) as Record<string, unknown>;
+    // Deliberately NOT falling back to `mc.msrp`. That field is the feed's
+    // current asking/market figure, not a manufacturer price: on the real
+    // 2019 Q50 (JN1FV7AR5KM800521) it reads 27,887 while the vehicle's
+    // actual base MSRP was 53,350. Printing the former as "Base MSRP" would
+    // put a fabricated manufacturer price on a compliance document, so an
+    // unknown base MSRP stays unknown.
+    push(out, "base_msrp",
+      posNum(mc.base_msrp ?? sheetPricing.base_msrp), sheetSource, confidence, sheetAt, recordId);
+    push(out, "destination_charge",
+      posNum(mc.delivery_charges ?? mc.destination_charge ?? sheetPricing.destination_charge), sheetSource, confidence, sheetAt, recordId);
+    push(out, "total_msrp",
+      posNum(mc.total_msrp ?? mc.sticker_total_msrp ?? sheetPricing.total_msrp), sheetSource, confidence, sheetAt, recordId);
 
     const packages = (Array.isArray(sheet.packages) ? sheet.packages : []) as Array<Record<string, unknown>>;
     const opts = (Array.isArray(sheet.options) ? sheet.options : []) as Array<Record<string, unknown>>;

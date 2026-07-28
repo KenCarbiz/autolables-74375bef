@@ -191,10 +191,25 @@ export function normalizeNeovin(input: NormalizeNeovinInput): FactoryStickerData
 
   const equipmentResult = buildEquipment({ standard, packages, options });
 
+  // marketcheck-specs extracts Monroney pricing into `build_sheet.pricing`,
+  // while this normalizer historically read only the top level of
+  // mc_attributes. Reading both recovers pricing already retrieved and
+  // stored — a vehicle could otherwise hold a complete base / destination /
+  // total set and still render a sticker with no MSRP at all.
+  const sheetPricing = (sheet?.pricing && typeof sheet.pricing === "object"
+    ? sheet.pricing
+    : {}) as Record<string, unknown>;
+
   const pricing = reconcileMsrp({
-    baseMsrp: posNum(mc.base_msrp ?? mc.msrp),
-    destinationCharge: posNum(mc.delivery_charges ?? mc.destination_charge),
-    sourceReportedTotalMsrp: posNum(mc.total_msrp ?? mc.sticker_total_msrp),
+    // `mc.msrp` is deliberately absent here. It is the feed's current
+    // asking/market figure, not a manufacturer price: on the real 2019 Q50
+    // (JN1FV7AR5KM800521) it reads 27,887 against an actual base MSRP of
+    // 53,350. Printing it as "Base MSRP" would put a fabricated
+    // manufacturer price on the reproduction, so an unknown base stays
+    // unknown and the reconciler reports the gap instead.
+    baseMsrp: posNum(mc.base_msrp ?? sheetPricing.base_msrp),
+    destinationCharge: posNum(mc.delivery_charges ?? mc.destination_charge ?? sheetPricing.destination_charge),
+    sourceReportedTotalMsrp: posNum(mc.total_msrp ?? mc.sticker_total_msrp ?? sheetPricing.total_msrp),
     // A negative price can only have survived derivePriceStatus via an explicit
     // oem_credit flag, so re-flag it for the reconciler.
     packages: equipmentResult.packages.map((p) => ({

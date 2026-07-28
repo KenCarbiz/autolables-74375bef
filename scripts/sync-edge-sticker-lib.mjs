@@ -25,6 +25,8 @@ export const TARGET_DIR = join(root, "supabase/functions/_shared/factorySticker/
 // imports instead of contorting it to suit the mirror's shape.
 export const TRUTH_SOURCE_DIR = join(root, "src/lib/vehicleTruth");
 export const TRUTH_PREFIX = "vehicleTruth/";
+export const DOCUMENTS_SOURCE_DIR = join(root, "src/lib/documents");
+export const DOCUMENTS_PREFIX = "documents/";
 const rewriteTruthImports = (body) => body.replace(/from "\.\.\/factorySticker\//g, 'from "../');
 
 const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__"]);
@@ -55,13 +57,18 @@ export function collect(dir, base = dir, out = new Map(), withHeader = true) {
   return out;
 }
 
-/** Every file the mirror should contain: the engine, plus the truth layer. */
+/** Every file the mirror should contain: the engine, the truth layer, and shared document primitives. */
 export function collectAll() {
   const out = collect(SOURCE_DIR);
   const truth = collect(TRUTH_SOURCE_DIR, TRUTH_SOURCE_DIR, new Map(), false);
   for (const [rel, body] of truth) {
     const key = TRUTH_PREFIX + rel;
     out.set(key, HEADER.replace("{src}", `src/lib/vehicleTruth/${rel}`) + rewriteTruthImports(body));
+  }
+  const documents = collect(DOCUMENTS_SOURCE_DIR, DOCUMENTS_SOURCE_DIR, new Map(), false);
+  for (const [rel, body] of documents) {
+    const key = DOCUMENTS_PREFIX + rel;
+    out.set(key, HEADER.replace("{src}", `src/lib/documents/${rel}`) + body);
   }
   return out;
 }

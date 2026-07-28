@@ -195,9 +195,15 @@ const specEndpoints = (vin: string): string[] => {
   return [
     // NeoVIN carries the full installed options / equipment / features list —
     // the basic decoder returns core specs but no per-vehicle equipment.
-    // include_generic falls back to generic specs when a VIN can't be fully
-    // decoded. Try NeoVIN first; if the plan doesn't include it the call 4xx's
-    // and we fall through to the basic decoder.
+    //
+    // Ask for THIS VIN's build first. `include_generic=true` tells NeoVIN to
+    // substitute typical-for-trim specs whenever it cannot fully decode the
+    // VIN, so sending it on the first call means we never learn which VINs
+    // were genuinely decodable — and a generic match can never carry real
+    // base MSRP, destination charge or per-vehicle options. The generic
+    // fallback is still tried, but only after the strict decode came back
+    // empty, so a decodable VIN always yields real build data.
+    `${MC_BASE}/decode/car/neovin/${v}/specs?api_key=${k}`,
     `${MC_BASE}/decode/car/neovin/${v}/specs?api_key=${k}&include_generic=true`,
     `${MC_BASE}/decode/car/${v}/specs?api_key=${k}`,
     `${MC_BASE}/decode/car/${v}?api_key=${k}`,
@@ -248,11 +254,19 @@ Deno.serve(async (req) => {
   // actually has options/features; otherwise keep it as a fallback and try the
   // next endpoint, settling for the specs-only payload only if nothing better answers.
   const endpoints = specEndpoints(vin);
+  // Whether this VIN was actually asked for its OWN build. A timeout is not
+  // an answer, so it does not count — otherwise a slow call would retire the
+  // VIN to the generic fallback permanently.
+  let strictAttempted = false;
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];
+    const isNeovin = url.includes("/neovin/");
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(i === 0 ? 30000 : 12000) });
+      // Both NeoVIN calls are the slow, heavy ones; only the basic decoder
+      // fallbacks get the short timeout.
+      const res = await fetch(url, { signal: AbortSignal.timeout(isNeovin ? 30000 : 12000) });
       tried.push({ url: redact(url), status: res.status });
+      if (i === 0) strictAttempted = true;
       if (!res.ok) continue;
       const data = await res.json().catch(() => null);
       if (data == null) continue;
@@ -323,12 +337,31 @@ Deno.serve(async (req) => {
         // decoder answered (NeoVIN timed out / 4xx'd), keep null so NeoVIN is
         // retried later rather than finalizing the car with no equipment.
         const neovinAnswered = endpoint.includes("neovin");
+        // Lift the extracted Monroney pricing to the top level of
+        // mc_attributes. Every consumer — the sticker normalizer, the truth
+        // layer — reads mc.base_msrp there, so leaving it only inside
+        // build_sheet.pricing filed the numbers where nothing looks and the
+        // sticker rendered with no MSRP.
+        const sheetPricing = (sheet?.pricing ?? {}) as Record<string, number>;
+        const liftedPricing: Record<string, number> = {};
+        if (sheetPricing.base_msrp) liftedPricing.base_msrp = sheetPricing.base_msrp;
+        if (sheetPricing.destination_charge) liftedPricing.delivery_charges = sheetPricing.destination_charge;
+        if (sheetPricing.total_msrp) liftedPricing.total_msrp = sheetPricing.total_msrp;
+
         const merged = {
           ...prev,
           ...fill,
+          ...liftedPricing,
           options: options.length ? options : (neovinAnswered ? (prev.options ?? []) : (prev.options ?? null)),
           features: features.length ? features : (neovinAnswered ? (prev.features ?? []) : (prev.features ?? null)),
           build_sheet: sheet ?? prev.build_sheet ?? null,
+          // Records which decoder answered, so a generic match is never later
+          // mistaken for manufacturer build data.
+          ...(neovinAnswered ? { specs_source: "neovin" } : {}),
+          // Records that this VIN was asked for its own build. Without it a
+          // generic sheet would be re-decoded on every sweep forever; with
+          // it, the retry happens exactly once.
+          ...(strictAttempted ? { specs_strict_attempted: true } : {}),
           specs_decoded_at: new Date().toISOString(),
         };
         await admin.from("vehicle_listings").update({ mc_attributes: merged }).eq("id", row.id);
