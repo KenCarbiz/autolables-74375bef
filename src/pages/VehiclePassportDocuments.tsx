@@ -91,11 +91,11 @@ const DocumentPreview = ({ input, pageCount, onQuickView }: {
   // 8.5x11 with neutral space either side. Neither is ever stretched to fill,
   // and an official form is never cropped.
   const sheet = art.orientation === "landscape"
-    ? "w-full max-h-full aspect-[11/8.5]"
-    : "h-full max-h-[112px] aspect-[8.5/11]";
+    ? "h-full max-h-[112px] max-w-full aspect-[11/8.5]"
+    : "h-full max-h-[112px] max-w-full aspect-[8.5/11]";
 
   return (
-    <div className="relative h-[124px] sm:h-[126px] w-full sm:w-[250px] sm:flex-[0_0_250px] bg-[#F8FAFC] sm:border-r sm:border-[#E2E8F0] flex items-center justify-center p-[7px] overflow-hidden">
+    <div className="relative h-[112px] sm:h-full sm:min-h-[126px] w-full sm:w-[250px] bg-[#F8FAFC] sm:border-r sm:border-[#E2E8F0] flex items-center justify-center p-[7px] overflow-hidden">
       {showImage ? (
         <img
           src={art.artworkUrl!}
@@ -220,12 +220,12 @@ const OwnersManualCard = ({
   const action = (
     <div className="flex items-center gap-2">
       <a href={savedUrl || m.url} target="_blank" rel="noopener noreferrer" onClick={() => track("owners_manual_open")}
-        className="flex-1 h-9 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]">
+        className="flex-1 h-11 sm:h-8 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]">
         {savedUrl ? "Download" : "Open Manual"} <ExternalLink className="w-4 h-4" />
       </a>
       {!savedUrl && (
         <button onClick={save} disabled={saving}
-          className="flex-1 h-9 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1D4ED8] disabled:opacity-60">
+          className="flex-1 h-11 sm:h-8 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1D4ED8] disabled:opacity-60">
           {saving ? "Saving…" : "Save to passport"}
         </button>
       )}
@@ -308,18 +308,18 @@ const DocSkeleton = () => (
 const RecordCard = ({ cover, title, source, status, explanation, meta, action, why }: {
   cover: ReactNode; title: string; source: string; status: DocStatus; explanation?: string; meta?: ReactNode; action: ReactNode; why?: string;
 }) => (
-  <div className="rounded-xl border border-[#E6E8EC] bg-white overflow-hidden flex flex-col sm:flex-row">
-    <div className="shrink-0 sm:self-stretch">{cover}</div>
-    <div className="p-3.5 sm:px-4 sm:py-3 flex-1 min-w-0 flex flex-col justify-center">
-      <div><StatusBadge status={status} /></div>
-      <p className="text-[15px] font-bold text-[#0F172A] mt-1.5 leading-tight">{title}</p>
-      <p className="text-[12.5px] text-[#64748B] mt-1">{source}</p>
-      {explanation && <p className="text-[12.5px] text-[#475569] mt-1 leading-snug line-clamp-2">{explanation}</p>}
-      {meta && <div className="mt-1.5 text-[12px] text-[#64748B] flex flex-wrap items-center gap-x-2 gap-y-1">{meta}</div>}
-      <div className="mt-2.5">{action}</div>
+  <div className="rounded-2xl border border-[#E2E8F0] bg-white overflow-hidden flex flex-col sm:flex-row">
+    <div className="shrink-0 sm:self-stretch sm:w-[250px]">{cover}</div>
+    <div className="p-3.5 sm:px-4 sm:py-2 flex-1 min-w-0 flex flex-col justify-center">
+      <div className="flex items-center gap-2 leading-none"><StatusBadge status={status} /></div>
+      <p className="text-[15px] font-bold text-[#0F172A] mt-1 leading-tight">{title}</p>
+      <p className="text-[12px] text-[#64748B] mt-0.5 leading-tight">{source}</p>
+      {explanation && <p className="text-[12.5px] text-[#475569] mt-1 leading-snug line-clamp-1">{explanation}</p>}
+      {meta && <div className="mt-1 text-[11.5px] leading-tight text-[#64748B] flex flex-wrap items-center gap-x-2 gap-y-0.5">{meta}</div>}
+      <div className="mt-1.5">{action}</div>
       {why && (
-        <details className="mt-2 group">
-          <summary className="text-[13px] font-semibold text-[#2563EB] cursor-pointer list-none inline-flex items-center gap-1">Why this matters <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" /></summary>
+        <details className="mt-1 group leading-tight">
+          <summary className="text-[12px] leading-tight font-semibold text-[#2563EB] cursor-pointer list-none inline-flex items-center gap-1">Why this matters <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" /></summary>
           <p className="text-[12.5px] text-[#64748B] mt-1.5 leading-snug">{why}</p>
         </details>
       )}
@@ -519,8 +519,8 @@ const VehiclePassportDocuments = () => {
 
   const uploadedAction = (doc: Doc) => (
     <div className="flex items-center gap-2">
-      <button onClick={() => setPreview(doc)} className="flex-1 h-9 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Eye className="w-4 h-4" /> Preview</button>
-      <a href={doc.url} download target="_blank" rel="noreferrer" className="flex-1 h-9 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"><Download className="w-4 h-4" /> Download</a>
+      <button onClick={() => setPreview(doc)} className="flex-1 h-11 sm:h-8 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Eye className="w-4 h-4" /> Preview</button>
+      <a href={doc.url} download target="_blank" rel="noreferrer" className="flex-1 h-11 sm:h-8 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"><Download className="w-4 h-4" /> Download</a>
     </div>
   );
   const externalAction = (url: string, label: string, cta: string, meta: Record<string, unknown> = {}) => (
@@ -603,7 +603,7 @@ const VehiclePassportDocuments = () => {
             {listing.trim && <p className="text-[12px] text-[#64748B]">{listing.trim}</p>}
             <p className="text-[11px] text-[#94A3B8] mt-1.5">VIN {listing.vin}</p>
             <p className="text-[11px] text-[#94A3B8]">Stock # {listing.vin.slice(-6)}{listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi` : ""}</p>
-            <button onClick={() => navigate(pp(""))} className="mt-3 w-full h-9 rounded-lg border border-[#E6E8EC] text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ExternalLink className="w-3.5 h-3.5 text-[#2563EB]" /> View Full Passport</button>
+            <button onClick={() => navigate(pp(""))} className="mt-3 w-full h-11 sm:h-8 rounded-lg border border-[#E6E8EC] text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ExternalLink className="w-3.5 h-3.5 text-[#2563EB]" /> View Full Passport</button>
           </div>
           <nav className="mt-4 space-y-0.5 flex-1">
             {PASSPORT_NAV.map((n) => (
@@ -645,7 +645,7 @@ const VehiclePassportDocuments = () => {
                 <p className="text-[16px] font-bold text-[#0F172A]">Available Now</p>
                 <p className="text-[13px] text-[#64748B] mt-0.5 mb-4">Documents you can view immediately.</p>
                 {availableCount > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-2.5">
                     {uploaded.map(({ doc, status }, i) => (
                       <RecordCard key={`u-${i}`}
                         cover={<DocumentPreview input={{ type: doc.type, title: doc.name, url: doc.url }} />}
