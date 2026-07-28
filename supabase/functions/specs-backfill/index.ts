@@ -2,6 +2,30 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 import { adminClient, SERVICE_KEY, SUPABASE_URL, isServiceOrCron } from "../_shared/supabase.ts";
 import { preflight, json } from "../_shared/http.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Allow a signed-in admin user to trigger the backfill manually from the app.
+// Verifies the caller's JWT, then checks user_roles for the 'admin' role.
+async function isAuthenticatedAdmin(req: Request): Promise<boolean> {
+  try {
+    const auth = req.headers.get("Authorization") || "";
+    if (!auth.toLowerCase().startsWith("bearer ")) return false;
+    const token = auth.slice(7).trim();
+    if (!token || token === SERVICE_KEY) return false;
+    const anon = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    const client = createClient(SUPABASE_URL, anon, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await client.auth.getClaims(token);
+    const uid = data?.claims?.sub;
+    if (error || !uid) return false;
+    const admin = adminClient();
+    const { data: roles } = await admin
+      .from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").limit(1);
+    return !!(roles && roles.length > 0);
+  } catch { return false; }
+}
 
 // ──────────────────────────────────────────────────────────────
 // specs-backfill — decode the NeoVIN equipment breakout for every published
@@ -97,7 +121,9 @@ async function run(depth: number) {
 serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
-  if (!isServiceOrCron(req)) return json(401, { error: "unauthorized" });
+  if (!isServiceOrCron(req) && !(await isAuthenticatedAdmin(req))) {
+    return json(401, { error: "unauthorized" });
+  }
   const body = await req.json().catch(() => ({})) as { depth?: number };
   const depth = typeof body.depth === "number" ? body.depth : 0;
   const work = run(depth);
