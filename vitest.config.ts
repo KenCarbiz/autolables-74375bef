@@ -19,6 +19,10 @@ export default defineConfig({
       // Stub Supabase in unit tests so pure modules behind a transitive client
       // import can load without the real (network-bound) package.
       "@supabase/supabase-js": path.resolve(__dirname, "./src/test/mocks/supabaseClient.ts"),
+      // Edge functions pin pdf-lib by URL (Deno has no node_modules). Point the
+      // URL at the same version already in the lockfile so the page-1 cover
+      // extraction can be tested against the library that actually runs there.
+      "https://esm.sh/pdf-lib@1.17.1": "pdf-lib",
       "@": path.resolve(__dirname, "./src"),
     },
   },

@@ -50,8 +50,10 @@ export interface ExtractedCover {
 /** Thrown for a document we will never be able to cover (encrypted, empty). */
 export class UnsupportedPdfError extends Error {}
 
+// PDFName.asString() keeps the leading solidus ("/Image"), which is not what
+// any of the comparisons below want.
 const nameOf = (v: unknown): string => {
-  if (v instanceof PDFName) return v.asString();
+  if (v instanceof PDFName) return v.asString().replace(/^\//, "");
   return "";
 };
 
@@ -164,7 +166,11 @@ function soleFullPageJpeg(doc: PDFDocument): Uint8Array | null {
  * Throws UnsupportedPdfError for a document that can never yield a cover, and
  * a plain Error for anything the caller should be free to retry.
  */
-export async function extractFirstPageCover(pdfBytes: Uint8Array): Promise<ExtractedCover> {
+export async function extractFirstPageCover(
+  // ArrayBuffer is accepted because pdf-lib's runtime type check rejects a
+  // cross-realm Uint8Array under the jsdom test environment.
+  pdfBytes: Uint8Array | ArrayBuffer,
+): Promise<ExtractedCover> {
   let source: PDFDocument;
   try {
     source = await PDFDocument.load(pdfBytes, { updateMetadata: false });

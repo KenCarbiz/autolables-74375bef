@@ -192,29 +192,25 @@ export async function generateCover(
   // object, and a same-row re-run writes a new version rather than replacing
   // the artifact a passport may still be serving.
   const path = coverStoragePath(kind, row.id, row.url, cover.mime);
-  let up = await admin.storage.from(COVER_BUCKET).upload(path, cover.bytes, {
-    upsert: false,
-    contentType: cover.mime,
-  });
-  if (up.error) {
-    const msg = String(up.error.message || "");
-    if (/exists/i.test(msg)) {
-      // Deterministic path: an object already here is this row's own cover for
-      // this same url. Adopt it instead of failing.
-      up = { data: { path, id: "", fullPath: `${COVER_BUCKET}/${path}` }, error: null } as typeof up;
-    } else {
-      await admin.storage
-        .createBucket(COVER_BUCKET, { public: false, fileSizeLimit: 8 * 1024 * 1024 })
-        .catch(() => undefined);
-      up = await admin.storage.from(COVER_BUCKET).upload(path, cover.bytes, {
-        upsert: false,
-        contentType: cover.mime,
-      });
-    }
+  const put = () => admin.storage.from(COVER_BUCKET)
+    .upload(path, cover.bytes, { upsert: false, contentType: cover.mime });
+
+  let storeError = (await put()).error;
+  if (storeError && /exists/i.test(String(storeError.message || ""))) {
+    // The path is deterministic in (kind, row id, url), so an object already
+    // sitting there is this row's own cover for this same url — adopt it
+    // rather than overwrite it. upsert stays false precisely so this case
+    // surfaces instead of silently replacing bytes a passport is serving.
+    storeError = null;
+  } else if (storeError) {
+    await admin.storage
+      .createBucket(COVER_BUCKET, { public: false, fileSizeLimit: 8 * 1024 * 1024 })
+      .catch(() => undefined);
+    storeError = (await put()).error;
   }
-  if (up.error) {
+  if (storeError) {
     await record(admin, kind, row.id, unresolvedCoverColumns("failed"));
-    return { ok: false, status: "failed", reason: `store_failed: ${up.error.message}`.slice(0, 160) };
+    return { ok: false, status: "failed", reason: `store_failed: ${storeError.message}`.slice(0, 160) };
   }
 
   await record(

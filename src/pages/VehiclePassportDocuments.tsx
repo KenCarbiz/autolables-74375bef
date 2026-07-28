@@ -19,7 +19,7 @@ import { resolvePassportBack } from "@/lib/passportReturn";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { listingHero } from "@/lib/photos";
-import { resolveDocumentArtwork, type ArtworkInput } from "@/lib/passport/documentArtwork";
+import { imageCoverUrl, resolveDocumentArtwork, type ArtworkInput, type OemLinkCover } from "@/lib/passport/documentArtwork";
 import { usePublishedWindowSticker } from "@/hooks/usePublishedWindowSticker";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
@@ -205,6 +205,12 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
   );
 };
 
+// A harvested OEM link as public-listing-view now returns it: the link itself
+// plus, when the cover pipeline produced one, a page-1 cover. The cover is
+// usually a one-page PDF rather than an image, so it is only ever put in front
+// of an <img> through imageCoverUrl().
+type OemLink = { url: string; title?: string | null; year?: number | null } & OemLinkCover;
+
 // Owner's-manual card. By default we only hold the OEM link (no bytes stored),
 // so the shopper can open it on the manufacturer site OR pull a copy into this
 // vehicle's passport with one click. Once a copy is saved it shows as a normal
@@ -214,7 +220,7 @@ const OwnersManualCard = ({
 }: { listing: VehicleListing; isPreview: boolean; hasStoredCopy: boolean }) => {
   const [saving, setSaving] = useState(false);
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
-  const m = (listing as { oem_owners_manual?: { url: string; title?: string | null; year?: number | null } }).oem_owners_manual;
+  const m = (listing as { oem_owners_manual?: OemLink }).oem_owners_manual;
   if (hasStoredCopy || !m?.url || !packetVisible(listing, "ownersManual")) return null;
   const mk = (listing.ymm || "").trim().split(/\s+/)[1] || "manufacturer";
   const track = (cta: string) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page" } }); };
@@ -251,7 +257,7 @@ const OwnersManualCard = ({
   const openManual = () => { track("owners_manual_open"); window.open(savedUrl || m.url, "_blank", "noopener"); };
   return (
     <RecordCard
-      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual" }} onQuickView={openManual} />}
+      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual", coverUrl: imageCoverUrl(m) }} onQuickView={openManual} />}
       title={`Official ${mk.toUpperCase()} Owner's Manual${m.year ? ` (${m.year})` : ""}`}
       source={`${mk.toUpperCase()} · Manufacturer source`}
       status={savedUrl ? "available" : "external"}
@@ -507,14 +513,14 @@ const VehiclePassportDocuments = () => {
   // active search/category filter) so Print always emits the full packet.
   const printGroups = CATEGORIES.map((c) => ({ c, docs: allDocs.filter((x) => categoryOf(x) === c.key) })).filter((g) => g.docs.length > 0);
   const printedOn = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  const oemBrochure = (listing as { oem_brochure?: { url: string; title?: string | null; year?: number | null } }).oem_brochure;
+  const oemBrochure = (listing as { oem_brochure?: OemLink }).oem_brochure;
   const brochureMk = (listing.ymm || "").trim().split(/\s+/)[1] || "";
   const printLinks: { title: string; note: string; url: string }[] = [];
   if (d.historyReport && packetVisible(listing, "historyReport"))
     printLinks.push({ title: `${historyReportName(d.historyReport.provider)} Vehicle History Report`, note: d.historyReport.source === "vin" ? "Official record for this VIN" : "External report link", url: d.historyReport.url });
   if (oemBrochure?.url && packetVisible(listing, "brochure"))
     printLinks.push({ title: `Official ${brochureMk.toUpperCase()} Brochure${oemBrochure.year ? ` (${oemBrochure.year})` : ""}`, note: "Manufacturer website", url: oemBrochure.url });
-  const oemManual = (listing as { oem_owners_manual?: { url: string; title?: string | null; year?: number | null } }).oem_owners_manual;
+  const oemManual = (listing as { oem_owners_manual?: OemLink }).oem_owners_manual;
   if (oemManual?.url && packetVisible(listing, "ownersManual") && !allDocs.some((x) => x.type === "owners_manual"))
     printLinks.push({ title: `Official ${brochureMk.toUpperCase()} Owner's Manual${oemManual.year ? ` (${oemManual.year})` : ""}`, note: "Manufacturer website", url: oemManual.url });
   if (listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker"))
@@ -748,7 +754,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {brochureLink && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure" }} onQuickView={openExternal(brochureLink.url, "oem_brochure")} />}
+                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure", coverUrl: imageCoverUrl(brochureLink) }} onQuickView={openExternal(brochureLink.url, "oem_brochure")} />}
                         title={`${(listing.ymm || "").trim()} Official Brochure`}
                         source={`${((listing.ymm || "").trim().split(/\s+/)[1] || "Manufacturer").toUpperCase()} USA · Manufacturer source`}
                         status="external"

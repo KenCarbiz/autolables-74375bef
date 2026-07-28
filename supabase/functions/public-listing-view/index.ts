@@ -3,6 +3,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
+import {
+  COVER_BUCKET,
+  COVER_SIGNED_URL_TTL_SECONDS,
+  publicCoverPayload,
+  type PublicCover,
+} from "../_shared/oemCover.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
@@ -633,6 +639,39 @@ serve(async (req) => {
       }
     } catch { /* notification is best-effort; never block the shopper view */ }
 
+    // ── Page-1 cover for a harvested OEM link.
+    //
+    // The stored artifact is normally a ONE-PAGE PDF, not an image — the edge
+    // runtime has no PDF rasterizer, so oem-document-cover copies page 1 with
+    // pdf-lib instead of rendering it. `cover_is_image` says which it is, and
+    // an <img src> only works when that is true; otherwise the consumer needs
+    // <object>/<embed> or pdf.js. (A page 1 that is a single full-bleed JPEG
+    // is lifted out as image/jpeg, so the flag genuinely varies per row.)
+    //
+    // The bucket is private: what ships is a short-lived signed URL, minted
+    // per request, never a stored one. A stored signed URL is what made
+    // published cars show broken previews once it aged out.
+    interface CoverLinkRow {
+      url: string; title: string | null; year: number | null;
+      cover_storage_path: string | null; cover_storage_bucket: string | null;
+      cover_status: string | null; cover_mime: string | null; cover_page_count: number | null;
+    }
+    const coverFor = async (link: CoverLinkRow): Promise<PublicCover | null> => {
+      if (link.cover_status !== "ready" || !link.cover_storage_path) return null;
+      try {
+        const { data } = await admin.storage
+          .from(link.cover_storage_bucket || COVER_BUCKET)
+          .createSignedUrl(link.cover_storage_path, COVER_SIGNED_URL_TTL_SECONDS);
+        return publicCoverPayload({
+          signedUrl: data?.signedUrl,
+          mime: link.cover_mime,
+          pageCount: link.cover_page_count,
+        });
+      } catch {
+        return null;
+      }
+    };
+
     // ── Official OEM brochure link from the global harvest cache: exact
     // model year first, otherwise the nearest within two model years.
     try {
@@ -643,15 +682,15 @@ serve(async (req) => {
       if (mk && md) {
         const { data: bl } = await admin
           .from("oem_brochure_links")
-          .select("url, title, year")
+          .select("url, title, year, cover_storage_path, cover_storage_bucket, cover_status, cover_mime, cover_page_count")
           .ilike("make", mk).ilike("model", md)
           .order("year", { ascending: false, nullsFirst: false })
           .limit(6);
-        const rows = (bl || []) as { url: string; title: string | null; year: number | null }[];
+        const rows = (bl || []) as CoverLinkRow[];
         const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
           rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
           (!yr ? rows[0] : undefined);
-        if (pick) row.oem_brochure = { url: pick.url, title: pick.title, year: pick.year };
+        if (pick) row.oem_brochure = { url: pick.url, title: pick.title, year: pick.year, ...(await coverFor(pick) ?? {}) };
       }
     } catch { /* brochure link optional */ }
 
@@ -666,15 +705,15 @@ serve(async (req) => {
       if (mk && md) {
         const { data: ml } = await admin
           .from("oem_owners_manual_links")
-          .select("url, title, year")
+          .select("url, title, year, cover_storage_path, cover_storage_bucket, cover_status, cover_mime, cover_page_count")
           .ilike("make", mk).ilike("model", md)
           .order("year", { ascending: false, nullsFirst: false })
           .limit(6);
-        const rows = (ml || []) as { url: string; title: string | null; year: number | null }[];
+        const rows = (ml || []) as CoverLinkRow[];
         const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
           rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
           (!yr ? rows[0] : undefined);
-        if (pick) row.oem_owners_manual = { url: pick.url, title: pick.title, year: pick.year };
+        if (pick) row.oem_owners_manual = { url: pick.url, title: pick.title, year: pick.year, ...(await coverFor(pick) ?? {}) };
       }
     } catch { /* owner's-manual link optional */ }
 

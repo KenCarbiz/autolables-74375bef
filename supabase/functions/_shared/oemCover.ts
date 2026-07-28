@@ -86,9 +86,14 @@ export function coverStoragePath(
   return `${kind}/${id}/p1-${urlToken(sourceUrl)}.${coverExtension(mime)}`;
 }
 
-/** Path segment with anything that could escape the prefix stripped out. */
+/**
+ * Path segment with anything that could escape the prefix stripped out.
+ * Dots are dropped rather than kept: the ids in play are UUIDs, and allowing
+ * them is all it takes to turn "../.." into a traversal once slashes have been
+ * rewritten to dashes.
+ */
 export function safeSegment(raw: string): string {
-  const s = String(raw ?? "").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const s = String(raw ?? "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
   return s.slice(0, 80) || "unknown";
 }
 
