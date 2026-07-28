@@ -76,8 +76,10 @@ const DocThumb = ({ url }: { url: string }) => {
 
 // "Email me this packet" — the deepest-funnel shoppers on the passport are
 // document seekers, and until now they converted at 0%. Uses the existing
-// delivery pipeline (request -> outbox -> send function) and flushes the outbox
-// immediately so the packet arrives while the shopper is still on the lot.
+// delivery pipeline (request -> outbox -> send-passport-document-deliveries),
+// which the `passport-delivery-flush` cron drains every 5 minutes. The send
+// function is service-key gated, so this anonymous session queues only — the
+// confirmation copy promises a queued request, never a delivered email.
 const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; docs: Doc[]; onClose: () => void }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -94,7 +96,6 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
         customerName: name.trim(), customerEmail: email.trim(),
         requestedDocuments: docs.slice(0, 20).map((x) => ({ documentType: x.type || "document", documentTitle: x.name })),
       });
-      supabase.functions.invoke("send-passport-document-deliveries", { body: { limit: 5 } }).catch(() => { /* cron will flush */ });
       setSent(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
@@ -104,7 +105,7 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
   if (sent) return (
     <div className={`${CARD} p-5 mb-5 flex items-center gap-3`}>
       <CheckCircle2 className="w-8 h-8 text-[#16A34A] shrink-0" />
-      <div className="min-w-0 flex-1"><p className="text-[14px] font-bold text-[#0F172A]">Packet on its way</p><p className="text-[12px] text-[#64748B]">Check {email} — the dealership team was notified too.</p></div>
+      <div className="min-w-0 flex-1"><p className="text-[14px] font-bold text-[#0F172A]">Request received</p><p className="text-[12px] text-[#64748B]">We&rsquo;ll email the packet to {email} shortly. The dealership also has your request.</p></div>
       <button onClick={onClose} className="text-[12px] font-semibold text-[#64748B] shrink-0">Close</button>
     </div>
   );

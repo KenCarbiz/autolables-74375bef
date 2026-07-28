@@ -226,7 +226,9 @@ describe("ensureComplianceDrafts", () => {
     state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "used" } });
     // buyers_guide exists; the K-208 form doc does not — the drafts created
     // here would otherwise sit file-less forever.
-    state("generated_documents").listResults.push({ data: [{ id: "d1", document_type: "buyers_guide" }] });
+    state("generated_documents").listResults.push({
+      data: [{ id: "d1", document_type: "buyers_guide", online_url: "https://f/bg.pdf" }],
+    });
     state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
     await artifactPostsIdle();
@@ -242,13 +244,39 @@ describe("ensureComplianceDrafts", () => {
     const { admin, state } = makeAdmin();
     state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "cpo" } });
     state("generated_documents").listResults.push({
-      data: [{ id: "d1", document_type: "buyers_guide" }, { id: "d2", document_type: "k208" }],
+      data: [
+        { id: "d1", document_type: "buyers_guide", online_url: "https://f/bg.pdf" },
+        { id: "d2", document_type: "k208", pdf_url: "https://f/k208.pdf" },
+      ],
     });
     state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
     await artifactPostsIdle();
     await flush();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("re-renders when a form draft exists but holds no PDF", async () => {
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "used" } });
+    // Both rows are present, but the render that should have filled them was
+    // rate-limited away. Row presence alone used to read as "done" here, which
+    // is how file-less drafts became permanent.
+    state("generated_documents").listResults.push({
+      data: [
+        { id: "d1", document_type: "buyers_guide", online_url: null, pdf_url: null },
+        { id: "d2", document_type: "k208", online_url: "", pdf_url: null },
+      ],
+    });
+    state("factory_sticker_records").maybeSingleResults.push(settledSticker);
+    await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await artifactPostsIdle();
+    await flush();
+    expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
+      "https://x.supabase.co/functions/v1/generate-vehicle-forms",
+    ]);
   });
 
   it("never renders the form PDFs for a new car or without a render target", async () => {

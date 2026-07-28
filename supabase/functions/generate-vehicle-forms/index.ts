@@ -247,6 +247,44 @@ async function fillK208(tpl: ArrayBuffer, v: Vehicle, d: Dealer, opts?: { initia
   return await pdf.save();
 }
 
+interface DocumentAssetRow {
+  tenant_id: string; vehicle_id: string; document_id: string;
+  document_type: string; document_version: number; asset_type: "pdf";
+  storage_bucket: string; storage_path: string; mime_type: string;
+  checksum: string; byte_size: number; updated_at: string;
+}
+
+function buildPdfAssetRow(args: {
+  tenantId: string; vehicleId: string; documentId: string; docType: string;
+  version: number; bucket: string; path: string; checksum: string; byteSize: number;
+}): DocumentAssetRow {
+  return {
+    tenant_id: args.tenantId, vehicle_id: args.vehicleId, document_id: args.documentId,
+    document_type: args.docType, document_version: args.version || 1, asset_type: "pdf",
+    storage_bucket: args.bucket, storage_path: args.path, mime_type: "application/pdf",
+    checksum: args.checksum, byte_size: args.byteSize, updated_at: new Date().toISOString(),
+  };
+}
+
+// The durable address of every filed compliance PDF. Signed URLs expire and
+// generated_documents.pdf_url is only a cache, so without this row
+// get_published_document_asset can never resolve the document — the K-208 and
+// Buyers Guide stayed invisible on the passport even after they were published.
+// Written on EVERY fill regardless of document_status: the row is the address,
+// not the permission. Publishing stays a human/legal decision (the manager
+// ladder in documentWorkflow.ts, or autopublish_k208_on_signoff once service
+// signs), and the asset is already there the moment that decision lands.
+// deno-lint-ignore no-explicit-any
+async function recordPdfAsset(admin: any, row: DocumentAssetRow): Promise<void> {
+  try {
+    await admin.from("document_assets").upsert(row, { onConflict: "document_id,asset_type" });
+  } catch (e) {
+    // Asset bookkeeping must never fail a filed government form; the next
+    // regeneration repairs it.
+    console.error("document_assets upsert failed", String((e as Error)?.message || e));
+  }
+}
+
 // deno-lint-ignore no-explicit-any
 async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: string | null, docType: string, bytes: Uint8Array, year: string, snapExtra?: Record<string, unknown>): Promise<string> {
   const hash = await sha256Hex(bytes);
@@ -296,17 +334,35 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
           .update({ document_status: "superseded", superseded_by: current.id, updated_at: new Date().toISOString() })
           .in("id", extras);
       }
+      // Overwriting in place still changes the bytes at rest, so the asset row
+      // has to follow it — this branch is the common one (one keyed draft per
+      // vehicle), and it used to return with no asset written at all.
+      await recordPdfAsset(admin, buildPdfAssetRow({
+        tenantId, vehicleId, documentId: current.id, docType, version: current.version,
+        bucket: BUCKET, path, checksum: hash, byteSize: bytes.length,
+      }));
       return url;
     }
 
     // Locked + byte-identical → refresh the signed URL on the live row.
     if (current && (current.data_snapshot as { content_hash?: string } | null)?.content_hash === hash) {
       await admin.from("generated_documents").update({ online_url: url, pdf_url: url, updated_at: new Date().toISOString() }).eq("id", current.id);
+      await recordPdfAsset(admin, buildPdfAssetRow({
+        tenantId, vehicleId, documentId: current.id, docType, version: current.version,
+        bucket: BUCKET, path, checksum: hash, byteSize: bytes.length,
+      }));
       return url;
     }
 
     // Locked + changed (or none yet) → mint a new immutable version.
     const nextVersion = rows.reduce((m, r) => Math.max(m, r.version || 0), 0) + 1;
+    // Status stays "draft" on purpose. A filled government form is an
+    // unreviewed compliance draft: the Buyers Guide box still needs a human to
+    // confirm it (create_draft_buyers_guide stamps needs_verification), and a
+    // K-208 may only reach "published" once a signed inspection exists —
+    // trg_k208_publish_requires_execution rejects it otherwise. Publishing here
+    // would fake an approval, so instead the asset row below makes the document
+    // servable the instant a human (or autopublish_k208_on_signoff) publishes it.
     const { data: inserted, error: insErr } = await admin.from("generated_documents").insert({
       tenant_id: tenantId, vehicle_id: vehicleId, template_id: docType === "k208" ? "ct-k208" : "ftc-buyers-guide",
       document_type: docType, document_status: "draft", version: nextVersion, template_version: 1,
@@ -316,14 +372,18 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
       // Race: a concurrent fill minted the live draft first
       // (ux_generated_documents_one_live_compliance_draft) — fold into it.
       if (insErr.code === "23505") {
-        const { data: race } = await admin.from("generated_documents").select("id")
+        const { data: race } = await admin.from("generated_documents").select("id, version")
           .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("document_type", docType)
           .in("document_status", ["draft", "pending_approval"]).maybeSingle();
-        const raceId = (race as { id?: string } | null)?.id;
-        if (raceId) {
+        const raceRow = race as { id?: string; version?: number } | null;
+        if (raceRow?.id) {
           await admin.from("generated_documents")
             .update({ online_url: url, pdf_url: url, data_snapshot: snap, updated_at: new Date().toISOString() })
-            .eq("id", raceId);
+            .eq("id", raceRow.id);
+          await recordPdfAsset(admin, buildPdfAssetRow({
+            tenantId, vehicleId, documentId: raceRow.id, docType, version: raceRow.version || 1,
+            bucket: BUCKET, path, checksum: hash, byteSize: bytes.length,
+          }));
           return url;
         }
       }
@@ -334,6 +394,12 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
       await admin.from("generated_documents")
         .update({ document_status: "superseded", superseded_by: newId, updated_at: new Date().toISOString() })
         .in("id", liveRows.map((r) => r.id));
+    }
+    if (newId) {
+      await recordPdfAsset(admin, buildPdfAssetRow({
+        tenantId, vehicleId, documentId: newId, docType, version: nextVersion,
+        bucket: BUCKET, path, checksum: hash, byteSize: bytes.length,
+      }));
     }
   }
   return url;

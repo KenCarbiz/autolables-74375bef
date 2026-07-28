@@ -243,14 +243,21 @@ export async function ensureComplianceDrafts(
       listingId = (listing?.id as string | undefined) ?? null;
       if (listing?.id && ["used", "cpo", "certified"].includes(cond)) {
         const { data: formDocs, error } = await admin.from("generated_documents")
-          .select("id, document_type")
+          .select("id, document_type, online_url, pdf_url")
           .eq("tenant_id", tenantId).eq("vehicle_id", listing.id)
           .in("document_type", ["buyers_guide", "k208"])
           .not("document_status", "in", '("superseded","archived","rejected")');
         if (!error) {
-          const types = new Set(
-            (((formDocs || []) as { document_type?: string }[])).map((d) => String(d.document_type)));
-          needsFormRender = !types.has("buyers_guide") || !types.has("k208");
+          // A row is only "done" if it actually points at a PDF. Testing row
+          // presence alone is what left 123 of 136 Buyers Guide drafts and every
+          // window draft file-less and un-retried: create_draft_* mints the row,
+          // the render that fills it got rate-limited away, and from then on the
+          // resync saw a row and concluded there was nothing to do.
+          const filled = new Set(
+            (((formDocs || []) as { document_type?: string; online_url?: string | null; pdf_url?: string | null }[]))
+              .filter((d) => !!(d.online_url || d.pdf_url))
+              .map((d) => String(d.document_type)));
+          needsFormRender = !filled.has("buyers_guide") || !filled.has("k208");
         }
       }
       // Factory sticker orchestration (all conditions — new cars get the

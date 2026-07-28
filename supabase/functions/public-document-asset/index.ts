@@ -40,9 +40,17 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,120}$/i;
 
-// Only document types a shopper is meant to reach through this route.
+// Only document types that a writer actually files into document_assets, so
+// every accepted type can genuinely be served. Anything else is a route that
+// 404s forever while reading as "supported" to the caller.
+//   factory_sticker — factory-sticker-orchestrate.recordAssets
+//   buyers_guide, k208 — generate-vehicle-forms.recordPdfAsset
+// Deliberately absent: "window" and "addendum" are stored as data URLs on
+// generated_documents.pdf_url with no storage object behind them, and
+// "cpo_sheet" is not a document_type this project writes at all. Add a type
+// here only once something files its asset row.
 const PUBLIC_DOCUMENT_TYPES = new Set([
-  "factory_sticker", "buyers_guide", "k208", "window", "addendum", "cpo_sheet",
+  "factory_sticker", "buyers_guide", "k208",
 ]);
 const ASSET_TYPES = new Set(["pdf", "thumbnail", "preview"]);
 

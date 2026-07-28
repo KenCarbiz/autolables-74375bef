@@ -551,7 +551,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  if (!MC_KEY) return json(200, { ok: false, reason: "marketcheck_not_configured" });
+  // 503, not 200: enrich-sweep counts a 2xx as an enriched vehicle, so a
+  // missing key used to drain the sweep queue without pulling any data.
+  if (!MC_KEY) return json(503, { ok: false, reason: "marketcheck_not_configured" });
 
   const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; zip?: string; sources?: "all" | "marketcheck" | "blackbook" };
   // Which providers to run: "all" (default), "marketcheck" (skip Black Book),

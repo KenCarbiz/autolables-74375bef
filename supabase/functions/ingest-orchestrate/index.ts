@@ -34,13 +34,30 @@ async function orchestrateOne(admin: any, tenantId: string, vin: string, listing
 
   // Auto-publish the customer passport on intake (default on). No prep/K-208
   // gate at intake — only a known do-not-drive recall blocks the publish
-  // trigger, in which case this stays draft (best-effort; never throws here).
+  // trigger, in which case this stays draft.
+  //
+  // supabase-js REPORTS a blocked publish as { error }; it does not throw. The
+  // block therefore has to be read off the result, or a car that the recall
+  // gate refused to publish leaves no trace anywhere.
   if (String(settings.ingest_auto_publish) !== "false") {
-    try {
-      await admin.from("vehicle_listings")
-        .update({ status: "published", published_at: new Date().toISOString() })
-        .eq("id", listingId).neq("status", "published");
-    } catch { /* do-not-drive gate or other block → leave as draft */ }
+    const { error: pubErr } = await admin.from("vehicle_listings")
+      .update({ status: "published", published_at: new Date().toISOString() })
+      .eq("id", listingId).neq("status", "published");
+    if (pubErr) {
+      try {
+        await admin.from("audit_log").insert({
+          action: "ingest_auto_publish_blocked",
+          entity_type: "vehicle_listing",
+          entity_id: listingId,
+          store_id: tenantId,
+          details: {
+            vin,
+            code: pubErr.code ?? null,
+            reason: String(pubErr.message || pubErr).slice(0, 500),
+          },
+        });
+      } catch { /* audit is best-effort; it must never fail intake */ }
+    }
   }
 
   // Auto-dispatch the detail get-ready to the detail department on intake when

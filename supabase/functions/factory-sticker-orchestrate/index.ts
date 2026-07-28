@@ -52,6 +52,23 @@ const BUCKET = "vehicle-docs";
 const TEMPLATE_VERSION = "1.0.0";
 const MAX_RETRYABLE_ATTEMPTS = 3;
 
+// ── Nightly sweep policy ─────────────────────────────────────────────
+// Statuses whose record is unfinished work: the pipeline stopped short of a
+// filed, decided document and would move forward the moment the missing data
+// or the renderer arrives.
+const SWEEP_RETRYABLE_STATUSES = new Set(["PENDING_DATA", "FAILED_RETRYABLE", "READY_TO_GENERATE"]);
+// Statuses a sweep must never touch. PUBLISHED / APPROVED / SUPERSEDED are
+// settled documents — regenerating one behind the dealer's back can replace
+// what a customer is already looking at. FAILED_PERMANENT and ARCHIVED only
+// re-enter through an explicitly forced regeneration.
+const SWEEP_NEVER_RERUN_STATUSES = new Set([
+  "PUBLISHED", "APPROVED", "SUPERSEDED", "ARCHIVED", "FAILED_PERMANENT",
+]);
+const SWEEP_LOCK_KEY = "factory_sticker_sweep";
+const SWEEP_LOCK_TTL_SECONDS = 300;
+const SWEEP_BUDGET_MS = 90_000;
+const SWEEP_MAX_ROWS = 2000;
+
 const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
 
 // Regeneration is always a recorded decision. "other" additionally demands a
@@ -944,8 +961,12 @@ serve(async (req) => {
     };
 
     const tenantId = String(body.tenant_id || "");
-    if (!tenantId) return json({ error: "tenant_id required" }, 400);
-    if (!allowed(tenantId)) return json({ error: "forbidden" }, 403);
+    // The nightly cron has no tenant to name — it sweeps every dealer. Only a
+    // service-role or cron caller may omit the scope; an interactive caller
+    // still has to say which tenant it is acting for.
+    const allTenantSweep = action === "orchestrate_sweep" && !tenantId && (isService || isCron);
+    if (!tenantId && !allTenantSweep) return json({ error: "tenant_id required" }, 400);
+    if (tenantId && !allowed(tenantId)) return json({ error: "forbidden" }, 403);
 
     // vehicle_id or vin: the manual add paths only know the VIN.
     let vehicleId = String(body.vehicle_id || "");
@@ -955,7 +976,9 @@ serve(async (req) => {
         .select("id").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
       vehicleId = String(byVin?.id || "");
     }
-    if (!vehicleId && action !== "refresh_truth_sweep") return json({ error: "vehicle_id or vin required" }, 400);
+    if (!vehicleId && action !== "refresh_truth_sweep" && action !== "orchestrate_sweep") {
+      return json({ error: "vehicle_id or vin required" }, 400);
+    }
 
     if (action === "orchestrate" || action === "regenerate") {
       const force = action === "regenerate" || !!body.force;
@@ -1287,6 +1310,140 @@ serve(async (req) => {
       return json({ success: true, started: true, total: rows.length, note: "Sweep running in background; re-invoke to see remaining." });
     }
 
+    // Nightly self-heal for the sticker itself. A factory_sticker_record is
+    // otherwise only ever created by a live orchestrate call, so a vehicle that
+    // arrived from autocurb-sync, the DMS webhook, a CSV import or a manual add
+    // got exactly one attempt at ingest and was never retried — and a vehicle
+    // that was parked PENDING_DATA before its build sheet landed stayed parked
+    // forever. Bounded by a wall-clock budget rather than a row count so it
+    // cannot exceed the function timeout; re-invoke until `remaining` is 0.
+    if (action === "orchestrate_sweep") {
+      if (tenantId && !can(tenantId, "regenerate")) return json({ error: "insufficient_permission" }, 403);
+      // `only_missing` (the default) is the worklist: vehicles with no record
+      // at all plus records the pipeline left unfinished. Pass false to also
+      // re-run records wedged mid-pipeline by a crashed run and drafts sitting
+      // in review; the never-re-run terminal states are excluded either way.
+      const onlyMissing = body.only_missing !== false;
+      // Opt-in: re-run REVIEW_REQUIRED records that already have a filed
+      // document waiting on a human. See the default rule below.
+      const includeReview = body.include_review === true;
+      const limit = Math.min(Math.max(Number(body.limit) || 500, 1), SWEEP_MAX_ROWS);
+
+      let listingQuery = admin.from("vehicle_listings")
+        .select("id, tenant_id, vin")
+        .eq("status", "published")
+        .order("updated_at", { ascending: false })
+        .limit(limit);
+      if (tenantId) listingQuery = listingQuery.eq("tenant_id", tenantId);
+      const { data: listings } = await listingQuery;
+      let rows = ((listings || []) as Array<{ id: string; tenant_id: string | null; vin: string | null }>)
+        .filter((r) => !!r.tenant_id);
+
+      if (rows.length) {
+        // Chunked: a single `in` over a whole inventory builds a URL long
+        // enough to be rejected, and PostgREST caps an unfiltered select.
+        const existing = new Map<string, { status: string; documentId: string | null }>();
+        for (let i = 0; i < rows.length; i += 200) {
+          const ids = rows.slice(i, i + 200).map((r) => r.id);
+          let recordQuery = admin.from("factory_sticker_records")
+            .select("vehicle_id, generation_status, current_document_id").in("vehicle_id", ids);
+          if (tenantId) recordQuery = recordQuery.eq("tenant_id", tenantId);
+          const { data: recs } = await recordQuery;
+          for (const r of (recs || []) as Array<{ vehicle_id: string; generation_status: string; current_document_id: string | null }>) {
+            existing.set(r.vehicle_id, {
+              status: String(r.generation_status || ""),
+              documentId: r.current_document_id ?? null,
+            });
+          }
+        }
+        rows = rows.filter((r) => {
+          const rec = existing.get(r.id);
+          if (!rec) return true;
+          if (SWEEP_NEVER_RERUN_STATUSES.has(rec.status)) return false;
+          if (rec.status === "REVIEW_REQUIRED") {
+            // A REVIEW_REQUIRED record with no filed document is not a pending
+            // human decision — nothing was ever produced to decide on. It is a
+            // pipeline blocked upstream (ineligible, template unresolved, no
+            // passport slug), which is precisely the population that can never
+            // self-heal once the underlying data is fixed. Those are swept. One
+            // that DOES hold a document is a manager's draft, and re-rendering
+            // it under them is a decision the sweep does not get to make.
+            return includeReview || !onlyMissing || !rec.documentId;
+          }
+          return onlyMissing ? SWEEP_RETRYABLE_STATUSES.has(rec.status) : true;
+        });
+      }
+
+      if (!rows.length) {
+        return json({ success: true, total: 0, processed: 0, remaining: 0, note: "Nothing to sweep." });
+      }
+
+      // Single-runner. The pipeline this drives files documents, writes
+      // storage objects and can reach a paid provider, so two overlapping
+      // sweeps would do — and be billed for — the same work twice. Taken only
+      // once the worklist is known, so a failed query can never leak the lock.
+      const { data: acquired } = await admin.rpc("try_acquire_service_lock", {
+        _key: SWEEP_LOCK_KEY,
+        _ttl_seconds: SWEEP_LOCK_TTL_SECONDS,
+        _holder: tenantId || "all_tenants",
+      });
+      if (acquired === false) {
+        return json({ success: true, skipped: "already_running", total: rows.length });
+      }
+      const releaseSweepLock = async () => {
+        try { await admin.rpc("release_service_lock", { _key: SWEEP_LOCK_KEY }); }
+        catch { /* the TTL expiry is the backstop */ }
+      };
+
+      const sync = !!body.sync;
+      const worker = async () => {
+        const deadline = Date.now() + SWEEP_BUDGET_MS;
+        let processed = 0, generated = 0, published = 0, skipped = 0, failed = 0;
+        const statuses: Record<string, number> = {};
+        try {
+          for (const row of rows) {
+            if (Date.now() >= deadline) break;
+            processed++;
+            try {
+              // Never force and never allow a source fetch: the sweep works
+              // from data already saved, so a nightly run cannot spend a
+              // dealer's provider budget or override a review decision.
+              const res = await orchestrateVehicle(admin, req, String(row.tenant_id), row.id, {
+                reason: "nightly_sweep",
+                appBase: body.app_base ? String(body.app_base) : undefined,
+              });
+              const outcome = String(res.status || res.skipped || (res.error ? "error" : "unknown"));
+              statuses[outcome] = (statuses[outcome] || 0) + 1;
+              if (res.error) failed++;
+              else if (res.skipped) skipped++;
+              else {
+                generated++;
+                if (res.published === true) published++;
+              }
+            } catch { failed++; }
+          }
+        } finally {
+          await releaseSweepLock();
+        }
+        return { processed, generated, published, skipped, failed, statuses };
+      };
+
+      if (sync) {
+        const r = await worker();
+        return json({ success: true, total: rows.length, ...r, remaining: Math.max(0, rows.length - r.processed) });
+      }
+      // Callers (cron's http_post, the admin button) have short deadlines a 90s
+      // inline sweep blows past. Ack immediately and finish in the background.
+      // deno-lint-ignore no-explicit-any
+      const er = (globalThis as any).EdgeRuntime;
+      if (er && typeof er.waitUntil === "function") er.waitUntil(worker());
+      else worker();
+      return json({
+        success: true, started: true, total: rows.length,
+        scope: tenantId || "all_tenants",
+        note: "Sweep running in background; re-invoke to see remaining.",
+      });
+    }
 
     if (action === "refresh_truth") {
       const { data: listing } = await admin.from("vehicle_listings")

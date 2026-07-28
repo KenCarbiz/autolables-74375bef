@@ -42,8 +42,40 @@ async function isAuthenticatedAdmin(req: Request): Promise<boolean> {
 
 const BUDGET_MS = 100_000;
 const MAX_DEPTH = 60;
+const BATCH_LIMIT = 4;
 
 const LOCK_KEY = "specs_backfill";
+
+type Candidate = { tenant_id: string; vin: string; mc_attributes: Record<string, unknown> | null };
+
+// Published vehicles that still need a decode. Two populations qualify:
+// those that never decoded at all, and those holding a GENERIC sheet that
+// was never asked for its own build — every sheet decoded before the
+// strict-first request shipped is generic, so selecting only on "no build
+// sheet" would leave them permanently stuck on typical-for-trim data with
+// no real MSRP. `specs_strict_attempted` drops a VIN out of this set once
+// it has been asked properly, so the retry happens once, not every sweep.
+const CANDIDATE_FILTER = [
+  "mc_attributes->>build_sheet.is.null",
+  "and(mc_attributes->build_sheet->>generic.eq.true,mc_attributes->>specs_strict_attempted.is.null)",
+].join(",");
+
+// The single question this function asks — of the work loop and of the chain
+// condition alike. The row filter above cannot express the attempt cap, so the
+// cap is applied in TypeScript; any caller that skips that step is asking a
+// different, laxer question and will disagree about whether work remains.
+async function nextCandidates(
+  admin: ReturnType<typeof adminClient>,
+): Promise<{ rows: Candidate[]; batch: Candidate[] }> {
+  const { data } = await admin
+    .from("vehicle_listings")
+    .select("tenant_id, vin, mc_attributes")
+    .eq("status", "published")
+    .or(CANDIDATE_FILTER)
+    .limit(BATCH_LIMIT);
+  const rows = ((data as Candidate[] | null) || []);
+  return { rows, batch: rows.filter((r) => shouldDecodeVin(r.mc_attributes, MAX_SPEC_ATTEMPTS).decode) };
+}
 
 const releaseLock = async () => {
   try { await adminClient().rpc("release_service_lock", { _key: LOCK_KEY }); }
@@ -77,28 +109,11 @@ async function runInner(): Promise<boolean> {
   const deadline = Date.now() + BUDGET_MS;
   let decoded = 0, failed = 0;
   while (Date.now() < deadline) {
-    // Published vehicles that still need a decode. Two populations qualify:
-    // those that never decoded at all, and those holding a GENERIC sheet that
-    // was never asked for its own build — every sheet decoded before the
-    // strict-first request shipped is generic, so selecting only on "no build
-    // sheet" would leave them permanently stuck on typical-for-trim data with
-    // no real MSRP. `specs_strict_attempted` drops a VIN out of this set once
-    // it has been asked properly, so the retry happens once, not every sweep.
-    const { data: rows } = await admin
-      .from("vehicle_listings")
-      .select("tenant_id, vin, mc_attributes")
-      .eq("status", "published")
-      .or([
-        "mc_attributes->>build_sheet.is.null",
-        "and(mc_attributes->build_sheet->>generic.eq.true,mc_attributes->>specs_strict_attempted.is.null)",
-      ].join(","))
-      .limit(4);
     // Same rule the nightly sweep uses. This path used to select purely on
     // "options is null" and ignore the attempt cap, so a VIN the provider
     // cannot decode was re-paid on every backfill chain.
-    const batch = ((rows as { tenant_id: string; vin: string; mc_attributes: Record<string, unknown> | null }[] | null) || [])
-      .filter((r) => shouldDecodeVin(r.mc_attributes, MAX_SPEC_ATTEMPTS).decode);
-    if (batch.length === 0 && (rows || []).length > 0) {
+    const { rows, batch } = await nextCandidates(admin);
+    if (batch.length === 0 && rows.length > 0) {
       console.log("specs-backfill: remaining rows are all at the attempt cap; stopping");
       return false;
     }
@@ -136,19 +151,14 @@ async function runInner(): Promise<boolean> {
       } catch { failed++; }
     }
   }
-  // Must ask the SAME question the work loop asks. This used to check
-  // "options is null", which the generic-retry population fails — those VINs
-  // were decoded, so they have options — and the chain would stop with the
-  // retries still outstanding, reporting done while half the backfill had
-  // never run.
-  const { data: more } = await admin.from("vehicle_listings")
-    .select("vin").eq("status", "published")
-    .or([
-      "mc_attributes->>build_sheet.is.null",
-      "and(mc_attributes->build_sheet->>generic.eq.true,mc_attributes->>specs_strict_attempted.is.null)",
-    ].join(","))
-    .limit(1);
-  return ((more as unknown[]) || []).length > 0;
+  // Must ask the SAME question the work loop asks — and now literally does,
+  // through the same helper. It used to check "options is null", which the
+  // generic-retry population fails; then it checked the row filter alone,
+  // which ignores the attempt cap the loop applies, so a budget that expired
+  // with only cap-exhausted rows left still chained a hop that could decode
+  // nothing.
+  const { batch: remaining } = await nextCandidates(admin);
+  return remaining.length > 0;
 }
 
 serve(async (req) => {
