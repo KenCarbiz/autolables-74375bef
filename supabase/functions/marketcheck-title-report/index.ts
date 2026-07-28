@@ -30,6 +30,12 @@ const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHEC
 const MC_BASE = "https://api.marketcheck.com/v2";
 const REPORT_TTL_DAYS = 90;            // VINData keeps a generated report this long
 const GENERATE_UNIT_COST = 0.49;       // USD per paid generate (provider list price)
+// Owner policy (2026-07-28): NMVTIS title reports are never pulled
+// automatically, are Compliance Pro only, and are capped per dealer per
+// calendar month. At $0.49 a generate this is the one provider whose spend
+// scales with clicks rather than with inventory, so the ceiling is enforced
+// server-side where no client can talk past it.
+const MONTHLY_GENERATE_CAP = 50;
 
 // VIN: 17 chars, letters/digits, excluding I, O, Q.
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
@@ -158,6 +164,8 @@ Deno.serve(async (req) => {
       monthCost: Math.round(monthCost * 100) / 100,
       totalCount: totalRes.count ?? 0,
       unitCost: GENERATE_UNIT_COST,
+      monthlyCap: MONTHLY_GENERATE_CAP,
+      monthlyRemaining: Math.max(0, MONTHLY_GENERATE_CAP - monthRows.length),
       lastGeneratedAt,
       withinWindow,
     };
@@ -171,6 +179,28 @@ Deno.serve(async (req) => {
 
   if (action !== "generate" && action !== "view") {
     return json(400, { error: "invalid_action", note: "action must be load, generate, or view" });
+  }
+
+  // ── A generate is never automatic. It costs real money per click, so it
+  // requires a signed-in human on a Compliance Pro plan, within the monthly
+  // cap. The service-role exemption below deliberately does NOT extend to
+  // generate: a sweep, a cron or a backfill must not be able to bill a dealer
+  // for title reports.
+  if (action === "generate") {
+    if (!userId) {
+      return json(403, {
+        error: "manual_only",
+        note: "Title reports are pulled by a signed-in user only — never automatically.",
+      });
+    }
+    const capStats = await pullStats();
+    if (capStats.monthCount >= MONTHLY_GENERATE_CAP && !capStats.withinWindow) {
+      return json(429, {
+        error: "monthly_cap_reached",
+        note: `This dealership has used all ${MONTHLY_GENERATE_CAP} title reports for this month.`,
+        stats: capStats,
+      });
+    }
   }
 
   // ── Paid path is Compliance-Pro only. Service-role callers are exempt.

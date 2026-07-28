@@ -41,6 +41,8 @@ interface PullStats {
   monthCost: number;
   totalCount: number;
   unitCost: number;
+  monthlyCap?: number;
+  monthlyRemaining?: number;
   lastGeneratedAt: string | null;
   withinWindow: boolean;
 }
@@ -162,7 +164,9 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
         <div className="mb-3 -mt-1 flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
           <Receipt className="w-3.5 h-3.5 shrink-0" />
           <span>
-            <span className="font-semibold text-foreground tabular-nums">{stats.monthCount}</span> report{stats.monthCount === 1 ? "" : "s"} generated this month
+            <span className="font-semibold text-foreground tabular-nums">{stats.monthCount}</span>
+            {stats.monthlyCap ? <> of <span className="tabular-nums">{stats.monthlyCap}</span></> : null}
+            {" "}report{stats.monthCount === 1 ? "" : "s"} generated this month
             {stats.monthCost > 0 ? ` · ~$${stats.monthCost.toFixed(2)}` : ""}
             {" · "}<span className="tabular-nums">{stats.totalCount}</span> all-time
           </span>
