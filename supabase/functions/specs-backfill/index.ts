@@ -131,12 +131,18 @@ async function runInner(): Promise<boolean> {
         // answered, none) — either way the row leaves the null pool, so the
         // next loop's `is null` query naturally advances. A row that stays null
         // (all endpoints failed) is simply retried on the next chain.
-        await res.json().catch(() => ({}));
+        const body = await res.json().catch(() => ({})) as { retryable?: boolean };
+        // The provider refusing us (quota/unauthorized) says nothing about
+        // this VIN. Stamping an attempt for it would spend the cap on an
+        // answer we never received and retire a decodable VIN after three
+        // quota days.
+        const refused = body?.retryable === true;
         if (res.ok) decoded++; else failed++;
         // Stamp the attempt from here: marketcheck-specs returns early
         // without writing on a no-match, which is exactly the case the cap
         // exists for.
         try {
+          if (refused) throw new Error("provider_refused");
           const { data: after } = await admin.from("vehicle_listings")
             .select("mc_attributes").eq("tenant_id", r.tenant_id).eq("vin", r.vin).maybeSingle();
           const fresh = ((after?.mc_attributes ?? r.mc_attributes) || {}) as Record<string, unknown>;

@@ -156,7 +156,10 @@ async function runSweep(admin: Admin, sweepStart: string): Promise<boolean> {
             deadlineMs: Math.max(1_000, Math.min(50_000, deadline - Date.now())),
           });
           const ok = sres.ok;
-          if (sres.rateLimited) throttled++;
+          // A provider refusal (quota/unauthorized) is reported as a 200 with
+          // retryable:true, so it has to be read off the body, not the status.
+          const refused = !!(sres.data as { retryable?: boolean } | null)?.retryable;
+          if (sres.rateLimited || refused) throttled++;
           else if (!ok) failures++;
           // Stamp the attempt from here, not from the decoder: the decoder
           // returns early on a no-match without writing anything, so a
@@ -168,7 +171,7 @@ async function runSweep(admin: Admin, sweepStart: string): Promise<boolean> {
           // of only MAX_SPEC_ATTEMPTS paid attempts on an answer we never
           // received, and three throttles would retire a perfectly decodable
           // VIN forever. Leave the counter alone and let the next sweep ask.
-          if (!sres.rateLimited) {
+          if (!sres.rateLimited && !refused) {
             try {
               const { data: after } = await admin
                 .from("vehicle_listings").select("mc_attributes")

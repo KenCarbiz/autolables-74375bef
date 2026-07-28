@@ -258,6 +258,13 @@ Deno.serve(async (req) => {
   // an answer, so it does not count — otherwise a slow call would retire the
   // VIN to the generic fallback permanently.
   let strictAttempted = false;
+  // A provider REFUSAL is not an answer about the VIN. 401/403/429 mean the
+  // account is out of quota, unauthorized or throttled — the same VIN would
+  // decode perfectly tomorrow. Collapsing that into "no_endpoint_matched"
+  // makes it indistinguishable from "this VIN has no build data", and the
+  // sweeps then burn one of only MAX_SPEC_ATTEMPTS on it. Three quota days in
+  // a row would retire a decodable VIN permanently.
+  let providerRefused: number | null = null;
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];
     const isNeovin = url.includes("/neovin/");
@@ -267,6 +274,10 @@ Deno.serve(async (req) => {
       const res = await fetch(url, { signal: AbortSignal.timeout(isNeovin ? 30000 : 12000) });
       tried.push({ url: redact(url), status: res.status });
       if (i === 0) strictAttempted = true;
+      if (res.status === 401 || res.status === 403 || res.status === 429) {
+        providerRefused = res.status;
+        continue;
+      }
       if (!res.ok) continue;
       const data = await res.json().catch(() => null);
       if (data == null) continue;
@@ -278,7 +289,17 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (!payload) return json(200, { ok: false, error: "no_endpoint_matched", tried });
+  if (!payload) {
+    // Retryable: the caller must NOT spend a decode attempt on this, and must
+    // not finalize the vehicle as having no equipment.
+    if (providerRefused !== null) {
+      return json(200, {
+        ok: false, error: "provider_quota_exhausted", retryable: true,
+        provider_status: providerRefused, tried,
+      });
+    }
+    return json(200, { ok: false, error: "no_endpoint_matched", tried });
+  }
 
   // ── Complete provider capture: capture FIRST, extract SECOND ─────────
   // The FULL raw decode response is persisted to neovin_snapshots before any
