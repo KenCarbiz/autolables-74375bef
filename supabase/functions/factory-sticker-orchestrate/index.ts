@@ -57,6 +57,14 @@ const MAX_RETRYABLE_ATTEMPTS = 3;
 // filed, decided document and would move forward the moment the missing data
 // or the renderer arrives.
 const SWEEP_RETRYABLE_STATUSES = new Set(["PENDING_DATA", "FAILED_RETRYABLE", "READY_TO_GENERATE"]);
+// Mid-pipeline statuses. A function timeout or a killed invocation between
+// NORMALIZING and the final write leaves the record parked in one of these
+// with no document, reading "Generating..." and "Needs review" forever: they
+// were in neither the retryable set nor the never-rerun set, so the sweep
+// filtered them out and nothing else ever looked at them. Only rescued once
+// the row has genuinely gone stale, so a live run is never re-entered.
+const SWEEP_INFLIGHT_STATUSES = new Set(["NORMALIZING", "VALIDATING", "GENERATING", "RUNNING_QA"]);
+const SWEEP_INFLIGHT_STALE_MS = 15 * 60_000;
 // Statuses a sweep must never touch. PUBLISHED / APPROVED / SUPERSEDED are
 // settled documents — regenerating one behind the dealer's back can replace
 // what a customer is already looking at. FAILED_PERMANENT and ARCHIVED only
@@ -1342,17 +1350,18 @@ serve(async (req) => {
       if (rows.length) {
         // Chunked: a single `in` over a whole inventory builds a URL long
         // enough to be rejected, and PostgREST caps an unfiltered select.
-        const existing = new Map<string, { status: string; documentId: string | null }>();
+        const existing = new Map<string, { status: string; documentId: string | null; updatedAt: string | null }>();
         for (let i = 0; i < rows.length; i += 200) {
           const ids = rows.slice(i, i + 200).map((r) => r.id);
           let recordQuery = admin.from("factory_sticker_records")
-            .select("vehicle_id, generation_status, current_document_id").in("vehicle_id", ids);
+            .select("vehicle_id, generation_status, current_document_id, updated_at").in("vehicle_id", ids);
           if (tenantId) recordQuery = recordQuery.eq("tenant_id", tenantId);
           const { data: recs } = await recordQuery;
-          for (const r of (recs || []) as Array<{ vehicle_id: string; generation_status: string; current_document_id: string | null }>) {
+          for (const r of (recs || []) as Array<{ vehicle_id: string; generation_status: string; current_document_id: string | null; updated_at: string | null }>) {
             existing.set(r.vehicle_id, {
               status: String(r.generation_status || ""),
               documentId: r.current_document_id ?? null,
+              updatedAt: r.updated_at ?? null,
             });
           }
         }
@@ -1369,6 +1378,10 @@ serve(async (req) => {
             // that DOES hold a document is a manager's draft, and re-rendering
             // it under them is a decision the sweep does not get to make.
             return includeReview || !onlyMissing || !rec.documentId;
+          }
+          if (SWEEP_INFLIGHT_STATUSES.has(rec.status)) {
+            const age = Date.now() - Date.parse(rec.updatedAt || "");
+            return !Number.isFinite(age) ? false : age > SWEEP_INFLIGHT_STALE_MS;
           }
           return onlyMissing ? SWEEP_RETRYABLE_STATUSES.has(rec.status) : true;
         });
@@ -1399,19 +1412,29 @@ serve(async (req) => {
       const worker = async () => {
         const deadline = Date.now() + SWEEP_BUDGET_MS;
         let processed = 0, generated = 0, published = 0, skipped = 0, failed = 0;
+        // Bounded provider spend per sweep run. Explicitly overridable so an
+        // admin can drain a backlog deliberately.
+        let fetchBudget = Math.max(0, Number(body.fetch_limit ?? 25));
         const statuses: Record<string, number> = {};
         try {
           for (const row of rows) {
             if (Date.now() >= deadline) break;
             processed++;
             try {
-              // Never force and never allow a source fetch: the sweep works
-              // from data already saved, so a nightly run cannot spend a
-              // dealer's provider budget or override a review decision.
+              // A sweep that may never fetch could not make a PENDING_DATA
+              // record progress: it re-entered the same "awaiting_build_sheet"
+              // branch four times a night, forever, for every undecoded car.
+              // The decode is now durable (the feed sync no longer wipes it),
+              // so acquiring a missing sheet is a one-time cost per VIN rather
+              // than a nightly one — but it is still money, so it is bounded
+              // per run and never forces, so no review decision is overridden.
+              const mayFetch = fetchBudget > 0;
               const res = await orchestrateVehicle(admin, req, String(row.tenant_id), row.id, {
                 reason: "nightly_sweep",
+                allowSourceFetch: mayFetch,
                 appBase: body.app_base ? String(body.app_base) : undefined,
               });
+              if (mayFetch && res.skipped !== "no_build_sheet") fetchBudget--;
               const outcome = String(res.status || res.skipped || (res.error ? "error" : "unknown"));
               statuses[outcome] = (statuses[outcome] || 0) + 1;
               if (res.error) failed++;
