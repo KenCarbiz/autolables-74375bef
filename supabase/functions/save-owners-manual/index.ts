@@ -16,12 +16,14 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { COVER_SOURCE_MAX_BYTES, coverExtension } from "../_shared/oemCover.ts";
+import { extractFirstPageCover } from "../_shared/oemCoverPdf.ts";
 
 const BUCKET = "vehicle-docs";
 const MAX_BYTES = 60 * 1024 * 1024; // owner's manuals are large but bounded
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
-interface DocRow { name: string; url: string; type: string }
+interface DocRow { name: string; url: string; type: string; cover_url?: string | null; cover_mime?: string | null }
 
 // Parse a "2026 INFINITI QX60 LUXE" ymm into make/model/year (same split the
 // brochure finder uses).
@@ -56,7 +58,7 @@ Deno.serve(async (req) => {
 
   // Idempotent: if a manual copy is already attached, return it — never re-fetch.
   const existing = docs.find((d) => d && d.type === "owners_manual" && d.url);
-  if (existing) return json(200, { ok: true, cached: true, url: existing.url, name: existing.name });
+  if (existing) return json(200, { ok: true, cached: true, url: existing.url, name: existing.name, cover_url: existing.cover_url ?? null, cover_mime: existing.cover_mime ?? null });
 
   // Resolve the manual LINK server-side from the harvested cache (never trust
   // a client URL). Prefer exact year, then nearest within 2 model years.
@@ -104,14 +106,49 @@ Deno.serve(async (req) => {
 
   const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 365);
   const name = `${[year, make, model].filter(Boolean).join(" ")} Owner's Manual`.trim() || "Owner's Manual";
+
+  // Page-1 cover for the stored copy, so the Documents page can picture the
+  // real manual. We already hold the bytes, so this costs no second download.
+  //
+  // NOT an image in the general case: pdf-lib copies page 1 into a new
+  // one-page PDF (there is no rasterizer in this runtime), so cover_mime is
+  // usually application/pdf and an <img src> will not render it. See
+  // ../_shared/oemCoverPdf.ts. Entirely best-effort — the manual is already
+  // uploaded at this point and a cover failure must not cost the customer it.
+  let coverUrl: string | null = null;
+  let coverMime: string | null = null;
+  let coverPages: number | null = null;
+  try {
+    // pdf-lib parses in-process; a 60 MB manual would OOM the worker for a
+    // thumbnail. The manual itself is still saved.
+    if (bytes.byteLength <= COVER_SOURCE_MAX_BYTES) {
+      const cover = await extractFirstPageCover(bytes);
+      // Timestamped, under this vehicle's own folder — it can never land on
+      // another vehicle's object, and re-saving writes a new version.
+      const coverPath = `${listing.tenant_id}/${listing.id}/owners_manual-cover-${Date.now()}.${coverExtension(cover.mime)}`;
+      const upCover = await admin.storage.from(BUCKET)
+        .upload(coverPath, cover.bytes, { upsert: false, contentType: cover.mime });
+      if (!upCover.error) {
+        const { data: coverSigned } = await admin.storage.from(BUCKET)
+          .createSignedUrl(coverPath, 60 * 60 * 24 * 365);
+        coverUrl = coverSigned?.signedUrl || coverPath;
+        coverMime = cover.mime;
+        coverPages = cover.pageCount;
+      }
+    }
+  } catch { /* cover is optional; the manual is what matters */ }
+
   // Append in one statement. This function reads the array, then spends 45+
   // seconds fetching and uploading the OEM PDF, then wrote the stale array
   // back — deleting every document anyone attached during that window.
   const { error: updErr } = await admin.rpc("append_vehicle_document", {
     _vehicle_id: listing.id,
-    _doc: { name, type: "owners_manual", url: signed?.signedUrl || path },
+    _doc: {
+      name, type: "owners_manual", url: signed?.signedUrl || path,
+      ...(coverUrl ? { cover_url: coverUrl, cover_mime: coverMime, cover_page_count: coverPages, cover_is_image: !!coverMime?.startsWith("image/") } : {}),
+    },
   });
   if (updErr) return json(500, { error: "attach_failed", detail: updErr.message });
 
-  return json(200, { ok: true, cached: false, url: signed?.signedUrl || path, name });
+  return json(200, { ok: true, cached: false, url: signed?.signedUrl || path, name, cover_url: coverUrl, cover_mime: coverMime, cover_is_image: !!coverMime?.startsWith("image/") });
 });

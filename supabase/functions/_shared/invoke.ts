@@ -58,6 +58,22 @@ export interface InvokeResult {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Run work that must not delay the response, without it being killed.
+ *
+ * An edge worker is torn down once the handler resolves, so a bare
+ * `void somePromise()` after `return` is a coin flip. `EdgeRuntime.waitUntil`
+ * is the supported way to keep the worker alive for it. Errors are swallowed
+ * on purpose: the caller has already succeeded at its real job, and a failed
+ * side task must never turn that into an error response.
+ */
+export function runInBackground(work: Promise<unknown>): void {
+  const guarded = work.catch(() => undefined);
+  const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (typeof rt?.waitUntil === "function") rt.waitUntil(guarded);
+  else void guarded;
+}
+
 // AbortSignal.timeout is missing in some test runtimes; without it we only
 // lose the client-side timeout.
 const timeoutSignal = (ms: number): AbortSignal | undefined => {

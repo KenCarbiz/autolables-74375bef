@@ -9,7 +9,9 @@
 // Auth: tenant user JWT or service role.
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
-import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { adminClient, isServiceOrCron, SERVICE_KEY, SUPABASE_URL } from "../_shared/supabase.ts";
+import { invokeFunction, runInBackground } from "../_shared/invoke.ts";
+import { shouldGenerateCover } from "../_shared/oemCover.ts";
 
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
 
@@ -39,6 +41,21 @@ const hostAllowed = (url: string, domains: string[]): boolean => {
 };
 
 interface Hit { url: string; title?: string; description?: string }
+
+/**
+ * Ask oem-document-cover for this row's page-1 cover, off the critical path.
+ *
+ * Fail-soft by construction: it is fired in the background, its result is
+ * ignored, and the cover function records its own failure on the row. A cover
+ * problem must never cost us a harvested link.
+ */
+const kickCover = (id: string): void => {
+  if (!id || !SUPABASE_URL || !SERVICE_KEY) return;
+  runInBackground(invokeFunction(`${SUPABASE_URL}/functions/v1/oem-document-cover`, SERVICE_KEY, {
+    body: { kind: "brochure", id },
+    timeoutMs: 60_000, maxRetries: 0, deadlineMs: 65_000,
+  }));
+};
 
 async function firecrawlSearch(query: string): Promise<Hit[]> {
   const res = await fetch("https://api.firecrawl.dev/v1/search", {
@@ -104,15 +121,24 @@ Deno.serve(async (req) => {
   if (!refresh) {
     const { data: cached } = await admin
       .from("oem_brochure_links")
-      .select("url, title, year, source")
+      .select("id, url, title, year, source, cover_status, cover_storage_path")
       .ilike("make", make).ilike("model", model)
       .order("year", { ascending: false, nullsFirst: false })
       .limit(6);
-    const rows = (cached || []) as { url: string; title: string | null; year: number | null; source: string }[];
+    type CachedRow = {
+      id: string; url: string; title: string | null; year: number | null; source: string;
+      cover_status: string | null; cover_storage_path: string | null;
+    };
+    const rows = (cached || []) as CachedRow[];
     // Exact year first, then the nearest year within 2 model years.
     const exact = year ? rows.find((r) => r.year === year) : rows[0];
     const near = exact || rows.find((r) => r.year != null && year != null && Math.abs(r.year - year) <= 2) || (!year ? rows[0] : undefined);
-    if (near) return json(200, { ok: true, cached: true, url: near.url, title: near.title, year: near.year, source: near.source });
+    if (near) {
+      // Rows harvested before the cover pipeline existed still owe one; a cache
+      // hit is the cheapest moment to notice.
+      if (shouldGenerateCover(near)) kickCover(near.id);
+      return json(200, { ok: true, cached: true, url: near.url, title: near.title, year: near.year, source: near.source, cover_status: near.cover_status });
+    }
   }
 
   if (!FIRECRAWL_KEY) return json(200, { error: "not_configured" });
@@ -153,9 +179,11 @@ Deno.serve(async (req) => {
   let del = admin.from("oem_brochure_links").delete().ilike("make", make).ilike("model", model);
   del = brochureYear === null ? del.is("year", null) : del.eq("year", brochureYear);
   await del;
-  await admin.from("oem_brochure_links").insert(
-    { make, model, year: brochureYear, url: best.url, title: best.title || null, source: "oem_site", verified_at: new Date().toISOString() },
-  );
+  const { data: saved } = await admin.from("oem_brochure_links").insert(
+    { make, model, year: brochureYear, url: best.url, title: best.title || null, source: "oem_site", verified_at: new Date().toISOString(), cover_status: "pending" },
+  ).select("id").maybeSingle();
 
-  return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: brochureYear });
+  if (saved?.id) kickCover(String(saved.id));
+
+  return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: brochureYear, cover_status: "pending" });
 });

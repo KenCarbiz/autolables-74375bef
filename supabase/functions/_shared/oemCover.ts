@@ -146,9 +146,19 @@ export function looksLikePdf(bytes: Uint8Array): boolean {
   return false;
 }
 
-/** JPEG SOI marker. Guards the extracted-image path against a truncated stream. */
+/**
+ * SOI at the front and EOI at the back. A DCTDecode stream lifted out of a PDF
+ * is a complete JPEG file, but a damaged or truncated one is not — and a
+ * truncated JPEG renders as a half-grey box in the browser, which is worse
+ * than the drawn fallback. Trailing stream padding after EOI is tolerated.
+ */
 export function looksLikeJpeg(bytes: Uint8Array): boolean {
-  return bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[bytes.length - 2] !== undefined;
+  if (bytes.length < 4) return false;
+  if (!(bytes[0] === 0xff && bytes[1] === 0xd8)) return false;
+  for (let i = bytes.length - 2; i >= Math.max(2, bytes.length - 16); i--) {
+    if (bytes[i] === 0xff && bytes[i + 1] === 0xd9) return true;
+  }
+  return false;
 }
 
 /**
