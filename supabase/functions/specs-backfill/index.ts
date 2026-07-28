@@ -97,7 +97,9 @@ async function run(depth: number) {
 serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
-  if (!isServiceOrCron(req)) return json(401, { error: "unauthorized" });
+  if (!isServiceOrCron(req) && !(await isAuthenticatedAdmin(req))) {
+    return json(401, { error: "unauthorized" });
+  }
   const body = await req.json().catch(() => ({})) as { depth?: number };
   const depth = typeof body.depth === "number" ? body.depth : 0;
   const work = run(depth);
