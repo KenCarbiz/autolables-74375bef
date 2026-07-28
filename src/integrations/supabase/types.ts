@@ -5810,6 +5810,51 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_payload_shapes: {
+        Row: {
+          dependency_types: Json
+          endpoint: string
+          findings: Json
+          first_seen_at: string
+          id: string
+          key_names: string[]
+          last_seen_at: string
+          observations: number
+          parse_failed: boolean
+          provider: string
+          sample_vin: string | null
+          shape_hash: string
+        }
+        Insert: {
+          dependency_types?: Json
+          endpoint: string
+          findings?: Json
+          first_seen_at?: string
+          id?: string
+          key_names?: string[]
+          last_seen_at?: string
+          observations?: number
+          parse_failed?: boolean
+          provider: string
+          sample_vin?: string | null
+          shape_hash: string
+        }
+        Update: {
+          dependency_types?: Json
+          endpoint?: string
+          findings?: Json
+          first_seen_at?: string
+          id?: string
+          key_names?: string[]
+          last_seen_at?: string
+          observations?: number
+          parse_failed?: boolean
+          provider?: string
+          sample_vin?: string | null
+          shape_hash?: string
+        }
+        Relationships: []
+      }
       qr_codes: {
         Row: {
           code: string
@@ -9396,6 +9441,10 @@ export type Database = {
         Args: { _patch: Json; _tenant_id: string }
         Returns: undefined
       }
+      append_vehicle_document: {
+        Args: { _doc: Json; _vehicle_id: string }
+        Returns: Json
+      }
       approve_description_version: {
         Args: {
           p_approve?: boolean
@@ -10182,11 +10231,36 @@ export type Database = {
         Args: { _modules: Json; _session: string; _slug: string }
         Returns: Json
       }
+      record_provider_payload_shape: {
+        Args: {
+          _dependency_types: Json
+          _endpoint: string
+          _findings: Json
+          _key_names: string[]
+          _parse_failed: boolean
+          _provider: string
+          _sample_vin: string
+          _shape_hash: string
+        }
+        Returns: {
+          is_new: boolean
+          prior_keys: string[]
+        }[]
+      }
       record_signing_reengagement: {
         Args: { _addendum_id: string; _channel?: string; _details?: Json }
         Returns: undefined
       }
       release_service_lock: { Args: { _key: string }; Returns: undefined }
+      remove_vehicle_document: {
+        Args: {
+          _name: string
+          _type: string
+          _url: string
+          _vehicle_id: string
+        }
+        Returns: Json
+      }
       request_return: {
         Args: { _reason?: string; _signing_token: string }
         Returns: Json
