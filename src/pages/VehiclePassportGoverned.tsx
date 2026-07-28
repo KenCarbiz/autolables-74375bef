@@ -470,6 +470,20 @@ export default function VehiclePassportGoverned() {
     setIdx((i) => (i + dir + gallery.length) % gallery.length);
   };
 
+  // Arrow keys and Escape while the lightbox is open. It previously answered
+  // to a touch swipe only, so a desktop shopper could open it and have no way
+  // at all to reach photo 2.
+  useEffect(() => {
+    if (!galleryOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") { e.preventDefault(); swipeHero(1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); swipeHero(-1); }
+      else if (e.key === "Escape") setGalleryOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [galleryOpen, gallery.length]);
+
   return (
     <div className={`min-h-screen ${isDesktop ? "" : "pb-28"}`} style={{ background: BG, color: NAVY }}>
       <Helmet>
@@ -615,8 +629,8 @@ export default function VehiclePassportGoverned() {
                   <span className="absolute top-3 left-3 h-7 px-2.5 rounded-full bg-white/95 text-[11px] font-bold inline-flex items-center gap-1" style={{ color: NAVY }}><Play className="w-3.5 h-3.5" /> Video</span>
                 )}
                 {gallery.length > 1 && <>
-                  <button aria-label="Previous photo" onClick={(e) => { e.stopPropagation(); swipeHero(-1); }} className="absolute left-2.5 top-1/2 -translate-y-1/2 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronLeft className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
-                  <button aria-label="Next photo" onClick={(e) => { e.stopPropagation(); swipeHero(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronRight className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
+                  <button type="button" aria-label="Previous photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(-1); }} className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronLeft className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
+                  <button type="button" aria-label="Next photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronRight className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
                 </>}
                 <button aria-label={isSaved ? "Saved" : "Save this vehicle"} aria-pressed={isSaved} onClick={(e) => { e.stopPropagation(); handleSave(); }} className="absolute bottom-3 right-3 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow">
                   <Bookmark className="w-[22px] h-[22px]" style={{ color: isSaved ? BLUE : NAVY, fill: isSaved ? BLUE : "none" }} />
@@ -1094,8 +1108,8 @@ export default function VehiclePassportGoverned() {
                       {heroImg ? <img src={heroImg} alt={listing.ymm || "Vehicle"} className="w-full h-full object-cover" /> : <div className="w-full h-full grid place-items-center text-slate-400"><Package className="w-10 h-10" /></div>}
                       {gallery.length > 1 && <span className="absolute top-3 right-3 h-7 px-2.5 rounded-full bg-black/60 text-white text-[11px] font-semibold inline-flex items-center">{idx + 1} / {gallery.length}</span>}
                       {gallery.length > 1 && <>
-                        <button aria-label="Previous photo" onClick={(e) => { e.stopPropagation(); swipeHero(-1); }} className="absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 grid place-items-center rounded-full bg-white/90 shadow opacity-0 group-hover:opacity-100 transition"><ChevronLeft className="w-5 h-5" style={{ color: NAVY }} /></button>
-                        <button aria-label="Next photo" onClick={(e) => { e.stopPropagation(); swipeHero(1); }} className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 grid place-items-center rounded-full bg-white/90 shadow opacity-0 group-hover:opacity-100 transition"><ChevronRight className="w-5 h-5" style={{ color: NAVY }} /></button>
+                        <button type="button" aria-label="Previous photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(-1); }} className="absolute left-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 grid place-items-center rounded-full bg-white/90 shadow opacity-0 group-hover:opacity-100 transition"><ChevronLeft className="w-5 h-5" style={{ color: NAVY }} /></button>
+                        <button type="button" aria-label="Next photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(1); }} className="absolute right-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 grid place-items-center rounded-full bg-white/90 shadow opacity-0 group-hover:opacity-100 transition"><ChevronRight className="w-5 h-5" style={{ color: NAVY }} /></button>
                       </>}
                     </div>
                     {gallery.length > 1 && (
@@ -1511,9 +1525,9 @@ export default function VehiclePassportGoverned() {
         <div className="fixed inset-0 z-[60] bg-black/95 flex flex-col" onClick={() => setGalleryOpen(false)}>
           <div className="h-14 flex items-center justify-between px-4 text-white/90">
             <div className="text-[13px] font-semibold">{idx + 1} / {gallery.length}</div>
-            <button aria-label="Close" className="h-10 w-10 grid place-items-center rounded-full hover:bg-white/10"><X className="w-5 h-5" /></button>
+            <button type="button" aria-label="Close" className="h-10 w-10 grid place-items-center rounded-full hover:bg-white/10"><X className="w-5 h-5" /></button>
           </div>
-          <div className="flex-1 grid place-items-center" onClick={(e) => e.stopPropagation()}
+          <div className="relative flex-1 grid place-items-center" onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => { (e.currentTarget as HTMLDivElement).dataset.tsx = String(e.touches[0].clientX); }}
             onTouchEnd={(e) => {
               const start = Number((e.currentTarget as HTMLDivElement).dataset.tsx || 0);
@@ -1522,6 +1536,18 @@ export default function VehiclePassportGoverned() {
             }}
           >
             <img src={gallery[idx]} alt="" className="max-w-full max-h-full object-contain" />
+            {gallery.length > 1 && <>
+              <button
+                type="button" aria-label="Previous photo"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(-1); }}
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-10 h-12 w-12 grid place-items-center rounded-full bg-white/15 hover:bg-white/25 text-white"
+              ><ChevronLeft className="w-6 h-6" /></button>
+              <button
+                type="button" aria-label="Next photo"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(1); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 h-12 w-12 grid place-items-center rounded-full bg-white/15 hover:bg-white/25 text-white"
+              ><ChevronRight className="w-6 h-6" /></button>
+            </>}
           </div>
         </div>
       )}
