@@ -248,10 +248,10 @@ const OwnersManualCard = ({
       )}
     </div>
   );
-  const hero = listingHero(listing);
+  const openManual = () => { track("owners_manual_open"); window.open(savedUrl || m.url, "_blank", "noopener"); };
   return (
     <RecordCard
-      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual" }} />}
+      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual" }} onQuickView={openManual} />}
       title={`Official ${mk.toUpperCase()} Owner's Manual${m.year ? ` (${m.year})` : ""}`}
       source={`${mk.toUpperCase()} · Manufacturer source`}
       status={savedUrl ? "available" : "external"}
@@ -318,28 +318,44 @@ const DocSkeleton = () => (
   </div>
 );
 
-// A real, visual record card: cover preview on the left, one clear status,
-// source, explanation, an optional source-detail row, and one action. The cover
-// is a real preview (uploaded doc thumbnail or the vehicle photo) — never a
-// repeated generic file icon.
+// A real, visual record card: a document preview on the left, one clear status,
+// and a four-line content column — status · title · what it is · where it came
+// from — over a single action row.
+//
+// Every arbitrary text size carries its own `leading-*`: without one they
+// inherit Tailwind's 1.5 root line-height, which spent ~5px of strut per line
+// on a card that has five of them. `source` rides the meta line and the "Why
+// this matters" disclosure rides the status line, so a card with either costs
+// no extra row. The preview well is a flex child of a stretched wrapper, so it
+// fills the row height the content column sets rather than pinning its own.
 const RecordCard = ({ cover, title, source, status, explanation, meta, action, why }: {
   cover: ReactNode; title: string; source: string; status: DocStatus; explanation?: string; meta?: ReactNode; action: ReactNode; why?: string;
 }) => (
-  <div className="rounded-2xl border border-[#E2E8F0] bg-white overflow-hidden flex flex-col sm:flex-row">
-    <div className="shrink-0 sm:self-stretch sm:w-[250px]">{cover}</div>
-    <div className="p-3.5 sm:px-4 sm:py-2 flex-1 min-w-0 flex flex-col justify-center">
-      <div className="flex items-center gap-2 leading-none"><StatusBadge status={status} /></div>
-      <p className="text-[15px] font-bold text-[#0F172A] mt-1 leading-tight">{title}</p>
-      <p className="text-[12px] text-[#64748B] mt-0.5 leading-tight">{source}</p>
-      {explanation && <p className="text-[12.5px] text-[#475569] mt-1 leading-snug line-clamp-1">{explanation}</p>}
-      {meta && <div className="mt-1 text-[11.5px] leading-tight text-[#64748B] flex flex-wrap items-center gap-x-2 gap-y-0.5">{meta}</div>}
+  // The row layout needs ~250px for the well plus a readable content column.
+  // Between lg and xl the page gives this card only ~296px, so it stacks there
+  // and returns to a row at xl.
+  <div className="rounded-2xl border border-[#E2E8F0] bg-white overflow-hidden flex flex-col sm:flex-row lg:flex-col xl:flex-row">
+    {/* The well is inset by the wrapper's flex padding, never flush with the
+        card edge, so `overflow-hidden` + `rounded-2xl` cannot shave the
+        sheet's left corners. */}
+    <div className="shrink-0 flex w-full sm:w-[250px] lg:w-full xl:w-[250px]">{cover}</div>
+    <div className="flex-1 min-w-0 flex flex-col justify-center px-4 py-3 sm:py-1.5 lg:py-3 xl:py-1.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-none">
+        <StatusBadge status={status} />
+        {why && (
+          <details className="group ml-auto open:basis-full">
+            <summary className="text-[12px] leading-[1.25] font-semibold text-[#2563EB] cursor-pointer list-none inline-flex items-center gap-1">Why this matters <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" /></summary>
+            <p className="text-[12.5px] leading-snug text-[#64748B] mt-1.5">{why}</p>
+          </details>
+        )}
+      </div>
+      <p className="text-[15px] leading-[1.15] font-bold text-[#0F172A] mt-1 truncate">{title}</p>
+      {explanation && <p className="text-[12.5px] leading-[1.3] text-[#475569] mt-1 line-clamp-1">{explanation}</p>}
+      <div className="mt-1 text-[11.5px] leading-[1.25] text-[#64748B] flex items-center gap-x-2 overflow-hidden whitespace-nowrap">
+        <span className="min-w-0 truncate">{source}</span>
+        {meta && <><span aria-hidden className="text-[#CBD5E1] shrink-0">·</span><span className="shrink-0 inline-flex items-center gap-x-2">{meta}</span></>}
+      </div>
       <div className="mt-1.5">{action}</div>
-      {why && (
-        <details className="mt-1 group leading-tight">
-          <summary className="text-[12px] leading-tight font-semibold text-[#2563EB] cursor-pointer list-none inline-flex items-center gap-1">Why this matters <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" /></summary>
-          <p className="text-[12.5px] text-[#64748B] mt-1.5 leading-snug">{why}</p>
-        </details>
-      )}
     </div>
   </div>
 );
@@ -541,8 +557,15 @@ const VehiclePassportDocuments = () => {
     </div>
   );
   const externalAction = (url: string, label: string, cta: string, meta: Record<string, unknown> = {}) => (
-    <a href={url} target="_blank" rel="noopener noreferrer" onClick={() => trackDoc(cta, meta)} className="h-10 w-fit px-4 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]">{label} <ExternalLink className="w-4 h-4" /></a>
+    <a href={url} target="_blank" rel="noopener noreferrer" onClick={() => trackDoc(cta, meta)} className="h-11 sm:h-8 w-fit px-4 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]">{label} <ExternalLink className="w-4 h-4" /></a>
   );
+  // Quick View on an external record does exactly what that record's own
+  // action does — same destination, same tracked event. No second viewer.
+  const openExternal = (url: string, cta: string, meta: Record<string, unknown> = {}) => () => {
+    trackDoc(cta, meta);
+    window.open(url, "_blank", "noopener");
+  };
+  const openFactoryRecord = () => { trackDoc("factory_build_record_view"); setPreview({ type: "factory_sticker", name: factoryTitle, url: factoryDocUrl }); };
 
   return (
     <div className="vpd-doc-root min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -665,7 +688,7 @@ const VehiclePassportDocuments = () => {
                   <div className="space-y-2.5">
                     {uploaded.map(({ doc, status }, i) => (
                       <RecordCard key={`u-${i}`}
-                        cover={<DocumentPreview input={{ type: doc.type, title: doc.name, url: doc.url }} />}
+                        cover={<DocumentPreview input={{ type: doc.type, title: doc.name, url: doc.url }} onQuickView={() => setPreview(doc)} />}
                         title={doc.name}
                         source={`Provided by ${dealerName}`}
                         status={status}
@@ -675,7 +698,7 @@ const VehiclePassportDocuments = () => {
                     ))}
                     {factoryDocUrl && factoryDoc && (
                       <RecordCard
-                        cover={<DocumentPreview pageCount={1} input={{ type: isNewCar ? "window_sticker" : "build_sheet", title: isNewCar ? "Window Sticker" : "Build Record", thumbnailUrl: publishedSticker?.thumbnailUrl ?? null }} />}
+                        cover={<DocumentPreview input={{ type: isNewCar ? "window_sticker" : "build_sheet", title: isNewCar ? "Window Sticker" : "Build Record", thumbnailUrl: publishedSticker?.thumbnailUrl ?? null }} onQuickView={openFactoryRecord} />}
                         title={factoryTitle}
                         source={factorySubtitle}
                         status="available"
@@ -689,21 +712,21 @@ const VehiclePassportDocuments = () => {
                         action={
                           <div className="flex items-center gap-2 flex-wrap">
                             <button
-                              onClick={() => { trackDoc("factory_build_record_view"); setPreview({ type: "factory_sticker", name: factoryTitle, url: factoryDocUrl }); }}
-                              className="h-9 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
+                              onClick={openFactoryRecord}
+                              className="h-11 sm:h-8 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
                             >
                               <Eye className="w-4 h-4" /> View Document
                             </button>
                             <a
                               href={factoryDoc.pdf_url || factoryDocUrl} download target="_blank" rel="noreferrer"
                               onClick={() => trackDoc("factory_build_record_download")}
-                              className="h-9 px-3.5 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"
+                              className="h-11 sm:h-8 px-3.5 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"
                             >
                               <Download className="w-4 h-4" /> Download PDF
                             </a>
                             <button
                               onClick={() => { trackDoc("factory_build_record_print"); window.open(factoryDocUrl, "_blank", "noopener"); }}
-                              className="h-9 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#0F172A] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
+                              className="h-11 sm:h-8 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#0F172A] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
                             >
                               <Printer className="w-4 h-4" /> Print
                             </button>
@@ -713,7 +736,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {histLink && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: "vehicle_history", title: "Vehicle History Report" }} />}
+                        cover={<DocumentPreview input={{ type: "vehicle_history", title: "Vehicle History Report" }} onQuickView={openExternal(histLink.url, "history_report", { provider: histLink.provider })} />}
                         title={`${historyReportName(histLink.provider)} Vehicle History Report`}
                         source={histLink.source === "vin" ? `${historyReportName(histLink.provider)} · Official VIN record` : `${histLink.provider === "autocheck" ? "AutoCheck" : "CARFAX"} · provided by ${dealerName}`}
                         status="external"
@@ -724,7 +747,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {brochureLink && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure" }} />}
+                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure" }} onQuickView={openExternal(brochureLink.url, "oem_brochure")} />}
                         title={`${(listing.ymm || "").trim()} Official Brochure`}
                         source={`${((listing.ymm || "").trim().split(/\s+/)[1] || "Manufacturer").toUpperCase()} USA · Manufacturer source`}
                         status="external"
@@ -736,7 +759,7 @@ const VehiclePassportDocuments = () => {
                     <OwnersManualCard listing={listing} isPreview={isPreview} hasStoredCopy={manualStored} />
                     {stickerLink && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: "window_sticker", title: "Window Sticker" }} />}
+                        cover={<DocumentPreview input={{ type: "window_sticker", title: "Window Sticker", url: stickerLink }} onQuickView={openExternal(stickerLink, "oem_window_sticker")} />}
                         title="Original OEM Window Sticker"
                         source="Manufacturer source"
                         status="external"

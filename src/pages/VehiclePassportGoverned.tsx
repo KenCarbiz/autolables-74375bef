@@ -232,6 +232,29 @@ export default function VehiclePassportGoverned() {
   const [activePanel, setActivePanel] = useState<PassportPanelKey | null>(null);
   const [actionDrawer, setActionDrawer] = useState<PassportActionKey | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
+
+  // Arrow keys and Escape while the lightbox is open. It previously answered
+  // to a touch swipe only, so a desktop shopper could open it and have no way
+  // at all to reach photo 2.
+  //
+  // Declared HERE, above every early return. Placing it lower — after the
+  // `if (loading) return <Skeleton />` guard — meant the first render ran
+  // fewer hooks than the second, which is React error #310 and took the whole
+  // customer Passport down with "Something went wrong".
+  useEffect(() => {
+    if (!galleryOpen) return;
+    const step = (dir: number) => setIdx((i) => {
+      const n = gallery.length;
+      return n ? (i + dir + n) % n : i;
+    });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
+      else if (e.key === "Escape") setGalleryOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [galleryOpen, gallery.length]);
   const [watchOpen, setWatchOpen] = useState(false);
   const [heroInView, setHeroInView] = useState(true);
   const heroRef = useRef<HTMLDivElement | null>(null);
@@ -470,19 +493,6 @@ export default function VehiclePassportGoverned() {
     setIdx((i) => (i + dir + gallery.length) % gallery.length);
   };
 
-  // Arrow keys and Escape while the lightbox is open. It previously answered
-  // to a touch swipe only, so a desktop shopper could open it and have no way
-  // at all to reach photo 2.
-  useEffect(() => {
-    if (!galleryOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") { e.preventDefault(); swipeHero(1); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); swipeHero(-1); }
-      else if (e.key === "Escape") setGalleryOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [galleryOpen, gallery.length]);
 
   return (
     <div className={`min-h-screen ${isDesktop ? "" : "pb-28"}`} style={{ background: BG, color: NAVY }}>
