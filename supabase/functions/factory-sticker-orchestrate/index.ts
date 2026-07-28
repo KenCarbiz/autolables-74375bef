@@ -1231,32 +1231,40 @@ serve(async (req) => {
     // until `remaining` is 0.
     if (action === "refresh_truth_sweep") {
       if (!can(tenantId, "regenerate")) return json({ error: "insufficient_permission" }, 403);
-      const deadline = Date.now() + 90_000;
       const { data: listings } = await admin.from("vehicle_listings")
         .select("*").eq("tenant_id", tenantId).eq("status", "published")
         .order("updated_at", { ascending: false }).limit(500);
       const rows = (listings || []) as Array<Record<string, unknown>>;
-
-      let created = 0, reused = 0, failed = 0, processed = 0;
-      const conflicts: string[] = [];
-      for (const listing of rows) {
-        if (Date.now() >= deadline) break;
-        processed++;
-        try {
-          const res = await refreshVehicleTruth(admin, tenantId, listing);
-          if (res.created) created++; else reused++;
-          if (res.blocking_conflicts > 0) conflicts.push(String(listing.vin || ""));
-        } catch {
-          failed++;
+      // Callers (the admin curl tool, the app button) have short client-side
+      // deadlines that a 90s inline sweep blows past. Ack immediately and let
+      // EdgeRuntime.waitUntil finish the work; re-invoke to see remaining.
+      const sync = !!body.sync;
+      const worker = async () => {
+        const deadline = Date.now() + 90_000;
+        let created = 0, reused = 0, failed = 0, processed = 0;
+        const conflicts: string[] = [];
+        for (const listing of rows) {
+          if (Date.now() >= deadline) break;
+          processed++;
+          try {
+            const res = await refreshVehicleTruth(admin, tenantId, listing);
+            if (res.created) created++; else reused++;
+            if (res.blocking_conflicts > 0) conflicts.push(String(listing.vin || ""));
+          } catch { failed++; }
         }
+        return { created, reused, failed, processed, conflicts };
+      };
+      if (sync) {
+        const r = await worker();
+        return json({ success: true, total: rows.length, ...r, remaining: Math.max(0, rows.length - r.processed) });
       }
-      return json({
-        success: true,
-        total: rows.length, processed, created, reused, failed,
-        remaining: Math.max(0, rows.length - processed),
-        vehicles_with_blocking_conflicts: conflicts,
-      });
+      // deno-lint-ignore no-explicit-any
+      const er = (globalThis as any).EdgeRuntime;
+      if (er && typeof er.waitUntil === "function") er.waitUntil(worker());
+      else worker();
+      return json({ success: true, started: true, total: rows.length, note: "Sweep running in background; re-invoke to see remaining." });
     }
+
 
     if (action === "refresh_truth") {
       const { data: listing } = await admin.from("vehicle_listings")
