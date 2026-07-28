@@ -715,7 +715,7 @@ serve(async (req) => {
 
     // ── Official OEM owner's-manual link from its harvest cache (same
     // nearest-year rule). Link only; a stored copy, when one exists, comes
-    // through row.documents (attached on demand by save-owners-manual).
+    // through row.documents when a dealer attached one by hand.
     try {
       const parts = String((row.ymm as string) || "").trim().split(/\s+/);
       const yr = Number.parseInt(parts[0] || "", 10) || null;

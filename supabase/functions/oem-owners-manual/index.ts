@@ -5,7 +5,7 @@
 // (incl. owner portals + Mopar for Stellantis), then caches the link in the
 // global oem_owners_manual_links table. We link to the OEM's hosted document —
 // never rehost bytes by default. A copy is stored into a vehicle's passport
-// documents only on demand, by save-owners-manual.
+// no copy is stored -- the packet links straight to the manufacturer.
 //
 // Body: { make, model, year?, refresh? }
 // Auth: tenant user JWT or service role.

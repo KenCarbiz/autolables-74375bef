@@ -211,56 +211,36 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
 // of an <img> through imageCoverUrl().
 type OemLink = { url: string; title?: string | null; year?: number | null } & OemLinkCover;
 
-// Owner's-manual card. By default we only hold the OEM link (no bytes stored),
-// so the shopper can open it on the manufacturer site OR pull a copy into this
-// vehicle's passport with one click. Once a copy is saved it shows as a normal
-// document instead, so this card hides (hasStoredCopy).
+// Owner's-manual card. We hold the manufacturer's LINK and nothing else — the
+// shopper opens or downloads the manual from the OEM, and no bytes are copied
+// into the vehicle. hasStoredCopy still hides the card, so a manual attached by
+// hand as a document does not appear twice.
 const OwnersManualCard = ({
   listing, isPreview, hasStoredCopy,
 }: { listing: VehicleListing; isPreview: boolean; hasStoredCopy: boolean }) => {
-  const [saving, setSaving] = useState(false);
-  const [savedUrl, setSavedUrl] = useState<string | null>(null);
   const m = (listing as { oem_owners_manual?: OemLink }).oem_owners_manual;
   if (hasStoredCopy || !m?.url || !packetVisible(listing, "ownersManual")) return null;
   const mk = (listing.ymm || "").trim().split(/\s+/)[1] || "manufacturer";
   const track = (cta: string) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page" } }); };
-  const save = async () => {
-    if (isPreview) { toast.message("Sample preview — saving is disabled here."); return; }
-    setSaving(true);
-    track("owners_manual_save");
-    try {
-      const { data, error } = await supabase.functions.invoke("save-owners-manual", { body: { slug: listing.slug || listing.vin } });
-      if (error || !data?.url) throw new Error(error?.message || "save_failed");
-      setSavedUrl(data.url as string);
-      toast.success("Owner's manual saved to this vehicle.");
-      window.open(data.url as string, "_blank", "noopener");
-    } catch {
-      toast.error("Couldn't save the manual right now. The manufacturer link still opens below.");
-    } finally {
-      setSaving(false);
-    }
-  };
   const action = (
     <div className="flex items-center gap-2">
-      <a href={savedUrl || m.url} target="_blank" rel="noopener noreferrer" onClick={() => track("owners_manual_open")}
+      <a href={m.url} target="_blank" rel="noopener noreferrer" onClick={() => track("owners_manual_open")}
         className="flex-1 h-11 sm:h-8 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]">
-        {savedUrl ? "Download" : "Open Manual"} <ExternalLink className="w-4 h-4" />
+        Open Manual <ExternalLink className="w-4 h-4" />
       </a>
-      {!savedUrl && (
-        <button onClick={save} disabled={saving}
-          className="flex-1 h-11 sm:h-8 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1D4ED8] disabled:opacity-60">
-          {saving ? "Saving…" : "Save to passport"}
-        </button>
-      )}
+      <a href={m.url} target="_blank" rel="noopener noreferrer" download onClick={() => track("owners_manual_download")}
+        className="flex-1 h-11 sm:h-8 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1D4ED8]">
+        <Download className="w-4 h-4" /> Download
+      </a>
     </div>
   );
-  const openManual = () => { track("owners_manual_open"); window.open(savedUrl || m.url, "_blank", "noopener"); };
+  const openManual = () => { track("owners_manual_open"); window.open(m.url, "_blank", "noopener"); };
   return (
     <RecordCard
       cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual", coverUrl: imageCoverUrl(m) }} onQuickView={openManual} />}
       title={`Official ${mk.toUpperCase()} Owner's Manual${m.year ? ` (${m.year})` : ""}`}
       source={`${mk.toUpperCase()} · Manufacturer source`}
-      status={savedUrl ? "available" : "external"}
+      status="external"
       explanation="The manufacturer's official owner's manual for this year and model."
       meta={<span className="inline-flex items-center gap-1"><ExternalLink className="w-3.5 h-3.5" /> Opens on the manufacturer site</span>}
       action={action}
