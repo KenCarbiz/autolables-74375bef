@@ -1,6 +1,8 @@
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { invokeFunction } from "../_shared/invoke.ts";
+import { findVehiclesNeedingForms } from "../_shared/complianceFormsSweep.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // generate-vehicle-forms — fills the EXACT official government forms for a
@@ -405,15 +407,107 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
   return url;
 }
 
+const SWEEP_LOCK_KEY = "compliance_forms_sweep";
+const SWEEP_LOCK_TTL_SECONDS = 300;
+const SWEEP_BUDGET_MS = 90_000;
+const SWEEP_MAX_ROWS = 2000;
+// Forms are filled one VIN at a time with a gap between them. Each fill loads
+// two PDF templates and writes storage, and fanning those unpaced is what
+// produced the throttle storm this whole repair exists to undo.
+const SWEEP_GAP_MS = 300;
+
+const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function runFormsSweep(
+  req: Request, tenantId: string | null, limitRaw: number, appBase: string,
+): Promise<Response> {
+  const admin = adminClient();
+  const limit = Math.min(Math.max(limitRaw, 1), SWEEP_MAX_ROWS);
+  const work = await findVehiclesNeedingForms(admin, tenantId, limit);
+  if (!work.length) return json(200, { success: true, total: 0, processed: 0, note: "Nothing to sweep." });
+
+  // Single-runner. Two overlapping sweeps would re-fill and re-upload the same
+  // PDFs. Taken only once the worklist is known, so a failed query cannot leak
+  // the lock.
+  const { data: acquired } = await admin.rpc("try_acquire_service_lock", {
+    _key: SWEEP_LOCK_KEY, _ttl_seconds: SWEEP_LOCK_TTL_SECONDS, _holder: tenantId || "all_tenants",
+  });
+  if (acquired === false) return json(200, { success: true, skipped: "already_running", total: work.length });
+
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const selfUrl = `${Deno.env.get("SUPABASE_URL") || ""}/functions/v1/generate-vehicle-forms`;
+
+  const worker = async () => {
+    const deadline = Date.now() + SWEEP_BUDGET_MS;
+    let processed = 0, filled = 0, failed = 0, throttled = 0;
+    try {
+      for (const item of work) {
+        if (Date.now() >= deadline) break;
+        processed++;
+        // No `action` in this body — the per-VIN path, never the sweep, so it
+        // cannot recurse into itself.
+        const res = await invokeFunction(selfUrl, serviceKey, {
+          body: { tenant_id: item.tenant_id, vin: item.vin, app_base: appBase },
+          timeoutMs: 25_000, maxRetries: 1, maxWaitMs: 5_000,
+          deadlineMs: Math.max(1_000, Math.min(30_000, deadline - Date.now())),
+        });
+        if (res.ok) filled++;
+        else if (res.rateLimited) throttled++;
+        else failed++;
+        if (Date.now() + SWEEP_GAP_MS < deadline) await sleepMs(SWEEP_GAP_MS);
+      }
+    } finally {
+      try { await admin.rpc("release_service_lock", { _key: SWEEP_LOCK_KEY }); }
+      catch { /* the TTL expiry is the backstop */ }
+    }
+    console.log(`forms sweep: processed ${processed}, filled ${filled}, failed ${failed}, throttled ${throttled}`);
+    return { processed, filled, failed, throttled };
+  };
+
+  if (req.headers.get("x-sweep-sync") === "1") {
+    const r = await worker();
+    return json(200, { success: true, total: work.length, ...r, remaining: Math.max(0, work.length - r.processed) });
+  }
+  // deno-lint-ignore no-explicit-any
+  const er = (globalThis as any).EdgeRuntime;
+  if (er && typeof er.waitUntil === "function") er.waitUntil(worker()); else worker();
+  return json(200, {
+    success: true, started: true, total: work.length,
+    scope: tenantId || "all_tenants",
+    note: "Sweep running in background; re-invoke to see remaining.",
+  });
+}
+
 Deno.serve(async (req) => {
   const pf = preflight(req);
   if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; kinds?: string[]; box?: string; lang?: string; app_base?: string };
+  const body = await req.json().catch(() => ({})) as {
+    tenant_id?: string; vin?: string; kinds?: string[]; box?: string; lang?: string; app_base?: string;
+    action?: string; limit?: number;
+  };
   const appBase = resolveAppBase(req, body.app_base);
   const tenantId = body.tenant_id;
   const vin = (body.vin || "").toUpperCase().trim();
+
+  // ── Nightly self-heal for the compliance forms ──────────────────────
+  // ensureComplianceDrafts re-renders a file-less draft, but its only caller
+  // with a render target is marketcheck-sync's update branch — so the repair
+  // reached a vehicle only if it appeared in tonight's MarketCheck payload for
+  // a tenant with a configured feed. Everything from autocurb-sync, the DMS
+  // webhook, a CSV import or a manual add had no path back at all: the draft
+  // row existed, so nothing thought work was outstanding, and the Buyers Guide
+  // stayed unopenable. This is the missing sweep, and it asks the same question
+  // ensureComplianceDrafts now asks — does the row point at a PDF, not does the
+  // row exist.
+  if (String(body.action || "") === "sweep") {
+    if (!isServiceOrCron(req) && !(tenantId && await isManagerMember(adminClient(), req, tenantId))) {
+      return json(401, { error: "unauthorized" });
+    }
+    return await runFormsSweep(req, tenantId || null, Number(body.limit) || 500, appBase);
+  }
+
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
   const kinds = Array.isArray(body.kinds) && body.kinds.length ? body.kinds : ["buyers_guide", "k208"];
   // Optional box override (as-is | implied | warranty) so a manual selection in
