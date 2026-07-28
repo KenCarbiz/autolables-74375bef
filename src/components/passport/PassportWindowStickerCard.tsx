@@ -42,9 +42,10 @@ export default function PassportWindowStickerCard({
           // contain, not cover: the sticker is an 11x8.5 landscape page and
           // must show all four corners. object-cover object-top was cropping
           // it into a portrait tile, which is why it read as warped.
-          className="max-w-full max-h-full object-contain bg-white rounded-none"
+          className="max-w-full max-h-full object-cover object-top bg-white rounded-none"
           style={{ aspectRatio: "11 / 8.5", border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 1px 4px rgba(15,23,42,0.12)" }}
           loading="lazy"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
         />
       ) : (
         <FileText className="w-7 h-7 text-[#94A3B8]" aria-hidden />

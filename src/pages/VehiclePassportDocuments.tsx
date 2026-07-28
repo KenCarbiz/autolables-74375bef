@@ -78,31 +78,47 @@ const ARTWORK_ICONS = {
 // type. The vehicle photograph is never used here — it belongs to the vehicle
 // summary, and repeating it on six cards told the shopper nothing about what
 // each record was.
-const DocumentPreview = ({ input, pageCount, onQuickView }: {
-  input: ArtworkInput; pageCount?: number | null; onQuickView?: () => void;
+//
+// The well fills the card row instead of standing at a fixed height inside it,
+// so the tint and the divider run the full height rather than dead-ending
+// against bare white. `self-stretch` on the sheet — not a percentage height —
+// is what makes that resolve: the well is itself a stretched flex item, so
+// `h-full` inside it would depend on stretched items being treated as definite,
+// while stretching the sheet needs no resolution at all.
+const DocumentPreview = ({ input, onQuickView }: {
+  input: ArtworkInput; onQuickView?: () => void;
 }) => {
   const art = resolveDocumentArtwork(input);
   const [failed, setFailed] = useState(false);
   const Icon = ARTWORK_ICONS[art.fallbackIcon] ?? FileText;
   const showImage = !!art.artworkUrl && !failed;
-  // Portrait pages render as an upright sheet at roughly 8.5x11; a landscape
-  // window sticker takes the width. Neither is ever stretched to fill.
-  // A landscape window sticker takes the width; every upright form renders at
-  // 8.5x11 with neutral space either side. Neither is ever stretched to fill,
-  // and an official form is never cropped.
+  // Height-driven, never width-driven: the sheet stands at the full height of
+  // the well and takes whatever width its own page shape gives it, so an 11x8.5
+  // window sticker reads as a landscape page and an 8.5x11 form as an upright
+  // one. `w-full` used to fight `max-h-full` here — the box went full width and
+  // the page was letterboxed inside it, which is where the dead gutters came
+  // from.
   const sheet = art.orientation === "landscape"
-    ? "h-full max-h-[112px] max-w-full aspect-[11/8.5]"
-    : "h-full max-h-[112px] max-w-full aspect-[8.5/11]";
+    ? "self-stretch w-auto max-w-full aspect-[11/8.5]"
+    : "self-stretch w-auto max-w-full aspect-[8.5/11]";
 
   return (
-    <div className="relative h-[112px] sm:h-full sm:min-h-[126px] w-full sm:w-[250px] bg-[#F8FAFC] sm:border-r sm:border-[#E2E8F0] flex items-center justify-center p-[7px] overflow-hidden">
+    <div className="relative w-full flex items-center justify-center overflow-hidden bg-[#F8FAFC] p-1.5 h-[104px] sm:h-auto sm:min-h-[126px] sm:border-r sm:border-[#E2E8F0] lg:h-[104px] lg:min-h-0 lg:border-r-0 xl:h-auto xl:min-h-[126px] xl:border-r">
       {showImage ? (
         <img
           src={art.artworkUrl!}
           alt=""
           loading="lazy"
           onError={() => setFailed(true)}
-          className={`${sheet} object-contain bg-white`}
+          // Landscape (window sticker): cover + top. The frame is already the
+          // page's own 11:8.5, so for a correct single-page asset this crops
+          // nothing and behaves exactly like contain — but when the stored
+          // preview is a legacy STACKED multi-page SVG, top-anchored cover
+          // shows precisely page 1 and clips page 2 away, instead of squeezing
+          // both pages into an illegible sliver. Stale assets self-heal without
+          // waiting for a regeneration. Portrait forms stay contain so a
+          // government form is never cropped.
+          className={`${sheet} bg-white ${art.orientation === "landscape" ? "object-cover object-top" : "object-contain"}`}
           style={{ border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 2px 6px rgba(15,23,42,0.12)" }}
         />
       ) : (
@@ -116,21 +132,22 @@ const DocumentPreview = ({ input, pageCount, onQuickView }: {
           </span>
         </div>
       )}
-      {pageCount ? (
-        <span className="absolute bottom-1.5 left-1.5 h-5 px-1.5 inline-flex items-center rounded-[5px] bg-white/90 border border-[#E2E8F0] text-[10px] font-semibold text-[#475569]">
-          {pageCount} PAGE{pageCount === 1 ? "" : "S"}
-        </span>
-      ) : null}
       {/* Routes to the SAME handler as the button in the content area — one
-          preview implementation, and never a button nested inside a button. */}
+          preview implementation, and never a button nested inside a button.
+          The chip is small enough to sit in the well's side gutter instead of
+          on top of the page; on touch the whole well is the target, so a 20px
+          chip never has to serve as a 20px tap area. */}
       {onQuickView ? (
         <button
           type="button"
           onClick={onQuickView}
+          title="Quick view"
           aria-label={`Quick view ${art.accessibleLabel}`}
-          className="absolute bottom-1.5 right-1.5 h-5 px-1.5 inline-flex items-center gap-1 rounded-[5px] bg-white/90 border border-[#E2E8F0] text-[10px] font-semibold text-[#475569] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2563EB]"
+          className="group/qv absolute inset-0 flex items-end justify-end p-1.5 sm:inset-auto sm:bottom-1.5 sm:right-1.5 sm:p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
         >
-          <Eye className="w-3 h-3" aria-hidden /> Quick View
+          <span className="w-7 h-7 sm:w-5 sm:h-5 rounded-md bg-white/95 border border-[#E2E8F0] text-[#475569] inline-flex items-center justify-center shadow-sm transition-colors group-hover/qv:border-[#2563EB] group-hover/qv:text-[#2563EB]">
+            <Eye className="w-3.5 h-3.5 sm:w-3 sm:h-3" aria-hidden />
+          </span>
         </button>
       ) : null}
     </div>
