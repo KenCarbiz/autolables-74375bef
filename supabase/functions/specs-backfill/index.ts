@@ -2,25 +2,25 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 import { adminClient, SERVICE_KEY, SUPABASE_URL, isServiceOrCron } from "../_shared/supabase.ts";
 import { preflight, json } from "../_shared/http.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Allow a signed-in admin user to trigger the backfill manually from the app.
 // Verifies the caller's JWT, then checks user_roles for the 'admin' role.
+//
+// Validated with the admin client's own `getUser`, the same call every other
+// function here uses. That asks the auth server whether the token is still
+// good — so a deleted or signed-out user is rejected, which local claim
+// verification cannot tell you — and it needs no second client, no anon key
+// and no floating dependency version.
 async function isAuthenticatedAdmin(req: Request): Promise<boolean> {
   try {
     const auth = req.headers.get("Authorization") || "";
     if (!auth.toLowerCase().startsWith("bearer ")) return false;
     const token = auth.slice(7).trim();
     if (!token || token === SERVICE_KEY) return false;
-    const anon = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    const client = createClient(SUPABASE_URL, anon, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { data, error } = await client.auth.getClaims(token);
-    const uid = data?.claims?.sub;
-    if (error || !uid) return false;
     const admin = adminClient();
+    const { data: ures, error } = await admin.auth.getUser(token);
+    const uid = ures?.user?.id;
+    if (error || !uid) return false;
     const { data: roles } = await admin
       .from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").limit(1);
     return !!(roles && roles.length > 0);
@@ -33,13 +33,46 @@ async function isAuthenticatedAdmin(req: Request): Promise<boolean> {
 // decoded, but a too-tight NeoVIN timeout was finalizing cars with empty
 // equipment; this backfill (with the timeout fixed in marketcheck-specs) fills
 // the accumulated gap in one pass. Works a ~100s budget then self-chains until
-// no null-options published vehicle remains. Auth: service role or cron secret.
+// no published vehicle still needs a decode — meaning none is missing a build
+// sheet and none is holding a generic sheet that was never asked for its own
+// build. Auth: service role, cron secret, or a signed-in platform admin.
+// Single-runner: the sweep costs money per VIN, so a service lock stops two
+// chains billing the provider twice for the same answer.
 // ──────────────────────────────────────────────────────────────
 
 const BUDGET_MS = 100_000;
 const MAX_DEPTH = 60;
 
+const LOCK_KEY = "specs_backfill";
+
+const releaseLock = async () => {
+  try { await adminClient().rpc("release_service_lock", { _key: LOCK_KEY }); }
+  catch { /* the expiry is the backstop */ }
+};
+
 async function run(depth: number) {
+  let more = false;
+  try {
+    more = await runInner();
+  } finally {
+    // Released even when a link throws, so a failure cannot wedge the sweep
+    // until the TTL expires.
+    await releaseLock();
+  }
+  // Chained only AFTER the lock is free, or the next link would find the
+  // sweep "already running" — against itself — and the chain would stop one
+  // batch in.
+  if (more && depth < MAX_DEPTH) {
+    await fetch(`${SUPABASE_URL}/functions/v1/specs-backfill`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+      body: JSON.stringify({ depth: depth + 1 }),
+      signal: AbortSignal.timeout(10000),
+    }).catch(() => {});
+  }
+}
+
+async function runInner(): Promise<boolean> {
   const admin = adminClient();
   const deadline = Date.now() + BUDGET_MS;
   let decoded = 0, failed = 0;
@@ -67,9 +100,9 @@ async function run(depth: number) {
       .filter((r) => shouldDecodeVin(r.mc_attributes, MAX_SPEC_ATTEMPTS).decode);
     if (batch.length === 0 && (rows || []).length > 0) {
       console.log("specs-backfill: remaining rows are all at the attempt cap; stopping");
-      return;
+      return false;
     }
-    if (batch.length === 0) { console.log(`specs-backfill: done (decoded ${decoded}, failed ${failed})`); return; }
+    if (batch.length === 0) { console.log(`specs-backfill: done (decoded ${decoded}, failed ${failed})`); return false; }
     for (const r of batch) {
       if (Date.now() >= deadline) break;
       try {
@@ -103,29 +136,19 @@ async function run(depth: number) {
       } catch { failed++; }
     }
   }
-  if (depth < MAX_DEPTH) {
-    const admin2 = adminClient();
-    // Must ask the SAME question the work loop asks. This used to check
-    // "options is null", which the generic-retry population fails — those
-    // VINs were decoded, so they have options — and the chain would stop
-    // with the retries still outstanding, reporting done while half the
-    // backfill had never run.
-    const { data: more } = await admin2.from("vehicle_listings")
-      .select("vin").eq("status", "published")
-      .or([
-        "mc_attributes->>build_sheet.is.null",
-        "and(mc_attributes->build_sheet->>generic.eq.true,mc_attributes->>specs_strict_attempted.is.null)",
-      ].join(","))
-      .limit(1);
-    if (((more as unknown[]) || []).length > 0) {
-      await fetch(`${SUPABASE_URL}/functions/v1/specs-backfill`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
-        body: JSON.stringify({ depth: depth + 1 }),
-        signal: AbortSignal.timeout(10000),
-      }).catch(() => {});
-    }
-  }
+  // Must ask the SAME question the work loop asks. This used to check
+  // "options is null", which the generic-retry population fails — those VINs
+  // were decoded, so they have options — and the chain would stop with the
+  // retries still outstanding, reporting done while half the backfill had
+  // never run.
+  const { data: more } = await admin.from("vehicle_listings")
+    .select("vin").eq("status", "published")
+    .or([
+      "mc_attributes->>build_sheet.is.null",
+      "and(mc_attributes->build_sheet->>generic.eq.true,mc_attributes->>specs_strict_attempted.is.null)",
+    ].join(","))
+    .limit(1);
+  return ((more as unknown[]) || []).length > 0;
 }
 
 serve(async (req) => {
@@ -136,6 +159,22 @@ serve(async (req) => {
   }
   const body = await req.json().catch(() => ({})) as { depth?: number };
   const depth = typeof body.depth === "number" ? body.depth : 0;
+
+  // One sweep at a time. Each link in the chain re-takes the lock and
+  // extends it, so the run holds it start to finish while an expiry still
+  // releases it if a link dies. Without this, two admins clicking — or a
+  // click landing on the nightly cron — bill the provider twice for the
+  // same VIN.
+  const admin = adminClient();
+  const { data: acquired } = await admin.rpc("try_acquire_service_lock", {
+    _key: "specs_backfill",
+    _ttl_seconds: 300,
+    _holder: `depth:${depth}`,
+  });
+  if (acquired === false) {
+    return json(200, { ok: true, skipped: "already_running", depth });
+  }
+
   const work = run(depth);
   // deno-lint-ignore no-explicit-any
   const er = (globalThis as any).EdgeRuntime;
