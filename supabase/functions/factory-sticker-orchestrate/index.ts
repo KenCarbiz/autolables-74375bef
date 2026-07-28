@@ -1231,10 +1231,25 @@ serve(async (req) => {
     // until `remaining` is 0.
     if (action === "refresh_truth_sweep") {
       if (!can(tenantId, "regenerate")) return json({ error: "insufficient_permission" }, 403);
+      // `only_missing` (the default) skips vehicles already resolved, so a
+      // run that hits the budget resumes where the last one stopped instead
+      // of spending it re-resolving settled work. Pass only_missing: false to
+      // re-check the whole inventory.
+      const onlyMissing = body.only_missing !== false;
       const { data: listings } = await admin.from("vehicle_listings")
         .select("*").eq("tenant_id", tenantId).eq("status", "published")
         .order("updated_at", { ascending: false }).limit(500);
-      const rows = (listings || []) as Array<Record<string, unknown>>;
+      let rows = (listings || []) as Array<Record<string, unknown>>;
+
+      if (onlyMissing && rows.length) {
+        const { data: existing } = await admin.from("vehicle_snapshots")
+          .select("vehicle_id").eq("tenant_id", tenantId);
+        const resolved = new Set(
+          ((existing || []) as Array<{ vehicle_id: string }>).map((r) => r.vehicle_id),
+        );
+        rows = rows.filter((r) => !resolved.has(String(r.id)));
+      }
+
       // Callers (the admin curl tool, the app button) have short client-side
       // deadlines that a 90s inline sweep blows past. Ack immediately and let
       // EdgeRuntime.waitUntil finish the work; re-invoke to see remaining.
