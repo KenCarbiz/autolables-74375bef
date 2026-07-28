@@ -519,7 +519,14 @@ async function orchestrateVehicle(
       ],
       settings: {
         enabled: stickerSettings.enabled !== false,
-        used_reproduction: stickerSettings.used_reproduction === true,
+        // `=== true` made this opt-IN, so every tenant that had never opened
+        // the Factory Sticker panel had no `factory_sticker` key at all and
+        // every used and CPO vehicle returned ineligible_used before anything
+        // rendered. The documented default is on (DEFAULT_FACTORY_STICKER_
+        // SETTINGS.used_reproduction === true) and the library already treats
+        // a used reproduction as permitted unless explicitly disabled — this
+        // line was the only thing overriding both.
+        used_reproduction: stickerSettings.used_reproduction !== false,
       },
       hasVinSpecificBuildData: !normalized.data.generic,
       hasManufacturerPricing: !!normalized.baseMsrp && !!normalized.statedTotalMsrp,

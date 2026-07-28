@@ -1,6 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
+import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
+
+// Artifact posts are queued and paced, so they can still be in flight when the
+// handler returns. Without this the isolate is torn down mid-queue and the
+// last vehicles of a feed silently lose their documents — serialising the
+// posts makes that MORE likely, not less, so the two changes belong together.
+function drainArtifactPosts(): void {
+  // deno-lint-ignore no-explicit-any
+  const er = (globalThis as any).EdgeRuntime;
+  if (er && typeof er.waitUntil === "function") er.waitUntil(artifactPostsIdle());
+}
+
 
 // ──────────────────────────────────────────────────────────────
 // marketcheck-sync
@@ -401,7 +412,7 @@ serve(async (req) => {
       domain: toSourceHost(d.source ?? d.inventory_url ?? d.website ?? ""),
       city: d.city ?? "", state: d.state ?? "", listings: d.listing_count ?? d.inventory_count ?? null,
     })).filter((d: { id: string }) => d.id);
-    return json(200, { ok: true, http: res.status, dealers });
+  return json(200, { ok: true, http: res.status, dealers });
   }
 
   // ── Pick configs: allowed + enabled, and either a website domain OR a
@@ -1290,6 +1301,7 @@ serve(async (req) => {
     }
   } catch { /* best-effort */ }
 
+  drainArtifactPosts();
   return json(200, {
     ok: true, tenants_due: due.length, tenants_synced: tenantsSynced,
     listings_seen: seen, new_vehicles: newVehicles,

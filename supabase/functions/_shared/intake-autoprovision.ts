@@ -17,6 +17,8 @@
 // overlap) is safe. No Deno globals — unit-testable under vitest.
 // ──────────────────────────────────────────────────────────────────────
 
+import { invokeFunction } from "./invoke.ts";
+
 // Minimal structural view of the supabase-js client; both the Deno edge
 // client and the vitest fake satisfy it.
 // deno-lint-ignore no-explicit-any
@@ -65,13 +67,6 @@ const hex16 = () => {
 
 const errText = (e: unknown): string =>
   String((e as { message?: string } | null)?.message || e || "unknown error").slice(0, 500);
-
-// AbortSignal.timeout exists in Deno and modern Node but not in every test
-// environment; a missing signal only drops the client-side timeout.
-const timeoutSignal = (ms: number): AbortSignal | undefined => {
-  const t = (AbortSignal as unknown as { timeout?: (ms: number) => AbortSignal }).timeout;
-  return typeof t === "function" ? t.call(AbortSignal, ms) : undefined;
-};
 
 // Record one failed artifact for the VIN. One open exception row per VIN
 // (partial unique index on (tenant, vin, exception_type) for open rows), so an
@@ -126,24 +121,68 @@ async function draftRpc(
 }
 
 // Fire-and-forget POST to a sibling edge function. Never awaited by callers by
-// design (a render/enrichment failure must not slow the ingest loop); failures
-// are recorded asynchronously.
+// design (a render failure must not slow the ingest loop) — but drained
+// through ONE serial queue per isolate.
+//
+// Six of these fired per new vehicle, in the same tick, inside a loop over
+// every vehicle in the feed. A fifty-car page issued ~300 invocations in a
+// few hundred milliseconds, the platform throttled them, and the throttle was
+// recorded as a failed artifact. Three of these artifacts are retried by
+// nothing, so a transient rate limit destroyed them permanently. That is the
+// whole of the 97 artifact_autogen_failed rows.
+//
+// The queue is the fix; the retry inside invokeFunction is only the net for
+// what still slips through.
+let postGapMs = 250;
+let postQueue: Promise<unknown> = Promise.resolve();
+const pause = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
+
+/** Test hook: the real 250ms stagger would add seconds to every test. */
+export function setArtifactPostGapMs(ms: number): void {
+  postGapMs = Math.max(0, ms);
+}
+
+/**
+ * Resolves once every queued artifact post has settled.
+ *
+ * Callers should hand this to EdgeRuntime.waitUntil before responding —
+ * otherwise the isolate can be torn down with posts still queued, which
+ * serialising them makes more likely, not less.
+ */
+export function artifactPostsIdle(): Promise<unknown> {
+  return postQueue;
+}
+
 function firePost(
   admin: Admin, serviceKey: string, tenantId: string, vin: string,
   url: string, body: Record<string, unknown>, timeoutMs: number, artifact: string,
 ): void {
-  const record = (msg: string) => { void recordArtifactFailure(admin, tenantId, vin, artifact, msg); };
-  try {
-    fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-      body: JSON.stringify(body),
-      signal: timeoutSignal(timeoutMs),
-    }).then((res) => { if (!res.ok) record(`http_${res.status}`); })
-      .catch((e) => record(errText(e)));
-  } catch (e) {
-    record(errText(e));
-  }
+  postQueue = postQueue
+    .then(async () => {
+      // One retry, not three. The serial queue is what keeps us under the
+      // limit; a long retry chain here would stall every artifact behind a
+      // vehicle whose render is deterministically broken.
+      const res = await invokeFunction(url, serviceKey, {
+        body, timeoutMs, maxRetries: 1, maxWaitMs: 3_000,
+      });
+      if (res.ok) return;
+      // A throttle is not an artifact failure. Recording it as one buries the
+      // real failures under transient noise and tells the operator a document
+      // could not be produced when nobody ever asked for it. The nightly
+      // sweep re-runs the sweepable artifacts; the rest are surfaced with
+      // their own type so they can be found and retried deliberately.
+      if (res.rateLimited) {
+        await recordArtifactFailure(
+          admin, tenantId, vin, artifact,
+          `rate_limited: the platform throttled this call${res.retryAfterMs ? ` (asked for ${res.retryAfterMs}ms)` : ""}. Not generated yet.`,
+        );
+        return;
+      }
+      await recordArtifactFailure(admin, tenantId, vin, artifact, res.error ?? "unknown error");
+    })
+    // Settle either way, then space the next dispatch. Sustained rate stays
+    // near four invocations a second per isolate, under the platform limit.
+    .then(() => pause(postGapMs), () => pause(postGapMs));
 }
 
 // Mint the permanent Get-Ready hub token if this vehicle doesn't already have a

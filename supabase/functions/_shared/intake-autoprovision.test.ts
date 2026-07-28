@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  artifactPostsIdle,
+  setArtifactPostGapMs,
   autoPreload,
   ensureComplianceDrafts,
   ensureReadyToken,
@@ -188,10 +190,13 @@ describe("ensureReadyToken", () => {
   });
 });
 
+beforeEach(() => { setArtifactPostGapMs(0); });
+
 describe("ensureComplianceDrafts", () => {
   it("calls the four VIN-idempotent draft RPCs", async () => {
     const { admin, rpcCalls } = makeAdmin();
     await ensureComplianceDrafts(admin, "t1", "VIN123");
+    await artifactPostsIdle();
     expect(rpcCalls.map((c) => c.fn)).toEqual([
       "create_draft_buyers_guide",
       "create_draft_safety_inspection",
@@ -204,6 +209,7 @@ describe("ensureComplianceDrafts", () => {
   it("records a supabase-style { error } RPC result instead of swallowing it", async () => {
     const { admin, state } = makeAdmin({ create_draft_get_ready: "rls denied" });
     await ensureComplianceDrafts(admin, "t1", "VIN123");
+    await artifactPostsIdle();
     const rows = state("vehicle_exceptions").inserts;
     expect(rows).toHaveLength(1);
     expect((rows[0].source_values as { artifacts: Record<string, string> }).artifacts).toEqual({
@@ -223,6 +229,7 @@ describe("ensureComplianceDrafts", () => {
     state("generated_documents").listResults.push({ data: [{ id: "d1", document_type: "buyers_guide" }] });
     state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await artifactPostsIdle();
     await flush();
     expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
       "https://x.supabase.co/functions/v1/generate-vehicle-forms",
@@ -239,6 +246,7 @@ describe("ensureComplianceDrafts", () => {
     });
     state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await artifactPostsIdle();
     await flush();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -250,7 +258,9 @@ describe("ensureComplianceDrafts", () => {
     state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "new" } });
     state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await artifactPostsIdle();
     await ensureComplianceDrafts(admin, "t1", "VIN456");
+    await artifactPostsIdle();
     await flush();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -263,6 +273,7 @@ describe("ensureComplianceDrafts", () => {
     state("generated_documents").listResults.push({ data: null, error: { message: "denied" } });
     state("factory_sticker_records").maybeSingleResults.push(settledSticker);
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await artifactPostsIdle();
     await flush();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -275,6 +286,7 @@ describe("ensureComplianceDrafts", () => {
     state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "new" } });
     // no factory_sticker_records row queued → maybeSingle returns null → missing
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await artifactPostsIdle();
     await flush();
     expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
       "https://x.supabase.co/functions/v1/factory-sticker-orchestrate",
@@ -290,15 +302,18 @@ describe("ensureComplianceDrafts", () => {
     state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "new" } });
     state("factory_sticker_records").maybeSingleResults.push({ data: { id: "r1", generation_status: "FAILED_RETRYABLE" } });
     await ensureComplianceDrafts(admin, "t1", "VIN123", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await artifactPostsIdle();
     // READY_TO_GENERATE waits on the renderer — resync must keep re-firing it
     // so the fleet generates the night the renderer lands.
     state("vehicle_listings").maybeSingleResults.push({ data: { id: "l2", condition: "new" } });
     state("factory_sticker_records").maybeSingleResults.push({ data: { id: "r2", generation_status: "READY_TO_GENERATE" } });
     await ensureComplianceDrafts(admin, "t1", "VIN456", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await artifactPostsIdle();
     // REVIEW_REQUIRED is a human decision in flight — never re-posted.
     state("vehicle_listings").maybeSingleResults.push({ data: { id: "l3", condition: "new" } });
     state("factory_sticker_records").maybeSingleResults.push({ data: { id: "r3", generation_status: "REVIEW_REQUIRED" } });
     await ensureComplianceDrafts(admin, "t1", "VIN789", { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" });
+    await artifactPostsIdle();
     await flush();
     expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
       "https://x.supabase.co/functions/v1/factory-sticker-orchestrate",
@@ -315,6 +330,7 @@ describe("autoPreload", () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const { admin, rpcCalls } = makeAdmin();
     await autoPreload(admin, "https://x.supabase.co", "svc-key", { ...input, emailTitle: true });
+    await artifactPostsIdle();
     expect(rpcCalls.map((c) => c.fn)).toEqual([
       "create_draft_addendum",
       "create_draft_buyers_guide",
@@ -338,6 +354,7 @@ describe("autoPreload", () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const { admin } = makeAdmin();
     await autoPreload(admin, "https://x.supabase.co", "svc-key", { ...input, listingId: null });
+    await artifactPostsIdle();
     const urls = fetchMock.mock.calls.map((c) => String(c[0]));
     expect(urls).toEqual([
       "https://x.supabase.co/functions/v1/generate-vehicle-forms",
@@ -368,6 +385,7 @@ describe("autoPreload", () => {
     globalThis.fetch = vi.fn(() => Promise.reject(new Error("network down"))) as unknown as typeof fetch;
     const { admin, state } = makeAdmin();
     await expect(autoPreload(admin, "https://x.supabase.co", "svc-key", input)).resolves.toBeUndefined();
+    await artifactPostsIdle();
     await flush(); await flush();
     const t = state("vehicle_exceptions");
     expect(t.inserts.length + t.updates.length).toBeGreaterThan(0);
@@ -380,6 +398,7 @@ describe("autoPreload", () => {
     globalThis.fetch = vi.fn(async () => ({ ok: false, status: 500 })) as unknown as typeof fetch;
     const { admin, state } = makeAdmin();
     await autoPreload(admin, "https://x.supabase.co", "svc-key", { ...input, listingId: null });
+    await artifactPostsIdle();
     await flush(); await flush();
     const t = state("vehicle_exceptions");
     const all = [...t.inserts, ...t.updates.map((u) => u.patch)];
