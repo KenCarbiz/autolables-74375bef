@@ -7,9 +7,9 @@
     "barcode": 1,
     "path": 55,
     "qr": 2,
-    "rect": 33,
-    "rule": 11,
-    "text": 216
+    "rect": 31,
+    "rule": 12,
+    "text": 217
   },
   "fills": [
     "#0d0d0d",
@@ -32,7 +32,9 @@
     "#0b1f3a",
     "#0d0d0d",
     "#1a1a1e",
+    "#2563eb",
     "#4c5157",
+    "#55595e",
     "#ffffff"
   ],
   "fontSizes": [
@@ -56,18 +58,17 @@
     10,
     10.5,
     11,
-    13.5,
+    11.5,
     16,
     17,
-    18,
     20,
     27
   ],
   "regions": {
-    "barcode": "21,517.5 227.15x23",
+    "barcode": "21,560 227.15x23",
     "qr": "755.5,204.8 17",
-    "qr2": "594,390.05 96",
-    "totalMsrp": "481,585 @18"
+    "qr2": "592,373.3 100",
+    "totalMsrp": "493,490.7 @11.5"
   },
   "headings": [
     "ORIGINAL FACTORY BUILD & MSRP RECORD",
@@ -84,9 +85,9 @@
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,390.00",
-    "5N1DR3DK5SC220145",
-    "TOTAL ORIGINAL MSRP",
+    "ORIGINAL TOTAL MSRP",
     "$53,550.00",
+    "5N1DR3DK5SC220145",
     "Fuel Economy & Environment",
     "Fuel Economy",
     "22",
@@ -97,6 +98,6 @@
   ],
   "totalBand": "$53,550.00",
   "svgDigest": [
-    "e647d048"
+    "a615cc96"
   ]
 }

@@ -5,17 +5,15 @@
   "fonts": "\"Roboto Condensed\", \"Arial Narrow\", \"Helvetica Neue\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 57,
+    "path": 59,
     "qr": 2,
-    "rect": 29,
-    "rule": 10,
-    "text": 253
+    "rect": 27,
+    "rule": 11,
+    "text": 257
   },
   "fills": [
     "#0d0d0d",
     "#141414",
-    "#161616",
-    "#171717",
     "#4a4f55",
     "#b7d9f1",
     "#ffffff"
@@ -39,8 +37,6 @@
     5.2,
     5.4,
     5.5,
-    5.6,
-    5.8,
     6,
     6.2,
     6.4,
@@ -56,17 +52,16 @@
     9.5,
     10,
     10.5,
-    13.5,
+    11.5,
     16,
     17,
-    18,
     27
   ],
   "regions": {
-    "barcode": "21,517.5 227.15x23",
+    "barcode": "21,560 227.15x23",
     "qr": "755.5,204.8 17",
-    "qr2": "594,390.05 96",
-    "totalMsrp": "481,585 @18"
+    "qr2": "592,373.3 100",
+    "totalMsrp": "493,484.9 @11.5"
   },
   "headings": [
     "2025 INFINITI QX80",
@@ -79,9 +74,9 @@
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,995.00",
-    "JN8AZ3NE5S9123456",
-    "TOTAL ORIGINAL MSRP",
+    "ORIGINAL TOTAL MSRP",
     "$95,695.00",
+    "JN8AZ3NE5S9123456",
     "Fuel Economy & Environment",
     "Fuel Economy",
     "17",
@@ -96,7 +91,7 @@
   ],
   "totalBand": "$95,695.00",
   "svgDigest": [
-    "e9ac112e",
-    "2fb1c880"
+    "9f96319b",
+    "c8981f7e"
   ]
 }

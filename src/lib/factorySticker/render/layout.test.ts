@@ -28,8 +28,10 @@ describe("layout: INFINITI benchmark", () => {
     expect(["STANDARD", "DENSE"]).toContain(model.mode);
   });
 
-  it("draws the used-vehicle total banner with the reconciled amount", () => {
-    expect(page1.some((s) => s.includes("TOTAL ORIGINAL MSRP"))).toBe(true);
+  it("concludes the price table with the reconciled total, not a reversed band", () => {
+    // 2026-07 INFINITI directive: the total is the last row OF the price
+    // table. A full-width reversed band read as retail advertising.
+    expect(page1.some((s) => s.includes("ORIGINAL TOTAL MSRP"))).toBe(true);
     expect(page1).toContain("$95,695.00");
     expect(page1).toContain("$89,450.00");
     // Monroney convention: option and rollup rows carry plain amounts.
@@ -83,7 +85,7 @@ describe("layout: condition-specific banner", () => {
     const model = buildRenderLayout(newConditionBenchmark(), themeFor("infiniti"));
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("TOTAL FACTORY MSRP");
-    expect(page1.some((s) => s.includes("TOTAL ORIGINAL MSRP"))).toBe(false);
+    expect(page1.some((s) => (s.includes("TOTAL ORIGINAL MSRP") || s.includes("ORIGINAL TOTAL MSRP")))).toBe(false);
   });
 });
 
@@ -125,7 +127,7 @@ describe("layout: long equipment continuation", () => {
 
   it("keeps pricing, banner, VIN and disclosures on page 1", () => {
     const page1 = pageStrings(model, 0);
-    expect(page1.some((s) => s.includes("TOTAL ORIGINAL MSRP"))).toBe(true);
+    expect(page1.some((s) => (s.includes("TOTAL ORIGINAL MSRP") || s.includes("ORIGINAL TOTAL MSRP")))).toBe(true);
     expect(page1).toContain("$95,695.00");
     expect(page1).toContain(VIN);
     expect(page1.some((s) => s.includes("Monroney label"))).toBe(true);

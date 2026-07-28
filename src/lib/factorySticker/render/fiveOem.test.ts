@@ -623,12 +623,15 @@ describe("INFINITI profile (infiniti-us-2026-v2)", () => {
     expectMinFontRespected(model);
   });
 
-  it("carries the charcoal band, burgundy keyline and governed emblem paths", () => {
+  it("carries a paper masthead, burgundy keyline and governed emblem paths", () => {
     const model = buildRenderLayout(infinitiQx80NewFixture(), themeFor(null));
     const prims = model.pages[0].primitives;
     const fills = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
     const rules = new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
-    expect(fills.has("#171717")).toBe(true);   // charcoal model band
+    // Paper masthead: the emblem, model and trim sit in ink on white over the
+    // keyline. The charcoal hero band it replaced was dealer-advertising
+    // language on a document that has to read as a manufacturer record.
+    expect(fills.has("#171717")).toBe(false);  // no reversed model band
     expect(rules.has("#8a1538")).toBe(true);   // muted burgundy keyline
     expect(prims.some((p) => p.kind === "rect" && p.fill === "#8a1538")).toBe(false);
     // Governed horizon-mark recreation renders as stroked paths in the block.
