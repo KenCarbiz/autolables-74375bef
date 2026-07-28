@@ -6,6 +6,8 @@ import {
   Package, DollarSign, Car, MessageSquare, Phone, ExternalLink, X, Star, Wrench,
   TrendingUp, Clock, Settings, Building2, PenLine, Plus, Info, Globe,
   ChevronRight, FileCheck2, ClipboardX, FilePlus2,
+  FileSpreadsheet, PanelsTopLeft, BookOpen, ClipboardCheck, FileSignature,
+  History as HistoryIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -17,6 +19,7 @@ import { resolvePassportBack } from "@/lib/passportReturn";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { listingHero } from "@/lib/photos";
+import { resolveDocumentArtwork, type ArtworkInput } from "@/lib/passport/documentArtwork";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,12 +67,71 @@ const PASSPORT_NAV: { label: string; to?: string; panel?: string; active?: boole
   { label: "Why Buy From This Dealership?", to: "dealer" }, { label: "Documents", to: "documents", active: true },
 ];
 
-const DocThumb = ({ url }: { url: string }) => {
-  if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(url)) return <img src={url} alt="" className="w-full h-full object-cover" />;
+const ARTWORK_ICONS = {
+  FileSpreadsheet, History: HistoryIcon, PanelsTopLeft, BookOpen, ClipboardCheck,
+  Wrench, FileCheck2, ShieldCheck, FileSignature, FileText,
+} as const;
+
+// The document preview well. A document is pictured as a document: a real
+// first page when a customer-safe one exists, otherwise a drawn cover for its
+// type. The vehicle photograph is never used here — it belongs to the vehicle
+// summary, and repeating it on six cards told the shopper nothing about what
+// each record was.
+const DocumentPreview = ({ input, pageCount, onQuickView }: {
+  input: ArtworkInput; pageCount?: number | null; onQuickView?: () => void;
+}) => {
+  const art = resolveDocumentArtwork(input);
+  const [failed, setFailed] = useState(false);
+  const Icon = ARTWORK_ICONS[art.fallbackIcon] ?? FileText;
+  const showImage = !!art.artworkUrl && !failed;
+  // Portrait pages render as an upright sheet at roughly 8.5x11; a landscape
+  // window sticker takes the width. Neither is ever stretched to fill.
+  // A landscape window sticker takes the width; every upright form renders at
+  // 8.5x11 with neutral space either side. Neither is ever stretched to fill,
+  // and an official form is never cropped.
+  const sheet = art.orientation === "landscape"
+    ? "w-full max-w-[152px] aspect-[11/8.5]"
+    : "h-[102px] sm:h-[112px] aspect-[8.5/11]";
+
   return (
-    <div className="w-full h-full bg-white p-3">
-      <div className="h-1.5 w-8 bg-[#2563EB]/30 rounded mb-2" />
-      {Array.from({ length: 7 }).map((_, i) => <div key={i} className="h-1 rounded bg-slate-200 mb-1.5" style={{ width: `${[100, 92, 96, 70, 88, 60, 80][i]}%` }} />)}
+    <div className="relative h-[112px] sm:h-[132px] w-full sm:w-[176px] sm:flex-[0_0_176px] bg-[#F8FAFC] sm:border-r sm:border-[#E2E8F0] flex items-center justify-center p-2 overflow-hidden">
+      {showImage ? (
+        <img
+          src={art.artworkUrl!}
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className={`${sheet} object-contain bg-white`}
+          style={{ border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 2px 6px rgba(15,23,42,0.12)" }}
+        />
+      ) : (
+        <div
+          className={`${sheet} bg-white flex flex-col items-center justify-center gap-1.5 px-2`}
+          style={{ border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 2px 6px rgba(15,23,42,0.12)" }}
+        >
+          <Icon className="w-7 h-7" strokeWidth={1.75} style={{ color: art.accentColor }} aria-hidden />
+          <span className="text-[9px] font-bold tracking-[0.08em] text-center leading-tight" style={{ color: art.accentColor }}>
+            {art.label}
+          </span>
+        </div>
+      )}
+      {pageCount ? (
+        <span className="absolute bottom-1.5 left-1.5 h-5 px-1.5 inline-flex items-center rounded-[5px] bg-white/90 border border-[#E2E8F0] text-[10px] font-semibold text-[#475569]">
+          {pageCount} PAGE{pageCount === 1 ? "" : "S"}
+        </span>
+      ) : null}
+      {/* Routes to the SAME handler as the button in the content area — one
+          preview implementation, and never a button nested inside a button. */}
+      {onQuickView ? (
+        <button
+          type="button"
+          onClick={onQuickView}
+          aria-label={`Quick view ${art.accessibleLabel}`}
+          className="absolute bottom-1.5 right-1.5 h-5 px-1.5 inline-flex items-center gap-1 rounded-[5px] bg-white/90 border border-[#E2E8F0] text-[10px] font-semibold text-[#475569] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2563EB]"
+        >
+          <Eye className="w-3 h-3" aria-hidden /> Quick View
+        </button>
+      ) : null}
     </div>
   );
 };
@@ -171,7 +233,7 @@ const OwnersManualCard = ({
   const hero = listingHero(listing);
   return (
     <RecordCard
-      cover={<RecordCover hero={hero} label="Owner's Manual" />}
+      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual" }} />}
       title={`Official ${mk.toUpperCase()} Owner's Manual${m.year ? ` (${m.year})` : ""}`}
       source={`${mk.toUpperCase()} · Manufacturer source`}
       status={savedUrl ? "available" : "external"}
@@ -246,7 +308,7 @@ const RecordCard = ({ cover, title, source, status, explanation, meta, action, w
   cover: ReactNode; title: string; source: string; status: DocStatus; explanation?: string; meta?: ReactNode; action: ReactNode; why?: string;
 }) => (
   <div className="rounded-xl border border-[#E6E8EC] bg-white overflow-hidden flex flex-col sm:flex-row">
-    <div className="sm:w-[210px] shrink-0 bg-slate-100 sm:self-stretch">{cover}</div>
+    <div className="shrink-0 sm:self-stretch">{cover}</div>
     <div className="p-4 sm:p-5 flex-1 min-w-0 flex flex-col">
       <div><StatusBadge status={status} /></div>
       <p className="text-[16px] font-bold text-[#0F172A] mt-2 leading-tight">{title}</p>
@@ -263,15 +325,6 @@ const RecordCard = ({ cover, title, source, status, explanation, meta, action, w
     </div>
   </div>
 );
-// Branded "cover" for an external/manufacturer record when there is no file
-// thumbnail — the vehicle photo with a dark wash, so the card reads as a real
-// document tile rather than a generic icon.
-const RecordCover = ({ hero, label }: { hero?: string | null; label: string }) => (
-  hero
-    ? <div className="h-44 sm:h-full sm:min-h-[150px] w-full overflow-hidden"><img src={hero} alt="" className="h-full w-full object-cover" /></div>
-    : <div className="h-44 sm:h-full sm:min-h-[150px] w-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center"><span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/85">{label}</span></div>
-);
-
 // The generated factory build record, served only when its generated_documents
 // row is published (get_published_documents_public returns nothing else).
 interface FactoryStickerDoc {
@@ -589,7 +642,7 @@ const VehiclePassportDocuments = () => {
                   <div className="space-y-4">
                     {uploaded.map(({ doc, status }, i) => (
                       <RecordCard key={`u-${i}`}
-                        cover={<div className="h-40 sm:h-full sm:min-h-[150px]"><DocThumb url={doc.url} /></div>}
+                        cover={<DocumentPreview input={{ type: doc.type, title: doc.name, url: doc.url }} />}
                         title={doc.name}
                         source={`Provided by ${dealerName}`}
                         status={status}
@@ -599,7 +652,7 @@ const VehiclePassportDocuments = () => {
                     ))}
                     {factoryDocUrl && factoryDoc && (
                       <RecordCard
-                        cover={<RecordCover hero={hero} label={isNewCar ? "Window Sticker" : "Build Record"} />}
+                        cover={<DocumentPreview input={{ type: isNewCar ? "window_sticker" : "build_sheet", title: isNewCar ? "Window Sticker" : "Build Record" }} />}
                         title={factoryTitle}
                         source={factorySubtitle}
                         status="available"
@@ -637,7 +690,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {histLink && (
                       <RecordCard
-                        cover={<RecordCover hero={hero} label="History Report" />}
+                        cover={<DocumentPreview input={{ type: "vehicle_history", title: "Vehicle History Report" }} />}
                         title={`${historyReportName(histLink.provider)} Vehicle History Report`}
                         source={histLink.source === "vin" ? `${historyReportName(histLink.provider)} · Official VIN record` : `${histLink.provider === "autocheck" ? "AutoCheck" : "CARFAX"} · provided by ${dealerName}`}
                         status="external"
@@ -648,7 +701,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {brochureLink && (
                       <RecordCard
-                        cover={<RecordCover hero={hero} label="Brochure" />}
+                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure" }} />}
                         title={`${(listing.ymm || "").trim()} Official Brochure`}
                         source={`${((listing.ymm || "").trim().split(/\s+/)[1] || "Manufacturer").toUpperCase()} USA · Manufacturer source`}
                         status="external"
@@ -660,7 +713,7 @@ const VehiclePassportDocuments = () => {
                     <OwnersManualCard listing={listing} isPreview={isPreview} hasStoredCopy={manualStored} />
                     {stickerLink && (
                       <RecordCard
-                        cover={<RecordCover hero={hero} label="Window Sticker" />}
+                        cover={<DocumentPreview input={{ type: "window_sticker", title: "Window Sticker" }} />}
                         title="Original OEM Window Sticker"
                         source="Manufacturer source"
                         status="external"
