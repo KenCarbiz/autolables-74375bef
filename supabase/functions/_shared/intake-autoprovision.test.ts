@@ -371,10 +371,28 @@ describe("autoPreload", () => {
       "https://x.supabase.co/functions/v1/generate-vehicle-forms",
       "https://x.supabase.co/functions/v1/oem-window-sticker",
       "https://x.supabase.co/functions/v1/email-title-request",
+      "https://x.supabase.co/functions/v1/marketcheck-specs",
       "https://x.supabase.co/functions/v1/ingest-orchestrate",
       "https://x.supabase.co/functions/v1/description-orchestrate",
       "https://x.supabase.co/functions/v1/factory-sticker-orchestrate",
     ]);
+  });
+
+  it("decodes the VIN before asking the sticker orchestrator to build", async () => {
+    // The orchestrator never fetches a build sheet on an automatic run, so if
+    // the decode has not already landed on the listing it parks the record at
+    // PENDING_DATA and the sticker never appears without a human pressing
+    // Generate. The post queue is serial, so this ordering is the guarantee.
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin } = makeAdmin();
+    await autoPreload(admin, "https://x.supabase.co", "svc-key", input);
+    await artifactPostsIdle();
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    const decodedAt = urls.indexOf("https://x.supabase.co/functions/v1/marketcheck-specs");
+    const stickerAt = urls.indexOf("https://x.supabase.co/functions/v1/factory-sticker-orchestrate");
+    expect(decodedAt).toBeGreaterThanOrEqual(0);
+    expect(stickerAt).toBeGreaterThan(decodedAt);
   });
 
   it("skips the title email by default and the listing-scoped calls without a listing id", async () => {

@@ -156,6 +156,7 @@ export function artifactPostsIdle(): Promise<unknown> {
 function firePost(
   admin: Admin, serviceKey: string, tenantId: string, vin: string,
   url: string, body: Record<string, unknown>, timeoutMs: number, artifact: string,
+  opts: { deadlineMs?: number } = {},
 ): void {
   postQueue = postQueue
     .then(async () => {
@@ -164,6 +165,7 @@ function firePost(
       // vehicle whose render is deterministically broken.
       const res = await invokeFunction(url, serviceKey, {
         body, timeoutMs, maxRetries: 1, maxWaitMs: 3_000,
+        ...(opts.deadlineMs ? { deadlineMs: opts.deadlineMs } : {}),
       });
       if (res.ok) return;
       // A throttle is not an artifact failure. Recording it as one buries the
@@ -321,6 +323,29 @@ export async function autoPreload(
       `${supabaseUrl}/functions/v1/email-title-request`, { tenant_id: tenantId, vin }, 20000, "title_request_email");
   }
   if (listingId) {
+    // Decode the VIN's equipment breakout FIRST, because everything below
+    // needs it and none of them will fetch it themselves.
+    //
+    // factory-sticker-orchestrate deliberately never calls a paid provider on
+    // an automatic run — a source fetch is an explicit, permissioned, audited
+    // operator action (`allowSourceFetch`). So at ingest it found no build
+    // sheet, parked the record at PENDING_DATA "awaiting_build_sheet", and the
+    // sticker only ever appeared if a human later pressed Generate. Nothing
+    // decoded the VIN at ingest at all; the decode arrived hours later in the
+    // nightly enrich sweep, by which time the sticker call was long finished.
+    //
+    // Ordering is what makes this work: the post queue is serial, so this
+    // resolves before the sticker call below is dispatched, and the
+    // orchestrator finds the build sheet already saved on the listing. The
+    // decode is not extra spend — the nightly sweep would decode this VIN
+    // anyway; it just happens now instead of tonight.
+    firePost(admin, serviceKey, tenantId, vin,
+      `${supabaseUrl}/functions/v1/marketcheck-specs`,
+      { tenant_id: tenantId, vin, vehicle_id: listingId },
+      // NeoVIN is asked strictly first and only then generically, each with a
+      // 30s timeout, so this one call can legitimately outlast the default
+      // per-attempt and total budgets.
+      55_000, "vin_decode", { deadlineMs: 70_000 });
     // Fire-once recon orchestration; idempotent server-side, so a re-sync
     // never double-dispatches.
     firePost(admin, serviceKey, tenantId, vin,
