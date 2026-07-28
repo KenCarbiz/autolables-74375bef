@@ -2,6 +2,29 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 
+// Allow a signed-in platform admin to trigger the sweep from the app,
+// mirroring specs-backfill's pattern. Verifies via admin.auth.getUser then
+// checks user_roles for role='admin'.
+async function isAuthenticatedAdmin(req: Request): Promise<boolean> {
+  try {
+    const auth = req.headers.get("Authorization") || "";
+    if (!auth.toLowerCase().startsWith("bearer ")) return false;
+    const token = auth.slice(7).trim();
+    if (!token || token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) return false;
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL") || "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+    const { data: ures, error } = await admin.auth.getUser(token);
+    const uid = ures?.user?.id;
+    if (error || !uid) return false;
+    const { data: roles } = await admin
+      .from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").limit(1);
+    return !!(roles && roles.length > 0);
+  } catch { return false; }
+}
+
 // ──────────────────────────────────────────────────────────────
 // enrich-sweep — the nightly self-chaining enrichment sweep.
 //
