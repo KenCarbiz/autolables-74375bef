@@ -10293,6 +10293,14 @@ export type Database = {
             }
             Returns: undefined
           }
+      schedule_compliance_forms_sweep: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
       schedule_description_reconcile: {
         Args: { p_schedule?: string }
         Returns: string
