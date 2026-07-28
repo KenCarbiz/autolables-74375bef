@@ -40,8 +40,19 @@ function resolveAppBase(req: Request, appBase?: string): string {
   if (isHttp(origin)) return clean(origin);
   const env = Deno.env.get("APP_BASE_URL");
   if (isHttp(env)) return clean(env);
-  return "https://app.autolabels.io";
+  return TEMPLATE_HOST_FALLBACKS[0];
 }
+
+// Hosts known to serve the bundled /forms/*.pdf masters. The first is the
+// default when nothing else resolves; loadTemplate retries the rest when a
+// resolved base can't serve the template (cron/service calls carry no Origin,
+// and app.autolabels.io does not resolve — that made every nightly fill 500).
+const TEMPLATE_HOST_FALLBACKS = [
+  "https://www.autolabels.io",
+  "https://autolabels.io",
+  "https://autolables.lovable.app",
+];
+
 
 const MANAGER_ROLES = new Set([
   "owner", "general_manager", "gsm", "admin", "manager",
