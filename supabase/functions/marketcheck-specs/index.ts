@@ -258,6 +258,10 @@ Deno.serve(async (req) => {
   // an answer, so it does not count — otherwise a slow call would retire the
   // VIN to the generic fallback permanently.
   let strictAttempted = false;
+  // A 429 is the provider refusing to answer at all (monthly quota), not a
+  // verdict about this VIN. Callers must be able to tell the two apart, or a
+  // quota outage silently burns every VIN's decode attempt budget.
+  let quotaExhausted = false;
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];
     const isNeovin = url.includes("/neovin/");
@@ -266,6 +270,7 @@ Deno.serve(async (req) => {
       // fallbacks get the short timeout.
       const res = await fetch(url, { signal: AbortSignal.timeout(isNeovin ? 30000 : 12000) });
       tried.push({ url: redact(url), status: res.status });
+      if (res.status === 429) { quotaExhausted = true; continue; }
       if (i === 0) strictAttempted = true;
       if (!res.ok) continue;
       const data = await res.json().catch(() => null);
@@ -278,7 +283,13 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (!payload && quotaExhausted) {
+    console.error(`marketcheck-specs: provider quota exhausted (vin ${vin})`);
+    return json(200, { ok: false, error: "provider_quota_exhausted", retryable: true, tried });
+  }
   if (!payload) return json(200, { ok: false, error: "no_endpoint_matched", tried });
+
+
 
   // ── Complete provider capture: capture FIRST, extract SECOND ─────────
   // The FULL raw decode response is persisted to neovin_snapshots before any

@@ -156,6 +156,13 @@ async function runSweep(admin: Admin, sweepStart: string): Promise<boolean> {
             deadlineMs: Math.max(1_000, Math.min(50_000, deadline - Date.now())),
           });
           const ok = sres.ok;
+          // The provider answering 200 with "monthly quota exhausted" is the
+          // same class of non-answer as a throttle: nobody could decode right
+          // now, so charging this VIN an attempt would retire decodable VINs
+          // fleet-wide after three quota days.
+          const quotaExhausted =
+            (sres.data as { error?: string } | null)?.error === "provider_quota_exhausted";
+
           if (sres.rateLimited) throttled++;
           else if (!ok) failures++;
           // Stamp the attempt from here, not from the decoder: the decoder
@@ -168,7 +175,7 @@ async function runSweep(admin: Admin, sweepStart: string): Promise<boolean> {
           // of only MAX_SPEC_ATTEMPTS paid attempts on an answer we never
           // received, and three throttles would retire a perfectly decodable
           // VIN forever. Leave the counter alone and let the next sweep ask.
-          if (!sres.rateLimited) {
+          if (!sres.rateLimited && !quotaExhausted) {
             try {
               const { data: after } = await admin
                 .from("vehicle_listings").select("mc_attributes")

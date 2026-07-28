@@ -64,6 +64,12 @@ const CANDIDATE_FILTER = [
 // condition alike. The row filter above cannot express the attempt cap, so the
 // cap is applied in TypeScript; any caller that skips that step is asking a
 // different, laxer question and will disagree about whether work remains.
+// The scan window must be much wider than the batch: the cap is applied in
+// TypeScript, so selecting only BATCH_LIMIT rows lets a handful of
+// cap-exhausted VINs sit at the head of the result forever and starve every
+// decodable VIN behind them ("all at the attempt cap" with 90 rows waiting).
+const SCAN_LIMIT = 500;
+
 async function nextCandidates(
   admin: ReturnType<typeof adminClient>,
 ): Promise<{ rows: Candidate[]; batch: Candidate[] }> {
@@ -72,10 +78,12 @@ async function nextCandidates(
     .select("tenant_id, vin, mc_attributes")
     .eq("status", "published")
     .or(CANDIDATE_FILTER)
-    .limit(BATCH_LIMIT);
+    .limit(SCAN_LIMIT);
   const rows = ((data as Candidate[] | null) || []);
-  return { rows, batch: rows.filter((r) => shouldDecodeVin(r.mc_attributes, MAX_SPEC_ATTEMPTS).decode) };
+  const decodable = rows.filter((r) => shouldDecodeVin(r.mc_attributes, MAX_SPEC_ATTEMPTS).decode);
+  return { rows, batch: decodable.slice(0, BATCH_LIMIT) };
 }
+
 
 const releaseLock = async () => {
   try { await adminClient().rpc("release_service_lock", { _key: LOCK_KEY }); }
@@ -131,7 +139,15 @@ async function runInner(): Promise<boolean> {
         // answered, none) — either way the row leaves the null pool, so the
         // next loop's `is null` query naturally advances. A row that stays null
         // (all endpoints failed) is simply retried on the next chain.
-        await res.json().catch(() => ({}));
+        const out = await res.json().catch(() => ({})) as { error?: string };
+        // The provider refusing everyone (monthly quota) is not a verdict about
+        // this VIN. Counting it as an attempt burns the whole fleet's decode
+        // budget in one outage and permanently parks those VINs at the cap, so
+        // stop the sweep instead — nothing else can succeed this run either.
+        if (out?.error === "provider_quota_exhausted") {
+          console.error("specs-backfill: provider quota exhausted; stopping without charging attempts");
+          return false;
+        }
         if (res.ok) decoded++; else failed++;
         // Stamp the attempt from here: marketcheck-specs returns early
         // without writing on a no-match, which is exactly the case the cap
@@ -150,6 +166,7 @@ async function runInner(): Promise<boolean> {
         } catch { /* the cap is the backstop */ }
       } catch { failed++; }
     }
+
   }
   // Must ask the SAME question the work loop asks — and now literally does,
   // through the same helper. It used to check "options is null", which the
