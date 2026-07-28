@@ -94,7 +94,9 @@ function structuredSheet(payload: any): Record<string, unknown> | null {
   };
 
   const packages: { name: string; code?: string; msrp?: number; contents: string[] }[] = [];
-  const pkgSrc = Array.isArray(src.options_packages) ? src.options_packages : [];
+  // Same list under any of the names the provider has been observed to use.
+  const firstArray = (...vals: unknown[]) => vals.find((v) => Array.isArray(v) && v.length) as unknown[] | undefined;
+  const pkgSrc = firstArray(src.options_packages, src.option_packages, src.packages) ?? [];
   for (const p of pkgSrc) {
     const name = flat(p);
     if (!name) continue;
@@ -105,7 +107,7 @@ function structuredSheet(payload: any): Record<string, unknown> | null {
   }
 
   const options: { name: string; code?: string; msrp?: number }[] = [];
-  const optSrc = Array.isArray(src.installed_options_details) ? src.installed_options_details : [];
+  const optSrc = firstArray(src.installed_options_details, src.installed_options, src.optional_equipment) ?? [];
   for (const o of optSrc) {
     const name = flat(o);
     if (!name) continue;
@@ -120,9 +122,32 @@ function structuredSheet(payload: any): Record<string, unknown> | null {
   }
 
   // Category map {category: [{description}|string]} → {category: [names]}.
-  const catMap = (obj: unknown): Record<string, string[]> => {
+  //
+  // NeoVIN returns these EITHER as a {category: [...]} map OR as a flat typed
+  // array (Feature/HighValueFeature items). The array form used to be rejected
+  // outright by an `!Array.isArray` guard, so every feature was silently
+  // dropped, structuredSheet returned null, and the window sticker reported
+  // "no factory build data" for a VIN the provider had answered 200 for.
+  // Grouping is presentational; losing the equipment is not.
+  const catMap = (obj: unknown, fallbackCategory: string): Record<string, string[]> => {
     const out: Record<string, string[]> = {};
-    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+    if (Array.isArray(obj)) {
+      // Prefer the item's own category when it carries one, so a flat array
+      // still produces grouped output rather than one undifferentiated bucket.
+      for (const item of obj) {
+        const name = flat(item);
+        if (!name) continue;
+        const cat = String(
+          (item as { category?: unknown; group?: unknown; type?: unknown } | null)?.category
+          ?? (item as { group?: unknown } | null)?.group
+          ?? (item as { type?: unknown } | null)?.type ?? "",
+        ).trim() || fallbackCategory;
+        (out[cat] ||= []).push(name);
+      }
+      for (const k of Object.keys(out)) out[k] = [...new Set(out[k])];
+      return out;
+    }
+    if (obj && typeof obj === "object") {
       for (const [cat, arr] of Object.entries(obj as Record<string, unknown>)) {
         const names = (Array.isArray(arr) ? arr : [arr]).map(flat).filter(Boolean);
         if (names.length) out[cat] = names;
@@ -130,8 +155,8 @@ function structuredSheet(payload: any): Record<string, unknown> | null {
     }
     return out;
   };
-  const key_features = catMap(src.high_value_features);
-  const standard = catMap(src.features);
+  const key_features = catMap(src.high_value_features, "Key Features");
+  const standard = catMap(src.features, "Standard Equipment");
 
   // include_generic=true falls back to typical-for-trim specs when the VIN
   // can't be fully decoded — the passport must label those, never assert them.
@@ -177,9 +202,18 @@ function structuredSheet(payload: any): Record<string, unknown> | null {
     ? { ...(plant ? { plant } : {}), ...(country ? { country } : {}), ...(city ? { city } : {}) }
     : undefined;
 
-  if (!packages.length && !options.length && !Object.keys(key_features).length && !Object.keys(standard).length) return null;
+  // Equipment absent but pricing present is still a usable factory record —
+  // base MSRP, destination and total are exactly what the sticker's price
+  // table needs. This guard used to throw a perfectly good MSRP away because
+  // the option arrays did not match an expected shape.
+  const noEquipment = !packages.length && !options.length
+    && !Object.keys(key_features).length && !Object.keys(standard).length;
+  if (noEquipment && !Object.keys(pricing).length) return null;
   return {
     packages, options, key_features, standard, generic,
+    // Lets a consumer tell "the provider had no equipment" from "we have
+    // pricing only", instead of inferring it from an absent key.
+    ...(noEquipment ? { equipment_absent: true } : {}),
     ...(Object.keys(pricing).length ? { pricing } : {}),
     ...(colors ? { colors } : {}),
     ...(assembly ? { assembly } : {}),
@@ -325,9 +359,13 @@ Deno.serve(async (req) => {
   } catch { /* capture is best-effort; the table may not be migrated yet */ }
 
   const { options, features } = extractLists(payload);
-  const sheet = structuredSheet(payload);
+  // Unwrap first: the merge below already knew the payload may be wrapped
+  // (`payload.build || payload`), but structuredSheet was handed the outer
+  // object, so on a wrapped response every key it reads was one level too
+  // shallow and it returned null.
   // deno-lint-ignore no-explicit-any
   const build = (payload.build || payload) as any;
+  const sheet = structuredSheet(build) ?? structuredSheet(payload);
 
   // Best-effort merge into mc_attributes so the file + sticker pick it up,
   // isolated so a missing column never fails the decode response.
