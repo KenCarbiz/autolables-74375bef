@@ -921,7 +921,7 @@ serve(async (req) => {
     const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const cronHeader = req.headers.get("x-cron-secret") || "";
     const isService = !!SERVICE_KEY && jwt === SERVICE_KEY;
-    const isCron = !!CRON_SECRET && cronHeader === CRON_SECRET;
+    const isCron = !!cronHeader && CRON_SECRETS.includes(cronHeader);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
