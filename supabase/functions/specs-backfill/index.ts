@@ -139,7 +139,15 @@ async function runInner(): Promise<boolean> {
         // answered, none) — either way the row leaves the null pool, so the
         // next loop's `is null` query naturally advances. A row that stays null
         // (all endpoints failed) is simply retried on the next chain.
-        await res.json().catch(() => ({}));
+        const out = await res.json().catch(() => ({})) as { error?: string };
+        // The provider refusing everyone (monthly quota) is not a verdict about
+        // this VIN. Counting it as an attempt burns the whole fleet's decode
+        // budget in one outage and permanently parks those VINs at the cap, so
+        // stop the sweep instead — nothing else can succeed this run either.
+        if (out?.error === "provider_quota_exhausted") {
+          console.error("specs-backfill: provider quota exhausted; stopping without charging attempts");
+          return false;
+        }
         if (res.ok) decoded++; else failed++;
         // Stamp the attempt from here: marketcheck-specs returns early
         // without writing on a no-match, which is exactly the case the cap
@@ -158,6 +166,7 @@ async function runInner(): Promise<boolean> {
         } catch { /* the cap is the backstop */ }
       } catch { failed++; }
     }
+
   }
   // Must ask the SAME question the work loop asks — and now literally does,
   // through the same helper. It used to check "options is null", which the
