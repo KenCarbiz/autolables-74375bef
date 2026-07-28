@@ -28,15 +28,22 @@ export default function PassportWindowStickerCard({
 
   const Thumb = (
     <div
-      className={`shrink-0 overflow-hidden rounded-xl border border-[#E6E8EC] bg-white grid place-items-center ${
-        mobile ? "w-full h-28" : "w-[136px] h-[104px]"
+      // The well keeps a subtle radius to match the design system; the sheet
+      // inside it does not. `overflow-hidden` + `rounded-xl` on the container
+      // was rounding the paper's own corners.
+      className={`shrink-0 rounded-[4px] border border-[#E6E8EC] bg-[#F8FAFC] grid place-items-center p-[7px] ${
+        mobile ? "w-full h-32" : "w-[168px] h-[124px]"
       }`}
     >
       {sticker.thumbnailUrl ? (
         <img
           src={sticker.thumbnailUrl}
           alt={`Window sticker for this ${vehicleLabel}`}
-          className="w-full h-full object-cover object-top"
+          // contain, not cover: the sticker is an 11x8.5 landscape page and
+          // must show all four corners. object-cover object-top was cropping
+          // it into a portrait tile, which is why it read as warped.
+          className="max-w-full max-h-full object-contain bg-white rounded-none"
+          style={{ aspectRatio: "11 / 8.5", border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 1px 4px rgba(15,23,42,0.12)" }}
           loading="lazy"
         />
       ) : (
