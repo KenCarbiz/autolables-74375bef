@@ -321,6 +321,14 @@ export async function autoPreload(
       `${supabaseUrl}/functions/v1/email-title-request`, { tenant_id: tenantId, vin }, 20000, "title_request_email");
   }
   if (listingId) {
+    // Decode FIRST. factory-sticker-orchestrate refuses to fetch a build sheet
+    // on an automatic run (that spend is an explicit operator action), so with
+    // no decode saved yet it parks at PENDING_DATA/awaiting_build_sheet and
+    // nothing re-fires it until the nightly sweep. The post queue is serial,
+    // which is what makes this an ordering guarantee and not a race.
+    firePost(admin, serviceKey, tenantId, vin,
+      `${supabaseUrl}/functions/v1/marketcheck-specs`,
+      { tenant_id: tenantId, vin }, 25000, "vin_decode");
     // Fire-once recon orchestration; idempotent server-side, so a re-sync
     // never double-dispatches.
     firePost(admin, serviceKey, tenantId, vin,
@@ -331,6 +339,7 @@ export async function autoPreload(
     firePost(admin, serviceKey, tenantId, vin,
       `${supabaseUrl}/functions/v1/description-orchestrate`,
       { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "ingest" }, 20000, "description");
+
     // Factory Window Sticker: fingerprint-idempotent server-side; the nightly
     // resync path (ensureComplianceDrafts) re-fires anything missed here.
     firePost(admin, serviceKey, tenantId, vin,
