@@ -94,6 +94,38 @@ export default function AdminSpecsBackfillOne() {
         </button>
       </div>
 
+      <div className="space-y-3 rounded-2xl border p-4 shadow-sm">
+        <div>
+          <h2 className="text-lg font-semibold">Truth sweep (all tenants)</h2>
+          <p className="text-sm text-muted-foreground">
+            Kicks off the global enrich-sweep chain: market data, recall, value,
+            and any still-missing NeoVIN decode. Self-chains until inventory is
+            complete. Safe to click; if a chain is already running it returns
+            immediately.
+          </p>
+        </div>
+        <button
+          onClick={async () => {
+            setBusy(true); setResult(null);
+            try {
+              const { data, error } = await supabase.functions.invoke("enrich-sweep", { body: {} });
+              if (error) throw error;
+              setResult(data);
+              toast.success("enrich-sweep launched");
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              setResult({ error: msg });
+              toast.error(msg);
+            } finally { setBusy(false); }
+          }}
+          disabled={busy}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Run enrich-sweep
+        </button>
+      </div>
+
       {result !== null && (
         <pre className="max-h-[500px] overflow-auto rounded-2xl border bg-muted/40 p-4 text-xs">
           {JSON.stringify(result, null, 2)}
