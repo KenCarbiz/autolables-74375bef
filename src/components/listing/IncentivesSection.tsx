@@ -127,16 +127,12 @@ export default function IncentivesSection({
   const lookupZip = async () => {
     const z = zip.trim();
     if (!/^\d{5}$/.test(z)) return;
-    setLookingUp(true);
-    try {
-      const { data } = await supabase.functions.invoke("marketcheck-incentives", {
-        body: { tenant_id: tenantId, vin, zip: z },
-      });
-      setZipOffers(asArray((data as Record<string, unknown> | null)?.incentives));
-    } catch {
-      setZipOffers([]);
-    }
+    // OEM incentive lookups are switched off by owner decision (2026-07-28) —
+    // the data is not used and each lookup is a metered provider call. The
+    // list below already degrades to "See dealer for current financing
+    // offers.", which is the correct thing to show a shopper.
     setLookingUp(false);
+    setZipOffers([]);
   };
 
   const OfferList = ({ offers }: { offers: Incentive[] }) =>

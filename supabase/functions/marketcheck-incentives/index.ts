@@ -103,6 +103,15 @@ serve(async (req) => {
   let body: { tenant_id?: string; vin?: string; zip?: string; batch?: boolean } = {};
   try { body = await req.json(); } catch { /* empty */ }
 
+  // OEM incentives are switched OFF by owner decision (2026-07-28): the data
+  // is not used by the business and every lookup is a metered provider call.
+  // Refused here rather than only at the call sites so a leftover cron, a
+  // stale client bundle or a manual invoke cannot quietly resume the spend.
+  // To re-enable, set MARKETCHECK_INCENTIVES_ENABLED=true on the project.
+  if ((Deno.env.get("MARKETCHECK_INCENTIVES_ENABLED") || "").toLowerCase() !== "true") {
+    return json({ ok: true, disabled: true, incentives: [], reason: "incentives_disabled" });
+  }
+
   const admin = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
 
   // ── On-demand customer-ZIP lookup ───────────────────────────────
