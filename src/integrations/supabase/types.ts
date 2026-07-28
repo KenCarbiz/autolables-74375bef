@@ -6503,6 +6503,27 @@ export type Database = {
           },
         ]
       }
+      service_locks: {
+        Row: {
+          acquired_at: string
+          expires_at: string
+          holder: string | null
+          lock_key: string
+        }
+        Insert: {
+          acquired_at?: string
+          expires_at: string
+          holder?: string | null
+          lock_key: string
+        }
+        Update: {
+          acquired_at?: string
+          expires_at?: string
+          holder?: string | null
+          lock_key?: string
+        }
+        Relationships: []
+      }
       service_messages: {
         Row: {
           attachments: Json
@@ -10152,6 +10173,7 @@ export type Database = {
         Args: { _addendum_id: string; _channel?: string; _details?: Json }
         Returns: undefined
       }
+      release_service_lock: { Args: { _key: string }; Returns: undefined }
       request_return: {
         Args: { _reason?: string; _signing_token: string }
         Returns: Json
@@ -10431,6 +10453,10 @@ export type Database = {
           p_reason?: string
         }
         Returns: Json
+      }
+      try_acquire_service_lock: {
+        Args: { _holder?: string; _key: string; _ttl_seconds?: number }
+        Returns: boolean
       }
       unschedule_marketcheck_sync: { Args: never; Returns: undefined }
       unschedule_reengage_abandoned_signings: {
