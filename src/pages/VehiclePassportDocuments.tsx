@@ -335,9 +335,10 @@ const RecordCard = ({ cover, title, source, status, explanation, meta, action, w
   // Between lg and xl the page gives this card only ~296px, so it stacks there
   // and returns to a row at xl.
   <div className="rounded-2xl border border-[#E2E8F0] bg-white overflow-hidden flex flex-col sm:flex-row lg:flex-col xl:flex-row">
-    {/* The well is inset by the wrapper's flex padding, never flush with the
-        card edge, so `overflow-hidden` + `rounded-2xl` cannot shave the
-        sheet's left corners. */}
+    {/* The well itself is flush with the card edge, but the sheet inside it is
+        inset 6px by the well's padding, which keeps it clear of the 16px
+        `rounded-2xl` corner arc — so widening the sheet cannot get its left
+        corners shaved by the card's `overflow-hidden`. */}
     <div className="shrink-0 flex w-full sm:w-[250px] lg:w-full xl:w-[250px]">{cover}</div>
     <div className="flex-1 min-w-0 flex flex-col justify-center px-4 py-3 sm:py-1.5 lg:py-3 xl:py-1.5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-none">
