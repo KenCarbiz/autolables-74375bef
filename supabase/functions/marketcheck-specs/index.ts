@@ -327,8 +327,18 @@ Deno.serve(async (req) => {
   if (vehicleId || tenantId) {
     try {
       const admin = adminClient();
-      let sel = admin.from("vehicle_listings").select("id, mc_attributes").eq("vin", vin);
-      if (tenantId) sel = sel.eq("tenant_id", tenantId);
+      // Target the row the CALLER named. Selecting on (vin[, tenant]) LIMIT 1
+      // with no ordering meant that when a VIN had more than one listing row
+      // — a draft from autocurb-sync or the DMS webhook alongside the
+      // published one — the build sheet landed on an arbitrary row, while the
+      // sticker workspace and the orchestrator both read the row addressed by
+      // vehicle_id and saw nothing.
+      let sel = admin.from("vehicle_listings").select("id, mc_attributes");
+      if (vehicleId) sel = sel.eq("id", vehicleId);
+      else {
+        sel = sel.eq("vin", vin);
+        if (tenantId) sel = sel.eq("tenant_id", tenantId);
+      }
       const { data: rows } = await sel.limit(1);
       const row = rows && rows[0];
       if (row) {

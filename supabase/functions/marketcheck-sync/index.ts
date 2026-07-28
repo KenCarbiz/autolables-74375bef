@@ -51,6 +51,24 @@ const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHEC
 // inventory-search endpoint forces rows=0 (analytics mode) whenever a dealer
 // scope like `source` is passed, which is why a domain-only query returns no
 // cars. Syndication is keyed on MarketCheck's internal dealer_id.
+// Keys on mc_attributes that belong to the VIN decode (marketcheck-specs), not
+// to the syndication feed. The feed never carries them, so they must survive a
+// sync verbatim or the decode is lost and re-billed.
+const DECODE_OWNED_KEYS = [
+  "build_sheet",
+  "base_msrp", "delivery_charges", "total_msrp",
+  "specs_source", "specs_strict_attempted", "specs_decoded_at",
+  "specs_attempts", "specs_attempted_at", "specs_no_build_sheet",
+] as const;
+
+function decodeOwned(prior: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of DECODE_OWNED_KEYS) {
+    if (prior[k] !== undefined && prior[k] !== null) out[k] = prior[k];
+  }
+  return out;
+}
+
 const MC_BASE = "https://api.marketcheck.com/v2";
 const SYND_ENDPOINT = `${MC_BASE}/dealerships/inventory`;
 const SEARCH_ENDPOINT = `${MC_BASE}/search/car/active`;
@@ -884,6 +902,23 @@ serve(async (req) => {
                 // OEM equipment / options & packages when present in the feed.
                 features: ((l.extra?.features ?? l.features) ?? priorMc.features) ?? null,
                 options: ((l.extra?.options ?? l.options) ?? priorMc.options) ?? null,
+                // Everything the VIN decode owns. mcAttrs is rebuilt from
+                // scratch rather than spread over the prior value, so a key
+                // that is not named here is DESTROYED on every sync.
+                //
+                // Carrying only options/features forward was not enough: the
+                // syndication feed never carries a build sheet, so every night
+                // this wiped build_sheet and the lifted factory pricing that
+                // marketcheck-specs had written. The window sticker gates on
+                // exactly that key, so the whole fleet fell back to
+                // "awaiting_build_sheet: no saved NeoVIN build sheet on this
+                // listing yet" — while vehicle_facts, which is an append-only
+                // ledger, kept showing the same vehicle's MSRP as VERIFIED.
+                //
+                // It also wiped specs_attempts/specs_decoded_at, so the sweeps
+                // saw an undecoded VIN again and RE-PAID the provider for an
+                // answer we already had, every single night.
+                ...decodeOwned(priorMc),
               };
               const enrich: Record<string, unknown> = { mc_attributes: mcAttrs };
               if (gallery.length) { enrich.photos = gallery; enrich.photo_count = gallery.length; }
