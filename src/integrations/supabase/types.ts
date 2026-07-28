@@ -4864,6 +4864,12 @@ export type Database = {
       }
       oem_brochure_links: {
         Row: {
+          cover_generated_at: string | null
+          cover_mime: string | null
+          cover_page_count: number | null
+          cover_status: string | null
+          cover_storage_bucket: string | null
+          cover_storage_path: string | null
           created_at: string
           id: string
           make: string
@@ -4876,6 +4882,12 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          cover_generated_at?: string | null
+          cover_mime?: string | null
+          cover_page_count?: number | null
+          cover_status?: string | null
+          cover_storage_bucket?: string | null
+          cover_storage_path?: string | null
           created_at?: string
           id?: string
           make: string
@@ -4888,6 +4900,69 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          cover_generated_at?: string | null
+          cover_mime?: string | null
+          cover_page_count?: number | null
+          cover_status?: string | null
+          cover_storage_bucket?: string | null
+          cover_storage_path?: string | null
+          created_at?: string
+          id?: string
+          make?: string
+          model?: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          url?: string
+          verified_at?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
+      oem_owners_manual_links: {
+        Row: {
+          cover_generated_at: string | null
+          cover_mime: string | null
+          cover_page_count: number | null
+          cover_status: string | null
+          cover_storage_bucket: string | null
+          cover_storage_path: string | null
+          created_at: string
+          id: string
+          make: string
+          model: string
+          source: string
+          title: string | null
+          updated_at: string
+          url: string
+          verified_at: string | null
+          year: number | null
+        }
+        Insert: {
+          cover_generated_at?: string | null
+          cover_mime?: string | null
+          cover_page_count?: number | null
+          cover_status?: string | null
+          cover_storage_bucket?: string | null
+          cover_storage_path?: string | null
+          created_at?: string
+          id?: string
+          make: string
+          model: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          url: string
+          verified_at?: string | null
+          year?: number | null
+        }
+        Update: {
+          cover_generated_at?: string | null
+          cover_mime?: string | null
+          cover_page_count?: number | null
+          cover_status?: string | null
+          cover_storage_bucket?: string | null
+          cover_storage_path?: string | null
           created_at?: string
           id?: string
           make?: string
