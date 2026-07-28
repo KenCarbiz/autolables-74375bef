@@ -40,8 +40,19 @@ function resolveAppBase(req: Request, appBase?: string): string {
   if (isHttp(origin)) return clean(origin);
   const env = Deno.env.get("APP_BASE_URL");
   if (isHttp(env)) return clean(env);
-  return "https://app.autolabels.io";
+  return TEMPLATE_HOST_FALLBACKS[0];
 }
+
+// Hosts known to serve the bundled /forms/*.pdf masters. The first is the
+// default when nothing else resolves; loadTemplate retries the rest when a
+// resolved base can't serve the template (cron/service calls carry no Origin,
+// and app.autolabels.io does not resolve — that made every nightly fill 500).
+const TEMPLATE_HOST_FALLBACKS = [
+  "https://www.autolabels.io",
+  "https://autolabels.io",
+  "https://autolables.lovable.app",
+];
+
 
 const MANAGER_ROLES = new Set([
   "owner", "general_manager", "gsm", "admin", "manager",
@@ -84,10 +95,25 @@ interface VerifiedTemplate { bytes: ArrayBuffer; version: string; contentHash: s
 
 // deno-lint-ignore no-explicit-any
 async function loadTemplate(admin: any, base: string, name: string): Promise<VerifiedTemplate> {
-  const res = await fetch(`${base}/forms/${name}`);
-  if (!res.ok) throw new Error(`template ${name} ${res.status} from ${base}`);
-  const bytes = await res.arrayBuffer();
+  // Try the resolved base first, then the known template hosts. A dead or
+  // non-serving base must not fail the fill — the drift check below is what
+  // guarantees we only ever fill the exact approved master bytes.
+  const candidates = [base, ...TEMPLATE_HOST_FALLBACKS.filter((h) => h !== base)];
+  let bytes: ArrayBuffer | null = null;
+  const failures: string[] = [];
+  for (const host of candidates) {
+    try {
+      const res = await fetch(`${host}/forms/${name}`);
+      if (!res.ok) { failures.push(`${host} ${res.status}`); continue; }
+      bytes = await res.arrayBuffer();
+      break;
+    } catch (e) {
+      failures.push(`${host} ${String((e as Error)?.message || e)}`);
+    }
+  }
+  if (!bytes) throw new Error(`template ${name} unavailable (${failures.join("; ")})`);
   const contentHash = await sha256Hex(new Uint8Array(bytes));
+
   const key = TEMPLATE_KEYS[name];
   const { data: reg } = await admin.from("compliance_form_templates")
     .select("version, content_hash").eq("template_key", key).is("retired_at", null).maybeSingle();

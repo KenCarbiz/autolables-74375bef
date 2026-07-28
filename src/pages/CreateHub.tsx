@@ -41,7 +41,6 @@ const TOOLS: CreateTool[] = [
   // The FTC Buyers Guide + CT K-208 are generated per-vehicle in the Vehicle
   // File's Deal Flow (off the vehicle's real data), so there are no standalone
   // hub tiles for them anymore — open the vehicle and use Deal Flow.
-  { id: "ftc-buyers-guide", title: "FTC Buyers Guide", description: "Federally required used-vehicle warranty disclosure. Staff often call it the warranty sticker.", category: "Compliance", iconKey: "buyers-guide", iconCategory: "document", route: "/buyers-guide", tags: ["buyers guide", "warranty sticker", "as is", "ftc", "used", "compliance", "16 cfr 455"], chip: "FTC Required" },
   { id: "cpo-sheet", title: "CPO Info Sheet", description: "Certified Pre-Owned program sheet.", category: "Other Documents", iconKey: "cpo-info-sheet", iconCategory: "document", route: "/cpo-sheet", tags: ["cpo", "certified", "program", "warranty"], chip: "Template" },
   { id: "used-car-sticker", title: "Used Car Window Sticker", description: "AutoLabels used-vehicle equipment and information summary.", category: "Vehicle Stickers", iconKey: "used-car-sticker", iconCategory: "sticker", route: "/used-car-sticker", tags: ["sticker", "label", "used", "window", "equipment", "merchandising"], chip: "Most Used", isQuickStart: true },
 
