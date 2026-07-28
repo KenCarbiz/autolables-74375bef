@@ -166,6 +166,13 @@ export async function refreshVehicleTruth(
 
   const blocking = built.conflicts.filter((c) => c.blocksGeneration);
   if (built.conflicts.length) {
+    // Refresh, do not ignore. The unique key is (vehicle_id, fact_key) and is
+    // NOT scoped by status, so `ignoreDuplicates: true` meant that once any
+    // row existed for a fact — including one a manager had already resolved or
+    // dismissed — every later disagreement about that same fact was silently
+    // dropped. New evidence that two sources now disagree about MSRP never
+    // reached anyone, and blocks_generation was never re-raised, so the
+    // sticker generated unblocked on a conflict nobody was told about.
     await admin.from("vehicle_fact_conflicts").upsert(
       built.conflicts.map((conflict) => ({
         tenant_id: tenantId,
@@ -175,8 +182,9 @@ export async function refreshVehicleTruth(
         candidates: conflict.candidates,
         blocks_generation: conflict.blocksGeneration,
         status: "open",
+        updated_at: new Date().toISOString(),
       })),
-      { onConflict: "vehicle_id,fact_key", ignoreDuplicates: true },
+      { onConflict: "vehicle_id,fact_key", ignoreDuplicates: false },
     );
   }
   // The same conflicts also reach the Command Center queue a manager

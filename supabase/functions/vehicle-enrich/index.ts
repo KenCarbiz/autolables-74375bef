@@ -608,9 +608,12 @@ serve(async (req) => {
   }
 
   const { data: row } = await admin.from("vehicle_listings")
-    .select("id, vin, ymm, trim, condition, price, mileage, dealer_snapshot")
+    .select("id, vin, ymm, trim, condition, price, mileage, dealer_snapshot, market_meta")
     .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!row) return json(404, { error: "listing_not_found" });
+  // What is already stored, so a pass that returns only part of the picture
+  // adds to it instead of replacing it.
+  const priorMarketMeta = ((row.market_meta || {}) as Record<string, unknown>);
 
   const miles = num(row.mileage);
   const price = num(row.price);
@@ -688,11 +691,17 @@ serve(async (req) => {
     if (comps.comparables.length > 0) patch.comparables = comps.comparables;
     // Fold the regional Market Days Supply into market_meta so the Passport's
     // demand/trend surfaces have a real figure instead of a null placeholder.
-    patch.market_meta = mds?.mds != null
-      ? { ...comps.meta, market_days_supply: mds.mds, inventory_count: mds.count ?? comps.meta.inventory_count }
-      : comps.meta;
+    // Merge over what is already stored. Replacing the whole object destroyed
+    // a prior market_days_supply / inventory_count / sold_stats whenever this
+    // pass happened not to return them — the same "rebuilt from scratch"
+    // shape as the mc_attributes bug, one field at a time. The comparables
+    // guard directly above already got this right.
+    patch.market_meta = { ...priorMarketMeta, ...comps.meta,
+      ...(mds?.mds != null
+        ? { market_days_supply: mds.mds, inventory_count: mds.count ?? comps.meta.inventory_count }
+        : {}) };
   } else if (mds?.mds != null) {
-    patch.market_meta = { market_days_supply: mds.mds, inventory_count: mds.count, checked_at: mds.checked_at };
+    patch.market_meta = { ...priorMarketMeta, market_days_supply: mds.mds, inventory_count: mds.count, checked_at: mds.checked_at };
   }
   if (soldStats) {
     patch.market_meta = { ...((patch.market_meta as Record<string, unknown> | undefined) ?? {}), sold_stats: soldStats };
