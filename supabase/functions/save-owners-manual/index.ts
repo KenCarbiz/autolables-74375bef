@@ -18,9 +18,14 @@ import { json, preflight } from "../_shared/http.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { COVER_SOURCE_MAX_BYTES, coverExtension } from "../_shared/oemCover.ts";
 import { extractFirstPageCover } from "../_shared/oemCoverPdf.ts";
+import { VEHICLE_DOCS_BUCKET, VEHICLE_DOCS_MAX_BYTES } from "../_shared/vehicleDocs.ts";
 
-const BUCKET = "vehicle-docs";
-const MAX_BYTES = 60 * 1024 * 1024; // owner's manuals are large but bounded
+// One cap, shared with the bucket's own file_size_limit. This function used to
+// accept 60 MB against a bucket created at 25 MB, so a manual between the two
+// passed the check here and then failed at upload with an opaque storage
+// error — after the fetch had already been paid for.
+const BUCKET = VEHICLE_DOCS_BUCKET;
+const MAX_BYTES = VEHICLE_DOCS_MAX_BYTES;
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 interface DocRow { name: string; url: string; type: string; cover_url?: string | null; cover_mime?: string | null }

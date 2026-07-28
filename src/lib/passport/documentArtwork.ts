@@ -88,6 +88,14 @@ const TYPE_STYLES: Record<string, TypeStyle> = {
 
 /** Map the many free-text type strings in the data onto one vocabulary. */
 export function canonicalDocumentType(raw?: string | null, title?: string | null): string {
+  // A value that is ALREADY canonical must map to itself. The patterns below
+  // are written for prose ("service record"), so an underscored key coming
+  // straight back out of the data ("service_record") missed every one of them
+  // and landed on "other" — which quietly dropped that type's sanitization
+  // requirement along with its styling.
+  const exact = String(raw || "").trim().toLowerCase();
+  if (exact && Object.prototype.hasOwnProperty.call(TYPE_STYLES, exact)) return exact;
+
   const s = `${raw || ""} ${title || ""}`.toLowerCase();
   if (/k-?208/.test(s)) return "k208";
   if (/buyer.?s guide|ftc/.test(s)) return "buyers_guide";
@@ -157,8 +165,15 @@ export function resolveDocumentArtwork(input: ArtworkInput): DocumentArtwork {
     return { ...base, artworkUrl: input.thumbnailUrl, artworkKind: "generated_first_page", safeForCustomerDisplay: true };
   }
 
-  // 2. An approved cover supplied by the integration.
-  if (input.coverUrl) {
+  // 2. An approved cover supplied by the integration. Held to the SAME
+  //    sanitization rule as a thumbnail: a cover is page 1 of the real file,
+  //    so for a repair order or a signed record it carries the customer's
+  //    name, address, payment and signature just as a thumbnail would. The
+  //    only covers that exist today are OEM brochures and owner's manuals,
+  //    which carry none of that — but the moment covers are generated for
+  //    dealer uploads, an ungated branch here is a PII leak onto a public
+  //    page, so the gate goes in before the pipeline arrives, not after.
+  if (input.coverUrl && thumbAllowed) {
     return { ...base, artworkUrl: input.coverUrl, artworkKind: "official_cover", safeForCustomerDisplay: true };
   }
 

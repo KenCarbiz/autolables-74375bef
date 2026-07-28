@@ -651,21 +651,30 @@ serve(async (req) => {
     // The bucket is private: what ships is a short-lived signed URL, minted
     // per request, never a stored one. A stored signed URL is what made
     // published cars show broken previews once it aged out.
-    interface CoverLinkRow {
-      url: string; title: string | null; year: number | null;
-      cover_storage_path: string | null; cover_storage_bucket: string | null;
-      cover_status: string | null; cover_mime: string | null; cover_page_count: number | null;
-    }
-    const coverFor = async (link: CoverLinkRow): Promise<PublicCover | null> => {
-      if (link.cover_status !== "ready" || !link.cover_storage_path) return null;
+    //
+    // The cover columns are read in a SEPARATE query from the link itself, on
+    // purpose. Naming them in the link select would mean that on a database
+    // where 20260728210000_oem_document_covers.sql has not been applied yet,
+    // PostgREST rejects the whole select for an unknown column, the enclosing
+    // catch swallows it, and the brochure and owner's manual silently vanish
+    // from every passport. A cosmetic thumbnail must never be able to take
+    // the document down with it, so the cover is strictly additive.
+    interface LinkRow { id: string; url: string; title: string | null; year: number | null }
+    const coverFor = async (table: string, id: string): Promise<PublicCover | null> => {
       try {
+        const { data: c } = await admin
+          .from(table)
+          .select("cover_storage_path, cover_storage_bucket, cover_status, cover_mime, cover_page_count")
+          .eq("id", id)
+          .maybeSingle();
+        if (!c || c.cover_status !== "ready" || !c.cover_storage_path) return null;
         const { data } = await admin.storage
-          .from(link.cover_storage_bucket || COVER_BUCKET)
-          .createSignedUrl(link.cover_storage_path, COVER_SIGNED_URL_TTL_SECONDS);
+          .from(c.cover_storage_bucket || COVER_BUCKET)
+          .createSignedUrl(c.cover_storage_path, COVER_SIGNED_URL_TTL_SECONDS);
         return publicCoverPayload({
           signedUrl: data?.signedUrl,
-          mime: link.cover_mime,
-          pageCount: link.cover_page_count,
+          mime: c.cover_mime,
+          pageCount: c.cover_page_count,
         });
       } catch {
         return null;
@@ -682,15 +691,25 @@ serve(async (req) => {
       if (mk && md) {
         const { data: bl } = await admin
           .from("oem_brochure_links")
-          .select("url, title, year, cover_storage_path, cover_storage_bucket, cover_status, cover_mime, cover_page_count")
+          .select("id, url, title, year")
           .ilike("make", mk).ilike("model", md)
           .order("year", { ascending: false, nullsFirst: false })
           .limit(6);
-        const rows = (bl || []) as CoverLinkRow[];
+        const rows = (bl || []) as LinkRow[];
+        // Exact year, then within two model years, then a year-less row. That
+        // last step matters: the harvest falls back to the make's "Manuals &
+        // Guides" portal, which carries no year, and the old chain dropped
+        // those rows for any vehicle that had a year -- so a harvest that
+        // succeeded still showed nothing on the passport.
         const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
           rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
-          (!yr ? rows[0] : undefined);
-        if (pick) row.oem_brochure = { url: pick.url, title: pick.title, year: pick.year, ...(await coverFor(pick) ?? {}) };
+          rows.find((r) => r.year == null);
+        if (pick) {
+          row.oem_brochure = {
+            url: pick.url, title: pick.title, year: pick.year,
+            ...(await coverFor("oem_brochure_links", pick.id) ?? {}),
+          };
+        }
       }
     } catch { /* brochure link optional */ }
 
@@ -705,15 +724,25 @@ serve(async (req) => {
       if (mk && md) {
         const { data: ml } = await admin
           .from("oem_owners_manual_links")
-          .select("url, title, year, cover_storage_path, cover_storage_bucket, cover_status, cover_mime, cover_page_count")
+          .select("id, url, title, year")
           .ilike("make", mk).ilike("model", md)
           .order("year", { ascending: false, nullsFirst: false })
           .limit(6);
-        const rows = (ml || []) as CoverLinkRow[];
+        const rows = (ml || []) as LinkRow[];
+        // Exact year, then within two model years, then a year-less row. That
+        // last step matters: the harvest falls back to the make's "Manuals &
+        // Guides" portal, which carries no year, and the old chain dropped
+        // those rows for any vehicle that had a year -- so a harvest that
+        // succeeded still showed nothing on the passport.
         const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
           rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
-          (!yr ? rows[0] : undefined);
-        if (pick) row.oem_owners_manual = { url: pick.url, title: pick.title, year: pick.year, ...(await coverFor(pick) ?? {}) };
+          rows.find((r) => r.year == null);
+        if (pick) {
+          row.oem_owners_manual = {
+            url: pick.url, title: pick.title, year: pick.year,
+            ...(await coverFor("oem_owners_manual_links", pick.id) ?? {}),
+          };
+        }
       }
     } catch { /* owner's-manual link optional */ }
 
