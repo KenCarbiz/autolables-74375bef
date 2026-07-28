@@ -1409,7 +1409,10 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
       const { data, error } = await supabase.functions.invoke("oem-brochure", { body: { make, model, year } });
       if (error || !data?.ok) {
         const code = (data as { error?: string } | null)?.error;
-        toast.error(code === "make_not_supported" ? `No official brochure source configured for ${make}.` : `No official ${make} brochure found for this model.`);
+        toast.error(
+          code === "make_not_supported" ? `No official brochure source configured for ${make}.`
+          : code === "brochure_link_not_saved" ? "Found the brochure but couldn't save the link — it won't show on the packet."
+          : `No official ${make} brochure found for this model.`);
         return;
       }
       setFound({ url: data.url, year: data.year });
@@ -1453,7 +1456,10 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
       const { data, error } = await supabase.functions.invoke("oem-owners-manual", { body: { make, model, year } });
       if (error || !data?.ok) {
         const code = (data as { error?: string } | null)?.error;
-        toast.error(code === "make_not_supported" ? `No official manual source configured for ${make}.` : `No official ${make} owner's manual found for this model.`);
+        toast.error(
+          code === "make_not_supported" ? `No official manual source configured for ${make}.`
+          : code === "manual_link_not_saved" ? "Found the manual but couldn't save the link — it won't show on the packet."
+          : `No official ${make} owner's manual found for this model.`);
         return;
       }
       setFound({ url: data.url, year: data.year });

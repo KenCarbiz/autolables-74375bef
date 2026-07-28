@@ -228,11 +228,19 @@ Deno.serve(async (req) => {
   let del = admin.from("oem_owners_manual_links").delete().ilike("make", make).ilike("model", model);
   del = manualYear === null ? del.is("year", null) : del.eq("year", manualYear);
   await del;
-  const { data: saved } = await admin.from("oem_owners_manual_links").insert(
+  const { data: saved, error: saveErr } = await admin.from("oem_owners_manual_links").insert(
     { make, model, year: manualYear, url: best.url, title: best.title || null, source, verified_at: new Date().toISOString(), cover_status: "pending" },
   ).select("id").maybeSingle();
 
-  if (saved?.id) kickCover(String(saved.id));
+  // The insert error used to be discarded, so a write that never landed still
+  // answered ok:true — the dealer was told "it now shows in the shopper
+  // packet" while the passport, which reads this table, had nothing to show.
+  // A harvest that did not persist is a failed harvest.
+  if (saveErr || !saved?.id) {
+    return json(500, { error: "manual_link_not_saved", detail: saveErr?.message ?? "insert returned no row", url: best.url });
+  }
+
+  kickCover(String(saved.id));
 
   return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: manualYear, source, cover_status: "pending" });
 });

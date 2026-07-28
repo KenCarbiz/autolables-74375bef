@@ -179,11 +179,18 @@ Deno.serve(async (req) => {
   let del = admin.from("oem_brochure_links").delete().ilike("make", make).ilike("model", model);
   del = brochureYear === null ? del.is("year", null) : del.eq("year", brochureYear);
   await del;
-  const { data: saved } = await admin.from("oem_brochure_links").insert(
+  const { data: saved, error: saveErr } = await admin.from("oem_brochure_links").insert(
     { make, model, year: brochureYear, url: best.url, title: best.title || null, source: "oem_site", verified_at: new Date().toISOString(), cover_status: "pending" },
   ).select("id").maybeSingle();
 
-  if (saved?.id) kickCover(String(saved.id));
+  // A harvest that did not persist is a failed harvest. Discarding this error
+  // reported success to the dealer while the passport, which reads this table,
+  // had nothing to show.
+  if (saveErr || !saved?.id) {
+    return json(500, { error: "brochure_link_not_saved", detail: saveErr?.message ?? "insert returned no row", url: best.url });
+  }
+
+  kickCover(String(saved.id));
 
   return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: brochureYear, cover_status: "pending" });
 });
