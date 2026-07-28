@@ -46,7 +46,11 @@ const json = (b: unknown, status = 200) =>
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
+const CRON_SECRETS = [
+  Deno.env.get("MARKETCHECK_CRON_SECRET") || "",
+  Deno.env.get("CRON_SHARED_SECRET") || "",
+].filter(Boolean);
+
 
 const BUCKET = "vehicle-docs";
 const TEMPLATE_VERSION = "1.0.0";
