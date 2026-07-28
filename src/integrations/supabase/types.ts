@@ -10053,6 +10053,7 @@ export type Database = {
       }
       rbac_is_tenant_admin: { Args: { p_tenant_id: string }; Returns: boolean }
       recalc_tenant_doc_fee: { Args: { p_tenant_id: string }; Returns: number }
+      recall_is_do_not_drive: { Args: { p: Json }; Returns: boolean }
       recall_payload_signature: { Args: { p: Json }; Returns: string }
       recompute_delivery_clearance: {
         Args: { p_tenant_id: string; p_vin: string }
