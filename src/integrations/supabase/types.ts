@@ -5047,10 +5047,14 @@ export type Database = {
       }
       passport_document_delivery_outbox: {
         Row: {
+          attempts: number
           channel: string
           created_at: string
           error: string | null
           id: string
+          last_attempt_at: string | null
+          max_attempts: number
+          next_attempt_at: string
           payload: Json
           provider: string | null
           provider_message_id: string | null
@@ -5063,10 +5067,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attempts?: number
           channel?: string
           created_at?: string
           error?: string | null
           id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
           payload?: Json
           provider?: string | null
           provider_message_id?: string | null
@@ -5079,10 +5087,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attempts?: number
           channel?: string
           created_at?: string
           error?: string | null
           id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
           payload?: Json
           provider?: string | null
           provider_message_id?: string | null
@@ -10280,6 +10292,18 @@ export type Database = {
             }
             Returns: undefined
           }
+      schedule_description_reconcile: {
+        Args: { p_schedule?: string }
+        Returns: string
+      }
+      schedule_factory_sticker_sweep: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
       schedule_ingest_orchestrate_sweep: {
         Args: {
           _cron_expr?: string
@@ -10289,6 +10313,14 @@ export type Database = {
         Returns: number
       }
       schedule_marketcheck_sync: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
+      schedule_passport_delivery_flush: {
         Args: {
           _cron_expr?: string
           _service_key?: string
