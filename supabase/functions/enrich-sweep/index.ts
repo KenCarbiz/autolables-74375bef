@@ -161,7 +161,8 @@ serve(async (req) => {
 
   const auth = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const secret = req.headers.get("x-cron-secret") || "";
-  if (!(SERVICE_KEY && auth === SERVICE_KEY) && !(CRON_SECRET && secret === CRON_SECRET)) {
+  const serviceOrCron = (SERVICE_KEY && auth === SERVICE_KEY) || (CRON_SECRET && secret === CRON_SECRET);
+  if (!serviceOrCron && !(await isAuthenticatedAdmin(req))) {
     return json(401, { error: "unauthorized" });
   }
 
