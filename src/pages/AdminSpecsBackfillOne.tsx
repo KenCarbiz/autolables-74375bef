@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 export default function AdminSpecsBackfillOne() {
-  const { tenantId } = useTenant();
+  const { tenant } = useTenant();
+  const tenantId = tenant?.id ?? null;
   const [vin, setVin] = useState("");
   const [tenantOverride, setTenantOverride] = useState("");
   const [fn, setFn] = useState<"marketcheck-specs" | "specs-backfill">("marketcheck-specs");
