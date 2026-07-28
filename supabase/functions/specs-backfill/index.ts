@@ -105,8 +105,18 @@ async function run(depth: number) {
   }
   if (depth < MAX_DEPTH) {
     const admin2 = adminClient();
+    // Must ask the SAME question the work loop asks. This used to check
+    // "options is null", which the generic-retry population fails — those
+    // VINs were decoded, so they have options — and the chain would stop
+    // with the retries still outstanding, reporting done while half the
+    // backfill had never run.
     const { data: more } = await admin2.from("vehicle_listings")
-      .select("vin").eq("status", "published").is("mc_attributes->>options", null).limit(1);
+      .select("vin").eq("status", "published")
+      .or([
+        "mc_attributes->>build_sheet.is.null",
+        "and(mc_attributes->build_sheet->>generic.eq.true,mc_attributes->>specs_strict_attempted.is.null)",
+      ].join(","))
+      .limit(1);
     if (((more as unknown[]) || []).length > 0) {
       await fetch(`${SUPABASE_URL}/functions/v1/specs-backfill`, {
         method: "POST",
