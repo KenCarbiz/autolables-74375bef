@@ -371,11 +371,28 @@ describe("autoPreload", () => {
       "https://x.supabase.co/functions/v1/generate-vehicle-forms",
       "https://x.supabase.co/functions/v1/oem-window-sticker",
       "https://x.supabase.co/functions/v1/email-title-request",
+      "https://x.supabase.co/functions/v1/marketcheck-specs",
       "https://x.supabase.co/functions/v1/ingest-orchestrate",
       "https://x.supabase.co/functions/v1/description-orchestrate",
       "https://x.supabase.co/functions/v1/factory-sticker-orchestrate",
     ]);
   });
+
+  it("decodes the VIN before the sticker orchestrator is asked to build it", async () => {
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin } = makeAdmin();
+    await autoPreload(admin, "https://x.supabase.co", "svc-key", input);
+    await artifactPostsIdle();
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    const decode = urls.indexOf("https://x.supabase.co/functions/v1/marketcheck-specs");
+    const sticker = urls.indexOf("https://x.supabase.co/functions/v1/factory-sticker-orchestrate");
+    const description = urls.indexOf("https://x.supabase.co/functions/v1/description-orchestrate");
+    expect(decode).toBeGreaterThanOrEqual(0);
+    expect(decode).toBeLessThan(sticker);
+    expect(decode).toBeLessThan(description);
+  });
+
 
   it("skips the title email by default and the listing-scoped calls without a listing id", async () => {
     const fetchMock = okFetch();
