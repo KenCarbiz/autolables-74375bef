@@ -64,6 +64,12 @@ const CANDIDATE_FILTER = [
 // condition alike. The row filter above cannot express the attempt cap, so the
 // cap is applied in TypeScript; any caller that skips that step is asking a
 // different, laxer question and will disagree about whether work remains.
+// The scan window must be much wider than the batch: the cap is applied in
+// TypeScript, so selecting only BATCH_LIMIT rows lets a handful of
+// cap-exhausted VINs sit at the head of the result forever and starve every
+// decodable VIN behind them ("all at the attempt cap" with 90 rows waiting).
+const SCAN_LIMIT = 500;
+
 async function nextCandidates(
   admin: ReturnType<typeof adminClient>,
 ): Promise<{ rows: Candidate[]; batch: Candidate[] }> {
@@ -72,10 +78,12 @@ async function nextCandidates(
     .select("tenant_id, vin, mc_attributes")
     .eq("status", "published")
     .or(CANDIDATE_FILTER)
-    .limit(BATCH_LIMIT);
+    .limit(SCAN_LIMIT);
   const rows = ((data as Candidate[] | null) || []);
-  return { rows, batch: rows.filter((r) => shouldDecodeVin(r.mc_attributes, MAX_SPEC_ATTEMPTS).decode) };
+  const decodable = rows.filter((r) => shouldDecodeVin(r.mc_attributes, MAX_SPEC_ATTEMPTS).decode);
+  return { rows, batch: decodable.slice(0, BATCH_LIMIT) };
 }
+
 
 const releaseLock = async () => {
   try { await adminClient().rpc("release_service_lock", { _key: LOCK_KEY }); }
