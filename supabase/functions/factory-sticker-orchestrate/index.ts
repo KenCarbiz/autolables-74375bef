@@ -460,9 +460,15 @@ async function orchestrateVehicle(
         const reason = fetchDetail
           ? `source_fetch_failed: ${fetchDetail}`
           : "source_fetch_returned_no_build_sheet: the provider had no equipment breakout for this VIN";
+        // NOT review_required. Nothing was produced to review, and a human
+        // cannot make the provider answer. Flagging it as a pending review
+        // put the record in a state the operator could not clear and the
+        // sweep would not retry, so the same stale reason ("source fetch
+        // failed: provider quota exhausted") sat on the card indefinitely
+        // while the actual condition was simply "no data yet".
         await setRecord(admin, record.id, {
           generation_status: "PENDING_DATA", last_error: reason,
-          review_required: true, review_reason: reason,
+          review_required: false, review_reason: null,
         });
         return {
           vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA",
@@ -472,9 +478,15 @@ async function orchestrateVehicle(
       listing.mc_attributes = mc;
     }
     if (!sheet) {
+      // Clear any stale review flag from an earlier failed run. This patch
+      // used to touch only status and last_error, so a review_reason written
+      // days ago survived every subsequent pass — which is why a card could
+      // show "Review: source_fetch_failed: provider_quota_exhausted" long
+      // after that had stopped being what was wrong.
       await setRecord(admin, record.id, {
         generation_status: "PENDING_DATA",
         last_error: "awaiting_build_sheet: no saved NeoVIN build sheet on this listing yet. Use Generate to retrieve it.",
+        review_required: false, review_reason: null,
       });
       return { vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA", skipped: "no_build_sheet" };
     }
