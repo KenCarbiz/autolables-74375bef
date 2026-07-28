@@ -2622,10 +2622,12 @@ const COVERAGE_ICON_IMG: Record<"btb" | "pt", Record<"default" | "hover" | "acti
   },
 };
 
-// Segmented-control card: 64px tall, 14px radius, uploaded state icon on the
-// left, bold title over a gray subtitle. Selected → blue/green border + tint +
+// Segmented-control card: 54px tall, 14px radius, uploaded state icon on the
+// left, bold title. The descriptive subtitle lives above the selector rather
+// than inside it — repeating it in both tabs cost ~36px of drawer height for
+// text the shopper has already read. Selected → blue/green border + tint +
 // accent title. Hover/pressed/disabled swap the icon PNG accordingly.
-const CoverageToggle = ({ selected, tone, iconKey, title, sub, disabled = false, onClick }: { selected: boolean; tone: "blue" | "green"; iconKey: "btb" | "pt"; title: string; sub: string; disabled?: boolean; onClick: () => void }) => {
+const CoverageToggle = ({ selected, tone, iconKey, title, disabled = false, onClick }: { selected: boolean; tone: "blue" | "green"; iconKey: "btb" | "pt"; title: string; disabled?: boolean; onClick: () => void }) => {
   const [hover, setHover] = useState(false);
   const [pressed, setPressed] = useState(false);
   const accent = tone === "blue" ? "#2563EB" : "#16A34A";
@@ -2650,13 +2652,10 @@ const CoverageToggle = ({ selected, tone, iconKey, title, sub, disabled = false,
       onMouseLeave={() => { setHover(false); setPressed(false); }}
       onMouseDown={() => setPressed(true)}
       onMouseUp={() => setPressed(false)}
-      className={`w-full flex items-center gap-3 h-[72px] px-3.5 py-3 rounded-2xl text-left transition-all duration-[120ms] ${box} ${pressed && !disabled ? "scale-[0.98]" : ""}`}
+      className={`w-full flex items-center justify-center gap-2 h-[54px] px-2.5 rounded-2xl transition-all duration-[120ms] ${box} ${pressed && !disabled ? "scale-[0.98]" : ""}`}
     >
-      <img src={COVERAGE_ICON_IMG[iconKey][iconState]} alt="" aria-hidden="true" className="w-[30px] h-[30px] shrink-0 object-contain" />
-      <div className="min-w-0">
-        <p className="text-[14px] font-bold leading-[1.15] whitespace-nowrap" style={{ color: disabled ? "#94A3B8" : selected ? accent : "#111827" }}>{title}</p>
-        <p className="text-[11.5px] leading-[1.25] mt-0.5" style={{ color: disabled ? "#CBD5E1" : "#64748B" }}>{sub}</p>
-      </div>
+      <img src={COVERAGE_ICON_IMG[iconKey][iconState]} alt="" aria-hidden="true" className="w-[19px] h-[19px] shrink-0 object-contain" />
+      <p className="text-[13px] font-bold leading-[1.15] whitespace-nowrap" style={{ color: disabled ? "#94A3B8" : selected ? accent : "#111827" }}>{title}</p>
     </button>
   );
 };
@@ -2712,29 +2711,30 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
   const accent = mode === "basic" ? "#2563EB" : "#16A34A";
   return (
     <div className={`${CARD} p-4`}>
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,35fr)_minmax(0,65fr)] gap-4 items-start">
-        {/* Left ~35% — segmented selector + live covered-systems list */}
-        <div className="space-y-2.5">
-          <CoverageToggle selected={mode === "basic"} tone="blue" iconKey="btb" title="Bumper-to-Bumper" sub="Basic Vehicle Coverage" onClick={() => switchTo("basic")} />
-          {hasPowertrain && <CoverageToggle selected={mode === "powertrain"} tone="green" iconKey="pt" title="Powertrain" sub="Engine, Transmission & Drivetrain" onClick={() => switchTo("powertrain")} />}
-          <ul className="pt-1.5 space-y-1.5">
-            {COVERED_SYSTEMS[mode].map((s) => (
-              <li key={s} className="flex items-center gap-1.5 text-[12px] text-[#0F172A]"><CheckCircle2 className="w-3.5 h-3.5 shrink-0" style={{ color: accent }} />{s}</li>
-            ))}
-          </ul>
-        </div>
-        {/* Right ~65% — large vehicle illustration + legend beneath */}
-        <div>
-          <div className="relative w-full" style={{ aspectRatio: "1448 / 630" }}>
-            <img src={WARR_IMG.basic} alt="Bumper-to-bumper coverage" loading="lazy" className={`${layer} ${mode === "basic" && !morphing ? "opacity-100" : "opacity-0"}`} />
-            <img src={WARR_IMG.powertrain} alt="Powertrain coverage" loading="lazy" className={`${layer} ${mode === "powertrain" && !morphing ? "opacity-100" : "opacity-0"}`} />
-            <img src={WARR_IMG.transition} alt="" aria-hidden="true" loading="lazy" className={`${layer} ${morphing ? "opacity-100" : "opacity-0"}`} />
-          </div>
-          <div className="flex items-center justify-center gap-4 mt-1.5 text-[11px] text-[#6B7280]">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: accent }} /> Covered</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-300" /> Not Covered</span>
-          </div>
-        </div>
+      {/* Both coverage types sit on one row at every width, so the shopper
+          reaches the vehicle illustration without scrolling past a stack. */}
+      <div className={`grid gap-2 ${hasPowertrain ? "grid-cols-2" : "grid-cols-1"}`}>
+        <CoverageToggle selected={mode === "basic"} tone="blue" iconKey="btb" title="Bumper-to-Bumper" onClick={() => switchTo("basic")} />
+        {hasPowertrain && <CoverageToggle selected={mode === "powertrain"} tone="green" iconKey="pt" title="Powertrain" onClick={() => switchTo("powertrain")} />}
+      </div>
+      {/* Two columns, and both coverage types carry exactly six systems — the
+          block is the same height in either mode, so switching never moves the
+          illustration under the reader's finger. */}
+      <ul className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3">
+        {COVERED_SYSTEMS[mode].map((s) => (
+          <li key={s} className="flex items-center gap-1.5 min-h-[24px] text-[13px] leading-tight text-[#0F172A]">
+            <CheckCircle2 className="w-[15px] h-[15px] shrink-0" style={{ color: accent }} />{s}
+          </li>
+        ))}
+      </ul>
+      <div className="relative w-full mt-2" style={{ aspectRatio: "1448 / 630" }}>
+        <img src={WARR_IMG.basic} alt="Bumper-to-bumper coverage" loading="lazy" className={`${layer} ${mode === "basic" && !morphing ? "opacity-100" : "opacity-0"}`} />
+        <img src={WARR_IMG.powertrain} alt="Powertrain coverage" loading="lazy" className={`${layer} ${mode === "powertrain" && !morphing ? "opacity-100" : "opacity-0"}`} />
+        <img src={WARR_IMG.transition} alt="" aria-hidden="true" loading="lazy" className={`${layer} ${morphing ? "opacity-100" : "opacity-0"}`} />
+      </div>
+      <div className="flex items-center justify-center gap-4 mt-1.5 text-[11px] text-[#6B7280]">
+        <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: accent }} /> Covered</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-300" /> Not Covered</span>
       </div>
       <div className="flex justify-end mt-2 pt-2 border-t border-slate-100">
         <button onClick={onAll} className="text-[11px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View all covered components <ArrowRight className="w-3 h-3" /></button>
@@ -2840,15 +2840,15 @@ const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
     default: return { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
   }
 };
-const TrustRow = ({ items }: { items: { icon: React.ElementType; t: string }[] }) => (
-  <div className="flex items-start justify-between mt-3 gap-1">{items.map((x) => (
-    <div key={x.t} className="flex flex-col items-center gap-0.5 text-center flex-1"><x.icon className="w-3.5 h-3.5 text-[#94A3B8]" /><span className="text-[9px] text-[#94A3B8] leading-tight">{x.t}</span></div>
-  ))}</div>
+// One line rather than three icon columns: the footer is fixed, so every pixel
+// it spends is taken off the scrollable panel above it.
+const TrustRow = ({ items }: { items: string[] }) => (
+  <p className="mt-2 text-center text-[11px] text-[#94A3B8] leading-tight">{items.join(" · ")}</p>
 );
 // Honest promise set: reserving sends a request the dealer confirms — nothing
-// is charged or instantly locked, so the chips must not claim it is.
-const TRUST_DEFAULT = [{ icon: ShieldCheck, t: "No Payment Now" }, { icon: CheckCircle2, t: "Dealer Confirms Fast" }, { icon: BadgeCheck, t: "No Obligation" }];
-const TRUST_PROGRESSIVE = [{ icon: ShieldCheck, t: "No Payment Now" }, { icon: BadgeCheck, t: "Dealer Will Confirm" }, { icon: CheckCircle2, t: "No Obligation" }];
+// is charged or instantly locked, so the line must not claim it is.
+const TRUST_DEFAULT = ["No payment", "Dealer confirmation", "No obligation"];
+const TRUST_PROGRESSIVE = ["No payment", "Dealer will confirm", "No obligation"];
 
 function MobileCtaFooter({ variant, panelKey, go, signals }: { variant: string; panelKey: string; go: (s: string) => void; signals: CtaSignals }) {
   const cta = ctaFor(panelKey, signals);
