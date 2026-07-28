@@ -420,7 +420,14 @@ export async function runRenderPipeline(
 ): Promise<FactoryStickerRenderResult> {
   const model = buildRenderLayout(data, theme);
   const pdfBytes = await realizePdf(model, pdfLib);
-  const previewSvg = layoutToSvg(model);
+  // Page 1 only. layoutToSvg stacks every page vertically into one tall
+  // image, so a two-page sticker was stored as a compressed contact sheet and
+  // the Passport rendered it as the thumbnail. Every other caller already
+  // narrows to a single page; this one — the stored asset — did not.
+  //
+  // The PDF itself is untouched: View, Download and Print still serve the
+  // complete multi-page document, and the page count stays in the model.
+  const previewSvg = layoutToSvg(model.pages.length > 1 ? { ...model, pages: [model.pages[0]] } : model);
   return {
     pdfBytes,
     previewSvg,
