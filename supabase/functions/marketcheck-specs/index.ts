@@ -293,8 +293,15 @@ Deno.serve(async (req) => {
     // Retryable: the caller must NOT spend a decode attempt on this, and must
     // not finalize the vehicle as having no equipment.
     if (providerRefused !== null) {
+      // Name the actual status. Calling every refusal "quota exhausted" sent
+      // us chasing a billing problem that did not exist: 401 is credentials,
+      // 403 is plan scope on that endpoint, 429 is rate. They need different
+      // responses and must never be reported as one thing.
+      const kind = providerRefused === 429 ? "provider_rate_limited"
+        : providerRefused === 401 ? "provider_unauthorized"
+        : "provider_forbidden";
       return json(200, {
-        ok: false, error: "provider_quota_exhausted", retryable: true,
+        ok: false, error: kind, retryable: true,
         provider_status: providerRefused, tried,
       });
     }
