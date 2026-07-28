@@ -96,11 +96,18 @@ export function canonicalDocumentType(raw?: string | null, title?: string | null
   const exact = String(raw || "").trim().toLowerCase();
   if (exact && Object.prototype.hasOwnProperty.call(TYPE_STYLES, exact)) return exact;
 
-  const s = `${raw || ""} ${title || ""}`.toLowerCase();
-  if (/k-?208/.test(s)) return "k208";
-  if (/buyer.?s guide|ftc/.test(s)) return "buyers_guide";
+  // Underscores, hyphens and curly apostrophes all collapse first, so the
+  // patterns below only ever have to describe the prose form.
+  const s = `${raw || ""} ${title || ""}`
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (/k ?208/.test(s)) return "k208";
+  if (/buyer'?s? guide|ftc/.test(s)) return "buyers_guide";
   if (/carfax|autocheck|vehicle history|history report/.test(s)) return "vehicle_history";
-  if (/owner.?s manual/.test(s)) return "owners_manual";
+  if (/owner'?s? manual|^manual\b|\bmanual$/.test(s)) return "owners_manual";
   if (/brochure/.test(s)) return "brochure";
   if (/build (record|sheet)/.test(s)) return "build_sheet";
   if (/window|monroney|sticker/.test(s)) return "window_sticker";
@@ -112,6 +119,39 @@ export function canonicalDocumentType(raw?: string | null, title?: string | null
 }
 
 const isImage = (url?: string | null) => !!url && /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url);
+
+/**
+ * Canonical type -> the cover art to draw for it. This is the ONLY place the
+ * two vocabularies meet; no component may compare document-type strings of
+ * its own. `provider` splits the history report into a CARFAX-titled record
+ * and a generic one — the drawn cover is unbranded either way, because the
+ * repository holds no authorized CARFAX asset.
+ */
+export function documentCoverType(
+  rawType?: string | null,
+  title?: string | null,
+  provider?: string | null,
+): "factory_sticker" | "carfax" | "vehicle_history" | "owners_manual" | "oem_brochure" | "buyers_guide" | "warranty" | "generic" {
+  const canonical = canonicalDocumentType(rawType, title);
+  switch (canonical) {
+    case "window_sticker":
+    case "factory_sticker":
+    case "build_sheet":
+      return "factory_sticker";
+    case "vehicle_history":
+      return /carfax/i.test(`${provider ?? ""} ${rawType ?? ""} ${title ?? ""}`) ? "carfax" : "vehicle_history";
+    case "owners_manual":
+      return "owners_manual";
+    case "brochure":
+      return "oem_brochure";
+    case "buyers_guide":
+      return "buyers_guide";
+    case "warranty":
+      return "warranty";
+    default:
+      return "generic";
+  }
+}
 
 /**
  * The page-1 cover fields public-listing-view attaches to a harvested OEM

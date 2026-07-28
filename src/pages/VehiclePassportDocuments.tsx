@@ -19,7 +19,9 @@ import { resolvePassportBack } from "@/lib/passportReturn";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { listingHero } from "@/lib/photos";
-import { imageCoverUrl, resolveDocumentArtwork, type ArtworkInput, type OemLinkCover } from "@/lib/passport/documentArtwork";
+import { documentCoverType, imageCoverUrl, resolveDocumentArtwork, type ArtworkInput, type OemLinkCover } from "@/lib/passport/documentArtwork";
+import { countAvailableDocuments } from "@/lib/passport/documentAvailability";
+import { DocumentCoverThumbnail } from "@/components/passport/DocumentCoverThumbnail";
 import { usePublishedWindowSticker } from "@/hooks/usePublishedWindowSticker";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
@@ -68,6 +70,28 @@ const PASSPORT_NAV: { label: string; to?: string; panel?: string; active?: boole
   { label: "Why Buy From This Dealership?", to: "dealer" }, { label: "Documents", to: "documents", active: true },
 ];
 
+// What a drawn cover is built from. Read off the listing once, per page, so
+// no card re-derives year/make/model for itself.
+interface CoverVehicle {
+  year?: string; make?: string; model?: string; trim?: string; vin?: string;
+  photo?: string | null; provider?: string | null; oemLogoUrl?: string | null;
+}
+
+// Split the stored "2025 INFINITI QX55 LUXE" once. Every card used to re-split
+// it inline for its own copy.
+const coverVehicleFor = (listing: VehicleListing): CoverVehicle => {
+  const parts = (listing.ymm || "").trim().split(/\s+/);
+  return {
+    year: parts[0] || "",
+    make: parts[1] || "",
+    model: parts.slice(2).join(" "),
+    trim: listing.trim || "",
+    vin: listing.vin || "",
+    photo: listingHero(listing) || null,
+    oemLogoUrl: null,
+  };
+};
+
 const ARTWORK_ICONS = {
   FileSpreadsheet, History: HistoryIcon, PanelsTopLeft, BookOpen, ClipboardCheck,
   Wrench, FileCheck2, ShieldCheck, FileSignature, FileText,
@@ -85,8 +109,8 @@ const ARTWORK_ICONS = {
 // is what makes that resolve: the well is itself a stretched flex item, so
 // `h-full` inside it would depend on stretched items being treated as definite,
 // while stretching the sheet needs no resolution at all.
-const DocumentPreview = ({ input, onQuickView }: {
-  input: ArtworkInput; onQuickView?: () => void;
+const DocumentPreview = ({ input, vehicle, onQuickView }: {
+  input: ArtworkInput; vehicle?: CoverVehicle; onQuickView?: () => void;
 }) => {
   const art = resolveDocumentArtwork(input);
   const [failed, setFailed] = useState(false);
@@ -98,12 +122,15 @@ const DocumentPreview = ({ input, onQuickView }: {
   // one. `w-full` used to fight `max-h-full` here — the box went full width and
   // the page was letterboxed inside it, which is where the dead gutters came
   // from.
+  // Height-driven: the sheet stands at the well's full height and takes the
+  // width its own page shape gives it, so an 11x8.5 window sticker reads as a
+  // landscape page and an 8.5x11 form as an upright one.
   const sheet = art.orientation === "landscape"
     ? "self-stretch w-auto max-w-full aspect-[11/8.5]"
     : "self-stretch w-auto max-w-full aspect-[8.5/11]";
 
   return (
-    <div className="relative w-full flex items-center justify-center overflow-hidden bg-[#F8FAFC] p-1.5 h-[104px] sm:h-auto sm:min-h-[126px] sm:border-r sm:border-[#E2E8F0] lg:h-[104px] lg:min-h-0 lg:border-r-0 xl:h-auto xl:min-h-[126px] xl:border-r">
+    <div className="relative w-full flex items-center justify-center overflow-hidden bg-[#F8FAFC] p-1.5 min-h-[131px] sm:min-h-[172px] sm:border-r sm:border-[#E2E8F0] lg:min-h-[131px] lg:border-r-0 xl:min-h-[172px] xl:border-r">
       {showImage ? (
         <img
           src={art.artworkUrl!}
@@ -120,6 +147,25 @@ const DocumentPreview = ({ input, onQuickView }: {
           // government form is never cropped.
           className={`${sheet} bg-white ${art.orientation === "landscape" ? "object-cover object-top" : "object-contain"}`}
           style={{ border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 2px 6px rgba(15,23,42,0.12)" }}
+        />
+      ) : vehicle ? (
+        // A drawn cover built from this vehicle. Replaces the old icon-on-a-
+        // blank-sheet, which told the shopper nothing and read as a document
+        // that had failed to load.
+        <DocumentCoverThumbnail
+          className="self-stretch w-auto max-w-full"
+          type={documentCoverType(input.type, input.title, vehicle.provider)}
+          year={vehicle.year}
+          make={vehicle.make}
+          model={vehicle.model}
+          trim={vehicle.trim}
+          vin={vehicle.vin}
+          primaryVehiclePhotoUrl={vehicle.photo}
+          provider={vehicle.provider}
+          oemLogoUrl={vehicle.oemLogoUrl}
+          // The record's own name ("Retail Installment Contract") when it has
+          // one, else its type label. accessibleLabel already resolves that.
+          neutralTitle={art.accessibleLabel}
         />
       ) : (
         <div
@@ -237,7 +283,7 @@ const OwnersManualCard = ({
   const openManual = () => { track("owners_manual_open"); window.open(m.url, "_blank", "noopener"); };
   return (
     <RecordCard
-      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual", coverUrl: imageCoverUrl(m) }} onQuickView={openManual} />}
+      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual", coverUrl: imageCoverUrl(m) }} vehicle={coverVehicleFor(listing)} onQuickView={openManual} />}
       title={`Official ${mk.toUpperCase()} Owner's Manual${m.year ? ` (${m.year})` : ""}`}
       source={`${mk.toUpperCase()} · Manufacturer source`}
       status="external"
@@ -484,6 +530,7 @@ const VehiclePassportDocuments = () => {
   const pp = (s: string) =>
     s ? `/v/${slug}/${s}${isPreview ? "?preview=1" : ""}` : resolvePassportBack(window.location.search, slug || "", isPreview);
   const hero = listingHero(listing);
+  const coverVehicle = coverVehicleFor(listing);
   const total = allDocs.length;
   const adv = d.dealerTrust;
   const share = async (url: string) => { try { if (navigator.share) { await navigator.share({ url }); return; } } catch { return; } await navigator.clipboard.writeText(url); toast.success("Link copied"); };
@@ -525,8 +572,11 @@ const VehiclePassportDocuments = () => {
   const manualStored = allDocs.some((x) => x.type === "owners_manual");
   const manualLink = oemManual?.url && packetVisible(listing, "ownersManual") && !manualStored ? oemManual : null;
   const stickerLink = listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker") ? listing.oem_sticker_url : null;
-  const externalCount = (histLink ? 1 : 0) + (brochureLink ? 1 : 0) + (manualLink ? 1 : 0) + (stickerLink ? 1 : 0);
-  const availableCount = uploaded.length + externalCount + (factoryDocUrl ? 1 : 0);
+  const availableCount = countAvailableDocuments({
+    uploadedCount: uploaded.length,
+    hasFactoryRecord: !!factoryDocUrl,
+    externalLinks: [histLink?.url, brochureLink?.url, manualLink?.url, stickerLink],
+  });
   const lastChecked = lastUpdated || "Today";
   const trackDoc = (cta: string, meta: Record<string, unknown> = {}) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page", ...meta } }); };
   const toggleReq = (k: string) => setReqSel((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
@@ -540,7 +590,7 @@ const VehiclePassportDocuments = () => {
   const uploadedAction = (doc: Doc) => (
     <div className="flex items-center gap-2">
       <button onClick={() => setPreview(doc)} className="flex-1 h-11 sm:h-8 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Eye className="w-4 h-4" /> Preview</button>
-      <a href={doc.url} download target="_blank" rel="noreferrer" className="flex-1 h-11 sm:h-8 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"><Download className="w-4 h-4" /> Download</a>
+      <a href={doc.url} download target="_blank" rel="noopener noreferrer" className="flex-1 h-11 sm:h-8 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"><Download className="w-4 h-4" /> Download</a>
     </div>
   );
   const externalAction = (url: string, label: string, cta: string, meta: Record<string, unknown> = {}) => (
@@ -675,7 +725,7 @@ const VehiclePassportDocuments = () => {
                   <div className="space-y-2.5">
                     {uploaded.map(({ doc, status }, i) => (
                       <RecordCard key={`u-${i}`}
-                        cover={<DocumentPreview input={{ type: doc.type, title: doc.name, url: doc.url }} onQuickView={() => setPreview(doc)} />}
+                        cover={<DocumentPreview input={{ type: doc.type, title: doc.name, url: doc.url }} vehicle={coverVehicle} onQuickView={() => setPreview(doc)} />}
                         title={doc.name}
                         source={`Provided by ${dealerName}`}
                         status={status}
@@ -685,7 +735,7 @@ const VehiclePassportDocuments = () => {
                     ))}
                     {factoryDocUrl && factoryDoc && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: isNewCar ? "window_sticker" : "build_sheet", title: isNewCar ? "Window Sticker" : "Build Record", thumbnailUrl: publishedSticker?.thumbnailUrl ?? null }} onQuickView={openFactoryRecord} />}
+                        cover={<DocumentPreview input={{ type: isNewCar ? "window_sticker" : "build_sheet", title: isNewCar ? "Window Sticker" : "Build Record", thumbnailUrl: publishedSticker?.thumbnailUrl ?? null }} vehicle={coverVehicle} onQuickView={openFactoryRecord} />}
                         title={factoryTitle}
                         source={factorySubtitle}
                         status="available"
@@ -705,7 +755,7 @@ const VehiclePassportDocuments = () => {
                               <Eye className="w-4 h-4" /> View Document
                             </button>
                             <a
-                              href={factoryDoc.pdf_url || factoryDocUrl} download target="_blank" rel="noreferrer"
+                              href={factoryDoc.pdf_url || factoryDocUrl} download target="_blank" rel="noopener noreferrer"
                               onClick={() => trackDoc("factory_build_record_download")}
                               className="h-11 sm:h-8 px-3.5 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"
                             >
@@ -723,7 +773,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {histLink && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: "vehicle_history", title: "Vehicle History Report" }} onQuickView={openExternal(histLink.url, "history_report", { provider: histLink.provider })} />}
+                        cover={<DocumentPreview input={{ type: "vehicle_history", title: "Vehicle History Report" }} vehicle={{ ...coverVehicle, provider: histLink.provider }} onQuickView={openExternal(histLink.url, "history_report", { provider: histLink.provider })} />}
                         title={`${historyReportName(histLink.provider)} Vehicle History Report`}
                         source={histLink.source === "vin" ? `${historyReportName(histLink.provider)} · Official VIN record` : `${histLink.provider === "autocheck" ? "AutoCheck" : "CARFAX"} · provided by ${dealerName}`}
                         status="external"
@@ -734,7 +784,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {brochureLink && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure", coverUrl: imageCoverUrl(brochureLink) }} onQuickView={openExternal(brochureLink.url, "oem_brochure")} />}
+                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure", coverUrl: imageCoverUrl(brochureLink) }} vehicle={coverVehicle} onQuickView={openExternal(brochureLink.url, "oem_brochure")} />}
                         title={`${(listing.ymm || "").trim()} Official Brochure`}
                         source={`${((listing.ymm || "").trim().split(/\s+/)[1] || "Manufacturer").toUpperCase()} USA · Manufacturer source`}
                         status="external"
@@ -746,7 +796,7 @@ const VehiclePassportDocuments = () => {
                     <OwnersManualCard listing={listing} isPreview={isPreview} hasStoredCopy={manualStored} />
                     {stickerLink && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: "window_sticker", title: "Window Sticker", url: stickerLink }} onQuickView={openExternal(stickerLink, "oem_window_sticker")} />}
+                        cover={<DocumentPreview input={{ type: "window_sticker", title: "Window Sticker", url: stickerLink }} vehicle={coverVehicle} onQuickView={openExternal(stickerLink, "oem_window_sticker")} />}
                         title="Original OEM Window Sticker"
                         source="Manufacturer source"
                         status="external"
@@ -851,7 +901,7 @@ const VehiclePassportDocuments = () => {
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E6E8EC] shrink-0">
               <div className="flex items-center gap-2.5 min-w-0"><span className="w-9 h-9 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></span><p className="font-bold truncate">{preview.name}</p></div>
               <div className="flex items-center gap-2 shrink-0">
-                <a href={preview.url} download target="_blank" rel="noreferrer" className="h-9 px-3 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-[#2563EB]"><Download className="w-4 h-4" /> Download</a>
+                <a href={preview.url} download target="_blank" rel="noopener noreferrer" className="h-9 px-3 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-[#2563EB]"><Download className="w-4 h-4" /> Download</a>
                 <button onClick={() => window.open(preview.url, "_blank")} className="h-9 px-3 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-[#2563EB]"><Printer className="w-4 h-4" /> Print</button>
                 <button onClick={() => share(preview.url)} className="h-9 px-3 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-[#2563EB]"><Upload className="w-4 h-4" /> Share</button>
                 <button onClick={() => setPreview(null)} className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center"><X className="w-5 h-5" /></button>
