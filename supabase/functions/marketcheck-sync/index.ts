@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
+import { isDue, overdueBy, skipReason } from "../_shared/syncSchedule.ts";
 
 // Artifact posts are queued and paced, so they can still be in flight when the
 // handler returns. Without this the isolate is torn down mid-queue and the
@@ -290,20 +291,9 @@ const makeSlug = (vin: string, ymm: string | undefined) => {
   return seed.replace(/^-+|-+$/g, "").slice(0, 64);
 };
 
-// Is this tenant due to run in the current UTC hour, given its cadence?
-const isDue = (cfg: SyncConfig, now: Date): boolean => {
-  if (now.getUTCHours() !== cfg.run_hour) return false;
-  const last = cfg.last_run_at ? new Date(cfg.last_run_at).getTime() : 0;
-  const hoursSince = (now.getTime() - last) / 3.6e6;
-  const dow = now.getUTCDay();
-  switch (cfg.frequency) {
-    case "nightly":  return hoursSince >= 20;
-    case "weekly":   return dow === cfg.day_of_week && hoursSince >= 6 * 24;
-    case "biweekly": return dow === cfg.day_of_week && hoursSince >= 13 * 24;
-    case "monthly":  return dow === cfg.day_of_week && hoursSince >= 27 * 24;
-    default:         return false;
-  }
-};
+// Scheduling lives in ../_shared/syncSchedule.ts, where it is unit-tested
+// against a fixed clock. It used to be an exact-hour equality here, which gave
+// each tenant exactly one chance per cadence period.
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -458,9 +448,32 @@ serve(async (req) => {
   if (cErr) return json(500, { error: cErr.message });
 
   const now = new Date();
-  const due = (configs || [])
-    .filter((c: SyncConfig) => toSourceHost(c.source) || (c.dealer_id || "").trim())
-    .filter((c: SyncConfig) => (body.force && body.tenant_id) ? true : isDue(c, now));
+  const reachable = (configs || [])
+    .filter((c: SyncConfig) => toSourceHost(c.source) || (c.dealer_id || "").trim());
+  const forced = !!(body.force && body.tenant_id);
+  const due = reachable.filter((c: SyncConfig) => forced ? true : isDue(c, now));
+
+  // A tenant that was considered and passed over used to leave no trace at
+  // all, so afterwards there was no way to tell a rooftop that never ran from
+  // one that ran and legitimately found nothing. Every skip is now reported,
+  // and a tenant that is genuinely overdue is written to inventory_sync_runs
+  // so it surfaces in the same place a failure would.
+  const skipped = forced ? [] : reachable
+    .filter((c: SyncConfig) => !due.includes(c))
+    .map((c: SyncConfig) => ({
+      tenant_id: c.tenant_id,
+      reason: skipReason(c, now),
+      overdue_hours: overdueBy(c, now),
+      last_run_at: c.last_run_at,
+    }));
+  for (const sk of skipped) {
+    if (sk.overdue_hours <= 0) continue;
+    await logSyncRun({
+      tenant_id: sk.tenant_id, started_at: now.toISOString(), status: "skipped",
+      error_summary: `overdue by ${sk.overdue_hours}h (${sk.reason})`,
+      raw: { reason: sk.reason, overdue_hours: sk.overdue_hours, last_run_at: sk.last_run_at },
+    });
+  }
 
   let tenantsSynced = 0, newVehicles = 0, listingsUpserted = 0, pricesRecorded = 0, seen = 0;
   const errors: Array<{ tenant_id: string; error: string }> = [];
@@ -1355,5 +1368,8 @@ serve(async (req) => {
     listings_seen: seen, new_vehicles: newVehicles,
     listings_upserted: listingsUpserted, prices_recorded: pricesRecorded,
     enrich_queued: enrichQueue.length, enriched, errors, diagnostics,
+    // Why each considered tenant was passed over, so an empty run can be read
+    // as "nothing was due" or "something is overdue" rather than just silence.
+    tenants_considered: reachable.length, skipped,
   });
 });
