@@ -335,12 +335,29 @@ async function orchestrateVehicle(
     ? `${opts.targeting.primaryKeyword || ""}|${(opts.targeting.secondaryKeywords || []).slice().sort().join(",")}|${opts.targeting.city || ""}`
     : "default";
   const jobKey = `${tenantId}:${vehicleId}:${sdv}:${configVersion}:${toneKey}:${targetKey}:${scopedRun ? "channels:" + [...opts.channels!].sort().join("+") : "full_generation"}`;
-  const { data: jobId } = await admin.rpc("claim_description_job", {
+  const { data: jobId, error: claimErr } = await admin.rpc("claim_description_job", {
     p_tenant_id: tenantId, p_vehicle_id: vehicleId, p_case_id: caseId,
     p_job_type: "full_generation", p_idempotency_key: jobKey,
     p_payload: { reason: opts.reason || "ingest" },
     p_allow_completed: !!opts.force,
   });
+  // A failed claim and a genuine concurrent claim both yield a null job id, so
+  // the error has to be read. Discarding it once cost this pipeline every
+  // generation on every vehicle: a dropped RPC reported for weeks as the benign
+  // "already running", with no failure recorded anywhere to contradict it.
+  if (claimErr) {
+    await audit(admin, tenantId, "description_job_claim_failed", caseId,
+      { vin: listing.vin, code: claimErr.code ?? null, message: String(claimErr.message || "").slice(0, 300) });
+    await setCase(admin, caseId, {
+      status: "FAILED_RETRYABLE",
+      last_failure_at: new Date().toISOString(),
+      last_error_message: `Could not claim a generation job: ${String(claimErr.message || "unknown")}`.slice(0, 500),
+    });
+    return {
+      vehicle_id: vehicleId, case_id: caseId,
+      error: "JOB_CLAIM_FAILED", retryable: true, cost_incurred: false,
+    };
+  }
   if (!jobId) return { vehicle_id: vehicleId, case_id: caseId, skipped: "already_claimed" };
 
   const raisedTypes = new Set<string>();
@@ -603,6 +620,11 @@ async function orchestrateVehicle(
     // rebuilt; everything else keeps its existing variant.
     const scoped = Array.isArray(opts.channels) && opts.channels.length
       ? allEnabled.filter((k) => opts.channels!.includes(k)) : allEnabled;
+    // Naming a channel the tenant has not enabled used to intersect to nothing
+    // and fall through silently: the master was regenerated at full provider
+    // cost, no variant was written, and the caller was told nothing. Say so.
+    const refusedChannels = Array.isArray(opts.channels) && opts.channels.length
+      ? opts.channels.filter((k) => !allEnabled.includes(k)) : [];
     const enabled = scoped;
     const channelRows: Array<Record<string, unknown>> = [];
     // Cross-channel comparison corpus, grown as each variant lands.
@@ -835,6 +857,7 @@ async function orchestrateVehicle(
       status: finalStatus, eligibility, quality,
       fact_confidence: snap.fact_confidence, channels: channelRows.length,
       conflicts: snap.conflicts.length, published,
+      ...(refusedChannels.length ? { refused_channels: refusedChannels } : {}),
     };
   } catch (e) {
     const err = e as Error & { code?: string };

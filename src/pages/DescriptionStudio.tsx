@@ -82,6 +82,7 @@ const DescriptionStudio = () => {
   const snapshot = record?.snapshot ?? null;
   const versions: Row[] = record?.versions ?? [];
   const channels: Row[] = record?.channels ?? [];
+  const enabledChannels: string[] = record?.enabledChannels ?? [];
   const findings: Row[] = record?.findings ?? [];
   const deliveries: Row[] = record?.deliveries ?? [];
 
@@ -137,8 +138,13 @@ const DescriptionStudio = () => {
   const blocking = channelFindings.filter((f) => f.blocking);
 
   const statusFor = useCallback((key: string): ChannelCardStatus => {
-    const enabled = CHANNEL_META.some((m) => m.key === key);
-    if (!enabled) return { state: "disabled", disabledReason: "Not available" };
+    // The tenant's own destination list governs. Reading the static catalog
+    // here offered a Generate button for a destination the server would not
+    // build — the master was regenerated at full cost and no variant appeared.
+    const known = CHANNEL_META.some((m) => m.key === key);
+    const enabled = known && (enabledChannels.length === 0 || enabledChannels.includes(key));
+    if (!known) return { state: "disabled", disabledReason: "Not available" };
+    if (!enabled) return { state: "disabled", disabledReason: "Not enabled for this dealership" };
     const cv = channels.find((c) => c.channel === key);
     if (!cv) return { state: "not_generated", note: "Not generated" };
     if (cv.validation_status === "blocked") return { state: "warning", note: "Validation failed" };
@@ -147,7 +153,7 @@ const DescriptionStudio = () => {
     if (m?.connectorStatus === "not_configured") return { state: "warning", note: "No connector" };
     if (m?.deliveryMode === "export_only") return { state: "ready", note: "Export only" };
     return { state: "ready", note: "Draft ready" };
-  }, [channels]);
+  }, [channels, enabledChannels]);
 
   // ── Actions ────────────────────────────────────────────────────────
   const copy = async () => {

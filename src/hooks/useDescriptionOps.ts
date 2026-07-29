@@ -207,6 +207,8 @@ export function useDescriptionCase(vehicleId: string | undefined) {
     caseRow: DescriptionCaseRow | null; vehicle: Row | null;
     versions: Row[]; channels: Row[]; findings: Row[];
     exceptions: Row[]; snapshot: Row | null; deliveries: Row[];
+    /** The tenant's own destinations, not the static catalog. */
+    enabledChannels: string[];
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -219,9 +221,13 @@ export function useDescriptionCase(vehicleId: string | undefined) {
         .select("*").eq("id", vehicleId).maybeSingle();
       const { data: caseRow } = await (supabase as any).from("description_cases")
         .select("*").eq("tenant_id", tenant.id).eq("vehicle_id", vehicleId).maybeSingle();
+      const { data: settingsRow } = await (supabase as any).from("description_settings")
+        .select("enabled_channels").eq("tenant_id", tenant.id).maybeSingle();
+      const enabledChannels: string[] = Array.isArray(settingsRow?.enabled_channels)
+        ? settingsRow.enabled_channels : [];
 
       if (!caseRow) {
-        setRecord({ caseRow: null, vehicle: veh, versions: [], channels: [], findings: [], exceptions: [], snapshot: null, deliveries: [] });
+        setRecord({ caseRow: null, vehicle: veh, versions: [], channels: [], findings: [], exceptions: [], snapshot: null, deliveries: [], enabledChannels });
         return;
       }
       const [vers, chans, finds, excs, snaps, dels] = await Promise.all([
@@ -248,6 +254,7 @@ export function useDescriptionCase(vehicleId: string | undefined) {
         caseRow, vehicle: veh,
         versions: vers.data || [], channels: [...byChannel.values()], findings: finds.data || [],
         exceptions: excs.data || [], snapshot: (snaps.data || [])[0] || null, deliveries: dels.data || [],
+        enabledChannels,
       });
     } catch (e) {
       setError((e as Error).message || "Could not load the description record");

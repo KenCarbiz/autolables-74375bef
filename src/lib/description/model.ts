@@ -176,3 +176,24 @@ export function sweepState(s: SweepCounts): SweepState {
   if (s.settled === 0 && s.pending > 0) return "queued";
   return "working";
 }
+
+// ── Destination availability ─────────────────────────────────────────
+// Whether a writing preset can be generated for THIS dealership.
+//
+// The Studio previously derived this from the static catalog, which offered a
+// Generate button for a destination the server would refuse to build: the
+// master was regenerated at full provider cost, the channel loop intersected
+// to nothing, and no variant ever appeared. The tenant's own list governs.
+
+export type ChannelAvailability = "available" | "not_enabled" | "unknown_channel";
+
+export function channelAvailability(
+  key: string, enabledChannels: string[],
+): ChannelAvailability {
+  if (!CHANNEL_META.some((m) => m.key === key)) return "unknown_channel";
+  // An empty list means settings have not loaded yet, not that every
+  // destination is off — blanking the whole grid on a slow query is worse
+  // than briefly showing a card the server may still refuse.
+  if (!enabledChannels.length) return "available";
+  return enabledChannels.includes(key) ? "available" : "not_enabled";
+}
