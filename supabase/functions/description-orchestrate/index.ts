@@ -42,6 +42,30 @@ const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
 const RECONCILE_BUDGET_MS = 100_000;
 const RECONCILE_MAX_DEPTH = 80; // backstop against runaway chaining
 
+// A dropped/renamed RPC signature returns { data: null, error } — destructuring
+// only `data` turns that into an indistinguishable "nothing to do" and the
+// pipeline stalls silently. Every RPC goes through one of these two.
+async function rpc<T = unknown>(admin: any, fn: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await admin.rpc(fn, args);
+  if (error) {
+    console.error(`rpc ${fn} failed`, error.code, error.message, error.details ?? "");
+    throw new Error(`rpc_failed:${fn}:${error.code || ""}:${error.message}`);
+  }
+  return data as T;
+}
+
+// Advisory RPCs: a failure must be visible in logs but must not abort the run.
+async function rpcSoft(admin: any, fn: string, args: Record<string, unknown>): Promise<boolean> {
+  const { error } = await admin.rpc(fn, args);
+  if (error) {
+    console.error(`rpc ${fn} failed (non-fatal)`, error.code, error.message, error.details ?? "");
+    return false;
+  }
+  return true;
+}
+
+
+
 const DEFAULT_SETTINGS = {
   review_mode: "EXCEPTION_REVIEW", review_mode_by_class: {},
   enabled_channels: ["vehicle_passport", "dealer_website", "autotrader", "cars_com", "cargurus", "facebook", "google_seo"],
@@ -304,7 +328,7 @@ async function orchestrateVehicle(
   if (listing.tenant_id !== tenantId) return { vehicle_id: vehicleId, skipped: "tenant_mismatch" };
   if (listing.status === "archived") return { vehicle_id: vehicleId, skipped: "archived" };
 
-  const { data: caseId } = await admin.rpc("init_description_case", {
+  const caseId = await rpc<string | null>(admin, "init_description_case", {
     p_tenant_id: tenantId, p_vehicle_id: vehicleId,
   });
   if (!caseId) return { vehicle_id: vehicleId, skipped: "case_not_initialized" };
@@ -321,7 +345,7 @@ async function orchestrateVehicle(
   if (existing && existing.processed_source_data_version &&
       existing.processed_source_data_version !== sdv &&
       (existing.master_locked || existing.status === "PUBLISHED")) {
-    await admin.rpc("mark_description_stale", { p_case_id: caseId, p_reason: "source data changed" });
+    await rpcSoft(admin, "mark_description_stale", { p_case_id: caseId, p_reason: "source data changed" });
   }
 
   if (!opts.force && existing?.processed_source_data_version === sdv &&
@@ -335,29 +359,16 @@ async function orchestrateVehicle(
     ? `${opts.targeting.primaryKeyword || ""}|${(opts.targeting.secondaryKeywords || []).slice().sort().join(",")}|${opts.targeting.city || ""}`
     : "default";
   const jobKey = `${tenantId}:${vehicleId}:${sdv}:${configVersion}:${toneKey}:${targetKey}:${scopedRun ? "channels:" + [...opts.channels!].sort().join("+") : "full_generation"}`;
-  const { data: jobId, error: claimErr } = await admin.rpc("claim_description_job", {
+  // rpc() throws on a failed claim, so a null id here is only ever a genuine
+  // concurrent claim. Discarding that error once cost this pipeline every
+  // generation on every vehicle: a dropped RPC reported for weeks as the
+  // benign "already running", with no failure recorded to contradict it.
+  const jobId = await rpc<string | null>(admin, "claim_description_job", {
     p_tenant_id: tenantId, p_vehicle_id: vehicleId, p_case_id: caseId,
     p_job_type: "full_generation", p_idempotency_key: jobKey,
     p_payload: { reason: opts.reason || "ingest" },
     p_allow_completed: !!opts.force,
   });
-  // A failed claim and a genuine concurrent claim both yield a null job id, so
-  // the error has to be read. Discarding it once cost this pipeline every
-  // generation on every vehicle: a dropped RPC reported for weeks as the benign
-  // "already running", with no failure recorded anywhere to contradict it.
-  if (claimErr) {
-    await audit(admin, tenantId, "description_job_claim_failed", caseId,
-      { vin: listing.vin, code: claimErr.code ?? null, message: String(claimErr.message || "").slice(0, 300) });
-    await setCase(admin, caseId, {
-      status: "FAILED_RETRYABLE",
-      last_failure_at: new Date().toISOString(),
-      last_error_message: `Could not claim a generation job: ${String(claimErr.message || "unknown")}`.slice(0, 500),
-    });
-    return {
-      vehicle_id: vehicleId, case_id: caseId,
-      error: "JOB_CLAIM_FAILED", retryable: true, cost_incurred: false,
-    };
-  }
   if (!jobId) return { vehicle_id: vehicleId, case_id: caseId, skipped: "already_claimed" };
 
   const raisedTypes = new Set<string>();
@@ -440,7 +451,7 @@ async function orchestrateVehicle(
     // than discovered by the model.
     const { data: budgetRow } = await admin.from("description_generation_budgets")
       .select("*").eq("tenant_id", tenantId).maybeSingle();
-    const { data: spend } = await admin.rpc("description_generation_spend", { p_tenant_id: tenantId });
+    const spend = await rpc(admin, "description_generation_spend", { p_tenant_id: tenantId });
     const budgetCfg = budgetRow ? {
       ...DEFAULT_BUDGET,
       monthlyGenerationBudget: budgetRow.monthly_generation_budget,
@@ -774,7 +785,7 @@ async function orchestrateVehicle(
     // Auto-publish only when eligible, permitted, and not manually locked.
     let published = false;
     const { data: caseNow } = await admin.from("description_cases").select("lock_version, master_locked").eq("id", caseId).maybeSingle();
-    const { data: gate } = await admin.rpc("description_publish_allowed", {
+    const gate = await rpc(admin, "description_publish_allowed", {
       p_case_id: caseId, p_version_id: version.id,
     });
     const gateOk = (gate as any)?.ok !== false;
@@ -783,7 +794,7 @@ async function orchestrateVehicle(
       // trips, and a crash mid-flight must leave a status the reconcile sweep
       // recognizes as stalled rather than a silent "READY".
       await setCase(admin, caseId, { status: "PUBLISHING" });
-      const { data: pub } = await admin.rpc("publish_description_internal", {
+      const pub = await rpc(admin, "publish_description_internal", {
         p_case_id: caseId, p_version_id: version.id, p_expected_lock_version: caseNow?.lock_version ?? null,
       });
       published = !!(pub as any)?.ok;
@@ -834,7 +845,7 @@ async function orchestrateVehicle(
     // that was repaired and cleanly regenerated reads as "Blocked" forever.
     // Scoped runs only touch the channels they rebuilt, so they never sweep.
     if (!scopedRun) {
-      await admin.rpc("close_resolved_description_exceptions", {
+      await rpcSoft(admin, "close_resolved_description_exceptions", {
         p_case_id: caseId, p_keep_types: [...raisedTypes],
       });
     }
@@ -1026,7 +1037,7 @@ serve(async (req) => {
       const seenThisHop = new Set<string>();
       let examined = 0;
       while (Date.now() < deadline) {
-        const { data: batch } = await admin.rpc("next_description_reconcile_batch", {
+        const batch = await rpc(admin, "next_description_reconcile_batch", {
           p_tenant_id: tenantId, p_limit: 5, p_sweep_start: sweepStart,
         });
         const rows = ((batch || []) as Array<{ tenant_id: string; vehicle_id: string; reason: string }>)
@@ -1056,7 +1067,7 @@ serve(async (req) => {
       let chained = false;
       let pendingCount = 0;
       if (depth < RECONCILE_MAX_DEPTH) {
-        const { data: more } = await admin.rpc("next_description_reconcile_batch", {
+        const more = await rpc(admin, "next_description_reconcile_batch", {
           p_tenant_id: tenantId, p_limit: 20, p_sweep_start: sweepStart,
         });
         // Chain only for work this hop did not already attempt — a vehicle that

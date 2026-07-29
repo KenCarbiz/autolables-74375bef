@@ -9767,6 +9767,10 @@ export type Database = {
         }
         Returns: Json
       }
+      archive_description_case: {
+        Args: { p_case_id: string; p_reason?: string; p_system?: boolean }
+        Returns: boolean
+      }
       assert_tenant_member_or_service: {
         Args: { p_tenant_id: string }
         Returns: undefined
@@ -9824,6 +9828,18 @@ export type Database = {
           p_licensee_name: string
           p_result_initial: string
           p_signature_data: string
+        }
+        Returns: string
+      }
+      claim_description_job: {
+        Args: {
+          p_allow_completed?: boolean
+          p_case_id: string
+          p_idempotency_key: string
+          p_job_type: string
+          p_payload?: Json
+          p_tenant_id: string
+          p_vehicle_id: string
         }
         Returns: string
       }
