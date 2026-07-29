@@ -1087,9 +1087,13 @@ export default function VehiclePassportGoverned() {
           sampleSize: d.marketMeta.similarCount, radiusMiles: d.marketMeta.radius, checkedAt: d.marketCheckedAt,
         });
         const subjectYear = Number((listing.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0]) || null;
+        // The OFFER, not the price evidence. d.comparables is the market set
+        // and deliberately excludes this dealer's own rooftop, so rendering it
+        // here could only ever show competitors -- which is how a car 91 miles
+        // away at another store ended up on this dealer's own passport.
         const sims = normalizeComparables(
           { vin: listing.vin, year: subjectYear, trim: listing.trim ?? null, advertisedPrice: price },
-          d.comparables,
+          ((listing as unknown as { group_similar?: typeof d.comparables }).group_similar) ?? [],
         );
         const fuel = resolveFuelEconomy(d.epa);
         return (

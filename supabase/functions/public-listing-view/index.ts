@@ -801,6 +801,17 @@ serve(async (req) => {
             trim: c.trim ?? null, dist: c.dist ?? null, dom: c.dom ?? null, image: c.image ?? null,
           }));
       }
+      // The OFFER. Same shaping as comparables, but no price floor: these are
+      // the dealer's own cars, and a cheaper one of theirs is a sale, not a
+      // leak. Cannibalisation is already excluded upstream.
+      if (Array.isArray(row.group_similar)) {
+        row.group_similar = (row.group_similar as Record<string, unknown>[])
+          .filter((c) => { const p = Number(c?.price); return Number.isFinite(p) && p > 0; })
+          .map((c) => ({
+            price: c.price ?? null, miles: c.miles ?? null, ymm: c.ymm ?? null,
+            trim: c.trim ?? null, dist: c.dist ?? null, dom: c.dom ?? null, image: c.image ?? null,
+          }));
+      }
       if (row.market_meta && typeof row.market_meta === "object") {
         const mm = row.market_meta as Record<string, unknown>;
         delete mm.cheaper_count;

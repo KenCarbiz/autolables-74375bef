@@ -95,7 +95,7 @@ async function fetchPredict(vin: string, miles: number | null, carType: string, 
 // NOT the subject VIN — searching active listings by `vin` returns only that
 // one car, which is why this used to come back empty. Search by ymm, then drop
 // the subject VIN from the results.
-async function fetchComps(ymm: string | null, condition: string, zip: string | null, listingPrice: number | null, subjectVin: string, subjectTrim: string | null, dealerName: string | null) {
+async function fetchComps(ymm: string | null, condition: string, zip: string | null, listingPrice: number | null, subjectVin: string, subjectTrim: string | null, dealerName: string | null, subjectMileage: number | null) {
   try {
     if (!ymm) return null;
     const parts = ymm.split(/\s+/);
@@ -136,17 +136,33 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       const b: any = await res.json().catch(() => ({}));
       // deno-lint-ignore no-explicit-any
       const all: any[] = Array.isArray(b?.listings) ? b.listings : [];
+      // Two different sets out of one search, because they answer two
+      // different questions and used to be conflated.
+      //
+      // MARKET rows are evidence: the price bar, the market value, "N
+      // comparables". They exclude this dealer's own rooftop, because a
+      // dealer's own cars are not independent evidence of the market.
+      //
+      // GROUP rows are the OFFER: the cars we actually invite the shopper to
+      // look at. Those must be the dealer's own, never a competitor's -- we
+      // partner with dealers, we do not route their customers off the lot.
+      // They were being thrown away here, which is why the only cars left to
+      // show were competitors'.
       // deno-lint-ignore no-explicit-any
-      const rows: any[] = all.filter((l: any) => {
-        if (String(l.vin || "").toUpperCase() === subjectVin) return false;
-        // Drop the dealer's own rooftop (name match) and any same-location lot
-        // (dist 0) so a shopper never sees this dealer's own cars as comps.
+      const isOurs = (l: any): boolean => {
         const cn = normDealer((l.dealer as any)?.name ?? l.seller_name);
-        if (ownName && cn && (cn.includes(ownName) || ownName.includes(cn))) return false;
-        if (Number(l.dist) === 0) return false;
-        return true;
-      });
-      return { rows, rawCount: all.length, numFound: num(b?.num_found), http: res.status };
+        if (ownName && cn && (cn.includes(ownName) || ownName.includes(cn))) return true;
+        // Same physical lot. MarketCheck reports dist 0 for the subject's own
+        // rooftop even when the seller name is written differently.
+        return Number(l.dist) === 0;
+      };
+      // deno-lint-ignore no-explicit-any
+      const notSubject = (l: any) => String(l.vin || "").toUpperCase() !== subjectVin;
+      // deno-lint-ignore no-explicit-any
+      const rows: any[] = all.filter((l: any) => notSubject(l) && !isOurs(l));
+      // deno-lint-ignore no-explicit-any
+      const groupRows: any[] = all.filter((l: any) => notSubject(l) && isOurs(l));
+      return { rows, groupRows, rawCount: all.length, numFound: num(b?.num_found), http: res.status };
     };
 
     // Tightest first — same trim + year + price band, so comps are like-for-like
@@ -172,6 +188,44 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     const atOrAbove = listingPrice != null ? r.rows.filter((l) => (rowPrice(l) ?? 0) >= listingPrice) : r.rows;
     const belowRows = listingPrice != null ? r.rows.filter((l) => (rowPrice(l) ?? 0) < listingPrice && (rowPrice(l) ?? 0) > 0) : [];
     const sampleRows = [...atOrAbove, ...belowRows.reverse()].slice(0, 16);
+
+    // The OFFER: cars from this dealer's own stock we are willing to put in
+    // front of the shopper.
+    //
+    // "Never detract from the car they came in on" is not "never cheaper" --
+    // a cheaper car in a different segment is often the right offer. The
+    // failure is CANNIBALISATION: an alternative that beats this one on every
+    // axis the shopper is weighing at once. So a car is dropped only when it
+    // is cheaper AND the same-or-better trim AND the same-or-fewer miles.
+    const sameTrim = (t: unknown) =>
+      String(t || "").trim().toLowerCase() === String(subjectTrim || "").trim().toLowerCase();
+    // deno-lint-ignore no-explicit-any
+    const cannibalises = (l: any): boolean => {
+      const p = rowPrice(l);
+      if (p == null || listingPrice == null || p >= listingPrice) return false;
+      const m = num(l.miles);
+      const subjectMiles = num(subjectMileage);
+      const fewerOrEqualMiles = m != null && subjectMiles != null ? m <= subjectMiles : true;
+      return sameTrim(l.build?.trim) && fewerOrEqualMiles;
+    };
+    const groupSimilar = (r.groupRows || [])
+      // deno-lint-ignore no-explicit-any
+      .filter((l: any) => rowPrice(l) != null && !cannibalises(l))
+      // deno-lint-ignore no-explicit-any
+      .sort((a: any, b2: any) => (num(a.dist) ?? 0) - (num(b2.dist) ?? 0))
+      .slice(0, 8)
+      // deno-lint-ignore no-explicit-any
+      .map((l: any) => ({
+        vin: l.vin ?? null,
+        ymm: l.heading ?? ([l.build?.year, l.build?.make, l.build?.model].filter(Boolean).join(" ") || null),
+        trim: l.build?.trim ?? null,
+        miles: num(l.miles),
+        price: num(l.price),
+        dist: num(l.dist),
+        dealer: l.dealer?.name ?? l.seller_name ?? null,
+        dom: num(l.dom),
+        image: l.media?.photo_links?.[0] ?? null,
+      }));
 
     const comparables = sampleRows.map((l) => ({
       vin: l.vin ?? null,
@@ -291,7 +345,7 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     };
     // median (fallback to mean) lets the caller backfill market_value when
     // MarketCheck's price prediction has no value for an older/rare car.
-    return { comparables, meta, stats, debug, median: median ?? mean };
+    return { comparables, groupSimilar, meta, stats, debug, median: median ?? mean };
   } catch { return null; }
 }
 
@@ -656,7 +710,7 @@ serve(async (req) => {
   // moment, which can't trip the RPS limit. (fetchRecalls tries MarketCheck
   // then falls back to free NHTSA.) Skipped entirely on a Black-Book-only run.
   const predict = wantMC ? await fetchPredict(vin, miles, condition, zip) : null;
-  const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName) : null;
+  const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName, miles) : null;
   const mds = wantMC && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
   const soldStats = wantMC ? await fetchSoldStats(ymm, condition, dealerState) : null;
   const history = wantMC ? await fetchHistory(vin) : null;
@@ -689,6 +743,12 @@ serve(async (req) => {
     // Only overwrite comparables when this pass actually returned listings, so a
     // transient empty result never clobbers a previously-good comp set.
     if (comps.comparables.length > 0) patch.comparables = comps.comparables;
+    // Stored separately from comparables on purpose. One array served both the
+    // price evidence and the cars we invite the shopper to look at, so a
+    // change to the pricing maths silently changed what was on offer -- which
+    // is how a competitor's car 91 miles away ended up on a dealer's own
+    // passport. Two names, two purposes, no shared blast radius.
+    patch.group_similar = comps.groupSimilar;
     // Fold the regional Market Days Supply into market_meta so the Passport's
     // demand/trend surfaces have a real figure instead of a null placeholder.
     // Merge over what is already stored. Replacing the whole object destroyed
