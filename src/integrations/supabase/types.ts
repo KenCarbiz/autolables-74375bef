@@ -8690,6 +8690,7 @@ export type Database = {
           factory_sticker_url: string | null
           features: Json
           feed_source: string | null
+          group_similar: Json
           hero_image_url: string | null
           history_payload: Json | null
           history_report_url: string | null
@@ -8777,6 +8778,7 @@ export type Database = {
           factory_sticker_url?: string | null
           features?: Json
           feed_source?: string | null
+          group_similar?: Json
           hero_image_url?: string | null
           history_payload?: Json | null
           history_report_url?: string | null
@@ -8864,6 +8866,7 @@ export type Database = {
           factory_sticker_url?: string | null
           features?: Json
           feed_source?: string | null
+          group_similar?: Json
           hero_image_url?: string | null
           history_payload?: Json | null
           history_report_url?: string | null
@@ -10179,6 +10182,7 @@ export type Database = {
           factory_sticker_url: string | null
           features: Json
           feed_source: string | null
+          group_similar: Json
           hero_image_url: string | null
           history_payload: Json | null
           history_report_url: string | null
