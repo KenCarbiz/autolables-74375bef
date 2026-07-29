@@ -4919,68 +4919,41 @@ export type Database = {
         }
         Relationships: []
       }
-      oem_distribution_grants: {
+      oem_distribution_blocks: {
         Row: {
-          attestation_text: string
-          attestation_version: number
-          attested_at: string
-          attested_by: string | null
+          blocked_by: string | null
           brand: string
           created_at: string
-          evidence_note: string | null
           id: string
-          revoke_reason: string | null
-          revoked_at: string | null
-          revoked_by: string | null
-          status: string
-          store_id: string | null
-          tenant_id: string
-          updated_at: string
+          reason: string
+          tenant_id: string | null
         }
         Insert: {
-          attestation_text: string
-          attestation_version: number
-          attested_at?: string
-          attested_by?: string | null
+          blocked_by?: string | null
           brand: string
           created_at?: string
-          evidence_note?: string | null
           id?: string
-          revoke_reason?: string | null
-          revoked_at?: string | null
-          revoked_by?: string | null
-          status?: string
-          store_id?: string | null
-          tenant_id: string
-          updated_at?: string
+          reason: string
+          tenant_id?: string | null
         }
         Update: {
-          attestation_text?: string
-          attestation_version?: number
-          attested_at?: string
-          attested_by?: string | null
+          blocked_by?: string | null
           brand?: string
           created_at?: string
-          evidence_note?: string | null
           id?: string
-          revoke_reason?: string | null
-          revoked_at?: string | null
-          revoked_by?: string | null
-          status?: string
-          store_id?: string | null
-          tenant_id?: string
-          updated_at?: string
+          reason?: string
+          tenant_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "oem_distribution_grants_tenant_id_fkey"
+            foreignKeyName: "oem_distribution_blocks_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenant_summary"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "oem_distribution_grants_tenant_id_fkey"
+            foreignKeyName: "oem_distribution_blocks_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -9845,6 +9818,14 @@ export type Database = {
         }
         Returns: Json
       }
+      derive_oem_franchise_brands: {
+        Args: { _tenant_id: string }
+        Returns: {
+          brand: string
+          latest_listed_at: string
+          new_units: number
+        }[]
+      }
       description_generation_spend: {
         Args: { p_tenant_id: string }
         Returns: Json
@@ -10205,15 +10186,6 @@ export type Database = {
         Args: { p_product_id: string; p_tenant_id: string; p_vin: string }
         Returns: string
       }
-      grant_oem_distribution: {
-        Args: {
-          _brand: string
-          _evidence_note?: string
-          _store_id?: string
-          _tenant_id: string
-        }
-        Returns: string
-      }
       has_app_access: { Args: { _app_slug: string }; Returns: boolean }
       has_description_authority: {
         Args: { p_level?: string; p_tenant_id: string }
@@ -10364,13 +10336,8 @@ export type Database = {
           vin: string
         }[]
       }
-      oem_attestation_text: {
-        Args: never
-        Returns: {
-          body: string
-          version: number
-        }[]
-      }
+      oem_franchise_min_new_units: { Args: never; Returns: number }
+      oem_make_from_ymm: { Args: { _ymm: string }; Returns: string }
       publish_description_internal: {
         Args: {
           p_case_id: string
@@ -10611,10 +10578,6 @@ export type Database = {
       respond_service_clarification: {
         Args: { p_request_id: string; p_response: string }
         Returns: Json
-      }
-      revoke_oem_distribution: {
-        Args: { _grant_id: string; _reason?: string }
-        Returns: undefined
       }
       save_description_channel_policy: {
         Args: {
