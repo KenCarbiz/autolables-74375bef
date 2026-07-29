@@ -37,3 +37,10 @@ verify_jwt = true
 # edited — not merely added — before this one can ever be made public.
 [functions.packet-backfill]
 verify_jwt = true
+
+# oem-document-store is the only place manufacturer document bytes are fetched.
+# It claims the right to host first (which records the decision) and refuses
+# before touching the network when the dealer is not franchised for the brand.
+# Service role only; there is no user-facing path to storing a byte.
+[functions.oem-document-store]
+verify_jwt = true

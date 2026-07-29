@@ -255,7 +255,13 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
 // hold: the brochure and the owner's manual stay on the manufacturer site and
 // neither PDF is ever downloaded, so there is no stored page-1 to show. The
 // card art is drawn instead, by DocumentCoverThumbnail.
-type OemLink = { url: string; title?: string | null; year?: number | null };
+type OemLink = {
+  url: string; title?: string | null; year?: number | null;
+  /** True when `url` is this dealer's own stored copy rather than the OEM site. */
+  hosted?: boolean | null;
+  /** The manufacturer's own URL, always present even when we serve a copy. */
+  manufacturer_url?: string | null;
+};
 
 // Owner's-manual card. We hold the manufacturer's LINK and nothing else — the
 // shopper opens or downloads the manual from the OEM, and no bytes are copied
@@ -286,9 +292,11 @@ const OwnersManualCard = ({
       cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual" }} vehicle={coverVehicleFor(listing)} onQuickView={openManual} />}
       title={`Official ${mk.toUpperCase()} Owner's Manual${m.year ? ` (${m.year})` : ""}`}
       source={`${mk.toUpperCase()} · Manufacturer source`}
-      status="external"
+      status={m.hosted ? "available" : "external"}
       explanation="The manufacturer's official owner's manual for this year and model."
-      meta={<span className="inline-flex items-center gap-1"><ExternalLink className="w-3.5 h-3.5" /> Opens on the manufacturer site</span>}
+      meta={m.hosted
+        ? <span className="inline-flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> Saved with this vehicle &middot; yours to keep</span>
+        : <span className="inline-flex items-center gap-1"><ExternalLink className="w-3.5 h-3.5" /> Opens on the manufacturer site</span>}
       action={action}
       why="The owner's manual explains the exact features, controls and maintenance for this vehicle's build."
     />
