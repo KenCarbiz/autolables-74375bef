@@ -40,26 +40,34 @@ export default function PassportWindowStickerCard({
       // `overflow-hidden` is the belt to that braces: at a 4px radius it costs
       // nothing visible on the paper's corners, and it makes "this can never
       // paint outside the well" true by construction rather than by arithmetic.
-      className={`shrink-0 rounded-[4px] border border-[#E6E8EC] bg-[#F8FAFC] grid place-items-center p-[7px] overflow-hidden ${
-        mobile ? "w-full aspect-[11/8.5]" : "w-[168px] h-[124px]"
+      className={`relative shrink-0 rounded-[4px] border border-[#E6E8EC] bg-[#F8FAFC] overflow-hidden ${
+        mobile ? "w-full aspect-[11/8.5]" : "w-[168px] aspect-[11/8.5]"
       }`}
     >
-      {sticker.thumbnailUrl ? (
-        <img
-          src={sticker.thumbnailUrl}
-          alt={`Window sticker for this ${vehicleLabel}`}
-          // Height-driven: the sheet stands at the well's full height and takes
-          // the width its own 11x8.5 page shape gives it, so it can never
-          // outgrow the well. Top-anchored cover so a legacy STACKED multi-page
-          // SVG shows page 1 rather than squeezing both pages into a sliver.
-          className="h-full w-auto max-w-full object-cover object-top bg-white rounded-none"
-          style={{ aspectRatio: "11 / 8.5", border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 1px 4px rgba(15,23,42,0.12)" }}
-          loading="lazy"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-        />
-      ) : (
-        <FileText className="w-7 h-7 text-[#94A3B8]" aria-hidden />
-      )}
+      {/* Absolutely inset, so its size comes from the four offsets and needs no
+          percentage to resolve against the well. That matters: the sheet is
+          sized from THIS box, and a percentage height against an
+          aspect-ratio-derived parent is exactly the sizing iOS Safari is
+          unreliable about. Nothing here depends on it. */}
+      <div className="absolute inset-[7px] flex items-center justify-center">
+        {sticker.thumbnailUrl ? (
+          <img
+            src={sticker.thumbnailUrl}
+            alt={`Window sticker for this ${vehicleLabel}`}
+            // No aspect-ratio on the sheet itself — the well already carries
+            // the page's 11x8.5, so the sheet simply fills it. Giving the image
+            // its own ratio is what let it compute a height the well could not
+            // hold. Top-anchored cover so a legacy STACKED multi-page SVG shows
+            // page 1 rather than squeezing both pages into a sliver.
+            className="block w-full h-full object-cover object-top bg-white rounded-none"
+            style={{ border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 1px 4px rgba(15,23,42,0.12)" }}
+            loading="lazy"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <FileText className="w-7 h-7 text-[#94A3B8]" aria-hidden />
+        )}
+      </div>
     </div>
   );
 

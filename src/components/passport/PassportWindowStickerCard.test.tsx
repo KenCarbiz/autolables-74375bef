@@ -30,7 +30,9 @@ const renderCard = (variant: "desktop" | "mobile") =>
     />,
   );
 
-const wellOf = (c: HTMLElement) => c.querySelector("img")!.parentElement!;
+// well > inset frame > img
+const wellOf = (c: HTMLElement) => c.querySelector("img")!.parentElement!.parentElement!;
+const frameOf = (c: HTMLElement) => c.querySelector("img")!.parentElement!;
 
 describe("the sticker sheet cannot escape its well", () => {
   it("shapes the mobile well by the page instead of pinning a height", () => {
@@ -46,13 +48,31 @@ describe("the sticker sheet cannot escape its well", () => {
     }
   });
 
-  it("sizes the sheet from the well's height, not its own width", () => {
+  it("fills a box whose size needs no percentage to resolve", () => {
     for (const v of ["mobile", "desktop"] as const) {
-      const img = renderCard(v).container.querySelector("img")!;
+      const { container } = renderCard(v);
+      // The frame is sized by its four offsets, not by a percentage of a
+      // parent whose own height came from an aspect ratio -- the sizing iOS
+      // Safari is unreliable about.
+      expect(frameOf(container).className).toContain("absolute");
+      expect(frameOf(container).className).toContain("inset-[7px]");
+      expect(wellOf(container).className).toContain("relative");
+      const img = container.querySelector("img")!;
+      expect(img.className).toContain("w-full");
       expect(img.className).toContain("h-full");
-      expect(img.className).toContain("w-auto");
       // max-h-full was the old guard and it did not hold for a sizeless SVG.
       expect(img.className).not.toContain("max-h-full");
+    }
+  });
+
+  it("never gives the sheet an aspect ratio of its own", () => {
+    // Its own ratio is what let the sheet compute a height the well could not
+    // hold. The well carries the page shape; the sheet just fills it.
+    for (const v of ["mobile", "desktop"] as const) {
+      const img = renderCard(v).container.querySelector("img")!;
+      // jsdom does not surface .style.aspectRatio, so read the declaration.
+      expect(img.style.getPropertyValue("aspect-ratio")).toBe("");
+      expect(wellOf(renderCard(v).container).className).toContain("aspect-[11/8.5]");
     }
   });
 
