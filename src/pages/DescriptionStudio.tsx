@@ -7,6 +7,7 @@ import { CHANNEL_CARDS, CHANNEL_META, channelMeta, connectorLabel, STATUS_META, 
          type DescriptionStatus } from "@/lib/description/model";
 import { ChannelCardGrid, type ChannelCardStatus } from "@/components/description/ChannelCard";
 import { missingAssets } from "@/lib/description/channelAssets";
+import type { GenerationOutcome } from "@/lib/description/generationOutcome";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowRight, CheckCircle2, Copy, Download, Gauge, Globe, ImageIcon,
@@ -63,6 +64,7 @@ const DescriptionStudio = () => {
 
   const { record, busy, generate } = useDescriptionCase(vehicleId || undefined);
 
+  const [refusal, setRefusal] = useState<GenerationOutcome | null>(null);
   const [channel, setChannel] = useState<string>(params.get("channel") || "autotrader");
   const [tone, setTone] = useState<Tone>("professional");
   const [city, setCity] = useState("");
@@ -198,9 +200,17 @@ const DescriptionStudio = () => {
       `The current version is preserved — regeneration always creates a new draft and never replaces an approved or published version.`,
     )) return;
     const res = await generate("manual_regenerate", scopeToChannel ? [channel] : undefined);
-    if (!res.ok) return toast.error(res.error || "Generation failed");
-    toast[res.generated ? "success" : "info"](
-      res.generated ? "A new draft version was created" : "Inputs were unchanged — the existing version was reused");
+    if (!res.ok) {
+      setRefusal(null);
+      return toast.error(res.error || "Generation failed");
+    }
+    const o = res.outcome;
+    // A refusal is pinned to the page, not just toasted: the operator needs the
+    // blocking code and its remedy after the toast has gone.
+    setRefusal(o.tone === "error" ? o : null);
+    toast[o.tone](o.message, o.remedy
+      ? { action: { label: o.remedy.label, onClick: () => navigate(o.remedy!.href) } }
+      : undefined);
   };
 
   // Publication truth: the button only appears for a channel we genuinely
@@ -247,6 +257,44 @@ const DescriptionStudio = () => {
           ))}
         </div>
       </div>
+
+      {/* A refused run stays on screen with its blocking code and the screen
+          that clears it. The toast is gone in four seconds; the block is not. */}
+      {refusal && (
+        <div className="mx-auto max-w-[1600px] px-5 pt-5">
+          <div className="flex items-start gap-3 rounded-2xl border-2 border-red-200 bg-red-50 p-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-red-900">{refusal.message}</p>
+              {refusal.codes.length > 0 && (
+                <p className="mt-1 font-mono text-xs font-bold text-red-700">
+                  {refusal.codes.join(" · ")}
+                </p>
+              )}
+              {refusal.costFree && (
+                <p className="mt-1 text-xs font-semibold text-red-800">
+                  No AI request was made and nothing was charged.
+                </p>
+              )}
+              {refusal.remedy && (
+                <button
+                  onClick={() => navigate(refusal.remedy!.href)}
+                  className="mt-2 text-sm font-black text-red-700 underline"
+                >
+                  {refusal.remedy.label} →
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setRefusal(null)}
+              aria-label="Dismiss"
+              className="shrink-0 text-xs font-bold text-red-500 hover:text-red-800"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto grid max-w-[1600px] gap-5 p-5 xl:grid-cols-[370px_1fr_470px]">
         {/* ── Column 1: the vehicle, straight from the truth snapshot ── */}

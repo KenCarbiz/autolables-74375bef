@@ -4,6 +4,10 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import {
+  describeGenerationOutcome,
+  type GenerationResult, type GenerationOutcome,
+} from "@/lib/description/generationOutcome";
 
 // Data access for Description Intelligence. Every mutation goes through a
 // server-side RPC or edge function — nothing here fabricates a completion
@@ -241,7 +245,10 @@ export function useDescriptionCase(vehicleId: string | undefined) {
 
   useEffect(() => { load(); }, [load]);
 
-  const generate = useCallback(async (reason = "manual", channels?: string[]) => {
+  const generate = useCallback(async (reason = "manual", channels?: string[]): Promise<
+    | { ok: false; error: string }
+    | { ok: true; generated: boolean; outcome: GenerationOutcome; result: unknown }
+  > => {
     if (!tenant?.id || !vehicleId) return { ok: false, error: "missing context" };
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("description-orchestrate", {
@@ -251,8 +258,15 @@ export function useDescriptionCase(vehicleId: string | undefined) {
     if (error) return { ok: false, error: await fnErrorMessage(error) };
     if ((data as any)?.error) return { ok: false, error: String((data as any).error) };
     await load();
-    // the server tells us whether a version was actually produced
-    return { ok: true, generated: (data as any)?.generated !== false, result: data };
+    // The server tells us whether a version was actually produced, and when it
+    // was not, WHY. A refusal carries a skip reason and its blocking codes —
+    // dropping them here is what made every refusal look like a no-op.
+    return {
+      ok: true,
+      generated: (data as any)?.generated !== false,
+      outcome: describeGenerationOutcome(data as GenerationResult),
+      result: data,
+    };
   }, [tenant?.id, vehicleId, load]);
 
   // Internal publication is a server RPC guarded by optimistic concurrency:
