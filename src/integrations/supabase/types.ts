@@ -4919,6 +4919,75 @@ export type Database = {
         }
         Relationships: []
       }
+      oem_distribution_grants: {
+        Row: {
+          attestation_text: string
+          attestation_version: number
+          attested_at: string
+          attested_by: string | null
+          brand: string
+          created_at: string
+          evidence_note: string | null
+          id: string
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string
+          store_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          attestation_text: string
+          attestation_version: number
+          attested_at?: string
+          attested_by?: string | null
+          brand: string
+          created_at?: string
+          evidence_note?: string | null
+          id?: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          store_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          attestation_text?: string
+          attestation_version?: number
+          attested_at?: string
+          attested_by?: string | null
+          brand?: string
+          created_at?: string
+          evidence_note?: string | null
+          id?: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          store_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_distribution_grants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_distribution_grants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oem_owners_manual_links: {
         Row: {
           cover_generated_at: string | null
@@ -10136,6 +10205,15 @@ export type Database = {
         Args: { p_product_id: string; p_tenant_id: string; p_vin: string }
         Returns: string
       }
+      grant_oem_distribution: {
+        Args: {
+          _brand: string
+          _evidence_note?: string
+          _store_id?: string
+          _tenant_id: string
+        }
+        Returns: string
+      }
       has_app_access: { Args: { _app_slug: string }; Returns: boolean }
       has_description_authority: {
         Args: { p_level?: string; p_tenant_id: string }
@@ -10284,6 +10362,13 @@ export type Database = {
         Returns: {
           tenant_id: string
           vin: string
+        }[]
+      }
+      oem_attestation_text: {
+        Args: never
+        Returns: {
+          body: string
+          version: number
         }[]
       }
       publish_description_internal: {
@@ -10526,6 +10611,10 @@ export type Database = {
       respond_service_clarification: {
         Args: { p_request_id: string; p_response: string }
         Returns: Json
+      }
+      revoke_oem_distribution: {
+        Args: { _grant_id: string; _reason?: string }
+        Returns: undefined
       }
       save_description_channel_policy: {
         Args: {
@@ -10798,6 +10887,10 @@ export type Database = {
       }
       sweep_getready_install_safety_net: { Args: never; Returns: number }
       sweep_missing_intake_drafts: { Args: { _limit?: number }; Returns: Json }
+      tenant_may_host_oem_documents: {
+        Args: { _brand: string; _store_id?: string; _tenant_id: string }
+        Returns: boolean
+      }
       tenant_price_verification_on: {
         Args: { _tenant_id: string }
         Returns: boolean
