@@ -343,6 +343,17 @@ interface FamilyStyle {
   leftPartsPanel?: boolean;
   /** Compact Passport panel: "VEHICLE PASSPORT" + Powered by AutoLabels line. */
   passportBrandLine?: boolean;
+  /** Factory pricing convention: the total is the last row OF the price table,
+   *  under a heavy rule, rather than a full-width reversed band beneath it. A
+   *  manufacturer sticker concludes its price column; it does not advertise. */
+  totalInPriceTable?: boolean;
+  /** Masthead stays on paper: emblem, model and trim in ink on white over the
+   *  brand accent rule, instead of a reversed hero panel. */
+  paperHeader?: boolean;
+  /** Passport reduced to a records reference inside the vehicle-record rail —
+   *  ~1.4in QR, no bordered promotional card. The Passport is provenance, not
+   *  the subject of the document. */
+  compactPassport?: boolean;
 }
 
 const FAMILY_STYLES: Record<string, FamilyStyle> = {
@@ -368,8 +379,29 @@ const FAMILY_STYLES: Record<string, FamilyStyle> = {
   AUTOLABELS_FALLBACK: { headerComposition: "WORDMARK_RULE", sectionHeadingBar: false, headingBarAccent: false, accentKeyline: false, trackedHeadings: true, boxedZones: false, equipmentColumns: 3 },
 };
 
+// Per-brand composition overrides, applied on top of the brand's family.
+//
+// The 2026-07 factory-record directive: paper masthead, the total as the last
+// row of the price table, and the Passport reduced to a records reference.
+// Scoped to NISSAN and INFINITI by owner instruction — the brands they share a
+// family with (Hyundai, Lincoln, Mercedes-Benz, Cadillac on LUXURY_FACTORY;
+// the JAPANESE_FACTORY marques) each have their own separately approved
+// reference parity, so a family-level change would silently redesign
+// signed-off templates.
+const FACTORY_RECORD_COMPOSITION: Partial<FamilyStyle> = {
+  totalInPriceTable: true,
+  compactPassport: true,
+  paperHeader: true,
+};
+const PROFILE_STYLES: Partial<Record<OemStickerTheme["oemId"], Partial<FamilyStyle>>> = {
+  INFINITI: FACTORY_RECORD_COMPOSITION,
+  NISSAN: FACTORY_RECORD_COMPOSITION,
+};
+
 function familyStyle(theme: OemStickerTheme): FamilyStyle {
-  return FAMILY_STYLES[theme.templateFamilyId] ?? FAMILY_STYLES.AUTOLABELS_FALLBACK;
+  const base = FAMILY_STYLES[theme.templateFamilyId] ?? FAMILY_STYLES.AUTOLABELS_FALLBACK;
+  const override = PROFILE_STYLES[theme.oemId];
+  return override ? { ...base, ...override } : base;
 }
 
 class Painter {
@@ -618,10 +650,15 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
     // Masthead polarity: JAPANESE_FACTORY fills the model band; the premium
     // variant fills the emblem block instead and keeps the band on paper.
     const blockFilled = !!style.emblemBlockFilled;
-    const bandFill = blockFilled ? theme.colors.background : theme.colors.headerBackground;
-    const bandInk = blockFilled ? BLACK : theme.colors.headerText;
-    const blockInk = blockFilled ? theme.colors.headerText : BLACK;
-    if (blockFilled) p.rect(LX, bandTop, blockW, bandH, theme.colors.headerBackground);
+    // Paper masthead: a real factory sticker carries its emblem and model on
+    // white over a thin rule. The reversed panel this replaces was the second
+    // strongest "aftermarket" signal on the document — a filled hero banner is
+    // dealer-advertising language, not manufacturer-record language.
+    const paperHead = !!style.paperHeader;
+    const bandFill = (blockFilled || paperHead) ? theme.colors.background : theme.colors.headerBackground;
+    const bandInk = (blockFilled || paperHead) ? BLACK : theme.colors.headerText;
+    const blockInk = (blockFilled && !paperHead) ? theme.colors.headerText : BLACK;
+    if (blockFilled && !paperHead) p.rect(LX, bandTop, blockW, bandH, theme.colors.headerBackground);
     p.rect(bandX, bandTop, LX + LW - bandX, bandH, bandFill);
     // Identity block: governed emblem (when a recreated asset exists)
     // stacked over the wordmark; otherwise the wordmark treatment alone.
@@ -1055,6 +1092,23 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
     ry += lh;
     leaderRow(p, rightX, rightX + rightW, ry, label, dollar ? formatMoney(amount) : formatPlain(amount), size, "body", BLACK, BLACK);
   }
+  // Factory convention: the total concludes the price column under a heavy
+  // rule. The reversed full-width band it replaces read as retail advertising
+  // rather than a manufacturer price record.
+  if (familyStyle(ctx.theme).totalInPriceTable) {
+    const total = pricing.sourceReportedTotalMsrp ?? pricing.calculatedTotalMsrp;
+    const label = input.data.vehicle.condition === "NEW"
+      ? (ctx.theme.totalLabel ?? "TOTAL FACTORY MSRP")
+      : "ORIGINAL TOTAL MSRP";
+    ry += 4;
+    p.rule(rightX, ry, rightW, 1.1, BLACK);
+    ry += lh + 2;
+    const amount = total !== undefined ? formatMoney(total) : "SEE DEALER";
+    p.text(label, rightX, ry, 9, "bold", BLACK, { charSpacing: 0.3 });
+    p.text(amount, rightX + rightW, ry, 11.5, "bold", BLACK, { align: "right" });
+    ry += 3;
+    p.rule(rightX, ry, rightW, 0.7, BLACK);
+  }
   // The taxes/title/license footnote belongs to new-vehicle MSRP documents;
   // the used reconstruction record states its provenance in the footer.
   if (familyStyle(ctx.theme).msrpFootnote && input.data.vehicle.condition === "NEW") {
@@ -1173,6 +1227,9 @@ function paintVinBarcode(p: Painter, y: number, ctx: BuildContext): number {
 // ── Navy total band ───────────────────────────────────────────────────
 
 function paintTotalBand(p: Painter, y: number, ctx: BuildContext): number {
+  // Families that conclude their price table with the total have already
+  // printed it; a band here would state the same number twice.
+  if (familyStyle(ctx.theme).totalInPriceTable) return y;
   const { theme, input } = ctx;
   const pricing = input.data.pricing;
   const condition = input.data.vehicle.condition;
@@ -1531,8 +1588,35 @@ function paintPassportPanel(p: Painter, y: number, ctx: BuildContext, targetH: n
   const passportUrl = input.data.document.passportUrl.trim();
   if (!passportUrl) return y;
   const navy = "#0b1f3a";
-  const boxH = Math.max(118, Math.min(targetH, 190));
   const brandLine = !!familyStyle(ctx.theme).passportBrandLine;
+
+  // Compact form: the Passport is a records reference inside the vehicle-record
+  // rail, not a promotional card. A ~1.4in QR under a small heading, no border,
+  // no marketing headline — the strongest "aftermarket" signal on the sticker
+  // was this panel rendered at nearly a third of the right column.
+  if (familyStyle(ctx.theme).compactPassport) {
+    const qrSize = 100; // ≈1.39in at 72dpi
+    let cy = y + 9;
+    p.text("VEHICLE PASSPORT", RX + RW / 2, cy, 7.5, "bold", BLACK, { align: "center", charSpacing: 0.4 });
+    cy += 8;
+    p.text("Scan for verified vehicle records", RX + RW / 2, cy, 6, "body", "#4c5157", { align: "center" });
+    cy += 5;
+    p.qr(RX + (RW - qrSize) / 2, cy, qrSize, passportUrl, BLACK);
+    cy += qrSize + 8;
+    p.text(passportUrl.replace(/^https?:\/\//i, ""), RX + RW / 2, cy, 6.2, "body", "#4c5157", { align: "center" });
+    cy += 8;
+    const t1 = "Powered by ", t2 = "auto", t3 = "(LABELS)";
+    const total = measureText(t1, "body", 6) + measureText(t2, "bold", 6.2) + measureText(t3, "bold", 6.2);
+    let bx = RX + (RW - total) / 2;
+    p.text(t1, bx, cy, 6, "body", "#55595e");
+    bx += measureText(t1, "body", 6);
+    p.text(t2, bx, cy, 6.2, "bold", "#2563eb");
+    bx += measureText(t2, "bold", 6.2);
+    p.text(t3, bx, cy, 6.2, "bold", navy);
+    return cy + 3;
+  }
+
+  const boxH = Math.max(118, Math.min(targetH, 190));
 
   let cy = y + 15;
   p.text(brandLine ? "VEHICLE PASSPORT" : "AUTOLABELS VEHICLE PASSPORT", RX + RW / 2, cy, 8.5, "bold", navy, { align: "center", charSpacing: 0.5 });

@@ -20,6 +20,12 @@ export const adminClient = () =>
 export const isServiceOrCron = (req: Request): boolean => {
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   if (!!SERVICE_KEY && auth === SERVICE_KEY) return true;
-  const cronSecret = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
-  return !!cronSecret && (req.headers.get("x-cron-secret") || "") === cronSecret;
+  const provided = req.headers.get("x-cron-secret") || "";
+  if (!provided) return false;
+  const accepted = [
+    Deno.env.get("MARKETCHECK_CRON_SECRET") || "",
+    Deno.env.get("CRON_SHARED_SECRET") || "",
+  ].filter(Boolean);
+  return accepted.some((s) => s === provided);
 };
+

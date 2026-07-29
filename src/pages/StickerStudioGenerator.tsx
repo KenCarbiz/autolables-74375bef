@@ -215,6 +215,17 @@ const StickerStudioGenerator = () => {
     })();
   }, [prefill.vehicle, tenant?.id, rules.trackQrScans, stickerType]);
 
+  // Asset readiness (logo resolution + QR availability) for the warning row.
+  // Must stay above the `!template` return: called below it, the missing-template
+  // render would run one hook fewer than the normal one (React #310).
+  const assets = useAssetReadiness({
+    logoUrl: branding.logoUrl,
+    logoEnabled: !!template?.config.supportsLogo && branding.showLogo,
+    qrUrl: data.qrUrl,
+    qrSupported: !!template?.config.supportsQr,
+    qrRequired: !!template?.config.styleTags.includes("Compliance"),
+  });
+
   if (!template) {
     return (
       <div className="p-8 text-center">
@@ -253,12 +264,6 @@ const StickerStudioGenerator = () => {
   } : null;
   const matchBlocked = !!packetCtx && rules.blockPacketOnMismatchFail &&
     validateStickerPacketMatch(data, packetCtx).status === "blocked";
-
-  // Asset readiness (logo resolution + QR availability) for the warning row.
-  const assets = useAssetReadiness({
-    logoUrl: branding.logoUrl, logoEnabled: cfg.supportsLogo && branding.showLogo,
-    qrUrl: data.qrUrl, qrSupported: cfg.supportsQr, qrRequired: cfg.styleTags.includes("Compliance"),
-  });
 
   const setItem = (key: "installed" | "upgrades" | "benefits", i: number, patch: Partial<StickerLineItem>) =>
     setData((d) => ({ ...d, [key]: d[key].map((it, idx) => (idx === i ? { ...it, ...patch } : it)) }));

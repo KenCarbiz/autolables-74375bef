@@ -32,7 +32,9 @@ describe("theme matrix: benchmark renders under every OEM theme", () => {
       const page1 = pageStrings(model, 0);
       expect(model.drawnStrings).toContain("JN8AZ3NE5S9123456");
       expect(page1).toContain("$95,695.00");
-      expect(page1.some((s) => s.includes("TOTAL ORIGINAL MSRP"))).toBe(true);
+      // Either total convention: a reversed band, or the last row of the price
+      // table for profiles carrying the factory-record composition.
+      expect(page1.some((s) => (s.includes("TOTAL ORIGINAL MSRP") || s.includes("ORIGINAL TOTAL MSRP")))).toBe(true);
       expect(page1.some((s) => s.includes(theme.logo.wordmarkText.toUpperCase()))).toBe(true);
       if (theme.layout.barcodeVariant === "NONE") {
         expect(model.pages[0].primitives.some((p) => p.kind === "barcode")).toBe(false);

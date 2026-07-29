@@ -633,6 +633,51 @@ serve(async (req) => {
       }
     } catch { /* notification is best-effort; never block the shopper view */ }
 
+    // The harvested OEM links the packet hands the shopper. We store the
+    // LINK and nothing else — the brochure and the owner's manual stay on the
+    // manufacturer's site, and no PDF of either is ever downloaded here.
+    interface LinkRow { id: string; url: string; title: string | null; year: number | null }
+
+    // A franchised dealer's own copy, when they hold one. Serving it is what
+    // makes the passport survive the manufacturer reorganising their site --
+    // a link is a promise somebody else keeps, and this record is meant to
+    // outlive the sale by years.
+    //
+    // Entitlement comes from oem_distribution_for_vehicle, which answers "was
+    // this vehicle EVER distributed under a host decision", not "may this
+    // dealer host today". A dealer who later drops the franchise stops NEW
+    // hosting; it does not reach into a passport somebody already owns.
+    const hostedDoc = async (
+      kind: "owners_manual" | "brochure", brand: string, model: string, yr: number | null,
+    ): Promise<{ url: string; hosted: true } | null> => {
+      try {
+        if (!row.tenant_id || !row.vin || !brand) return null;
+        const { data: entitled } = await admin.rpc("oem_distribution_for_vehicle", {
+          _tenant_id: row.tenant_id, _vin: row.vin, _document_kind: kind,
+        });
+        if (entitled !== "host") return null;
+        const { data: held } = await admin
+          .from("oem_hosted_documents")
+          .select("storage_path")
+          .eq("tenant_id", row.tenant_id)
+          .ilike("brand", brand).ilike("model", model)
+          .eq("document_kind", kind)
+          .order("model_year", { ascending: false, nullsFirst: false })
+          .limit(6);
+        const rows = (held || []) as { storage_path: string; model_year?: number | null }[];
+        const pick = (yr ? rows.find((r) => r.model_year === yr) : rows[0]) || rows[0];
+        if (!pick?.storage_path) return null;
+        // Signed per request, never stored: a signed URL kept on the row is
+        // what made published cars serve dead links once it aged out.
+        const { data: signed } = await admin.storage
+          .from("oem-documents").createSignedUrl(pick.storage_path, 6 * 60 * 60);
+        return signed?.signedUrl ? { url: signed.signedUrl, hosted: true } : null;
+      } catch {
+        // Never let the hosted lookup cost the shopper the manufacturer link.
+        return null;
+      }
+    };
+
     // ── Official OEM brochure link from the global harvest cache: exact
     // model year first, otherwise the nearest within two model years.
     try {
@@ -643,21 +688,32 @@ serve(async (req) => {
       if (mk && md) {
         const { data: bl } = await admin
           .from("oem_brochure_links")
-          .select("url, title, year")
+          .select("id, url, title, year")
           .ilike("make", mk).ilike("model", md)
           .order("year", { ascending: false, nullsFirst: false })
           .limit(6);
-        const rows = (bl || []) as { url: string; title: string | null; year: number | null }[];
+        const rows = (bl || []) as LinkRow[];
+        // Exact year, then within two model years, then a year-less row. That
+        // last step matters: the harvest falls back to the make's "Manuals &
+        // Guides" portal, which carries no year, and the old chain dropped
+        // those rows for any vehicle that had a year -- so a harvest that
+        // succeeded still showed nothing on the passport.
         const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
           rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
-          (!yr ? rows[0] : undefined);
-        if (pick) row.oem_brochure = { url: pick.url, title: pick.title, year: pick.year };
+          rows.find((r) => r.year == null);
+        if (pick) {
+          const held = await hostedDoc("brochure", mk, md, yr);
+          row.oem_brochure = {
+            url: held?.url ?? pick.url, title: pick.title, year: pick.year,
+            hosted: !!held, manufacturer_url: pick.url,
+          };
+        }
       }
     } catch { /* brochure link optional */ }
 
     // ── Official OEM owner's-manual link from its harvest cache (same
     // nearest-year rule). Link only; a stored copy, when one exists, comes
-    // through row.documents (attached on demand by save-owners-manual).
+    // through row.documents when a dealer attached one by hand.
     try {
       const parts = String((row.ymm as string) || "").trim().split(/\s+/);
       const yr = Number.parseInt(parts[0] || "", 10) || null;
@@ -666,15 +722,26 @@ serve(async (req) => {
       if (mk && md) {
         const { data: ml } = await admin
           .from("oem_owners_manual_links")
-          .select("url, title, year")
+          .select("id, url, title, year")
           .ilike("make", mk).ilike("model", md)
           .order("year", { ascending: false, nullsFirst: false })
           .limit(6);
-        const rows = (ml || []) as { url: string; title: string | null; year: number | null }[];
+        const rows = (ml || []) as LinkRow[];
+        // Exact year, then within two model years, then a year-less row. That
+        // last step matters: the harvest falls back to the make's "Manuals &
+        // Guides" portal, which carries no year, and the old chain dropped
+        // those rows for any vehicle that had a year -- so a harvest that
+        // succeeded still showed nothing on the passport.
         const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
           rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
-          (!yr ? rows[0] : undefined);
-        if (pick) row.oem_owners_manual = { url: pick.url, title: pick.title, year: pick.year };
+          rows.find((r) => r.year == null);
+        if (pick) {
+          const held = await hostedDoc("owners_manual", mk, md, yr);
+          row.oem_owners_manual = {
+            url: held?.url ?? pick.url, title: pick.title, year: pick.year,
+            hosted: !!held, manufacturer_url: pick.url,
+          };
+        }
       }
     } catch { /* owner's-manual link optional */ }
 
@@ -729,6 +796,17 @@ serve(async (req) => {
             if (!Number.isFinite(p) || p <= 0) return false;
             return ourPrice == null || p >= ourPrice;
           })
+          .map((c) => ({
+            price: c.price ?? null, miles: c.miles ?? null, ymm: c.ymm ?? null,
+            trim: c.trim ?? null, dist: c.dist ?? null, dom: c.dom ?? null, image: c.image ?? null,
+          }));
+      }
+      // The OFFER. Same shaping as comparables, but no price floor: these are
+      // the dealer's own cars, and a cheaper one of theirs is a sale, not a
+      // leak. Cannibalisation is already excluded upstream.
+      if (Array.isArray(row.group_similar)) {
+        row.group_similar = (row.group_similar as Record<string, unknown>[])
+          .filter((c) => { const p = Number(c?.price); return Number.isFinite(p) && p > 0; })
           .map((c) => ({
             price: c.price ?? null, miles: c.miles ?? null, ymm: c.ymm ?? null,
             trim: c.trim ?? null, dist: c.dist ?? null, dom: c.dom ?? null, image: c.image ?? null,

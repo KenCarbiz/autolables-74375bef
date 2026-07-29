@@ -103,6 +103,15 @@ serve(async (req) => {
   let body: { tenant_id?: string; vin?: string; zip?: string; batch?: boolean } = {};
   try { body = await req.json(); } catch { /* empty */ }
 
+  // OEM incentives are switched OFF by owner decision (2026-07-28): the data
+  // is not used by the business and every lookup is a metered provider call.
+  // Refused here rather than only at the call sites so a leftover cron, a
+  // stale client bundle or a manual invoke cannot quietly resume the spend.
+  // To re-enable, set MARKETCHECK_INCENTIVES_ENABLED=true on the project.
+  if ((Deno.env.get("MARKETCHECK_INCENTIVES_ENABLED") || "").toLowerCase() !== "true") {
+    return json({ ok: true, disabled: true, incentives: [], reason: "incentives_disabled" });
+  }
+
   const admin = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
 
   // ── On-demand customer-ZIP lookup ───────────────────────────────
@@ -173,7 +182,20 @@ serve(async (req) => {
     for (const t of (enabled || []) as { tenant_id: string; dealer_zip_override: string | null }[]) {
       const zip = (t.dealer_zip_override || "").trim();
       if (!/^\d{5}$/.test(zip)) continue;
-      const { offers } = await fetchOffers({ zip, rows: 500 });
+      // Read the error. Discarding it meant a single throttled or failed pull
+      // produced an empty offer index, which then wrote `[]` over the OEM
+      // incentives of EVERY vehicle in the rooftop — customer-facing offers
+      // gone for a whole dealer on one bad night. The single-VIN path above
+      // already checks this; the batch path did not.
+      const { offers, error: offersError } = await fetchOffers({ zip, rows: 500 });
+      if (offersError) {
+        console.warn(`incentives: skipping tenant ${t.tenant_id} — provider error ${offersError}`);
+        continue;
+      }
+      if (!offers.length) {
+        console.warn(`incentives: tenant ${t.tenant_id} returned zero offers for ${zip}; not overwriting stored incentives`);
+        continue;
+      }
       // Index offers by make|model|year for quick per-vehicle matching.
       const idx = new Map<string, Incentive[]>();
       for (const off of offers) {

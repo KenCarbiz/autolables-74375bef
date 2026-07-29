@@ -132,20 +132,28 @@ export async function refreshVehicleTruth(
   // Candidate facts are written whether or not a snapshot version follows:
   // knowing that MarketCheck still says the same thing is worth recording
   // even when nothing material moved.
-  for (const [factKey, fact] of Object.entries(built.facts)) {
-    await admin.from("vehicle_facts").upsert({
-      tenant_id: tenantId,
-      vehicle_id: vehicleId,
-      fact_key: factKey,
-      fact_value: { v: fact.value },
-      source_kind: fact.source,
-      source_record_id: fact.evidence.sourceRecordId ?? null,
-      confidence: fact.confidence,
-      authority: fact.authority,
-      usable_in_copy: fact.usableInCopy,
-      evidence: fact.evidence,
-      observed_at: fact.observedAt ?? new Date().toISOString(),
-    }, { onConflict: "vehicle_id,fact_key,source_kind" });
+  //
+  // Written in ONE upsert. A vehicle resolves around twenty facts, and
+  // awaiting a round trip per fact made a sweep manage roughly ten vehicles
+  // inside its budget — the difference between a backfill finishing in one
+  // click and needing a dozen.
+  const now = new Date().toISOString();
+  const factRows = Object.entries(built.facts).map(([factKey, fact]) => ({
+    tenant_id: tenantId,
+    vehicle_id: vehicleId,
+    fact_key: factKey,
+    fact_value: { v: fact.value },
+    source_kind: fact.source,
+    source_record_id: fact.evidence.sourceRecordId ?? null,
+    confidence: fact.confidence,
+    authority: fact.authority,
+    usable_in_copy: fact.usableInCopy,
+    evidence: fact.evidence,
+    observed_at: fact.observedAt ?? now,
+  }));
+  if (factRows.length) {
+    await admin.from("vehicle_facts")
+      .upsert(factRows, { onConflict: "vehicle_id,fact_key,source_kind" });
   }
 
   const decision = decideSnapshotVersion(
@@ -157,16 +165,27 @@ export async function refreshVehicleTruth(
   const toStore = current ? carryForward(current.snapshot_json, built.snapshot) : built.snapshot;
 
   const blocking = built.conflicts.filter((c) => c.blocksGeneration);
-  for (const conflict of built.conflicts) {
-    await admin.from("vehicle_fact_conflicts").upsert({
-      tenant_id: tenantId,
-      vehicle_id: vehicleId,
-      fact_key: conflict.factKey,
-      authority: conflict.authority,
-      candidates: conflict.candidates,
-      blocks_generation: conflict.blocksGeneration,
-      status: "open",
-    }, { onConflict: "vehicle_id,fact_key", ignoreDuplicates: true });
+  if (built.conflicts.length) {
+    // Refresh, do not ignore. The unique key is (vehicle_id, fact_key) and is
+    // NOT scoped by status, so `ignoreDuplicates: true` meant that once any
+    // row existed for a fact — including one a manager had already resolved or
+    // dismissed — every later disagreement about that same fact was silently
+    // dropped. New evidence that two sources now disagree about MSRP never
+    // reached anyone, and blocks_generation was never re-raised, so the
+    // sticker generated unblocked on a conflict nobody was told about.
+    await admin.from("vehicle_fact_conflicts").upsert(
+      built.conflicts.map((conflict) => ({
+        tenant_id: tenantId,
+        vehicle_id: vehicleId,
+        fact_key: conflict.factKey,
+        authority: conflict.authority,
+        candidates: conflict.candidates,
+        blocks_generation: conflict.blocksGeneration,
+        status: "open",
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: "vehicle_id,fact_key", ignoreDuplicates: false },
+    );
   }
   // The same conflicts also reach the Command Center queue a manager
   // actually watches. Without this the truth layer would know a vehicle was

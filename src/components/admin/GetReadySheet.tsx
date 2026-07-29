@@ -88,10 +88,13 @@ export const GetReadySheet = ({
     })();
   }, [open, record.vin, record.storeId, record.ymm, tenant?.id]);
 
+  // Above the `!open` return: a hook below it runs on the open render only,
+  // which changes the hook order between renders (React #310).
+  const keyTagQrRef = useRef<HTMLDivElement>(null);
+
   if (!open) return null;
 
   const installUrl = token ? `${window.location.origin}/install/${token}` : "";
-  const keyTagQrRef = useRef<HTMLDivElement>(null);
 
   // Print a compact key-tag/hang-tag carrying just the installer QR — attach it
   // to the keys until the install is verified, then discard. Printed in an

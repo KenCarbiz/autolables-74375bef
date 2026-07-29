@@ -37,6 +37,19 @@ describe("artifactNoRetryReason", () => {
     }
   });
 
+  it("names the sweep that really does re-run the sticker and the VIN decode", () => {
+    expect(artifactNoRetryReason("factory_sticker")).toMatch(/nightly resync/i);
+    expect(artifactNoRetryReason("vin_decode")).toMatch(/nightly enrich sweep/i);
+  });
+
+  it("promises no sweep for the OEM link harvests, which nothing re-runs", () => {
+    for (const a of ["oem_brochure", "owners_manual"]) {
+      const reason = String(artifactNoRetryReason(a));
+      expect(reason).toMatch(/not retried by any sweep/i);
+      expect(reason).not.toMatch(/nightly/i);
+    }
+  });
+
   it("is null exactly where a retry RPC exists", () => {
     expect(artifactNoRetryReason("buyers_guide")).toBeNull();
     expect(artifactNoRetryReason("window_sticker")).toBeNull();
@@ -81,5 +94,12 @@ describe("buildAutogenExceptionRows", () => {
 
   it("humanizes an unknown artifact name instead of dropping it", () => {
     expect(artifactLabel("weird_new_artifact")).toBe("Weird New Artifact");
+  });
+
+  it("labels the ingest artifacts the auto-generation pipeline records", () => {
+    expect(artifactLabel("factory_sticker")).toBe("Factory window sticker");
+    expect(artifactLabel("vin_decode")).toBe("VIN equipment decode");
+    expect(artifactLabel("oem_brochure")).toBe("OEM brochure link");
+    expect(artifactLabel("owners_manual")).toBe("Owner's manual link");
   });
 });

@@ -23,6 +23,8 @@ import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRe
 import { listingGallery, listingHero } from "@/lib/photos";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { assessListingDecodeHealth, HEALTH_TONE, type DataHealthReport } from "@/lib/vehicleData/dataContract";
+import { harvestVerdict, type HarvestResponse, type HarvestVerdict } from "@/lib/ingest/harvestVerdict";
+import { recordIngestStep } from "@/lib/ingest/recordIngestStep";
 import type { VehicleListing, TitleVerification } from "@/hooks/useVehicleListing";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
@@ -1009,11 +1011,12 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
     const raw = linkUrl.trim();
     if (!raw) { toast.error("Paste a link first"); return; }
     const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    const next = [...(vehicle.documents || []), { name: linkName.trim() || url, type, url }];
-    const { error } = await (supabase as any)
-      .from("vehicle_listings")
-      .update({ documents: next })
-      .eq("id", vehicle.id);
+    // Append server-side. Building `next` from React state and writing the
+    // whole array back deleted anything attached since this tab loaded.
+    const { error } = await (supabase as any).rpc("append_vehicle_document", {
+      _vehicle_id: vehicle.id,
+      _doc: { name: linkName.trim() || url, type, url },
+    });
     if (error) { toast.error("Failed to add link"); return; }
     setLinkSlot(null); setLinkName(""); setLinkUrl("");
     toast.success("Link added");
@@ -1021,13 +1024,10 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   };
 
   const removeDoc = async (doc: { name: string; url: string; type: string }) => {
-    const next = (vehicle.documents || []).filter(
-      (d) => !(d.name === doc.name && d.url === doc.url && d.type === doc.type),
-    );
-    const { error } = await (supabase as any)
-      .from("vehicle_listings")
-      .update({ documents: next })
-      .eq("id", vehicle.id);
+    // Remove only this entry, server-side, so a concurrent attach survives.
+    const { error } = await (supabase as any).rpc("remove_vehicle_document", {
+      _vehicle_id: vehicle.id, _name: doc.name, _url: doc.url, _type: doc.type,
+    });
     if (error) { toast.error("Failed to remove"); return; }
     toast.success("Removed");
     onReload();
@@ -1061,13 +1061,10 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
     const { data: signed } = await supabase.storage
       .from("vehicle-docs")
       .createSignedUrl(path, 60 * 60 * 24 * 365);
-    const next = [...(vehicle.documents || []), {
-      name: file.name, type, url: signed?.signedUrl || path,
-    }];
-    const { error: updErr } = await (supabase as any)
-      .from("vehicle_listings")
-      .update({ documents: next })
-      .eq("id", vehicle.id);
+    const { error: updErr } = await (supabase as any).rpc("append_vehicle_document", {
+      _vehicle_id: vehicle.id,
+      _doc: { name: file.name, type, url: signed?.signedUrl || path },
+    });
     setUploading(null);
     if (updErr) {
       toast.error("Saved file, but failed to attach to vehicle row");
@@ -1400,6 +1397,22 @@ interface AddendumRow {
 // /v/:slug scan: service history, remaining warranty, and accessories still
 // available for this vehicle. Saved straight onto vehicle_listings, which the
 // public RPC returns, so changes appear on the shopper page immediately.
+
+// File the harvest outcome against this VIN. Best-effort: a ledger write that
+// fails must not change what the operator is told about the harvest itself,
+// but it is logged rather than discarded.
+const recordHarvestVerdict = async (vehicle: VehicleRow, verdict: HarvestVerdict): Promise<void> => {
+  await recordIngestStep({
+    tenantId: vehicle.tenant_id,
+    vin: vehicle.vin,
+    vehicleId: vehicle.id,
+    step: verdict.step,
+    status: verdict.status,
+    reason: verdict.reason,
+    detail: { trigger: "vehicle_file_manual" },
+  });
+};
+
 const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
   const [busy, setBusy] = useState(false);
   const [found, setFound] = useState<{ url: string; year?: number | null } | null>(null);
@@ -1412,13 +1425,13 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("oem-brochure", { body: { make, model, year } });
-      if (error || !data?.ok) {
-        const code = (data as { error?: string } | null)?.error;
-        toast.error(code === "make_not_supported" ? `No official brochure source configured for ${make}.` : `No official ${make} brochure found for this model.`);
-        return;
-      }
-      setFound({ url: data.url, year: data.year });
-      toast.success(`Official brochure linked${data.cached ? "" : " (newly harvested)"} — it now shows in the shopper packet.`);
+      // One verdict drives the toast AND the per-VIN ledger row, so the
+      // operator can never be told "linked" while the ledger says otherwise.
+      const verdict = harvestVerdict("brochure", data as HarvestResponse | null, error?.message ?? null, make);
+      await recordHarvestVerdict(vehicle, verdict);
+      if (verdict.status !== "succeeded") { toast.error(verdict.toastMessage); return; }
+      setFound({ url: String(data.url), year: data.year });
+      toast.success(verdict.toastMessage);
     } finally {
       setBusy(false);
     }
@@ -1456,27 +1469,12 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("oem-owners-manual", { body: { make, model, year } });
-      if (error || !data?.ok) {
-        const code = (data as { error?: string } | null)?.error;
-        toast.error(code === "make_not_supported" ? `No official manual source configured for ${make}.` : `No official ${make} owner's manual found for this model.`);
-        return;
-      }
-      setFound({ url: data.url, year: data.year });
-      toast.success(`Owner's manual linked${data.cached ? "" : " (newly harvested)"} — it now shows in the shopper packet.`);
+      const verdict = harvestVerdict("owners_manual", data as HarvestResponse | null, error?.message ?? null, make);
+      await recordHarvestVerdict(vehicle, verdict);
+      if (verdict.status !== "succeeded") { toast.error(verdict.toastMessage); return; }
+      setFound({ url: String(data.url), year: data.year });
+      toast.success(verdict.toastMessage);
     } finally { setBusy(false); }
-  };
-  const saveToDocs = async () => {
-    setSaving(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("save-owners-manual", { body: { vehicle_id: vehicle.id } });
-      if (error || !data?.ok) {
-        const code = (data as { error?: string } | null)?.error;
-        toast.error(code === "manual_link_not_harvested" ? "Find the manual first, then save it." : "Couldn't save the manual to documents.");
-        return;
-      }
-      toast.success(data.cached ? "Owner's manual is already in this vehicle's documents." : "Owner's manual saved to documents.");
-      onReload();
-    } finally { setSaving(false); }
   };
   return (
     <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5 flex items-center justify-between gap-4 flex-wrap">
@@ -1486,7 +1484,7 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
           {savedInDocs
             ? <>Saved to this vehicle's documents.</>
             : found
-            ? <>Linked to the manufacturer's official manual{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a> — the link shows on the packet; save a copy to store it with the car.</>
+            ? <>Linked to the manufacturer's official manual{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a> — the shopper packet links straight to the manufacturer; no copy is stored here.</>
             : <>Search the manufacturer's own site for the official {make || "model"} owner's manual and link it on the shopper packet.</>}
         </p>
       </div>
@@ -1494,11 +1492,6 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
         {!savedInDocs && (
           <button onClick={find} disabled={busy} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-border text-[13px] font-semibold hover:bg-muted disabled:opacity-60">
             {busy ? "Searching…" : found ? "Search again" : "Find owner's manual"}
-          </button>
-        )}
-        {found && !savedInDocs && (
-          <button onClick={saveToDocs} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-blue-600 text-white text-[13px] font-semibold hover:bg-blue-700 disabled:opacity-60">
-            {saving ? "Saving…" : "Save to documents"}
           </button>
         )}
       </div>

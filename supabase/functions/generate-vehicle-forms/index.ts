@@ -1,6 +1,9 @@
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { invokeFunction } from "../_shared/invoke.ts";
+import { findVehiclesNeedingForms } from "../_shared/complianceFormsSweep.ts";
+import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // generate-vehicle-forms — fills the EXACT official government forms for a
@@ -37,8 +40,19 @@ function resolveAppBase(req: Request, appBase?: string): string {
   if (isHttp(origin)) return clean(origin);
   const env = Deno.env.get("APP_BASE_URL");
   if (isHttp(env)) return clean(env);
-  return "https://app.autolabels.io";
+  return TEMPLATE_HOST_FALLBACKS[0];
 }
+
+// Hosts known to serve the bundled /forms/*.pdf masters. The first is the
+// default when nothing else resolves; loadTemplate retries the rest when a
+// resolved base can't serve the template (cron/service calls carry no Origin,
+// and app.autolabels.io does not resolve — that made every nightly fill 500).
+const TEMPLATE_HOST_FALLBACKS = [
+  "https://www.autolabels.io",
+  "https://autolabels.io",
+  "https://autolables.lovable.app",
+];
+
 
 const MANAGER_ROLES = new Set([
   "owner", "general_manager", "gsm", "admin", "manager",
@@ -81,10 +95,25 @@ interface VerifiedTemplate { bytes: ArrayBuffer; version: string; contentHash: s
 
 // deno-lint-ignore no-explicit-any
 async function loadTemplate(admin: any, base: string, name: string): Promise<VerifiedTemplate> {
-  const res = await fetch(`${base}/forms/${name}`);
-  if (!res.ok) throw new Error(`template ${name} ${res.status} from ${base}`);
-  const bytes = await res.arrayBuffer();
+  // Try the resolved base first, then the known template hosts. A dead or
+  // non-serving base must not fail the fill — the drift check below is what
+  // guarantees we only ever fill the exact approved master bytes.
+  const candidates = [base, ...TEMPLATE_HOST_FALLBACKS.filter((h) => h !== base)];
+  let bytes: ArrayBuffer | null = null;
+  const failures: string[] = [];
+  for (const host of candidates) {
+    try {
+      const res = await fetch(`${host}/forms/${name}`);
+      if (!res.ok) { failures.push(`${host} ${res.status}`); continue; }
+      bytes = await res.arrayBuffer();
+      break;
+    } catch (e) {
+      failures.push(`${host} ${String((e as Error)?.message || e)}`);
+    }
+  }
+  if (!bytes) throw new Error(`template ${name} unavailable (${failures.join("; ")})`);
   const contentHash = await sha256Hex(new Uint8Array(bytes));
+
   const key = TEMPLATE_KEYS[name];
   const { data: reg } = await admin.from("compliance_form_templates")
     .select("version, content_hash").eq("template_key", key).is("retired_at", null).maybeSingle();
@@ -247,6 +276,44 @@ async function fillK208(tpl: ArrayBuffer, v: Vehicle, d: Dealer, opts?: { initia
   return await pdf.save();
 }
 
+interface DocumentAssetRow {
+  tenant_id: string; vehicle_id: string; document_id: string;
+  document_type: string; document_version: number; asset_type: "pdf";
+  storage_bucket: string; storage_path: string; mime_type: string;
+  checksum: string; byte_size: number; updated_at: string;
+}
+
+function buildPdfAssetRow(args: {
+  tenantId: string; vehicleId: string; documentId: string; docType: string;
+  version: number; bucket: string; path: string; checksum: string; byteSize: number;
+}): DocumentAssetRow {
+  return {
+    tenant_id: args.tenantId, vehicle_id: args.vehicleId, document_id: args.documentId,
+    document_type: args.docType, document_version: args.version || 1, asset_type: "pdf",
+    storage_bucket: args.bucket, storage_path: args.path, mime_type: "application/pdf",
+    checksum: args.checksum, byte_size: args.byteSize, updated_at: new Date().toISOString(),
+  };
+}
+
+// The durable address of every filed compliance PDF. Signed URLs expire and
+// generated_documents.pdf_url is only a cache, so without this row
+// get_published_document_asset can never resolve the document — the K-208 and
+// Buyers Guide stayed invisible on the passport even after they were published.
+// Written on EVERY fill regardless of document_status: the row is the address,
+// not the permission. Publishing stays a human/legal decision (the manager
+// ladder in documentWorkflow.ts, or autopublish_k208_on_signoff once service
+// signs), and the asset is already there the moment that decision lands.
+// deno-lint-ignore no-explicit-any
+async function recordPdfAsset(admin: any, row: DocumentAssetRow): Promise<void> {
+  try {
+    await admin.from("document_assets").upsert(row, { onConflict: "document_id,asset_type" });
+  } catch (e) {
+    // Asset bookkeeping must never fail a filed government form; the next
+    // regeneration repairs it.
+    console.error("document_assets upsert failed", String((e as Error)?.message || e));
+  }
+}
+
 // deno-lint-ignore no-explicit-any
 async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: string | null, docType: string, bytes: Uint8Array, year: string, snapExtra?: Record<string, unknown>): Promise<string> {
   const hash = await sha256Hex(bytes);
@@ -296,17 +363,35 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
           .update({ document_status: "superseded", superseded_by: current.id, updated_at: new Date().toISOString() })
           .in("id", extras);
       }
+      // Overwriting in place still changes the bytes at rest, so the asset row
+      // has to follow it — this branch is the common one (one keyed draft per
+      // vehicle), and it used to return with no asset written at all.
+      await recordPdfAsset(admin, buildPdfAssetRow({
+        tenantId, vehicleId, documentId: current.id, docType, version: current.version,
+        bucket: BUCKET, path, checksum: hash, byteSize: bytes.length,
+      }));
       return url;
     }
 
     // Locked + byte-identical → refresh the signed URL on the live row.
     if (current && (current.data_snapshot as { content_hash?: string } | null)?.content_hash === hash) {
       await admin.from("generated_documents").update({ online_url: url, pdf_url: url, updated_at: new Date().toISOString() }).eq("id", current.id);
+      await recordPdfAsset(admin, buildPdfAssetRow({
+        tenantId, vehicleId, documentId: current.id, docType, version: current.version,
+        bucket: BUCKET, path, checksum: hash, byteSize: bytes.length,
+      }));
       return url;
     }
 
     // Locked + changed (or none yet) → mint a new immutable version.
     const nextVersion = rows.reduce((m, r) => Math.max(m, r.version || 0), 0) + 1;
+    // Status stays "draft" on purpose. A filled government form is an
+    // unreviewed compliance draft: the Buyers Guide box still needs a human to
+    // confirm it (create_draft_buyers_guide stamps needs_verification), and a
+    // K-208 may only reach "published" once a signed inspection exists —
+    // trg_k208_publish_requires_execution rejects it otherwise. Publishing here
+    // would fake an approval, so instead the asset row below makes the document
+    // servable the instant a human (or autopublish_k208_on_signoff) publishes it.
     const { data: inserted, error: insErr } = await admin.from("generated_documents").insert({
       tenant_id: tenantId, vehicle_id: vehicleId, template_id: docType === "k208" ? "ct-k208" : "ftc-buyers-guide",
       document_type: docType, document_status: "draft", version: nextVersion, template_version: 1,
@@ -316,14 +401,18 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
       // Race: a concurrent fill minted the live draft first
       // (ux_generated_documents_one_live_compliance_draft) — fold into it.
       if (insErr.code === "23505") {
-        const { data: race } = await admin.from("generated_documents").select("id")
+        const { data: race } = await admin.from("generated_documents").select("id, version")
           .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("document_type", docType)
           .in("document_status", ["draft", "pending_approval"]).maybeSingle();
-        const raceId = (race as { id?: string } | null)?.id;
-        if (raceId) {
+        const raceRow = race as { id?: string; version?: number } | null;
+        if (raceRow?.id) {
           await admin.from("generated_documents")
             .update({ online_url: url, pdf_url: url, data_snapshot: snap, updated_at: new Date().toISOString() })
-            .eq("id", raceId);
+            .eq("id", raceRow.id);
+          await recordPdfAsset(admin, buildPdfAssetRow({
+            tenantId, vehicleId, documentId: raceRow.id, docType, version: raceRow.version || 1,
+            bucket: BUCKET, path, checksum: hash, byteSize: bytes.length,
+          }));
           return url;
         }
       }
@@ -335,8 +424,85 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
         .update({ document_status: "superseded", superseded_by: newId, updated_at: new Date().toISOString() })
         .in("id", liveRows.map((r) => r.id));
     }
+    if (newId) {
+      await recordPdfAsset(admin, buildPdfAssetRow({
+        tenantId, vehicleId, documentId: newId, docType, version: nextVersion,
+        bucket: BUCKET, path, checksum: hash, byteSize: bytes.length,
+      }));
+    }
   }
   return url;
+}
+
+const SWEEP_LOCK_KEY = "compliance_forms_sweep";
+const SWEEP_LOCK_TTL_SECONDS = 300;
+const SWEEP_BUDGET_MS = 90_000;
+const SWEEP_MAX_ROWS = 2000;
+// Forms are filled one VIN at a time with a gap between them. Each fill loads
+// two PDF templates and writes storage, and fanning those unpaced is what
+// produced the throttle storm this whole repair exists to undo.
+const SWEEP_GAP_MS = 300;
+
+const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function runFormsSweep(
+  req: Request, tenantId: string | null, limitRaw: number, appBase: string,
+): Promise<Response> {
+  const admin = adminClient();
+  const limit = Math.min(Math.max(limitRaw, 1), SWEEP_MAX_ROWS);
+  const work = await findVehiclesNeedingForms(admin, tenantId, limit);
+  if (!work.length) return json(200, { success: true, total: 0, processed: 0, note: "Nothing to sweep." });
+
+  // Single-runner. Two overlapping sweeps would re-fill and re-upload the same
+  // PDFs. Taken only once the worklist is known, so a failed query cannot leak
+  // the lock.
+  const { data: acquired } = await admin.rpc("try_acquire_service_lock", {
+    _key: SWEEP_LOCK_KEY, _ttl_seconds: SWEEP_LOCK_TTL_SECONDS, _holder: tenantId || "all_tenants",
+  });
+  if (acquired === false) return json(200, { success: true, skipped: "already_running", total: work.length });
+
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const selfUrl = `${Deno.env.get("SUPABASE_URL") || ""}/functions/v1/generate-vehicle-forms`;
+
+  const worker = async () => {
+    const deadline = Date.now() + SWEEP_BUDGET_MS;
+    let processed = 0, filled = 0, failed = 0, throttled = 0;
+    try {
+      for (const item of work) {
+        if (Date.now() >= deadline) break;
+        processed++;
+        // No `action` in this body — the per-VIN path, never the sweep, so it
+        // cannot recurse into itself.
+        const res = await invokeFunction(selfUrl, serviceKey, {
+          body: { tenant_id: item.tenant_id, vin: item.vin, app_base: appBase },
+          timeoutMs: 25_000, maxRetries: 1, maxWaitMs: 5_000,
+          deadlineMs: Math.max(1_000, Math.min(30_000, deadline - Date.now())),
+        });
+        if (res.ok) filled++;
+        else if (res.rateLimited) throttled++;
+        else failed++;
+        if (Date.now() + SWEEP_GAP_MS < deadline) await sleepMs(SWEEP_GAP_MS);
+      }
+    } finally {
+      try { await admin.rpc("release_service_lock", { _key: SWEEP_LOCK_KEY }); }
+      catch { /* the TTL expiry is the backstop */ }
+    }
+    console.log(`forms sweep: processed ${processed}, filled ${filled}, failed ${failed}, throttled ${throttled}`);
+    return { processed, filled, failed, throttled };
+  };
+
+  if (req.headers.get("x-sweep-sync") === "1") {
+    const r = await worker();
+    return json(200, { success: true, total: work.length, ...r, remaining: Math.max(0, work.length - r.processed) });
+  }
+  // deno-lint-ignore no-explicit-any
+  const er = (globalThis as any).EdgeRuntime;
+  if (er && typeof er.waitUntil === "function") er.waitUntil(worker()); else worker();
+  return json(200, {
+    success: true, started: true, total: work.length,
+    scope: tenantId || "all_tenants",
+    note: "Sweep running in background; re-invoke to see remaining.",
+  });
 }
 
 Deno.serve(async (req) => {
@@ -344,10 +510,31 @@ Deno.serve(async (req) => {
   if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; kinds?: string[]; box?: string; lang?: string; app_base?: string };
+  const body = await req.json().catch(() => ({})) as {
+    tenant_id?: string; vin?: string; kinds?: string[]; box?: string; lang?: string; app_base?: string;
+    action?: string; limit?: number;
+  };
   const appBase = resolveAppBase(req, body.app_base);
   const tenantId = body.tenant_id;
   const vin = (body.vin || "").toUpperCase().trim();
+
+  // ── Nightly self-heal for the compliance forms ──────────────────────
+  // ensureComplianceDrafts re-renders a file-less draft, but its only caller
+  // with a render target is marketcheck-sync's update branch — so the repair
+  // reached a vehicle only if it appeared in tonight's MarketCheck payload for
+  // a tenant with a configured feed. Everything from autocurb-sync, the DMS
+  // webhook, a CSV import or a manual add had no path back at all: the draft
+  // row existed, so nothing thought work was outstanding, and the Buyers Guide
+  // stayed unopenable. This is the missing sweep, and it asks the same question
+  // ensureComplianceDrafts now asks — does the row point at a PDF, not does the
+  // row exist.
+  if (String(body.action || "") === "sweep") {
+    if (!isServiceOrCron(req) && !(tenantId && await isManagerMember(adminClient(), req, tenantId))) {
+      return json(401, { error: "unauthorized" });
+    }
+    return await runFormsSweep(req, tenantId || null, Number(body.limit) || 500, appBase);
+  }
+
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
   const kinds = Array.isArray(body.kinds) && body.kinds.length ? body.kinds : ["buyers_guide", "k208"];
   // Optional box override (as-is | implied | warranty) so a manual selection in
@@ -366,11 +553,14 @@ Deno.serve(async (req) => {
     .select("id, ymm, condition, mileage").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!listing?.id) return json(404, { error: "vehicle not found" });
   const { data: vf } = await admin.from("vehicle_files").select("year, make, model").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
-  const ymmParts = String(listing.ymm || "").trim().split(/\s+/);
+  // parseYmm, not a positional split. Taking token 1 as the make turns
+  // "2024 Land Rover Defender 110" into make "Land" — printed onto a
+  // federally required FTC Buyers Guide and onto the CT K-208.
+  const parsedYmm = parseYmm(listing.ymm as string | null);
   const vehicle: Vehicle = {
-    year: String(vf?.year || ymmParts[0] || ""),
-    make: vf?.make || ymmParts[1] || "",
-    model: vf?.model || ymmParts.slice(2).join(" ") || "",
+    year: String(vf?.year || parsedYmm.year || ""),
+    make: vf?.make || parsedYmm.make || "",
+    model: vf?.model || parsedYmm.model || "",
     body: "",
     vin,
     mileage: listing.mileage != null ? Number(listing.mileage).toLocaleString("en-US") : "",

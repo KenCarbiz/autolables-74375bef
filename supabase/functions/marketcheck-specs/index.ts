@@ -10,6 +10,8 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
+import { flat, structuredSheet } from "../_shared/neovinSheet.ts";
+import { describeShape, detectDrift, shapeHash } from "../_shared/payloadShape.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
@@ -21,15 +23,6 @@ const sha256Hex = async (text: string): Promise<string> => {
   const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, "0")).join("");
 };
-
-// Flatten a feed value (string | {name|label|description|...}) to a clean name.
-// deno-lint-ignore no-explicit-any
-// NeoVIN shapes: InstalledOption/AvailableOption use `name`; Feature/
-// HighValueFeature use `description`; InstalledEquipment uses `item`.
-const flat = (x: any): string =>
-  typeof x === "string" ? x.trim()
-  : x && typeof x === "object" ? String(x.name ?? x.label ?? x.item ?? x.description ?? x.value ?? x.code ?? "").trim()
-  : "";
 
 // Pull every array that looks like an option/equipment/feature list out of a
 // decode payload, wherever MarketCheck nests it (the shape varies by plan).
@@ -71,120 +64,6 @@ function extractLists(raw: any): { options: string[]; features: string[] } {
   };
   walk(raw);
   return { options: [...options], features: [...features] };
-}
-
-// ── Structured build sheet ───────────────────────────────────────────────────
-// NeoVIN returns five distinct layers (packages / installed options / high-value
-// features / standard features / granular installed_equipment). The flat
-// options+features arrays keep back-compat; this preserves the tiers so the
-// passport can show packages as packages instead of a 633-row info dump.
-// installed_equipment (engineering rows) is deliberately NOT captured — it is
-// noise for shoppers.
-// deno-lint-ignore no-explicit-any
-function structuredSheet(payload: any): Record<string, unknown> | null {
-  const src = payload || {};
-  const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
-
-  // Per-item factory option codes are sticker-grade data (the Monroney lists
-  // them); persist them additively when the feed carries them.
-  const codeOf = (x: unknown): string | undefined => {
-    const c = String((x as { code?: unknown; option_code?: unknown } | null)?.code
-      ?? (x as { option_code?: unknown } | null)?.option_code ?? "").trim();
-    return c || undefined;
-  };
-
-  const packages: { name: string; code?: string; msrp?: number; contents: string[] }[] = [];
-  const pkgSrc = Array.isArray(src.options_packages) ? src.options_packages : [];
-  for (const p of pkgSrc) {
-    const name = flat(p);
-    if (!name) continue;
-    const contents = ([] as unknown[])
-      .concat(p?.options ?? p?.contents ?? p?.items ?? p?.features ?? [])
-      .map(flat).filter(Boolean);
-    packages.push({ name, code: codeOf(p), msrp: num(p?.msrp ?? p?.price), contents });
-  }
-
-  const options: { name: string; code?: string; msrp?: number }[] = [];
-  const optSrc = Array.isArray(src.installed_options_details) ? src.installed_options_details : [];
-  for (const o of optSrc) {
-    const name = flat(o);
-    if (!name) continue;
-    // Some feeds list packages inside installed options — route them by type or
-    // by the presence of sub-contents.
-    const subs = ([] as unknown[]).concat(o?.options ?? o?.contents ?? []).map(flat).filter(Boolean);
-    if (/package/i.test(String(o?.type ?? o?.category ?? "")) || subs.length) {
-      if (!packages.some((p) => p.name === name)) packages.push({ name, code: codeOf(o), msrp: num(o?.msrp ?? o?.price), contents: subs });
-    } else {
-      options.push({ name, code: codeOf(o), msrp: num(o?.msrp ?? o?.price) });
-    }
-  }
-
-  // Category map {category: [{description}|string]} → {category: [names]}.
-  const catMap = (obj: unknown): Record<string, string[]> => {
-    const out: Record<string, string[]> = {};
-    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
-      for (const [cat, arr] of Object.entries(obj as Record<string, unknown>)) {
-        const names = (Array.isArray(arr) ? arr : [arr]).map(flat).filter(Boolean);
-        if (names.length) out[cat] = names;
-      }
-    }
-    return out;
-  };
-  const key_features = catMap(src.high_value_features);
-  const standard = catMap(src.features);
-
-  // include_generic=true falls back to typical-for-trim specs when the VIN
-  // can't be fully decoded — the passport must label those, never assert them.
-  const generic = Boolean(src.is_generic ?? src.generic ?? /generic/i.test(String(src.decode_mode ?? src.decode ?? "")));
-
-  // ── Sticker-grade fields (Factory Window Sticker Generator) ──────────
-  // The raw NeoVIN payload was historically discarded after extraction, so
-  // base MSRP, destination charge, and color codes were lost forever. These
-  // additive keys persist them for future decodes (the complete raw response
-  // is also captured verbatim in neovin_snapshots). NeoVIN field names, per
-  // the parsing above + mc-probe: msrp (base), delivery_charges
-  // (destination), combined_msrp (total); exterior_color/interior_color as
-  // {name|generic_name, code, msrp}; made_in/made_in_city for assembly.
-  const pricing: Record<string, number> = {};
-  const baseMsrp = num(src.msrp ?? src.base_msrp ?? src.base_price);
-  const destCharge = num(src.delivery_charges ?? src.destination_charge ?? src.destination ?? src.freight_charge);
-  const totalMsrp = num(src.combined_msrp ?? src.total_msrp ?? src.total_price ?? src.msrp_with_options);
-  if (baseMsrp) pricing.base_msrp = baseMsrp;
-  if (destCharge) pricing.destination_charge = destCharge;
-  if (totalMsrp) pricing.total_msrp = totalMsrp;
-
-  // deno-lint-ignore no-explicit-any
-  const colorOf = (c: any): Record<string, unknown> | undefined => {
-    if (c == null) return undefined;
-    if (typeof c === "string") return c.trim() ? { name: c.trim() } : undefined;
-    if (typeof c !== "object") return undefined;
-    const name = String(c.name ?? c.generic_name ?? c.description ?? "").trim();
-    const code = String(c.code ?? c.color_code ?? "").trim();
-    const cMsrp = num(c.msrp ?? c.price);
-    if (!name && !code) return undefined;
-    return { ...(name ? { name } : {}), ...(code ? { code } : {}), ...(cMsrp ? { msrp: cMsrp } : {}) };
-  };
-  const exterior = colorOf(src.exterior_color ?? src.base_ext_color);
-  const interior = colorOf(src.interior_color ?? src.base_int_color);
-  const colors = exterior || interior
-    ? { ...(exterior ? { exterior } : {}), ...(interior ? { interior } : {}) }
-    : undefined;
-
-  const plant = String(src.plant ?? src.assembly_plant ?? "").trim();
-  const country = String(src.made_in ?? src.assembly_country ?? "").trim();
-  const city = String(src.made_in_city ?? "").trim();
-  const assembly = plant || country || city
-    ? { ...(plant ? { plant } : {}), ...(country ? { country } : {}), ...(city ? { city } : {}) }
-    : undefined;
-
-  if (!packages.length && !options.length && !Object.keys(key_features).length && !Object.keys(standard).length) return null;
-  return {
-    packages, options, key_features, standard, generic,
-    ...(Object.keys(pricing).length ? { pricing } : {}),
-    ...(colors ? { colors } : {}),
-    ...(assembly ? { assembly } : {}),
-    decoded_at: new Date().toISOString(), source: "neovin",
-  };
 }
 
 // Candidate MarketCheck VIN-decode endpoints — the specs/options path differs
@@ -258,6 +137,13 @@ Deno.serve(async (req) => {
   // an answer, so it does not count — otherwise a slow call would retire the
   // VIN to the generic fallback permanently.
   let strictAttempted = false;
+  // A provider REFUSAL is not an answer about the VIN. 401/403/429 mean the
+  // account is out of quota, unauthorized or throttled — the same VIN would
+  // decode perfectly tomorrow. Collapsing that into "no_endpoint_matched"
+  // makes it indistinguishable from "this VIN has no build data", and the
+  // sweeps then burn one of only MAX_SPEC_ATTEMPTS on it. Three quota days in
+  // a row would retire a decodable VIN permanently.
+  let providerRefused: number | null = null;
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];
     const isNeovin = url.includes("/neovin/");
@@ -267,6 +153,10 @@ Deno.serve(async (req) => {
       const res = await fetch(url, { signal: AbortSignal.timeout(isNeovin ? 30000 : 12000) });
       tried.push({ url: redact(url), status: res.status });
       if (i === 0) strictAttempted = true;
+      if (res.status === 401 || res.status === 403 || res.status === 429) {
+        providerRefused = res.status;
+        continue;
+      }
       if (!res.ok) continue;
       const data = await res.json().catch(() => null);
       if (data == null) continue;
@@ -278,7 +168,24 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (!payload) return json(200, { ok: false, error: "no_endpoint_matched", tried });
+  if (!payload) {
+    // Retryable: the caller must NOT spend a decode attempt on this, and must
+    // not finalize the vehicle as having no equipment.
+    if (providerRefused !== null) {
+      // Name the actual status. Calling every refusal "quota exhausted" sent
+      // us chasing a billing problem that did not exist: 401 is credentials,
+      // 403 is plan scope on that endpoint, 429 is rate. They need different
+      // responses and must never be reported as one thing.
+      const kind = providerRefused === 429 ? "provider_rate_limited"
+        : providerRefused === 401 ? "provider_unauthorized"
+        : "provider_forbidden";
+      return json(200, {
+        ok: false, error: kind, retryable: true,
+        provider_status: providerRefused, tried,
+      });
+    }
+    return json(200, { ok: false, error: "no_endpoint_matched", tried });
+  }
 
   // ── Complete provider capture: capture FIRST, extract SECOND ─────────
   // The FULL raw decode response is persisted to neovin_snapshots before any
@@ -297,17 +204,71 @@ Deno.serve(async (req) => {
   } catch { /* capture is best-effort; the table may not be migrated yet */ }
 
   const { options, features } = extractLists(payload);
-  const sheet = structuredSheet(payload);
+  // Unwrap first: the merge below already knew the payload may be wrapped
+  // (`payload.build || payload`), but structuredSheet was handed the outer
+  // object, so on a wrapped response every key it reads was one level too
+  // shallow and it returned null.
   // deno-lint-ignore no-explicit-any
   const build = (payload.build || payload) as any;
+  const sheet = structuredSheet(build) ?? structuredSheet(payload);
+
+  // Shape drift alarm. We have always captured the raw response and never
+  // examined it, so the day NeoVIN changed shape we found out from a dealer
+  // asking why a sticker said "no factory build data" for a car the provider
+  // had answered 200 for. This asks the one question that separates the two
+  // cases: did the provider send nothing (a coverage gap — stop retrying), or
+  // did it send something we failed to read (our bug — never re-buy it)?
+  // Best-effort: an alarm must never fail the decode it is watching.
+  try {
+    const shape = describeShape(build);
+    const hash = await shapeHash(shape);
+    const { data: seen } = await admin.rpc("record_provider_payload_shape", {
+      _provider: "marketcheck_neovin",
+      _endpoint: endpoint || "decode-neovin",
+      _shape_hash: hash,
+      _key_names: shape.keys,
+      _dependency_types: shape.dependencyTypes,
+      _findings: [],
+      _parse_failed: !sheet,
+      _sample_vin: vin,
+    });
+    const row = Array.isArray(seen) ? seen[0] as { is_new?: boolean; prior_keys?: string[] } : null;
+    const findings = detectDrift(shape, { parsedSheet: !!sheet, priorKeys: row?.prior_keys ?? null });
+    // Raise once per NEW shape, not once per vehicle — otherwise a schema
+    // change would open one exception per car in the fleet.
+    if (findings.length && row?.is_new && tenantId) {
+      await admin.from("vehicle_exceptions").upsert({
+        tenant_id: tenantId, vin, exception_type: "provider_payload_drift",
+        severity: findings.some((f) => f.kind === "parse_failure") ? "high" : "medium",
+        title: "Provider response shape changed",
+        explanation: "MarketCheck/NeoVIN returned a response shape this decoder has not seen before. "
+          + findings.map((f) => f.detail).join(" · "),
+        source_values: { shape_hash: hash, keys: shape.keys, findings, endpoint },
+        recommended_action: "Compare the stored neovin_snapshots payload for this VIN against the decoder's "
+          + "expected keys. Equipment may be silently missing from window stickers until the decoder is updated.",
+        status: "open",
+      }, { onConflict: "tenant_id,vin,exception_type", ignoreDuplicates: true });
+      console.warn(`payload drift ${hash}: ${findings.map((f) => `${f.kind} — ${f.detail}`).join(" | ")}`);
+    }
+  } catch { /* the alarm is best-effort; it must never break the decode */ }
 
   // Best-effort merge into mc_attributes so the file + sticker pick it up,
   // isolated so a missing column never fails the decode response.
   if (vehicleId || tenantId) {
     try {
       const admin = adminClient();
-      let sel = admin.from("vehicle_listings").select("id, mc_attributes").eq("vin", vin);
-      if (tenantId) sel = sel.eq("tenant_id", tenantId);
+      // Target the row the CALLER named. Selecting on (vin[, tenant]) LIMIT 1
+      // with no ordering meant that when a VIN had more than one listing row
+      // — a draft from autocurb-sync or the DMS webhook alongside the
+      // published one — the build sheet landed on an arbitrary row, while the
+      // sticker workspace and the orchestrator both read the row addressed by
+      // vehicle_id and saw nothing.
+      let sel = admin.from("vehicle_listings").select("id, mc_attributes");
+      if (vehicleId) sel = sel.eq("id", vehicleId);
+      else {
+        sel = sel.eq("vin", vin);
+        if (tenantId) sel = sel.eq("tenant_id", tenantId);
+      }
       const { data: rows } = await sel.limit(1);
       const row = rows && rows[0];
       if (row) {

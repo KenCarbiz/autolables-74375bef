@@ -7,15 +7,13 @@
     "barcode": 1,
     "path": 68,
     "qr": 2,
-    "rect": 31,
-    "rule": 11,
+    "rect": 29,
+    "rule": 12,
     "text": 196
   },
   "fills": [
     "#0d0d0d",
     "#141414",
-    "#161616",
-    "#171717",
     "#4a4f55",
     "#b7d9f1",
     "#ffffff"
@@ -39,8 +37,6 @@
     5.2,
     5.4,
     5.5,
-    5.6,
-    5.8,
     6,
     6.2,
     6.4,
@@ -58,17 +54,16 @@
     9.5,
     10,
     10.5,
-    13.5,
+    11.5,
     16,
     17,
-    18,
     27
   ],
   "regions": {
-    "barcode": "21,517.5 227.15x23",
+    "barcode": "21,560 227.15x23",
     "qr": "755.5,198.4 17",
-    "qr2": "596.05,376.9 91.9",
-    "totalMsrp": "481,585 @18"
+    "qr2": "592,366.9 100",
+    "totalMsrp": "493,397.5 @11.5"
   },
   "headings": [
     "2026 INFINITI QX80",
@@ -82,9 +77,9 @@
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,995.00",
-    "JN8AZ3DC0T9500123",
     "TOTAL FACTORY MSRP",
     "$113,045.00",
+    "JN8AZ3DC0T9500123",
     "Fuel Economy & Environment",
     "Fuel Economy",
     "17",
@@ -98,6 +93,6 @@
   ],
   "totalBand": "$113,045.00",
   "svgDigest": [
-    "790bf74f"
+    "52eecd45"
   ]
 }

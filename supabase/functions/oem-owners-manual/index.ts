@@ -5,13 +5,19 @@
 // (incl. owner portals + Mopar for Stellantis), then caches the link in the
 // global oem_owners_manual_links table. We link to the OEM's hosted document —
 // never rehost bytes by default. A copy is stored into a vehicle's passport
-// documents only on demand, by save-owners-manual.
+// no copy is stored -- the packet links straight to the manufacturer.
 //
 // Body: { make, model, year?, refresh? }
-// Auth: tenant user JWT or service role.
+// Auth: tenant user JWT, or service role / cron secret. The service-role path
+// is what the ingest wiring uses (intake-autoprovision.ensureOemDocLinks): its
+// bearer is the project's service-role key, which the gateway's verify_jwt
+// accepts and isServiceOrCron matches, so no ingest-time exception is needed
+// and the function stays closed to anonymous callers. `refresh` — the one
+// input that forces a paid search past the cache — is privileged-only.
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { resolveOemMake } from "../_shared/oemDocKey.ts";
 
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
 
@@ -117,7 +123,8 @@ Deno.serve(async (req) => {
   if (pf) return pf;
 
   const admin = adminClient();
-  if (!isServiceOrCron(req)) {
+  const privileged = isServiceOrCron(req);
+  if (!privileged) {
     const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     if (!jwt) return json(401, { error: "missing bearer token" });
     const { data: ures } = await admin.auth.getUser(jwt);
@@ -130,21 +137,37 @@ Deno.serve(async (req) => {
   const year = Number.parseInt(String(body.year ?? ""), 10) || null;
   const refresh = body.refresh === true;
   if (!make || !model) return json(400, { error: "make and model required" });
+  // The cache this bypasses is global, and the four searches behind it are
+  // metered, so any signed-in user could otherwise re-bill the whole platform
+  // for a model on a loop. Nothing in the app sends refresh; operators and
+  // cron do.
+  if (refresh && !privileged) return json(403, { error: "refresh_requires_service_role" });
 
-  const domains = OEM_DOMAINS[make.toLowerCase()];
-  if (!domains) return json(404, { error: "make_not_supported", make });
+  // The stored key is (make, model) exactly as received, because that is what
+  // the passport queries. searchMake/searchModel only steer the search.
+  const resolved = resolveOemMake(make, model, OEM_DOMAINS);
+  if (!resolved) return json(404, { error: "make_not_supported", make });
+  const { domains, make: searchMake, model: searchModel } = resolved;
 
   if (!refresh) {
     const { data: cached } = await admin
       .from("oem_owners_manual_links")
-      .select("url, title, year, source")
+      .select("id, url, title, year, source")
       .ilike("make", make).ilike("model", model)
       .order("year", { ascending: false, nullsFirst: false })
       .limit(6);
-    const rows = (cached || []) as { url: string; title: string | null; year: number | null; source: string }[];
+    type CachedRow = {
+      id: string; url: string; title: string | null; year: number | null; source: string;
+    };
+    const rows = (cached || []) as CachedRow[];
     const exact = year ? rows.find((r) => r.year === year) : rows[0];
     const near = exact || rows.find((r) => r.year != null && year != null && Math.abs(r.year - year) <= 2) || (!year ? rows[0] : undefined);
-    if (near) return json(200, { ok: true, cached: true, url: near.url, title: near.title, year: near.year, source: near.source });
+    if (near) {
+      return json(200, {
+        ok: true, cached: true, url: near.url, title: near.title, year: near.year,
+        source: near.source,
+      });
+    }
   }
 
   if (!FIRECRAWL_KEY) return json(200, { error: "not_configured" });
@@ -153,10 +176,10 @@ Deno.serve(async (req) => {
   // Several query shapes: manuals may be a static PDF, an "owner's manual" page,
   // or the make's "Manuals & Guides" tool. First non-empty allowlisted set wins.
   const queries = [
-    `${year ? `${year} ` : ""}${make} ${model} owner's manual pdf (${siteFilter})`,
-    `${year ? `${year} ` : ""}${make} ${model} owner's manual (${siteFilter})`,
-    `${make} ${model} owners manual (${siteFilter})`,
-    `${make} ${model} manuals and guides (${siteFilter})`,
+    `${year ? `${year} ` : ""}${searchMake} ${searchModel} owner's manual pdf (${siteFilter})`,
+    `${year ? `${year} ` : ""}${searchMake} ${searchModel} owner's manual (${siteFilter})`,
+    `${searchMake} ${searchModel} owners manual (${siteFilter})`,
+    `${searchMake} ${searchModel} manuals and guides (${siteFilter})`,
   ];
   let hits: Hit[] = [];
   for (const q of queries) {
@@ -167,13 +190,13 @@ Deno.serve(async (req) => {
   let best: Hit;
   let source = "oem_site";
   if (hits.length) {
-    hits.sort((a, b) => scoreHit(b, model, year) - scoreHit(a, model, year));
+    hits.sort((a, b) => scoreHit(b, searchModel, year) - scoreHit(a, searchModel, year));
     best = hits[0];
   } else {
     // No indexable manual — fall back to the official manuals portal for the make.
-    const portal = MANUAL_PORTAL[make.toLowerCase()];
+    const portal = MANUAL_PORTAL[searchMake.toLowerCase()];
     if (!portal || !hostAllowed(portal, domains)) return json(404, { error: "manual_not_found" });
-    best = { url: portal, title: `${make} Owner's Manuals & Guides` };
+    best = { url: portal, title: `${searchMake} Owner's Manuals & Guides` };
     source = "oem_portal";
   }
 
@@ -197,14 +220,37 @@ Deno.serve(async (req) => {
   }
   const manualYear = yearOf(best) ?? year;
 
-  // Expression-based unique index (lower(make), lower(model), year) — upsert
-  // can't target it by name, so replace via delete + insert.
-  let del = admin.from("oem_owners_manual_links").delete().ilike("make", make).ilike("model", model);
-  del = manualYear === null ? del.is("year", null) : del.eq("year", manualYear);
-  await del;
-  await admin.from("oem_owners_manual_links").insert(
-    { make, model, year: manualYear, url: best.url, title: best.title || null, source, verified_at: new Date().toISOString() },
-  );
+  const row = {
+    make, model, year: manualYear, url: best.url, title: best.title || null,
+    source, verified_at: new Date().toISOString(),
+  };
+  const insert = () => admin.from("oem_owners_manual_links").insert(row).select("id").maybeSingle();
+
+  // Insert FIRST, and only delete the old row once a conflict proves one is in
+  // the way. Deleting up front — the previous shape — threw away a working
+  // cached link whenever the insert then failed for any reason, leaving the
+  // passport with nothing where it previously had something. The unique index
+  // is expression-based (lower(make), lower(model), year) so upsert cannot
+  // target it by name; a 23505 is how we learn a row exists.
+  let { data: saved, error: saveErr } = await insert();
+  if (saveErr && (saveErr as { code?: string }).code === "23505") {
+    let del = admin.from("oem_owners_manual_links").delete().ilike("make", make).ilike("model", model);
+    del = manualYear === null ? del.is("year", null) : del.eq("year", manualYear);
+    const { error: delErr } = await del;
+    if (delErr) {
+      return json(500, { error: "manual_link_not_saved", detail: delErr.message, url: best.url });
+    }
+    ({ data: saved, error: saveErr } = await insert());
+  }
+
+  // The insert error used to be discarded, so a write that never landed still
+  // answered ok:true — the dealer was told "it now shows in the shopper
+  // packet" while the passport, which reads this table, had nothing to show.
+  // A harvest that did not persist is a failed harvest.
+  if (saveErr || !saved?.id) {
+    return json(500, { error: "manual_link_not_saved", detail: saveErr?.message ?? "insert returned no row", url: best.url });
+  }
+
 
   return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: manualYear, source });
 });

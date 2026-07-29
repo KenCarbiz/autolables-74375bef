@@ -164,6 +164,9 @@ const WorkQueue = () => {
         .from("vehicle_listings")
         .select("id,tenant_id,vin,stock_number,ymm,year,make,model,trim,condition,mileage,price,fuel_type,title_status,cpo_status,is_demo")
         .or(`tenant_id.eq.${tenant.id},tenant_id.is.null`)
+        // Retired cars keep their row for the customer passport; they are not
+        // work.
+        .neq("status", "archived")
         .order("updated_at", { ascending: false })
         .limit(150);
 

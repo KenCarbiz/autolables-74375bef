@@ -304,6 +304,12 @@ export const MOCK_LISTING = {
     { type: "inspection_checklist", name: "Multi-Point Inspection Checklist", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-12" },
     { type: "window_sticker", name: "Window Sticker (Monroney)", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-10" },
   ],
+  // The two harvested manufacturer links. The preview carried neither, so the
+  // Documents page could not be reviewed with its brochure and owner's-manual
+  // cards present -- the exact two records whose covers are drawn rather than
+  // stored. Shape matches what public-listing-view attaches.
+  oem_brochure: { url: "https://www.infinitiusa.com/brochures/qx60.pdf", title: "QX60 Brochure", year: 2027 },
+  oem_owners_manual: { url: "https://owners.infinitiusa.com/manuals/qx60-2027.pdf", title: "QX60 Owner's Manual", year: 2027 },
   value_history: [
     { captured_at: "2025-05-01", market_value: 61800, listing_price: 59500, below_market: 2300, position: "good_deal" },
     { captured_at: "2025-05-15", market_value: 61500, listing_price: 59000, below_market: 2500, position: "good_deal" },

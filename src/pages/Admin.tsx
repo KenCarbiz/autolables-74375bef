@@ -24,6 +24,7 @@ import MerchandisingSeoPanel from "@/components/admin/MerchandisingSeoPanel";
 import InstallerInvoicesPanel from "@/components/admin/InstallerInvoicesPanel";
 import PassportPublishingCard from "@/components/admin/PassportPublishingCard";
 import PacketDefaultsPanel from "@/components/admin/PacketDefaultsPanel";
+import OemDistributionPanel from "@/components/admin/OemDistributionPanel";
 import { useInstantSave } from "@/hooks/useInstantSave";
 import { TODAYS_PRICE_MODE_OPTIONS, DEFAULT_TODAYS_PRICE_CUSTOM, resolveTodaysPrice } from "@/lib/todaysPrice";
 import { COMP_STRATEGY_OPTIONS, type CompStrategy } from "@/lib/compStrategy";
@@ -39,6 +40,7 @@ import StickerPrintTemplates from "@/components/admin/StickerPrintTemplates";
 import LabelDefaultsPanel from "@/components/admin/LabelDefaultsPanel";
 import FactoryStickerPanel from "@/components/admin/FactoryStickerPanel";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
+import IngestOutcomePanel from "@/components/admin/IngestOutcomePanel";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
 import { PriceAuditPanel } from "@/components/admin/PriceAuditPanel";
@@ -1661,6 +1663,7 @@ const Admin = () => {
         {tab === "passport-ctas" && (
           <div className="space-y-5">
             <PacketDefaultsPanel />
+            <OemDistributionPanel />
             <PassportPublishingCard />
             <StickyButtonsPanel />
           </div>
@@ -2260,6 +2263,11 @@ const Admin = () => {
                 dealer who notices "I'm missing rows" can check
                 the pull status without leaving this tab. */}
             <InventoryFeedHealth />
+
+            {/* Per-vehicle ingest outcome sits directly under feed health: the
+                feed answers "did the row arrive", this answers "did anything
+                actually get produced for it, and if not, why". */}
+            <IngestOutcomePanel />
 
             <div className="flex items-center justify-between">
               <div>

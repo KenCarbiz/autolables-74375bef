@@ -80,8 +80,12 @@ function assertInvariants(
     expect(barcode.x + barcode.w, where).toBeLessThanOrEqual(PAGE_WIDTH - PAGE_MARGIN);
   }
 
-  // Total MSRP placement: the largest money figure on the page is the
-  // total, and it sits in the bottom band.
+  // Total MSRP placement: the largest money figure on the page is the total.
+  // Where it sits depends on the profile's pricing convention — a reversed
+  // band pins it to the bottom, while the factory-record convention makes it
+  // the last row of the price table, which ends wherever the options end. The
+  // invariant that actually matters in both is that the biggest money figure
+  // IS the total, so the position check applies only to the band convention.
   if (data.pricing.totalMsrp !== null) {
     const monies = texts(model).filter((t) => /^\$[\d,]+\.\d{2}$/.test(t.str)).sort((a, b) => b.size - a.size);
     expect(monies.length, where).toBeGreaterThan(0);
@@ -89,7 +93,8 @@ function assertInvariants(
       minimumFractionDigits: 2, maximumFractionDigits: 2,
     });
     expect(monies[0].str, where).toBe(`$${total}`);
-    expect(monies[0].y, where).toBeGreaterThan(PAGE_HEIGHT * 0.75);
+    const inPriceTable = texts(model).some((t) => t.str.includes("ORIGINAL TOTAL MSRP"));
+    if (!inPriceTable) expect(monies[0].y, where).toBeGreaterThan(PAGE_HEIGHT * 0.75);
   }
 
   // QR placement: the passport QR is present and within bounds.

@@ -195,7 +195,10 @@ const persist = async (admin: any, tenantId: string | null, vin: string, n: Norm
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
-  if (!MC_KEY) return json(200, { recallStatus: "error", error: "not_configured", note: "Set MARKETCHECK_API_KEY_1 (AutoRecalls access)" });
+  // 503, not 200: pg_cron's recall sweep and every dashboard read a 2xx as a
+  // successful recall check, so a missing key used to mute the entire recall
+  // system silently. Callers already fall back to NHTSA on a non-2xx.
+  if (!MC_KEY) return json(503, { recallStatus: "error", error: "not_configured", note: "Set MARKETCHECK_API_KEY_1 (AutoRecalls access)" });
 
   const admin = adminClient();
   const body = await req.json().catch(() => ({}));

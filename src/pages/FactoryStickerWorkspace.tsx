@@ -538,17 +538,25 @@ export default function FactoryStickerWorkspace({
           ...(reason ? { reason_code: reason.reason_code, reason_notes: reason.reason_notes } : {}),
         },
       });
-      const payload = (data || {}) as { success?: boolean; error?: string; status?: string };
+      const payload = (data || {}) as { success?: boolean; error?: string; status?: string; generated?: boolean; skipped?: string; reused?: boolean };
       if (error || payload.success !== true) {
         const detail = error?.message || payload.error || "action failed";
         toast.error(/insufficient_permission/i.test(detail)
           ? "This action needs manager authority."
           : `Action failed: ${detail}`);
       } else {
+        // success:true only means the call was accepted. The orchestrator
+        // answers 200 with generated:false and a `skipped` reason when it
+        // could not build anything — most often no_build_sheet. Reporting
+        // that as "waiting for review" is what made a permanently stuck
+        // record look like a finished one.
+        const skipped = !payload.generated && !!payload.skipped;
         toast.success(
           action === "approve_publish" ? "Approved and published to the passport."
           : action === "unpublish" ? "Unpublished — the record is back in review."
           : payload.status === "PUBLISHED" ? "Regenerated and published."
+          : payload.reused ? "No change — the existing version is still current."
+          : skipped ? `Not generated yet — ${String(payload.skipped).replace(/_/g, " ")}.`
           : "Regenerated — the new version is waiting for review.");
       }
       await load();

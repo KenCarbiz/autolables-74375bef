@@ -35,6 +35,11 @@ import {
   listCompatibleTemplates, validateTemplateOverride, checkRenderedCompleteness,
 } from "../_shared/factorySticker/render.ts";
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
+import { structuredSheet } from "../_shared/neovinSheet.ts";
+import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
+import {
+  AUTO_PUBLISH_POLICY_VERSION, evaluateAutoPublish, reconcileMsrp,
+} from "../_shared/factorySticker/lib/autoPublish.ts";
 import { recordSourcePayload, refreshVehicleTruth } from "./truth.ts";
 
 const cors = {
@@ -51,6 +56,31 @@ const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
 const BUCKET = "vehicle-docs";
 const TEMPLATE_VERSION = "1.0.0";
 const MAX_RETRYABLE_ATTEMPTS = 3;
+
+// ── Nightly sweep policy ─────────────────────────────────────────────
+// Statuses whose record is unfinished work: the pipeline stopped short of a
+// filed, decided document and would move forward the moment the missing data
+// or the renderer arrives.
+const SWEEP_RETRYABLE_STATUSES = new Set(["PENDING_DATA", "FAILED_RETRYABLE", "READY_TO_GENERATE"]);
+// Mid-pipeline statuses. A function timeout or a killed invocation between
+// NORMALIZING and the final write leaves the record parked in one of these
+// with no document, reading "Generating..." and "Needs review" forever: they
+// were in neither the retryable set nor the never-rerun set, so the sweep
+// filtered them out and nothing else ever looked at them. Only rescued once
+// the row has genuinely gone stale, so a live run is never re-entered.
+const SWEEP_INFLIGHT_STATUSES = new Set(["NORMALIZING", "VALIDATING", "GENERATING", "RUNNING_QA"]);
+const SWEEP_INFLIGHT_STALE_MS = 15 * 60_000;
+// Statuses a sweep must never touch. PUBLISHED / APPROVED / SUPERSEDED are
+// settled documents — regenerating one behind the dealer's back can replace
+// what a customer is already looking at. FAILED_PERMANENT and ARCHIVED only
+// re-enter through an explicitly forced regeneration.
+const SWEEP_NEVER_RERUN_STATUSES = new Set([
+  "PUBLISHED", "APPROVED", "SUPERSEDED", "ARCHIVED", "FAILED_PERMANENT",
+]);
+const SWEEP_LOCK_KEY = "factory_sticker_sweep";
+const SWEEP_LOCK_TTL_SECONDS = 300;
+const SWEEP_BUDGET_MS = 90_000;
+const SWEEP_MAX_ROWS = 2000;
 
 const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
 
@@ -408,6 +438,44 @@ async function orchestrateVehicle(
     // explicit, permissioned, audited request rather than an implicit one.
     let mc = (listing.mc_attributes || {}) as Record<string, unknown>;
     let sheet = (mc.build_sheet || null) as Record<string, unknown> | null;
+    // Before paying: we already stored the complete raw provider response for
+    // every decode we have ever run, and nothing has ever read it back. A
+    // build sheet missing from mc_attributes does NOT mean we never decoded
+    // this VIN — the nightly feed sync used to delete the key outright. Try
+    // the durable copy first; it costs a select and closes the re-purchase
+    // loop that was re-billing the fleet.
+    if (!sheet) {
+      try {
+        const { data: snap } = await admin.from("neovin_snapshots")
+          .select("payload").eq("tenant_id", tenantId).eq("vin", vin)
+          .order("fetched_at", { ascending: false }).limit(1).maybeSingle();
+        const payload = (snap as { payload?: Record<string, unknown> } | null)?.payload;
+        if (payload) {
+          const rehydrated = structuredSheet(payload);
+          if (rehydrated) {
+            sheet = rehydrated;
+            mc = { ...mc, build_sheet: rehydrated };
+            await admin.from("vehicle_listings")
+              .update({ mc_attributes: mc }).eq("id", vehicleId);
+            listing.mc_attributes = mc;
+            await audit(admin, tenantId, "factory_sticker.source_rehydrated", record.id,
+              { vin, from: "neovin_snapshots" });
+          }
+        }
+      } catch { /* the paid path below is the fallback, not the other way round */ }
+    }
+    // Attempt cap. The two sweeps enforce MAX_SPEC_ATTEMPTS; this path did
+    // not, and never stamped the attempt either, so it was the one way to
+    // re-buy an undecodable VIN indefinitely — four times a night.
+    const decodeDecision = shouldDecodeVin(mc, MAX_SPEC_ATTEMPTS);
+    if (!sheet && opts.allowSourceFetch && !decodeDecision.decode) {
+      await setRecord(admin, record.id, {
+        generation_status: "PENDING_DATA",
+        last_error: `attempt_cap_reached: ${decodeDecision.reason}`,
+        review_required: false, review_reason: null,
+      });
+      return { vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA", skipped: "no_build_sheet" };
+    }
     if (!sheet && opts.allowSourceFetch) {
       await setRecord(admin, record.id, { generation_status: "PENDING_DATA", last_error: null });
       await audit(admin, tenantId, "factory_sticker.source_fetch_requested", record.id,
@@ -418,12 +486,33 @@ async function orchestrateVehicle(
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
           body: JSON.stringify({ vin, tenant_id: tenantId, vehicle_id: vehicleId }),
+          // NeoVIN is asked strictly and then generically, 30s each, so the
+          // decode legitimately runs a minute. Without a deadline an
+          // unresponsive provider parks this await until the isolate is
+          // killed, which on a sweep burns the whole wall-clock budget on one
+          // row and leaves the rest of the worklist untouched.
+          signal: AbortSignal.timeout(60_000),
         });
         const payload = await res.json().catch(() => ({}));
         fetchDetail = res.ok && payload?.ok !== false ? null : String(payload?.error || `http_${res.status}`);
       } catch (e) {
         fetchDetail = String((e as Error)?.message || e).slice(0, 200);
       }
+      // Stamp the attempt from here. marketcheck-specs returns early without
+      // writing on a no-match, which is exactly the case the cap exists for.
+      // A retryable provider refusal is deliberately not counted.
+      try {
+        const { data: after } = await admin.from("vehicle_listings")
+          .select("mc_attributes").eq("id", vehicleId).maybeSingle();
+        const fresh = ((after?.mc_attributes ?? mc) || {}) as Record<string, unknown>;
+        await admin.from("vehicle_listings").update({
+          mc_attributes: {
+            ...fresh,
+            specs_attempts: (Number(fresh.specs_attempts) || 0) + 1,
+            specs_attempted_at: new Date().toISOString(),
+          },
+        }).eq("id", vehicleId);
+      } catch { /* the cap is the backstop */ }
       await audit(admin, tenantId, "factory_sticker.source_fetch_completed", record.id,
         { vin, ok: fetchDetail === null, detail: fetchDetail });
       // Re-read: marketcheck-specs writes the decode back onto the listing.
@@ -435,9 +524,15 @@ async function orchestrateVehicle(
         const reason = fetchDetail
           ? `source_fetch_failed: ${fetchDetail}`
           : "source_fetch_returned_no_build_sheet: the provider had no equipment breakout for this VIN";
+        // NOT review_required. Nothing was produced to review, and a human
+        // cannot make the provider answer. Flagging it as a pending review
+        // put the record in a state the operator could not clear and the
+        // sweep would not retry, so the same stale reason ("source fetch
+        // failed: provider quota exhausted") sat on the card indefinitely
+        // while the actual condition was simply "no data yet".
         await setRecord(admin, record.id, {
           generation_status: "PENDING_DATA", last_error: reason,
-          review_required: true, review_reason: reason,
+          review_required: false, review_reason: null,
         });
         return {
           vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA",
@@ -447,9 +542,15 @@ async function orchestrateVehicle(
       listing.mc_attributes = mc;
     }
     if (!sheet) {
+      // Clear any stale review flag from an earlier failed run. This patch
+      // used to touch only status and last_error, so a review_reason written
+      // days ago survived every subsequent pass — which is why a card could
+      // show "Review: source_fetch_failed: provider_quota_exhausted" long
+      // after that had stopped being what was wrong.
       await setRecord(admin, record.id, {
         generation_status: "PENDING_DATA",
         last_error: "awaiting_build_sheet: no saved NeoVIN build sheet on this listing yet. Use Generate to retrieve it.",
+        review_required: false, review_reason: null,
       });
       return { vehicle_id: vehicleId, record_id: record.id, status: "PENDING_DATA", skipped: "no_build_sheet" };
     }
@@ -519,7 +620,14 @@ async function orchestrateVehicle(
       ],
       settings: {
         enabled: stickerSettings.enabled !== false,
-        used_reproduction: stickerSettings.used_reproduction === true,
+        // `=== true` made this opt-IN, so every tenant that had never opened
+        // the Factory Sticker panel had no `factory_sticker` key at all and
+        // every used and CPO vehicle returned ineligible_used before anything
+        // rendered. The documented default is on (DEFAULT_FACTORY_STICKER_
+        // SETTINGS.used_reproduction === true) and the library already treats
+        // a used reproduction as permitted unless explicitly disabled — this
+        // line was the only thing overriding both.
+        used_reproduction: stickerSettings.used_reproduction !== false,
       },
       hasVinSpecificBuildData: !normalized.data.generic,
       hasManufacturerPricing: !!normalized.baseMsrp && !!normalized.statedTotalMsrp,
@@ -637,30 +745,23 @@ async function orchestrateVehicle(
     };
 
     // ── Reconcile MSRP: computed (base + options + destination) vs the
-    // stated total (NeoVIN combined_msrp, else the feed MSRP).
+    // stated total (NeoVIN combined_msrp, else the feed MSRP). Integer cents
+    // throughout — see reconcileMsrp.
     await setRecord(admin, record.id, { generation_status: "VALIDATING" });
-    let reconciliationStatus = "INSUFFICIENT_DATA";
-    let reconciliationDifference: number | null = null;
-    let reviewRequired = false;
-    let reviewReason: string | null = null;
-    if (normalized.baseMsrp && normalized.statedTotalMsrp) {
-      const computed = normalized.baseMsrp + (normalized.optionsTotal || 0) + (normalized.destinationCharge || 0);
-      reconciliationDifference = Math.round(Math.abs(computed - normalized.statedTotalMsrp) * 100) / 100;
-      if (reconciliationDifference <= 5) reconciliationStatus = "MATCHED";
-      else if (reconciliationDifference <= 100) reconciliationStatus = "MINOR_VARIANCE";
-      else {
-        reconciliationStatus = "REVIEW_REQUIRED";
-        reviewRequired = true;
-        reviewReason = `msrp_reconciliation: computed ${computed} differs from stated ${normalized.statedTotalMsrp} by ${reconciliationDifference}`;
-      }
-    }
-    if (!canonicalPassportUrl) {
-      reviewRequired = true;
-      reviewReason = reviewReason || "missing_passport_slug: the QR payload cannot be resolved";
-    }
-    if (reviewRequired) {
+    const reconciliation = reconcileMsrp({
+      baseMsrp: normalized.baseMsrp,
+      optionsTotal: normalized.optionsTotal,
+      destinationCharge: normalized.destinationCharge,
+      statedTotalMsrp: normalized.statedTotalMsrp,
+    });
+    const reconciliationStatus = reconciliation.status;
+    const reconciliationDifference = reconciliation.difference;
+    // Provisional, for the row written before the render. The authoritative
+    // decision is evaluateAutoPublish below, once QA has actually run.
+    const preRenderBlocking = reconciliationStatus === "REVIEW_REQUIRED" || !canonicalPassportUrl;
+    if (preRenderBlocking) {
       await audit(admin, tenantId, "factory_sticker.review_required", record.id,
-        { vin, reason: reviewReason, reconciliation: reconciliationStatus });
+        { vin, reconciliation: reconciliationStatus, has_passport_url: !!canonicalPassportUrl });
     }
 
     // ── Existing OEM provider sticker: recorded as the original-document
@@ -680,6 +781,12 @@ async function orchestrateVehicle(
       logo_asset_version: theme.logoAssetVersion,
       passport_url: canonicalPassportUrl,
       template_override: appliedOverride?.templateKey ?? null,
+      // The publication policy is an input to the outcome, so it belongs in
+      // the fingerprint. Without it, relaxing a gate never reached the fleet:
+      // every record already parked in REVIEW_REQUIRED matched its own stored
+      // fingerprint, took the reuse path below, and was re-reported under the
+      // policy that had blocked it — forever.
+      auto_publish_policy_version: AUTO_PUBLISH_POLICY_VERSION,
     }));
 
     const basePatch: Record<string, unknown> = {
@@ -690,8 +797,8 @@ async function orchestrateVehicle(
       verification_status: normalized.data.generic ? "UNVERIFIED_GENERIC" : "PROVIDER_DECODED",
       reconciliation_status: reconciliationStatus,
       reconciliation_difference: reconciliationDifference,
-      review_required: reviewRequired,
-      review_reason: reviewReason,
+      review_required: preRenderBlocking,
+      review_reason: null,
       normalized_data_json: normalized.data,
       canonical_oem_id: canonicalOemId,
       detected_make_value: make || null,
@@ -804,16 +911,40 @@ async function orchestrateVehicle(
         selection: {
           status: selection.selectionStatus, confidence: selection.confidence,
           template_key: selection.templateKey, reasons: selection.reasons,
+          downgrades: selection.downgrades,
         },
       },
     };
     await audit(admin, tenantId, qaPass ? "factory_sticker.qa_passed" : "factory_sticker.qa_failed",
       record.id, { vin, checks: qaChecks });
 
-    // ── File + publish decision: auto-publish ONLY on a fully clean run.
-    const autoPublish = qaPass && reconciliationStatus === "MATCHED"
-      && normalized.confidence === "HIGH" && !reviewRequired
-      && selection.selectionStatus === "selected";
+    // ── File + publish decision. One pure, unit-tested policy (see
+    // _shared/factorySticker/lib/autoPublish.ts) rather than a boolean
+    // assembled here: the same evaluation produces both the verdict and the
+    // reason a dealer reads, so a record can never sit in review under a
+    // reason that does not correspond to what actually blocked it.
+    const decision = evaluateAutoPublish({
+      hasBuildSheet: !!sheet,
+      eligibility: {
+        eligible: eligibility.eligible,
+        status: eligibility.status,
+        reasons: eligibility.reasons,
+      },
+      selection: {
+        selectionStatus: selection.selectionStatus,
+        downgrades: selection.downgrades,
+        conflictingFields: selection.conflictingFields,
+        hasTemplateDefinition: !!selection.definition,
+      },
+      templateOverrideActive: !!appliedOverride && !appliedOverride.isAutomatic,
+      reconciliation,
+      confidence: normalized.confidence,
+      canonicalPassportUrl,
+      qaChecks,
+      completeness,
+      geometry,
+    });
+    const autoPublish = decision.autoPublish;
     const filed = await fileStickerDocument(admin, tenantId, vehicleId, vin,
       rendered.pdfBytes, rendered.previewSvg, {
         title, condition: normalized.data.condition, vin,
@@ -837,6 +968,7 @@ async function orchestrateVehicle(
 
     await audit(admin, tenantId, "factory_sticker.generated", record.id, {
       vin, document_id: filed.documentId, version: filed.version, auto_publish: autoPublish,
+      blockers: decision.blockers.map((b) => b.code),
       generated_by: opts.regeneration ? "user" : "system",
       ...(opts.regeneration ? { reason_code: opts.regeneration.reasonCode } : {}),
     });
@@ -844,20 +976,18 @@ async function orchestrateVehicle(
     const finalStatus = autoPublish ? "PUBLISHED" : "REVIEW_REQUIRED";
     await setRecord(admin, record.id, {
       ...qaPatch,
+      qa_metadata: {
+        ...(qaPatch.qa_metadata as Record<string, unknown>),
+        auto_publish: {
+          policy_version: AUTO_PUBLISH_POLICY_VERSION,
+          published: autoPublish,
+          blockers: decision.blockers,
+        },
+      },
       generation_status: finalStatus,
       current_document_id: filed.documentId,
       review_required: !autoPublish,
-      review_reason: autoPublish ? null : (reviewReason
-        || (!completeness.pass
-          ? `${completeness.code.toLowerCase()}: ${[
-            ...completeness.missing.map((m) => `missing ${m.label}`),
-            ...completeness.miscounted.map((m) => `${m.label} appeared ${m.actualCount}x`),
-          ].slice(0, 6).join("; ")}`
-          : !geometry.pass ? `${geometry.code.toLowerCase()}: ${geometry.reasons.join("; ")}`
-          : !qaPass ? "qa_failed"
-          : selection.selectionStatus !== "selected" ? `template_${selection.selectionStatus}: ${selection.reasons.join("; ")}`
-          : reconciliationStatus !== "MATCHED" ? `reconciliation_${reconciliationStatus.toLowerCase()}`
-          : `confidence_${normalized.confidence.toLowerCase()}`)),
+      review_reason: decision.reviewReason,
       attempt_count: 0, last_error: null,
       ...(autoPublish ? { published_at: new Date().toISOString(), approved_at: new Date().toISOString() } : {}),
     });
@@ -937,8 +1067,12 @@ serve(async (req) => {
     };
 
     const tenantId = String(body.tenant_id || "");
-    if (!tenantId) return json({ error: "tenant_id required" }, 400);
-    if (!allowed(tenantId)) return json({ error: "forbidden" }, 403);
+    // The nightly cron has no tenant to name — it sweeps every dealer. Only a
+    // service-role or cron caller may omit the scope; an interactive caller
+    // still has to say which tenant it is acting for.
+    const allTenantSweep = action === "orchestrate_sweep" && !tenantId && (isService || isCron);
+    if (!tenantId && !allTenantSweep) return json({ error: "tenant_id required" }, 400);
+    if (tenantId && !allowed(tenantId)) return json({ error: "forbidden" }, 403);
 
     // vehicle_id or vin: the manual add paths only know the VIN.
     let vehicleId = String(body.vehicle_id || "");
@@ -948,7 +1082,9 @@ serve(async (req) => {
         .select("id").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
       vehicleId = String(byVin?.id || "");
     }
-    if (!vehicleId) return json({ error: "vehicle_id or vin required" }, 400);
+    if (!vehicleId && action !== "refresh_truth_sweep" && action !== "orchestrate_sweep") {
+      return json({ error: "vehicle_id or vin required" }, 400);
+    }
 
     if (action === "orchestrate" || action === "regenerate") {
       const force = action === "regenerate" || !!body.force;
@@ -1008,6 +1144,7 @@ serve(async (req) => {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
               body: JSON.stringify({ vin: refreshVin, tenant_id: tenantId, vehicle_id: vehicleId }),
+              signal: AbortSignal.timeout(60_000),
             });
             const payload = await res.json().catch(() => ({}));
             refresh = { ok: res.ok && payload?.ok !== false, detail: payload?.error ?? null };
@@ -1231,30 +1368,205 @@ serve(async (req) => {
     // until `remaining` is 0.
     if (action === "refresh_truth_sweep") {
       if (!can(tenantId, "regenerate")) return json({ error: "insufficient_permission" }, 403);
-      const deadline = Date.now() + 90_000;
+      // `only_missing` (the default) skips vehicles already resolved, so a
+      // run that hits the budget resumes where the last one stopped instead
+      // of spending it re-resolving settled work. Pass only_missing: false to
+      // re-check the whole inventory.
+      const onlyMissing = body.only_missing !== false;
       const { data: listings } = await admin.from("vehicle_listings")
         .select("*").eq("tenant_id", tenantId).eq("status", "published")
         .order("updated_at", { ascending: false }).limit(500);
-      const rows = (listings || []) as Array<Record<string, unknown>>;
+      let rows = (listings || []) as Array<Record<string, unknown>>;
 
-      let created = 0, reused = 0, failed = 0, processed = 0;
-      const conflicts: string[] = [];
-      for (const listing of rows) {
-        if (Date.now() >= deadline) break;
-        processed++;
-        try {
-          const res = await refreshVehicleTruth(admin, tenantId, listing);
-          if (res.created) created++; else reused++;
-          if (res.blocking_conflicts > 0) conflicts.push(String(listing.vin || ""));
-        } catch {
-          failed++;
-        }
+      if (onlyMissing && rows.length) {
+        const { data: existing } = await admin.from("vehicle_snapshots")
+          .select("vehicle_id").eq("tenant_id", tenantId);
+        const resolved = new Set(
+          ((existing || []) as Array<{ vehicle_id: string }>).map((r) => r.vehicle_id),
+        );
+        rows = rows.filter((r) => !resolved.has(String(r.id)));
       }
+
+      // Callers (the admin curl tool, the app button) have short client-side
+      // deadlines that a 90s inline sweep blows past. Ack immediately and let
+      // EdgeRuntime.waitUntil finish the work; re-invoke to see remaining.
+      const sync = !!body.sync;
+      const worker = async () => {
+        const deadline = Date.now() + 90_000;
+        let created = 0, reused = 0, failed = 0, processed = 0;
+        const conflicts: string[] = [];
+        for (const listing of rows) {
+          if (Date.now() >= deadline) break;
+          processed++;
+          try {
+            const res = await refreshVehicleTruth(admin, tenantId, listing);
+            if (res.created) created++; else reused++;
+            if (res.blocking_conflicts > 0) conflicts.push(String(listing.vin || ""));
+          } catch { failed++; }
+        }
+        return { created, reused, failed, processed, conflicts };
+      };
+      if (sync) {
+        const r = await worker();
+        return json({ success: true, total: rows.length, ...r, remaining: Math.max(0, rows.length - r.processed) });
+      }
+      // deno-lint-ignore no-explicit-any
+      const er = (globalThis as any).EdgeRuntime;
+      if (er && typeof er.waitUntil === "function") er.waitUntil(worker());
+      else worker();
+      return json({ success: true, started: true, total: rows.length, note: "Sweep running in background; re-invoke to see remaining." });
+    }
+
+    // Nightly self-heal for the sticker itself. A factory_sticker_record is
+    // otherwise only ever created by a live orchestrate call, so a vehicle that
+    // arrived from autocurb-sync, the DMS webhook, a CSV import or a manual add
+    // got exactly one attempt at ingest and was never retried — and a vehicle
+    // that was parked PENDING_DATA before its build sheet landed stayed parked
+    // forever. Bounded by a wall-clock budget rather than a row count so it
+    // cannot exceed the function timeout; re-invoke until `remaining` is 0.
+    if (action === "orchestrate_sweep") {
+      if (tenantId && !can(tenantId, "regenerate")) return json({ error: "insufficient_permission" }, 403);
+      // `only_missing` (the default) is the worklist: vehicles with no record
+      // at all plus records the pipeline left unfinished. Pass false to also
+      // re-run records wedged mid-pipeline by a crashed run and drafts sitting
+      // in review; the never-re-run terminal states are excluded either way.
+      const onlyMissing = body.only_missing !== false;
+      // Opt-in: re-run REVIEW_REQUIRED records that already have a filed
+      // document waiting on a human. See the default rule below.
+      const includeReview = body.include_review === true;
+      const limit = Math.min(Math.max(Number(body.limit) || 500, 1), SWEEP_MAX_ROWS);
+
+      let listingQuery = admin.from("vehicle_listings")
+        .select("id, tenant_id, vin")
+        .eq("status", "published")
+        .order("updated_at", { ascending: false })
+        .limit(limit);
+      if (tenantId) listingQuery = listingQuery.eq("tenant_id", tenantId);
+      const { data: listings } = await listingQuery;
+      let rows = ((listings || []) as Array<{ id: string; tenant_id: string | null; vin: string | null }>)
+        .filter((r) => !!r.tenant_id);
+
+      if (rows.length) {
+        // Chunked: a single `in` over a whole inventory builds a URL long
+        // enough to be rejected, and PostgREST caps an unfiltered select.
+        const existing = new Map<string, { status: string; documentId: string | null; updatedAt: string | null }>();
+        for (let i = 0; i < rows.length; i += 200) {
+          const ids = rows.slice(i, i + 200).map((r) => r.id);
+          let recordQuery = admin.from("factory_sticker_records")
+            .select("vehicle_id, generation_status, current_document_id, updated_at").in("vehicle_id", ids);
+          if (tenantId) recordQuery = recordQuery.eq("tenant_id", tenantId);
+          const { data: recs } = await recordQuery;
+          for (const r of (recs || []) as Array<{ vehicle_id: string; generation_status: string; current_document_id: string | null; updated_at: string | null }>) {
+            existing.set(r.vehicle_id, {
+              status: String(r.generation_status || ""),
+              documentId: r.current_document_id ?? null,
+              updatedAt: r.updated_at ?? null,
+            });
+          }
+        }
+        rows = rows.filter((r) => {
+          const rec = existing.get(r.id);
+          if (!rec) return true;
+          if (SWEEP_NEVER_RERUN_STATUSES.has(rec.status)) return false;
+          if (rec.status === "REVIEW_REQUIRED") {
+            // A REVIEW_REQUIRED record with no filed document is not a pending
+            // human decision — nothing was ever produced to decide on. It is a
+            // pipeline blocked upstream (ineligible, template unresolved, no
+            // passport slug), which is precisely the population that can never
+            // self-heal once the underlying data is fixed. Those are swept. One
+            // that DOES hold a document is a manager's draft, and re-rendering
+            // it under them is a decision the sweep does not get to make.
+            return includeReview || !onlyMissing || !rec.documentId;
+          }
+          if (SWEEP_INFLIGHT_STATUSES.has(rec.status)) {
+            const age = Date.now() - Date.parse(rec.updatedAt || "");
+            return !Number.isFinite(age) ? false : age > SWEEP_INFLIGHT_STALE_MS;
+          }
+          return onlyMissing ? SWEEP_RETRYABLE_STATUSES.has(rec.status) : true;
+        });
+      }
+
+      if (!rows.length) {
+        return json({ success: true, total: 0, processed: 0, remaining: 0, note: "Nothing to sweep." });
+      }
+
+      // Single-runner. The pipeline this drives files documents, writes
+      // storage objects and can reach a paid provider, so two overlapping
+      // sweeps would do — and be billed for — the same work twice. Taken only
+      // once the worklist is known, so a failed query can never leak the lock.
+      const { data: acquired } = await admin.rpc("try_acquire_service_lock", {
+        _key: SWEEP_LOCK_KEY,
+        _ttl_seconds: SWEEP_LOCK_TTL_SECONDS,
+        _holder: tenantId || "all_tenants",
+      });
+      if (acquired === false) {
+        return json({ success: true, skipped: "already_running", total: rows.length });
+      }
+      const releaseSweepLock = async () => {
+        try { await admin.rpc("release_service_lock", { _key: SWEEP_LOCK_KEY }); }
+        catch { /* the TTL expiry is the backstop */ }
+      };
+
+      const sync = !!body.sync;
+      const worker = async () => {
+        const deadline = Date.now() + SWEEP_BUDGET_MS;
+        let processed = 0, generated = 0, published = 0, skipped = 0, failed = 0;
+        // Bounded provider spend per sweep run. Explicitly overridable so an
+        // admin can drain a backlog deliberately.
+        let fetchBudget = Math.max(0, Number(body.fetch_limit ?? 25));
+        const statuses: Record<string, number> = {};
+        try {
+          for (const row of rows) {
+            if (Date.now() >= deadline) break;
+            processed++;
+            try {
+              // A sweep that may never fetch could not make a PENDING_DATA
+              // record progress: it re-entered the same "awaiting_build_sheet"
+              // branch four times a night, forever, for every undecoded car.
+              // The decode is now durable (the feed sync no longer wipes it),
+              // so acquiring a missing sheet is a one-time cost per VIN rather
+              // than a nightly one — but it is still money, so it is bounded
+              // per run and never forces, so no review decision is overridden.
+              const mayFetch = fetchBudget > 0;
+              const res = await orchestrateVehicle(admin, req, String(row.tenant_id), row.id, {
+                reason: "nightly_sweep",
+                allowSourceFetch: mayFetch,
+                appBase: body.app_base ? String(body.app_base) : undefined,
+              });
+              // Decrement on EVERY fetch-enabled pass. Charging the budget only
+              // when a sheet came back exempted precisely the fruitless calls
+              // the budget exists to bound, so fetch_limit bounded nothing.
+              if (mayFetch) fetchBudget--;
+              const outcome = String(res.status || res.skipped || (res.error ? "error" : "unknown"));
+              statuses[outcome] = (statuses[outcome] || 0) + 1;
+              if (res.error) failed++;
+              else if (res.skipped) skipped++;
+              else {
+                generated++;
+                if (res.published === true) published++;
+              }
+            } catch { failed++; }
+          }
+        } finally {
+          await releaseSweepLock();
+        }
+        return { processed, generated, published, skipped, failed, statuses };
+      };
+
+      if (sync) {
+        const r = await worker();
+        return json({ success: true, total: rows.length, ...r, remaining: Math.max(0, rows.length - r.processed) });
+      }
+      // Callers (cron's http_post, the admin button) have short deadlines a 90s
+      // inline sweep blows past. Ack immediately and finish in the background.
+      // deno-lint-ignore no-explicit-any
+      const er = (globalThis as any).EdgeRuntime;
+      if (er && typeof er.waitUntil === "function") er.waitUntil(worker());
+      else worker();
       return json({
-        success: true,
-        total: rows.length, processed, created, reused, failed,
-        remaining: Math.max(0, rows.length - processed),
-        vehicles_with_blocking_conflicts: conflicts,
+        success: true, started: true, total: rows.length,
+        scope: tenantId || "all_tenants",
+        note: "Sweep running in background; re-invoke to see remaining.",
       });
     }
 

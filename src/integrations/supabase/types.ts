@@ -4864,6 +4864,12 @@ export type Database = {
       }
       oem_brochure_links: {
         Row: {
+          cover_generated_at: string | null
+          cover_mime: string | null
+          cover_page_count: number | null
+          cover_status: string | null
+          cover_storage_bucket: string | null
+          cover_storage_path: string | null
           created_at: string
           id: string
           make: string
@@ -4876,6 +4882,12 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          cover_generated_at?: string | null
+          cover_mime?: string | null
+          cover_page_count?: number | null
+          cover_status?: string | null
+          cover_storage_bucket?: string | null
+          cover_storage_path?: string | null
           created_at?: string
           id?: string
           make: string
@@ -4888,6 +4900,12 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          cover_generated_at?: string | null
+          cover_mime?: string | null
+          cover_page_count?: number | null
+          cover_status?: string | null
+          cover_storage_bucket?: string | null
+          cover_storage_path?: string | null
           created_at?: string
           id?: string
           make?: string
@@ -4898,6 +4916,219 @@ export type Database = {
           url?: string
           verified_at?: string | null
           year?: number | null
+        }
+        Relationships: []
+      }
+      oem_distribution_blocks: {
+        Row: {
+          blocked_by: string | null
+          brand: string
+          created_at: string
+          id: string
+          reason: string
+          tenant_id: string | null
+        }
+        Insert: {
+          blocked_by?: string | null
+          brand: string
+          created_at?: string
+          id?: string
+          reason: string
+          tenant_id?: string | null
+        }
+        Update: {
+          blocked_by?: string | null
+          brand?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_distribution_blocks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_distribution_blocks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oem_distribution_events: {
+        Row: {
+          brand: string
+          decided_at: string
+          decided_by: string | null
+          decision: string
+          document_kind: string
+          evidence: Json
+          gate_version: number
+          id: string
+          source_url: string | null
+          store_id: string | null
+          stored_path: string | null
+          tenant_id: string
+          vehicle_listing_id: string | null
+          vin: string
+        }
+        Insert: {
+          brand: string
+          decided_at?: string
+          decided_by?: string | null
+          decision: string
+          document_kind: string
+          evidence?: Json
+          gate_version?: number
+          id?: string
+          source_url?: string | null
+          store_id?: string | null
+          stored_path?: string | null
+          tenant_id: string
+          vehicle_listing_id?: string | null
+          vin: string
+        }
+        Update: {
+          brand?: string
+          decided_at?: string
+          decided_by?: string | null
+          decision?: string
+          document_kind?: string
+          evidence?: Json
+          gate_version?: number
+          id?: string
+          source_url?: string | null
+          store_id?: string | null
+          stored_path?: string | null
+          tenant_id?: string
+          vehicle_listing_id?: string | null
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_distribution_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_distribution_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oem_owners_manual_links: {
+        Row: {
+          cover_generated_at: string | null
+          cover_mime: string | null
+          cover_page_count: number | null
+          cover_status: string | null
+          cover_storage_bucket: string | null
+          cover_storage_path: string | null
+          created_at: string
+          id: string
+          make: string
+          model: string
+          source: string
+          title: string | null
+          updated_at: string
+          url: string
+          verified_at: string | null
+          year: number | null
+        }
+        Insert: {
+          cover_generated_at?: string | null
+          cover_mime?: string | null
+          cover_page_count?: number | null
+          cover_status?: string | null
+          cover_storage_bucket?: string | null
+          cover_storage_path?: string | null
+          created_at?: string
+          id?: string
+          make: string
+          model: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          url: string
+          verified_at?: string | null
+          year?: number | null
+        }
+        Update: {
+          cover_generated_at?: string | null
+          cover_mime?: string | null
+          cover_page_count?: number | null
+          cover_status?: string | null
+          cover_storage_bucket?: string | null
+          cover_storage_path?: string | null
+          created_at?: string
+          id?: string
+          make?: string
+          model?: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          url?: string
+          verified_at?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
+      oem_packet_backfill_attempts: {
+        Row: {
+          attempts: number
+          created_at: string
+          detail: string | null
+          id: string
+          kind: string
+          last_attempt_at: string
+          make: string
+          make_key: string
+          model: string
+          model_key: string
+          outcome: string
+          year: number | null
+          year_key: number
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          detail?: string | null
+          id?: string
+          kind: string
+          last_attempt_at?: string
+          make: string
+          make_key: string
+          model: string
+          model_key: string
+          outcome: string
+          year?: number | null
+          year_key?: number
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          detail?: string | null
+          id?: string
+          kind?: string
+          last_attempt_at?: string
+          make?: string
+          make_key?: string
+          model?: string
+          model_key?: string
+          outcome?: string
+          year?: number | null
+          year_key?: number
         }
         Relationships: []
       }
@@ -5047,10 +5278,14 @@ export type Database = {
       }
       passport_document_delivery_outbox: {
         Row: {
+          attempts: number
           channel: string
           created_at: string
           error: string | null
           id: string
+          last_attempt_at: string | null
+          max_attempts: number
+          next_attempt_at: string
           payload: Json
           provider: string | null
           provider_message_id: string | null
@@ -5063,10 +5298,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attempts?: number
           channel?: string
           created_at?: string
           error?: string | null
           id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
           payload?: Json
           provider?: string | null
           provider_message_id?: string | null
@@ -5079,10 +5318,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attempts?: number
           channel?: string
           created_at?: string
           error?: string | null
           id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
           payload?: Json
           provider?: string | null
           provider_message_id?: string | null
@@ -5798,6 +6041,51 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_payload_shapes: {
+        Row: {
+          dependency_types: Json
+          endpoint: string
+          findings: Json
+          first_seen_at: string
+          id: string
+          key_names: string[]
+          last_seen_at: string
+          observations: number
+          parse_failed: boolean
+          provider: string
+          sample_vin: string | null
+          shape_hash: string
+        }
+        Insert: {
+          dependency_types?: Json
+          endpoint: string
+          findings?: Json
+          first_seen_at?: string
+          id?: string
+          key_names?: string[]
+          last_seen_at?: string
+          observations?: number
+          parse_failed?: boolean
+          provider: string
+          sample_vin?: string | null
+          shape_hash: string
+        }
+        Update: {
+          dependency_types?: Json
+          endpoint?: string
+          findings?: Json
+          first_seen_at?: string
+          id?: string
+          key_names?: string[]
+          last_seen_at?: string
+          observations?: number
+          parse_failed?: boolean
+          provider?: string
+          sample_vin?: string | null
+          shape_hash?: string
+        }
+        Relationships: []
+      }
       qr_codes: {
         Row: {
           code: string
@@ -6502,6 +6790,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      service_locks: {
+        Row: {
+          acquired_at: string
+          expires_at: string
+          holder: string | null
+          lock_key: string
+        }
+        Insert: {
+          acquired_at?: string
+          expires_at: string
+          holder?: string | null
+          lock_key: string
+        }
+        Update: {
+          acquired_at?: string
+          expires_at?: string
+          holder?: string | null
+          lock_key?: string
+        }
+        Relationships: []
       }
       service_messages: {
         Row: {
@@ -8082,6 +8391,8 @@ export type Database = {
       vehicle_files: {
         Row: {
           aftermarket_installs: Json
+          archive_reason: string | null
+          archived_at: string | null
           attached_documents: Json
           available_accessories: Json
           cobuyer_email: string
@@ -8119,6 +8430,8 @@ export type Database = {
         }
         Insert: {
           aftermarket_installs?: Json
+          archive_reason?: string | null
+          archived_at?: string | null
           attached_documents?: Json
           available_accessories?: Json
           cobuyer_email?: string
@@ -8156,6 +8469,8 @@ export type Database = {
         }
         Update: {
           aftermarket_installs?: Json
+          archive_reason?: string | null
+          archived_at?: string | null
           attached_documents?: Json
           available_accessories?: Json
           cobuyer_email?: string
@@ -8204,6 +8519,73 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_ingest_ledger: {
+        Row: {
+          attempt_count: number
+          detail: Json
+          first_run_at: string
+          id: string
+          last_run_at: string
+          reason: string
+          recorded_by: string | null
+          status: string
+          step: string
+          tenant_id: string
+          vehicle_id: string | null
+          vin: string
+        }
+        Insert: {
+          attempt_count?: number
+          detail?: Json
+          first_run_at?: string
+          id?: string
+          last_run_at?: string
+          reason: string
+          recorded_by?: string | null
+          status: string
+          step: string
+          tenant_id: string
+          vehicle_id?: string | null
+          vin: string
+        }
+        Update: {
+          attempt_count?: number
+          detail?: Json
+          first_run_at?: string
+          id?: string
+          last_run_at?: string
+          reason?: string
+          recorded_by?: string | null
+          status?: string
+          step?: string
+          tenant_id?: string
+          vehicle_id?: string | null
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_ingest_ledger_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_ingest_ledger_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_ingest_ledger_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
             referencedColumns: ["id"]
           },
         ]
@@ -8284,6 +8666,8 @@ export type Database = {
       vehicle_listings: {
         Row: {
           advertised_price_before_doc: number | null
+          archive_reason: string | null
+          archived_at: string | null
           assigned_agent_id: string | null
           available_accessories: Json
           blackbook: Json | null
@@ -8369,6 +8753,8 @@ export type Database = {
         }
         Insert: {
           advertised_price_before_doc?: number | null
+          archive_reason?: string | null
+          archived_at?: string | null
           assigned_agent_id?: string | null
           available_accessories?: Json
           blackbook?: Json | null
@@ -8454,6 +8840,8 @@ export type Database = {
         }
         Update: {
           advertised_price_before_doc?: number | null
+          archive_reason?: string | null
+          archived_at?: string | null
           assigned_agent_id?: string | null
           available_accessories?: Json
           blackbook?: Json | null
@@ -9363,6 +9751,10 @@ export type Database = {
         Args: { _patch: Json; _tenant_id: string }
         Returns: undefined
       }
+      append_vehicle_document: {
+        Args: { _doc: Json; _vehicle_id: string }
+        Returns: Json
+      }
       approve_description_version: {
         Args: {
           p_approve?: boolean
@@ -9491,6 +9883,14 @@ export type Database = {
           p_spend_limit?: number
         }
         Returns: Json
+      }
+      derive_oem_franchise_brands: {
+        Args: { _tenant_id: string }
+        Returns: {
+          brand: string
+          latest_listed_at: string
+          new_units: number
+        }[]
       }
       description_generation_spend: {
         Args: { p_tenant_id: string }
@@ -9707,6 +10107,8 @@ export type Database = {
         Args: { _token: string }
         Returns: {
           aftermarket_installs: Json
+          archive_reason: string | null
+          archived_at: string | null
           attached_documents: Json
           available_accessories: Json
           cobuyer_email: string
@@ -9753,6 +10155,8 @@ export type Database = {
         Args: { _slug: string }
         Returns: {
           advertised_price_before_doc: number | null
+          archive_reason: string | null
+          archived_at: string | null
           assigned_agent_id: string | null
           available_accessories: Json
           blackbook: Json | null
@@ -9959,6 +10363,10 @@ export type Database = {
         Args: { _live_vins: string[]; _tenant_id: string }
         Returns: Json
       }
+      marketcheck_revive_listing: {
+        Args: { _tenant_id: string; _vin: string }
+        Returns: undefined
+      }
       merge_dealer_settings: {
         Args: { _patch: Json; _tenant_id: string }
         Returns: boolean
@@ -9994,6 +10402,12 @@ export type Database = {
           vin: string
         }[]
       }
+      oem_distribution_for_vehicle: {
+        Args: { _document_kind: string; _tenant_id: string; _vin: string }
+        Returns: string
+      }
+      oem_franchise_min_new_units: { Args: never; Returns: number }
+      oem_make_from_ymm: { Args: { _ymm: string }; Returns: string }
       publish_description_internal: {
         Args: {
           p_case_id: string
@@ -10020,6 +10434,7 @@ export type Database = {
       }
       rbac_is_tenant_admin: { Args: { p_tenant_id: string }; Returns: boolean }
       recalc_tenant_doc_fee: { Args: { p_tenant_id: string }; Returns: number }
+      recall_is_do_not_drive: { Args: { p: Json }; Returns: boolean }
       recall_payload_signature: { Args: { p: Json }; Returns: string }
       recompute_delivery_clearance: {
         Args: { p_tenant_id: string; p_vin: string }
@@ -10114,6 +10529,18 @@ export type Database = {
         }
         Returns: string
       }
+      record_ingest_step: {
+        Args: {
+          p_detail?: Json
+          p_reason: string
+          p_status: string
+          p_step: string
+          p_tenant_id: string
+          p_vehicle_id?: string
+          p_vin: string
+        }
+        Returns: undefined
+      }
       record_install_proof:
         | {
             Args: {
@@ -10144,13 +10571,66 @@ export type Database = {
             }
             Returns: string
           }
+      record_oem_distribution: {
+        Args: {
+          _brand: string
+          _document_kind: string
+          _source_url?: string
+          _store_id?: string
+          _stored_path?: string
+          _tenant_id: string
+          _vehicle_listing_id?: string
+          _vin: string
+        }
+        Returns: {
+          decision: string
+          event_id: string
+        }[]
+      }
+      record_packet_backfill_attempt: {
+        Args: {
+          _detail?: string
+          _kind: string
+          _make: string
+          _model: string
+          _outcome: string
+          _year: number
+        }
+        Returns: number
+      }
       record_passport_engagement: {
         Args: { _modules: Json; _session: string; _slug: string }
         Returns: Json
       }
+      record_provider_payload_shape: {
+        Args: {
+          _dependency_types: Json
+          _endpoint: string
+          _findings: Json
+          _key_names: string[]
+          _parse_failed: boolean
+          _provider: string
+          _sample_vin: string
+          _shape_hash: string
+        }
+        Returns: {
+          is_new: boolean
+          prior_keys: string[]
+        }[]
+      }
       record_signing_reengagement: {
         Args: { _addendum_id: string; _channel?: string; _details?: Json }
         Returns: undefined
+      }
+      release_service_lock: { Args: { _key: string }; Returns: undefined }
+      remove_vehicle_document: {
+        Args: {
+          _name: string
+          _type: string
+          _url: string
+          _vehicle_id: string
+        }
+        Returns: Json
       }
       request_return: {
         Args: { _reason?: string; _signing_token: string }
@@ -10258,6 +10738,26 @@ export type Database = {
             }
             Returns: undefined
           }
+      schedule_compliance_forms_sweep: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
+      schedule_description_reconcile: {
+        Args: { p_schedule?: string }
+        Returns: string
+      }
+      schedule_factory_sticker_sweep: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
       schedule_ingest_orchestrate_sweep: {
         Args: {
           _cron_expr?: string
@@ -10267,6 +10767,22 @@ export type Database = {
         Returns: number
       }
       schedule_marketcheck_sync: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
+      schedule_packet_backfill: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
+      schedule_passport_delivery_flush: {
         Args: {
           _cron_expr?: string
           _service_key?: string
@@ -10420,6 +10936,10 @@ export type Database = {
       }
       sweep_getready_install_safety_net: { Args: never; Returns: number }
       sweep_missing_intake_drafts: { Args: { _limit?: number }; Returns: Json }
+      tenant_may_host_oem_documents: {
+        Args: { _brand: string; _store_id?: string; _tenant_id: string }
+        Returns: boolean
+      }
       tenant_price_verification_on: {
         Args: { _tenant_id: string }
         Returns: boolean
@@ -10431,6 +10951,10 @@ export type Database = {
           p_reason?: string
         }
         Returns: Json
+      }
+      try_acquire_service_lock: {
+        Args: { _holder?: string; _key: string; _ttl_seconds?: number }
+        Returns: boolean
       }
       unschedule_marketcheck_sync: { Args: never; Returns: undefined }
       unschedule_reengage_abandoned_signings: {

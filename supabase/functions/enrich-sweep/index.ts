@@ -1,6 +1,30 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
+import { invokeFunction } from "../_shared/invoke.ts";
+
+// Allow a signed-in platform admin to trigger the sweep from the app,
+// mirroring specs-backfill's pattern. Verifies via admin.auth.getUser then
+// checks user_roles for role='admin'.
+async function isAuthenticatedAdmin(req: Request): Promise<boolean> {
+  try {
+    const auth = req.headers.get("Authorization") || "";
+    if (!auth.toLowerCase().startsWith("bearer ")) return false;
+    const token = auth.slice(7).trim();
+    if (!token || token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) return false;
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL") || "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+    const { data: ures, error } = await admin.auth.getUser(token);
+    const uid = ures?.user?.id;
+    if (error || !uid) return false;
+    const { data: roles } = await admin
+      .from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").limit(1);
+    return !!(roles && roles.length > 0);
+  } catch { return false; }
+}
 
 // ──────────────────────────────────────────────────────────────
 // enrich-sweep — the nightly self-chaining enrichment sweep.
@@ -14,6 +38,13 @@ import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/li
 //
 // Acks immediately and does the work in EdgeRuntime.waitUntil so each hop stays
 // well under the wall-clock limit. Auth: service-role bearer or x-cron-secret.
+//
+// Single-runner: three independent triggers can start a chain (the nightly
+// cron, marketcheck-sync's once-a-day opportunistic kick, and the admin
+// button), and a chain can run for hours — so without a lock a second chain
+// starts on top of a live one and doubles the invocation rate against the
+// shared MarketCheck key. Same service lock, and the same release-before-chain
+// ordering, as specs-backfill.
 // ──────────────────────────────────────────────────────────────
 
 const corsHeaders = {
@@ -26,18 +57,61 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
 const BUDGET_MS = 100_000;
 const MAX_DEPTH = 80; // backstop against runaway chaining
+const LOCK_KEY = "enrich_sweep";
+const LOCK_TTL_SECONDS = 300;
+// Pacing between VINs. Working one at a time is not by itself gentle: each VIN
+// fans two sibling invocations at the platform's per-function rate limit and
+// two calls at the single shared provider key, back to back with no gap.
+const VIN_GAP_MS = 250;
 
 const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-async function runSweep(sweepStart: string, depth: number) {
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+type Admin = ReturnType<typeof createClient>;
+
+const newAdmin = (): Admin =>
+  createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+
+const releaseLock = async (admin: Admin) => {
+  try { await admin.rpc("release_service_lock", { _key: LOCK_KEY }); }
+  catch { /* the expiry is the backstop */ }
+};
+
+async function run(sweepStart: string, depth: number) {
+  const admin = newAdmin();
+  let more = false;
+  try {
+    more = await runSweep(admin, sweepStart);
+  } finally {
+    // Released even when a hop throws, so a failure cannot wedge the sweep
+    // until the TTL expires.
+    await releaseLock(admin);
+  }
+  // Chained only AFTER the lock is free, or the next hop would find the sweep
+  // "already running" — against itself — and the chain would stop one batch in.
+  if (more && depth < MAX_DEPTH) {
+    await fetch(`${SUPABASE_URL}/functions/v1/enrich-sweep`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`, "x-cron-secret": CRON_SECRET },
+      body: JSON.stringify({ sweep_start: sweepStart, depth: depth + 1 }),
+      signal: AbortSignal.timeout(15000),
+    }).catch(() => { /* best-effort */ });
+  }
+}
+
+async function runSweep(admin: Admin, sweepStart: string): Promise<boolean> {
   const deadline = Date.now() + BUDGET_MS;
   let failures = 0;
+  let throttled = 0;
   while (Date.now() < deadline) {
     const { data: batch } = await admin.rpc("next_enrich_batch", { p_sweep_start: sweepStart, p_limit: 5 });
     // deno-lint-ignore no-explicit-any
     const rows = (batch as any[]) || [];
-    if (rows.length === 0) { if (failures) console.warn(`enrich-sweep: ${failures} enrich call(s) failed this sweep`); return; } // done
+    if (rows.length === 0) {
+      if (failures || throttled) console.warn(`enrich-sweep: ${failures} call(s) failed, ${throttled} throttled this hop`);
+      return false; // done
+    }
     for (const r of rows) {
       if (Date.now() >= deadline) break;
       try {
@@ -74,36 +148,46 @@ async function runSweep(sweepStart: string, depth: number) {
         const decision = shouldDecodeVin(mc, MAX_SPEC_ATTEMPTS);
         const attempts = decision.attempts;
         if (decision.decode && Date.now() < deadline) {
-          let ok = false;
-          try {
-            const sres = await fetch(`${SUPABASE_URL}/functions/v1/marketcheck-specs`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
-              body: JSON.stringify({ tenant_id: r.tenant_id, vin: r.vin }),
-              signal: AbortSignal.timeout(45000),
-            });
-            ok = sres.ok;
-            if (!ok) failures++;
-          } catch { failures++; }
+          const sres = await invokeFunction(`${SUPABASE_URL}/functions/v1/marketcheck-specs`, SERVICE_KEY, {
+            body: { tenant_id: r.tenant_id, vin: r.vin },
+            timeoutMs: 45_000, maxRetries: 1, maxWaitMs: 5_000,
+            // Never more of the hop's remaining budget than one VIN is worth:
+            // a throttled decode must not eat the whole batch's time.
+            deadlineMs: Math.max(1_000, Math.min(50_000, deadline - Date.now())),
+          });
+          const ok = sres.ok;
+          // A provider refusal (quota/unauthorized) is reported as a 200 with
+          // retryable:true, so it has to be read off the body, not the status.
+          const refused = !!(sres.data as { retryable?: boolean } | null)?.retryable;
+          if (sres.rateLimited || refused) throttled++;
+          else if (!ok) failures++;
           // Stamp the attempt from here, not from the decoder: the decoder
           // returns early on a no-match without writing anything, so a
           // stamp written there would never land for exactly the VINs that
           // need the cap.
-          try {
-            const { data: after } = await admin
-              .from("vehicle_listings").select("mc_attributes")
-              .eq("tenant_id", r.tenant_id).eq("vin", r.vin).maybeSingle();
-            // deno-lint-ignore no-explicit-any
-            const fresh = (after?.mc_attributes ?? mc) as Record<string, any>;
-            await admin.from("vehicle_listings").update({
-              mc_attributes: {
-                ...fresh,
-                specs_attempts: attempts + 1,
-                specs_attempted_at: new Date().toISOString(),
-                ...(ok && !fresh.build_sheet ? { specs_no_build_sheet: true } : {}),
-              },
-            }).eq("tenant_id", r.tenant_id).eq("vin", r.vin);
-          } catch { /* stamping is best-effort; the cap is the backstop */ }
+          //
+          // A throttle is the exception: the platform asked us to slow down,
+          // it is not this VIN failing to decode. Counting it would spend one
+          // of only MAX_SPEC_ATTEMPTS paid attempts on an answer we never
+          // received, and three throttles would retire a perfectly decodable
+          // VIN forever. Leave the counter alone and let the next sweep ask.
+          if (!sres.rateLimited && !refused) {
+            try {
+              const { data: after } = await admin
+                .from("vehicle_listings").select("mc_attributes")
+                .eq("tenant_id", r.tenant_id).eq("vin", r.vin).maybeSingle();
+              // deno-lint-ignore no-explicit-any
+              const fresh = (after?.mc_attributes ?? mc) as Record<string, any>;
+              await admin.from("vehicle_listings").update({
+                mc_attributes: {
+                  ...fresh,
+                  specs_attempts: attempts + 1,
+                  specs_attempted_at: new Date().toISOString(),
+                  ...(ok && !fresh.build_sheet ? { specs_no_build_sheet: true } : {}),
+                },
+              }).eq("tenant_id", r.tenant_id).eq("vin", r.vin);
+            } catch { /* stamping is best-effort; the cap is the backstop */ }
+          }
         }
       } catch { failures++; /* specs retried next sweep, within the cap */ }
       // Liveness guard: stamp enriched_at no matter the outcome so this VIN drops
@@ -115,21 +199,13 @@ async function runSweep(sweepStart: string, depth: number) {
       // (new sweep_start), never in a tight loop.
       await admin.from("vehicle_listings").update({ enriched_at: new Date().toISOString() })
         .eq("tenant_id", r.tenant_id).eq("vin", r.vin);
+      if (Date.now() + VIN_GAP_MS < deadline) await sleep(VIN_GAP_MS);
     }
   }
-  // Budget hit — anything left? If so, chain another hop with the same cursor.
-  if (depth < MAX_DEPTH) {
-    const admin2 = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: more } = await admin2.rpc("next_enrich_batch", { p_sweep_start: sweepStart, p_limit: 1 });
-    if (((more as unknown[]) || []).length > 0) {
-      await fetch(`${SUPABASE_URL}/functions/v1/enrich-sweep`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`, "x-cron-secret": CRON_SECRET },
-        body: JSON.stringify({ sweep_start: sweepStart, depth: depth + 1 }),
-        signal: AbortSignal.timeout(15000),
-      }).catch(() => { /* best-effort */ });
-    }
-  }
+  // Budget hit — anything left? If so the caller chains another hop with the
+  // same cursor, once it has let the lock go.
+  const { data: more } = await admin.rpc("next_enrich_batch", { p_sweep_start: sweepStart, p_limit: 1 });
+  return ((more as unknown[]) || []).length > 0;
 }
 
 serve(async (req) => {
@@ -138,7 +214,8 @@ serve(async (req) => {
 
   const auth = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const secret = req.headers.get("x-cron-secret") || "";
-  if (!(SERVICE_KEY && auth === SERVICE_KEY) && !(CRON_SECRET && secret === CRON_SECRET)) {
+  const serviceOrCron = (SERVICE_KEY && auth === SERVICE_KEY) || (CRON_SECRET && secret === CRON_SECRET);
+  if (!serviceOrCron && !(await isAuthenticatedAdmin(req))) {
     return json(401, { error: "unauthorized" });
   }
 
@@ -146,7 +223,20 @@ serve(async (req) => {
   const sweepStart = body.sweep_start || new Date().toISOString();
   const depth = typeof body.depth === "number" ? body.depth : 0;
 
-  const work = runSweep(sweepStart, depth);
+  // One sweep at a time. Each hop re-takes the lock and extends it, so the run
+  // holds it start to finish while an expiry still releases it if a hop dies.
+  // Without this, the cron, marketcheck-sync's daily kick and the admin button
+  // each start their own multi-hour chain over the same inventory.
+  const { data: acquired } = await newAdmin().rpc("try_acquire_service_lock", {
+    _key: LOCK_KEY,
+    _ttl_seconds: LOCK_TTL_SECONDS,
+    _holder: `depth:${depth}`,
+  });
+  if (acquired === false) {
+    return json(200, { ok: true, skipped: "already_running", sweep_start: sweepStart, depth });
+  }
+
+  const work = run(sweepStart, depth);
   // deno-lint-ignore no-explicit-any
   const er = (globalThis as any).EdgeRuntime;
   if (er && typeof er.waitUntil === "function") er.waitUntil(work);

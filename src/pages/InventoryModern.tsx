@@ -225,6 +225,9 @@ const InventoryModern = () => {
       .from("vehicle_listings")
       .select(cols)
       .or(`tenant_id.eq.${tenant.id},tenant_id.is.null`)
+      // A car that left the feed is retired, not deleted, so active inventory
+      // has to exclude it explicitly now.
+      .neq("status", "archived")
       .order("updated_at", { ascending: false })
       .limit(500);
     // Resilient cascade: drop only the columns that aren't migrated yet, so a

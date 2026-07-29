@@ -1,6 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
+import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
+
+// Artifact posts are queued and paced, so they can still be in flight when the
+// handler returns. Without this the isolate is torn down mid-queue and the
+// last vehicles of a feed silently lose their documents — serialising the
+// posts makes that MORE likely, not less, so the two changes belong together.
+function drainArtifactPosts(): void {
+  // deno-lint-ignore no-explicit-any
+  const er = (globalThis as any).EdgeRuntime;
+  if (er && typeof er.waitUntil === "function") er.waitUntil(artifactPostsIdle());
+}
+
 
 // ──────────────────────────────────────────────────────────────
 // marketcheck-sync
@@ -40,6 +51,24 @@ const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHEC
 // inventory-search endpoint forces rows=0 (analytics mode) whenever a dealer
 // scope like `source` is passed, which is why a domain-only query returns no
 // cars. Syndication is keyed on MarketCheck's internal dealer_id.
+// Keys on mc_attributes that belong to the VIN decode (marketcheck-specs), not
+// to the syndication feed. The feed never carries them, so they must survive a
+// sync verbatim or the decode is lost and re-billed.
+const DECODE_OWNED_KEYS = [
+  "build_sheet",
+  "base_msrp", "delivery_charges", "total_msrp",
+  "specs_source", "specs_strict_attempted", "specs_decoded_at",
+  "specs_attempts", "specs_attempted_at", "specs_no_build_sheet",
+] as const;
+
+function decodeOwned(prior: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of DECODE_OWNED_KEYS) {
+    if (prior[k] !== undefined && prior[k] !== null) out[k] = prior[k];
+  }
+  return out;
+}
+
 const MC_BASE = "https://api.marketcheck.com/v2";
 const SYND_ENDPOINT = `${MC_BASE}/dealerships/inventory`;
 const SEARCH_ENDPOINT = `${MC_BASE}/search/car/active`;
@@ -401,7 +430,7 @@ serve(async (req) => {
       domain: toSourceHost(d.source ?? d.inventory_url ?? d.website ?? ""),
       city: d.city ?? "", state: d.state ?? "", listings: d.listing_count ?? d.inventory_count ?? null,
     })).filter((d: { id: string }) => d.id);
-    return json(200, { ok: true, http: res.status, dealers });
+  return json(200, { ok: true, http: res.status, dealers });
   }
 
   // ── Pick configs: allowed + enabled, and either a website domain OR a
@@ -808,6 +837,12 @@ serve(async (req) => {
               if (!error) {
                 listingsUpserted++;
                 updatedListingIds.push(vl.id);
+                // A VIN that left the feed is retired, not deleted, so a car
+                // that comes back is an UPDATE now where it used to be a fresh
+                // INSERT. Without this it would keep the archived status it was
+                // given on the way out and stay invisible to its own dealer.
+                await admin.rpc("marketcheck_revive_listing", { _tenant_id: cfg.tenant_id, _vin: vin })
+                  .then(({ error: e }) => { if (e) console.warn("revive_failed", vin, e.message); });
                 // Back-fill the Get-Ready hub token for cars that predate this
                 // feature or were first ingested by another path (autocurb-sync,
                 // manual add) so they never fall out of the get-ready flow.
@@ -873,6 +908,23 @@ serve(async (req) => {
                 // OEM equipment / options & packages when present in the feed.
                 features: ((l.extra?.features ?? l.features) ?? priorMc.features) ?? null,
                 options: ((l.extra?.options ?? l.options) ?? priorMc.options) ?? null,
+                // Everything the VIN decode owns. mcAttrs is rebuilt from
+                // scratch rather than spread over the prior value, so a key
+                // that is not named here is DESTROYED on every sync.
+                //
+                // Carrying only options/features forward was not enough: the
+                // syndication feed never carries a build sheet, so every night
+                // this wiped build_sheet and the lifted factory pricing that
+                // marketcheck-specs had written. The window sticker gates on
+                // exactly that key, so the whole fleet fell back to
+                // "awaiting_build_sheet: no saved NeoVIN build sheet on this
+                // listing yet" — while vehicle_facts, which is an append-only
+                // ledger, kept showing the same vehicle's MSRP as VERIFIED.
+                //
+                // It also wiped specs_attempts/specs_decoded_at, so the sweeps
+                // saw an undecoded VIN again and RE-PAID the provider for an
+                // answer we already had, every single night.
+                ...decodeOwned(priorMc),
               };
               const enrich: Record<string, unknown> = { mc_attributes: mcAttrs };
               if (gallery.length) { enrich.photos = gallery; enrich.photo_count = gallery.length; }
@@ -1290,6 +1342,7 @@ serve(async (req) => {
     }
   } catch { /* best-effort */ }
 
+  drainArtifactPosts();
   return json(200, {
     ok: true, tenants_due: due.length, tenants_synced: tenantsSynced,
     listings_seen: seen, new_vehicles: newVehicles,

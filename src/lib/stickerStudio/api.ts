@@ -167,15 +167,17 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
 
   // Fallback path: append a reference to vehicle_listings.documents.
   try {
-    const { data: row } = await client.from("vehicle_listings").select("documents").eq("id", args.vehicleId).maybeSingle();
-    const documents = Array.isArray(row?.documents) ? row.documents : [];
     const entry = {
       name: `${args.docType === "window" ? "Window Sticker" : args.docType === "cpo_sheet" ? "CPO Sheet" : "Addendum"} · ${args.templateId}`,
       type: "sticker",
       url: args.pdfDataUrl || args.pngDataUrl || "",
       created_at: new Date().toISOString(),
     };
-    const { error } = await client.from("vehicle_listings").update({ documents: [...documents, entry] }).eq("id", args.vehicleId);
+    // Server-side append: the read-then-write this replaces could drop any
+    // document attached between the select and the update.
+    const { error } = await client.rpc("append_vehicle_document", {
+      _vehicle_id: args.vehicleId, _doc: entry,
+    });
     if (error) return { ok: false, error: error.message };
     await recordStickerGenerated({
       tenantId: args.tenantId,

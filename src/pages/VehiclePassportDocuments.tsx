@@ -6,6 +6,8 @@ import {
   Package, DollarSign, Car, MessageSquare, Phone, ExternalLink, X, Star, Wrench,
   TrendingUp, Clock, Settings, Building2, PenLine, Plus, Info, Globe,
   ChevronRight, FileCheck2, ClipboardX, FilePlus2,
+  FileSpreadsheet, PanelsTopLeft, BookOpen, ClipboardCheck, FileSignature,
+  History as HistoryIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -17,6 +19,10 @@ import { resolvePassportBack } from "@/lib/passportReturn";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { listingHero } from "@/lib/photos";
+import { documentCoverType, resolveDocumentArtwork, type ArtworkInput } from "@/lib/passport/documentArtwork";
+import { countAvailableDocuments } from "@/lib/passport/documentAvailability";
+import { DocumentCoverThumbnail } from "@/components/passport/DocumentCoverThumbnail";
+import { usePublishedWindowSticker } from "@/hooks/usePublishedWindowSticker";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,21 +70,143 @@ const PASSPORT_NAV: { label: string; to?: string; panel?: string; active?: boole
   { label: "Why Buy From This Dealership?", to: "dealer" }, { label: "Documents", to: "documents", active: true },
 ];
 
-const DocThumb = ({ url }: { url: string }) => {
-  if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(url)) return <img src={url} alt="" className="w-full h-full object-cover" />;
+// What a drawn cover is built from. Read off the listing once, per page, so
+// no card re-derives year/make/model for itself.
+interface CoverVehicle {
+  year?: string; make?: string; model?: string; trim?: string; vin?: string;
+  photo?: string | null; provider?: string | null; oemLogoUrl?: string | null;
+}
+
+// Split the stored "2025 INFINITI QX55 LUXE" once. Every card used to re-split
+// it inline for its own copy.
+const coverVehicleFor = (listing: VehicleListing): CoverVehicle => {
+  const parts = (listing.ymm || "").trim().split(/\s+/);
+  return {
+    year: parts[0] || "",
+    make: parts[1] || "",
+    model: parts.slice(2).join(" "),
+    trim: listing.trim || "",
+    vin: listing.vin || "",
+    photo: listingHero(listing) || null,
+    oemLogoUrl: null,
+  };
+};
+
+const ARTWORK_ICONS = {
+  FileSpreadsheet, History: HistoryIcon, PanelsTopLeft, BookOpen, ClipboardCheck,
+  Wrench, FileCheck2, ShieldCheck, FileSignature, FileText,
+} as const;
+
+// The document preview well. A document is pictured as a document: a real
+// first page when a customer-safe one exists, otherwise a drawn cover for its
+// type. The vehicle photograph is never used here — it belongs to the vehicle
+// summary, and repeating it on six cards told the shopper nothing about what
+// each record was.
+//
+// The well fills the card row instead of standing at a fixed height inside it,
+// so the tint and the divider run the full height rather than dead-ending
+// against bare white. `self-stretch` on the sheet — not a percentage height —
+// is what makes that resolve: the well is itself a stretched flex item, so
+// `h-full` inside it would depend on stretched items being treated as definite,
+// while stretching the sheet needs no resolution at all.
+const DocumentPreview = ({ input, vehicle, onQuickView }: {
+  input: ArtworkInput; vehicle?: CoverVehicle; onQuickView?: () => void;
+}) => {
+  const art = resolveDocumentArtwork(input);
+  const [failed, setFailed] = useState(false);
+  const Icon = ARTWORK_ICONS[art.fallbackIcon] ?? FileText;
+  const showImage = !!art.artworkUrl && !failed;
+  // Height-driven, never width-driven: the sheet stands at the full height of
+  // the well and takes whatever width its own page shape gives it, so an 11x8.5
+  // window sticker reads as a landscape page and an 8.5x11 form as an upright
+  // one. `w-full` used to fight `max-h-full` here — the box went full width and
+  // the page was letterboxed inside it, which is where the dead gutters came
+  // from.
+  // Height-driven: the sheet stands at the well's full height and takes the
+  // width its own page shape gives it, so an 11x8.5 window sticker reads as a
+  // landscape page and an 8.5x11 form as an upright one.
+  const sheet = art.orientation === "landscape"
+    ? "self-stretch w-auto max-w-full aspect-[11/8.5]"
+    : "self-stretch w-auto max-w-full aspect-[8.5/11]";
+
   return (
-    <div className="w-full h-full bg-white p-3">
-      <div className="h-1.5 w-8 bg-[#2563EB]/30 rounded mb-2" />
-      {Array.from({ length: 7 }).map((_, i) => <div key={i} className="h-1 rounded bg-slate-200 mb-1.5" style={{ width: `${[100, 92, 96, 70, 88, 60, 80][i]}%` }} />)}
+    <div className="relative w-full flex items-center justify-center overflow-hidden bg-[#F8FAFC] p-1.5 min-h-[131px] sm:min-h-[172px] sm:border-r sm:border-[#E2E8F0] lg:min-h-[131px] lg:border-r-0 xl:min-h-[172px] xl:border-r">
+      {showImage ? (
+        <img
+          src={art.artworkUrl!}
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(true)}
+          // Landscape (window sticker): cover + top. The frame is already the
+          // page's own 11:8.5, so for a correct single-page asset this crops
+          // nothing and behaves exactly like contain — but when the stored
+          // preview is a legacy STACKED multi-page SVG, top-anchored cover
+          // shows precisely page 1 and clips page 2 away, instead of squeezing
+          // both pages into an illegible sliver. Stale assets self-heal without
+          // waiting for a regeneration. Portrait forms stay contain so a
+          // government form is never cropped.
+          className={`${sheet} bg-white ${art.orientation === "landscape" ? "object-cover object-top" : "object-contain"}`}
+          style={{ border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 2px 6px rgba(15,23,42,0.12)" }}
+        />
+      ) : vehicle ? (
+        // A drawn cover built from this vehicle. Replaces the old icon-on-a-
+        // blank-sheet, which told the shopper nothing and read as a document
+        // that had failed to load.
+        <DocumentCoverThumbnail
+          className="self-stretch w-auto max-w-full"
+          type={documentCoverType(input.type, input.title, vehicle.provider)}
+          year={vehicle.year}
+          make={vehicle.make}
+          model={vehicle.model}
+          trim={vehicle.trim}
+          vin={vehicle.vin}
+          primaryVehiclePhotoUrl={vehicle.photo}
+          provider={vehicle.provider}
+          oemLogoUrl={vehicle.oemLogoUrl}
+          // The record's own name ("Retail Installment Contract") when it has
+          // one, else its type label. accessibleLabel already resolves that.
+          neutralTitle={art.accessibleLabel}
+        />
+      ) : (
+        <div
+          className={`${sheet} bg-white flex flex-col items-center justify-center gap-1.5 px-2`}
+          style={{ border: "1px solid rgba(15,23,42,0.10)", boxShadow: "0 2px 6px rgba(15,23,42,0.12)" }}
+        >
+          <Icon className="w-7 h-7" strokeWidth={1.75} style={{ color: art.accentColor }} aria-hidden />
+          <span className="text-[9px] font-bold tracking-[0.08em] text-center leading-tight" style={{ color: art.accentColor }}>
+            {art.label}
+          </span>
+        </div>
+      )}
+      {/* Routes to the SAME handler as the button in the content area — one
+          preview implementation, and never a button nested inside a button.
+          The chip is small enough to sit in the well's side gutter instead of
+          on top of the page; on touch the whole well is the target, so a 20px
+          chip never has to serve as a 20px tap area. */}
+      {onQuickView ? (
+        <button
+          type="button"
+          onClick={onQuickView}
+          title="Quick view"
+          aria-label={`Quick view ${art.accessibleLabel}`}
+          className="group/qv absolute inset-0 flex items-end justify-end p-1.5 sm:inset-auto sm:bottom-1.5 sm:right-1.5 sm:p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
+        >
+          <span className="w-7 h-7 sm:w-5 sm:h-5 rounded-md bg-white/95 border border-[#E2E8F0] text-[#475569] inline-flex items-center justify-center shadow-sm transition-colors group-hover/qv:border-[#2563EB] group-hover/qv:text-[#2563EB]">
+            <Eye className="w-3.5 h-3.5 sm:w-3 sm:h-3" aria-hidden />
+          </span>
+        </button>
+      ) : null}
     </div>
   );
 };
 
 // "Email me this packet" — the deepest-funnel shoppers on the passport are
 // document seekers, and until now they converted at 0%. Uses the existing
-// delivery pipeline (request -> outbox -> send function) and flushes the outbox
-// immediately so the packet arrives while the shopper is still on the lot.
-const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; docs: Doc[]; onClose: () => void }) => {
+// delivery pipeline (request -> outbox -> send-passport-document-deliveries),
+// which the `passport-delivery-flush` cron drains every 5 minutes. The send
+// function is service-key gated, so this anonymous session queues only — the
+// confirmation copy promises a queued request, never a delivered email.
+const EmailPacketCard = ({ listing, docs, availableCount, onClose }: { listing: VehicleListing; availableCount?: number; docs: Doc[]; onClose: () => void }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
@@ -94,7 +222,6 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
         customerName: name.trim(), customerEmail: email.trim(),
         requestedDocuments: docs.slice(0, 20).map((x) => ({ documentType: x.type || "document", documentTitle: x.name })),
       });
-      supabase.functions.invoke("send-passport-document-deliveries", { body: { limit: 5 } }).catch(() => { /* cron will flush */ });
       setSent(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
@@ -104,78 +231,76 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
   if (sent) return (
     <div className={`${CARD} p-5 mb-5 flex items-center gap-3`}>
       <CheckCircle2 className="w-8 h-8 text-[#16A34A] shrink-0" />
-      <div className="min-w-0 flex-1"><p className="text-[14px] font-bold text-[#0F172A]">Packet on its way</p><p className="text-[12px] text-[#64748B]">Check {email} — the dealership team was notified too.</p></div>
+      <div className="min-w-0 flex-1"><p className="text-[14px] font-bold text-[#0F172A]">Request received</p><p className="text-[12px] text-[#64748B]">We&rsquo;ll email the packet to {email} shortly. The dealership also has your request.</p></div>
       <button onClick={onClose} className="text-[12px] font-semibold text-[#64748B] shrink-0">Close</button>
     </div>
   );
   return (
     <div className={`${CARD} p-5 mb-5`}>
       <div className="flex items-start justify-between gap-3">
-        <div><p className="text-[14px] font-bold text-[#0F172A]">Email me this packet</p><p className="text-[12px] text-[#64748B] mt-0.5">All {docs.length} documents for the {listing.ymm}, straight to your inbox.</p></div>
+        <div><p className="text-[14px] font-bold text-[#0F172A]">Email me this packet</p><p className="text-[12px] text-[#64748B] mt-0.5">All {availableCount ?? docs.length} documents for the {listing.ymm}, straight to your inbox.</p></div>
         <button onClick={onClose} className="text-[#94A3B8] hover:text-[#0F172A] shrink-0"><X className="w-4 h-4" /></button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2.5 mt-3">
+      {/* One column, always. This card lives inside the 360px status rail, and
+          `sm:` is the VIEWPORT width, not the container's -- so a three-column
+          grid put three fields into a 360px column and pushed the button, and
+          the page, off its own right edge. */}
+      <div className="grid grid-cols-1 gap-2.5 mt-3">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email address" className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <button onClick={submit} disabled={sending} className="h-[42px] px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white text-sm font-bold">{sending ? "Sending..." : "Send packet"}</button>
+        <button onClick={submit} disabled={sending} className="h-[42px] w-full px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white text-sm font-bold">{sending ? "Sending..." : "Send packet"}</button>
       </div>
       <p className="text-[11px] text-[#94A3B8] mt-2">By submitting, you agree the dealership may contact you about this vehicle.</p>
     </div>
   );
 };
 
-// Owner's-manual card. By default we only hold the OEM link (no bytes stored),
-// so the shopper can open it on the manufacturer site OR pull a copy into this
-// vehicle's passport with one click. Once a copy is saved it shows as a normal
-// document instead, so this card hides (hasStoredCopy).
+// A harvested OEM link as public-listing-view returns it. The LINK is all we
+// hold: the brochure and the owner's manual stay on the manufacturer site and
+// neither PDF is ever downloaded, so there is no stored page-1 to show. The
+// card art is drawn instead, by DocumentCoverThumbnail.
+type OemLink = {
+  url: string; title?: string | null; year?: number | null;
+  /** True when `url` is this dealer's own stored copy rather than the OEM site. */
+  hosted?: boolean | null;
+  /** The manufacturer's own URL, always present even when we serve a copy. */
+  manufacturer_url?: string | null;
+};
+
+// Owner's-manual card. We hold the manufacturer's LINK and nothing else — the
+// shopper opens or downloads the manual from the OEM, and no bytes are copied
+// into the vehicle. hasStoredCopy still hides the card, so a manual attached by
+// hand as a document does not appear twice.
 const OwnersManualCard = ({
   listing, isPreview, hasStoredCopy,
 }: { listing: VehicleListing; isPreview: boolean; hasStoredCopy: boolean }) => {
-  const [saving, setSaving] = useState(false);
-  const [savedUrl, setSavedUrl] = useState<string | null>(null);
-  const m = (listing as { oem_owners_manual?: { url: string; title?: string | null; year?: number | null } }).oem_owners_manual;
+  const m = (listing as { oem_owners_manual?: OemLink }).oem_owners_manual;
   if (hasStoredCopy || !m?.url || !packetVisible(listing, "ownersManual")) return null;
   const mk = (listing.ymm || "").trim().split(/\s+/)[1] || "manufacturer";
   const track = (cta: string) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page" } }); };
-  const save = async () => {
-    if (isPreview) { toast.message("Sample preview — saving is disabled here."); return; }
-    setSaving(true);
-    track("owners_manual_save");
-    try {
-      const { data, error } = await supabase.functions.invoke("save-owners-manual", { body: { slug: listing.slug || listing.vin } });
-      if (error || !data?.url) throw new Error(error?.message || "save_failed");
-      setSavedUrl(data.url as string);
-      toast.success("Owner's manual saved to this vehicle.");
-      window.open(data.url as string, "_blank", "noopener");
-    } catch {
-      toast.error("Couldn't save the manual right now. The manufacturer link still opens below.");
-    } finally {
-      setSaving(false);
-    }
-  };
   const action = (
     <div className="flex items-center gap-2">
-      <a href={savedUrl || m.url} target="_blank" rel="noopener noreferrer" onClick={() => track("owners_manual_open")}
-        className="flex-1 h-9 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]">
-        {savedUrl ? "Download" : "Open Manual"} <ExternalLink className="w-4 h-4" />
+      <a href={m.url} target="_blank" rel="noopener noreferrer" onClick={() => track("owners_manual_open")}
+        className="flex-1 h-11 sm:h-8 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]">
+        Open Manual <ExternalLink className="w-4 h-4" />
       </a>
-      {!savedUrl && (
-        <button onClick={save} disabled={saving}
-          className="flex-1 h-9 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1D4ED8] disabled:opacity-60">
-          {saving ? "Saving…" : "Save to passport"}
-        </button>
-      )}
+      <a href={m.url} target="_blank" rel="noopener noreferrer" download onClick={() => track("owners_manual_download")}
+        className="flex-1 h-11 sm:h-8 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1D4ED8]">
+        <Download className="w-4 h-4" /> Download
+      </a>
     </div>
   );
-  const hero = listingHero(listing);
+  const openManual = () => { track("owners_manual_open"); window.open(m.url, "_blank", "noopener"); };
   return (
     <RecordCard
-      cover={<RecordCover hero={hero} label="Owner's Manual" />}
+      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual" }} vehicle={coverVehicleFor(listing)} onQuickView={openManual} />}
       title={`Official ${mk.toUpperCase()} Owner's Manual${m.year ? ` (${m.year})` : ""}`}
       source={`${mk.toUpperCase()} · Manufacturer source`}
-      status={savedUrl ? "available" : "external"}
+      status={m.hosted ? "available" : "external"}
       explanation="The manufacturer's official owner's manual for this year and model."
-      meta={<span className="inline-flex items-center gap-1"><ExternalLink className="w-3.5 h-3.5" /> Opens on the manufacturer site</span>}
+      meta={m.hosted
+        ? <span className="inline-flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> Saved with this vehicle &middot; yours to keep</span>
+        : <span className="inline-flex items-center gap-1"><ExternalLink className="w-3.5 h-3.5" /> Opens on the manufacturer site</span>}
       action={action}
       why="The owner's manual explains the exact features, controls and maintenance for this vehicle's build."
     />
@@ -202,14 +327,18 @@ const StatusBadge = ({ status }: { status: DocStatus }) => {
 
 // Records a shopper may ASK the dealership for. These are request options, never
 // presented as currently-available documents (data boundary).
-const REQUEST_OPTIONS: { key: string; label: string; icon: typeof FileText; tint: string }[] = [
-  { key: "buyers_guide", label: "Buyer's Guide", icon: FileText, tint: "bg-blue-50 text-[#2563EB]" },
-  { key: "window_sticker", label: "Window Sticker / Build Sheet", icon: Car, tint: "bg-blue-50 text-[#2563EB]" },
-  { key: "warranty", label: "Warranty Information", icon: ShieldCheck, tint: "bg-emerald-50 text-[#059669]" },
+// `satisfiedBy` is the cover types that already answer this request. When one
+// of them is on the page the chip is dropped -- asking a shopper to request the
+// document they are looking at reads as though we cannot see our own page.
+// "Other Document" has none, so it always stays.
+const REQUEST_OPTIONS: { key: string; label: string; icon: typeof FileText; tint: string; satisfiedBy?: string[] }[] = [
+  { key: "buyers_guide", label: "Buyer's Guide", icon: FileText, tint: "bg-blue-50 text-[#2563EB]", satisfiedBy: ["buyers_guide"] },
+  { key: "window_sticker", label: "Window Sticker / Build Sheet", icon: Car, tint: "bg-blue-50 text-[#2563EB]", satisfiedBy: ["factory_sticker"] },
+  { key: "warranty", label: "Warranty Information", icon: ShieldCheck, tint: "bg-emerald-50 text-[#059669]", satisfiedBy: ["warranty"] },
   { key: "verification", label: "Verification Report", icon: BadgeCheck, tint: "bg-teal-50 text-[#0D9488]" },
-  { key: "inspection", label: "Inspection Report", icon: ClipboardX, tint: "bg-amber-50 text-[#D97706]" },
-  { key: "signed_price", label: "Signed Price Record", icon: PenLine, tint: "bg-purple-50 text-[#7C3AED]" },
-  { key: "service", label: "Service Records", icon: Wrench, tint: "bg-orange-50 text-[#EA580C]" },
+  { key: "inspection", label: "Inspection Report", icon: ClipboardX, tint: "bg-amber-50 text-[#D97706]", satisfiedBy: ["inspection"] },
+  { key: "signed_price", label: "Signed Price Record", icon: PenLine, tint: "bg-purple-50 text-[#7C3AED]", satisfiedBy: ["signed_record"] },
+  { key: "service", label: "Service Records", icon: Wrench, tint: "bg-orange-50 text-[#EA580C]", satisfiedBy: ["service_record"] },
   { key: "other", label: "Other Document", icon: FilePlus2, tint: "bg-slate-100 text-[#64748B]" },
 ];
 
@@ -237,40 +366,48 @@ const DocSkeleton = () => (
   </div>
 );
 
-// A real, visual record card: cover preview on the left, one clear status,
-// source, explanation, an optional source-detail row, and one action. The cover
-// is a real preview (uploaded doc thumbnail or the vehicle photo) — never a
-// repeated generic file icon.
+// A real, visual record card: a document preview on the left, one clear status,
+// and a four-line content column — status · title · what it is · where it came
+// from — over a single action row.
+//
+// Every arbitrary text size carries its own `leading-*`: without one they
+// inherit Tailwind's 1.5 root line-height, which spent ~5px of strut per line
+// on a card that has five of them. `source` rides the meta line and the "Why
+// this matters" disclosure rides the status line, so a card with either costs
+// no extra row. The preview well is a flex child of a stretched wrapper, so it
+// fills the row height the content column sets rather than pinning its own.
 const RecordCard = ({ cover, title, source, status, explanation, meta, action, why }: {
   cover: ReactNode; title: string; source: string; status: DocStatus; explanation?: string; meta?: ReactNode; action: ReactNode; why?: string;
 }) => (
-  <div className="rounded-xl border border-[#E6E8EC] bg-white overflow-hidden flex flex-col sm:flex-row">
-    <div className="sm:w-[210px] shrink-0 bg-slate-100 sm:self-stretch">{cover}</div>
-    <div className="p-4 sm:p-5 flex-1 min-w-0 flex flex-col">
-      <div><StatusBadge status={status} /></div>
-      <p className="text-[16px] font-bold text-[#0F172A] mt-2 leading-tight">{title}</p>
-      <p className="text-[12.5px] text-[#64748B] mt-1">{source}</p>
-      {explanation && <p className="text-[13px] text-[#475569] mt-2 leading-snug">{explanation}</p>}
-      {meta && <div className="mt-2.5 text-[12px] text-[#64748B] flex flex-wrap items-center gap-x-2 gap-y-1">{meta}</div>}
-      <div className="mt-3.5">{action}</div>
-      {why && (
-        <details className="mt-2 group">
-          <summary className="text-[13px] font-semibold text-[#2563EB] cursor-pointer list-none inline-flex items-center gap-1">Why this matters <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" /></summary>
-          <p className="text-[12.5px] text-[#64748B] mt-1.5 leading-snug">{why}</p>
-        </details>
-      )}
+  // The row layout needs ~250px for the well plus a readable content column.
+  // Between lg and xl the page gives this card only ~296px, so it stacks there
+  // and returns to a row at xl.
+  <div className="rounded-2xl border border-[#E2E8F0] bg-white overflow-hidden flex flex-col sm:flex-row lg:flex-col xl:flex-row">
+    {/* The well itself is flush with the card edge, but the sheet inside it is
+        inset 6px by the well's padding, which keeps it clear of the 16px
+        `rounded-2xl` corner arc — so widening the sheet cannot get its left
+        corners shaved by the card's `overflow-hidden`. */}
+    <div className="shrink-0 flex w-full sm:w-[250px] lg:w-full xl:w-[250px]">{cover}</div>
+    <div className="flex-1 min-w-0 flex flex-col justify-center px-4 py-3 sm:py-1.5 lg:py-3 xl:py-1.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-none">
+        <StatusBadge status={status} />
+        {why && (
+          <details className="group ml-auto open:basis-full">
+            <summary className="text-[12px] leading-[1.25] font-semibold text-[#2563EB] cursor-pointer list-none inline-flex items-center gap-1">Why this matters <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" /></summary>
+            <p className="text-[12.5px] leading-snug text-[#64748B] mt-1.5">{why}</p>
+          </details>
+        )}
+      </div>
+      <p className="text-[15px] leading-[1.15] font-bold text-[#0F172A] mt-1 truncate">{title}</p>
+      {explanation && <p className="text-[12.5px] leading-[1.3] text-[#475569] mt-1 line-clamp-1">{explanation}</p>}
+      <div className="mt-1 text-[11.5px] leading-[1.25] text-[#64748B] flex items-center gap-x-2 overflow-hidden whitespace-nowrap">
+        <span className="min-w-0 truncate">{source}</span>
+        {meta && <><span aria-hidden className="text-[#CBD5E1] shrink-0">·</span><span className="shrink-0 inline-flex items-center gap-x-2">{meta}</span></>}
+      </div>
+      <div className="mt-1.5">{action}</div>
     </div>
   </div>
 );
-// Branded "cover" for an external/manufacturer record when there is no file
-// thumbnail — the vehicle photo with a dark wash, so the card reads as a real
-// document tile rather than a generic icon.
-const RecordCover = ({ hero, label }: { hero?: string | null; label: string }) => (
-  hero
-    ? <div className="h-44 sm:h-full sm:min-h-[150px] w-full overflow-hidden"><img src={hero} alt="" className="h-full w-full object-cover" /></div>
-    : <div className="h-44 sm:h-full sm:min-h-[150px] w-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center"><span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/85">{label}</span></div>
-);
-
 // The generated factory build record, served only when its generated_documents
 // row is published (get_published_documents_public returns nothing else).
 interface FactoryStickerDoc {
@@ -306,7 +443,12 @@ const VehiclePassportDocuments = () => {
   const [factoryVerification, setFactoryVerification] = useState<string | null>(null);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
+  // The real page-1 preview asset filed alongside the published PDF. The card
+  // was resolving to a drawn cover only because nothing handed it this URL.
+  const { sticker: publishedSticker } = usePublishedWindowSticker(listing?.slug || null, !isPreview);
+
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   // Server strips excluded docs on live listings; this mirrors it for
@@ -404,6 +546,7 @@ const VehiclePassportDocuments = () => {
   const pp = (s: string) =>
     s ? `/v/${slug}/${s}${isPreview ? "?preview=1" : ""}` : resolvePassportBack(window.location.search, slug || "", isPreview);
   const hero = listingHero(listing);
+  const coverVehicle = coverVehicleFor(listing);
   const total = allDocs.length;
   const adv = d.dealerTrust;
   const share = async (url: string) => { try { if (navigator.share) { await navigator.share({ url }); return; } } catch { return; } await navigator.clipboard.writeText(url); toast.success("Link copied"); };
@@ -413,14 +556,14 @@ const VehiclePassportDocuments = () => {
   // active search/category filter) so Print always emits the full packet.
   const printGroups = CATEGORIES.map((c) => ({ c, docs: allDocs.filter((x) => categoryOf(x) === c.key) })).filter((g) => g.docs.length > 0);
   const printedOn = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  const oemBrochure = (listing as { oem_brochure?: { url: string; title?: string | null; year?: number | null } }).oem_brochure;
+  const oemBrochure = (listing as { oem_brochure?: OemLink }).oem_brochure;
   const brochureMk = (listing.ymm || "").trim().split(/\s+/)[1] || "";
   const printLinks: { title: string; note: string; url: string }[] = [];
   if (d.historyReport && packetVisible(listing, "historyReport"))
     printLinks.push({ title: `${historyReportName(d.historyReport.provider)} Vehicle History Report`, note: d.historyReport.source === "vin" ? "Official record for this VIN" : "External report link", url: d.historyReport.url });
   if (oemBrochure?.url && packetVisible(listing, "brochure"))
     printLinks.push({ title: `Official ${brochureMk.toUpperCase()} Brochure${oemBrochure.year ? ` (${oemBrochure.year})` : ""}`, note: "Manufacturer website", url: oemBrochure.url });
-  const oemManual = (listing as { oem_owners_manual?: { url: string; title?: string | null; year?: number | null } }).oem_owners_manual;
+  const oemManual = (listing as { oem_owners_manual?: OemLink }).oem_owners_manual;
   if (oemManual?.url && packetVisible(listing, "ownersManual") && !allDocs.some((x) => x.type === "owners_manual"))
     printLinks.push({ title: `Official ${brochureMk.toUpperCase()} Owner's Manual${oemManual.year ? ` (${oemManual.year})` : ""}`, note: "Manufacturer website", url: oemManual.url });
   if (listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker"))
@@ -445,9 +588,29 @@ const VehiclePassportDocuments = () => {
   const manualStored = allDocs.some((x) => x.type === "owners_manual");
   const manualLink = oemManual?.url && packetVisible(listing, "ownersManual") && !manualStored ? oemManual : null;
   const stickerLink = listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker") ? listing.oem_sticker_url : null;
-  const externalCount = (histLink ? 1 : 0) + (brochureLink ? 1 : 0) + (manualLink ? 1 : 0) + (stickerLink ? 1 : 0);
-  const availableCount = uploaded.length + externalCount + (factoryDocUrl ? 1 : 0);
+  const availableCount = countAvailableDocuments({
+    uploadedCount: uploaded.length,
+    hasFactoryRecord: !!factoryDocUrl,
+    externalLinks: [histLink?.url, brochureLink?.url, manualLink?.url, stickerLink],
+  });
   const lastChecked = lastUpdated || "Today";
+  // Do not ask a shopper to request a record that is sitting on the same page.
+  // The chip list is filtered against what is actually available, through the
+  // one type vocabulary, so a rename on either side cannot desynchronise them.
+  //
+  // Deliberately NOT a hook: everything below here runs after the loading and
+  // not-found returns above, so a useMemo here would make the first render call
+  // fewer hooks than the second (React #310) and take the page down.
+  const requestOptions = (() => {
+    const present = new Set<string>();
+    for (const doc of allDocs) present.add(documentCoverType(doc.type, doc.name));
+    if (factoryDocUrl) present.add("factory_sticker");
+    if (stickerLink) present.add("factory_sticker");
+    if (histLink) present.add(histLink.provider === "autocheck" ? "vehicle_history" : "carfax");
+    if (brochureLink) present.add("oem_brochure");
+    if (manualLink) present.add("owners_manual");
+    return REQUEST_OPTIONS.filter((o) => !o.satisfiedBy?.some((k) => present.has(k)));
+  })();
   const trackDoc = (cta: string, meta: Record<string, unknown> = {}) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page", ...meta } }); };
   const toggleReq = (k: string) => setReqSel((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const requestSelected = () => {
@@ -459,13 +622,20 @@ const VehiclePassportDocuments = () => {
 
   const uploadedAction = (doc: Doc) => (
     <div className="flex items-center gap-2">
-      <button onClick={() => setPreview(doc)} className="flex-1 h-9 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Eye className="w-4 h-4" /> Preview</button>
-      <a href={doc.url} download target="_blank" rel="noreferrer" className="flex-1 h-9 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"><Download className="w-4 h-4" /> Download</a>
+      <button onClick={() => setPreview(doc)} className="flex-1 h-11 sm:h-8 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Eye className="w-4 h-4" /> Preview</button>
+      <a href={doc.url} download target="_blank" rel="noopener noreferrer" className="flex-1 h-11 sm:h-8 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"><Download className="w-4 h-4" /> Download</a>
     </div>
   );
   const externalAction = (url: string, label: string, cta: string, meta: Record<string, unknown> = {}) => (
-    <a href={url} target="_blank" rel="noopener noreferrer" onClick={() => trackDoc(cta, meta)} className="h-10 w-fit px-4 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]">{label} <ExternalLink className="w-4 h-4" /></a>
+    <a href={url} target="_blank" rel="noopener noreferrer" onClick={() => trackDoc(cta, meta)} className="h-11 sm:h-8 w-fit px-4 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]">{label} <ExternalLink className="w-4 h-4" /></a>
   );
+  // Quick View on an external record does exactly what that record's own
+  // action does — same destination, same tracked event. No second viewer.
+  const openExternal = (url: string, cta: string, meta: Record<string, unknown> = {}) => () => {
+    trackDoc(cta, meta);
+    window.open(url, "_blank", "noopener");
+  };
+  const openFactoryRecord = () => { trackDoc("factory_build_record_view"); setPreview({ type: "factory_sticker", name: factoryTitle, url: factoryDocUrl }); };
 
   return (
     <div className="vpd-doc-root min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -543,7 +713,7 @@ const VehiclePassportDocuments = () => {
             {listing.trim && <p className="text-[12px] text-[#64748B]">{listing.trim}</p>}
             <p className="text-[11px] text-[#94A3B8] mt-1.5">VIN {listing.vin}</p>
             <p className="text-[11px] text-[#94A3B8]">Stock # {listing.vin.slice(-6)}{listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi` : ""}</p>
-            <button onClick={() => navigate(pp(""))} className="mt-3 w-full h-9 rounded-lg border border-[#E6E8EC] text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ExternalLink className="w-3.5 h-3.5 text-[#2563EB]" /> View Full Passport</button>
+            <button onClick={() => navigate(pp(""))} className="mt-3 w-full h-11 sm:h-8 rounded-lg border border-[#E6E8EC] text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ExternalLink className="w-3.5 h-3.5 text-[#2563EB]" /> View Full Passport</button>
           </div>
           <nav className="mt-4 space-y-0.5 flex-1">
             {PASSPORT_NAV.map((n) => (
@@ -585,10 +755,10 @@ const VehiclePassportDocuments = () => {
                 <p className="text-[16px] font-bold text-[#0F172A]">Available Now</p>
                 <p className="text-[13px] text-[#64748B] mt-0.5 mb-4">Documents you can view immediately.</p>
                 {availableCount > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-2.5">
                     {uploaded.map(({ doc, status }, i) => (
                       <RecordCard key={`u-${i}`}
-                        cover={<div className="h-40 sm:h-full sm:min-h-[150px]"><DocThumb url={doc.url} /></div>}
+                        cover={<DocumentPreview input={{ type: doc.type, title: doc.name, url: doc.url }} vehicle={coverVehicle} onQuickView={() => setPreview(doc)} />}
                         title={doc.name}
                         source={`Provided by ${dealerName}`}
                         status={status}
@@ -598,7 +768,7 @@ const VehiclePassportDocuments = () => {
                     ))}
                     {factoryDocUrl && factoryDoc && (
                       <RecordCard
-                        cover={<RecordCover hero={hero} label={isNewCar ? "Window Sticker" : "Build Record"} />}
+                        cover={<DocumentPreview input={{ type: isNewCar ? "window_sticker" : "build_sheet", title: isNewCar ? "Window Sticker" : "Build Record", thumbnailUrl: publishedSticker?.thumbnailUrl ?? null }} vehicle={coverVehicle} onQuickView={openFactoryRecord} />}
                         title={factoryTitle}
                         source={factorySubtitle}
                         status="available"
@@ -612,21 +782,21 @@ const VehiclePassportDocuments = () => {
                         action={
                           <div className="flex items-center gap-2 flex-wrap">
                             <button
-                              onClick={() => { trackDoc("factory_build_record_view"); setPreview({ type: "factory_sticker", name: factoryTitle, url: factoryDocUrl }); }}
-                              className="h-9 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
+                              onClick={openFactoryRecord}
+                              className="h-11 sm:h-8 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
                             >
                               <Eye className="w-4 h-4" /> View Document
                             </button>
                             <a
-                              href={factoryDoc.pdf_url || factoryDocUrl} download target="_blank" rel="noreferrer"
+                              href={factoryDoc.pdf_url || factoryDocUrl} download target="_blank" rel="noopener noreferrer"
                               onClick={() => trackDoc("factory_build_record_download")}
-                              className="h-9 px-3.5 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"
+                              className="h-11 sm:h-8 px-3.5 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"
                             >
                               <Download className="w-4 h-4" /> Download PDF
                             </a>
                             <button
                               onClick={() => { trackDoc("factory_build_record_print"); window.open(factoryDocUrl, "_blank", "noopener"); }}
-                              className="h-9 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#0F172A] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
+                              className="h-11 sm:h-8 px-3.5 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#0F172A] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"
                             >
                               <Printer className="w-4 h-4" /> Print
                             </button>
@@ -636,7 +806,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {histLink && (
                       <RecordCard
-                        cover={<RecordCover hero={hero} label="History Report" />}
+                        cover={<DocumentPreview input={{ type: "vehicle_history", title: "Vehicle History Report" }} vehicle={{ ...coverVehicle, provider: histLink.provider }} onQuickView={openExternal(histLink.url, "history_report", { provider: histLink.provider })} />}
                         title={`${historyReportName(histLink.provider)} Vehicle History Report`}
                         source={histLink.source === "vin" ? `${historyReportName(histLink.provider)} · Official VIN record` : `${histLink.provider === "autocheck" ? "AutoCheck" : "CARFAX"} · provided by ${dealerName}`}
                         status="external"
@@ -647,7 +817,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {brochureLink && (
                       <RecordCard
-                        cover={<RecordCover hero={hero} label="Brochure" />}
+                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure" }} vehicle={coverVehicle} onQuickView={openExternal(brochureLink.url, "oem_brochure")} />}
                         title={`${(listing.ymm || "").trim()} Official Brochure`}
                         source={`${((listing.ymm || "").trim().split(/\s+/)[1] || "Manufacturer").toUpperCase()} USA · Manufacturer source`}
                         status="external"
@@ -659,7 +829,7 @@ const VehiclePassportDocuments = () => {
                     <OwnersManualCard listing={listing} isPreview={isPreview} hasStoredCopy={manualStored} />
                     {stickerLink && (
                       <RecordCard
-                        cover={<RecordCover hero={hero} label="Window Sticker" />}
+                        cover={<DocumentPreview input={{ type: "window_sticker", title: "Window Sticker", url: stickerLink }} vehicle={coverVehicle} onQuickView={openExternal(stickerLink, "oem_window_sticker")} />}
                         title="Original OEM Window Sticker"
                         source="Manufacturer source"
                         status="external"
@@ -708,7 +878,7 @@ const VehiclePassportDocuments = () => {
                 {availableCount > 0 && !isPreview && (
                   <button onClick={() => setEmailOpen((v) => !v)} className="mt-3 w-full text-[12.5px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:underline"><Upload className="w-3.5 h-3.5" /> Email me this packet</button>
                 )}
-                {emailOpen && <div className="mt-3"><EmailPacketCard listing={listing} docs={allDocs} onClose={() => setEmailOpen(false)} /></div>}
+                {emailOpen && <div className="mt-3"><EmailPacketCard listing={listing} docs={allDocs} availableCount={availableCount} onClose={() => setEmailOpen(false)} /></div>}
               </div>
             </div>
 
@@ -717,7 +887,7 @@ const VehiclePassportDocuments = () => {
               <p className="text-[16px] font-bold text-[#0F172A]">Need a document you don&rsquo;t see?</p>
               <p className="text-[13px] text-[#64748B] mt-0.5 mb-4">Choose the records you need and {dealerName} will confirm what is available for this vehicle.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                {REQUEST_OPTIONS.map((o) => {
+                {requestOptions.map((o) => {
                   const on = reqSel.has(o.key);
                   return (
                     <button key={o.key} onClick={() => toggleReq(o.key)} aria-pressed={on}
@@ -764,7 +934,7 @@ const VehiclePassportDocuments = () => {
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E6E8EC] shrink-0">
               <div className="flex items-center gap-2.5 min-w-0"><span className="w-9 h-9 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0"><FileText className="w-5 h-5" /></span><p className="font-bold truncate">{preview.name}</p></div>
               <div className="flex items-center gap-2 shrink-0">
-                <a href={preview.url} download target="_blank" rel="noreferrer" className="h-9 px-3 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-[#2563EB]"><Download className="w-4 h-4" /> Download</a>
+                <a href={preview.url} download target="_blank" rel="noopener noreferrer" className="h-9 px-3 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-[#2563EB]"><Download className="w-4 h-4" /> Download</a>
                 <button onClick={() => window.open(preview.url, "_blank")} className="h-9 px-3 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-[#2563EB]"><Printer className="w-4 h-4" /> Print</button>
                 <button onClick={() => share(preview.url)} className="h-9 px-3 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center gap-1.5 hover:border-[#2563EB]"><Upload className="w-4 h-4" /> Share</button>
                 <button onClick={() => setPreview(null)} className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center"><X className="w-5 h-5" /></button>

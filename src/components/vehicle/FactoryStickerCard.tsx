@@ -194,15 +194,19 @@ export default function FactoryStickerCard({
           ...(reason ? { reason_code: reason.reason_code, reason_notes: reason.reason_notes } : {}),
         },
       });
-      const payload = (data || {}) as { success?: boolean; error?: string; status?: string };
+      const payload = (data || {}) as { success?: boolean; error?: string; status?: string; generated?: boolean; skipped?: string; reused?: boolean };
       if (error || payload.success !== true) {
         const detail = error?.message || payload.error || "generation failed";
         toast.error(/insufficient_permission/i.test(detail)
           ? "Regenerating needs manager authority."
           : `Couldn't regenerate the build record: ${detail}`);
       } else {
-        toast.success(payload.status === "PUBLISHED"
-          ? "Factory build record regenerated and published."
+        // See FactoryStickerWorkspace: a 200 with generated:false is a
+        // skip, not a new version.
+        toast.success(
+          payload.status === "PUBLISHED" ? "Factory build record regenerated and published."
+          : !payload.generated && payload.skipped
+            ? `Not generated yet — ${String(payload.skipped).replace(/_/g, " ")}.`
           : "Factory build record regenerated — it is waiting for review.");
       }
       await load();

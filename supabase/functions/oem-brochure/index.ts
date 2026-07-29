@@ -6,10 +6,16 @@
 // never rehost bytes, never fall back to unofficial brochure archives.
 //
 // Body: { make, model, year?, refresh? }
-// Auth: tenant user JWT or service role.
+// Auth: tenant user JWT, or service role / cron secret. The service-role path
+// is what the ingest wiring uses (intake-autoprovision.ensureOemDocLinks): its
+// bearer is the project's service-role key, which the gateway's verify_jwt
+// accepts and isServiceOrCron matches, so no ingest-time exception is needed
+// and the function stays closed to anonymous callers. `refresh` — the one
+// input that forces a paid search past the cache — is privileged-only.
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { resolveOemMake } from "../_shared/oemDocKey.ts";
 
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
 
@@ -84,7 +90,8 @@ Deno.serve(async (req) => {
   if (pf) return pf;
 
   const admin = adminClient();
-  if (!isServiceOrCron(req)) {
+  const privileged = isServiceOrCron(req);
+  if (!privileged) {
     const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     if (!jwt) return json(401, { error: "missing bearer token" });
     const { data: ures } = await admin.auth.getUser(jwt);
@@ -97,35 +104,50 @@ Deno.serve(async (req) => {
   const year = Number.parseInt(String(body.year ?? ""), 10) || null;
   const refresh = body.refresh === true;
   if (!make || !model) return json(400, { error: "make and model required" });
+  // The cache this bypasses is global, and the search behind it is metered, so
+  // any signed-in user could otherwise re-bill the whole platform for a model
+  // on a loop. Nothing in the app sends refresh; operators and cron do.
+  if (refresh && !privileged) return json(403, { error: "refresh_requires_service_role" });
 
-  const domains = OEM_DOMAINS[make.toLowerCase()];
-  if (!domains) return json(404, { error: "make_not_supported", make });
+  // The stored key is (make, model) exactly as received, because that is what
+  // the passport queries. searchMake/searchModel only steer the search.
+  const resolved = resolveOemMake(make, model, OEM_DOMAINS);
+  if (!resolved) return json(404, { error: "make_not_supported", make });
+  const { domains, make: searchMake, model: searchModel } = resolved;
 
   if (!refresh) {
     const { data: cached } = await admin
       .from("oem_brochure_links")
-      .select("url, title, year, source")
+      .select("id, url, title, year, source")
       .ilike("make", make).ilike("model", model)
       .order("year", { ascending: false, nullsFirst: false })
       .limit(6);
-    const rows = (cached || []) as { url: string; title: string | null; year: number | null; source: string }[];
+    type CachedRow = {
+      id: string; url: string; title: string | null; year: number | null; source: string;
+    };
+    const rows = (cached || []) as CachedRow[];
     // Exact year first, then the nearest year within 2 model years.
     const exact = year ? rows.find((r) => r.year === year) : rows[0];
     const near = exact || rows.find((r) => r.year != null && year != null && Math.abs(r.year - year) <= 2) || (!year ? rows[0] : undefined);
-    if (near) return json(200, { ok: true, cached: true, url: near.url, title: near.title, year: near.year, source: near.source });
+    if (near) {
+      return json(200, {
+        ok: true, cached: true, url: near.url, title: near.title, year: near.year,
+        source: near.source,
+      });
+    }
   }
 
   if (!FIRECRAWL_KEY) return json(200, { error: "not_configured" });
 
   const siteFilter = domains.map((d) => `site:${d}`).join(" OR ");
-  const query = `${year ? `${year} ` : ""}${make} ${model} brochure (${siteFilter})`;
+  const query = `${year ? `${year} ` : ""}${searchMake} ${searchModel} brochure (${siteFilter})`;
   let hits = (await firecrawlSearch(query)).filter((h) => hostAllowed(h.url, domains));
   if (!hits.length) {
-    hits = (await firecrawlSearch(`${make} ${model} ebrochure pdf (${siteFilter})`)).filter((h) => hostAllowed(h.url, domains));
+    hits = (await firecrawlSearch(`${searchMake} ${searchModel} ebrochure pdf (${siteFilter})`)).filter((h) => hostAllowed(h.url, domains));
   }
   if (!hits.length) return json(404, { error: "brochure_not_found", query });
 
-  hits.sort((a, b) => scoreHit(b, model, year) - scoreHit(a, model, year));
+  hits.sort((a, b) => scoreHit(b, searchModel, year) - scoreHit(a, searchModel, year));
   const best = hits[0];
 
   // Confirm the link is not dead before caching it. OEM CDNs often bot-block
@@ -148,14 +170,36 @@ Deno.serve(async (req) => {
   }
   const brochureYear = yearOf(best) ?? year;
 
-  // The unique index is expression-based (lower(make), lower(model), year),
-  // which upsert can't target by name — replace via delete + insert instead.
-  let del = admin.from("oem_brochure_links").delete().ilike("make", make).ilike("model", model);
-  del = brochureYear === null ? del.is("year", null) : del.eq("year", brochureYear);
-  await del;
-  await admin.from("oem_brochure_links").insert(
-    { make, model, year: brochureYear, url: best.url, title: best.title || null, source: "oem_site", verified_at: new Date().toISOString() },
-  );
+  const row = {
+    make, model, year: brochureYear, url: best.url, title: best.title || null,
+    source: "oem_site", verified_at: new Date().toISOString(),
+  };
+  const insert = () => admin.from("oem_brochure_links").insert(row).select("id").maybeSingle();
+
+  // Insert FIRST, and only delete the old row once a conflict proves one is in
+  // the way. Deleting up front — the previous shape — threw away a working
+  // cached link whenever the insert then failed for any reason, leaving the
+  // passport with nothing where it previously had something. The unique index
+  // is expression-based (lower(make), lower(model), year) so upsert cannot
+  // target it by name; a 23505 is how we learn a row exists.
+  let { data: saved, error: saveErr } = await insert();
+  if (saveErr && (saveErr as { code?: string }).code === "23505") {
+    let del = admin.from("oem_brochure_links").delete().ilike("make", make).ilike("model", model);
+    del = brochureYear === null ? del.is("year", null) : del.eq("year", brochureYear);
+    const { error: delErr } = await del;
+    if (delErr) {
+      return json(500, { error: "brochure_link_not_saved", detail: delErr.message, url: best.url });
+    }
+    ({ data: saved, error: saveErr } = await insert());
+  }
+
+  // A harvest that did not persist is a failed harvest. Discarding this error
+  // reported success to the dealer while the passport, which reads this table,
+  // had nothing to show.
+  if (saveErr || !saved?.id) {
+    return json(500, { error: "brochure_link_not_saved", detail: saveErr?.message ?? "insert returned no row", url: best.url });
+  }
+
 
   return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: brochureYear });
 });
