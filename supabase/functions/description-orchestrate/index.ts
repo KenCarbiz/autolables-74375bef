@@ -447,7 +447,7 @@ async function orchestrateVehicle(
     // than discovered by the model.
     const { data: budgetRow } = await admin.from("description_generation_budgets")
       .select("*").eq("tenant_id", tenantId).maybeSingle();
-    const { data: spend } = await admin.rpc("description_generation_spend", { p_tenant_id: tenantId });
+    const spend = await rpc(admin, "description_generation_spend", { p_tenant_id: tenantId });
     const budgetCfg = budgetRow ? {
       ...DEFAULT_BUDGET,
       monthlyGenerationBudget: budgetRow.monthly_generation_budget,
@@ -776,7 +776,7 @@ async function orchestrateVehicle(
     // Auto-publish only when eligible, permitted, and not manually locked.
     let published = false;
     const { data: caseNow } = await admin.from("description_cases").select("lock_version, master_locked").eq("id", caseId).maybeSingle();
-    const { data: gate } = await admin.rpc("description_publish_allowed", {
+    const gate = await rpc(admin, "description_publish_allowed", {
       p_case_id: caseId, p_version_id: version.id,
     });
     const gateOk = (gate as any)?.ok !== false;
@@ -785,7 +785,7 @@ async function orchestrateVehicle(
       // trips, and a crash mid-flight must leave a status the reconcile sweep
       // recognizes as stalled rather than a silent "READY".
       await setCase(admin, caseId, { status: "PUBLISHING" });
-      const { data: pub } = await admin.rpc("publish_description_internal", {
+      const pub = await rpc(admin, "publish_description_internal", {
         p_case_id: caseId, p_version_id: version.id, p_expected_lock_version: caseNow?.lock_version ?? null,
       });
       published = !!(pub as any)?.ok;
@@ -836,7 +836,7 @@ async function orchestrateVehicle(
     // that was repaired and cleanly regenerated reads as "Blocked" forever.
     // Scoped runs only touch the channels they rebuilt, so they never sweep.
     if (!scopedRun) {
-      await admin.rpc("close_resolved_description_exceptions", {
+      await rpcSoft(admin, "close_resolved_description_exceptions", {
         p_case_id: caseId, p_keep_types: [...raisedTypes],
       });
     }
@@ -1027,7 +1027,7 @@ serve(async (req) => {
       const seenThisHop = new Set<string>();
       let examined = 0;
       while (Date.now() < deadline) {
-        const { data: batch } = await admin.rpc("next_description_reconcile_batch", {
+        const batch = await rpc(admin, "next_description_reconcile_batch", {
           p_tenant_id: tenantId, p_limit: 5, p_sweep_start: sweepStart,
         });
         const rows = ((batch || []) as Array<{ tenant_id: string; vehicle_id: string; reason: string }>)
@@ -1057,7 +1057,7 @@ serve(async (req) => {
       let chained = false;
       let pendingCount = 0;
       if (depth < RECONCILE_MAX_DEPTH) {
-        const { data: more } = await admin.rpc("next_description_reconcile_batch", {
+        const more = await rpc(admin, "next_description_reconcile_batch", {
           p_tenant_id: tenantId, p_limit: 20, p_sweep_start: sweepStart,
         });
         // Chain only for work this hop did not already attempt — a vehicle that
