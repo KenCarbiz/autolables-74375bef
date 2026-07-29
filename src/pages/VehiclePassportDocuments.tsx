@@ -206,7 +206,7 @@ const DocumentPreview = ({ input, vehicle, onQuickView }: {
 // which the `passport-delivery-flush` cron drains every 5 minutes. The send
 // function is service-key gated, so this anonymous session queues only — the
 // confirmation copy promises a queued request, never a delivered email.
-const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; docs: Doc[]; onClose: () => void }) => {
+const EmailPacketCard = ({ listing, docs, availableCount, onClose }: { listing: VehicleListing; availableCount?: number; docs: Doc[]; onClose: () => void }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
@@ -238,13 +238,17 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
   return (
     <div className={`${CARD} p-5 mb-5`}>
       <div className="flex items-start justify-between gap-3">
-        <div><p className="text-[14px] font-bold text-[#0F172A]">Email me this packet</p><p className="text-[12px] text-[#64748B] mt-0.5">All {docs.length} documents for the {listing.ymm}, straight to your inbox.</p></div>
+        <div><p className="text-[14px] font-bold text-[#0F172A]">Email me this packet</p><p className="text-[12px] text-[#64748B] mt-0.5">All {availableCount ?? docs.length} documents for the {listing.ymm}, straight to your inbox.</p></div>
         <button onClick={onClose} className="text-[#94A3B8] hover:text-[#0F172A] shrink-0"><X className="w-4 h-4" /></button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2.5 mt-3">
+      {/* One column, always. This card lives inside the 360px status rail, and
+          `sm:` is the VIEWPORT width, not the container's -- so a three-column
+          grid put three fields into a 360px column and pushed the button, and
+          the page, off its own right edge. */}
+      <div className="grid grid-cols-1 gap-2.5 mt-3">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email address" className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <button onClick={submit} disabled={sending} className="h-[42px] px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white text-sm font-bold">{sending ? "Sending..." : "Send packet"}</button>
+        <button onClick={submit} disabled={sending} className="h-[42px] w-full px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white text-sm font-bold">{sending ? "Sending..." : "Send packet"}</button>
       </div>
       <p className="text-[11px] text-[#94A3B8] mt-2">By submitting, you agree the dealership may contact you about this vehicle.</p>
     </div>
@@ -323,14 +327,18 @@ const StatusBadge = ({ status }: { status: DocStatus }) => {
 
 // Records a shopper may ASK the dealership for. These are request options, never
 // presented as currently-available documents (data boundary).
-const REQUEST_OPTIONS: { key: string; label: string; icon: typeof FileText; tint: string }[] = [
-  { key: "buyers_guide", label: "Buyer's Guide", icon: FileText, tint: "bg-blue-50 text-[#2563EB]" },
-  { key: "window_sticker", label: "Window Sticker / Build Sheet", icon: Car, tint: "bg-blue-50 text-[#2563EB]" },
-  { key: "warranty", label: "Warranty Information", icon: ShieldCheck, tint: "bg-emerald-50 text-[#059669]" },
+// `satisfiedBy` is the cover types that already answer this request. When one
+// of them is on the page the chip is dropped -- asking a shopper to request the
+// document they are looking at reads as though we cannot see our own page.
+// "Other Document" has none, so it always stays.
+const REQUEST_OPTIONS: { key: string; label: string; icon: typeof FileText; tint: string; satisfiedBy?: string[] }[] = [
+  { key: "buyers_guide", label: "Buyer's Guide", icon: FileText, tint: "bg-blue-50 text-[#2563EB]", satisfiedBy: ["buyers_guide"] },
+  { key: "window_sticker", label: "Window Sticker / Build Sheet", icon: Car, tint: "bg-blue-50 text-[#2563EB]", satisfiedBy: ["factory_sticker"] },
+  { key: "warranty", label: "Warranty Information", icon: ShieldCheck, tint: "bg-emerald-50 text-[#059669]", satisfiedBy: ["warranty"] },
   { key: "verification", label: "Verification Report", icon: BadgeCheck, tint: "bg-teal-50 text-[#0D9488]" },
-  { key: "inspection", label: "Inspection Report", icon: ClipboardX, tint: "bg-amber-50 text-[#D97706]" },
-  { key: "signed_price", label: "Signed Price Record", icon: PenLine, tint: "bg-purple-50 text-[#7C3AED]" },
-  { key: "service", label: "Service Records", icon: Wrench, tint: "bg-orange-50 text-[#EA580C]" },
+  { key: "inspection", label: "Inspection Report", icon: ClipboardX, tint: "bg-amber-50 text-[#D97706]", satisfiedBy: ["inspection"] },
+  { key: "signed_price", label: "Signed Price Record", icon: PenLine, tint: "bg-purple-50 text-[#7C3AED]", satisfiedBy: ["signed_record"] },
+  { key: "service", label: "Service Records", icon: Wrench, tint: "bg-orange-50 text-[#EA580C]", satisfiedBy: ["service_record"] },
   { key: "other", label: "Other Document", icon: FilePlus2, tint: "bg-slate-100 text-[#64748B]" },
 ];
 
@@ -586,6 +594,19 @@ const VehiclePassportDocuments = () => {
     externalLinks: [histLink?.url, brochureLink?.url, manualLink?.url, stickerLink],
   });
   const lastChecked = lastUpdated || "Today";
+  // Do not ask a shopper to request a record that is sitting on the same page.
+  // The chip list is filtered against what is actually available, through the
+  // one type vocabulary, so a rename on either side cannot desynchronise them.
+  const requestOptions = useMemo(() => {
+    const present = new Set<string>();
+    for (const d of allDocs) present.add(documentCoverType(d.type, d.name));
+    if (factoryDocUrl) present.add("factory_sticker");
+    if (stickerLink) present.add("factory_sticker");
+    if (histLink) present.add(histLink.provider === "autocheck" ? "vehicle_history" : "carfax");
+    if (brochureLink) present.add("oem_brochure");
+    if (manualLink) present.add("owners_manual");
+    return REQUEST_OPTIONS.filter((o) => !o.satisfiedBy?.some((k) => present.has(k)));
+  }, [allDocs, factoryDocUrl, stickerLink, histLink, brochureLink, manualLink]);
   const trackDoc = (cta: string, meta: Record<string, unknown> = {}) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page", ...meta } }); };
   const toggleReq = (k: string) => setReqSel((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const requestSelected = () => {
@@ -853,7 +874,7 @@ const VehiclePassportDocuments = () => {
                 {availableCount > 0 && !isPreview && (
                   <button onClick={() => setEmailOpen((v) => !v)} className="mt-3 w-full text-[12.5px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:underline"><Upload className="w-3.5 h-3.5" /> Email me this packet</button>
                 )}
-                {emailOpen && <div className="mt-3"><EmailPacketCard listing={listing} docs={allDocs} onClose={() => setEmailOpen(false)} /></div>}
+                {emailOpen && <div className="mt-3"><EmailPacketCard listing={listing} docs={allDocs} availableCount={availableCount} onClose={() => setEmailOpen(false)} /></div>}
               </div>
             </div>
 
@@ -862,7 +883,7 @@ const VehiclePassportDocuments = () => {
               <p className="text-[16px] font-bold text-[#0F172A]">Need a document you don&rsquo;t see?</p>
               <p className="text-[13px] text-[#64748B] mt-0.5 mb-4">Choose the records you need and {dealerName} will confirm what is available for this vehicle.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                {REQUEST_OPTIONS.map((o) => {
+                {requestOptions.map((o) => {
                   const on = reqSel.has(o.key);
                   return (
                     <button key={o.key} onClick={() => toggleReq(o.key)} aria-pressed={on}
