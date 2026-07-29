@@ -157,7 +157,7 @@ const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: P
 
       {/* Full-report link */}
       <button onClick={onOpenReport} className="mt-4 w-full inline-flex items-center justify-center gap-1 text-[13px] font-bold" style={{ color: C.blue }}>
-        View full verification report <ChevronRight className="w-4 h-4" />
+        Open Full Verification Report <ChevronRight className="w-4 h-4" />
       </button>
     </div>
   );

@@ -10,6 +10,10 @@ export const PASSPORT_PANEL_KEYS = [
   "comparable-vehicles", "inventory-trend", "factory-warranty",
   "owner-reviews", "highlights", "overview", "key-specs", "equipment", "ownership-timeline",
   "visit-dealer",
+  // Trust + records drawers. These replaced full-page navigations: inspecting
+  // a title result or a document is investigating the SAME vehicle, so it
+  // belongs over the passport, not instead of it.
+  "title-brand", "vehicle-history", "verification-categories", "documents", "dealer-profile",
 ] as const;
 export type PassportPanelKey = (typeof PASSPORT_PANEL_KEYS)[number];
 export const isPassportPanelKey = (v: string | null | undefined): v is PassportPanelKey =>

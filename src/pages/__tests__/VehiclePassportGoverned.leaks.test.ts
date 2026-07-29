@@ -2,18 +2,28 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// ── Passport V3 desktop conversion-routing guard ────────────────────────────
-// The approved desktop architecture reuses the complete, existing V2 destination
-// pages for the high-intent conversion flows (See My Price, Reserve, Trade, Test
-// Drive, Contact, Documents) instead of re-implementing them as drawers. The V3
-// action center opens them via go("<section>"), which navigates to
-// /v/:slug/:section carrying a validated returnTo back to the originating V3 URL.
-// The mobile governed passport keeps its own action drawer unchanged.
+// ── Passport V3 conversion-routing guard ────────────────────────────────────
+// The line between a page and a drawer moved, deliberately.
+//
+// It used to sit around "high-intent conversion", which put Trade, Documents,
+// Verification and the dealership page on full pages. That cost the shopper
+// their passport — and their scroll position in it — for actions that were
+// only ever "tell me more about this same car".
+//
+// The line now sits at TASK vs INVESTIGATION. A page is earned by a
+// substantial multi-step task, a form that collects contact details, a formal
+// printable report, an external document, or a different vehicle. Everything
+// else opens over the passport.
+//
+// Trade moved the other way for a different reason: it was a page, but the
+// page was a contact form, so it was neither a real appraisal nor a
+// justifiable navigation. It is now a real appraisal, in a drawer.
 
 const SRC = readFileSync(resolve(__dirname, "../VehiclePassportGoverned.tsx"), "utf8");
 
-// Each conversion CTA must open its complete existing V2 destination page.
-const CONVERSION_ROUTES = ["todays-price", "reserve", "trade", "test-drive", "contact", "documents"];
+// These remain full pages: each is a substantial task or collects contact
+// details, and each is reached through the returnTo contract.
+const CONVERSION_ROUTES = ["todays-price", "reserve", "test-drive", "contact"];
 
 describe("VehiclePassportGoverned — desktop conversion routing", () => {
   it.each(CONVERSION_ROUTES)('opens the complete V2 %s page via go("%s")', (action) => {
@@ -27,8 +37,16 @@ describe("VehiclePassportGoverned — desktop conversion routing", () => {
     expect(SRC).toContain("location.pathname");
   });
 
-  it("still reaches the verification report in-flow via go(\"verification\")", () => {
-    expect(SRC).toMatch(/go\("(verification|dealer)"\)/);
+  it("no longer navigates away to investigate the same vehicle", () => {
+    // Trade, Documents, Verification and the dealer page are drawers now.
+    for (const gone of ["trade", "documents", "verification", "dealer"]) {
+      expect(SRC).not.toContain(`go("${gone}")`);
+    }
+  });
+
+  it("still reaches the formal reports, in a new tab so the passport survives", () => {
+    expect(SRC).toMatch(/openFullReport\("great-buy"\)/);
+    expect(SRC).toMatch(/const openFullReport = \(section: "verification" \| "great-buy"\)/);
   });
 
   it("keeps the mobile governed action drawer unchanged", () => {

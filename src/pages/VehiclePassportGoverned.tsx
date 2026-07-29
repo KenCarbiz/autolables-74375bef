@@ -15,6 +15,7 @@ import { packetVisible } from "@/lib/packetModules";
 import { buildPassportActionPath } from "@/lib/passportReturn";
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
+import PassportTradeDrawer from "@/components/passport/PassportTradeDrawer";
 import PassportWindowStickerCard from "@/components/passport/PassportWindowStickerCard";
 import { usePublishedWindowSticker } from "@/hooks/usePublishedWindowSticker";
 import VehiclePriceBreakdown from "@/components/passport/VehiclePriceBreakdown";
@@ -206,7 +207,7 @@ export default function VehiclePassportGoverned() {
   // Preview parity with the other passport pages (?preview=1 renders the shared
   // MOCK_LISTING) so the governed experience can be visually reviewed without a
   // live backend. No effect on real shopper traffic.
-  const [search] = useSearchParams();
+  const [search, setSearch] = useSearchParams();
   // ?preview=1 and ?showcase=1 both render the shared MOCK fixtures (showcase is
   // the marketing "open the live sample" entry point). No effect on real traffic.
   const isPreview = search.get("preview") === "1" || search.has("showcase");
@@ -229,7 +230,12 @@ export default function VehiclePassportGoverned() {
   const [saved, setSaved] = useState<boolean | null>(null);
   const [priceOpen, setPriceOpen] = useState(false);
   const [intelOpen, setIntelOpen] = useState(true);
-  const [activePanel, setActivePanel] = useState<PassportPanelKey | null>(null);
+  // The open drawer lives in the URL (?panel=), not in component state alone.
+  // That buys three things at once: browser Back closes the drawer instead of
+  // leaving the passport, a refreshed or shared link reopens the same drawer,
+  // and the passport underneath never unmounts — so its scroll position and
+  // its already-fetched data survive every open and close.
+  const activePanel: PassportPanelKey | null = isPassportPanelKey(search.get("panel")) ? (search.get("panel") as PassportPanelKey) : null;
   const [actionDrawer, setActionDrawer] = useState<PassportActionKey | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
 
@@ -258,6 +264,13 @@ export default function VehiclePassportGoverned() {
   const [watchOpen, setWatchOpen] = useState(false);
   const [heroInView, setHeroInView] = useState(true);
   const heroRef = useRef<HTMLDivElement | null>(null);
+  // Two persistent CTA systems must never be on screen together. On desktop the
+  // Customer Action Center is the CTA surface, and the floating dock duplicated
+  // it verbatim — same Reserve, same Trade, same Contact — so the dock now only
+  // appears once the action centre has scrolled away.
+  const [tradeOpen, setTradeOpen] = useState(false);
+  const [actionCenterInView, setActionCenterInView] = useState(true);
+  const actionCenterRef = useRef<HTMLDivElement | null>(null);
   const isDesktop = useIsDesktop();
 
   // Customer's own payment scenario (set on the Today's Price ladder). Read on
@@ -293,6 +306,14 @@ export default function VehiclePassportGoverned() {
     return () => ob.disconnect();
   }, [loading]);
 
+  useEffect(() => {
+    const el = actionCenterRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const ob = new IntersectionObserver(([e]) => setActionCenterInView(e.isIntersecting), { threshold: 0.15 });
+    ob.observe(el);
+    return () => ob.disconnect();
+  }, [loading, isDesktop]);
+
   if (loading) return <Skeleton />;
   if (notFound || !listing || !d) {
     return (
@@ -313,7 +334,51 @@ export default function VehiclePassportGoverned() {
   // unchanged — V3 CTAs never re-implement them as drawers.
   const go = (section: string) =>
     navigate(buildPassportActionPath(listing.slug || rawSlug, section, location.pathname, isPreview));
-  const openPanel = (k: PassportPanelKey) => { setActivePanel(k); };
+  // Normalized passport analytics. Identity fields (tenant, vehicle, VIN,
+  // session, campaign) are attached once here; callers pass only the event name
+  // and non-personal detail, so no surface can start shipping a shopper's name
+  // or email into an event payload.
+  const trackPassportEvent = (event: string, meta: Record<string, unknown> = {}) => {
+    if (isPreview) return;
+    trackCustomerEngagement({
+      tenantId: listing.tenant_id, storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin,
+      source: "passport", surface: "vehicle_passport", eventType: "engagement_ping",
+      metadata: {
+        event, passport_version: "v3", analytics_schema_version: 1,
+        purchase_vin: listing.vin, ...meta,
+      },
+    });
+  };
+
+  // Opening pushes a history entry so Back closes the drawer; closing replaces
+  // it so a close does not leave a dead forward entry behind.
+  const openPanel = (k: PassportPanelKey) => {
+    const next = new URLSearchParams(search);
+    next.set("panel", k);
+    setSearch(next, { replace: false });
+    trackPassportEvent("passport_drawer_opened", { drawer: k });
+  };
+  // A formal report is long, printable and shareable, so it earns a page — but
+  // it opens in a NEW tab, which means the shopper's passport (and their scroll
+  // position in it) is still sitting there when they come back.
+  // Value My Trade opens over the passport. It used to navigate to a page that
+  // asked for name/email/phone and nothing about the shopper's own car.
+  const openTrade = () => {
+    trackPassportEvent("trade_appraisal_started", { placement: "action_center" });
+    setTradeOpen(true);
+  };
+  const openFullReport = (section: "verification" | "great-buy") => {
+    trackPassportEvent("full_report_opened", { report: section });
+    const url = buildPassportActionPath(listing.slug || rawSlug, section, location.pathname, isPreview);
+    window.open(url, "_blank", "noopener");
+  };
+  const closePanel = () => {
+    const key = activePanel;
+    const next = new URLSearchParams(search);
+    next.delete("panel");
+    setSearch(next, { replace: true });
+    if (key) trackPassportEvent("passport_drawer_closed", { drawer: key });
+  };
   // Governed V3 action surfaces — reserve / test-drive / trade / contact /
   // payment / availability open a V3 drawer and NEVER navigate into the V2
   // detail pages. (Deep detail modules still use openPanel; call/text stay
@@ -466,8 +531,8 @@ export default function VehiclePassportGoverned() {
       test_drive: { icon: Clock, onClick: () => openAction("test-drive") },
       todays_price: { icon: DollarSign, onClick: () => openAction("payment") },
       contact_dealer: { icon: MessageSquare, onClick: () => openAction("contact") },
-      trade_appraisal: { icon: RefreshCw, onClick: () => openAction("trade") },
-      value_trade: { icon: RefreshCw, onClick: () => openAction("trade") },
+      trade_appraisal: { icon: RefreshCw, onClick: () => openTrade() },
+      value_trade: { icon: RefreshCw, onClick: () => openTrade() },
       reserve: { icon: BadgeCheck, onClick: () => openAction("reserve") },
       pre_qualified: { icon: DollarSign, onClick: () => openAction("payment") },
       apply_financing: { icon: DollarSign, onClick: () => openAction("payment") },
@@ -599,10 +664,10 @@ export default function VehiclePassportGoverned() {
 
         const watchEnabled = (listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false;
         const actionTiles: { label: string; icon: React.ElementType; onClick: () => void; active?: boolean }[] = [
-          { label: "Value My Trade", icon: RefreshCw, onClick: () => go("trade") },
-          { label: "Test Drive", icon: Clock, onClick: () => go("test-drive") },
-          { label: "Contact Dealer", icon: MessageSquare, onClick: () => go("contact") },
-          { label: "Documents", icon: FileText, onClick: () => go("documents") },
+          { label: "Value My Trade", icon: RefreshCw, onClick: () => openTrade() },
+          { label: "Build My Payment", icon: DollarSign, onClick: () => { trackPassportEvent("payment_builder_started", { placement: "action_center" }); go("todays-price"); } },
+          { label: "Ask a Question", icon: MessageSquare, onClick: () => { trackPassportEvent("contact_started", { placement: "action_center" }); go("contact"); } },
+          { label: "Documents", icon: FileText, onClick: () => openPanel("documents") },
           { label: "Save", icon: Bookmark, onClick: handleSave, active: isSaved },
           { label: "Share", icon: Upload, onClick: handleShare },
         ];
@@ -711,7 +776,7 @@ export default function VehiclePassportGoverned() {
                 </div>
                 {payAssumptions && <div className="mt-1 text-[12px]" style={{ color: SUB }}>{payAssumptions}</div>}
                 <div className="mt-2.5 flex items-center gap-4">
-                  <button onClick={() => go("todays-price")} className="inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: BLUE }}>Customize Payment <ChevronRight className="w-4 h-4" /></button>
+                  <button onClick={() => { trackPassportEvent("payment_builder_started", { placement: "price_ladder" }); go("todays-price"); }} className="inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: BLUE }}>Build My Payment <ChevronRight className="w-4 h-4" /></button>
                   {customPayment && <button onClick={resetPayment} className="text-[13px] font-semibold" style={{ color: SUB }}>Reset to default</button>}
                 </div>
                 <p className="mt-2.5 pt-2.5 border-t text-[11px] leading-snug" style={{ borderColor: BORDER, color: SUB }}>Estimated payment for illustration only. Terms, rates, taxes, fees and approval may vary. This is not a financing offer.</p>
@@ -721,8 +786,8 @@ export default function VehiclePassportGoverned() {
 
           {/* 7 — Primary + secondary actions (open the complete V2 destination pages) */}
           <section className="px-4 pt-4" data-module="primary-actions">
-            <button onClick={() => go("todays-price")} className="w-full h-14 rounded-2xl inline-flex items-center justify-center gap-2 text-[15px] font-bold text-white" style={{ background: BLUE }}><DollarSign className="w-[22px] h-[22px]" /> See My Price</button>
-            <button onClick={() => go("reserve")} className="mt-2.5 w-full h-14 rounded-2xl border inline-flex items-center justify-center gap-2 text-[15px] font-bold" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-[22px] h-[22px]" /> Reserve This Vehicle</button>
+            <button onClick={() => { trackPassportEvent("test_drive_started", { placement: "action_center" }); go("test-drive"); }} className="w-full h-14 rounded-2xl inline-flex items-center justify-center gap-2 text-[15px] font-bold text-white" style={{ background: BLUE }}><Clock className="w-[22px] h-[22px]" /> Schedule Test Drive</button>
+            <button onClick={() => { trackPassportEvent("reservation_started", { placement: "action_center" }); go("reserve"); }} className="mt-2.5 w-full h-14 rounded-2xl border inline-flex items-center justify-center gap-2 text-[15px] font-bold" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-[22px] h-[22px]" /> Reserve This Vehicle</button>
           </section>
 
           {/* 8 — Supporting action tiles */}
@@ -743,7 +808,7 @@ export default function VehiclePassportGoverned() {
           {/* 9 — AutoLabels Verified (Option B: Balanced Status Dashboard) */}
           {vShow && (
             <section className="px-4 pt-6" data-module="verification">
-              <AutoLabelsVerifiedCard report={report} onOpenReport={() => go("verification")} onReview={() => go("verification")} />
+              <AutoLabelsVerifiedCard report={report} onOpenReport={() => openFullReport("verification")} onReview={(key) => openPanel(key === "title" ? "title-brand" : key === "history" || key === "ownership" || key === "odometer" ? "vehicle-history" : "verification-categories")} />
             </section>
           )}
 
@@ -780,7 +845,7 @@ export default function VehiclePassportGoverned() {
                   <li key={i} className="flex items-start gap-2 text-[13px]" style={{ color: NAVY }}><CheckCircle2 className="w-[18px] h-[18px] shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}</li>
                 ))}
               </ul>
-              <button onClick={() => go("great-buy")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View full buying report <ChevronRight className="w-4 h-4" /></button>
+              <button onClick={() => openFullReport("great-buy")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>Open Full Buying Report <ExternalLink className="w-4 h-4" /></button>
             </div>
           </section>
 
@@ -807,7 +872,7 @@ export default function VehiclePassportGoverned() {
                     {d.historyReport.source !== "vin" && dealerName && <p className="text-[11px] mt-0.5" style={{ color: SUB }}>Provided at no cost by {dealerName}</p>}
                   </div>
                 )}
-                <button onClick={() => go("verification")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View full verification report <ChevronRight className="w-4 h-4" /></button>
+                <button onClick={() => openPanel("verification-categories")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View all categories <ChevronRight className="w-4 h-4" /></button>
               </div>
             </section>
           )}
@@ -837,7 +902,7 @@ export default function VehiclePassportGoverned() {
               <PassportWindowStickerCard
                 sticker={windowSticker}
                 vehicleLabel={listing.ymm || "vehicle"}
-                onAllDocuments={() => go("documents")}
+                onAllDocuments={() => openPanel("documents")}
                 variant="mobile"
               />
             </div>
@@ -995,7 +1060,7 @@ export default function VehiclePassportGoverned() {
                     )}
                   </div>
                 )}
-                <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "dealer_profile" } }); go("dealer"); }} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>
+                <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "dealer_profile" } }); openPanel("dealer-profile"); }} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>
                   Learn more about {dealerName} <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
@@ -1058,15 +1123,22 @@ export default function VehiclePassportGoverned() {
         // ── Fixed conversion action hierarchy (goal-locked). Each opens the
         // existing, complete V2 destination page via go() — never a drawer — and
         // carries returnTo so its "Back to Vehicle Passport" returns here.
-        const actPrimary = { label: "See My Price", onClick: () => go("todays-price") };
-        const actReserve = { label: "Reserve This Vehicle", onClick: () => go("reserve") };
+        // Order is fixed: test drive is the highest-intent action a shopper can
+        // take on a car they are already looking at, so it leads.
+        //
+        // The old price label is gone. The price is printed a few inches above
+        // this button, so inviting the shopper to click through and "see" it
+        // implied it was being withheld pending their contact details. The
+        // destination is a payment builder, and it now says so.
+        const actPrimary = { label: "Schedule Test Drive", onClick: () => { trackPassportEvent("test_drive_started", { placement: "action_center" }); go("test-drive"); } };
+        const actReserve = { label: "Reserve This Vehicle", onClick: () => { trackPassportEvent("reservation_started", { placement: "action_center" }); go("reserve"); } };
         const actGrid1 = [
-          { label: "Value My Trade", icon: RefreshCw, onClick: () => go("trade") },
-          { label: "Test Drive", icon: Clock, onClick: () => go("test-drive") },
+          { label: "Value My Trade", icon: RefreshCw, onClick: () => openTrade() },
+          { label: "Build My Payment", icon: DollarSign, onClick: () => { trackPassportEvent("payment_builder_started", { placement: "action_center" }); go("todays-price"); } },
         ];
         const actGrid2 = [
-          { label: "Contact Dealer", icon: MessageSquare, onClick: () => go("contact") },
-          { label: "Documents", icon: FileText, onClick: () => go("documents") },
+          { label: "Ask a Question", icon: MessageSquare, onClick: () => { trackPassportEvent("contact_started", { placement: "action_center" }); go("contact"); } },
+          { label: "Documents", icon: FileText, onClick: () => openPanel("documents") },
         ];
         const actUtility = [
           { label: "Save", icon: Bookmark, onClick: handleSave },
@@ -1164,7 +1236,7 @@ export default function VehiclePassportGoverned() {
 
                     {/* AutoLabels Verified (Option B: Balanced Status Dashboard) */}
                     {vShow && (
-                      <AutoLabelsVerifiedCard className="mt-4" report={report} onOpenReport={() => go("verification")} onReview={() => go("verification")} />
+                      <AutoLabelsVerifiedCard className="mt-4" report={report} onOpenReport={() => openFullReport("verification")} onReview={(key) => openPanel(key === "title" ? "title-brand" : key === "history" || key === "ownership" || key === "odometer" ? "vehicle-history" : "verification-categories")} />
                     )}
                   </div>
                 </section>
@@ -1176,7 +1248,7 @@ export default function VehiclePassportGoverned() {
                       <span className="h-8 w-8 grid place-items-center rounded-full" style={{ background: vAllVerified ? "#DCFCE7" : "#FEF3C7" }}><CheckCircle2 className="w-4 h-4" style={{ color: vAllVerified ? GREEN : AMBER }} /></span>
                       <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Verified Vehicle Data</div><div className="text-[12px]" style={{ color: SUB }}>{vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} checks verified · ${vSummary}`}</div></div>
                     </div>
-                    <button onClick={() => go("verification")} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View all categories <ChevronRight className="w-4 h-4" /></button>
+                    <button onClick={() => openPanel("verification-categories")} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View all categories <ChevronRight className="w-4 h-4" /></button>
                   </div>
                   <div className="mt-4 grid grid-cols-4 gap-2.5">
                     {vChecksUi.map((c) => (
@@ -1219,7 +1291,7 @@ export default function VehiclePassportGoverned() {
                     <PassportWindowStickerCard
                       sticker={windowSticker}
                       vehicleLabel={listing.ymm || "vehicle"}
-                      onAllDocuments={() => go("documents")}
+                      onAllDocuments={() => openPanel("documents")}
                     />
                   </div>
                 )}
@@ -1263,7 +1335,7 @@ export default function VehiclePassportGoverned() {
                         ));
                       })()}
                     </ul>
-                    <button onClick={() => go("great-buy")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>See full buying report <ChevronRight className="w-4 h-4" /></button>
+                    <button onClick={() => openFullReport("great-buy")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>Open Full Buying Report <ExternalLink className="w-4 h-4" /></button>
                   </div>
 
                   <ModuleView onView={() => firePhaseE("market_comparison_viewed", { module_id: "market-comparison", module_position: 2, mode: mc.mode })} dataModule="market-comparison" className={`${CARD} p-5`}>
@@ -1403,7 +1475,7 @@ export default function VehiclePassportGoverned() {
                           {dealerBenefits.slice(0, 4).map((b) => <div key={b} className="flex items-start gap-2 text-[12.5px] font-medium" style={{ color: NAVY }}><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}</div>)}
                         </div>
                       )}
-                      <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "dealer_profile" } }); go("dealer"); }} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>Meet {dealerName} <ChevronRight className="w-4 h-4" /></button>
+                      <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "dealer_profile" } }); openPanel("dealer-profile"); }} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>Meet {dealerName} <ChevronRight className="w-4 h-4" /></button>
                     </div>
                   )}
                 </section>
@@ -1411,7 +1483,7 @@ export default function VehiclePassportGoverned() {
 
               {/* ── STICKY CUSTOMER ACTION CENTER ── */}
               <aside className="self-start" style={{ position: "sticky", top: DESKTOP_STICKY_OFFSET }} data-module="action-center">
-                <div className={`${CARD} p-5`}>
+                <div ref={actionCenterRef} className={`${CARD} p-5`}>
                   <div className="text-[10px] font-black uppercase tracking-wider" style={{ color: SUB }}>Customer Action Center</div>
                   {/* Today's Sale Price + itemized breakdown. The ONE above-the-fold
                       price; the model reconciles vehiclePrice + fee to it exactly, so
@@ -1435,7 +1507,7 @@ export default function VehiclePassportGoverned() {
                   <p className="mt-3 text-[11px] leading-snug" style={{ color: SUB }}>Sales tax, title, registration and dealer-installed options are not included.</p>
 
                   {/* Fixed conversion hierarchy — each opens the complete existing V2 page. */}
-                  <button onClick={actPrimary.onClick} className="mt-4 w-full h-11 rounded-xl inline-flex items-center justify-center gap-2 text-[14px] font-bold text-white" style={{ background: BLUE }}><DollarSign className="w-4 h-4" /> {actPrimary.label}</button>
+                  <button onClick={actPrimary.onClick} className="mt-4 w-full h-11 rounded-xl inline-flex items-center justify-center gap-2 text-[14px] font-bold text-white" style={{ background: BLUE }}><Clock className="w-4 h-4" /> {actPrimary.label}</button>
                   <button onClick={actReserve.onClick} className="mt-2 w-full h-11 rounded-xl border inline-flex items-center justify-center gap-2 text-[14px] font-bold hover:bg-slate-50" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-4 h-4" /> {actReserve.label}</button>
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {actGrid1.map((s) => <button key={s.label} onClick={s.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: NAVY }}><s.icon className="w-4 h-4" style={{ color: BLUE }} /> {s.label}</button>)}
@@ -1463,7 +1535,7 @@ export default function VehiclePassportGoverned() {
                       {d.dealerAddress && <div className="text-[12px] mt-0.5" style={{ color: SUB }}>{d.dealerAddress}</div>}
                       {d.dealerPhone && <a href={`tel:${d.dealerPhone}`} className="text-[12px] font-semibold" style={{ color: BLUE }}>{d.dealerPhone}</a>}
                       <div className="mt-1 text-[11px]" style={{ color: SUB }}>Confirm current availability with the dealership.</div>
-                      <button onClick={() => go("dealer")} className="mt-2 text-[12px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>Meet {dealerName} <ChevronRight className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => openPanel("dealer-profile")} className="mt-2 text-[12px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>Meet {dealerName} <ChevronRight className="w-3.5 h-3.5" /></button>
                     </div>
                   )}
                   <div className="mt-3 pt-3 border-t inline-flex items-center gap-1.5 text-[10px]" style={{ borderColor: BORDER, color: SUB }}>
@@ -1477,14 +1549,14 @@ export default function VehiclePassportGoverned() {
                 low-friction next-step dock distinct from the sticky action rail.
                 Desktop-only (hidden lg:block); routes Reserve/Trade/Contact into
                 the complete V2 pages via go() and dials the dealer's real number. */}
-            <PassportCtaDock
+            {!actionCenterInView && <PassportCtaDock
               go={go}
               dealerPhone={d.dealerPhone || undefined}
               reviewRating={d.reviewRating}
               advisor={d.dealerTrust}
               routing={d.contactRouting}
               vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }}
-            />
+            />}
           </div>
         );
       })()}
@@ -1519,12 +1591,12 @@ export default function VehiclePassportGoverned() {
         <Suspense fallback={null}>
           <PassportPanel
             panel={activePanel}
-            onClose={() => setActivePanel(null)}
+            onClose={closePanel}
             listing={listing}
             d={d}
             isPreview={isPreview}
             go={go}
-            openPanel={(k) => setActivePanel(k)}
+            openPanel={openPanel}
           />
         </Suspense>
       )}
@@ -1533,6 +1605,15 @@ export default function VehiclePassportGoverned() {
           reserve / test-drive / trade / contact / payment / availability inside
           the V3 experience instead of navigating into the V2 detail pages. ── */}
       <PassportActionDrawer action={actionDrawer} listing={listing} d={d} onClose={() => setActionDrawer(null)} />
+
+      {/* Value My Trade — a real appraisal flow over the passport. */}
+      <PassportTradeDrawer
+        open={tradeOpen}
+        onClose={() => setTradeOpen(false)}
+        listing={listing}
+        dealerName={d.dealerName || "the dealership"}
+        track={trackPassportEvent}
+      />
 
       {/* ── Full-screen gallery sheet ──────────────────────────────── */}
       {galleryOpen && gallery.length > 0 && (

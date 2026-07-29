@@ -47,11 +47,30 @@ export function PassportSlideOver({
     return () => clearTimeout(t);
   }, [open]);
 
+  // Scroll lock that GIVES THE POSITION BACK.
+  //
+  // `overflow: hidden` alone collapses the document to viewport height, so the
+  // browser clamps scrollY on the way in and there is nothing to restore on the
+  // way out: opening a drawer two thousand pixels down the passport and closing
+  // it returned the shopper near the top. Pinning the body at a negative offset
+  // holds the rendered position, and the cleanup scrolls back to the exact
+  // pixel. The drawer is `fixed`, so it is unaffected by the body being fixed.
   useEffect(() => {
     if (!render) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    const body = document.body;
+    const y = window.scrollY;
+    const prev = { overflow: body.style.overflow, position: body.style.position, top: body.style.top, width: body.style.width };
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${y}px`;
+    body.style.width = "100%";
+    return () => {
+      body.style.overflow = prev.overflow;
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.width = prev.width;
+      window.scrollTo(0, y);
+    };
   }, [render]);
 
   useEffect(() => {

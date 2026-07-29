@@ -12,6 +12,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, deriveRating, ratingTier, fmt$, listingEquipment, deriveSoldClaims, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
 import { deriveVerificationReport } from "@/lib/passport/verificationSummary";
+import { savingsAgainst, MARKET_METRIC_LABEL, type MarketMetricKey } from "@/lib/passport/vehicleTruth";
 import { readDealerAlternatives } from "@/lib/dealerAlternatives";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { MOCK_LISTING } from "./VehiclePassportV3";
@@ -264,7 +265,10 @@ const VehiclePassportGreatBuy = () => {
   // Governance: the conclusion can never be more certain than its checks. A
   // pending MATERIAL factor (title & history) caps an "Exceptional" verdict.
   const materialPending = score != null && rating.factors.some((f) => f.key === "history" && f.score == null);
-  const governedHeadline = materialPending ? "Strong Candidate — One Check Pending" : tier.headline;
+  const historyBlocked = rating.factors.some((f) => f.key === "history" && f.score == null) && d.confBlockedBy.length > 0;
+  const governedHeadline = historyBlocked
+    ? "Promising — Title & History Not Yet Verified"
+    : materialPending ? "Strong Candidate — One Check Pending" : tier.headline;
   // "What could change this result?" — a credible report shows its limits too.
   const whatCouldChange: string[] = [
     "Final taxes, fees, and out-the-door price",
@@ -315,7 +319,17 @@ const VehiclePassportGreatBuy = () => {
   const breakdown: { icon: LucideIcon; label: string; score: number | null; evidence: string[] }[] =
     rating.factors.map((f) => ({ icon: FACTOR_ICONS[f.key] ?? FileText, label: f.label, score: f.score, evidence: f.evidence }));
   const verified = breakdown.filter((b) => b.score != null);
-  const pendingCards = breakdown.filter((b) => b.score == null);
+  // An unscored category says WHY. "Pending" alone reads as "coming shortly";
+  // when the score is missing because a critical source never returned, the
+  // honest word is that there is not enough data to score it, and the card
+  // names the sources it is waiting on.
+  const pendingCards = breakdown.filter((b) => b.score == null).map((b) => ({
+    ...b,
+    pendingLabel: b.label === "History & Title" && d.confBlockedBy.length ? "Insufficient data" : "Pending",
+    evidence: b.label === "History & Title" && d.confBlockedBy.length
+      ? [`Not scored — awaiting ${d.confBlockedBy.join(" and ").toLowerCase()}`, ...b.evidence]
+      : b.evidence,
+  }));
 
   // Hero trust badges — each renders only when the underlying data backs it.
   const oemVerified = Object.keys(mc).length > 0 || (listing.key_specs && Object.keys(listing.key_specs).length > 0);
@@ -373,18 +387,32 @@ const VehiclePassportGreatBuy = () => {
   const avgCompMiles = d.marketMeta.milesMean != null ? Math.round(d.marketMeta.milesMean) : null;
   type Adv = { text: string; good: boolean } | null;
   const priceAboveAnchor = pctVsAnchor != null && pctVsAnchor > 0 && !(d.belowMarket && d.belowMarket > 0);
+  // The figure this row PRINTS and the advantage badge beside it must be the
+  // same measurement. They were not: the badge read "$3,899 below" (derived
+  // from the $42,880 normalized market value) in a row whose comparison column
+  // showed $39,049 (the comparable listing average) — a $68 gap presented as
+  // $3,899. `savingsAgainst` takes the printed value, so the two cannot drift.
+  const priceComparison: { key: MarketMetricKey; value: number; label: string } | null =
+    priceAnchor != null && d.price != null && priceAnchor >= d.price
+      ? { key: "comparable_listing_average", value: priceAnchor, label: MARKET_METRIC_LABEL.comparable_listing_average }
+      : d.marketAvg != null && d.price != null && d.marketAvg >= d.price
+        ? { key: "normalized_market_value", value: d.marketAvg, label: MARKET_METRIC_LABEL.normalized_market_value }
+        : null;
+  const priceSaving = priceComparison ? savingsAgainst(priceComparison.value, d.price) : null;
   const priceAdv: Adv =
-    d.belowMarket && d.belowMarket > 0 ? { text: `${fmt$(d.belowMarket)} below`, good: true }
+    priceSaving != null ? { text: `${fmt$(priceSaving)} below`, good: true }
     : pctVsAnchor != null && pctVsAnchor <= 0 ? { text: "Better value", good: true }
     : null;
   const mmRaw = ((listing as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) as Record<string, unknown>;
   const trimCount = mmRaw.trim_count != null && Number.isFinite(Number(mmRaw.trim_count)) ? Number(mmRaw.trim_count) : null;
   type PosRow = { k: string; v: string; m: string; a: Adv };
-  // A dollar anchor renders only when it sits at or above our price — the
-  // sold-price median row is additionally gated by the strict sold-price claim.
-  const anchorPrintable = priceAnchor != null && d.price != null && priceAnchor >= d.price;
+  // A dollar anchor renders only when it sits at or above our price (see
+  // priceComparison above) — the sold-price median row is additionally gated by
+  // the strict sold-price claim.
   const posRows: PosRow[] = ([
-    { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: priceAboveAnchor ? (gbSheet?.estValue ? `Carries ${fmt$(gbSheet.estValue)} in factory packages the average comparable may not include` : "Priced to today's market for its trim") : anchorPrintable ? `${fmt$(priceAnchor)}${d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : d.marketAvg != null && d.price != null && d.marketAvg >= d.price ? fmt$(d.marketAvg) : isPreview ? "$71,400" : "", a: priceAboveAnchor ? null : priceAdv },
+    // The comparison cell names its own metric, so "Comparable listing average"
+    // can never be read as the normalized VIN-level value or vice versa.
+    { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: priceAboveAnchor ? (gbSheet?.estValue ? `Carries ${fmt$(gbSheet.estValue)} in factory packages the average comparable may not include` : "Priced to today's market for its trim") : priceComparison ? `${fmt$(priceComparison.value)} · ${priceComparison.label}${priceComparison.key === "comparable_listing_average" && d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : isPreview ? "$71,400" : "", a: priceAboveAnchor ? null : priceAdv },
     sold.soldPrice && d.marketMeta.soldPriceMedian != null
       ? { k: "Typical Sold Price", v: d.price != null ? fmt$(d.price) : "—", m: `${fmt$(d.marketMeta.soldPriceMedian)} (sold median, 90 days)`, a: { text: `${fmt$(sold.soldPrice.amount)} below`, good: true } }
       : null,
@@ -606,7 +634,7 @@ const VehiclePassportGreatBuy = () => {
           {pendingCards.length > 0 && (
             <>
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 mt-5">Confirm Before Purchase</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">{pendingCards.map((b) => <ScoreCard key={b.label} {...b} pendingLabel="Pending" />)}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">{pendingCards.map((b) => <ScoreCard key={b.label} {...b} />)}</div>
             </>
           )}
           {d.dealerTrust.googleRating && (
@@ -631,7 +659,7 @@ const VehiclePassportGreatBuy = () => {
           </Panel>
           <Panel title="Market Comparison" sub="How this vehicle compares to similar listings.">
             <div className="rounded-xl border border-[#E6E8EC] overflow-hidden">
-              <div className="grid grid-cols-[1.1fr_1fr_1fr_auto] gap-2 text-[10px] font-bold uppercase tracking-wide text-[#94A3B8] bg-slate-50 px-3 py-2"><span>Metric</span><span>This Vehicle</span><span>Market Average</span><span className="min-w-[86px] text-right">Advantage</span></div>
+              <div className="grid grid-cols-[1.1fr_1fr_1fr_auto] gap-2 text-[10px] font-bold uppercase tracking-wide text-[#94A3B8] bg-slate-50 px-3 py-2"><span>Metric</span><span>This Vehicle</span><span>Compared With</span><span className="min-w-[86px] text-right">Advantage</span></div>
               {posRows.map((r) => (
                 <div key={r.k} className="grid grid-cols-[1.1fr_1fr_1fr_auto] gap-2 px-3 py-2 border-t border-[#F1F5F9] text-[12px] items-center">
                   <span className="text-[#64748B]">{r.k}</span>
@@ -930,7 +958,7 @@ const VehiclePassportGreatBuy = () => {
                   <table className="w-full mt-2 border border-[#E5E7EB] rounded-lg" style={{ borderCollapse: "collapse" }}>
                     <thead>
                       <tr className="bg-slate-50 text-left">
-                        {["Metric", "This Vehicle", "Market Average", "Advantage"].map((h) => <th key={h} className="text-[7.5px] font-bold uppercase tracking-wide text-[#64748B] px-2.5 py-1.5 border-b border-[#E5E7EB]">{h}</th>)}
+                        {["Metric", "This Vehicle", "Compared With", "Advantage"].map((h) => <th key={h} className="text-[7.5px] font-bold uppercase tracking-wide text-[#64748B] px-2.5 py-1.5 border-b border-[#E5E7EB]">{h}</th>)}
                       </tr>
                     </thead>
                     <tbody>
