@@ -473,6 +473,9 @@ export default function DescriptionOperations() {
           <div role="menu" style={{ top: menu.y, left: Math.max(8, menu.x - 208) }}
             className="fixed z-40 w-52 rounded-xl border border-border bg-card shadow-lg p-1">
             {[["Open Record", () => navigate(`/description-intelligence/${menu.caseRow.vehicle_id}`)],
+              // The Studio is the per-vehicle override, and it was reachable
+              // only by typing the URL until this entry existed.
+              ["Open Studio", () => navigate(`/description-studio?vehicle=${menu.caseRow.vehicle_id}`)],
               ["Open Vehicle File", () => navigate(`/vehicle-file/${menu.caseRow.vehicle_id}`)],
               ["Copy VIN", () => navigator.clipboard.writeText(menu.caseRow.vin)
                 .then(() => toast.success("VIN copied"), () => toast.error("Clipboard unavailable"))],
