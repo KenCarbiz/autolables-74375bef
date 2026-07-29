@@ -4976,6 +4976,54 @@ export type Database = {
         }
         Relationships: []
       }
+      oem_packet_backfill_attempts: {
+        Row: {
+          attempts: number
+          created_at: string
+          detail: string | null
+          id: string
+          kind: string
+          last_attempt_at: string
+          make: string
+          make_key: string
+          model: string
+          model_key: string
+          outcome: string
+          year: number | null
+          year_key: number
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          detail?: string | null
+          id?: string
+          kind: string
+          last_attempt_at?: string
+          make: string
+          make_key: string
+          model: string
+          model_key: string
+          outcome: string
+          year?: number | null
+          year_key?: number
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          detail?: string | null
+          id?: string
+          kind?: string
+          last_attempt_at?: string
+          make?: string
+          make_key?: string
+          model?: string
+          model_key?: string
+          outcome?: string
+          year?: number | null
+          year_key?: number
+        }
+        Relationships: []
+      }
       onboarding_profiles: {
         Row: {
           billing: Json
@@ -8367,6 +8415,73 @@ export type Database = {
           },
         ]
       }
+      vehicle_ingest_ledger: {
+        Row: {
+          attempt_count: number
+          detail: Json
+          first_run_at: string
+          id: string
+          last_run_at: string
+          reason: string
+          recorded_by: string | null
+          status: string
+          step: string
+          tenant_id: string
+          vehicle_id: string | null
+          vin: string
+        }
+        Insert: {
+          attempt_count?: number
+          detail?: Json
+          first_run_at?: string
+          id?: string
+          last_run_at?: string
+          reason: string
+          recorded_by?: string | null
+          status: string
+          step: string
+          tenant_id: string
+          vehicle_id?: string | null
+          vin: string
+        }
+        Update: {
+          attempt_count?: number
+          detail?: Json
+          first_run_at?: string
+          id?: string
+          last_run_at?: string
+          reason?: string
+          recorded_by?: string | null
+          status?: string
+          step?: string
+          tenant_id?: string
+          vehicle_id?: string | null
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_ingest_ledger_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_ingest_ledger_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_ingest_ledger_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_lifecycle: {
         Row: {
           authorized_at: string | null
@@ -10292,6 +10407,18 @@ export type Database = {
         }
         Returns: string
       }
+      record_ingest_step: {
+        Args: {
+          p_detail?: Json
+          p_reason: string
+          p_status: string
+          p_step: string
+          p_tenant_id: string
+          p_vehicle_id?: string
+          p_vin: string
+        }
+        Returns: undefined
+      }
       record_install_proof:
         | {
             Args: {
@@ -10322,6 +10449,17 @@ export type Database = {
             }
             Returns: string
           }
+      record_packet_backfill_attempt: {
+        Args: {
+          _detail?: string
+          _kind: string
+          _make: string
+          _model: string
+          _outcome: string
+          _year: number
+        }
+        Returns: number
+      }
       record_passport_engagement: {
         Args: { _modules: Json; _session: string; _slug: string }
         Returns: Json
@@ -10491,6 +10629,14 @@ export type Database = {
         Returns: number
       }
       schedule_marketcheck_sync: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
+      schedule_packet_backfill: {
         Args: {
           _cron_expr?: string
           _service_key?: string
