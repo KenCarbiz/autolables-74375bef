@@ -117,7 +117,7 @@ describe("hostableBrands", () => {
 
 describe("the database gate is the same rule, derived and default-deny", () => {
   const sql = readFileSync(
-    join(__dirname, "..", "..", "..", "supabase/migrations/20260729040000_oem_distribution_grants.sql"),
+    join(__dirname, "..", "..", "..", "supabase/migrations/20260729140000_oem_franchise_derived_gate.sql"),
     "utf8",
   );
 
@@ -133,10 +133,15 @@ describe("the database gate is the same rule, derived and default-deny", () => {
     expect(sql).toMatch(/SELECT 3 \$\$/);
   });
 
-  it("offers no dealer-facing grant or revoke at all", () => {
-    expect(sql).not.toMatch(/FUNCTION public\.grant_oem_distribution/);
-    expect(sql).not.toMatch(/FUNCTION public\.revoke_oem_distribution/);
-    expect(sql).not.toMatch(/attestation/i);
+  it("creates no dealer-facing grant or revoke, and retires the ones that were", () => {
+    expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION public\.grant_oem_distribution/);
+    expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION public\.revoke_oem_distribution/);
+    // A dead SECURITY DEFINER function still granted to authenticated is worse
+    // than dead: it can still be called and will write rows nothing reads.
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.grant_oem_distribution/);
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.revoke_oem_distribution/);
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.oem_attestation_text/);
+    expect(sql).toMatch(/DROP TABLE IF EXISTS public\.oem_distribution_grants/);
   });
 
   it("keeps a platform takedown as the one override", () => {

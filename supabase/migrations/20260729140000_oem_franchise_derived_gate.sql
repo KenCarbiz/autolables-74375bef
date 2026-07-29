@@ -141,3 +141,16 @@ GRANT EXECUTE ON FUNCTION public.oem_make_from_ymm(TEXT) TO authenticated, servi
 GRANT EXECUTE ON FUNCTION public.oem_franchise_min_new_units() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.derive_oem_franchise_brands(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.tenant_may_host_oem_documents(UUID, TEXT, TEXT) TO authenticated, service_role;
+
+-- Supersede the attestation model.
+--
+-- An earlier revision asked the dealer to tick a box confirming the franchise.
+-- That was wrong twice over: the franchise is not ours to grant, and it is not
+-- the dealer's to decline. The permission is derived above, so the grant table
+-- and its RPCs are dead -- and a dead SECURITY DEFINER function still granted
+-- to authenticated is worse than dead, because it can still be called and will
+-- write rows nothing reads.
+DROP FUNCTION IF EXISTS public.grant_oem_distribution(UUID, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.revoke_oem_distribution(UUID, TEXT);
+DROP FUNCTION IF EXISTS public.oem_attestation_text();
+DROP TABLE IF EXISTS public.oem_distribution_grants;
