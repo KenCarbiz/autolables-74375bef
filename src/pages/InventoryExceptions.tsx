@@ -77,6 +77,12 @@ const TYPE_LABEL: Record<string, string> = {
   missing_required_field: "Missing required field",
   invalid_vin: "Invalid VIN",
   duplicate_stock: "Duplicate stock #",
+  price_mismatch: "Price mismatch",
+  artifact_autogen_failed: "Auto-generation failed",
+  // A provider changed the shape of what it sends us. Equipment can go
+  // silently missing from window stickers until the decoder is updated, so
+  // this one is worth reading as a decoder alarm, not a vehicle problem.
+  provider_payload_drift: "Provider response changed",
 };
 
 const fmtWhen = (iso: string | null | undefined) => {
