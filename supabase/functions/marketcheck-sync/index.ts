@@ -837,6 +837,12 @@ serve(async (req) => {
               if (!error) {
                 listingsUpserted++;
                 updatedListingIds.push(vl.id);
+                // A VIN that left the feed is retired, not deleted, so a car
+                // that comes back is an UPDATE now where it used to be a fresh
+                // INSERT. Without this it would keep the archived status it was
+                // given on the way out and stay invisible to its own dealer.
+                await admin.rpc("marketcheck_revive_listing", { _tenant_id: cfg.tenant_id, _vin: vin })
+                  .then(({ error: e }) => { if (e) console.warn("revive_failed", vin, e.message); });
                 // Back-fill the Get-Ready hub token for cars that predate this
                 // feature or were first ingested by another path (autocurb-sync,
                 // manual add) so they never fall out of the get-ready flow.

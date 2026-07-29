@@ -44,6 +44,7 @@ export default function PrintQueue() {
         .from("vehicle_listings")
         .select("id, vin, ymm, condition, mc_attributes, status")
         .eq("tenant_id", tenant.id)
+        .neq("status", "archived")
         .order("created_at", { ascending: false })
         .limit(300);
       if (off) return;

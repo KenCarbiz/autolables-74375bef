@@ -67,7 +67,7 @@ export default function ReadyBoard() {
     if (!tenantId) return;
     setLoading(true);
     const [list, si, fails, ds, ps, rr, re, prof, lc] = await Promise.all([
-      (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check, orchestrated_at, deal_processed_at").eq("tenant_id", tenantId).limit(500),
+      (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check, orchestrated_at, deal_processed_at").eq("tenant_id", tenantId).neq("status", "archived").limit(500),
       // All signed rows, reduced through the ONE executed predicate — a signed
       // FAIL (or a stale pass behind a newer signed failure) must not read as
       // station-complete on the board.
