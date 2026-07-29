@@ -328,7 +328,7 @@ async function orchestrateVehicle(
   if (listing.tenant_id !== tenantId) return { vehicle_id: vehicleId, skipped: "tenant_mismatch" };
   if (listing.status === "archived") return { vehicle_id: vehicleId, skipped: "archived" };
 
-  const { data: caseId } = await admin.rpc("init_description_case", {
+  const caseId = await rpc<string | null>(admin, "init_description_case", {
     p_tenant_id: tenantId, p_vehicle_id: vehicleId,
   });
   if (!caseId) return { vehicle_id: vehicleId, skipped: "case_not_initialized" };
@@ -345,7 +345,7 @@ async function orchestrateVehicle(
   if (existing && existing.processed_source_data_version &&
       existing.processed_source_data_version !== sdv &&
       (existing.master_locked || existing.status === "PUBLISHED")) {
-    await admin.rpc("mark_description_stale", { p_case_id: caseId, p_reason: "source data changed" });
+    await rpcSoft(admin, "mark_description_stale", { p_case_id: caseId, p_reason: "source data changed" });
   }
 
   if (!opts.force && existing?.processed_source_data_version === sdv &&
@@ -359,7 +359,7 @@ async function orchestrateVehicle(
     ? `${opts.targeting.primaryKeyword || ""}|${(opts.targeting.secondaryKeywords || []).slice().sort().join(",")}|${opts.targeting.city || ""}`
     : "default";
   const jobKey = `${tenantId}:${vehicleId}:${sdv}:${configVersion}:${toneKey}:${targetKey}:${scopedRun ? "channels:" + [...opts.channels!].sort().join("+") : "full_generation"}`;
-  const { data: jobId } = await admin.rpc("claim_description_job", {
+  const jobId = await rpc<string | null>(admin, "claim_description_job", {
     p_tenant_id: tenantId, p_vehicle_id: vehicleId, p_case_id: caseId,
     p_job_type: "full_generation", p_idempotency_key: jobKey,
     p_payload: { reason: opts.reason || "ingest" },
