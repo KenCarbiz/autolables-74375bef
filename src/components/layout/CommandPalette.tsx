@@ -268,6 +268,16 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
               ) : null}
               {hasDealerCapability(role, "can_manage_settings", isAdmin) ? (
                 <CommandItem
+                  value="Description Voice SEO dealership claims approved language"
+                  keywords={["voice", "voice profile", "seo", "description", "approved claims", "dealership claims", "tone", "disclosures", "prohibited phrases"]}
+                  onSelect={() => go("/admin/description-voice")}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Description Voice &amp; SEO
+                </CommandItem>
+              ) : null}
+              {hasDealerCapability(role, "can_manage_settings", isAdmin) ? (
+                <CommandItem
                   value="Website Integration embed widget passport"
                   keywords={["website", "embed", "widget", "vdp", "passport button", "integration"]}
                   onSelect={() => go("/admin/website-embed")}

@@ -57,6 +57,7 @@ const InventorySyncCenter = lazy(() => import("./pages/InventorySyncCenter"));
 const CommandCenter = lazy(() => import("./pages/CommandCenter"));
 const InventoryExceptions = lazy(() => import("./pages/InventoryExceptions"));
 const SourceAuthoritySettings = lazy(() => import("./pages/SourceAuthoritySettings"));
+const DescriptionVoiceSettings = lazy(() => import("./pages/DescriptionVoiceSettings"));
 const WebsiteEmbed = lazy(() => import("./pages/WebsiteEmbed"));
 const AdminSpecsBackfillOne = lazy(() => import("./pages/AdminSpecsBackfillOne"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
@@ -307,6 +308,7 @@ const App = () => (
                         <Route path="/admin/command-center" element={<CommandCenter />} />
                         <Route path="/admin/exceptions" element={<InventoryExceptions />} />
                         <Route path="/admin/source-authority" element={<SourceAuthoritySettings />} />
+                        <Route path="/admin/description-voice" element={<DescriptionVoiceSettings />} />
                         <Route path="/admin/website-embed" element={<WebsiteEmbed />} />
                         <Route path="/admin/specs-backfill" element={<AdminSpecsBackfillOne />} />
                         <Route path="/saved" element={<SavedAddendums />} />
