@@ -597,16 +597,20 @@ const VehiclePassportDocuments = () => {
   // Do not ask a shopper to request a record that is sitting on the same page.
   // The chip list is filtered against what is actually available, through the
   // one type vocabulary, so a rename on either side cannot desynchronise them.
-  const requestOptions = useMemo(() => {
+  //
+  // Deliberately NOT a hook: everything below here runs after the loading and
+  // not-found returns above, so a useMemo here would make the first render call
+  // fewer hooks than the second (React #310) and take the page down.
+  const requestOptions = (() => {
     const present = new Set<string>();
-    for (const d of allDocs) present.add(documentCoverType(d.type, d.name));
+    for (const doc of allDocs) present.add(documentCoverType(doc.type, doc.name));
     if (factoryDocUrl) present.add("factory_sticker");
     if (stickerLink) present.add("factory_sticker");
     if (histLink) present.add(histLink.provider === "autocheck" ? "vehicle_history" : "carfax");
     if (brochureLink) present.add("oem_brochure");
     if (manualLink) present.add("owners_manual");
     return REQUEST_OPTIONS.filter((o) => !o.satisfiedBy?.some((k) => present.has(k)));
-  }, [allDocs, factoryDocUrl, stickerLink, histLink, brochureLink, manualLink]);
+  })();
   const trackDoc = (cta: string, meta: Record<string, unknown> = {}) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page", ...meta } }); };
   const toggleReq = (k: string) => setReqSel((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const requestSelected = () => {

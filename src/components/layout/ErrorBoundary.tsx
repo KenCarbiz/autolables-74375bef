@@ -10,6 +10,23 @@ interface State {
   error: Error | null;
 }
 
+// Surfaces a shopper reaches without ever signing in. The recovery on these
+// pages must stay on the page they were reading: sending them to /dashboard
+// lands on EntitlementGate, which bounces an anonymous visitor to /login — so a
+// customer who hits a render error is shown a dealer sign-in form and the
+// vehicle they were looking at is gone.
+const CUSTOMER_PREFIXES = [
+  "/v/", "/v3/", "/v-classic/", "/vehicle/", "/passport-v2/", "/passport-v3/",
+  "/sign/", "/deal/", "/review/", "/install/", "/inspect/", "/title/",
+  "/ready/", "/approve/", "/scan",
+];
+
+const onCustomerSurface = () => {
+  if (typeof window === "undefined") return false;
+  const p = window.location.pathname;
+  return p === "/" || CUSTOMER_PREFIXES.some((prefix) => p.startsWith(prefix));
+};
+
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -26,6 +43,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const customer = onCustomerSurface();
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-6">
           <div className="max-w-md w-full text-center">
@@ -38,7 +56,7 @@ class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-muted-foreground mt-2 mb-6">
               An unexpected error occurred. Your data is safe — try refreshing the page.
             </p>
-            {this.state.error && (
+            {this.state.error && !customer && (
               <div className="bg-muted rounded-lg p-3 mb-6 text-left">
                 <p className="text-[10px] font-mono text-muted-foreground break-all">
                   {this.state.error.message}
@@ -48,13 +66,24 @@ class ErrorBoundary extends Component<Props, State> {
             <button
               onClick={() => {
                 this.setState({ hasError: false, error: null });
-                window.location.href = "/dashboard";
+                window.location.reload();
               }}
               className="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
             >
               <RotateCcw className="w-4 h-4" />
-              Return to Dashboard
+              Reload this page
             </button>
+            {!customer && (
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.location.href = "/dashboard";
+                }}
+                className="block mx-auto mt-3 text-sm font-medium text-muted-foreground hover:text-foreground"
+              >
+                Return to Dashboard
+              </button>
+            )}
           </div>
         </div>
       );
