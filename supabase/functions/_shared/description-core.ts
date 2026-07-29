@@ -11,6 +11,37 @@
 // can never be promoted into a vehicle claim.
 // ─────────────────────────────────────────────────────────────────────
 
+import {
+  DEFAULT_CHANNEL_POLICIES, resolveChannelPolicy, checkChannelPolicy,
+  computeChannelPolicyVersion, type ChannelPolicy,
+} from "./description-channel-policy.ts";
+import {
+  normalizeFeatures, prioritizeFeatures, splitByOrigin, featureChecksum,
+  type NormalizedFeature, type PrioritizedFeature, type RawFeatureInput, type ToneKey,
+} from "./description-features.ts";
+import { toneProfile, toneInstruction, checkTone, isToneKey, TONE_PROFILES } from "./description-tone.ts";
+import {
+  resolveVoiceProfile, computeVoiceProfileVersion, voiceInstruction,
+  checkDealerClaims, checkLocalityUse, type VoiceProfile,
+} from "./description-voice.ts";
+import {
+  scoreDescription, countFactsUsed, analyzeReadability, analyzeUniqueness,
+  analyzeKeywords, SCORE_VERSION,
+  type ScoreBreakdown, type ComparisonDoc, type SeoTargeting,
+} from "./description-scoring.ts";
+
+export {
+  DEFAULT_CHANNEL_POLICIES, resolveChannelPolicy, checkChannelPolicy, computeChannelPolicyVersion,
+  normalizeFeatures, prioritizeFeatures, splitByOrigin, featureChecksum,
+  toneProfile, toneInstruction, checkTone, isToneKey, TONE_PROFILES,
+  resolveVoiceProfile, computeVoiceProfileVersion, voiceInstruction, checkDealerClaims, checkLocalityUse,
+  scoreDescription, countFactsUsed, analyzeReadability, analyzeUniqueness, analyzeKeywords, SCORE_VERSION,
+};
+export type {
+  ChannelPolicy, NormalizedFeature, PrioritizedFeature, RawFeatureInput, ToneKey,
+  VoiceProfile, ScoreBreakdown, ComparisonDoc, SeoTargeting,
+};
+
 export type FactStatus =
   | "verified" | "dealer_entered" | "feed_provided"
   | "calculated" | "inferred" | "disputed" | "pending";
@@ -33,6 +64,13 @@ export interface FactSnapshot {
   excluded_claims: Array<{ field: string; reason: string; claim?: string }>;
   market_context: Record<string, unknown>;
   fact_confidence: number;
+  /**
+   * Canonical, de-duplicated equipment with origin attached. Factory and
+   * dealer-added never merge — the flat `facts.equipment` string cannot
+   * express that distinction, so it stays for backward compatibility while
+   * this is what V3 generation and the UI read.
+   */
+  features: NormalizedFeature[];
 }
 
 // ── Channel registry ─────────────────────────────────────────────────
@@ -51,48 +89,25 @@ export interface ChannelRule {
   instruction: string;
 }
 
-export const CHANNELS: ChannelRule[] = [
-  {
-    key: "vehicle_passport", label: "Vehicle Passport", characterLimit: 2400, minLength: 400,
-    deliveryMode: "internal_projection", connectorStatus: "available", seoFields: false,
-    instruction: "Full merchandising copy for the dealer's own shopper page. Rich detail, natural prose, no marketplace formatting tokens.",
-  },
-  {
-    key: "dealer_website", label: "Dealer Website", characterLimit: 2400, minLength: 400,
-    // The shopper listing IS the published surface; a separately-hosted dealer
-    // site has no connector, so this stays export-only rather than claiming a
-    // delivery we never perform.
-    deliveryMode: "export_only", connectorStatus: "export_only", seoFields: true,
-    instruction: "Polished website merchandising copy with natural local SEO. Never keyword-stuff.",
-  },
-  {
-    key: "autotrader", label: "AutoTrader", characterLimit: 1500, minLength: 300,
-    deliveryMode: "export_only", connectorStatus: "export_only", seoFields: false,
-    instruction: "Feature-forward and scannable. Strong opening line, clean close. Plain text only.",
-  },
-  {
-    key: "cars_com", label: "Cars.com", characterLimit: 1500, minLength: 300,
-    deliveryMode: "connector", connectorStatus: "not_configured", seoFields: false,
-    instruction: "Balanced equipment, utility and condition-neutral language. Plain text only.",
-  },
-  {
-    key: "cargurus", label: "CarGurus", characterLimit: 1200, minLength: 250,
-    deliveryMode: "export_only", connectorStatus: "export_only", seoFields: false,
-    instruction: "Concise and mobile-readable. Value-oriented WITHOUT any price or deal claim.",
-  },
-  {
-    key: "facebook", label: "Facebook Marketplace", characterLimit: 900, minLength: 200,
-    deliveryMode: "export_only", connectorStatus: "export_only", seoFields: false,
-    instruction: "Shorter, conversational but professional, mobile-first. Clear vehicle identity and key equipment.",
-  },
-  {
-    key: "google_seo", label: "Google Vehicle Ads", characterLimit: 900, minLength: 150,
-    deliveryMode: "export_only", connectorStatus: "export_only", seoFields: true,
-    instruction: "Produce an SEO title (<=60 chars), a meta description (<=155 chars) and a short search summary. Local relevance, no stuffing.",
-  },
-];
+// Derived from the versioned policy registry — there is exactly one place a
+// channel rule is written down. `ChannelRule` remains the narrow shape the
+// generator and the UI already consume; the full policy is available through
+// `policyForChannel` when a caller needs the rest of the contract.
+export const CHANNELS: ChannelRule[] = DEFAULT_CHANNEL_POLICIES.map((p) => ({
+  key: p.key,
+  label: p.label,
+  characterLimit: p.characterLimit,
+  minLength: p.recommendedMin,
+  deliveryMode: p.deliveryMode,
+  connectorStatus: p.connectorStatus,
+  seoFields: p.seoFields,
+  instruction: p.instruction,
+}));
 
 export const channelByKey = (k: string) => CHANNELS.find((c) => c.key === k);
+
+export const policyForChannel = (k: string, override?: Record<string, unknown> | null) =>
+  resolveChannelPolicy(k, override);
 
 // ── Claims that require authoritative evidence ───────────────────────
 // Each phrase may only appear when the guarding fact is verified AND the
@@ -388,7 +403,144 @@ export function buildFactSnapshot(
   const lineage: FactSnapshot["lineage"] = {};
   for (const [k, f] of Object.entries(facts)) lineage[k] = { source: f.source, status: f.status, observed_at: f.observed_at };
 
-  return { facts, lineage, conflicts, excluded_claims: excluded, market_context, fact_confidence };
+  // ── Canonical feature set ──────────────────────────────────────────
+  // Built from the SAME resolved equipment decisions above, so a feature can
+  // never enter the canonical set through a path the conflict logic did not
+  // see. Origin is assigned here and never revisited downstream.
+  const agreedLower = new Set(agreed.map((s) => s.toLowerCase().trim()));
+  const rawFeatures: RawFeatureInput[] = [];
+  for (const item of [...agreed, ...confirmedEquipment, ...decodedOnly, ...feedOnly]) {
+    const isExcluded = excludedNames.has(item.toLowerCase());
+    const fromDecode = decLower.includes(item.toLowerCase().trim());
+    const bothAgree = agreedLower.has(item.toLowerCase().trim());
+    rawFeatures.push({
+      name: item,
+      origin: "factory_option",
+      source: bothAgree ? "vin_decode+marketcheck_feed" : fromDecode ? "vin_decode" : "marketcheck_feed",
+      confidence: bothAgree ? 95 : fromDecode ? 78 : 55,
+      conflict: isExcluded,
+      descriptionEligible: !isExcluded,
+      publicEligible: !isExcluded,
+    });
+  }
+  // Dealer-added products carry install proof or they are not claimable at all.
+  for (const a of installed) {
+    rawFeatures.push({
+      name: String(a?.name || a?.label || "").trim(),
+      origin: "dealer_added", source: "install_proof", confidence: 95,
+      descriptionEligible: !!settings.accessory_language_allowed,
+      publicEligible: !!settings.accessory_language_allowed,
+    });
+  }
+  for (const p of pending) {
+    rawFeatures.push({
+      name: String(p?.name || p?.label || "").trim(),
+      origin: "dealer_added", source: "accessory_catalog", confidence: 30,
+      conflict: true, descriptionEligible: false, publicEligible: false,
+    });
+  }
+  const features = normalizeFeatures(rawFeatures.filter((f) => f.name));
+
+  return { facts, lineage, conflicts, excluded_claims: excluded, market_context, fact_confidence, features };
+}
+
+// ── Description packet (V3) ──────────────────────────────────────────
+// One approved fact packet per truth snapshot. Every channel is derived from
+// THIS object — no channel is allowed to re-read the provider payload, so a
+// channel physically cannot introduce a fact the master did not have.
+
+export interface DescriptionPacket {
+  tone: ToneKey;
+  voice: VoiceProfile;
+  targeting: SeoTargeting;
+  /** Facts the copy is permitted to state, already filtered for usability. */
+  verifiedFacts: Fact[];
+  /** Factory equipment, prioritized and budgeted for the channel. */
+  factoryFeatures: PrioritizedFeature[];
+  /** Dealer-installed products. Separate bucket, separate wording. */
+  dealerAddedFeatures: PrioritizedFeature[];
+  /** Everything the prioritizer or the validator kept out, with the reason. */
+  excludedFeatures: PrioritizedFeature[];
+  excludedClaims: FactSnapshot["excluded_claims"];
+  marketContext: Record<string, unknown>;
+  factConfidence: number;
+  selectedFeatureIds: string[];
+}
+
+export function buildDescriptionPacket(
+  snap: FactSnapshot,
+  settings: Record<string, any>,
+  voice: VoiceProfile,
+  opts: { tone?: ToneKey; targeting?: Partial<SeoTargeting>; featureBudget?: number } = {},
+): DescriptionPacket {
+  const tone = (opts.tone || voice.defaultTone || "professional") as ToneKey;
+  const identity = String(snap.facts.ymm?.value || "").trim();
+  const trim = String(snap.facts.trim?.value || "").trim();
+
+  const targeting: SeoTargeting = {
+    // The default primary phrase is the one a shopper actually types. It is a
+    // default, not a mandate: unnatural placement is penalized by the scorer.
+    primaryKeyword: opts.targeting?.primaryKeyword
+      ?? (identity ? `${identity}${trim ? ` ${trim}` : ""} for sale`.trim() : ""),
+    secondaryKeywords: opts.targeting?.secondaryKeywords ?? [],
+    city: opts.targeting?.city ?? voice.city,
+    state: opts.targeting?.state ?? voice.state,
+    marketArea: opts.targeting?.marketArea ?? voice.marketArea,
+    dealerName: opts.targeting?.dealerName ?? voice.dealerName,
+    searchIntent: opts.targeting?.searchIntent ?? "inventory",
+  };
+
+  const prioritized = prioritizeFeatures(snap.features || [], {
+    tone,
+    featureBudget: opts.featureBudget ?? 10,
+    bodyStyle: String(snap.facts.body_style?.value || ""),
+    fuelType: String(snap.facts.fuel_type?.value || ""),
+    toneEmphasis: toneProfile(tone).emphasis,
+  });
+  const { factory, dealerAdded, excluded } = splitByOrigin(prioritized);
+
+  return {
+    tone, voice, targeting,
+    verifiedFacts: Object.values(snap.facts).filter((f) => f.usable_in_copy),
+    factoryFeatures: factory,
+    dealerAddedFeatures: dealerAdded,
+    excludedFeatures: excluded,
+    excludedClaims: snap.excluded_claims,
+    marketContext: snap.market_context,
+    factConfidence: snap.fact_confidence,
+    selectedFeatureIds: [...factory, ...dealerAdded].map((f) => f.canonical_id),
+  };
+}
+
+/** The generation identity. Identical inputs must never bill a second call. */
+export async function computeInputChecksum(parts: {
+  tenantId: string; vehicleId: string; snapshotChecksum: string; channel: string;
+  channelPolicyVersion: string; voiceProfileVersion: string; tone: string;
+  featureChecksum: string; targeting: SeoTargeting; promptVersion: string; model: string;
+}): Promise<string> {
+  const material = [
+    parts.tenantId, parts.vehicleId, parts.snapshotChecksum, parts.channel,
+    parts.channelPolicyVersion, parts.voiceProfileVersion, parts.tone, parts.featureChecksum,
+    parts.targeting.primaryKeyword, [...parts.targeting.secondaryKeywords].sort().join(","),
+    parts.targeting.city, parts.targeting.state, parts.targeting.marketArea,
+    parts.promptVersion, parts.model,
+  ].map((x) => String(x ?? "").trim().toLowerCase()).join("|");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+  return "in_" + Array.from(new Uint8Array(digest)).slice(0, 12)
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function featureBlock(packet: DescriptionPacket): string {
+  const fmt = (f: PrioritizedFeature) =>
+    `  - ${f.display_name} [${f.category}; source: ${f.source}; confidence ${f.confidence}%]`;
+  const parts: string[] = [];
+  if (packet.factoryFeatures.length) {
+    parts.push(`FACTORY EQUIPMENT (verified on this vehicle, listed in priority order):\n${packet.factoryFeatures.map(fmt).join("\n")}`);
+  }
+  if (packet.dealerAddedFeatures.length) {
+    parts.push(`DEALER-INSTALLED PRODUCTS — these are NOT factory equipment. If you mention them, say so plainly (for example "dealer-installed"). Never present them as factory or included equipment:\n${packet.dealerAddedFeatures.map(fmt).join("\n")}`);
+  }
+  return parts.join("\n\n");
 }
 
 // ── Prompt construction ──────────────────────────────────────────────
@@ -438,6 +590,115 @@ STYLE
 ${settings.required_legal_text ? `- Include verbatim: ${settings.required_legal_text}` : ""}
 
 Return ONLY the description text. No headings, no markdown, no preamble.`;
+}
+
+/**
+ * V3 master prompt. Same absolute rules as the legacy builder, plus the three
+ * layers Phase 3 adds: canonical features with origin, the approval-gated
+ * dealership voice, and tone as a wording-only instruction.
+ */
+export function buildMasterPromptV3(packet: DescriptionPacket, settings: Record<string, any>): string {
+  const factLines = packet.verifiedFacts
+    .map((f) => `- ${f.field}: ${f.value}  [source: ${f.source}; status: ${f.status}]`).join("\n");
+  const banned = [
+    ...packet.voice.prohibitedPhrases,
+    ...packet.excludedClaims.map((e) => e.claim).filter(Boolean),
+    ...packet.excludedFeatures.filter((f) => f.conflict).map((f) => f.display_name),
+  ].filter(Boolean);
+  const marketLine = settings.market_context_allowed && Object.keys(packet.marketContext).length
+    ? `\nMarket context (EMPHASIS ONLY — never state as a vehicle fact, never claim a price advantage):\n${JSON.stringify(packet.marketContext)}`
+    : "";
+  const kw = packet.targeting.primaryKeyword
+    ? `\nSEARCH RELEVANCE\n- Shoppers reach this listing searching "${packet.targeting.primaryKeyword}". Use that phrasing ONCE, inside a sentence that would exist anyway. If it cannot be written naturally, leave it out.\n- Do not repeat the phrase, do not list nearby towns, do not add a keyword block.`
+    : "";
+
+  return `You are writing the canonical vehicle merchandising description for a franchise dealership.
+
+VERIFIED FACTS — the ONLY vehicle facts you may state:
+${factLines}
+
+${featureBlock(packet)}
+${marketLine}
+
+ABSOLUTE RULES
+- Never state a fact that is not listed above. If something is missing, omit it entirely.
+- Never invent equipment, packages, trim, ownership history, accident history, service history, recall completion, warranty coverage, CPO status, fuel economy, EV range, horsepower, torque, towing capacity, payload, seating capacity or safety ratings.
+- Never describe a dealer-installed product as factory equipment.
+- Never describe an accessory as installed unless it appears above as a dealer-installed product.
+- Never use: ${banned.length ? banned.join("; ") : "(no additional banned terms)"}.
+- Never claim the vehicle is below market, a great deal, the best price, rare, or loaded.
+- No exclamation marks, no unverifiable superlatives.
+- Do not include a price unless a price fact appears above.
+- Do not repeat the same feature under a second name.
+
+${toneInstruction(packet.tone)}
+
+${voiceInstruction(packet.voice)}
+
+STRUCTURE
+- Length: between ${settings.min_length || 400} and ${settings.max_length || 2400} characters.
+- A strong opening that names the vehicle, then the qualities that matter most, then the prioritized equipment grouped sensibly, then practical ownership detail, then the close.
+${kw}
+
+Return ONLY the description text. No headings, no markdown, no preamble.`;
+}
+
+/**
+ * V3 channel prompt. The master is the single source of facts; the channel
+ * policy is the only thing permitted to change. A channel may restructure,
+ * shorten, re-emphasize and re-close — it may not learn anything new.
+ */
+export function buildChannelPromptV3(
+  master: string, policy: ChannelPolicy, packet: DescriptionPacket,
+): string {
+  const body = master.length > CHANNEL_PROMPT_BUDGET
+    ? master.slice(0, CHANNEL_PROMPT_BUDGET).replace(/\s+\S*$/, "") + "…"
+    : master;
+  const override = packet.voice.channelOverrides?.[policy.key];
+  const cta = override?.ctaTemplate || packet.voice.ctaTemplate
+    || `Contact ${packet.voice.dealerName || "our team"} to schedule a test drive.`;
+
+  const rules = [
+    `- ${policy.instruction}`,
+    override?.instruction ? `- ${override.instruction}` : "",
+    `- Length: ${policy.recommendedMin}-${policy.recommendedMax} characters. Hard maximum ${policy.characterLimit}.`,
+    `- ${policy.paragraphMin}-${policy.paragraphMax} paragraphs.`,
+    `- Feature budget: name at most ${policy.featureBudget} pieces of equipment, chosen from the highest-priority ones in the master. Group the rest or leave them out.`,
+    policy.markdownAllowed ? "" : "- Plain text only. No markdown, no headings, no bullet characters.",
+    policy.htmlAllowed ? "" : "- No HTML.",
+    policy.emojiAllowed ? "" : "- No emoji.",
+    policy.linksAllowed ? "" : "- No URLs.",
+    policy.phoneAllowed ? "" : "- No phone numbers in the body.",
+    policy.pricingPolicy === "never"
+      ? "- Never state, imply or characterize a price, payment, discount, saving, deal quality or market position."
+      : "- Only state a price if one appears in the master.",
+    policy.keywordPolicy === "none"
+      ? "- Do not optimize for search. Write for a person scrolling on a phone."
+      : "- Search phrasing must read naturally. Never repeat a keyword or name more than one locality.",
+    policy.ctaPolicy === "none" ? "" : `- Close with: ${cta}`,
+    policy.prohibitedPhrases.length ? `- Never use: ${policy.prohibitedPhrases.join("; ")}.` : "",
+    policy.requiredDisclosures.length ? `- Include verbatim: ${policy.requiredDisclosures.join(" ")}` : "",
+  ].filter(Boolean).join("\n");
+
+  return `Rewrite the master vehicle description below for ${policy.label}.
+
+MASTER DESCRIPTION:
+${body}
+
+CHANNEL REQUIREMENTS (policy ${policy.policyVersion})
+${rules}
+
+FACT INVARIANT
+- Every factual statement must remain identical in meaning to the master.
+- Do not add a fact, a feature, a claim, a benefit or a number that is not already in the master.
+- Do not promote a dealer-installed product to factory equipment.
+- Changing the destination changes the presentation, never the vehicle.
+
+${toneInstruction(packet.tone)}
+${policy.seoFields ? `
+Return STRICT JSON only, no code fence:
+{"seo_title":"<=60 chars","meta_description":"<=155 chars","content":"the body copy"}` : `
+Return ONLY the rewritten text.`}`;
 }
 
 // The generator rejects a prompt_override over 4000 chars, and a full-length
@@ -615,6 +876,103 @@ export function validateContent(
   return out;
 }
 
+/**
+ * Deterministic claim validation for V3.
+ *
+ * Runs the legacy validator (identity, controlled claims, excluded claims,
+ * disclosures) and then the four checks Phase 3 adds, all of which compare
+ * generated text against the APPROVED PACKET rather than asking the model
+ * whether it told the truth:
+ *
+ *   - dealer benefits the tenant never approved
+ *   - locality stuffing and unapproved service areas
+ *   - tone overreach (invented performance, safety or savings language)
+ *   - equipment named in the copy that is not in the packet at all
+ *   - dealer-installed products presented as factory equipment
+ */
+export function validateContentV3(
+  content: string,
+  snap: FactSnapshot,
+  settings: Record<string, any>,
+  packet: DescriptionPacket,
+  policy?: ChannelPolicy,
+): Finding[] {
+  const legacyChannel = policy
+    ? CHANNELS.find((c) => c.key === policy.key) ?? {
+        key: policy.key, label: policy.label, characterLimit: policy.characterLimit,
+        minLength: policy.recommendedMin, deliveryMode: policy.deliveryMode,
+        connectorStatus: policy.connectorStatus, seoFields: policy.seoFields,
+        instruction: policy.instruction,
+      }
+    : undefined;
+
+  const out: Finding[] = validateContent(content, snap, settings, legacyChannel)
+    // Length + format are owned by the channel policy in V3; keeping the
+    // legacy copies would double-report the same problem on every variant.
+    .filter((f) => !policy || !["CHANNEL_LENGTH_EXCEEDED", "LENGTH_BELOW_MINIMUM", "CHANNEL_FORMAT_INVALID", "CTA_MISSING"].includes(f.validator_code));
+
+  for (const v of checkDealerClaims(content, packet.voice)) {
+    out.push({ validator_code: v.code, severity: v.severity, blocking: v.severity === "blocking",
+      message: v.message, claim_text: v.claim, fact_path: "voice_profile",
+      source_reference: packet.voice.version });
+  }
+  for (const v of checkLocalityUse(content, packet.voice)) {
+    out.push({ validator_code: v.code, severity: v.severity, blocking: v.severity === "blocking",
+      message: v.message, claim_text: v.claim, fact_path: "seo_targeting" });
+  }
+  for (const t of checkTone(content, packet.tone)) {
+    out.push({ validator_code: t.code, severity: "blocking", blocking: true,
+      message: t.message, claim_text: t.claim, fact_path: "tone" });
+  }
+
+  // Equipment attribution. A canonical feature the packet excluded (conflict,
+  // unverified install) must not appear, and a dealer-installed product must
+  // not be worded as factory equipment.
+  const lc = String(content || "").toLowerCase();
+  for (const f of packet.excludedFeatures) {
+    if (!f.conflict) continue;
+    if (!lc.includes(f.display_name.toLowerCase()) &&
+        !f.aliases_seen.some((a) => lc.includes(a.toLowerCase()))) continue;
+    out.push({ validator_code: "UNSUPPORTED_FEATURE_CLAIM", severity: "blocking", blocking: true,
+      message: `"${f.display_name}" is not confirmed on this vehicle (${f.selection_reason}) but appears in the copy.`,
+      claim_text: f.display_name, fact_path: `feature:${f.canonical_id}` });
+  }
+  for (const f of packet.dealerAddedFeatures) {
+    const name = f.display_name.toLowerCase();
+    if (!lc.includes(name)) continue;
+    const factoryFraming = new RegExp(
+      `\\b(factory|standard|comes with|equipped from the factory|included from the factory)\\b[^.]{0,60}${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+      "i");
+    if (factoryFraming.test(content)) {
+      out.push({ validator_code: "DEALER_ADDED_AS_FACTORY", severity: "blocking", blocking: true,
+        message: `"${f.display_name}" is a dealer-installed product and is described as factory equipment.`,
+        claim_text: f.display_name, fact_path: `feature:${f.canonical_id}` });
+    }
+  }
+
+  if (policy) {
+    for (const p of checkChannelPolicy(content, policy)) {
+      out.push({ validator_code: p.code, severity: p.severity, blocking: p.severity === "blocking",
+        message: p.message, fact_path: `channel:${policy.key}`,
+        source_reference: policy.policyVersion });
+    }
+  }
+
+  // Search-spam checks are content-safety findings, not style notes: hidden
+  // text and stuffing are the two things that get a listing demoted.
+  const kw = analyzeKeywords(content, packet.targeting);
+  if (kw.hiddenTextDetected) {
+    out.push({ validator_code: "HIDDEN_TEXT_DETECTED", severity: "blocking", blocking: true,
+      message: "Hidden text or markup was found in the description body." });
+  }
+  if (kw.stuffing) {
+    out.push({ validator_code: "KEYWORD_STUFFING", severity: "warning", blocking: false,
+      message: `Unnatural keyword repetition: ${kw.stuffedTerms.join(", ")}.`,
+      claim_text: kw.stuffedTerms.join(", ") });
+  }
+  return out;
+}
+
 // Content quality is deliberately SEPARATE from factual validity: a
 // description can score well and still be blocked.
 export function qualityScore(text: string, snap: FactSnapshot, settings: Record<string, any>): number {
@@ -633,6 +991,33 @@ export function qualityScore(text: string, snap: FactSnapshot, settings: Record<
   const avg = words / Math.max(1, text.split(/[.!?]+/).filter((x) => x.trim()).length);
   s += avg > 8 && avg < 26 ? 10 : 4;
   return Math.max(0, Math.min(100, s));
+}
+
+/**
+ * The real score. Replaces the heuristic `qualityScore` on every V3 path:
+ * readability, uniqueness and keyword safety are measured, not asserted, and
+ * a blocking finding caps the band regardless of how well the copy reads.
+ */
+export function scoreVersion(args: {
+  text: string; packet: DescriptionPacket; findings: Finding[];
+  comparisons: ComparisonDoc[]; policy?: ChannelPolicy; now?: string;
+}): ScoreBreakdown {
+  const { text, packet, findings, comparisons, policy } = args;
+  const policyFindings = policy ? checkChannelPolicy(text, policy) : [];
+  return scoreDescription({
+    text,
+    tone: packet.tone,
+    targeting: packet.targeting,
+    comparisons,
+    factsOffered: packet.verifiedFacts.length,
+    factsUsed: countFactsUsed(text, packet.verifiedFacts.map((f) => f.value)),
+    featuresSelected: [...packet.factoryFeatures, ...packet.dealerAddedFeatures].map((f) => f.display_name),
+    policyFindings: policyFindings.map((f) => ({ code: f.code, severity: f.severity })),
+    blockingFindings: findings.filter((f) => f.blocking).length,
+    warningFindings: findings.filter((f) => f.severity === "warning").length,
+    ctaExpected: !policy || policy.ctaPolicy !== "none",
+    now: args.now,
+  });
 }
 
 export function decideEligibility(

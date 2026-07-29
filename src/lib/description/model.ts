@@ -43,15 +43,46 @@ export interface ChannelMeta {
   connectorStatus: "available" | "not_configured" | "export_only";
 }
 
-// Mirrors supabase/functions/_shared/description-core.ts CHANNELS. Display only.
+// Mirrors supabase/functions/_shared/description-channel-policy.ts. DISPLAY
+// ONLY — the character limit shown next to a saved variant always comes from
+// the row the server wrote, never from this table, because a stored version
+// keeps the policy it was generated under even after the registry moves on.
 export const CHANNEL_META: ChannelMeta[] = [
   { key: "dealer_website",   label: "Dealer Website",       characterLimit: 2400, deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "vehicle_passport", label: "Vehicle Passport",     characterLimit: 2400, deliveryMode: "internal_projection", connectorStatus: "available" },
   { key: "autotrader",       label: "AutoTrader",           characterLimit: 1500, deliveryMode: "export_only",         connectorStatus: "export_only" },
-  { key: "cars_com",         label: "Cars.com Connector",   characterLimit: 1500, deliveryMode: "connector",           connectorStatus: "not_configured" },
+  { key: "cars_com",         label: "Cars.com",             characterLimit: 1500, deliveryMode: "connector",           connectorStatus: "not_configured" },
   { key: "cargurus",         label: "CarGurus",             characterLimit: 1200, deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "facebook",         label: "Facebook Marketplace", characterLimit: 900,  deliveryMode: "export_only",         connectorStatus: "export_only" },
-  { key: "google_seo",       label: "Google Vehicle Ads",   characterLimit: 900,  deliveryMode: "export_only",         connectorStatus: "export_only" },
+  { key: "google_seo",       label: "Google SEO",           characterLimit: 900,  deliveryMode: "export_only",         connectorStatus: "export_only" },
+  { key: "vauto",            label: "vAuto",                characterLimit: 1500, deliveryMode: "export_only",         connectorStatus: "export_only" },
+];
+
+/**
+ * The writing-preset cards, in display order.
+ *
+ * `key` is the durable identity and matches the server channel key. The
+ * Facebook card is keyed `facebook`, not `facebook_marketplace`: that key is
+ * already carried by stored channel versions, delivery rows and audit history,
+ * and renaming it would orphan every one of them. The display label carries
+ * the full product name instead.
+ */
+export interface ChannelCardMeta {
+  key: string;
+  name: string;
+  helper: string;
+  /** vAuto is an inventory workflow, not a consumer marketplace. */
+  providerType: "marketplace" | "search" | "owned_site" | "inventory_workflow";
+}
+
+export const CHANNEL_CARDS: ChannelCardMeta[] = [
+  { key: "autotrader",     name: "AutoTrader",           helper: "Optimized for AutoTrader",    providerType: "marketplace" },
+  { key: "cars_com",       name: "Cars.com",             helper: "Optimized for Cars.com",      providerType: "marketplace" },
+  { key: "cargurus",       name: "CarGurus",             helper: "Optimized for CarGurus",      providerType: "marketplace" },
+  { key: "facebook",       name: "Facebook Marketplace", helper: "Optimized for Facebook",      providerType: "marketplace" },
+  { key: "dealer_website", name: "Dealer Website",       helper: "Optimized for your website",  providerType: "owned_site" },
+  { key: "google_seo",     name: "Google SEO",           helper: "Optimized for Google",        providerType: "search" },
+  { key: "vauto",          name: "vAuto",                helper: "Optimized for vAuto workflow", providerType: "inventory_workflow" },
 ];
 
 export const channelMeta = (k: string) => CHANNEL_META.find((c) => c.key === k);

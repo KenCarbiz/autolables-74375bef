@@ -17,7 +17,17 @@ import {
   CHANNELS, channelByKey, buildFactSnapshot, buildMasterPrompt, buildChannelPrompt,
   computeSourceDataVersion, computeConfigVersion, validateContent, qualityScore,
   decideEligibility, type FactSnapshot, type Finding, type FactOverride,
+  // ── V3 ──
+  buildDescriptionPacket, buildMasterPromptV3, buildChannelPromptV3, validateContentV3,
+  scoreVersion, computeInputChecksum, resolveChannelPolicy, computeChannelPolicyVersion,
+  resolveVoiceProfile, computeVoiceProfileVersion, featureChecksum, isToneKey,
+  type DescriptionPacket, type ChannelPolicy, type ComparisonDoc, type SeoTargeting,
+  type ToneKey, type VoiceProfile,
 } from "../_shared/description-core.ts";
+import { repairContent, hasRepairableFindings } from "../_shared/description-repair.ts";
+import { preflight, preflightSummary } from "../_shared/description-preflight.ts";
+import { evaluateBudget, DEFAULT_BUDGET } from "../_shared/description-budget.ts";
+import { can } from "../_shared/description-permissions.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -78,6 +88,140 @@ async function loadSettings(admin: any, tenantId: string) {
       .update({ configuration_version: configVersion }).eq("tenant_id", tenantId);
   }
   return { settings: merged, configVersion };
+}
+
+// ── V3 configuration loaders ─────────────────────────────────────────
+
+/**
+ * The dealership voice. Version is recomputed from the resolved content on
+ * every run: an approved description keeps the version it was written under,
+ * so editing the profile marks descendants stale rather than rewriting history.
+ */
+async function loadVoiceProfile(
+  admin: any, tenantId: string, settings: Record<string, any>, dealer: Record<string, any> | null,
+): Promise<VoiceProfile> {
+  const { data } = await admin.from("description_voice_profiles")
+    .select("*").eq("tenant_id", tenantId).eq("status", "approved")
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const voice = resolveVoiceProfile(tenantId, data, settings, dealer);
+  voice.version = await computeVoiceProfileVersion(voice);
+  if (data && data.version !== voice.version) {
+    await admin.from("description_voice_profiles").update({ version: voice.version }).eq("id", data.id);
+  }
+  return voice;
+}
+
+async function loadChannelOverrides(admin: any, tenantId: string): Promise<Map<string, Record<string, unknown>>> {
+  const { data } = await admin.from("description_channel_policies")
+    .select("channel, policy_json, active").eq("tenant_id", tenantId);
+  const m = new Map<string, Record<string, unknown>>();
+  for (const row of data || []) {
+    m.set(String(row.channel), { ...(row.policy_json || {}), active: row.active !== false });
+  }
+  return m;
+}
+
+/**
+ * SEO targeting arrives from a browser form. It reaches a prompt AND a stored
+ * record, so it is sanitized here rather than trusted: markup, script and
+ * control characters are stripped, and the field lengths are capped so a
+ * keyword box cannot become a prompt-injection surface or a keyword block.
+ */
+function sanitizeTargeting(raw: Record<string, any>): Partial<SeoTargeting> {
+  const clean = (v: unknown, max: number) =>
+    String(v ?? "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .replace(/https?:\/\/\S+/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, max);
+  const list = Array.isArray(raw.secondaryKeywords) ? raw.secondaryKeywords : [];
+  const out: Partial<SeoTargeting> = {};
+  const primary = clean(raw.primaryKeyword, 90);
+  if (primary) out.primaryKeyword = primary;
+  const secondary = [...new Set(list.map((k: unknown) => clean(k, 60)).filter(Boolean))].slice(0, 8);
+  if (secondary.length) out.secondaryKeywords = secondary as string[];
+  const city = clean(raw.city, 60); if (city) out.city = city;
+  const state = clean(raw.state, 40); if (state) out.state = state;
+  const marketArea = clean(raw.marketArea, 80); if (marketArea) out.marketArea = marketArea;
+  const intent = String(raw.searchIntent || "");
+  if (["inventory", "model_research", "local_dealer", "generic"].includes(intent)) {
+    out.searchIntent = intent as SeoTargeting["searchIntent"];
+  }
+  return out;
+}
+
+const MAX_COMPARISONS = 24;
+
+/**
+ * The uniqueness comparison set. Named scopes travel with the score so the
+ * stored number always answers "unique against WHAT" — an unqualified
+ * percentage is exactly the decoration this phase exists to remove.
+ */
+async function buildComparisonSet(
+  admin: any, tenantId: string, vehicleId: string, caseId: string, listing: Record<string, any>,
+): Promise<ComparisonDoc[]> {
+  const docs: ComparisonDoc[] = [];
+
+  const { data: prior } = await admin.from("description_versions")
+    .select("id, version_number, content").eq("description_case_id", caseId)
+    .order("version_number", { ascending: false }).limit(3);
+  for (const p of prior || []) {
+    docs.push({ id: p.id, label: `this VIN, draft v${p.version_number}`,
+      scope: "same_vin_prior_version", content: String(p.content || "") });
+  }
+
+  // Same model+trim is where real duplication happens: two QX80 Sensory
+  // listings from one store are the pair a shopper sees side by side.
+  const model = String(listing.ymm || "").trim();
+  if (model) {
+    const { data: siblings } = await admin.from("description_versions")
+      .select("id, content, vehicle_id, vehicle_listings!inner(ymm, trim)")
+      .eq("tenant_id", tenantId).neq("vehicle_id", vehicleId)
+      .limit(60);
+    const wantTrim = String(listing.trim || "").toLowerCase().trim();
+    const sameModel = (siblings || []).filter((s: any) => {
+      const vl = s.vehicle_listings || {};
+      return String(vl.ymm || "").trim() === model;
+    });
+    for (const s of sameModel.slice(0, 12)) {
+      const vl = (s as any).vehicle_listings || {};
+      const sameTrim = String(vl.trim || "").toLowerCase().trim() === wantTrim;
+      docs.push({ id: s.id, label: `${model}${sameTrim ? ` ${vl.trim}` : ""} (another unit)`,
+        scope: "same_model_inventory", content: String(s.content || "") });
+    }
+    const others = (siblings || []).filter((s: any) => !sameModel.includes(s));
+    for (const s of others.slice(0, Math.max(0, MAX_COMPARISONS - docs.length - 2))) {
+      docs.push({ id: s.id, label: "another vehicle in this inventory",
+        scope: "tenant_inventory", content: String(s.content || "") });
+    }
+  }
+
+  return docs.filter((d) => d.content.trim().length > 40).slice(0, MAX_COMPARISONS);
+}
+
+/** Persist the feature selection that produced this version. */
+async function saveFeatureSelections(
+  admin: any, tenantId: string, vehicleId: string, caseId: string,
+  versionId: string, packet: DescriptionPacket,
+) {
+  const rows = [
+    ...packet.factoryFeatures, ...packet.dealerAddedFeatures, ...packet.excludedFeatures,
+  ].map((f) => ({
+    tenant_id: tenantId, vehicle_id: vehicleId, description_case_id: caseId, version_id: versionId,
+    canonical_feature_id: f.canonical_id, display_name: f.display_name, category: f.category,
+    origin: f.origin, source: f.source, confidence: f.confidence,
+    package_id: f.package_id, package_name: f.package_name,
+    conflict: f.conflict, description_eligible: f.description_eligible,
+    public_eligible: f.public_eligible, priority_rank: f.priority_rank,
+    priority_score: f.priority_score, selected: f.selected,
+    selection_reason: f.selection_reason, selection_actor: "automation",
+    aliases_seen: f.aliases_seen,
+  }));
+  if (!rows.length) return;
+  const { error } = await admin.from("description_feature_selections").insert(rows);
+  if (error) console.error("feature selection insert failed", error.message);
 }
 
 async function raiseException(
@@ -148,7 +292,11 @@ async function setCase(admin: any, caseId: string, patch: Record<string, unknown
 
 // ── The pipeline for a single vehicle ────────────────────────────────
 async function orchestrateVehicle(
-  admin: any, tenantId: string, vehicleId: string, opts: { force?: boolean; reason?: string; channels?: string[] } = {},
+  admin: any, tenantId: string, vehicleId: string,
+  opts: {
+    force?: boolean; reason?: string; channels?: string[];
+    tone?: string; targeting?: Partial<SeoTargeting>;
+  } = {},
 ): Promise<Record<string, unknown>> {
   const { data: listing } = await admin.from("vehicle_listings").select("*").eq("id", vehicleId).maybeSingle();
   if (!listing) return { vehicle_id: vehicleId, skipped: "listing_not_found" };
@@ -182,7 +330,11 @@ async function orchestrateVehicle(
   }
 
   const scopedRun = Array.isArray(opts.channels) && opts.channels.length > 0;
-  const jobKey = `${tenantId}:${vehicleId}:${sdv}:${configVersion}:${scopedRun ? "channels:" + [...opts.channels!].sort().join("+") : "full_generation"}`;
+  const toneKey = opts.tone && isToneKey(opts.tone) ? opts.tone : "default";
+  const targetKey = opts.targeting
+    ? `${opts.targeting.primaryKeyword || ""}|${(opts.targeting.secondaryKeywords || []).slice().sort().join(",")}|${opts.targeting.city || ""}`
+    : "default";
+  const jobKey = `${tenantId}:${vehicleId}:${sdv}:${configVersion}:${toneKey}:${targetKey}:${scopedRun ? "channels:" + [...opts.channels!].sort().join("+") : "full_generation"}`;
   const { data: jobId } = await admin.rpc("claim_description_job", {
     p_tenant_id: tenantId, p_vehicle_id: vehicleId, p_case_id: caseId,
     p_job_type: "full_generation", p_idempotency_key: jobKey,
@@ -225,6 +377,7 @@ async function orchestrateVehicle(
       source_data_version: sdv, facts_json: snap.facts, source_lineage_json: snap.lineage,
       conflicts_json: snap.conflicts, excluded_claims_json: snap.excluded_claims,
       market_context_json: snap.market_context, fact_confidence: snap.fact_confidence,
+      features_json: { features: snap.features },
     }).select("id").single();
 
     await audit(admin, tenantId, "description_fact_snapshot_created", caseId,
@@ -250,10 +403,118 @@ async function orchestrateVehicle(
         { vin: listing.vin, field: "cpo_status" });
     }
 
-    // 2 ── master
+    // 2 ── voice, tone, targeting, feature selection → one approved packet
+    const voice = await loadVoiceProfile(admin, tenantId, settings, dealer);
+    const channelOverrides = await loadChannelOverrides(admin, tenantId);
+    const requestedTone = opts.tone && isToneKey(opts.tone) ? opts.tone : null;
+    const tone: ToneKey = requestedTone
+      ?? (isToneKey(voice.defaultTone) ? voice.defaultTone : "professional");
+    const packet: DescriptionPacket = buildDescriptionPacket(snap, settings, voice, {
+      tone,
+      targeting: opts.targeting,
+      featureBudget: resolveChannelPolicy("vehicle_passport")?.featureBudget ?? 10,
+    });
+    const featChecksum = await featureChecksum(packet.selectedFeatureIds);
+    const masterPolicy = resolveChannelPolicy("vehicle_passport", channelOverrides.get("vehicle_passport"))!;
+
+    // ── Preflight: refuse a doomed request BEFORE any provider call ──
+    // Everything above this point is free. Everything below spends money, so
+    // a request that was always going to fail must be rejected here rather
+    // than discovered by the model.
+    const { data: budgetRow } = await admin.from("description_generation_budgets")
+      .select("*").eq("tenant_id", tenantId).maybeSingle();
+    const { data: spend } = await admin.rpc("description_generation_spend", { p_tenant_id: tenantId });
+    const budgetCfg = budgetRow ? {
+      ...DEFAULT_BUDGET,
+      monthlyGenerationBudget: budgetRow.monthly_generation_budget,
+      monthlyPreviewBudget: budgetRow.monthly_preview_budget,
+      maxCostPerGeneration: budgetRow.max_cost_per_generation,
+      maxRepairAttempts: budgetRow.max_repair_attempts ?? DEFAULT_BUDGET.maxRepairAttempts,
+      maxChannelsPerBatch: budgetRow.max_channels_per_batch ?? DEFAULT_BUDGET.maxChannelsPerBatch,
+      dailyGenerationLimit: budgetRow.daily_generation_limit,
+      perUserDailyLimit: budgetRow.per_user_daily_limit,
+      warningThresholdPct: budgetRow.warning_threshold_pct ?? DEFAULT_BUDGET.warningThresholdPct,
+      hardStopPct: budgetRow.hard_stop_pct ?? DEFAULT_BUDGET.hardStopPct,
+    } : DEFAULT_BUDGET;
+    const budgetDecision = evaluateBudget(budgetCfg, {
+      monthProductionSpend: Number((spend as any)?.month_production_spend ?? 0),
+      monthPreviewSpend: Number((spend as any)?.month_preview_spend ?? 0),
+      todayGenerationCount: Number((spend as any)?.today_generation_count ?? 0),
+      userTodayGenerationCount: 0,
+    }, { isPreview: false, estimatedCost: null });
+
+    const pf = preflight({
+      authenticated: true,
+      canGenerate: true,
+      listing, tenantId,
+      snapshot: snap,
+      policy: masterPolicy,
+      channelEnabled: true,
+      voice,
+      targeting: packet.targeting,
+      jobInFlight: false,
+      budget: { withinBudget: budgetDecision.withinBudget, reason: budgetDecision.reason },
+      providerConfigured: !!SERVICE_KEY,
+    });
+
+    await admin.from("description_preflight_results").insert({
+      tenant_id: tenantId, vehicle_id: vehicleId, description_case_id: caseId,
+      channel: "master", passed: pf.ok, blocking_codes: pf.blockingCodes,
+      findings_json: pf.findings, summary: preflightSummary(pf),
+    });
+
+    if (!pf.ok) {
+      await admin.from("description_jobs").update({
+        status: "failed_blocked", last_error_code: pf.blockingCodes[0] || "PREFLIGHT_FAILED",
+        last_error_message: preflightSummary(pf), failed_at: new Date().toISOString(),
+      }).eq("id", jobId);
+      await setCase(admin, caseId, {
+        status: "FAILED_BLOCKED", publication_eligibility: "blocked",
+        last_error_message: preflightSummary(pf),
+      });
+      await raiseException(admin, ctx, "GENERATION_BLOCKED", "high", true,
+        "Generation refused before any AI cost", preflightSummary(pf),
+        { blocking_codes: pf.blockingCodes, findings: pf.findings });
+      await audit(admin, tenantId, "generation_preflight_rejected", caseId,
+        { vin: listing.vin, blocking_codes: pf.blockingCodes });
+      return { vehicle_id: vehicleId, case_id: caseId, skipped: "preflight_rejected",
+               blocking_codes: pf.blockingCodes, reason: preflightSummary(pf), cost_incurred: false };
+    }
+    if (budgetDecision.verdict === "warning") {
+      await audit(admin, tenantId, "generation_budget_warning", caseId,
+        { vin: listing.vin, consumed_pct: budgetDecision.consumedPct });
+    }
+    const masterPolicyVersion = await computeChannelPolicyVersion(masterPolicy);
+    const inputChecksum = await computeInputChecksum({
+      tenantId, vehicleId, snapshotChecksum: sdv, channel: "master",
+      channelPolicyVersion: masterPolicyVersion, voiceProfileVersion: voice.version, tone,
+      featureChecksum: featChecksum, targeting: packet.targeting,
+      promptVersion: settings.prompt_version, model: settings.generation_model,
+    });
+
+    // Cost guard: an identical packet has already been paid for. Reuse the
+    // stored output rather than billing the provider for the same answer.
+    if (!opts.force) {
+      const { data: reusable } = await admin.from("description_versions")
+        .select("id, version_number").eq("description_case_id", caseId)
+        .eq("input_checksum", inputChecksum).in("validation_status", ["passed", "warning"])
+        .order("version_number", { ascending: false }).limit(1).maybeSingle();
+      if (reusable?.id) {
+        await admin.from("description_jobs").update({
+          status: "succeeded", completed_at: new Date().toISOString(),
+        }).eq("id", jobId);
+        await audit(admin, tenantId, "description_generation_reused", caseId,
+          { vin: listing.vin, version_id: reusable.id, input_checksum: inputChecksum });
+        return { vehicle_id: vehicleId, case_id: caseId, version_id: reusable.id,
+                 skipped: "equivalent_output_reused", input_checksum: inputChecksum };
+      }
+    }
+
+    // 3 ── master
     await setCase(admin, caseId, { status: "GENERATING" });
-    await audit(admin, tenantId, "description_generation_started", caseId, { vin: listing.vin });
-    const masterText = await callGenerator(buildMasterPrompt(snap, settings), settings.generation_model);
+    await audit(admin, tenantId, "description_generation_started", caseId,
+      { vin: listing.vin, tone, voice_profile_version: voice.version, input_checksum: inputChecksum });
+    const masterText = await callGenerator(buildMasterPromptV3(packet, settings), settings.generation_model);
 
     const { data: lastVer } = await admin.from("description_versions")
       .select("id, version_number").eq("description_case_id", caseId)
@@ -268,15 +529,56 @@ async function orchestrateVehicle(
       character_count: masterText.length, generation_model: settings.generation_model,
       prompt_version: settings.prompt_version, configuration_version: configVersion,
       source_data_version: sdv, created_by_type: "automation",
+      tone, seo_targeting_json: packet.targeting, voice_profile_version: voice.version,
+      channel_policy_version: masterPolicyVersion, selected_feature_checksum: featChecksum,
+      input_checksum: inputChecksum,
     }).select("*").single();
     if (!version?.id) {
       throw Object.assign(new Error("version_insert_failed"), { code: "DB_CONFLICT" });
     }
 
-    // 3 ── validate master
+    await saveFeatureSelections(admin, tenantId, vehicleId, caseId, version.id, packet);
+
+    // 4 ── validate → repair → revalidate
     await setCase(admin, caseId, { status: "VALIDATING" });
-    const findings: Finding[] = validateContent(masterText, snap, settings);
-    const quality = qualityScore(masterText, snap, settings);
+    let masterFinal = masterText;
+    let findings: Finding[] = validateContentV3(masterFinal, snap, settings, packet);
+    let repairLog: Record<string, unknown> | null = null;
+
+    // Repair only ever DELETES the offending sentence, trims, or appends the
+    // dealer's own disclosure. It never rewrites a claim and never calls the
+    // model again — a generative "fix" is a second chance to hallucinate.
+    if (hasRepairableFindings(findings)) {
+      const repaired = repairContent(masterFinal, findings, masterPolicy, voice.requiredDisclosures);
+      if (repaired.changed) {
+        const after = validateContentV3(repaired.content, snap, settings, packet);
+        const before = findings.filter((f) => f.blocking).length;
+        // Keep the repair only if it strictly reduces blocking findings.
+        // A repair that trades one blocker for another is not an improvement.
+        if (after.filter((f) => f.blocking).length < before) {
+          masterFinal = repaired.content;
+          findings = after;
+          repairLog = { applied: repaired.applied, unrepairable: repaired.unrepairable,
+                        blocking_before: before, blocking_after: after.filter((f) => f.blocking).length };
+          await admin.from("description_versions").update({
+            content: masterFinal,
+            word_count: masterFinal.split(/\s+/).filter(Boolean).length,
+            character_count: masterFinal.length,
+            repair_json: repairLog,
+          }).eq("id", version.id);
+          await audit(admin, tenantId, "description_repair_applied", caseId,
+            { vin: listing.vin, version_id: version.id, ...repairLog });
+        }
+      }
+    }
+    const masterText2 = masterFinal;
+    // The comparison set is built AFTER the version row exists but excludes it,
+    // because the prior-version query orders by version_number and this run's
+    // own copy would otherwise score as its own duplicate.
+    const comparisons = (await buildComparisonSet(admin, tenantId, vehicleId, caseId, listing))
+      .filter((d) => d.id !== version.id);
+    const masterScore = scoreVersion({ text: masterText2, packet, findings, comparisons });
+    const quality = masterScore.total;
 
     if (findings.length) {
       await admin.from("description_validation_results").insert(findings.map((f) => ({
@@ -288,10 +590,14 @@ async function orchestrateVehicle(
     }
     const masterStatus = findings.some((f) => f.blocking) ? "blocked"
       : findings.some((f) => f.severity === "warning") ? "warning" : "passed";
-    await admin.from("description_versions")
-      .update({ validation_status: masterStatus, quality_score: quality }).eq("id", version.id);
+    await admin.from("description_versions").update({
+      validation_status: masterStatus, quality_score: quality,
+      score_breakdown_json: masterScore, readability_json: masterScore.readability,
+      uniqueness_json: masterScore.uniqueness, score_version: masterScore.version,
+      read_time_seconds: Math.max(15, Math.round((masterScore.readability.words / 200) * 60)),
+    }).eq("id", version.id);
 
-    // 4 ── channel variants
+    // 5 ── channel variants
     const allEnabled: string[] = Array.isArray(settings.enabled_channels) ? settings.enabled_channels : [];
     // Selective regeneration: when the caller names channels, only those are
     // rebuilt; everything else keeps its existing variant.
@@ -299,10 +605,12 @@ async function orchestrateVehicle(
       ? allEnabled.filter((k) => opts.channels!.includes(k)) : allEnabled;
     const enabled = scoped;
     const channelRows: Array<Record<string, unknown>> = [];
+    // Cross-channel comparison corpus, grown as each variant lands.
+    const channelTexts: Array<{ channel: string; label: string; content: string }> = [];
     const channelBlocking: Finding[] = [];
     for (const key of enabled) {
-      const ch = channelByKey(key);
-      if (!ch) continue;
+      const policy: ChannelPolicy | undefined = resolveChannelPolicy(key, channelOverrides.get(key));
+      if (!policy || !policy.active) continue;
       // a locked channel is never overwritten by automation
       const { data: locked } = await admin.from("description_channel_versions")
         .select("id, locked").eq("description_case_id", caseId).eq("channel", key)
@@ -311,15 +619,23 @@ async function orchestrateVehicle(
         await admin.from("description_channel_versions")
           .update({ potentially_stale: true }).eq("id", locked.id);
         await raiseException(admin, ctx, "MANUAL_CONTENT_STALE", "medium", false,
-          `${ch.label} copy may be out of date`,
+          `${policy.label} copy may be out of date`,
           "This channel is locked to a manual edit while the underlying vehicle data changed.",
           { source_data_version: sdv }, key);
         continue;
       }
+      const policyVersion = await computeChannelPolicyVersion(policy);
+      // Each channel gets its own feature budget, so the destination's own
+      // policy decides how much equipment the copy carries.
+      const channelPacket: DescriptionPacket = buildDescriptionPacket(snap, settings, voice, {
+        tone, targeting: packet.targeting, featureBudget: policy.featureBudget,
+      });
+
       try {
-        const raw = await callGenerator(buildChannelPrompt(masterText, ch, snap, settings), settings.generation_model);
+        const raw = await callGenerator(
+          buildChannelPromptV3(masterText2, policy, channelPacket), settings.generation_model);
         let content = raw, seoTitle: string | null = null, metaDesc: string | null = null;
-        if (ch.seoFields) {
+        if (policy.seoFields) {
           try {
             const parsed = JSON.parse(raw.replace(/^```(?:json)?|```$/g, "").trim());
             content = String(parsed.content || raw);
@@ -327,15 +643,55 @@ async function orchestrateVehicle(
             metaDesc = parsed.meta_description ? String(parsed.meta_description) : null;
           } catch { /* fall back to raw text */ }
         }
-        const cFindings = validateContent(content, snap, settings, ch);
+        let cFindings = validateContentV3(content, snap, settings, channelPacket, policy);
+        let cRepair: Record<string, unknown> | null = null;
+        // Same removal-only repair per channel. A channel variant is the most
+        // common place a length or formatting rule bites, and those are the
+        // repairs that are unambiguously safe.
+        if (hasRepairableFindings(cFindings) || cFindings.some((f) =>
+            ["CHANNEL_LENGTH_EXCEEDED", "CHANNEL_FORMAT_INVALID", "CHANNEL_EMOJI_NOT_ALLOWED"]
+              .includes(f.validator_code))) {
+          const r = repairContent(content, cFindings, policy, policy.requiredDisclosures);
+          if (r.changed) {
+            const after = validateContentV3(r.content, snap, settings, channelPacket, policy);
+            const beforeBlocking = cFindings.filter((f) => f.blocking).length;
+            const afterBlocking = after.filter((f) => f.blocking).length;
+            if (afterBlocking <= beforeBlocking && after.length < cFindings.length) {
+              content = r.content;
+              cFindings = after;
+              cRepair = { applied: r.applied, unrepairable: r.unrepairable };
+            }
+          }
+        }
         const cStatus = cFindings.some((f) => f.blocking) ? "blocked"
           : cFindings.some((f) => f.severity === "warning") ? "warning" : "passed";
+
+        // A derivative is compared against the master and its already-generated
+        // siblings: "same copy with the channel name swapped" is a real defect,
+        // and only a cross-channel comparison can see it.
+        const cScore = scoreVersion({
+          text: content, packet: channelPacket, findings: cFindings, policy,
+          comparisons: [
+            { id: version.id, label: "master description", scope: "cross_channel", content: masterText2 },
+            ...channelTexts.map((t) => ({
+              id: `${version.id}:${t.channel}`, label: `${t.label} variant`,
+              scope: "cross_channel" as const, content: t.content,
+            })),
+            ...comparisons,
+          ],
+        });
+        channelTexts.push({ channel: key, label: policy.label, content });
 
         const { data: cv } = await admin.from("description_channel_versions").upsert({
           tenant_id: tenantId, vehicle_id: vehicleId, description_case_id: caseId,
           master_version_id: version.id, channel: key, content,
           seo_title: seoTitle, meta_description: metaDesc,
-          character_count: content.length, character_limit: ch.characterLimit,
+          character_count: content.length, character_limit: policy.characterLimit,
+          word_count: cScore.readability.words,
+          read_time_seconds: Math.max(10, Math.round((cScore.readability.words / 200) * 60)),
+          channel_policy_version: policyVersion, score_breakdown_json: cScore,
+          repair_json: cRepair,
+          quality_score: cScore.total,
           validation_status: cStatus, potentially_stale: false,
         }, { onConflict: "master_version_id,channel" }).select("id").single();
 
@@ -349,7 +705,7 @@ async function orchestrateVehicle(
         }
         if (cFindings.some((f) => f.validator_code === "CHANNEL_LENGTH_EXCEEDED")) {
           await raiseException(admin, ctx, "CHANNEL_LENGTH_EXCEEDED", "medium", false,
-            `${ch.label} exceeds the destination limit`,
+            `${policy.label} exceeds the destination limit`,
             cFindings.find((f) => f.validator_code === "CHANNEL_LENGTH_EXCEEDED")!.message, {}, key);
         }
         channelRows.push({ channel: key, status: cStatus });
@@ -358,7 +714,7 @@ async function orchestrateVehicle(
         if (cStatus === "blocked") channelBlocking.push(...cFindings.filter((f) => f.blocking));
       } catch (e) {
         await raiseException(admin, ctx, "CHANNEL_GENERATION_FAILED", "medium", false,
-          `${ch.label} variant could not be generated`, String((e as Error).message).slice(0, 200), {}, key);
+          `${policy.label} variant could not be generated`, String((e as Error).message).slice(0, 200), {}, key);
       }
     }
 
@@ -554,6 +910,9 @@ serve(async (req) => {
         force: action === "regenerate" || !!body.force,
         reason: action === "regenerate" ? "manual_regenerate" : String(body.reason || "ingest"),
         channels: Array.isArray(body.channels) ? body.channels.map(String) : undefined,
+        tone: typeof body.tone === "string" ? body.tone : undefined,
+        targeting: body.targeting && typeof body.targeting === "object"
+          ? sanitizeTargeting(body.targeting) : undefined,
       });
       // "skipped" is not success-with-a-new-version; say so plainly so the
       // UI cannot claim work that did not happen.
@@ -580,8 +939,23 @@ serve(async (req) => {
         .select("field_key, decision, value").eq("description_case_id", ver.description_case_id);
       const snap = buildFactSnapshot(listing || {}, settings, dealer, (ovRows || []) as FactOverride[]);
 
-      const f = validateContent(ver.content, snap, settings);
-      const q = qualityScore(ver.content, snap, settings);
+      // A human edit clears the SAME V3 validators as generated copy, against
+      // the same packet the version was written under. Falling back to the
+      // legacy validator here would let a manual edit introduce an unapproved
+      // dealer claim that automation could never have produced.
+      const voice = await loadVoiceProfile(admin, tenantId, settings, dealer);
+      const packet = buildDescriptionPacket(snap, settings, voice, {
+        tone: isToneKey(ver.tone) ? ver.tone : undefined,
+        targeting: (ver.seo_targeting_json || undefined) as Partial<SeoTargeting> | undefined,
+      });
+      const comparisons = await buildComparisonSet(
+        admin, tenantId, ver.vehicle_id, ver.description_case_id, listing || {});
+      const f = validateContentV3(ver.content, snap, settings, packet);
+      const score = scoreVersion({
+        text: ver.content, packet, findings: f,
+        comparisons: comparisons.filter((d) => d.id !== versionId),
+      });
+      const q = score.total;
       // master-scoped only; channel findings belong to their channel rows
       await admin.from("description_validation_results")
         .delete().eq("version_id", versionId).is("channel_version_id", null);
@@ -594,8 +968,12 @@ serve(async (req) => {
         })));
       }
       const st = f.some((x) => x.blocking) ? "blocked" : f.some((x) => x.severity === "warning") ? "warning" : "passed";
-      await admin.from("description_versions")
-        .update({ validation_status: st, quality_score: q }).eq("id", versionId);
+      await admin.from("description_versions").update({
+        validation_status: st, quality_score: q, score_breakdown_json: score,
+        readability_json: score.readability, uniqueness_json: score.uniqueness,
+        score_version: score.version,
+        read_time_seconds: Math.max(15, Math.round((score.readability.words / 200) * 60)),
+      }).eq("id", versionId);
 
       const { eligibility } = decideEligibility(f, settings, listing?.condition || "used");
       await setCase(admin, ver.description_case_id, { publication_eligibility: eligibility, quality_score: q }, true);
