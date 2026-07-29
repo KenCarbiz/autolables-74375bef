@@ -149,3 +149,30 @@ export function lifecycleIndex(status: DescriptionStatus): number {
     default: return -1;
   }
 }
+
+// ── Fleet sweep state ────────────────────────────────────────────────
+// Which band the Description Operations header shows.
+//
+// The green "all clear" band used to fire whenever every active vehicle had
+// a description CASE ROW, and printed the fleet size as a "processed" count.
+// A store with 136 initialized-but-never-generated vehicles therefore read
+// "136 processed · none need attention" while holding zero descriptions.
+// Having a row is not having a description.
+
+export type SweepState = "uninitialized" | "queued" | "working";
+
+export interface SweepCounts {
+  activeInventory: number;
+  missing: number;
+  /** Cases with a row but no outcome yet. */
+  pending: number;
+  /** Cases that actually finished. */
+  settled: number;
+}
+
+export function sweepState(s: SweepCounts): SweepState {
+  if (s.missing > 0) return "uninitialized";
+  // Nothing has finished and something is waiting: queued, not clear.
+  if (s.settled === 0 && s.pending > 0) return "queued";
+  return "working";
+}

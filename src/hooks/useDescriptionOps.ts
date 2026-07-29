@@ -51,6 +51,10 @@ export interface DescriptionCaseRow extends Row {
 export interface OpsSummary {
   activeInventory: number; published: number; ready: number;
   reviewRequired: number; failed: number; stale: number; missing: number;
+  /** Cases that exist but have not reached any outcome yet. */
+  pending: number;
+  /** Cases that actually finished — the only honest "processed" count. */
+  settled: number;
 }
 
 export function useDescriptionPermissions() {
@@ -149,7 +153,7 @@ export function useDescriptionOperations() {
         const { count } = await build(base);
         return count || 0;
       };
-      const [activeInventory, published, ready, reviewRequired, failed, staleStatus, stalePending, totalCases] =
+      const [activeInventory, published, ready, reviewRequired, failed, staleStatus, stalePending, totalCases, pending] =
         await Promise.all([
           (supabase as any).from("vehicle_listings").select("id", { count: "exact", head: true })
             .eq("tenant_id", tenant.id).in("status", ["draft", "published"]).then((r: any) => r.count || 0),
@@ -160,12 +164,19 @@ export function useDescriptionOperations() {
           countCases((q) => q.eq("status", "STALE")),
           countCases((q) => q.eq("potentially_stale", true).neq("status", "STALE")),
           countCases((q) => q),
+          // A case that exists but has not reached any outcome yet. Having a
+          // row is not having a description, and conflating the two let a
+          // fleet with zero generated copy report as fully processed.
+          countCases((q) => q.in("status",
+            ["UNINITIALIZED", "QUEUED", "BUILDING_FACTS", "GENERATING", "VALIDATING"])),
         ]);
       setSummary({
         activeInventory,
         published, ready, reviewRequired, failed,
         stale: staleStatus + stalePending,
         missing: Math.max(0, activeInventory - totalCases),
+        pending,
+        settled: Math.max(0, totalCases - pending),
       });
     } catch (e) {
       setError((e as Error).message || "Could not load description operations");

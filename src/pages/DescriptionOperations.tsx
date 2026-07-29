@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useDescriptionOperations, useDescriptionPermissions } from "@/hooks/useDescriptionOps";
 import {
-  STATUS_META, TONE_CLASS, factConfidenceLabel, type DescriptionStatus,
+  STATUS_META, TONE_CLASS, factConfidenceLabel, sweepState, type DescriptionStatus,
 } from "@/lib/description/model";
 import { toast } from "sonner";
 
@@ -206,7 +206,7 @@ export default function DescriptionOperations() {
 
       {/* Automation status band */}
       {summary && (
-        summary.missing > 0 ? (
+        sweepState(summary) === "uninitialized" ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3 mb-3 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[13px] text-amber-900 inline-flex items-center gap-2 min-w-0">
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -219,13 +219,34 @@ export default function DescriptionOperations() {
               </button>
             )}
           </div>
+        ) : sweepState(summary) === "queued" ? (
+          /* Every vehicle has a case row and none has produced anything. That
+             is not a clean fleet — it is a fleet that has not been written
+             yet, and the green band used to call it "processed". */
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 mb-3 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-[13px] text-slate-800 inline-flex items-center gap-2 min-w-0">
+              <Clock className="w-4 h-4 shrink-0" />
+              <span>
+                <b>{summary.pending}</b> vehicle{summary.pending === 1 ? " is" : "s are"} queued and no description has been generated yet.
+                {lastSync ? ` Last automated run ${lastSync.toLocaleString()}.` : ""}
+              </span>
+            </p>
+            {perms.canGenerate && (
+              <button onClick={runReconcile} disabled={syncing}
+                className="min-h-[44px] px-3.5 rounded-lg bg-slate-800 text-white text-[12.5px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0">
+                {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Run Reconciliation
+              </button>
+            )}
+          </div>
         ) : (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 mb-3 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[13px] text-emerald-900 inline-flex items-center gap-2 min-w-0">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>
-                {lastSync ? `Last automated run ${lastSync.toLocaleString()}` : "Automation is connected"} · {summary.activeInventory} processed
-                {exceptionCount > 0 ? ` · ${exceptionCount} need attention` : " · none need attention"}
+                {lastSync ? `Last automated run ${lastSync.toLocaleString()}` : "Automation is connected"}
+                {" · "}{summary.settled} of {summary.activeInventory} vehicles have a finished description
+                {summary.pending > 0 ? ` · ${summary.pending} still queued` : ""}
+                {exceptionCount > 0 ? ` · ${exceptionCount} need attention` : ""}
               </span>
             </p>
             {/* the audit tab needs settings or compliance access — offering the
