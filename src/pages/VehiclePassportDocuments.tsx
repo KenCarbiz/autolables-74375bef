@@ -19,7 +19,7 @@ import { resolvePassportBack } from "@/lib/passportReturn";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { listingHero } from "@/lib/photos";
-import { documentCoverType, imageCoverUrl, resolveDocumentArtwork, type ArtworkInput, type OemLinkCover } from "@/lib/passport/documentArtwork";
+import { documentCoverType, resolveDocumentArtwork, type ArtworkInput } from "@/lib/passport/documentArtwork";
 import { countAvailableDocuments } from "@/lib/passport/documentAvailability";
 import { DocumentCoverThumbnail } from "@/components/passport/DocumentCoverThumbnail";
 import { usePublishedWindowSticker } from "@/hooks/usePublishedWindowSticker";
@@ -251,11 +251,11 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
   );
 };
 
-// A harvested OEM link as public-listing-view now returns it: the link itself
-// plus, when the cover pipeline produced one, a page-1 cover. The cover is
-// usually a one-page PDF rather than an image, so it is only ever put in front
-// of an <img> through imageCoverUrl().
-type OemLink = { url: string; title?: string | null; year?: number | null } & OemLinkCover;
+// A harvested OEM link as public-listing-view returns it. The LINK is all we
+// hold: the brochure and the owner's manual stay on the manufacturer site and
+// neither PDF is ever downloaded, so there is no stored page-1 to show. The
+// card art is drawn instead, by DocumentCoverThumbnail.
+type OemLink = { url: string; title?: string | null; year?: number | null };
 
 // Owner's-manual card. We hold the manufacturer's LINK and nothing else — the
 // shopper opens or downloads the manual from the OEM, and no bytes are copied
@@ -283,7 +283,7 @@ const OwnersManualCard = ({
   const openManual = () => { track("owners_manual_open"); window.open(m.url, "_blank", "noopener"); };
   return (
     <RecordCard
-      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual", coverUrl: imageCoverUrl(m) }} vehicle={coverVehicleFor(listing)} onQuickView={openManual} />}
+      cover={<DocumentPreview input={{ type: "owners_manual", title: "Owner's Manual" }} vehicle={coverVehicleFor(listing)} onQuickView={openManual} />}
       title={`Official ${mk.toUpperCase()} Owner's Manual${m.year ? ` (${m.year})` : ""}`}
       source={`${mk.toUpperCase()} · Manufacturer source`}
       status="external"
@@ -784,7 +784,7 @@ const VehiclePassportDocuments = () => {
                     )}
                     {brochureLink && (
                       <RecordCard
-                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure", coverUrl: imageCoverUrl(brochureLink) }} vehicle={coverVehicle} onQuickView={openExternal(brochureLink.url, "oem_brochure")} />}
+                        cover={<DocumentPreview input={{ type: "brochure", title: "Official Brochure" }} vehicle={coverVehicle} onQuickView={openExternal(brochureLink.url, "oem_brochure")} />}
                         title={`${(listing.ymm || "").trim()} Official Brochure`}
                         source={`${((listing.ymm || "").trim().split(/\s+/)[1] || "Manufacturer").toUpperCase()} USA · Manufacturer source`}
                         status="external"

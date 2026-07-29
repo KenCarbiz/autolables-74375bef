@@ -153,37 +153,6 @@ export function documentCoverType(
   }
 }
 
-/**
- * The page-1 cover fields public-listing-view attaches to a harvested OEM
- * brochure / owner's-manual link.
- */
-export interface OemLinkCover {
-  cover_url?: string | null;
-  cover_mime?: string | null;
-  cover_page_count?: number | null;
-  cover_is_image?: boolean | null;
-}
-
-/**
- * The stored page-1 cover, but ONLY when it is genuinely an image.
- *
- * The generator has no rasterizer available to it, so in the common case the
- * artifact it stores is a one-page PDF, not a bitmap. An <img src> pointed at
- * a PDF paints nothing — the card would show an empty broken-image well, which
- * is a worse answer than the drawn cover it was meant to replace. So anything
- * that is not an image resolves to null here and the caller keeps its
- * fallback. `cover_is_image` is computed server-side from the stored mime;
- * a disagreement between the two flags means neither is trusted.
- */
-export function imageCoverUrl(link: OemLinkCover | null | undefined): string | null {
-  if (!link || link.cover_is_image !== true) return null;
-  const url = String(link.cover_url ?? "").trim();
-  if (!url) return null;
-  const mime = String(link.cover_mime ?? "").trim();
-  if (mime && !mime.toLowerCase().startsWith("image/")) return null;
-  return url;
-}
-
 export function resolveDocumentArtwork(input: ArtworkInput): DocumentArtwork {
   const type = canonicalDocumentType(input.type, input.title);
   const style = TYPE_STYLES[type] ?? GENERIC;

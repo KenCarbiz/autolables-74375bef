@@ -23,6 +23,8 @@ import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRe
 import { listingGallery, listingHero } from "@/lib/photos";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { assessListingDecodeHealth, HEALTH_TONE, type DataHealthReport } from "@/lib/vehicleData/dataContract";
+import { harvestVerdict, type HarvestResponse, type HarvestVerdict } from "@/lib/ingest/harvestVerdict";
+import { recordIngestStep } from "@/lib/ingest/recordIngestStep";
 import type { VehicleListing, TitleVerification } from "@/hooks/useVehicleListing";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
@@ -1395,6 +1397,22 @@ interface AddendumRow {
 // /v/:slug scan: service history, remaining warranty, and accessories still
 // available for this vehicle. Saved straight onto vehicle_listings, which the
 // public RPC returns, so changes appear on the shopper page immediately.
+
+// File the harvest outcome against this VIN. Best-effort: a ledger write that
+// fails must not change what the operator is told about the harvest itself,
+// but it is logged rather than discarded.
+const recordHarvestVerdict = async (vehicle: VehicleRow, verdict: HarvestVerdict): Promise<void> => {
+  await recordIngestStep({
+    tenantId: vehicle.tenant_id,
+    vin: vehicle.vin,
+    vehicleId: vehicle.id,
+    step: verdict.step,
+    status: verdict.status,
+    reason: verdict.reason,
+    detail: { trigger: "vehicle_file_manual" },
+  });
+};
+
 const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
   const [busy, setBusy] = useState(false);
   const [found, setFound] = useState<{ url: string; year?: number | null } | null>(null);
@@ -1407,16 +1425,13 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("oem-brochure", { body: { make, model, year } });
-      if (error || !data?.ok) {
-        const code = (data as { error?: string } | null)?.error;
-        toast.error(
-          code === "make_not_supported" ? `No official brochure source configured for ${make}.`
-          : code === "brochure_link_not_saved" ? "Found the brochure but couldn't save the link — it won't show on the packet."
-          : `No official ${make} brochure found for this model.`);
-        return;
-      }
-      setFound({ url: data.url, year: data.year });
-      toast.success(`Official brochure linked${data.cached ? "" : " (newly harvested)"} — it now shows in the shopper packet.`);
+      // One verdict drives the toast AND the per-VIN ledger row, so the
+      // operator can never be told "linked" while the ledger says otherwise.
+      const verdict = harvestVerdict("brochure", data as HarvestResponse | null, error?.message ?? null, make);
+      await recordHarvestVerdict(vehicle, verdict);
+      if (verdict.status !== "succeeded") { toast.error(verdict.toastMessage); return; }
+      setFound({ url: String(data.url), year: data.year });
+      toast.success(verdict.toastMessage);
     } finally {
       setBusy(false);
     }
@@ -1454,16 +1469,11 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("oem-owners-manual", { body: { make, model, year } });
-      if (error || !data?.ok) {
-        const code = (data as { error?: string } | null)?.error;
-        toast.error(
-          code === "make_not_supported" ? `No official manual source configured for ${make}.`
-          : code === "manual_link_not_saved" ? "Found the manual but couldn't save the link — it won't show on the packet."
-          : `No official ${make} owner's manual found for this model.`);
-        return;
-      }
-      setFound({ url: data.url, year: data.year });
-      toast.success(`Owner's manual linked${data.cached ? "" : " (newly harvested)"} — it now shows in the shopper packet.`);
+      const verdict = harvestVerdict("owners_manual", data as HarvestResponse | null, error?.message ?? null, make);
+      await recordHarvestVerdict(vehicle, verdict);
+      if (verdict.status !== "succeeded") { toast.error(verdict.toastMessage); return; }
+      setFound({ url: String(data.url), year: data.year });
+      toast.success(verdict.toastMessage);
     } finally { setBusy(false); }
   };
   return (

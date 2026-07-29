@@ -39,6 +39,7 @@ import StickerPrintTemplates from "@/components/admin/StickerPrintTemplates";
 import LabelDefaultsPanel from "@/components/admin/LabelDefaultsPanel";
 import FactoryStickerPanel from "@/components/admin/FactoryStickerPanel";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
+import IngestOutcomePanel from "@/components/admin/IngestOutcomePanel";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
 import { PriceAuditPanel } from "@/components/admin/PriceAuditPanel";
@@ -2260,6 +2261,11 @@ const Admin = () => {
                 dealer who notices "I'm missing rows" can check
                 the pull status without leaving this tab. */}
             <InventoryFeedHealth />
+
+            {/* Per-vehicle ingest outcome sits directly under feed health: the
+                feed answers "did the row arrive", this answers "did anything
+                actually get produced for it, and if not, why". */}
+            <IngestOutcomePanel />
 
             <div className="flex items-center justify-between">
               <div>

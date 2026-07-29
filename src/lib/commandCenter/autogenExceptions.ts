@@ -39,6 +39,10 @@ const ARTIFACT_LABEL: Record<string, string> = {
   description: "Description generation",
   stock_number: "Stock number",
   intake_incomplete: "Intake orchestration (queued)",
+  factory_sticker: "Factory window sticker",
+  vin_decode: "VIN equipment decode",
+  oem_brochure: "OEM brochure link",
+  owners_manual: "Owner's manual link",
 };
 
 // Why a row without a retry RPC has no Retry button — honest per artifact.
@@ -56,6 +60,17 @@ const ARTIFACT_NO_RETRY_REASON: Record<string, string> = {
   title_request_email: "The title request email is sent once at intake and is not retried by any sweep. Send it manually, then resolve this from the exception queue.",
   stock_number: "Re-enter the stock number on the vehicle file. No sweep retries it.",
   intake_incomplete: "The import was interrupted before this vehicle's intake finished. The nightly intake sweep completes the drafts — no manual retry is needed here.",
+  // factory_sticker is in intake-autoprovision's SWEEP_RETRIED set: the resync
+  // path re-fires it while the record is missing, PENDING_DATA,
+  // FAILED_RETRYABLE or READY_TO_GENERATE.
+  factory_sticker: "The factory build record is re-fired by the nightly resync while it is still unsettled — no manual retry is needed here. A manager can also regenerate it from Admin > Label Templates.",
+  // enrich-sweep-nightly re-runs marketcheck-specs for any listing
+  // shouldDecodeVin still accepts, bounded by MAX_SPEC_ATTEMPTS.
+  vin_decode: "The VIN equipment decode is retried by the nightly enrich sweep, up to its per-VIN attempt cap — no manual retry is needed here.",
+  // The link harvesters are fired on demand and by nothing else. Saying a
+  // sweep will fix them would promise a retry that never comes.
+  oem_brochure: "The OEM brochure harvest is not retried by any sweep. Re-run it from this vehicle's file; the outcome is recorded per VIN in the ingest ledger.",
+  owners_manual: "The owner's-manual harvest is not retried by any sweep. Re-run it from this vehicle's file; the outcome is recorded per VIN in the ingest ledger.",
 };
 
 export const artifactRetryRpc = (artifact: string): string | null =>

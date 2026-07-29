@@ -149,6 +149,18 @@ export interface OemTemplateSelectionInput {
   corroboratingMakes?: Array<string | null | undefined>;
 }
 
+// Machine-readable record of every reason the selection confidence was
+// reduced. `reasons` is prose for a human; this is what a downstream policy
+// is allowed to branch on, so no consumer has to pattern-match sentences.
+// Anything that lowers confidence MUST add a code here — a policy that reads
+// this list treats an unrecognised code as disqualifying, so the fail-closed
+// behaviour depends on the list being complete.
+export type SelectionDowngrade =
+  | "make_alias"
+  | "make_fuzzy"
+  | "model_year_missing"
+  | "generated_fallback_profile";
+
 export interface OemTemplateSelectionResult {
   templateKey: string | null;
   templateVersion: string | null;
@@ -157,6 +169,7 @@ export interface OemTemplateSelectionResult {
   confidence: number;
   selectionStatus: SelectionStatus;
   reasons: string[];
+  downgrades: SelectionDowngrade[];
   conflictingFields: string[];
   sourceReferences: string[];
   definition: OemTemplateDefinition | null;
@@ -179,6 +192,7 @@ export function selectOemTemplate(
   input: OemTemplateSelectionInput,
 ): OemTemplateSelectionResult {
   const reasons: string[] = [];
+  const downgrades: SelectionDowngrade[] = [];
   const conflictingFields: string[] = [];
   const sourceReferences: string[] = [];
   const year = input.modelYear ?? null;
@@ -189,8 +203,8 @@ export function selectOemTemplate(
     canonicalMake: OemId | null = null,
   ): OemTemplateSelectionResult => ({
     templateKey: null, templateVersion: null, templateFamily: null,
-    canonicalMake, confidence, selectionStatus, reasons, conflictingFields,
-    sourceReferences, definition: null,
+    canonicalMake, confidence, selectionStatus, reasons, downgrades,
+    conflictingFields, sourceReferences, definition: null,
   });
 
   const market = (input.market || "US").toUpperCase();
@@ -250,19 +264,23 @@ export function selectOemTemplate(
   let confidence = CONFIDENCE_BY_RESOLUTION[resolved.confidence] ?? 0.5;
   if (resolved.confidence === "ALIAS") {
     reasons.push(`make matched by registered alias ("${rawMake}")`);
+    downgrades.push("make_alias");
   }
   if (resolved.confidence === "FUZZY") {
     reasons.push(`make matched by normalization only ("${rawMake}"); confirm before publishing`);
     conflictingFields.push("make");
+    downgrades.push("make_fuzzy");
   }
   if (year === null) {
     // A missing model year still selects, but the profile could not be
     // pinned by year, so the document is not auto-publishable.
     reasons.push("model year missing; template year-range could not be pinned");
+    downgrades.push("model_year_missing");
     confidence = Math.min(confidence, 0.7);
   }
   if (definition.profileStatus === "fallback") {
     reasons.push(`${definition.displayName} is served by a generated fallback profile, not an authored one`);
+    downgrades.push("generated_fallback_profile");
     confidence = Math.min(confidence, 0.7);
   }
 
@@ -284,6 +302,7 @@ export function selectOemTemplate(
     confidence,
     selectionStatus,
     reasons,
+    downgrades,
     conflictingFields,
     sourceReferences,
     definition,

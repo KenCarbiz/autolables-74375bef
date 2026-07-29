@@ -4,10 +4,13 @@ import {
   setArtifactPostGapMs,
   autoPreload,
   ensureComplianceDrafts,
+  ensureOemDocLinks,
   ensureReadyToken,
   recommendedActionFor,
   recordArtifactFailure,
+  resetOemHarvestDedupe,
 } from "./intake-autoprovision";
+import { oemDocKeyFromYmm, oemDocKeyString, resolveOemMake } from "./oemDocKey";
 
 // ── Fake supabase admin client ─────────────────────────────────────────
 // Chainable query builder that records writes per table and serves canned
@@ -21,16 +24,21 @@ interface TableState {
   updates: Array<{ patch: Record<string, unknown>; filters: Record<string, unknown> }>;
 }
 
-function makeAdmin(rpcErrors: Record<string, string> = {}) {
+function makeAdmin(rpcErrors: Record<string, string> = {}, rpcData: Record<string, unknown> = {}) {
   const tables: Record<string, TableState> = {};
   const state = (t: string): TableState =>
     (tables[t] ||= { maybeSingleResults: [], listResults: [], inserts: [], updates: [] });
   const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = [];
+  // The real try_acquire_service_lock answers true to the first caller; the
+  // fake grants it unless a case says otherwise, so the harvest is exercised.
+  const defaultRpcData: Record<string, unknown> = { try_acquire_service_lock: true };
 
   const admin = {
     rpc: async (fn: string, args: Record<string, unknown>) => {
       rpcCalls.push({ fn, args });
-      return rpcErrors[fn] ? { data: null, error: { message: rpcErrors[fn] } } : { data: null, error: null };
+      if (rpcErrors[fn]) return { data: null, error: { message: rpcErrors[fn] } };
+      const data = fn in rpcData ? rpcData[fn] : defaultRpcData[fn] ?? null;
+      return { data, error: null };
     },
     from: (table: string) => {
       const t = state(table);
@@ -39,6 +47,9 @@ function makeAdmin(rpcErrors: Record<string, string> = {}) {
         select: () => builder,
         eq: (k: string, v: unknown) => { filters[k] = v; return builder; },
         in: (k: string, v: unknown) => { filters[k] = v; return builder; },
+        ilike: (k: string, v: unknown) => { filters[k] = v; return builder; },
+        order: () => builder,
+        limit: () => builder,
         not: () => builder,
         maybeSingle: async () => t.maybeSingleResults.shift() ?? { data: null },
         insert: async (row: Record<string, unknown>) => { t.inserts.push(row); return { data: null, error: null }; },
@@ -62,6 +73,16 @@ function makeAdmin(rpcErrors: Record<string, string> = {}) {
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 const okFetch = () => vi.fn(async () => ({ ok: true, status: 200 }));
+
+const OEM_BROCHURE_URL = "https://x.supabase.co/functions/v1/oem-brochure";
+const OEM_MANUAL_URL = "https://x.supabase.co/functions/v1/oem-owners-manual";
+const isOemHarvest = (url: string) => url === OEM_BROCHURE_URL || url === OEM_MANUAL_URL;
+
+/** A fetch fake that answers the OEM harvests with a real JSON body. */
+const harvestFetch = (body: unknown, status = 200) =>
+  vi.fn(async (url: unknown) => (isOemHarvest(String(url))
+    ? { ok: status >= 200 && status < 300, status, text: async () => JSON.stringify(body) }
+    : { ok: true, status: 200 }));
 
 let originalFetch: typeof globalThis.fetch;
 beforeEach(() => { originalFetch = globalThis.fetch; });
@@ -190,7 +211,7 @@ describe("ensureReadyToken", () => {
   });
 });
 
-beforeEach(() => { setArtifactPostGapMs(0); });
+beforeEach(() => { setArtifactPostGapMs(0); resetOemHarvestDedupe(); });
 
 describe("ensureComplianceDrafts", () => {
   it("calls the four VIN-idempotent draft RPCs", async () => {
@@ -359,7 +380,7 @@ describe("autoPreload", () => {
     const { admin, rpcCalls } = makeAdmin();
     await autoPreload(admin, "https://x.supabase.co", "svc-key", { ...input, emailTitle: true });
     await artifactPostsIdle();
-    expect(rpcCalls.map((c) => c.fn)).toEqual([
+    expect(rpcCalls.map((c) => c.fn).filter((f) => f.startsWith("create_draft"))).toEqual([
       "create_draft_addendum",
       "create_draft_buyers_guide",
       "create_draft_safety_inspection",
@@ -375,6 +396,8 @@ describe("autoPreload", () => {
       "https://x.supabase.co/functions/v1/ingest-orchestrate",
       "https://x.supabase.co/functions/v1/description-orchestrate",
       "https://x.supabase.co/functions/v1/factory-sticker-orchestrate",
+      OEM_BROCHURE_URL,
+      OEM_MANUAL_URL,
     ]);
   });
 
@@ -402,9 +425,13 @@ describe("autoPreload", () => {
     await autoPreload(admin, "https://x.supabase.co", "svc-key", { ...input, listingId: null });
     await artifactPostsIdle();
     const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    // The OEM link harvests are model-scoped, not listing-scoped, so they are
+    // the one pair that still runs for a vehicle with no listing row yet.
     expect(urls).toEqual([
       "https://x.supabase.co/functions/v1/generate-vehicle-forms",
       "https://x.supabase.co/functions/v1/oem-window-sticker",
+      OEM_BROCHURE_URL,
+      OEM_MANUAL_URL,
     ]);
   });
 
@@ -440,6 +467,18 @@ describe("autoPreload", () => {
     expect(artifacts).toContain("form_pdfs");
   });
 
+  it("does not harvest OEM links for a ymm with no leading model year", async () => {
+    // The passport reads the make out of token 1, so a ymm that does not start
+    // with a year produces a key nothing will ever query. Paying for it is the
+    // worst of both outcomes.
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin } = makeAdmin();
+    await autoPreload(admin, "https://x.supabase.co", "svc-key", { ...input, ymm: "Honda Civic EX", listingId: null });
+    await artifactPostsIdle();
+    expect(fetchMock.mock.calls.map((c) => String(c[0])).filter(isOemHarvest)).toEqual([]);
+  });
+
   it("records a non-ok HTTP status from a fire-and-forget endpoint", async () => {
     globalThis.fetch = vi.fn(async () => ({ ok: false, status: 500 })) as unknown as typeof fetch;
     const { admin, state } = makeAdmin();
@@ -450,5 +489,243 @@ describe("autoPreload", () => {
     const all = [...t.inserts, ...t.updates.map((u) => u.patch)];
     const msgs = all.map((r) => JSON.stringify(r.source_values));
     expect(msgs.some((m) => m.includes("http_500"))).toBe(true);
+  });
+});
+
+describe("oemDocKeyFromYmm", () => {
+  it("splits a ymm exactly the way the passport does, trim and all", () => {
+    // public-listing-view: parts[0] year, parts[1] make, parts.slice(2) model.
+    // The trim is deliberately left in the model — storing "QX80" while the
+    // passport asks for "QX80 Sensory" buys a link the shopper never sees.
+    expect(oemDocKeyFromYmm("2025 INFINITI QX80 Sensory")).toEqual({
+      year: 2025, make: "INFINITI", model: "QX80 Sensory",
+    });
+    expect(oemDocKeyFromYmm("2024 Honda Civic")).toEqual({
+      year: 2024, make: "Honda", model: "Civic",
+    });
+    expect(oemDocKeyFromYmm("2024   Nissan    Rogue  SV ")).toEqual({
+      year: 2024, make: "Nissan", model: "Rogue SV",
+    });
+  });
+
+  it("refuses a ymm that cannot produce the key the passport queries", () => {
+    expect(oemDocKeyFromYmm("Honda Civic EX")).toBeNull();
+    expect(oemDocKeyFromYmm("2024 Honda")).toBeNull();
+    expect(oemDocKeyFromYmm("")).toBeNull();
+    expect(oemDocKeyFromYmm(null)).toBeNull();
+  });
+
+  it("keys case-insensitively on (make, model, year), like the unique index", () => {
+    const a = oemDocKeyFromYmm("2024 Nissan Rogue SV")!;
+    const b = oemDocKeyFromYmm("2024 NISSAN rogue sv")!;
+    expect(oemDocKeyString(a)).toBe(oemDocKeyString(b));
+    expect(oemDocKeyString(oemDocKeyFromYmm("2023 Nissan Rogue SV")!)).not.toBe(oemDocKeyString(a));
+  });
+});
+
+describe("resolveOemMake", () => {
+  const domains = { honda: ["honda.com"], "land rover": ["landroverusa.com"] };
+
+  it("resolves a one-word make untouched", () => {
+    expect(resolveOemMake("Honda", "Civic", domains)).toEqual({
+      domains: ["honda.com"], make: "Honda", model: "Civic",
+    });
+  });
+
+  it("rejoins a two-word make split across the make/model boundary", () => {
+    // Every ymm reader takes token 1 as the make, so "2024 Land Rover
+    // Defender 110" arrives as make "Land". Before this, every Land Rover on
+    // every lot answered make_not_supported.
+    expect(resolveOemMake("Land", "Rover Defender 110", domains)).toEqual({
+      domains: ["landroverusa.com"], make: "Land Rover", model: "Defender 110",
+    });
+  });
+
+  it("still refuses a make no allow-list entry can explain", () => {
+    expect(resolveOemMake("Koenigsegg", "Jesko", domains)).toBeNull();
+    expect(resolveOemMake("Land", "Rover", domains)).toBeNull();
+  });
+});
+
+describe("ensureOemDocLinks", () => {
+  const KEY = { make: "Nissan", model: "Rogue SV", year: 2024 };
+  const YMM = "2024 Nissan Rogue SV";
+
+  const harvestUrls = (m: { mock: { calls: unknown[][] } }) =>
+    m.mock.calls.map((c) => String(c[0])).filter(isOemHarvest);
+
+  it("harvests each document exactly once for a whole sync window of one model", async () => {
+    // The requirement in one test: 40 vehicles of one model must cost one
+    // brochure harvest and one manual harvest, not 40 of each.
+    const fetchMock = harvestFetch({ ok: true, cached: false });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin } = makeAdmin();
+    for (let i = 0; i < 40; i++) {
+      await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", `VIN${i}`, YMM);
+    }
+    await artifactPostsIdle();
+    expect(harvestUrls(fetchMock)).toEqual([OEM_BROCHURE_URL, OEM_MANUAL_URL]);
+  });
+
+  it("sends the passport's key, verbatim, as the body", async () => {
+    const fetchMock = harvestFetch({ ok: true, cached: false });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin } = makeAdmin();
+    await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    const call = fetchMock.mock.calls.find((c) => String(c[0]) === OEM_BROCHURE_URL)!;
+    expect(JSON.parse(String((call[1] as { body: string }).body))).toEqual(KEY);
+  });
+
+  it("spends nothing when the link cache already answers the passport", async () => {
+    const fetchMock = harvestFetch({ ok: true, cached: true });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    // Exact year for the brochure; a year-less portal row for the manual —
+    // both are rows the passport's own pick would show.
+    state("oem_brochure_links").listResults.push({ data: [{ id: "b1", year: 2024 }] });
+    state("oem_owners_manual_links").listResults.push({ data: [{ id: "m1", year: null }] });
+    await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    expect(harvestUrls(fetchMock)).toEqual([]);
+  });
+
+  it("spends nothing when the negative cache says we already looked", async () => {
+    // The expensive case: a model with no brochure writes no link row, so
+    // without this every night re-runs the full paid query set forever.
+    const fetchMock = harvestFetch({ ok: true, cached: false });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    for (const outcome of ["not_found", "unsupported"]) {
+      state("oem_packet_backfill_attempts").maybeSingleResults.push({
+        data: {
+          kind: outcome === "unsupported" ? "owners_manual" : "brochure",
+          make_key: "nissan", model_key: "rogue sv", year_key: 2024,
+          outcome, attempts: 1, last_attempt_at: new Date().toISOString(),
+        },
+      });
+    }
+    await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    expect(harvestUrls(fetchMock)).toEqual([]);
+  });
+
+  it("spends nothing when the negative cache itself cannot be read", async () => {
+    // No negative cache means no way to stop tomorrow re-asking, so the safe
+    // reading of an unreadable attempt table is "do not spend".
+    const fetchMock = harvestFetch({ ok: true, cached: false });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    state("oem_packet_backfill_attempts").maybeSingleResults.push(
+      { data: null, error: { message: "relation does not exist" } } as unknown as { data: unknown },
+      { data: null, error: { message: "relation does not exist" } } as unknown as { data: unknown },
+    );
+    await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    expect(harvestUrls(fetchMock)).toEqual([]);
+  });
+
+  it("spends nothing when another runner holds the harvest lock", async () => {
+    const fetchMock = harvestFetch({ ok: true, cached: false });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, rpcCalls } = makeAdmin({}, { try_acquire_service_lock: false });
+    await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    expect(harvestUrls(fetchMock)).toEqual([]);
+    expect(rpcCalls.filter((c) => c.fn === "try_acquire_service_lock")).toHaveLength(2);
+  });
+
+  it("caps how many harvests one isolate can dispatch, leaving the rest to the sweep", async () => {
+    const fetchMock = harvestFetch({ ok: true, cached: false });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin } = makeAdmin();
+    // Ten distinct models in one feed page: the cap, not the feed, decides.
+    for (let i = 0; i < 10; i++) {
+      await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", `VIN${i}`, `202${i % 4} Honda Model${i}`);
+    }
+    await artifactPostsIdle();
+    expect(harvestUrls(fetchMock)).toHaveLength(6);
+  });
+
+  it("writes the verdict to the shared negative cache, but never for a throttle", async () => {
+    globalThis.fetch = vi.fn(async (url: unknown) => (isOemHarvest(String(url))
+      ? { ok: false, status: 404, text: async () => JSON.stringify({ error: "brochure_not_found" }) }
+      : { ok: true, status: 200 })) as unknown as typeof fetch;
+    const { admin, rpcCalls } = makeAdmin();
+    await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    const verdicts = rpcCalls.filter((c) => c.fn === "record_packet_backfill_attempt");
+    expect(verdicts).toHaveLength(2);
+    expect(verdicts[0].args).toMatchObject({
+      _kind: "brochure", _make: "Nissan", _model: "Rogue SV", _year: 2024, _outcome: "not_found",
+    });
+
+    // A 429 teaches us nothing about the model — remembering it as "no
+    // brochure" would be the negative cache lying.
+    resetOemHarvestDedupe();
+    const { admin: admin2, rpcCalls: rpc2 } = makeAdmin();
+    globalThis.fetch = vi.fn(async (url: unknown) => (isOemHarvest(String(url))
+      ? { ok: false, status: 429, text: async () => "Rate limit exceeded for function. Retry after 900ms." }
+      : { ok: true, status: 200 })) as unknown as typeof fetch;
+    await ensureOemDocLinks(admin2, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    expect(rpc2.filter((c) => c.fn === "record_packet_backfill_attempt")).toHaveLength(0);
+  });
+
+  it("does not open an exception for a model the manufacturer simply does not publish", async () => {
+    globalThis.fetch = vi.fn(async (url: unknown) => (isOemHarvest(String(url))
+      ? { ok: false, status: 404, text: async () => JSON.stringify({ error: "make_not_supported" }) }
+      : { ok: true, status: 200 })) as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    expect(state("vehicle_exceptions").inserts).toHaveLength(0);
+  });
+
+  it("treats a harvest that did not persist as a failure, and frees the lock for a retry", async () => {
+    // oem-brochure answers 500 brochure_link_not_saved when the row did not
+    // land. Reporting that as success is what left the passport empty while
+    // the dealer was told the document was linked.
+    globalThis.fetch = vi.fn(async (url: unknown) => (isOemHarvest(String(url))
+      ? { ok: false, status: 500, text: async () => JSON.stringify({ error: "brochure_link_not_saved" }) }
+      : { ok: true, status: 200 })) as unknown as typeof fetch;
+    const { admin, state, rpcCalls } = makeAdmin();
+    await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    await flush();
+    const artifacts = state("vehicle_exceptions").inserts.flatMap((r) =>
+      Object.keys((r.source_values as { artifacts: Record<string, string> }).artifacts));
+    expect(artifacts).toContain("oem_brochure");
+    expect(artifacts).toContain("oem_owners_manual");
+    expect(rpcCalls.filter((c) => c.fn === "release_service_lock")).toHaveLength(2);
+    // An error is a transient verdict, not "this model has no brochure".
+    const verdicts = rpcCalls.filter((c) => c.fn === "record_packet_backfill_attempt");
+    expect(verdicts.map((v) => v.args._outcome)).toEqual(["error", "error"]);
+  });
+
+  it("does not claim a failure when the link landed after our client gave up", async () => {
+    // The harvest is its own invocation and outlives our budget; the row is
+    // the truth, so it is re-read before anything is called a failure.
+    globalThis.fetch = vi.fn(async (url: unknown) => (isOemHarvest(String(url))
+      ? { ok: false, status: 500, text: async () => "boom" }
+      : { ok: true, status: 200 })) as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    // First read (pre-dispatch) misses for both; the post-failure re-read hits.
+    state("oem_brochure_links").listResults.push(
+      { data: [] }, { data: [] }, { data: [{ id: "b1", year: 2024 }] });
+    state("oem_owners_manual_links").listResults.push(
+      { data: [] }, { data: [] }, { data: [{ id: "m1", year: 2024 }] });
+    await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
+    await artifactPostsIdle();
+    await flush();
+    expect(state("vehicle_exceptions").inserts).toHaveLength(0);
+  });
+
+  it("never throws back into the ingest loop", async () => {
+    globalThis.fetch = okFetch() as unknown as typeof fetch;
+    const admin = { rpc: async () => ({ data: true, error: null }), from: () => { throw new Error("db down"); } };
+    await expect(
+      ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM),
+    ).resolves.toBeUndefined();
   });
 });

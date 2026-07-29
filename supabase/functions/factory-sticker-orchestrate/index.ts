@@ -37,6 +37,9 @@ import {
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 import { structuredSheet } from "../_shared/neovinSheet.ts";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
+import {
+  AUTO_PUBLISH_POLICY_VERSION, evaluateAutoPublish, reconcileMsrp,
+} from "../_shared/factorySticker/lib/autoPublish.ts";
 import { recordSourcePayload, refreshVehicleTruth } from "./truth.ts";
 
 const cors = {
@@ -483,6 +486,12 @@ async function orchestrateVehicle(
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
           body: JSON.stringify({ vin, tenant_id: tenantId, vehicle_id: vehicleId }),
+          // NeoVIN is asked strictly and then generically, 30s each, so the
+          // decode legitimately runs a minute. Without a deadline an
+          // unresponsive provider parks this await until the isolate is
+          // killed, which on a sweep burns the whole wall-clock budget on one
+          // row and leaves the rest of the worklist untouched.
+          signal: AbortSignal.timeout(60_000),
         });
         const payload = await res.json().catch(() => ({}));
         fetchDetail = res.ok && payload?.ok !== false ? null : String(payload?.error || `http_${res.status}`);
@@ -736,30 +745,23 @@ async function orchestrateVehicle(
     };
 
     // ── Reconcile MSRP: computed (base + options + destination) vs the
-    // stated total (NeoVIN combined_msrp, else the feed MSRP).
+    // stated total (NeoVIN combined_msrp, else the feed MSRP). Integer cents
+    // throughout — see reconcileMsrp.
     await setRecord(admin, record.id, { generation_status: "VALIDATING" });
-    let reconciliationStatus = "INSUFFICIENT_DATA";
-    let reconciliationDifference: number | null = null;
-    let reviewRequired = false;
-    let reviewReason: string | null = null;
-    if (normalized.baseMsrp && normalized.statedTotalMsrp) {
-      const computed = normalized.baseMsrp + (normalized.optionsTotal || 0) + (normalized.destinationCharge || 0);
-      reconciliationDifference = Math.round(Math.abs(computed - normalized.statedTotalMsrp) * 100) / 100;
-      if (reconciliationDifference <= 5) reconciliationStatus = "MATCHED";
-      else if (reconciliationDifference <= 100) reconciliationStatus = "MINOR_VARIANCE";
-      else {
-        reconciliationStatus = "REVIEW_REQUIRED";
-        reviewRequired = true;
-        reviewReason = `msrp_reconciliation: computed ${computed} differs from stated ${normalized.statedTotalMsrp} by ${reconciliationDifference}`;
-      }
-    }
-    if (!canonicalPassportUrl) {
-      reviewRequired = true;
-      reviewReason = reviewReason || "missing_passport_slug: the QR payload cannot be resolved";
-    }
-    if (reviewRequired) {
+    const reconciliation = reconcileMsrp({
+      baseMsrp: normalized.baseMsrp,
+      optionsTotal: normalized.optionsTotal,
+      destinationCharge: normalized.destinationCharge,
+      statedTotalMsrp: normalized.statedTotalMsrp,
+    });
+    const reconciliationStatus = reconciliation.status;
+    const reconciliationDifference = reconciliation.difference;
+    // Provisional, for the row written before the render. The authoritative
+    // decision is evaluateAutoPublish below, once QA has actually run.
+    const preRenderBlocking = reconciliationStatus === "REVIEW_REQUIRED" || !canonicalPassportUrl;
+    if (preRenderBlocking) {
       await audit(admin, tenantId, "factory_sticker.review_required", record.id,
-        { vin, reason: reviewReason, reconciliation: reconciliationStatus });
+        { vin, reconciliation: reconciliationStatus, has_passport_url: !!canonicalPassportUrl });
     }
 
     // ── Existing OEM provider sticker: recorded as the original-document
@@ -779,6 +781,12 @@ async function orchestrateVehicle(
       logo_asset_version: theme.logoAssetVersion,
       passport_url: canonicalPassportUrl,
       template_override: appliedOverride?.templateKey ?? null,
+      // The publication policy is an input to the outcome, so it belongs in
+      // the fingerprint. Without it, relaxing a gate never reached the fleet:
+      // every record already parked in REVIEW_REQUIRED matched its own stored
+      // fingerprint, took the reuse path below, and was re-reported under the
+      // policy that had blocked it — forever.
+      auto_publish_policy_version: AUTO_PUBLISH_POLICY_VERSION,
     }));
 
     const basePatch: Record<string, unknown> = {
@@ -789,8 +797,8 @@ async function orchestrateVehicle(
       verification_status: normalized.data.generic ? "UNVERIFIED_GENERIC" : "PROVIDER_DECODED",
       reconciliation_status: reconciliationStatus,
       reconciliation_difference: reconciliationDifference,
-      review_required: reviewRequired,
-      review_reason: reviewReason,
+      review_required: preRenderBlocking,
+      review_reason: null,
       normalized_data_json: normalized.data,
       canonical_oem_id: canonicalOemId,
       detected_make_value: make || null,
@@ -903,16 +911,40 @@ async function orchestrateVehicle(
         selection: {
           status: selection.selectionStatus, confidence: selection.confidence,
           template_key: selection.templateKey, reasons: selection.reasons,
+          downgrades: selection.downgrades,
         },
       },
     };
     await audit(admin, tenantId, qaPass ? "factory_sticker.qa_passed" : "factory_sticker.qa_failed",
       record.id, { vin, checks: qaChecks });
 
-    // ── File + publish decision: auto-publish ONLY on a fully clean run.
-    const autoPublish = qaPass && reconciliationStatus === "MATCHED"
-      && normalized.confidence === "HIGH" && !reviewRequired
-      && selection.selectionStatus === "selected";
+    // ── File + publish decision. One pure, unit-tested policy (see
+    // _shared/factorySticker/lib/autoPublish.ts) rather than a boolean
+    // assembled here: the same evaluation produces both the verdict and the
+    // reason a dealer reads, so a record can never sit in review under a
+    // reason that does not correspond to what actually blocked it.
+    const decision = evaluateAutoPublish({
+      hasBuildSheet: !!sheet,
+      eligibility: {
+        eligible: eligibility.eligible,
+        status: eligibility.status,
+        reasons: eligibility.reasons,
+      },
+      selection: {
+        selectionStatus: selection.selectionStatus,
+        downgrades: selection.downgrades,
+        conflictingFields: selection.conflictingFields,
+        hasTemplateDefinition: !!selection.definition,
+      },
+      templateOverrideActive: !!appliedOverride && !appliedOverride.isAutomatic,
+      reconciliation,
+      confidence: normalized.confidence,
+      canonicalPassportUrl,
+      qaChecks,
+      completeness,
+      geometry,
+    });
+    const autoPublish = decision.autoPublish;
     const filed = await fileStickerDocument(admin, tenantId, vehicleId, vin,
       rendered.pdfBytes, rendered.previewSvg, {
         title, condition: normalized.data.condition, vin,
@@ -936,6 +968,7 @@ async function orchestrateVehicle(
 
     await audit(admin, tenantId, "factory_sticker.generated", record.id, {
       vin, document_id: filed.documentId, version: filed.version, auto_publish: autoPublish,
+      blockers: decision.blockers.map((b) => b.code),
       generated_by: opts.regeneration ? "user" : "system",
       ...(opts.regeneration ? { reason_code: opts.regeneration.reasonCode } : {}),
     });
@@ -943,20 +976,18 @@ async function orchestrateVehicle(
     const finalStatus = autoPublish ? "PUBLISHED" : "REVIEW_REQUIRED";
     await setRecord(admin, record.id, {
       ...qaPatch,
+      qa_metadata: {
+        ...(qaPatch.qa_metadata as Record<string, unknown>),
+        auto_publish: {
+          policy_version: AUTO_PUBLISH_POLICY_VERSION,
+          published: autoPublish,
+          blockers: decision.blockers,
+        },
+      },
       generation_status: finalStatus,
       current_document_id: filed.documentId,
       review_required: !autoPublish,
-      review_reason: autoPublish ? null : (reviewReason
-        || (!completeness.pass
-          ? `${completeness.code.toLowerCase()}: ${[
-            ...completeness.missing.map((m) => `missing ${m.label}`),
-            ...completeness.miscounted.map((m) => `${m.label} appeared ${m.actualCount}x`),
-          ].slice(0, 6).join("; ")}`
-          : !geometry.pass ? `${geometry.code.toLowerCase()}: ${geometry.reasons.join("; ")}`
-          : !qaPass ? "qa_failed"
-          : selection.selectionStatus !== "selected" ? `template_${selection.selectionStatus}: ${selection.reasons.join("; ")}`
-          : reconciliationStatus !== "MATCHED" ? `reconciliation_${reconciliationStatus.toLowerCase()}`
-          : `confidence_${normalized.confidence.toLowerCase()}`)),
+      review_reason: decision.reviewReason,
       attempt_count: 0, last_error: null,
       ...(autoPublish ? { published_at: new Date().toISOString(), approved_at: new Date().toISOString() } : {}),
     });
@@ -1113,6 +1144,7 @@ serve(async (req) => {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
               body: JSON.stringify({ vin: refreshVin, tenant_id: tenantId, vehicle_id: vehicleId }),
+              signal: AbortSignal.timeout(60_000),
             });
             const payload = await res.json().catch(() => ({}));
             refresh = { ok: res.ok && payload?.ok !== false, detail: payload?.error ?? null };

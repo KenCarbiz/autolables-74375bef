@@ -17,3 +17,23 @@ verify_jwt = false
 # superseded versions).
 [functions.public-document-asset]
 verify_jwt = false
+
+# oem-brochure and oem-owners-manual reach a metered search provider and write
+# to a GLOBAL link cache, so an anonymous caller would be spending our money.
+# JWT verification stays ON — pinned here rather than left to the default so a
+# later edit has to argue with this comment first. The ingest-time call is not
+# an exception to it: intake-autoprovision invokes these with the project's
+# service-role bearer, which the gateway accepts and isServiceOrCron matches,
+# exactly as every other artifact call in that pipeline already does.
+[functions.oem-brochure]
+verify_jwt = true
+
+[functions.oem-owners-manual]
+verify_jwt = true
+
+# packet-backfill buys OEM window stickers and Firecrawl searches on every call
+# it makes. It is service-role/cron only and gates itself with isServiceOrCron,
+# but the platform default is stated explicitly here so that the entry has to be
+# edited — not merely added — before this one can ever be made public.
+[functions.packet-backfill]
+verify_jwt = true

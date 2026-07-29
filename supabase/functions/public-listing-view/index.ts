@@ -3,12 +3,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
-import {
-  COVER_BUCKET,
-  COVER_SIGNED_URL_TTL_SECONDS,
-  publicCoverPayload,
-  type PublicCover,
-} from "../_shared/oemCover.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
@@ -639,47 +633,10 @@ serve(async (req) => {
       }
     } catch { /* notification is best-effort; never block the shopper view */ }
 
-    // ── Page-1 cover for a harvested OEM link.
-    //
-    // The stored artifact is normally a ONE-PAGE PDF, not an image — the edge
-    // runtime has no PDF rasterizer, so oem-document-cover copies page 1 with
-    // pdf-lib instead of rendering it. `cover_is_image` says which it is, and
-    // an <img src> only works when that is true; otherwise the consumer needs
-    // <object>/<embed> or pdf.js. (A page 1 that is a single full-bleed JPEG
-    // is lifted out as image/jpeg, so the flag genuinely varies per row.)
-    //
-    // The bucket is private: what ships is a short-lived signed URL, minted
-    // per request, never a stored one. A stored signed URL is what made
-    // published cars show broken previews once it aged out.
-    //
-    // The cover columns are read in a SEPARATE query from the link itself, on
-    // purpose. Naming them in the link select would mean that on a database
-    // where 20260728210000_oem_document_covers.sql has not been applied yet,
-    // PostgREST rejects the whole select for an unknown column, the enclosing
-    // catch swallows it, and the brochure and owner's manual silently vanish
-    // from every passport. A cosmetic thumbnail must never be able to take
-    // the document down with it, so the cover is strictly additive.
+    // The harvested OEM links the packet hands the shopper. We store the
+    // LINK and nothing else — the brochure and the owner's manual stay on the
+    // manufacturer's site, and no PDF of either is ever downloaded here.
     interface LinkRow { id: string; url: string; title: string | null; year: number | null }
-    const coverFor = async (table: string, id: string): Promise<PublicCover | null> => {
-      try {
-        const { data: c } = await admin
-          .from(table)
-          .select("cover_storage_path, cover_storage_bucket, cover_status, cover_mime, cover_page_count")
-          .eq("id", id)
-          .maybeSingle();
-        if (!c || c.cover_status !== "ready" || !c.cover_storage_path) return null;
-        const { data } = await admin.storage
-          .from(c.cover_storage_bucket || COVER_BUCKET)
-          .createSignedUrl(c.cover_storage_path, COVER_SIGNED_URL_TTL_SECONDS);
-        return publicCoverPayload({
-          signedUrl: data?.signedUrl,
-          mime: c.cover_mime,
-          pageCount: c.cover_page_count,
-        });
-      } catch {
-        return null;
-      }
-    };
 
     // ── Official OEM brochure link from the global harvest cache: exact
     // model year first, otherwise the nearest within two model years.
@@ -705,10 +662,7 @@ serve(async (req) => {
           rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
           rows.find((r) => r.year == null);
         if (pick) {
-          row.oem_brochure = {
-            url: pick.url, title: pick.title, year: pick.year,
-            ...(await coverFor("oem_brochure_links", pick.id) ?? {}),
-          };
+          row.oem_brochure = { url: pick.url, title: pick.title, year: pick.year };
         }
       }
     } catch { /* brochure link optional */ }
@@ -738,10 +692,7 @@ serve(async (req) => {
           rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
           rows.find((r) => r.year == null);
         if (pick) {
-          row.oem_owners_manual = {
-            url: pick.url, title: pick.title, year: pick.year,
-            ...(await coverFor("oem_owners_manual_links", pick.id) ?? {}),
-          };
+          row.oem_owners_manual = { url: pick.url, title: pick.title, year: pick.year };
         }
       }
     } catch { /* owner's-manual link optional */ }
