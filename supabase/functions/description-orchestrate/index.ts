@@ -42,6 +42,30 @@ const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
 const RECONCILE_BUDGET_MS = 100_000;
 const RECONCILE_MAX_DEPTH = 80; // backstop against runaway chaining
 
+// A dropped/renamed RPC signature returns { data: null, error } — destructuring
+// only `data` turns that into an indistinguishable "nothing to do" and the
+// pipeline stalls silently. Every RPC goes through one of these two.
+async function rpc<T = unknown>(admin: any, fn: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await admin.rpc(fn, args);
+  if (error) {
+    console.error(`rpc ${fn} failed`, error.code, error.message, error.details ?? "");
+    throw new Error(`rpc_failed:${fn}:${error.code || ""}:${error.message}`);
+  }
+  return data as T;
+}
+
+// Advisory RPCs: a failure must be visible in logs but must not abort the run.
+async function rpcSoft(admin: any, fn: string, args: Record<string, unknown>): Promise<boolean> {
+  const { error } = await admin.rpc(fn, args);
+  if (error) {
+    console.error(`rpc ${fn} failed (non-fatal)`, error.code, error.message, error.details ?? "");
+    return false;
+  }
+  return true;
+}
+
+
+
 const DEFAULT_SETTINGS = {
   review_mode: "EXCEPTION_REVIEW", review_mode_by_class: {},
   enabled_channels: ["vehicle_passport", "dealer_website", "autotrader", "cars_com", "cargurus", "facebook", "google_seo"],
