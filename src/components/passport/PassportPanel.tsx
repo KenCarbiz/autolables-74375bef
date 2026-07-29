@@ -41,7 +41,8 @@ export { PASSPORT_PANEL_KEYS, isPassportPanelKey } from "./passportPanelKeys";
 export type { PassportPanelKey } from "./passportPanelKeys";
 import type { PassportPanelKey } from "./passportPanelKeys";
 
-interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string; footerNote?: string; wide?: boolean; xl?: boolean }
+import type { PanelDef } from "./panelDef";
+import { buildTrustPanel, isTrustPanelKey } from "./passportTrustPanels";
 
 function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleListing, isPreview: boolean, go: (s: string) => void, openPanel: (k: PassportPanelKey) => void, nhtsa: NhtsaSafetyResult | null): PanelDef {
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
@@ -2314,6 +2315,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         </>,
       };
     }
+    default:
+      // The trust / document / dealer keys are served by buildTrustPanel and
+      // never reach here. A neutral shell beats throwing on an unknown key.
+      return { title: "Vehicle details", subtitle: "", body: <Empty>Details are not available for this vehicle yet.</Empty> };
   }
 }
 
@@ -3352,6 +3357,8 @@ export const PANEL_ICON: Record<PassportPanelKey, React.ElementType> = {
   "factory-warranty": ShieldCheck, "owner-reviews": Star, "highlights": Award,
   "overview": FileText, "key-specs": FileText, "equipment": Package, "ownership-timeline": Clock,
   "visit-dealer": MapPin,
+  "title-brand": ShieldCheck, "vehicle-history": History, "verification-categories": BadgeCheck,
+  "documents": FileText, "dealer-profile": MapPin,
 };
 
 export interface PassportPanelProps {
@@ -3376,7 +3383,19 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
   const { data: nhtsa } = useNhtsaSafety(listing.ymm, key === "owner-reviews");
   if (!key) return null;
 
-  const def = buildPanel(key, d, listing, isPreview, go, openPanel, nhtsa);
+  // Trust / document / dealer drawers live in their own module; the dispatcher
+  // just routes to them so this file does not keep growing.
+  const def =
+    isTrustPanelKey(key)
+      ? (buildTrustPanel(key, {
+          d, listing, isPreview, go, openPanel,
+          track: (event, meta) => trackCustomerCtaClicked({
+            storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin,
+            source: "passport", surface: "vehicle_passport",
+            metadata: { cta: event, placement: `panel:${key}`, ...meta },
+          }),
+        }) ?? buildPanel(key, d, listing, isPreview, go, openPanel, nhtsa))
+      : buildPanel(key, d, listing, isPreview, go, openPanel, nhtsa);
   const ctaSignals: CtaSignals = { greatPrice: (d.belowMarket ?? 0) > 0, highDemand: (d.viewCount ?? 0) > 20, highConf: (d.confScore ?? 0) >= 85, highlyRated: (d.reviewRating ?? 0) >= 4.5, hasWarranty: !!d.warrantyStr && !d.warrantyExpired };
   const ctaVariant = d.dealerTrust.mobileCtaVariant || "dealer_availability";
   const footer = (def.primary || def.secondary) ? (

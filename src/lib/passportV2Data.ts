@@ -275,6 +275,11 @@ export interface PassportData {
   confScore: number | null;
   confLabel: string;
   confDeductions: { label: string; points: number }[];
+  // Critical History & Title sources that have not returned. Non-empty means
+  // confScore is null BECAUSE of missing evidence (not because the vehicle is
+  // new), so a surface can say "Insufficient data — title & brand pending"
+  // instead of implying a negative result.
+  confBlockedBy: string[];
   verifiedBy: string[];
   dealerVerified: boolean;
   verifyRows: VerifyRow[];
@@ -620,10 +625,26 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   ded(!isNew && serviceCount === 0 && knownSignals >= 2, "No service records on file", 4);
   ded(!warrantyStr && knownSignals >= 2, "No factory warranty remaining", 5);
   ded(!isNew && typeof mc.carfax_clean_title !== "boolean" && accidentCount == null, "History report not yet attached", 7);
-  const confScore = knownSignals >= 2
+  // History & Title scores ONLY when its own critical evidence has returned.
+  //
+  // `knownSignals >= 2` used to be the whole gate, and recall status + a
+  // warranty string satisfy it — neither of which is history or title. A car
+  // whose title was still pending and whose history report had not landed
+  // therefore scored 97 − 7 ("history report not yet attached") − 4 = 86 and
+  // was labelled "Strong", directly contradicting the Pending and Not-available
+  // states the same page showed for those two checks. Absent evidence must
+  // never lift a confidence score, so it now yields no score at all.
+  const titleResolved = titleStatus !== "unknown";
+  const historyResolved = accidentCount != null || ownerCount != null;
+  const confBlockedBy: string[] = [];
+  if (!titleResolved) confBlockedBy.push("Title & brand");
+  if (!historyResolved) confBlockedBy.push("Vehicle history");
+  const confScore = confBlockedBy.length === 0 && knownSignals >= 2
     ? Math.max(35, 97 - confDeductions.reduce((s, x) => s + x.points, 0))
     : null;
-  const confLabel = confScore == null ? "" : confScore >= 90 ? "Excellent" : confScore >= 80 ? "Very Good" : confScore >= 70 ? "Good" : "Fair";
+  const confLabel = confScore == null
+    ? (confBlockedBy.length ? "Insufficient data" : "")
+    : confScore >= 90 ? "Excellent" : confScore >= 80 ? "Very Good" : confScore >= 70 ? "Good" : "Fair";
 
   const verifiedBy = [
     { label: "Vehicle History", on: typeof mc.carfax_clean_title === "boolean" || ownerCount != null },
@@ -756,7 +777,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     ownerCount, accidentCount, cleanTitle, titleStatus, titleVerifiedAt, titleVerifiedSource, serviceCount, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr, warrantyExpired,
     oemWarranty: ((listing as unknown as { oem_warranty?: OemWarrantyView }).oem_warranty) || null,
-    confScore, confLabel, confDeductions, verifiedBy, dealerVerified, verifyRows,
+    confScore, confLabel, confDeductions, confBlockedBy, verifiedBy, dealerVerified, verifyRows,
     highlights, specRows, keySpecs, epa, overview, whyBuy,
     reviewRating: (dealer.review_rating as number) ?? null,
     reviewCount: (dealer.review_count as number) ?? null,
