@@ -8235,6 +8235,8 @@ export type Database = {
       vehicle_files: {
         Row: {
           aftermarket_installs: Json
+          archive_reason: string | null
+          archived_at: string | null
           attached_documents: Json
           available_accessories: Json
           cobuyer_email: string
@@ -8272,6 +8274,8 @@ export type Database = {
         }
         Insert: {
           aftermarket_installs?: Json
+          archive_reason?: string | null
+          archived_at?: string | null
           attached_documents?: Json
           available_accessories?: Json
           cobuyer_email?: string
@@ -8309,6 +8313,8 @@ export type Database = {
         }
         Update: {
           aftermarket_installs?: Json
+          archive_reason?: string | null
+          archived_at?: string | null
           attached_documents?: Json
           available_accessories?: Json
           cobuyer_email?: string
@@ -8437,6 +8443,8 @@ export type Database = {
       vehicle_listings: {
         Row: {
           advertised_price_before_doc: number | null
+          archive_reason: string | null
+          archived_at: string | null
           assigned_agent_id: string | null
           available_accessories: Json
           blackbook: Json | null
@@ -8522,6 +8530,8 @@ export type Database = {
         }
         Insert: {
           advertised_price_before_doc?: number | null
+          archive_reason?: string | null
+          archived_at?: string | null
           assigned_agent_id?: string | null
           available_accessories?: Json
           blackbook?: Json | null
@@ -8607,6 +8617,8 @@ export type Database = {
         }
         Update: {
           advertised_price_before_doc?: number | null
+          archive_reason?: string | null
+          archived_at?: string | null
           assigned_agent_id?: string | null
           available_accessories?: Json
           blackbook?: Json | null
@@ -9864,6 +9876,8 @@ export type Database = {
         Args: { _token: string }
         Returns: {
           aftermarket_installs: Json
+          archive_reason: string | null
+          archived_at: string | null
           attached_documents: Json
           available_accessories: Json
           cobuyer_email: string
@@ -9910,6 +9924,8 @@ export type Database = {
         Args: { _slug: string }
         Returns: {
           advertised_price_before_doc: number | null
+          archive_reason: string | null
+          archived_at: string | null
           assigned_agent_id: string | null
           available_accessories: Json
           blackbook: Json | null
@@ -10115,6 +10131,10 @@ export type Database = {
       marketcheck_prune_inventory: {
         Args: { _live_vins: string[]; _tenant_id: string }
         Returns: Json
+      }
+      marketcheck_revive_listing: {
+        Args: { _tenant_id: string; _vin: string }
+        Returns: undefined
       }
       merge_dealer_settings: {
         Args: { _patch: Json; _tenant_id: string }
