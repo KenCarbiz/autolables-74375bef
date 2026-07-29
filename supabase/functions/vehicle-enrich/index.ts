@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { parseYmm, canQueryMakeModel } from "../_shared/ymm.ts";
 
 // ──────────────────────────────────────────────────────────────
 // vehicle-enrich — pull EVERYTHING for one VIN at ingest and persist it.
@@ -98,15 +99,13 @@ async function fetchPredict(vin: string, miles: number | null, carType: string, 
 async function fetchComps(ymm: string | null, condition: string, zip: string | null, listingPrice: number | null, subjectVin: string, subjectTrim: string | null, dealerName: string | null, subjectMileage: number | null) {
   try {
     if (!ymm) return null;
-    const parts = ymm.split(/\s+/);
-    const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
+    const { year } = parseYmm(ymm);
     // Normalized dealer name for same-rooftop exclusion (so we never show the
     // customer the dealer's OWN cars as comparables).
     const normDealer = (s: unknown) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
     const ownName = normDealer(dealerName);
     const trim = String(subjectTrim || "").trim();
-    const make = year ? parts[1] : parts[0];
-    const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
+    const { make, model } = parseYmm(ymm);
     const carType = condition === "new" ? "new" : "used";
 
     // One MarketCheck active-search pass. Returns null only on transport error.
@@ -407,10 +406,10 @@ async function fetchHistory(vin: string) {
 async function fetchMds(ymm: string | null, condition: string, zip: string | null) {
   try {
     if (!ymm) return null;
-    const parts = ymm.split(/\s+/);
-    const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
-    const make = year ? parts[1] : parts[0];
-    const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
+    const { year, make, model } = parseYmm(ymm);
+    // A blank make or model is rejected by the provider and billed anyway, so
+    // the call is refused here rather than sent and paid for.
+    if (!canQueryMakeModel({ year, make, model })) return null;
     const carType = condition === "new" ? "new" : "used";
     const run = async (opts: { useYear: boolean; useZip: boolean }) => {
       const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType });
@@ -449,11 +448,8 @@ async function fetchMds(ymm: string | null, condition: string, zip: string | nul
 async function fetchSoldStats(ymm: string | null, condition: string, state: string | null) {
   try {
     if (!ymm || !state) return null;
-    const parts = ymm.split(/\s+/);
-    const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
-    const make = year ? parts[1] : parts[0];
-    const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
-    if (!make || !model) return null;
+    const { year, make, model } = parseYmm(ymm);
+    if (!canQueryMakeModel({ year, make, model })) return null;
     const carType = condition === "new" ? "new" : "used";
     const median = (xs: number[]) => {
       const s = [...xs].sort((a, z) => a - z);
@@ -564,10 +560,7 @@ async function fetchRecalls(vin: string, ymm: string | null) {
 async function fetchNhtsaRecalls(ymm: string | null) {
   try {
     if (!ymm) return null;
-    const parts = ymm.split(/\s+/);
-    const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
-    const make = year ? parts[1] : parts[0];
-    const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
+    const { year, make, model } = parseYmm(ymm);
     if (!year || !make || !model) return null;
     const url = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${encodeURIComponent(year)}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });

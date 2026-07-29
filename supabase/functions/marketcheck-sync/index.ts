@@ -203,6 +203,11 @@ const toSourceHost = (raw: string): string => {
 };
 
 interface MCListing {
+  // MarketCheck's own listing identifier. Required by /v2/listing/car/{id},
+  // which is the only source of extra.options / features / seller_comments —
+  // the syndication feed usually omits them. Captured now so the id exists
+  // whenever that call is worth making; costs nothing at sync time.
+  id?: string;
   vin?: string; price?: number | string; msrp?: number | string;
   stock_no?: string; miles?: number; source?: string;
   inventory_type?: string; is_certified?: boolean; vdp_url?: string;
@@ -905,6 +910,8 @@ serve(async (req) => {
                 carfax_1_owner: l.carfax_1_owner ?? null, carfax_clean_title: l.carfax_clean_title ?? null,
                 seller_type: l.seller_type || null, in_transit: l.in_transit ?? null,
                 vdp_url: l.vdp_url || null,
+                // Survives the rebuild only because it is named here.
+                mc_listing_id: l.id ?? priorMc.mc_listing_id ?? null,
                 // OEM equipment / options & packages when present in the feed.
                 features: ((l.extra?.features ?? l.features) ?? priorMc.features) ?? null,
                 options: ((l.extra?.options ?? l.options) ?? priorMc.options) ?? null,
