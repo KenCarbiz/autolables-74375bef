@@ -4961,6 +4961,72 @@ export type Database = {
           },
         ]
       }
+      oem_distribution_events: {
+        Row: {
+          brand: string
+          decided_at: string
+          decided_by: string | null
+          decision: string
+          document_kind: string
+          evidence: Json
+          gate_version: number
+          id: string
+          source_url: string | null
+          store_id: string | null
+          stored_path: string | null
+          tenant_id: string
+          vehicle_listing_id: string | null
+          vin: string
+        }
+        Insert: {
+          brand: string
+          decided_at?: string
+          decided_by?: string | null
+          decision: string
+          document_kind: string
+          evidence?: Json
+          gate_version?: number
+          id?: string
+          source_url?: string | null
+          store_id?: string | null
+          stored_path?: string | null
+          tenant_id: string
+          vehicle_listing_id?: string | null
+          vin: string
+        }
+        Update: {
+          brand?: string
+          decided_at?: string
+          decided_by?: string | null
+          decision?: string
+          document_kind?: string
+          evidence?: Json
+          gate_version?: number
+          id?: string
+          source_url?: string | null
+          store_id?: string | null
+          stored_path?: string | null
+          tenant_id?: string
+          vehicle_listing_id?: string | null
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_distribution_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_distribution_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oem_owners_manual_links: {
         Row: {
           cover_generated_at: string | null
@@ -10336,6 +10402,10 @@ export type Database = {
           vin: string
         }[]
       }
+      oem_distribution_for_vehicle: {
+        Args: { _document_kind: string; _tenant_id: string; _vin: string }
+        Returns: string
+      }
       oem_franchise_min_new_units: { Args: never; Returns: number }
       oem_make_from_ymm: { Args: { _ymm: string }; Returns: string }
       publish_description_internal: {
@@ -10501,6 +10571,22 @@ export type Database = {
             }
             Returns: string
           }
+      record_oem_distribution: {
+        Args: {
+          _brand: string
+          _document_kind: string
+          _source_url?: string
+          _store_id?: string
+          _stored_path?: string
+          _tenant_id: string
+          _vehicle_listing_id?: string
+          _vin: string
+        }
+        Returns: {
+          decision: string
+          event_id: string
+        }[]
+      }
       record_packet_backfill_attempt: {
         Args: {
           _detail?: string
