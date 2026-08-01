@@ -247,6 +247,9 @@ export type Database = {
           price_verified_at: string | null
           products_snapshot: Json
           ready_at: string | null
+          revised_from_id: string | null
+          revision_reason: string | null
+          revision_required_at: string | null
           sb766_add_on_precontract: Json | null
           sb766_financing_disclosure: Json | null
           sb766_three_day_return_ack: boolean | null
@@ -314,6 +317,9 @@ export type Database = {
           price_verified_at?: string | null
           products_snapshot?: Json
           ready_at?: string | null
+          revised_from_id?: string | null
+          revision_reason?: string | null
+          revision_required_at?: string | null
           sb766_add_on_precontract?: Json | null
           sb766_financing_disclosure?: Json | null
           sb766_three_day_return_ack?: boolean | null
@@ -381,6 +387,9 @@ export type Database = {
           price_verified_at?: string | null
           products_snapshot?: Json
           ready_at?: string | null
+          revised_from_id?: string | null
+          revision_reason?: string | null
+          revision_required_at?: string | null
           sb766_add_on_precontract?: Json | null
           sb766_financing_disclosure?: Json | null
           sb766_three_day_return_ack?: boolean | null
@@ -7914,48 +7923,69 @@ export type Database = {
       vehicle_addendum_items: {
         Row: {
           created_at: string
+          customer_status: string
           description: string | null
           disclosure_text: string | null
           display_order: number
+          external_ref: string | null
           id: string
+          installer_name: string | null
           is_included: boolean
           is_installed: boolean
           is_selected: boolean
           item_type: string
           name: string
           price: number
+          proof_due_at: string | null
+          status_changed_at: string
+          status_changed_by: string | null
           updated_at: string
           vehicle_addendum_id: string
+          workflow_status: string
         }
         Insert: {
           created_at?: string
+          customer_status?: string
           description?: string | null
           disclosure_text?: string | null
           display_order?: number
+          external_ref?: string | null
           id?: string
+          installer_name?: string | null
           is_included?: boolean
           is_installed?: boolean
           is_selected?: boolean
           item_type: string
           name: string
           price?: number
+          proof_due_at?: string | null
+          status_changed_at?: string
+          status_changed_by?: string | null
           updated_at?: string
           vehicle_addendum_id: string
+          workflow_status?: string
         }
         Update: {
           created_at?: string
+          customer_status?: string
           description?: string | null
           disclosure_text?: string | null
           display_order?: number
+          external_ref?: string | null
           id?: string
+          installer_name?: string | null
           is_included?: boolean
           is_installed?: boolean
           is_selected?: boolean
           item_type?: string
           name?: string
           price?: number
+          proof_due_at?: string | null
+          status_changed_at?: string
+          status_changed_by?: string | null
           updated_at?: string
           vehicle_addendum_id?: string
+          workflow_status?: string
         }
         Relationships: [
           {
@@ -9923,6 +9953,11 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: number
       }
+      equipment_has_verified_proof: {
+        Args: { _name: string; _ref: string; _vin: string }
+        Returns: boolean
+      }
+      expire_overdue_equipment_proofs: { Args: never; Returns: number }
       find_abandoned_signings: {
         Args: {
           _limit?: number
@@ -9940,6 +9975,10 @@ export type Database = {
           vehicle_vin: string
           vehicle_ymm: string
         }[]
+      }
+      flag_addendum_revision: {
+        Args: { _addendum_id: string; _reason: string }
+        Returns: undefined
       }
       get_addendum_by_token: {
         Args: { _token: string }
@@ -10353,6 +10392,23 @@ export type Database = {
           ymm: string
         }[]
       }
+      log_equipment_status_change: {
+        Args: {
+          _actor: string
+          _automatic: boolean
+          _item_id: string
+          _name: string
+          _next_status: string
+          _next_workflow: string
+          _prev_status: string
+          _prev_workflow: string
+          _price: number
+          _source: string
+          _tenant: string
+          _vin: string
+        }
+        Returns: undefined
+      }
       log_qr_scan: {
         Args: {
           _browser?: string
@@ -10685,6 +10741,8 @@ export type Database = {
         Args: { p_request_id: string; p_response: string }
         Returns: Json
       }
+      restore_verified_equipment: { Args: never; Returns: number }
+      run_equipment_proof_sweep: { Args: never; Returns: number }
       save_description_channel_policy: {
         Args: {
           p_active?: boolean
@@ -10841,6 +10899,37 @@ export type Database = {
           p_scope: string
         }
         Returns: Json
+      }
+      set_equipment_status: {
+        Args: { _item_id: string; _source?: string; _status: string }
+        Returns: {
+          created_at: string
+          customer_status: string
+          description: string | null
+          disclosure_text: string | null
+          display_order: number
+          external_ref: string | null
+          id: string
+          installer_name: string | null
+          is_included: boolean
+          is_installed: boolean
+          is_selected: boolean
+          item_type: string
+          name: string
+          price: number
+          proof_due_at: string | null
+          status_changed_at: string
+          status_changed_by: string | null
+          updated_at: string
+          vehicle_addendum_id: string
+          workflow_status: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "vehicle_addendum_items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       set_marketcheck_allowed: {
         Args: { _allowed: boolean; _tenant_id: string }
