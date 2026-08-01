@@ -3,6 +3,7 @@
 // purpose so the new-vehicle build-out (factory options, market adjustment,
 // incentives) happens here without touching the approved premium addendum.
 
+import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { SaturdaySticker } from "./types";
 import {
@@ -41,6 +42,11 @@ const SectionBar = ({ icon, title, tag, total, bg, fg }: { icon: AddendumIconKey
 
 export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   const { dealer, vehicle, installed = [], upgrades = [], benefits, qrUrl, disclaimer } = data;
+  // The dealer logo renders only when the dealership has one AND the template's
+  // "Show dealer logo" choice is on. A broken URL falls back to the name block
+  // rather than printing a broken-image box on a customer document.
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showLogo = dealer.logoEnabled !== false && !!dealer.logoUrl && !logoFailed;
   const accent = dealer.theme?.accentColor || "#0B6FEA";
   const accentSoft = `${accent}14`;
   const accentBorder = `${accent}40`;
@@ -116,8 +122,18 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
             </span>
           </div>
           <div className="text-right text-[7.2px] font-semibold leading-[1.4] min-w-0 pl-2.5" style={{ color: T.muted, borderLeft: `1px solid ${T.border}` }}>
+            {showLogo ? (
+              <img
+                src={dealer.logoUrl}
+                alt={dealer.name}
+                crossOrigin="anonymous"
+                onError={() => setLogoFailed(true)}
+                className="ml-auto mb-1 h-[0.34in] w-auto max-w-[1.5in] object-contain object-right"
+              />
+            ) : null}
             <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{dealer.name}</div>
             {dealer.address && <div className="break-words">{dealer.address}</div>}
+            {dealer.addressLine2 && <div className="break-words">{dealer.addressLine2}</div>}
             {dealer.phone && <div>{dealer.phone}</div>}
             {dealer.website && <div>{dealer.website}</div>}
           </div>

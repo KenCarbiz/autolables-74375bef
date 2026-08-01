@@ -66,6 +66,32 @@ describe("saturday template print resolution", () => {
   });
 });
 
+// The "Show dealer logo" control has to reach the rendered document, not just
+// the preview chrome — these two assertions are the unit form of that promise.
+describe("dealer logo toggle", () => {
+  const withLogo = { ...BRAND, logoUrl: "https://cdn.example.com/dealer.png", addressLine2: "Hartford, CT 06120" };
+  const render = (id: string, branding: StickerBranding) => {
+    const t = STUDIO_SATURDAY_TEMPLATES.find((x) => x.config.id === id)!;
+    return renderToStaticMarkup(<t.Render config={t.config} data={DATA} branding={branding} />);
+  };
+
+  for (const id of ["addendum-saturday-premium", "addendum-new-car-saas"]) {
+    it(`${id} renders the resolved logo when the toggle is on`, () => {
+      const html = render(id, { ...withLogo, showLogo: true });
+      expect(html).toContain("https://cdn.example.com/dealer.png");
+      expect(html).toContain("Hartford, CT 06120");
+    });
+
+    it(`${id} drops the logo but keeps the contact block when the toggle is off`, () => {
+      const html = render(id, { ...withLogo, showLogo: false });
+      expect(html).not.toContain("https://cdn.example.com/dealer.png");
+      expect(html).toContain("Harte Infiniti");
+      expect(html).toContain("Hartford, CT 06120");
+      expect(html).toContain("harteinfiniti.com");
+    });
+  }
+});
+
 describe("new car SaaS template", () => {
   const template = STUDIO_SATURDAY_TEMPLATES.find((t) => t.config.id === "addendum-new-car-saas")!;
 

@@ -70,8 +70,12 @@ export interface StickerData {
 export interface StickerBranding {
   dealerName: string;
   address: string;
+  /** "Hartford, CT 06120" — renderers with room print it as a second line. */
+  addressLine2?: string;
   phone: string;
   website: string;
+  /** Real destination for the displayed website text (never the printed text). */
+  websiteHref?: string;
   logoUrl?: string;
   showLogo: boolean;
   valueProp: string;

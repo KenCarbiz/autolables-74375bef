@@ -138,8 +138,11 @@ function toSaturdaySticker(data: StickerData, branding: StickerBranding): Saturd
     dealer: {
       name: branding.dealerName,
       address: branding.address,
+      addressLine2: branding.addressLine2,
       phone: branding.phone,
       website: branding.website,
+      logoUrl: branding.logoUrl,
+      logoEnabled: branding.showLogo,
       slogan: branding.valueProp,
       pricingLabel: extended.marketStatus || "Best Price",
       valueProps: benefits,

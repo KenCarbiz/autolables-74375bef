@@ -54,6 +54,8 @@ export interface PrefillVehicle {
   recallStatus: string;
   openRecallCount: number;
   slug: string;
+  /** Dealership location the vehicle is assigned to (vehicle_listings.store_id). */
+  storeId: string;
   warrantyInfo: Record<string, unknown> | null;
   // Full raw row + the MarketCheck attribute blob, so any future field we
   // need is already on hand without another round-trip.
@@ -145,6 +147,7 @@ function normalizeRow(row: Record<string, any>): PrefillVehicle {
     recallStatus: s(row.recall_status),
     openRecallCount: typeof row.open_recall_count === "number" ? row.open_recall_count : 0,
     slug: s(row.slug),
+    storeId: s(row.store_id),
     warrantyInfo: (row.warranty_info as Record<string, unknown>) || null,
     mcAttributes: mc,
     raw: row,

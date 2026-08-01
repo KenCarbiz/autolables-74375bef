@@ -53,8 +53,14 @@ export type SaturdayPassportMode = "enabled" | "disabled" | "selected_templates_
 export type SaturdayDealer = {
   name: string;
   address: string;
+  /** Optional second address line, e.g. "Hartford, CT 06120". */
+  addressLine2?: string;
   phone: string;
   website: string;
+  /** Resolved dealership logo. Rendered only when logoEnabled is not false. */
+  logoUrl?: string;
+  /** Dealer's "Show dealer logo" choice for this template. */
+  logoEnabled?: boolean;
   /** Optional dealer slogan/tagline, for example "Driven by trust. Backed by service." */
   slogan?: string;
   /** Optional dealer-specific pricing terminology, for example "Best Price", "One Price", "Market Price", or "Selling Price". */

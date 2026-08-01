@@ -24,7 +24,8 @@ import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useDealerPrintSettings } from "@/lib/stickerStudio/useDealerPrintSettings";
 import { useTemplateCustomization } from "@/lib/stickerStudio/useTemplateCustomization";
 import { applyCustomization } from "@/lib/stickerStudio/customization";
-import { brandingFromSettings } from "@/pages/StickerStudio";
+import { brandingFromIdentity } from "@/pages/StickerStudio";
+import { resolveDealerIdentity } from "@/lib/dealerIdentity";
 import { saveStickerToVehicle, publishToPassport, saveAddendumState, syncAddendumProductBadges, syncGetReadyInstalls, type AddendumItemInput } from "@/lib/stickerStudio/api";
 import { ArrowLeft, ArrowLeftRight, Printer, Download, Image as ImageIcon, Plus, Trash2, Save, Globe, Sun, Moon, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -43,16 +44,52 @@ const StickerStudioGenerator = () => {
   const { byId } = useStickerCatalog();
   const baseTemplate = byId(templateId) || getStudioTemplate(templateId);
   const { settings, loading: settingsLoading } = useDealerSettings();
-  const { tenant } = useTenant();
+  const { tenant, stores, currentStore } = useTenant();
   const { user } = useAuth();
   const rules = useDealerDocumentRules();
   const quota = useUsageLimits();
-  const { customization } = useTemplateCustomization(templateId);
+  const { customization, save: saveCustomization } = useTemplateCustomization(templateId);
+  // Vehicle data (prefilled from ?vehicleId, then editable).
+  const [data, setData] = useState<StickerData>({
+    vehicleTitle: "", vin: "", stock: "", mileage: "", msrp: "", price: "",
+    installed: [blankItem()], upgrades: [blankItem()], benefits: [blankItem()], notes: "", qrUrl: "",
+  });
+  const prefill = useVehiclePrefill((v) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    setData((prev) => ({
+      ...prev,
+      vehicleTitle: `${v.ymm}${v.trim ? ` ${v.trim}` : ""}`.trim() || prev.vehicleTitle,
+      vin: v.vin || prev.vin,
+      stock: v.stock || prev.stock,
+      mileage: v.mileage || prev.mileage,
+      msrp: v.msrp || prev.msrp,
+      price: v.price || prev.price,
+      specs: [v.engine, v.drivetrain, v.transmission,
+        (v.mpgCity && v.mpgHwy) ? `${v.mpgCity}/${v.mpgHwy} MPG` : v.mpgCity ? `${v.mpgCity} MPG` : v.fuelType,
+      ].filter(Boolean).join(" · ") || prev.specs,
+      qrUrl: v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/v/${v.vin}` : prev.qrUrl,
+    }));
+  });
+
   // Apply order: built-in base -> DB config (already in baseTemplate) -> dealer
   // customization. Vehicle data + UI toggles layer on below.
+  // Which dealership is speaking: the location the vehicle belongs to wins over
+  // whatever the user last had selected, so a group's locations never bleed
+  // into one another's paperwork.
+  const identity = useMemo(
+    () => resolveDealerIdentity({
+      settings,
+      tenantName: tenant?.name,
+      stores,
+      vehicleStoreId: prefill.vehicle?.storeId,
+      activeStoreId: currentStore?.id,
+      vehicleAssigned: !prefill.active ? undefined : !!prefill.vehicle?.storeId,
+    }),
+    [settings, tenant?.name, stores, prefill.active, prefill.vehicle?.storeId, currentStore?.id],
+  );
   const applied = useMemo(
-    () => (baseTemplate ? applyCustomization(baseTemplate, brandingFromSettings(settings, tenant?.name), customization) : null),
-    [baseTemplate, customization, settings, tenant?.name],
+    () => (baseTemplate ? applyCustomization(baseTemplate, brandingFromIdentity(identity, settings, customization.logoEnabled), customization) : null),
+    [baseTemplate, customization, identity, settings],
   );
   const template = applied?.template ?? baseTemplate;
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -79,31 +116,10 @@ const StickerStudioGenerator = () => {
   const [savedDoc, setSavedDoc] = useState<{ version?: number; status?: string } | null>(null);
 
   // Branding (seeded from dealer settings + template customization, editable here).
-  const seed = useMemo(() => applied?.branding ?? brandingFromSettings(settings, tenant?.name), [applied?.branding, settings, tenant?.name]);
+  const seed = useMemo(() => applied?.branding ?? brandingFromIdentity(identity, settings, customization.logoEnabled), [applied?.branding, identity, settings, customization.logoEnabled]);
   const [branding, setBranding] = useState(seed);
   useEffect(() => { setBranding(seed); }, [seed]);
 
-  // Vehicle data (prefilled from ?vehicleId, then editable).
-  const [data, setData] = useState<StickerData>({
-    vehicleTitle: "", vin: "", stock: "", mileage: "", msrp: "", price: "",
-    installed: [blankItem()], upgrades: [blankItem()], benefits: [blankItem()], notes: "", qrUrl: "",
-  });
-  const prefill = useVehiclePrefill((v) => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    setData((prev) => ({
-      ...prev,
-      vehicleTitle: `${v.ymm}${v.trim ? ` ${v.trim}` : ""}`.trim() || prev.vehicleTitle,
-      vin: v.vin || prev.vin,
-      stock: v.stock || prev.stock,
-      mileage: v.mileage || prev.mileage,
-      msrp: v.msrp || prev.msrp,
-      price: v.price || prev.price,
-      specs: [v.engine, v.drivetrain, v.transmission,
-        (v.mpgCity && v.mpgHwy) ? `${v.mpgCity}/${v.mpgHwy} MPG` : v.mpgCity ? `${v.mpgCity} MPG` : v.fuelType,
-      ].filter(Boolean).join(" · ") || prev.specs,
-      qrUrl: v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/v/${v.vin}` : prev.qrUrl,
-    }));
-  });
 
   // Seed line items from real data once both sources have settled: the
   // tenant's active product catalog fills installed / optional / benefit
@@ -510,8 +526,45 @@ const StickerStudioGenerator = () => {
 
           <CfgCard title="Branding">
             <div className="space-y-2.5">
+              {/* Resolved dealership block — what will actually print. Shown so a
+                  user can see WHICH location's identity this document carries. */}
+              <div className="rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Dealership{identity.locationName ? ` · ${identity.locationName}` : ""}
+                </p>
+                <p className="mt-0.5 text-sm font-semibold text-foreground">{identity.displayName || "Not configured"}</p>
+                {identity.addressLine1 && <p className="text-[11px] text-muted-foreground">{identity.addressLine1}</p>}
+                {identity.addressLine2 && <p className="text-[11px] text-muted-foreground">{identity.addressLine2}</p>}
+                {identity.phone && <p className="text-[11px] text-muted-foreground">{identity.phone}</p>}
+                {identity.websiteDisplay && <p className="text-[11px] text-muted-foreground">{identity.websiteDisplay}</p>}
+              </div>
+              {identity.warnings.length > 0 && (
+                <div className="space-y-1">
+                  {identity.warnings.map((w) => (
+                    <p key={w.code} className="text-[10px] text-amber-700 inline-flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 shrink-0" /> {w.message}
+                      <button onClick={() => navigate(w.settingsPath)} className="font-bold underline">
+                        {w.code === "missing_logo" ? "Upload logo" : w.code === "unassigned_vehicle" ? "Assign location" : "Open settings"}
+                      </button>
+                    </p>
+                  ))}
+                </div>
+              )}
               {cfg.supportsLogo && (
-                <label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={branding.showLogo} onChange={(e) => setBranding((b) => ({ ...b, showLogo: e.target.checked }))} /> Show dealer logo</label>
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={branding.showLogo}
+                    onChange={(e) => {
+                      const showLogo = e.target.checked;
+                      setBranding((b) => ({ ...b, showLogo }));
+                      // Persist through the template customization the renderer
+                      // already reads, so the choice survives reload and applies
+                      // to every generated output — not just this preview.
+                      saveCustomization({ ...customization, logoEnabled: showLogo });
+                    }}
+                  /> Show dealer logo
+                </label>
               )}
               {/* Asset readiness — warns before print on a missing/low-res logo or a required-but-missing QR. */}
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">

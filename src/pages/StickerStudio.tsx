@@ -7,6 +7,7 @@ import {
   type StickerData, type StickerBranding,
 } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
+import { resolveDealerIdentity, type DealerIdentity, type DealerIdentitySettings, type ResolveIdentityArgs } from "@/lib/dealerIdentity";
 import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
 import {
   LABEL_SLOTS, slotFor, resolveLabelDefault, parseLabelRef,
@@ -27,21 +28,36 @@ const SAMPLE: StickerData = {
   qrUrl: "https://autolabels.io/v/demo",
 };
 
-export function brandingFromSettings(
-  settings: { dealer_name?: string; dealer_address?: string; dealer_phone?: string; dealer_logo_url?: string; why_buy_here?: string; dealer_city?: string; dealer_state?: string; used_inventory_url?: string },
-  tenantName?: string
+// Every sticker surface builds its branding here so the preview, PDF, PNG,
+// print view, passport, and signing addendum can never disagree about which
+// dealership they are speaking for. Identity resolution (which location owns
+// this vehicle, which phone/website/logo applies) lives in dealerIdentity.
+export function brandingFromIdentity(
+  identity: DealerIdentity,
+  settings: { why_buy_here?: string },
+  showLogo = true,
 ): StickerBranding {
   return {
-    dealerName: settings.dealer_name || tenantName || "Your Dealership",
-    address: [settings.dealer_address, [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ")].filter(Boolean).join(", "),
-    phone: settings.dealer_phone || "",
-    website: settings.used_inventory_url || "",
-    logoUrl: settings.dealer_logo_url || "",
-    showLogo: true,
+    dealerName: identity.displayName || "Your Dealership",
+    address: identity.addressLine1,
+    addressLine2: identity.addressLine2,
+    phone: identity.phone,
+    website: identity.websiteDisplay,
+    websiteHref: identity.websiteHref,
+    logoUrl: identity.logoUrl,
+    showLogo,
     valueProp: settings.why_buy_here || "",
     disclaimer: "Prices exclude tax, title, registration, and dealer documentary fees. See dealer for complete details.",
-    accentColor: "#2563EB",
+    accentColor: identity.accentColor || "#2563EB",
   };
+}
+
+export function brandingFromSettings(
+  settings: DealerIdentitySettings & { why_buy_here?: string },
+  tenantName?: string,
+  scope?: Omit<ResolveIdentityArgs, "settings" | "tenantName">,
+): StickerBranding {
+  return brandingFromIdentity(resolveDealerIdentity({ settings, tenantName, ...scope }), settings);
 }
 
 const TYPES: { id: StickerType | "all"; label: string }[] = [
@@ -56,8 +72,11 @@ const StickerStudio = () => {
   const [params] = useSearchParams();
   const vehicleId = params.get("vehicleId") || "";
   const { settings, updateSettings } = useDealerSettings();
-  const { tenant } = useTenant();
-  const branding = useMemo(() => brandingFromSettings(settings, tenant?.name), [settings, tenant?.name]);
+  const { tenant, stores, currentStore } = useTenant();
+  const branding = useMemo(
+    () => brandingFromSettings(settings, tenant?.name, { stores, activeStoreId: currentStore?.id }),
+    [settings, tenant?.name, stores, currentStore?.id],
+  );
 
   const [type, setType] = useState<StickerType | "all">("all");
   const [tag, setTag] = useState<StyleTag | "all">("all");
