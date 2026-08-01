@@ -271,3 +271,41 @@ export function resolveDealerIdentity(args: ResolveIdentityArgs): DealerIdentity
 /** One-line address for renderers that only have room for a single field. */
 export const identityAddressLine = (identity: DealerIdentity) =>
   [identity.addressLine1, identity.addressLine2].filter(Boolean).join(", ");
+
+// ── Overflow ──────────────────────────────────────────────────────────
+
+/**
+ * The addendum's dealership block is a fixed ~1.55in column on a 4.25–4.5in
+ * sticker. Long names and addresses wrap, but there is a floor: below it the
+ * text would either shrink past legibility or push into the QR block. We warn
+ * rather than truncate, because silently dropping a licensed seller's address
+ * is the one failure mode a disclosure document cannot have.
+ */
+export interface OverflowAssessment {
+  overflows: boolean;
+  /** Lines that exceed what the block can hold at the minimum readable size. */
+  offending: string[];
+  message: string;
+}
+
+/** Characters that fit on one line of the 1.55in dealer column at 7.2px. */
+export const DEALER_BLOCK_MAX_CHARS = 30;
+/** Wrapped lines the block holds before it pushes into the layout below it. */
+export const DEALER_BLOCK_MAX_LINES = 6;
+
+const wrappedLineCount = (text: string, maxChars = DEALER_BLOCK_MAX_CHARS) =>
+  text ? Math.ceil(text.length / maxChars) : 0;
+
+export function assessIdentityOverflow(identity: DealerIdentity): OverflowAssessment {
+  const lines = [identity.displayName, identity.addressLine1, identity.addressLine2, identity.phone, identity.websiteDisplay].filter(Boolean);
+  const offending = lines.filter((line) => line.split(/\s+/).some((word) => word.length > DEALER_BLOCK_MAX_CHARS));
+  const total = lines.reduce((n, line) => n + wrappedLineCount(line), 0);
+  const overflows = total > DEALER_BLOCK_MAX_LINES || offending.length > 0;
+  return {
+    overflows,
+    offending,
+    message: overflows
+      ? "Dealership name or address is too long to print safely on a 4.5 × 11 addendum. Shorten the public display name or address so no contact line is lost."
+      : "",
+  };
+}

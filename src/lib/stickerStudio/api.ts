@@ -331,6 +331,42 @@ export interface LineSyncArgs {
 
 const normalizeName = (name: string) => name.trim().toLowerCase();
 
+/**
+ * A signed addendum is an executed legal record: it is never rewritten. When the
+ * equipment behind it materially changes, the signed version is preserved and
+ * marked "Revised — Signature Required" so a manager sees a new signature is
+ * owed. The DB enforces the same rule with a trigger.
+ */
+async function flagSignedAddendumIfMaterialChange(
+  tenantId: string, vin: string, installed: Set<string>, optional: Set<string>,
+): Promise<void> {
+  try {
+    const { data: signed } = await sb()
+      .from("addendums")
+      .select("id, products_snapshot, revision_required_at")
+      .eq("tenant_id", tenantId)
+      .eq("vehicle_vin", vin)
+      .not("customer_signed_at", "is", null)
+      .order("customer_signed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!signed?.id || signed.revision_required_at || !Array.isArray(signed.products_snapshot)) return;
+
+    const drifted = (signed.products_snapshot as { name?: string; badge_type?: string }[]).filter((p) => {
+      const key = normalizeName(String(p?.name || ""));
+      if (installed.has(key)) return p.badge_type !== "installed";
+      if (optional.has(key)) return p.badge_type !== "optional";
+      return false;
+    });
+    if (!drifted.length) return;
+
+    await sb().rpc("flag_addendum_revision", {
+      _addendum_id: signed.id,
+      _reason: `Equipment status changed after signature: ${drifted.map((p) => p.name).join(", ")}`,
+    });
+  } catch { /* never block the dealer's save on the revision flag */ }
+}
+
 // Re-badge the products on the vehicle's open addendum so the customer signs
 // the same installed/optional split shown in the studio. A signed addendum is
 // an immutable record — it is never rewritten.
@@ -350,7 +386,13 @@ export async function syncAddendumProductBadges(args: LineSyncArgs): Promise<Api
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (!row?.id || !Array.isArray(row.products_snapshot)) return { ok: true };
+    if (!row?.id || !Array.isArray(row.products_snapshot)) {
+      // No open addendum. If the customer already signed one, the executed
+      // record stays exactly as signed — but a material equipment change means
+      // it no longer reflects the deal, so it is flagged for re-signature.
+      await flagSignedAddendumIfMaterialChange(args.tenantId, vin, installed, optional);
+      return { ok: true };
+    }
 
     let changed = false;
     const next = (row.products_snapshot as { name?: string; badge_type?: string }[]).map((product) => {

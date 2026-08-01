@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  assessIdentityOverflow,
   formatDealerPhone,
   normalizeDealerWebsite,
   resolveDealerIdentity,
@@ -163,5 +164,34 @@ describe("resolveDealerIdentity", () => {
     const id = resolveDealerIdentity({ settings: { dealer_name: "Only Mine" }, stores: [], vehicleStoreId: "loc-from-other-tenant" });
     expect(id.displayName).toBe("Only Mine");
     expect(id.locationId).toBe("");
+  });
+});
+
+describe("assessIdentityOverflow", () => {
+  const identity = (over: Partial<ReturnType<typeof resolveDealerIdentity>>) =>
+    ({ ...resolveDealerIdentity({ settings, stores: [store({})], vehicleStoreId: "loc-1" }), ...over });
+
+  it("passes a normal dealership block", () => {
+    expect(assessIdentityOverflow(identity({})).overflows).toBe(false);
+  });
+
+  it("flags an unbreakable word that cannot fit the column", () => {
+    const result = assessIdentityOverflow(identity({ displayName: "Exampledealershipgroupofgreaterhartfordandsurroundingtowns" }));
+    expect(result.overflows).toBe(true);
+    expect(result.offending).toHaveLength(1);
+    expect(result.message).toContain("too long to print safely");
+  });
+
+  it("flags a block that would wrap past the safe line count", () => {
+    const result = assessIdentityOverflow(identity({
+      displayName: "Example Premier Automotive Group of Greater Hartford and Springfield",
+      addressLine1: "1500 Northwest Industrial Park Boulevard, Building C, Suite 2200",
+      addressLine2: "New Britain Township, Connecticut 06120-4471",
+    }));
+    expect(result.overflows).toBe(true);
+  });
+
+  it("does not warn merely because an optional line is missing", () => {
+    expect(assessIdentityOverflow(identity({ phone: "", websiteDisplay: "" })).overflows).toBe(false);
   });
 });

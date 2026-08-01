@@ -137,6 +137,14 @@ export interface DealerSettings {
   dealer_state: string;   // 2-letter operating state
   dealer_zip: string;
   dealer_phone: string;
+  // IANA timezone for the dealership. Proof deadlines and internal due dates
+  // render in the dealership's own time, not the viewer's.
+  dealer_timezone: string;
+  // Public web presence shown on customer documents. dealer_website_url is the
+  // dealership's front door; public_landing_url is an intentionally configured
+  // landing page that overrides it and keeps its path.
+  dealer_website_url: string;
+  public_landing_url: string;
   dealer_principal: string;        // dealer principal / owner of record
   dealer_license_number: string;   // DMV dealer license / ID number
   dealer_oem_brands: string;       // franchised OEM brands (comma-separated)
@@ -399,6 +407,9 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   dealer_state: "",
   dealer_zip: "",
   dealer_phone: "",
+  dealer_timezone: "",
+  dealer_website_url: "",
+  public_landing_url: "",
   dealer_principal: "",
   dealer_license_number: "",
   dealer_oem_brands: "",

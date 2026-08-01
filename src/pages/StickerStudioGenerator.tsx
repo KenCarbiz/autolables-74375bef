@@ -27,8 +27,11 @@ import { applyCustomization } from "@/lib/stickerStudio/customization";
 import { brandingFromIdentity } from "@/pages/StickerStudio";
 import { resolveDealerIdentity } from "@/lib/dealerIdentity";
 import { saveStickerToVehicle, publishToPassport, saveAddendumState, syncAddendumProductBadges, syncGetReadyInstalls, type AddendumItemInput } from "@/lib/stickerStudio/api";
-import { ArrowLeft, Printer, Download, Image as ImageIcon, MoreVertical, Plus, Trash2, Save, Globe, Sun, Moon, CheckCircle2 } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ArrowLeft, Printer, Download, GripVertical, Image as ImageIcon, MoreVertical, Plus, Trash2, Save, Globe, Sun, Moon, CheckCircle2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useVehicleEquipment } from "@/lib/equipment/useVehicleEquipment";
+import { proofBadge, type CustomerStatus } from "@/lib/equipment/status";
+import { assessIdentityOverflow } from "@/lib/dealerIdentity";
 import { toast } from "sonner";
 
 const ACCENTS = ["#2563EB", "#0B2041", "#7c5c1e", "#0f766e", "#9333ea", "#b91c1c"];
@@ -48,6 +51,24 @@ const SECTION_LABEL: Record<EquipmentStatusKey, string> = {
   upgrades: "Optional Upgrades",
   benefits: "Included Benefits",
 };
+// Bridge between the studio's section keys and the shared equipment record's
+// customer_status values.
+const STATUS_TO_RECORD: Record<EquipmentStatusKey, CustomerStatus> = {
+  installed: "pre_installed",
+  upgrades: "optional",
+  benefits: "included_benefit",
+};
+const RECORD_TO_STATUS: Record<CustomerStatus, EquipmentStatusKey> = {
+  pre_installed: "installed",
+  optional: "upgrades",
+  included_benefit: "benefits",
+};
+const BADGE_TONE = {
+  verified: "text-emerald-600",
+  awaiting: "text-amber-600",
+  overdue: "text-rose-600",
+  none: "text-muted-foreground",
+} as const;
 
 const StickerStudioGenerator = () => {
   const { templateId = "" } = useParams();
@@ -98,6 +119,7 @@ const StickerStudioGenerator = () => {
     }),
     [settings, tenant?.name, stores, prefill.active, prefill.vehicle?.storeId, currentStore?.id],
   );
+  const overflow = useMemo(() => assessIdentityOverflow(identity), [identity]);
   const applied = useMemo(
     () => (baseTemplate ? applyCustomization(baseTemplate, brandingFromIdentity(identity, settings, customization.logoEnabled), customization) : null),
     [baseTemplate, customization, identity, settings],
@@ -328,6 +350,62 @@ const StickerStudioGenerator = () => {
     ]);
   };
 
+  // The shared per-vehicle equipment record, keyed by stable uuid. Rows in this
+  // editor are matched to it so a status change writes the authoritative record
+  // every other module reads, instead of a private array.
+  const equipment = useVehicleEquipment(prefill.vehicle?.id, tenant?.id, data.msrp || data.price);
+  const equipmentRecordFor = (name: string) =>
+    name.trim() ? equipment.items.find((e) => e.name.trim().toLowerCase() === name.trim().toLowerCase()) : undefined;
+
+  // The authoritative record can change without this page doing anything — the
+  // 96-hour proof sweep demotes an unproven item, a late proof restores it. Pull
+  // those decisions into the editor so the preview and totals stay truthful.
+  useEffect(() => {
+    if (!equipment.items.length) return;
+    setData((d) => {
+      let changed = false;
+      const next = { ...d };
+      for (const record of equipment.items) {
+        const target = RECORD_TO_STATUS[record.customerStatus];
+        for (const key of STATUS_KEYS) {
+          if (key === target) continue;
+          const idx = next[key].findIndex((it) => it.name.trim().toLowerCase() === record.name.trim().toLowerCase());
+          if (idx < 0) continue;
+          const [moved] = next[key].splice(idx, 1);
+          next[key] = [...next[key]];
+          next[target] = [...next[target], moved];
+          changed = true;
+        }
+      }
+      return changed ? next : d;
+    });
+  }, [equipment.items]);
+
+  const nameInputFocus = (key: EquipmentStatusKey, i: number) => {
+    const el = document.querySelector<HTMLInputElement>(`[data-equipment-name="${key}-${i}"]`);
+    el?.focus();
+    el?.select();
+  };
+
+  const promptInstaller = async (itemId: string, current: string) => {
+    const name = window.prompt("Assign installer", current);
+    if (name === null) return;
+    await equipment.assignInstaller(itemId, name.trim());
+    toast.success(name.trim() ? `Installer set to ${name.trim()}` : "Installer cleared");
+  };
+
+  const moveRow = (key: EquipmentStatusKey, i: number, direction: -1 | 1) => {
+    const target = i + direction;
+    setData((d) => {
+      const list = [...d[key]];
+      if (target < 0 || target >= list.length) return d;
+      [list[i], list[target]] = [list[target], list[i]];
+      return { ...d, [key]: list };
+    });
+    const record = equipmentRecordFor(data[key][i]?.name || "");
+    if (record) void equipment.reorder(record.id, direction);
+  };
+
   const changeStatus = (from: EquipmentStatusKey, to: EquipmentStatusKey, i: number) => {
     if (from === to) return;
     const item = data[from][i];
@@ -347,11 +425,21 @@ const StickerStudioGenerator = () => {
       [to]: [...data[to].filter((it) => it.name.trim()), item],
     };
     setData(next);
-    void persistEquipment(next);
+
+    // Authoritative write first when the row is backed by the shared record —
+    // that is what carries the proof deadline, the audit entry, and every other
+    // module. The snapshot sync keeps pre-migration databases correct too.
+    const record = equipmentRecordFor(item.name);
+    const apply = async (target: EquipmentStatusKey, snapshot: StickerData) => {
+      if (record) await equipment.setStatus(record.id, STATUS_TO_RECORD[target]);
+      await persistEquipment(snapshot);
+    };
+    void apply(to, next);
+
     toast.success(`${item.name} changed to ${STATUS_LABEL[to]} everywhere`, {
       action: {
         label: "Undo",
-        onClick: () => { setData(previous); void persistEquipment(previous); },
+        onClick: () => { setData(previous); void apply(from, previous); },
       },
     });
   };
@@ -483,32 +571,57 @@ const StickerStudioGenerator = () => {
         <label className={label}>{SECTION_LABEL[keyName]} <span className="text-muted-foreground/60">({data[keyName].length}/{cfg.maxItems[keyName]})</span></label>
         <button onClick={() => addItem(keyName)} disabled={data[keyName].length >= cfg.maxItems[keyName]} className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 disabled:opacity-40"><Plus className="w-3 h-3" /> Add</button>
       </div>
-      {data[keyName].map((it, i) => (
-        <div key={i} className="flex gap-1.5">
-          <input value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} flex-1 min-w-0`} />
-          <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} !w-24 flex-none`} inputMode="decimal" />
-          {/* The status names the outcome, so nobody has to guess what an
-              arrow does to pricing, get-ready, or the signing addendum. */}
-          <select
-            value={keyName}
-            onChange={(e) => changeStatus(keyName, e.target.value as EquipmentStatusKey, i)}
-            aria-label={`Status for ${it.name || "new item"}`}
-            className={`${input} !w-36 flex-none cursor-pointer`}
-          >
-            {STATUS_KEYS.map((k) => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}
-          </select>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button aria-label={`Actions for ${it.name || "new item"}`} className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"><MoreVertical className="w-3.5 h-3.5" /></button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onSelect={() => removeItem(keyName, i)} className="text-rose-600 focus:text-rose-600">
-                <Trash2 className="w-3.5 h-3.5 mr-2" /> Remove item
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      ))}
+      {data[keyName].map((it, i) => {
+        const record = equipmentRecordFor(it.name);
+        const badge = proofBadge(
+          record ?? { customerStatus: STATUS_TO_RECORD[keyName], workflowStatus: "not_applicable", proofDueAt: null },
+          settings.dealer_timezone,
+        );
+        return (
+          <div key={i} className="flex items-center gap-1.5 rounded-md transition-all duration-200">
+            <span aria-hidden className="flex-none text-muted-foreground/50 cursor-grab active:cursor-grabbing"><GripVertical className="w-3.5 h-3.5" /></span>
+            <input data-equipment-name={`${keyName}-${i}`} value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} flex-1 min-w-0`} />
+            <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} !w-24 flex-none`} inputMode="decimal" />
+            {/* The status names the outcome, so nobody has to guess what an
+                arrow does to pricing, get-ready, or the signing addendum. */}
+            <select
+              value={keyName}
+              onChange={(e) => changeStatus(keyName, e.target.value as EquipmentStatusKey, i)}
+              aria-label={`Status for ${it.name || "new item"}`}
+              className={`${input} !w-36 flex-none cursor-pointer`}
+            >
+              {STATUS_KEYS.map((k) => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}
+            </select>
+            {/* Internal proof state. Never rendered on a customer document. */}
+            <span className={`flex-none w-36 truncate text-[11px] font-semibold ${BADGE_TONE[badge.tone]}`} title={badge.label}>
+              {badge.tone === "verified" && <CheckCircle2 className="inline w-3 h-3 mr-1" />}
+              {(badge.tone === "awaiting" || badge.tone === "overdue") && <AlertTriangle className="inline w-3 h-3 mr-1" />}
+              {badge.label}
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button aria-label={`Actions for ${it.name || "new item"}`} className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"><MoreVertical className="w-3.5 h-3.5" /></button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onSelect={() => nameInputFocus(keyName, i)}>Edit details</DropdownMenuItem>
+                <DropdownMenuItem disabled={!record} onSelect={() => record && promptInstaller(record.id, record.installerName || "")}>
+                  Assign installer{record?.installerName ? ` · ${record.installerName}` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!prefill.vehicle?.vin} onSelect={() => navigate(`/vehicle-file/${prefill.vehicle?.id || ""}`)}>
+                  View installation proof
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!record} onSelect={() => record && equipment.duplicate(record.id)}>Duplicate</DropdownMenuItem>
+                <DropdownMenuItem disabled={i === 0} onSelect={() => moveRow(keyName, i, -1)}>Move up</DropdownMenuItem>
+                <DropdownMenuItem disabled={i === data[keyName].length - 1} onSelect={() => moveRow(keyName, i, 1)}>Move down</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => removeItem(keyName, i)} className="text-rose-600 focus:text-rose-600">
+                  <Trash2 className="w-3.5 h-3.5 mr-2" /> Remove item
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      })}
     </div>
   );
 
@@ -592,6 +705,11 @@ const StickerStudioGenerator = () => {
                 {identity.phone && <p className="text-[11px] text-muted-foreground">{identity.phone}</p>}
                 {identity.websiteDisplay && <p className="text-[11px] text-muted-foreground">{identity.websiteDisplay}</p>}
               </div>
+              {overflow.overflows && (
+                <p className="text-[10px] text-amber-700 inline-flex items-start gap-1">
+                  <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" /> {overflow.message}
+                </p>
+              )}
               {identity.warnings.length > 0 && (
                 <div className="space-y-1">
                   {identity.warnings.map((w) => (
