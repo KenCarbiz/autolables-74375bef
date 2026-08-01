@@ -83,6 +83,7 @@ export interface StickerValuePropInput {
   imageUrl?: string;
   displayStyle: "image" | "image_text" | "banner";
   showAskForDetails: boolean;
+  imageScale?: "sm" | "md" | "lg" | "xl";
 }
 
 export interface StickerBranding {

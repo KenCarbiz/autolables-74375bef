@@ -116,6 +116,7 @@ export type SaturdayValueProp = {
   imageUrl?: string;
   displayStyle: "image" | "image_text" | "banner";
   showAskForDetails: boolean;
+  imageScale?: "sm" | "md" | "lg" | "xl";
 };
 
 export type SaturdaySticker = {

@@ -5,7 +5,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
 import { useProducts } from "@/hooks/useProducts";
-import { applicablePrograms, programMode, termLabel, emptyProgram, toStickerValueProp, PROGRAM_DISPLAY_STYLES, type DealerProgram, type ProgramDisplayStyle } from "@/lib/dealerPrograms";
+import { applicablePrograms, programMode, termLabel, emptyProgram, toStickerValueProp, PROGRAM_DISPLAY_STYLES, PROGRAM_IMAGE_SCALES, type DealerProgram, type ProgramDisplayStyle, type ProgramImageScale } from "@/lib/dealerPrograms";
 import { uploadPhoto } from "@/lib/storage";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { curatePrintEquipment } from "@/lib/equipmentPanel";
@@ -690,8 +690,8 @@ const StickerStudioGenerator = () => {
   const fitScale = cfg.type === "addendum" ? 0.9 : 0.62;
   const previewScale = zoomPreset === "fit" ? fitScale : Number(zoomPreset) / 100;
 
-  const ItemEditor = ({ keyName }: { keyName: EquipmentStatusKey }) => (
-    <div>
+  const renderItemEditor = (keyName: EquipmentStatusKey) => (
+    <div key={keyName}>
       {/* The three sections stay visible as groups inside the one table, so a
           row's status and where it sits always agree. */}
       <div className="flex items-center justify-between border-t border-border px-1 pt-2 pb-1 first:border-t-0">
@@ -867,9 +867,7 @@ const StickerStudioGenerator = () => {
                   <div className="grid grid-cols-[14px_minmax(0,1fr)_72px_124px_112px_32px] gap-1.5 px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     <span /><span>Item</span><span>Price</span><span>Status</span><span>Installation proof</span><span />
                   </div>
-                  {STATUS_KEYS.filter((k) => cfg.sections.includes(k)).map((keyName) => (
-                    <ItemEditor key={keyName} keyName={keyName} />
-                  ))}
+                  {STATUS_KEYS.filter((k) => cfg.sections.includes(k)).map(renderItemEditor)}
                 </div>
               </div>
 
@@ -933,16 +931,33 @@ const StickerStudioGenerator = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <label className={label}>Display style</label>
-                    <div className="mt-1 inline-flex rounded-lg border border-border bg-card p-0.5">
-                      {PROGRAM_DISPLAY_STYLES.map((sty) => (
-                        <button
-                          key={sty.id}
-                          onClick={() => saveProgram(selectedVp.id, { displayStyle: sty.id as ProgramDisplayStyle })}
-                          className={`px-3 h-8 rounded-md text-xs font-semibold ${(selectedVp.displayStyle || "image_text") === sty.id ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
-                        >{sty.label}</button>
-                      ))}
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div>
+                      <label className={label}>Display style</label>
+                      <div className="mt-1 inline-flex rounded-lg border border-border bg-card p-0.5">
+                        {PROGRAM_DISPLAY_STYLES.map((sty) => (
+                          <button
+                            key={sty.id}
+                            onClick={() => saveProgram(selectedVp.id, { displayStyle: sty.id as ProgramDisplayStyle })}
+                            className={`px-3 h-8 rounded-md text-xs font-semibold ${(selectedVp.displayStyle || "image_text") === sty.id ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
+                          >{sty.label}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Size applies whether or not the text is shown, so a logo
+                        can stand on its own at any scale. */}
+                    <div>
+                      <label className={label}>Logo size</label>
+                      <div className="mt-1 inline-flex rounded-lg border border-border bg-card p-0.5">
+                        {PROGRAM_IMAGE_SCALES.map((sc) => (
+                          <button
+                            key={sc.id}
+                            onClick={() => saveProgram(selectedVp.id, { imageScale: sc.id as ProgramImageScale })}
+                            disabled={!selectedVp.imageUrl}
+                            className={`px-3 h-8 rounded-md text-xs font-bold disabled:opacity-40 ${(selectedVp.imageScale || "sm") === sc.id ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
+                          >{sc.label}</button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 

@@ -45,7 +45,17 @@ export interface DealerProgram {
   displayStyle?: ProgramDisplayStyle;
   showAskForDetails?: boolean;
   supportingLine?: string;
+  /** How large the logo/image prints, with or without accompanying text. */
+  imageScale?: ProgramImageScale;
 }
+
+export type ProgramImageScale = "sm" | "md" | "lg" | "xl";
+export const PROGRAM_IMAGE_SCALES: { id: ProgramImageScale; label: string }[] = [
+  { id: "sm", label: "S" },
+  { id: "md", label: "M" },
+  { id: "lg", label: "L" },
+  { id: "xl", label: "XL" },
+];
 
 /** How a value proposition is laid out on the addendum. */
 export type ProgramDisplayStyle = "image" | "image_text" | "banner";
@@ -64,6 +74,7 @@ export interface StickerValueProp {
   imageUrl?: string;
   displayStyle: ProgramDisplayStyle;
   showAskForDetails: boolean;
+  imageScale: ProgramImageScale;
 }
 
 export const toStickerValueProp = (p: DealerProgram): StickerValueProp => ({
@@ -74,6 +85,7 @@ export const toStickerValueProp = (p: DealerProgram): StickerValueProp => ({
   imageUrl: p.imageUrl,
   displayStyle: p.displayStyle || (p.imageUrl ? "image_text" : "banner"),
   showAskForDetails: p.showAskForDetails !== false,
+  imageScale: p.imageScale || "sm",
 });
 
 export const emptyProgram = (): DealerProgram => ({
@@ -90,6 +102,7 @@ export const emptyProgram = (): DealerProgram => ({
   showOnPacket: true,
   displayStyle: "image_text",
   showAskForDetails: true,
+  imageScale: "sm",
   mode: "included",
   price: null,
   isWarranty: false,

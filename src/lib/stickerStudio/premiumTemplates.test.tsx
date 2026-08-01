@@ -182,3 +182,43 @@ describe("value propositions on the addendum", () => {
     });
   }
 });
+
+describe("addendum wordmark and value-prop sizing", () => {
+  const renderAddendum = (id: string, data: StickerData, branding = BRAND) => {
+    const t = STUDIO_SATURDAY_TEMPLATES.find((x) => x.config.id === id)!;
+    return renderToStaticMarkup(<t.Render config={t.config} data={data} branding={branding} />);
+  };
+  const logoVp = {
+    id: "vp-logo", headline: "Lifetime Powertrain", supportingLine: "On qualifying vehicles",
+    disclosure: "See dealer for terms.", imageUrl: "https://cdn.example.com/lp.png",
+    displayStyle: "image" as "image" | "image_text" | "banner", showAskForDetails: false,
+  };
+
+  for (const id of ["addendum-saturday-premium", "addendum-new-car-saas"]) {
+    it(`${id} keeps the autolabels wordmark fixed regardless of the dealer accent`, () => {
+      const red = renderAddendum(id, DATA, { ...BRAND, accentColor: "#b91c1c" });
+      expect(red).toContain("#0B6FEA");   // wordmark stays brand blue
+      expect(red).toContain("#0D1B2A");   // "labels.io" stays black
+    });
+
+    it(`${id} renders an image-only value proposition without its text`, () => {
+      const html = renderAddendum(id, { ...DATA, valueProps: [logoVp] });
+      expect(html).toContain("https://cdn.example.com/lp.png");
+      expect(html).not.toContain("On qualifying vehicles");
+      expect(html).toContain("See dealer for terms.");   // disclosure still prints
+    });
+
+    it(`${id} scales the value-prop image independently of the text`, () => {
+      const small = renderAddendum(id, { ...DATA, valueProps: [{ ...logoVp, imageScale: "sm" }] });
+      const xl = renderAddendum(id, { ...DATA, valueProps: [{ ...logoVp, imageScale: "xl" }] });
+      expect(small).toContain("h-[0.42in]");
+      expect(xl).toContain("h-[1.15in]");
+      const xlWithText = renderAddendum(id, {
+        ...DATA,
+        valueProps: [{ ...logoVp, displayStyle: "image_text", imageScale: "xl" }],
+      });
+      expect(xlWithText).toContain("h-[1.15in]");
+      expect(xlWithText).toContain("On qualifying vehicles");
+    });
+  }
+});

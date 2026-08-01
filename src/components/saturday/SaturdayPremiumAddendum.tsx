@@ -17,6 +17,20 @@ type Line = { name: string; price: string; description?: string; iconKey?: strin
 type Addendum = SaturdaySticker & { installed?: Line[]; upgrades?: Line[] };
 type Props = { data: Addendum };
 
+// AutoLabels brand blue. Fixed — the product wordmark is not dealer-themed.
+const BRAND_BLUE = "#0B6FEA";
+
+// Value-proposition image sizes. Aspect ratio is preserved at every step; the
+// image is contained, never stretched, and image-only propositions may use the
+// full width of the block.
+const VP_IMAGE_SIZE: Record<"sm" | "md" | "lg" | "xl", string> = {
+  sm: "h-[0.42in] max-w-[1.1in]",
+  md: "h-[0.62in] max-w-[1.6in]",
+  lg: "h-[0.85in] max-w-[2.2in]",
+  xl: "h-[1.15in] max-w-[2.9in]",
+};
+
+
 const T = {
   navy: "#0D1B2A", text: "#10202B", muted: "#64748B", border: "#DDE5EE",
   blue: "#0B6FEA", blueSoft: "#EAF4FF", green: "#1F7A4D", greenSoft: "#EAF6EF",
@@ -124,9 +138,10 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
         {/* Header — anchored AutoLabels lockup left, dealer block right of a vertical divider */}
         <header className="flex items-stretch justify-between gap-2.5 pb-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            <AutoLabelsAddendumIcon iconKey="autolabels-powered" size={20} color={accent} />
+            {/* The AutoLabels wordmark is fixed brand identity: it never takes
+                the dealer's accent color. */}
             <span>
-              <span className="block text-[15px] font-black tracking-tight leading-none"><span style={{ color: accent }}>auto</span><span style={{ color: T.navy }}>labels.io</span></span>
+              <span className="block text-[15px] font-black tracking-tight leading-none"><span style={{ color: BRAND_BLUE }}>auto</span><span style={{ color: T.navy }}>labels.io</span></span>
               <span className="block mt-[3px] text-[6px] font-bold uppercase tracking-[0.16em]" style={{ color: T.muted }}>AI-Powered Vehicle Transparency</span>
             </span>
           </div>
@@ -224,9 +239,14 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
         {valueProps.length > 0 && (
           <section className="mt-2.5 space-y-2">
             {valueProps.map((vp) => (
-              <div key={vp.id} className="flex items-center gap-2.5 rounded-[10px] border-2 px-2.5 py-2" style={{ borderColor: T.navy }}>
+              <div key={vp.id} className={`rounded-[10px] border-2 px-2.5 py-2 ${vp.displayStyle === "image" ? "block" : "flex items-center gap-2.5"}`} style={{ borderColor: T.navy }}>
                 {vp.imageUrl && vp.displayStyle !== "banner" ? (
-                  <img src={vp.imageUrl} alt="" crossOrigin="anonymous" className="h-[0.42in] w-auto max-w-[1.1in] shrink-0 object-contain" />
+                  <img
+                    src={vp.imageUrl}
+                    alt=""
+                    crossOrigin="anonymous"
+                    className={`w-auto shrink-0 object-contain ${VP_IMAGE_SIZE[vp.imageScale || "sm"]} ${vp.displayStyle === "image" ? "mx-auto max-w-full" : ""}`}
+                  />
                 ) : null}
                 {vp.displayStyle !== "image" && (
                   <div className="min-w-0 flex-1">
