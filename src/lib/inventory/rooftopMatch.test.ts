@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  classifyListing, shouldIngest, isStrictRooftop, normStreet, normZip, normHost,
+  classifyListing, shouldIngest, isStrictRooftop, normStreet, normZip, normHost, prunePreflight,
   type ListingIdentity, type Rooftop,
 } from "../../../supabase/functions/_shared/rooftopMatch";
 
@@ -99,5 +99,45 @@ describe("shouldIngest", () => {
     // Third-party syndication can rewrite the host; the lot address cannot.
     const ours = listing({ hosts: ["cars.com"], street: ROOFTOP.street, zip: "06120" });
     expect(shouldIngest(ours, ROOFTOP)).toBe(true);
+  });
+});
+
+describe("prunePreflight", () => {
+  const base = { feedWalked: true, matched: 100, liveVins: 100, lastGoodCount: 100, writeError: false };
+
+  it("allows the prune on a clean, complete run", () => {
+    expect(prunePreflight(base)).toBeNull();
+  });
+
+  it("never prunes on a partial feed", () => {
+    // The live VIN set is incomplete, so everything unseen looks sold.
+    expect(prunePreflight({ ...base, feedWalked: false })).toBe("partial_feed");
+  });
+
+  it("never prunes after a write error", () => {
+    expect(prunePreflight({ ...base, writeError: true })).toBe("write_error");
+  });
+
+  it("never prunes when the run matched nothing", () => {
+    expect(prunePreflight({ ...base, liveVins: 0, matched: 0 })).toBe("no_live_vins");
+  });
+
+  it("blocks a mass delete when inventory suddenly collapses", () => {
+    // A feed that returns 12 of 200 cars must not delete the other 188.
+    expect(prunePreflight({ ...base, matched: 12, liveVins: 12, lastGoodCount: 200 }))
+      .toBe("inventory_collapsed:12_vs_200");
+  });
+
+  it("still allows normal day-to-day inventory movement", () => {
+    // Selling a quarter of the lot is real; it must not trip the breaker.
+    expect(prunePreflight({ ...base, matched: 150, liveVins: 150, lastGoodCount: 200 })).toBeNull();
+  });
+
+  it("allows growth without complaint", () => {
+    expect(prunePreflight({ ...base, matched: 260, liveVins: 260, lastGoodCount: 200 })).toBeNull();
+  });
+
+  it("does not gate the very first run, which has no baseline", () => {
+    expect(prunePreflight({ ...base, matched: 5, liveVins: 5, lastGoodCount: 0 })).toBeNull();
   });
 });

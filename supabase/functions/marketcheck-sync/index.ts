@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
 import {
-  classifyListing, isStrictRooftop, normStreet, normZip,
+  classifyListing, isStrictRooftop, normStreet, normZip, prunePreflight,
   type ListingIdentity, type Rooftop,
 } from "../_shared/rooftopMatch.ts";
 
@@ -295,6 +295,10 @@ interface SyncConfig {
   // The identifier that resolved this rooftop on the last run, cached so we can
   // skip the multi-call probe (metered MarketCheck plans charge per call).
   last_status?: { mc_param?: string; mc_value?: string } | null;
+  // Pinned scope + verified rooftop (20260801210000). Empty until a run validates.
+  mc_scope_param?: string; mc_scope_value?: string;
+  rooftop_street?: string; rooftop_zip?: string; rooftop_name?: string;
+  strict_rooftop?: boolean; last_good_count?: number;
 }
 
 const makeSlug = (vin: string, ymm: string | undefined) => {
@@ -454,7 +458,7 @@ serve(async (req) => {
   // resolved dealer_id (a dealer chosen from the finder has an id but may have
   // no domain). Manual run targets one tenant and bypasses the schedule (force).
   // Cron runs all tenants due this hour. ──
-  const baseCols = "tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at, last_status";
+  const baseCols = "tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at, last_status, mc_scope_param, mc_scope_value, rooftop_street, rooftop_zip, rooftop_name, strict_rooftop, last_good_count";
   const mkQuery = (cols: string) => {
     let q = admin.from("marketcheck_sync_config").select(cols)
       .eq("allowed", true).eq("enabled", true);
@@ -606,11 +610,15 @@ serve(async (req) => {
       const rooftop: Rooftop = {
         domain: source,
         state: dealerState,
-        street: normStreet(pset.dealer_address),
-        zip: normZip(pset.dealer_zip),
+        street: normStreet(cfg.rooftop_street || pset.dealer_address),
+        zip: normZip(cfg.rooftop_zip || pset.dealer_zip),
       };
-      const strict = isStrictRooftop(rooftop);
+      // strict_rooftop defaults true; it only bites once an address exists, so a
+      // tenant that has not configured one is never locked out of syncing.
+      const strict = cfg.strict_rooftop !== false && isStrictRooftop(rooftop);
       let rejected = 0;
+      // True once every page of the feed has been fetched. Prune requires it.
+      let feedWalked = false;
 
       // Resolve the rooftop from its website domain via the NEW Dealerships
       // Search API, which returns the canonical mc_* ids the syndication feed
@@ -654,22 +662,27 @@ serve(async (req) => {
         if (r.listings.length > 0 && match > 0 && purity >= minPurity) hits.push({ param, value, r, purity });
       };
 
-      // Probe order, highest-confidence first: source=<domain>, then the rooftop's
-      // mc_* ids from the directory, then any manual id as a last resort.
-      const probeList: Array<{ param: string; value: string }> = [];
-      if (source) probeList.push({ param: "source", value: source });
-      probeList.push(...dealership.probes);
-      if (manualId) probeList.push({ param: "dealer_id", value: manualId });
-
-      // Reuse last run's winning identifier first (one call), still validated.
-      const cached = (cfg.last_status || {}) as { mc_param?: string; mc_value?: string };
-      if (cached.mc_param && cached.mc_value) {
-        const r = await syndPage(cached.mc_param, cached.mc_value, synRows, 0);
-        recordHit(cached.mc_param, cached.mc_value, r, "syndication(cached)");
-      }
-
+      // A pinned scope is the whole point of consistency: once a feed has been
+      // proven against this rooftop, every later run uses that same feed and
+      // nothing else. It is still re-validated each night — but if it stops
+      // validating the run FAILS rather than quietly falling back to a guess,
+      // because a silent fallback is exactly how the wrong store's cars arrived.
+      const pinnedParam = (cfg.mc_scope_param || "").trim();
+      const pinnedValue = (cfg.mc_scope_value || "").trim();
       let sample = { listings: [] as MCListing[], numFound: 0, http: 0 };
-      if (hits.length === 0) {
+      let pinBroken = false;
+
+      if (pinnedParam && pinnedValue) {
+        const r = await syndPage(pinnedParam, pinnedValue, synRows, 0);
+        recordHit(pinnedParam, pinnedValue, r, "syndication(pinned)");
+        if (hits.length === 0) pinBroken = true;
+      } else {
+        // Nothing pinned yet — probe, highest-confidence first, then pin the winner.
+        const probeList: Array<{ param: string; value: string }> = [];
+        if (manualId) probeList.push({ param: "dealer_id", value: manualId });
+        if (source) probeList.push({ param: "source", value: source });
+        probeList.push(...dealership.probes);
+
         for (const p of probeList) {
           if (hits.length > 0) break;   // stop at the first validated scope
           const r = await syndPage(p.param, p.value, synRows, 0);
@@ -679,6 +692,20 @@ serve(async (req) => {
           sample = await mcFetch(SEARCH_ENDPOINT, `dealer_id=${encodeURIComponent(manualId || source)}&rows=${ROWS}&start=0`);
           attempts.push({ feed: "search(sample)", param: "dealer_id", id: manualId || source, http: sample.http, num_found: sample.numFound, got: sample.listings.length });
         }
+      }
+
+      // A pinned feed that no longer proves out is an alert, not a fallback.
+      if (pinBroken) {
+        await admin.from("marketcheck_sync_config").update({
+          last_run_at: now.toISOString(),
+          last_status: {
+            ran_at: now.toISOString(), seen: 0, error: "pinned_scope_failed_validation",
+            note: `Pinned feed ${pinnedParam}=${pinnedValue} no longer matches ${rooftop.street} ${rooftop.zip}. Inventory left untouched. Clear the pin to re-resolve.`,
+            mc_param: pinnedParam, mc_value: pinnedValue, attempts: attempts.slice(0, 8),
+          },
+        }).eq("tenant_id", cfg.tenant_id);
+        diagnostics.push({ tenant_id: cfg.tenant_id, source, error: "pinned_scope_failed_validation", mc_param: pinnedParam, mc_value: pinnedValue });
+        continue;
       }
 
       // Prefer source, then mc_website_id, then purity, then count.
@@ -1189,7 +1216,7 @@ serve(async (req) => {
           }
 
           start += listings.length;
-          if (start >= numFound) break;
+          if (start >= numFound) { feedWalked = true; break; }
         }
       }
 
@@ -1216,7 +1243,9 @@ serve(async (req) => {
       // Only run when we pulled a FULL inventory successfully. Failed/partial
       // pulls never mark cars as removed — the prune guard already blocks that.
       try {
-        const fullSuccess = !firstWriteErr && liveVins.size > 0 && numFound > 0 && tenantSeen >= numFound;
+        // Same correction as prune: completeness is "we walked every page",
+        // not "we kept as many cars as the raw feed reported".
+        const fullSuccess = !firstWriteErr && liveVins.size > 0 && numFound > 0 && feedWalked;
         if (fullSuccess && priorExistingVins.size > 0) {
           for (const v of priorExistingVins) {
             if (liveVins.has(v)) continue;
@@ -1244,12 +1273,40 @@ serve(async (req) => {
       // Replace-on-sync: prune MarketCheck cars that left the feed. Only when we
       // pulled the FULL inventory (not capped) and got a real result, so a
       // partial/failed pull never deletes good cars.
+      //
+      // Two gates, because prune is the only destructive step:
+      //  1. feedWalked — we fetched every page, so liveVins is the whole lot.
+      //     (tenantSeen >= numFound can no longer be the test: numFound counts
+      //     the raw feed, tenantSeen counts only cars proven to be ours.)
+      //  2. Collapse breaker — if a validated feed suddenly returns far fewer
+      //     cars than the last good run, treat it as a feed fault and skip the
+      //     prune. Better to carry a stale car for a day than to delete a live
+      //     lot because a feed hiccuped.
       let pruned: { listings_deleted?: number; files_deleted?: number } | null = null;
-      if (!firstWriteErr && liveVins.size > 0 && numFound > 0 && tenantSeen >= numFound) {
+      const lastGood = Number(cfg.last_good_count || 0);
+      const pruneSkipped = prunePreflight({
+        feedWalked, matched: tenantSeen, liveVins: liveVins.size,
+        lastGoodCount: lastGood, writeError: !!firstWriteErr,
+      });
+      const collapsed = !!pruneSkipped?.startsWith("inventory_collapsed");
+
+      if (!pruneSkipped) {
         const { data: pr } = await admin.rpc("marketcheck_prune_inventory", {
           _tenant_id: cfg.tenant_id, _live_vins: Array.from(liveVins),
         });
         pruned = (pr || null) as { listings_deleted?: number; files_deleted?: number } | null;
+      }
+
+      // Pin the feed that just proved itself, and record the healthy count the
+      // collapse breaker measures against. Only on a clean full walk.
+      const cleanRun = !firstWriteErr && feedWalked && !collapsed && tenantSeen > 0;
+      if (cleanRun && chosen.param && chosen.value) {
+        try {
+          await admin.rpc("marketcheck_pin_scope", {
+            _tenant_id: cfg.tenant_id, _param: chosen.param, _value: chosen.value,
+            _name: verifiedName || "", _count: tenantSeen,
+          });
+        } catch { /* pinning is best-effort; the run itself already succeeded */ }
       }
 
       // Self-healing enrichment: the price-change gate above only queues new or
@@ -1286,7 +1343,7 @@ serve(async (req) => {
       }
 
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected };
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, prune_skipped: pruneSkipped, pinned: cleanRun };
       diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: manualId, matched_dealer: verifiedName || "(by domain)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })

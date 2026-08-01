@@ -92,3 +92,37 @@ export function shouldIngest(listing: ListingIdentity, rt: Rooftop): boolean {
   if (isStrictRooftop(rt)) return own === "match";
   return true;
 }
+
+// ── Destructive-step safety ───────────────────────────────────────────
+// Prune is the only step that deletes a dealer's cars, so it needs its own
+// gates. A wrong or truncated feed must never be able to empty a live lot.
+
+export interface PruneGateInput {
+  /** Every page of the feed was fetched, so the live VIN set is the whole lot. */
+  feedWalked: boolean;
+  /** Cars proven to belong to this rooftop on this run. */
+  matched: number;
+  /** Distinct live VINs written this run. */
+  liveVins: number;
+  /** Matched count from the last run that validated cleanly; 0 if never. */
+  lastGoodCount: number;
+  /** Any write failed this run. */
+  writeError: boolean;
+}
+
+/**
+ * Returns null when pruning is safe, otherwise the reason to skip it.
+ *
+ * The collapse threshold is deliberately generous: carrying a sold car for an
+ * extra day is a cosmetic problem, while deleting a live lot because a feed
+ * hiccuped is not recoverable from the dealer's side.
+ */
+export function prunePreflight(i: PruneGateInput): string | null {
+  if (i.writeError) return "write_error";
+  if (!i.feedWalked) return "partial_feed";
+  if (i.liveVins === 0) return "no_live_vins";
+  if (i.lastGoodCount > 0 && i.matched < Math.floor(i.lastGoodCount * 0.6)) {
+    return `inventory_collapsed:${i.matched}_vs_${i.lastGoodCount}`;
+  }
+  return null;
+}
