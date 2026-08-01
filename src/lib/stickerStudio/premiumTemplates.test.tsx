@@ -147,7 +147,7 @@ describe("value propositions on the addendum", () => {
     supportingLine: "Included with qualifying vehicles",
     disclosure: "Available on qualifying vehicles. See dealer for complete terms.",
     imageUrl: "https://cdn.example.com/lifetime.png",
-    displayStyle: "image_text" as const,
+    displayStyle: "image_text" as "image" | "image_text" | "banner",
     showAskForDetails: true,
   };
   const render = (id: string, valueProps: (typeof vp)[]) => {

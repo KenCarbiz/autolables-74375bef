@@ -266,6 +266,14 @@ export interface SaveAddendumArgs {
 }
 const num = (v?: string) => Number(String(v || "").replace(/[^0-9.]/g, "")) || 0;
 
+// The legacy item_type a caller passes maps 1:1 onto the authoritative status,
+// so a save states both and never lets the DB default decide for it.
+const CUSTOMER_STATUS_BY_ITEM_TYPE: Record<AddendumItemInput["itemType"], string> = {
+  installed: "pre_installed",
+  benefit: "included_benefit",
+  available_upgrade: "optional",
+};
+
 export async function saveAddendumState(args: SaveAddendumArgs): Promise<ApiResult> {
   if (!args.vehicleId || !args.tenantId) return { ok: false, error: "no_vehicle" };
   const client = sb();
@@ -293,21 +301,48 @@ export async function saveAddendumState(args: SaveAddendumArgs): Promise<ApiResu
       .maybeSingle();
     if (headErr || !head?.id) return { ok: false, error: headErr?.message || "addendum_unavailable" };
 
-    await client.from("vehicle_addendum_items").delete().eq("vehicle_addendum_id", head.id);
-    if (args.items.length) {
-      await client.from("vehicle_addendum_items").insert(
-        args.items.map((i, idx) => ({
-          vehicle_addendum_id: head.id,
-          item_type: i.itemType,
-          name: i.name,
-          description: i.note || null,
-          price: num(i.price),
-          is_installed: i.itemType === "installed",
-          is_included: i.itemType === "benefit",
-          is_selected: !!i.isSelected,
-          display_order: idx,
-        })),
-      );
+    // Reconcile in place rather than delete-and-reinsert. These rows carry the
+    // stable id every other module references, plus the proof workflow state
+    // (workflow_status, proof_due_at, installer). Recreating them would mint new
+    // ids and silently reset a 96-hour deadline or a verified install on every
+    // save, so matched rows are updated and only genuinely removed lines deleted.
+    const { data: existingRows } = await client
+      .from("vehicle_addendum_items")
+      .select("id, name")
+      .eq("vehicle_addendum_id", head.id);
+
+    const existing = (existingRows || []) as { id: string; name: string }[];
+    const unmatched = new Map(existing.map((r) => [normalizeName(r.name), r.id]));
+    const keptIds = new Set<string>();
+
+    for (const [idx, item] of args.items.entries()) {
+      const row = {
+        item_type: item.itemType,
+        customer_status: CUSTOMER_STATUS_BY_ITEM_TYPE[item.itemType],
+        name: item.name,
+        description: item.note || null,
+        price: num(item.price),
+        is_selected: !!item.isSelected,
+        display_order: idx,
+      };
+      const matchId = unmatched.get(normalizeName(item.name));
+      if (matchId) {
+        unmatched.delete(normalizeName(item.name));
+        keptIds.add(matchId);
+        await client.from("vehicle_addendum_items").update(row).eq("id", matchId);
+      } else {
+        const { data: inserted } = await client
+          .from("vehicle_addendum_items")
+          .insert({ vehicle_addendum_id: head.id, ...row })
+          .select("id")
+          .maybeSingle();
+        if (inserted?.id) keptIds.add(inserted.id);
+      }
+    }
+
+    const removed = existing.filter((r) => !keptIds.has(r.id)).map((r) => r.id);
+    if (removed.length) {
+      await client.from("vehicle_addendum_items").delete().in("id", removed);
     }
     return { ok: true, documentId: head.id };
   } catch (e) {

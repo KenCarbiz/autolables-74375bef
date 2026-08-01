@@ -658,7 +658,7 @@ const StickerStudioGenerator = () => {
           settings.dealer_timezone,
         );
         return (
-          <div key={i} className="grid grid-cols-[16px_1fr_84px_150px_150px_36px] items-center gap-1.5 rounded-md py-0.5 transition-all duration-200">
+          <div key={i} className="grid grid-cols-[14px_minmax(0,1fr)_72px_124px_112px_32px] items-center gap-1.5 rounded-md py-0.5 transition-all duration-200">
             <span aria-hidden className="text-muted-foreground/50 cursor-grab active:cursor-grabbing"><GripVertical className="w-3.5 h-3.5" /></span>
             <input data-equipment-name={`${keyName}-${i}`} value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} min-w-0`} />
             <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} min-w-0`} inputMode="decimal" />
@@ -804,9 +804,9 @@ const StickerStudioGenerator = () => {
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[640px]">
-                  <div className="grid grid-cols-[16px_1fr_84px_150px_150px_36px] gap-1.5 px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <div>
+                <div>
+                  <div className="grid grid-cols-[14px_minmax(0,1fr)_72px_124px_112px_32px] gap-1.5 px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     <span /><span>Item</span><span>Price</span><span>Status</span><span>Installation proof</span><span />
                   </div>
                   {STATUS_KEYS.filter((k) => cfg.sections.includes(k)).map((keyName) => (
