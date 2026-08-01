@@ -27,16 +27,27 @@ import { applyCustomization } from "@/lib/stickerStudio/customization";
 import { brandingFromIdentity } from "@/pages/StickerStudio";
 import { resolveDealerIdentity } from "@/lib/dealerIdentity";
 import { saveStickerToVehicle, publishToPassport, saveAddendumState, syncAddendumProductBadges, syncGetReadyInstalls, type AddendumItemInput } from "@/lib/stickerStudio/api";
-import { ArrowLeft, ArrowLeftRight, Printer, Download, Image as ImageIcon, Plus, Trash2, Save, Globe, Sun, Moon, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Printer, Download, Image as ImageIcon, MoreVertical, Plus, Trash2, Save, Globe, Sun, Moon, CheckCircle2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
 const ACCENTS = ["#2563EB", "#0B2041", "#7c5c1e", "#0f766e", "#9333ea", "#b91c1c"];
 const blankItem = (): StickerLineItem => ({ name: "", price: "", note: "" });
 
-// One-click destination for each line-item section. Installed and available
-// swap with each other; a benefit promotes to installed equipment.
-const MOVE_TARGET = { installed: "upgrades", upgrades: "installed", benefits: "installed" } as const;
-const MOVE_LABEL = { installed: "Installed equipment", upgrades: "Available upgrades", benefits: "Included benefits" } as const;
+// The three customer-facing equipment statuses. A row's status IS its section,
+// so the dropdown names the outcome instead of an arrow implying a direction.
+type EquipmentStatusKey = "installed" | "upgrades" | "benefits";
+const STATUS_KEYS: EquipmentStatusKey[] = ["installed", "upgrades", "benefits"];
+const STATUS_LABEL: Record<EquipmentStatusKey, string> = {
+  installed: "Pre-Installed",
+  upgrades: "Optional",
+  benefits: "Included Benefit",
+};
+const SECTION_LABEL: Record<EquipmentStatusKey, string> = {
+  installed: "Pre-Installed Equipment",
+  upgrades: "Optional Upgrades",
+  benefits: "Included Benefits",
+};
 
 const StickerStudioGenerator = () => {
   const { templateId = "" } = useParams();
@@ -292,23 +303,58 @@ const StickerStudioGenerator = () => {
     setData((d) => (d[key].length >= cfg.maxItems[key] ? d : { ...d, [key]: [...d[key], blankItem()] }));
   const removeItem = (key: "installed" | "upgrades" | "benefits", i: number) =>
     setData((d) => ({ ...d, [key]: d[key].filter((_, idx) => idx !== i) }));
-  // Moving a line between Installed Equipment and Available Upgrades is a
-  // merchandising decision, not a retype: it re-prices the addendum the
-  // customer signs and the install work get-ready has to do.
-  const moveItem = (from: "installed" | "upgrades" | "benefits", to: "installed" | "upgrades" | "benefits", i: number) =>
-    setData((d) => {
-      const item = d[from][i];
-      if (!item) return d;
-      if (d[to].length >= cfg.maxItems[to]) {
-        toast.error(`${MOVE_LABEL[to]} is full (${cfg.maxItems[to]} max)`);
-        return d;
-      }
-      return {
-        ...d,
-        [from]: d[from].filter((_, idx) => idx !== i),
-        [to]: [...d[to].filter((it) => it.name.trim()), item],
-      };
+  // ── Equipment status ─────────────────────────────────────────────────
+  // An equipment status change is operational data, not document formatting:
+  // it re-prices what the customer signs and changes the work get-ready owes.
+  // It persists on change — "Save to vehicle" generates the document, it is
+  // never the thing that makes the vehicle record true.
+  const persistEquipment = async (next: StickerData) => {
+    if (cfg.type !== "addendum" || !prefill.vehicle?.id || !tenant?.id) return;
+    const items: AddendumItemInput[] = [
+      ...next.installed.filter((i) => i.name.trim()).map((i) => ({ itemType: "installed" as const, name: i.name, price: i.price, note: i.note })),
+      ...next.benefits.filter((i) => i.name.trim()).map((i) => ({ itemType: "benefit" as const, name: i.name, price: i.price, note: i.note })),
+      ...next.upgrades.filter((i) => i.name.trim()).map((i) => ({ itemType: "available_upgrade" as const, name: i.name, price: i.price, note: i.note, isSelected: totalMsrpMode })),
+    ];
+    const scope = {
+      tenantId: tenant.id,
+      vin: next.vin,
+      installedNames: next.installed.map((i) => i.name).filter((n) => n.trim()),
+      optionalNames: next.upgrades.map((i) => i.name).filter((n) => n.trim()),
+    };
+    await Promise.all([
+      saveAddendumState({ tenantId: tenant.id, vehicleId: prefill.vehicle.id, baseMsrp: next.msrp, items }),
+      syncAddendumProductBadges(scope),
+      syncGetReadyInstalls(scope),
+    ]);
+  };
+
+  const changeStatus = (from: EquipmentStatusKey, to: EquipmentStatusKey, i: number) => {
+    if (from === to) return;
+    const item = data[from][i];
+    if (!item?.name.trim()) {
+      // Reclassifying a blank row is just a re-type; move it without the noise.
+      setData((d) => ({ ...d, [from]: d[from].filter((_, idx) => idx !== i), [to]: [...d[to], item || blankItem()] }));
+      return;
+    }
+    if (data[to].filter((it) => it.name.trim()).length >= cfg.maxItems[to]) {
+      toast.error(`${STATUS_LABEL[to]} is full (${cfg.maxItems[to]} max)`);
+      return;
+    }
+    const previous = data;
+    const next: StickerData = {
+      ...data,
+      [from]: data[from].filter((_, idx) => idx !== i),
+      [to]: [...data[to].filter((it) => it.name.trim()), item],
+    };
+    setData(next);
+    void persistEquipment(next);
+    toast.success(`${item.name} changed to ${STATUS_LABEL[to]} everywhere`, {
+      action: {
+        label: "Undo",
+        onClick: () => { setData(previous); void persistEquipment(previous); },
+      },
     });
+  };
 
   // ── Output ───────────────────────────────────────────────────────────
   const capture = async () => {
@@ -431,32 +477,40 @@ const StickerStudioGenerator = () => {
   const fitScale = cfg.type === "addendum" ? 0.9 : 0.62;
   const previewScale = zoomPreset === "fit" ? fitScale : Number(zoomPreset) / 100;
 
-  const ItemEditor = ({ keyName, title }: { keyName: "installed" | "upgrades" | "benefits"; title: string }) => {
-    const moveTo = MOVE_TARGET[keyName];
-    return (
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <label className={label}>{title} <span className="text-muted-foreground/60">({data[keyName].length}/{cfg.maxItems[keyName]})</span></label>
-          <button onClick={() => addItem(keyName)} disabled={data[keyName].length >= cfg.maxItems[keyName]} className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 disabled:opacity-40"><Plus className="w-3 h-3" /> Add</button>
-        </div>
-        {data[keyName].map((it, i) => (
-          <div key={i} className="flex gap-1.5">
-            <input value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} flex-1 min-w-0`} />
-            <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} !w-24 flex-none`} inputMode="decimal" />
-            <button
-              onClick={() => moveItem(keyName, moveTo, i)}
-              disabled={!it.name.trim()}
-              title={`Move to ${MOVE_LABEL[moveTo]}`}
-              aria-label={`Move ${it.name || "item"} to ${MOVE_LABEL[moveTo]}`}
-              className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-md border border-border text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent"
-            ><ArrowLeftRight className="w-3.5 h-3.5" /></button>
-            <button onClick={() => removeItem(keyName, i)} className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-md border border-border text-rose-600 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>
-          </div>
-        ))}
-        <p className="text-[10px] text-muted-foreground">Move sends the line to {MOVE_LABEL[moveTo]} and re-prices the addendum on save.</p>
+  const ItemEditor = ({ keyName }: { keyName: EquipmentStatusKey }) => (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className={label}>{SECTION_LABEL[keyName]} <span className="text-muted-foreground/60">({data[keyName].length}/{cfg.maxItems[keyName]})</span></label>
+        <button onClick={() => addItem(keyName)} disabled={data[keyName].length >= cfg.maxItems[keyName]} className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 disabled:opacity-40"><Plus className="w-3 h-3" /> Add</button>
       </div>
-    );
-  };
+      {data[keyName].map((it, i) => (
+        <div key={i} className="flex gap-1.5">
+          <input value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} flex-1 min-w-0`} />
+          <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} !w-24 flex-none`} inputMode="decimal" />
+          {/* The status names the outcome, so nobody has to guess what an
+              arrow does to pricing, get-ready, or the signing addendum. */}
+          <select
+            value={keyName}
+            onChange={(e) => changeStatus(keyName, e.target.value as EquipmentStatusKey, i)}
+            aria-label={`Status for ${it.name || "new item"}`}
+            className={`${input} !w-36 flex-none cursor-pointer`}
+          >
+            {STATUS_KEYS.map((k) => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}
+          </select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button aria-label={`Actions for ${it.name || "new item"}`} className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"><MoreVertical className="w-3.5 h-3.5" /></button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onSelect={() => removeItem(keyName, i)} className="text-rose-600 focus:text-rose-600">
+                <Trash2 className="w-3.5 h-3.5 mr-2" /> Remove item
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="p-4 lg:p-6 max-w-[1500px] mx-auto space-y-4">
@@ -518,9 +572,9 @@ const StickerStudioGenerator = () => {
 
           <CfgCard title="Line items">
             <div className="space-y-3">
-              {cfg.sections.includes("installed") && <ItemEditor keyName="installed" title="Installed equipment" />}
-              {cfg.sections.includes("upgrades") && <ItemEditor keyName="upgrades" title="Available upgrades" />}
-              {cfg.sections.includes("benefits") && <ItemEditor keyName="benefits" title="Included benefits" />}
+              {cfg.sections.includes("installed") && <ItemEditor keyName="installed" />}
+              {cfg.sections.includes("upgrades") && <ItemEditor keyName="upgrades" />}
+              {cfg.sections.includes("benefits") && <ItemEditor keyName="benefits" />}
             </div>
           </CfgCard>
 
