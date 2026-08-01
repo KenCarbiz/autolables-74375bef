@@ -83,14 +83,22 @@ const DEALER_DETAILS = `${MC_BASE}/dealer/car`;
 // feed (a legacy id can match a different rooftop), so we resolve via this.
 const DEALERSHIPS_ENDPOINT = `${MC_BASE}/dealerships/car`;
 const ROWS = 50;             // Inventory Search max page (used only for the diagnostic sample)
-const SYND_MAX_ROWS = 1000;  // Dealership Syndication allows up to 1500/page (Free plan caps at 10)
+const SYND_MAX_ROWS = 1500;  // Dealership Syndication allows up to 1500/page (Free plan caps at 10)
 
 // A full rooftop inventory (with price + stock) comes ONLY from the Dealership
 // Inventory Syndication endpoint, and only with owned=true (otherwise it returns
 // duplicate non-owned copies that carry no price/stock). Per the docs, owned= is
 // honored only with source, dealer_id, or mc_website_id — so we only append it
 // for those params.
-const OWNED_PARAMS = new Set(["source", "dealer_id", "mc_website_id"]);
+// owned=true asks for listings MarketCheck attributes as PHYSICALLY OWNED by the
+// requested dealership. The default is owned=false, which includes syndicated
+// and non-attributed records — i.e. sibling stores' cars. It applies to every
+// dealer-identity parameter on the syndication endpoint, so it is sent with all
+// of them. (mc_rooftop_id was previously excluded, which meant our single best
+// identifier was the one running unowned.)
+const OWNED_PARAMS = new Set([
+  "source", "dealer_id", "mc_website_id", "mc_dealer_id", "mc_rooftop_id", "mc_location_id",
+]);
 
 // Resolve a MarketCheck dealer_id for a dealer's website domain. The Dealers
 // Search endpoint only filters by GEOGRAPHY (zip/state/radius) — there is no
@@ -146,7 +154,14 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
 // for source/dealer_id/mc_website_id — so append it only for those params.
 const syndPage = (param: string, value: string, rows: number, start: number) => {
   const owned = OWNED_PARAMS.has(param) ? "&owned=true" : "";
-  return mcFetch(SYND_ENDPOINT, `${param}=${encodeURIComponent(value)}${owned}&rows=${rows}&start=${start}`);
+  // append_api_key=false keeps the secret out of image/VDP URLs in the payload.
+  // include_non_vin_listings=false: a VIN-less row cannot be deduplicated or
+  // enriched, and has no place in a strict inventory pipeline.
+  return mcFetch(
+    SYND_ENDPOINT,
+    `${param}=${encodeURIComponent(value)}${owned}&rows=${rows}&start=${start}` +
+    `&append_api_key=false&include_non_vin_listings=false`,
+  );
 };
 
 interface Dealership {
@@ -179,12 +194,15 @@ async function resolveDealership(domain: string): Promise<Dealership> {
     if (!hit) return { ...empty, http: res.status };
     const probes: Array<{ param: string; value: string }> = [];
     const push = (param: string, v: unknown) => { const s = String(v ?? "").trim(); if (s) probes.push({ param, value: s }); };
-    // mc_website_id is one rooftop and supports owned=true → best. Then the
-    // dealer-level ids as fallbacks.
-    push("mc_website_id", hit.mc_website_id);
-    push("mc_dealer_id", hit.mc_dealer_id);
+    // Order matters and is the crux of rooftop isolation. mc_rooftop_id is the
+    // physical retail rooftop — the narrowest boundary MarketCheck exposes.
+    // mc_location_id (address) is next. mc_website_id and mc_dealer_id are
+    // business/site identities a dealer group can share across stores, so they
+    // are last-resort only. Group ids are never probed at all.
     push("mc_rooftop_id", hit.mc_rooftop_id);
     push("mc_location_id", hit.mc_location_id);
+    push("mc_website_id", hit.mc_website_id);
+    push("mc_dealer_id", hit.mc_dealer_id);
     return {
       name: String(hit.seller_name ?? hit.name ?? ""),
       state: String(hit.state ?? "").trim().toUpperCase(),
@@ -279,6 +297,10 @@ const listingState = (l: MCListing): string => String((l?.dealer as any)?.state 
 // against live inventory each night.
 const listingIdentity = (l: MCListing): ListingIdentity => ({
   hosts: listingHosts(l),
+  // deno-lint-ignore no-explicit-any
+  rooftopId: String((l as any)?.mc_dealership?.mc_rooftop_id ?? "").trim() || undefined,
+  // deno-lint-ignore no-explicit-any
+  locationId: String((l as any)?.mc_dealership?.mc_location_id ?? "").trim() || undefined,
   // deno-lint-ignore no-explicit-any
   state: String((l?.dealer as any)?.state || "").trim().toUpperCase(),
   // deno-lint-ignore no-explicit-any
@@ -608,6 +630,9 @@ serve(async (req) => {
       // needed for the address assertion to take effect. When both are present
       // the pull runs strict: only cars positively at this address are kept.
       const rooftop: Rooftop = {
+        // When the pinned scope IS a rooftop id, every returned row must carry
+        // it. That is the tenancy invariant the API filter cannot guarantee.
+        rooftopId: (cfg.mc_scope_param === "mc_rooftop_id" ? (cfg.mc_scope_value || "").trim() : "") || undefined,
         domain: source,
         state: dealerState,
         street: normStreet(cfg.rooftop_street || pset.dealer_address),
@@ -679,9 +704,12 @@ serve(async (req) => {
       } else {
         // Nothing pinned yet — probe, highest-confidence first, then pin the winner.
         const probeList: Array<{ param: string; value: string }> = [];
-        if (manualId) probeList.push({ param: "dealer_id", value: manualId });
-        if (source) probeList.push({ param: "source", value: source });
+        // Rooftop ids first (narrowest), then the domain, then a manual legacy
+        // dealer_id. source= is a shared-domain risk, so it never outranks a
+        // resolved rooftop.
         probeList.push(...dealership.probes);
+        if (source) probeList.push({ param: "source", value: source });
+        if (manualId) probeList.push({ param: "dealer_id", value: manualId });
 
         for (const p of probeList) {
           if (hits.length > 0) break;   // stop at the first validated scope

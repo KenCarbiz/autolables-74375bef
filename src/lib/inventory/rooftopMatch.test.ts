@@ -141,3 +141,43 @@ describe("prunePreflight", () => {
     expect(prunePreflight({ ...base, matched: 5, liveVins: 5, lastGoodCount: 0 })).toBeNull();
   });
 });
+
+// MarketCheck's own physical-store key. Their docs name mc_rooftop_id as the
+// primary boundary for a single store; a group id or website id spans siblings.
+describe("mc_rooftop_id invariant", () => {
+  const pinned: Rooftop = { ...ROOFTOP, rooftopId: "RT-100" };
+
+  it("accepts a row carrying the pinned rooftop id", () => {
+    expect(classifyListing(listing({ rooftopId: "RT-100" }), pinned)).toBe("match");
+  });
+
+  it("rejects a sibling rooftop even when every other signal looks like ours", () => {
+    const sibling = listing({
+      rooftopId: "RT-200",
+      hosts: ["harteinfiniti.com"],
+      street: ROOFTOP.street,
+      zip: "06120",
+      state: "CT",
+    });
+    // Same domain, same address, same state — MarketCheck still says it is a
+    // different physical rooftop, and that wins.
+    expect(classifyListing(sibling, pinned)).toBe("mismatch");
+    expect(shouldIngest(sibling, pinned)).toBe(false);
+  });
+
+  it("falls back to the address when the row carries no rooftop id", () => {
+    expect(classifyListing(listing({ street: ROOFTOP.street, zip: "06120" }), pinned)).toBe("match");
+  });
+
+  it("rejects a disallowed location id", () => {
+    const rt: Rooftop = { ...ROOFTOP, locationIds: ["LOC-1"] };
+    expect(classifyListing(listing({ locationId: "LOC-9" }), rt)).toBe("mismatch");
+  });
+
+  it("treats a known rooftop id as strict on its own", () => {
+    const idOnly: Rooftop = { domain: "", state: "", street: "", zip: "", rooftopId: "RT-100" };
+    expect(isStrictRooftop(idOnly)).toBe(true);
+    expect(shouldIngest(listing({}), idOnly)).toBe(false);          // unproven
+    expect(shouldIngest(listing({ rooftopId: "RT-100" }), idOnly)).toBe(true);
+  });
+});

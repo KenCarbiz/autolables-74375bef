@@ -7,6 +7,14 @@
 // it is the one field unique to a physical rooftop.
 
 export interface Rooftop {
+  /**
+   * MarketCheck's physical retail rooftop id. The narrowest boundary the API
+   * exposes and, when known, the decisive one: a row carrying a different
+   * rooftop id is another store's car no matter what else matches.
+   */
+  rooftopId?: string;
+  /** Allowed physical location ids for this rooftop (address-level). */
+  locationIds?: string[];
   /** Dealer website host, e.g. "harteinfiniti.com". */
   domain: string;
   /** Two-letter state, uppercase. Can only ever disprove ownership. */
@@ -53,6 +61,10 @@ export interface ListingIdentity {
   state: string;
   street: string;
   zip: string;
+  /** mc_dealership.mc_rooftop_id from the listing, when present. */
+  rooftopId?: string;
+  /** mc_dealership.mc_location_id from the listing, when present. */
+  locationId?: string;
 }
 
 /**
@@ -63,6 +75,14 @@ export interface ListingIdentity {
  * nothing (every sibling shares it) and may only mark a listing as foreign.
  */
 export function classifyListing(listing: ListingIdentity, rt: Rooftop): Ownership {
+  // 0. Rooftop id — MarketCheck's own physical-store key. Strongest signal
+  //    available, and decisive in both directions when both sides carry it.
+  if (rt.rooftopId && listing.rooftopId) {
+    return listing.rooftopId === rt.rooftopId ? "match" : "mismatch";
+  }
+  if (rt.locationIds?.length && listing.locationId) {
+    if (!rt.locationIds.includes(listing.locationId)) return "mismatch";
+  }
   if (rt.street && rt.zip) {
     if (listing.street && listing.zip) {
       return listing.street === rt.street && listing.zip === rt.zip ? "match" : "mismatch";
@@ -79,7 +99,7 @@ export function classifyListing(listing: ListingIdentity, rt: Rooftop): Ownershi
 }
 
 /** True once the address is precise enough to reject anything unproven. */
-export const isStrictRooftop = (rt: Rooftop): boolean => !!(rt.street && rt.zip);
+export const isStrictRooftop = (rt: Rooftop): boolean => !!(rt.rooftopId || (rt.street && rt.zip));
 
 /**
  * Should this listing be written to the tenant's inventory?
