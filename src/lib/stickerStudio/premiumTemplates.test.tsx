@@ -66,6 +66,24 @@ describe("saturday template print resolution", () => {
   });
 });
 
+describe("new car SaaS template", () => {
+  const template = STUDIO_SATURDAY_TEMPLATES.find((t) => t.config.id === "addendum-new-car-saas")!;
+
+  it("is registered with its own renderer and name", () => {
+    expect(template).toBeDefined();
+    expect(template.config.name).toBe("New Car SaaS Template");
+    expect(template.config.type).toBe("addendum");
+  });
+
+  it("renders the addendum with the vehicle identity and MSRP-based total", () => {
+    const html = renderToStaticMarkup(<template.Render config={template.config} data={DATA} branding={BRAND} />);
+    expect(html).toContain("ADDENDUM");
+    expect(html).toContain("5N1AL1F87VC331335");
+    expect(html).toContain("I21567");
+    expect(html).toContain("MSRP (BASE PRICE)");
+  });
+});
+
 // A duplicated template is a new row with its own key; until a dedicated
 // renderer is bound to that key it must render with the source layout.
 describe("duplicated template resolution", () => {

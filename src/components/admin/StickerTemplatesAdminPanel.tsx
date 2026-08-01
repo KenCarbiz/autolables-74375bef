@@ -205,7 +205,7 @@ const sectionForDb = (row: Row): SectionId => {
   if (copySourceId(row)) return "copies";
   if (row.is_featured) return "featured";
   if (key.includes("saturday")) return "saturday";
-  if (row.type === "addendum") return "used-addendums";
+  if (row.type === "addendum") return key.includes("new-car") || hasAny(tags, ["new"]) ? "new-addendums" : "used-addendums";
   if (hasAny(tags, ["passport"])) return "passport-first";
   return "new-stickers";
 };

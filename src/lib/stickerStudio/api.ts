@@ -314,3 +314,132 @@ export async function saveAddendumState(args: SaveAddendumArgs): Promise<ApiResu
     return { ok: false, error: e instanceof Error ? e.message : "addendum_failed" };
   }
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// Downstream sync — moving a line between Installed Equipment and Available
+// Upgrades in the Sticker Studio is a real merchandising decision, so it has to
+// reach the two places that act on it: the addendum the customer signs, and the
+// get-ready install work. Both are best-effort and never block the save.
+// ──────────────────────────────────────────────────────────────────────
+
+export interface LineSyncArgs {
+  tenantId?: string | null;
+  vin?: string | null;
+  installedNames: string[];
+  optionalNames: string[];
+}
+
+const normalizeName = (name: string) => name.trim().toLowerCase();
+
+// Re-badge the products on the vehicle's open addendum so the customer signs
+// the same installed/optional split shown in the studio. A signed addendum is
+// an immutable record — it is never rewritten.
+export async function syncAddendumProductBadges(args: LineSyncArgs): Promise<ApiResult> {
+  const vin = (args.vin || "").trim().toUpperCase();
+  if (!vin || !args.tenantId) return { ok: false, error: "no_vehicle" };
+  const installed = new Set(args.installedNames.map(normalizeName));
+  const optional = new Set(args.optionalNames.map(normalizeName));
+  if (!installed.size && !optional.size) return { ok: true };
+  try {
+    const { data: row } = await sb()
+      .from("addendums")
+      .select("id, products_snapshot")
+      .eq("tenant_id", args.tenantId)
+      .eq("vehicle_vin", vin)
+      .is("customer_signed_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!row?.id || !Array.isArray(row.products_snapshot)) return { ok: true };
+
+    let changed = false;
+    const next = (row.products_snapshot as { name?: string; badge_type?: string }[]).map((product) => {
+      const key = normalizeName(String(product?.name || ""));
+      const badge = installed.has(key) ? "installed" : optional.has(key) ? "optional" : null;
+      if (!badge || badge === product.badge_type) return product;
+      changed = true;
+      return { ...product, badge_type: badge };
+    });
+    if (!changed) return { ok: true };
+
+    const { error } = await sb().from("addendums").update({ products_snapshot: next }).eq("id", row.id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, documentId: row.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "badge_sync_failed" };
+  }
+}
+
+export interface GetReadyAccessory { productId: string; productName: string; installed?: boolean }
+export interface GetReadyChecklistItem { id: string; label: string; category: string; status: string; assignedTo?: string; department?: string }
+
+// Pure reconciliation between the addendum's installed lines and the get-ready
+// accessory list. Two invariants:
+//   1. An accessory with installed=true is never retired — the install proof is
+//      evidence the part is physically on the car.
+//   2. Only accessories this sync created ("addendum:" prefix) are retired, so
+//      shop work queued from the product catalog is left alone.
+export function reconcileGetReadyAccessories(
+  accessories: GetReadyAccessory[],
+  items: GetReadyChecklistItem[],
+  installedNames: string[],
+): { accessories: GetReadyAccessory[]; items: GetReadyChecklistItem[]; added: GetReadyAccessory[]; retired: GetReadyAccessory[] } {
+  const wanted = installedNames.map((name) => name.trim()).filter(Boolean);
+  const wantedKeys = new Set(wanted.map(normalizeName));
+  const isOurs = (a: GetReadyAccessory) => String(a.productId || "").startsWith("addendum:");
+
+  const retired = accessories.filter((a) => isOurs(a) && !a.installed && !wantedKeys.has(normalizeName(a.productName || "")));
+  const retiredSet = new Set(retired);
+  const kept = accessories.filter((a) => !retiredSet.has(a));
+
+  const existingKeys = new Set(kept.map((a) => normalizeName(a.productName || "")));
+  const added = wanted
+    .filter((name) => !existingKeys.has(normalizeName(name)))
+    .map((name) => ({ productId: `addendum:${normalizeName(name)}`, productName: name, installed: false }));
+
+  const retiredLabels = new Set(retired.map((a) => normalizeName(`Install: ${a.productName}`)));
+  const nextItems = items
+    .filter((i) => !(i.category === "accessory" && i.status === "pending" && retiredLabels.has(normalizeName(i.label || ""))))
+    .concat(added.map((a) => ({
+      id: crypto.randomUUID(),
+      label: `Install: ${a.productName}`,
+      category: "accessory",
+      assignedTo: "",
+      status: "pending",
+      department: "detail",
+    })));
+
+  return { accessories: [...kept, ...added], items: nextItems, added, retired };
+}
+
+// Queue / retire the matching get-ready install work for the vehicle's record.
+export async function syncGetReadyInstalls(args: LineSyncArgs): Promise<ApiResult> {
+  const vin = (args.vin || "").trim().toUpperCase();
+  if (!vin) return { ok: false, error: "no_vehicle" };
+  try {
+    const { data: row } = await sb()
+      .from("get_ready_records")
+      .select("id, items, accessories_to_install")
+      .eq("vin", vin)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!row?.id) return { ok: true };
+
+    const next = reconcileGetReadyAccessories(
+      Array.isArray(row.accessories_to_install) ? row.accessories_to_install : [],
+      Array.isArray(row.items) ? row.items : [],
+      args.installedNames,
+    );
+    if (!next.added.length && !next.retired.length) return { ok: true };
+
+    const { error } = await sb()
+      .from("get_ready_records")
+      .update({ accessories_to_install: next.accessories, items: next.items })
+      .eq("id", row.id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, documentId: row.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "get_ready_sync_failed" };
+  }
+}

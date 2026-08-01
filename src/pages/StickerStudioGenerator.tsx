@@ -25,12 +25,17 @@ import { useDealerPrintSettings } from "@/lib/stickerStudio/useDealerPrintSettin
 import { useTemplateCustomization } from "@/lib/stickerStudio/useTemplateCustomization";
 import { applyCustomization } from "@/lib/stickerStudio/customization";
 import { brandingFromSettings } from "@/pages/StickerStudio";
-import { saveStickerToVehicle, publishToPassport, saveAddendumState, type AddendumItemInput } from "@/lib/stickerStudio/api";
-import { ArrowLeft, Printer, Download, Image as ImageIcon, Plus, Trash2, Save, Globe, Sun, Moon, CheckCircle2 } from "lucide-react";
+import { saveStickerToVehicle, publishToPassport, saveAddendumState, syncAddendumProductBadges, syncGetReadyInstalls, type AddendumItemInput } from "@/lib/stickerStudio/api";
+import { ArrowLeft, ArrowLeftRight, Printer, Download, Image as ImageIcon, Plus, Trash2, Save, Globe, Sun, Moon, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 const ACCENTS = ["#2563EB", "#0B2041", "#7c5c1e", "#0f766e", "#9333ea", "#b91c1c"];
 const blankItem = (): StickerLineItem => ({ name: "", price: "", note: "" });
+
+// One-click destination for each line-item section. Installed and available
+// swap with each other; a benefit promotes to installed equipment.
+const MOVE_TARGET = { installed: "upgrades", upgrades: "installed", benefits: "installed" } as const;
+const MOVE_LABEL = { installed: "Installed equipment", upgrades: "Available upgrades", benefits: "Included benefits" } as const;
 
 const StickerStudioGenerator = () => {
   const { templateId = "" } = useParams();
@@ -271,6 +276,23 @@ const StickerStudioGenerator = () => {
     setData((d) => (d[key].length >= cfg.maxItems[key] ? d : { ...d, [key]: [...d[key], blankItem()] }));
   const removeItem = (key: "installed" | "upgrades" | "benefits", i: number) =>
     setData((d) => ({ ...d, [key]: d[key].filter((_, idx) => idx !== i) }));
+  // Moving a line between Installed Equipment and Available Upgrades is a
+  // merchandising decision, not a retype: it re-prices the addendum the
+  // customer signs and the install work get-ready has to do.
+  const moveItem = (from: "installed" | "upgrades" | "benefits", to: "installed" | "upgrades" | "benefits", i: number) =>
+    setData((d) => {
+      const item = d[from][i];
+      if (!item) return d;
+      if (d[to].length >= cfg.maxItems[to]) {
+        toast.error(`${MOVE_LABEL[to]} is full (${cfg.maxItems[to]} max)`);
+        return d;
+      }
+      return {
+        ...d,
+        [from]: d[from].filter((_, idx) => idx !== i),
+        [to]: [...d[to].filter((it) => it.name.trim()), item],
+      };
+    });
 
   // ── Output ───────────────────────────────────────────────────────────
   const capture = async () => {
@@ -359,6 +381,21 @@ const StickerStudioGenerator = () => {
             ...data.upgrades.filter((i) => i.name.trim()).map((i) => ({ itemType: "available_upgrade" as const, name: i.name, price: i.price, note: i.note, isSelected: totalMsrpMode })),
           ];
           await saveAddendumState({ tenantId: tenant?.id, vehicleId: prefill.vehicle.id, baseMsrp: data.msrp, items });
+          // Carry the installed/available split downstream: the addendum the
+          // customer signs, and the get-ready install work. Best-effort — a
+          // failure here must never lose the save the dealer just made.
+          const lineSync = {
+            tenantId: tenant?.id,
+            vin: data.vin,
+            installedNames: data.installed.map((i) => i.name).filter((n) => n.trim()),
+            optionalNames: data.upgrades.map((i) => i.name).filter((n) => n.trim()),
+          };
+          const [badges, getReady] = await Promise.all([
+            syncAddendumProductBadges(lineSync),
+            syncGetReadyInstalls(lineSync),
+          ]);
+          const touched = [badges.documentId ? "customer addendum" : null, getReady.documentId ? "get-ready" : null].filter(Boolean);
+          if (touched.length) toast.success(`Updated ${touched.join(" and ")} from the line items`);
         }
       } else toast.error(r.error === "no_vehicle" ? "Open this from a vehicle to save it to the file" : "Couldn't save");
     } finally { setGenerating(false); }
@@ -378,21 +415,32 @@ const StickerStudioGenerator = () => {
   const fitScale = cfg.type === "addendum" ? 0.9 : 0.62;
   const previewScale = zoomPreset === "fit" ? fitScale : Number(zoomPreset) / 100;
 
-  const ItemEditor = ({ keyName, title }: { keyName: "installed" | "upgrades" | "benefits"; title: string }) => (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <label className={label}>{title} <span className="text-muted-foreground/60">({data[keyName].length}/{cfg.maxItems[keyName]})</span></label>
-        <button onClick={() => addItem(keyName)} disabled={data[keyName].length >= cfg.maxItems[keyName]} className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 disabled:opacity-40"><Plus className="w-3 h-3" /> Add</button>
-      </div>
-      {data[keyName].map((it, i) => (
-        <div key={i} className="flex gap-1.5">
-          <input value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} flex-1 min-w-0`} />
-          <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} !w-24 flex-none`} inputMode="decimal" />
-          <button onClick={() => removeItem(keyName, i)} className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-md border border-border text-rose-600 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>
+  const ItemEditor = ({ keyName, title }: { keyName: "installed" | "upgrades" | "benefits"; title: string }) => {
+    const moveTo = MOVE_TARGET[keyName];
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className={label}>{title} <span className="text-muted-foreground/60">({data[keyName].length}/{cfg.maxItems[keyName]})</span></label>
+          <button onClick={() => addItem(keyName)} disabled={data[keyName].length >= cfg.maxItems[keyName]} className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 disabled:opacity-40"><Plus className="w-3 h-3" /> Add</button>
         </div>
-      ))}
-    </div>
-  );
+        {data[keyName].map((it, i) => (
+          <div key={i} className="flex gap-1.5">
+            <input value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} flex-1 min-w-0`} />
+            <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} !w-24 flex-none`} inputMode="decimal" />
+            <button
+              onClick={() => moveItem(keyName, moveTo, i)}
+              disabled={!it.name.trim()}
+              title={`Move to ${MOVE_LABEL[moveTo]}`}
+              aria-label={`Move ${it.name || "item"} to ${MOVE_LABEL[moveTo]}`}
+              className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-md border border-border text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent"
+            ><ArrowLeftRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => removeItem(keyName, i)} className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-md border border-border text-rose-600 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>
+          </div>
+        ))}
+        <p className="text-[10px] text-muted-foreground">Move sends the line to {MOVE_LABEL[moveTo]} and re-prices the addendum on save.</p>
+      </div>
+    );
+  };
 
   return (
     <div className="p-4 lg:p-6 max-w-[1500px] mx-auto space-y-4">

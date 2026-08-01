@@ -4,6 +4,7 @@ import SaturdayPremiumAddendum from "@/components/saturday/SaturdayPremiumAddend
 import MidnightPremiumAddendum from "@/components/saturday/MidnightPremiumAddendum";
 import EclipsePremiumAddendum from "@/components/saturday/EclipsePremiumAddendum";
 import OnyxPremiumAddendum from "@/components/saturday/OnyxPremiumAddendum";
+import NewCarSaasAddendum from "@/components/saturday/NewCarSaasAddendum";
 import { USED_ADDENDUM_CATALOG_50 } from "@/components/saturday/UsedAddendumCatalog";
 import type { SaturdaySticker } from "@/components/saturday/types";
 import type {
@@ -217,6 +218,7 @@ const SaturdayPremiumAddendumRenderer = makeAddendumRenderer(SaturdayPremiumAdde
 const MidnightPremiumAddendumRenderer = makeAddendumRenderer(MidnightPremiumAddendum);
 const EclipsePremiumAddendumRenderer = makeAddendumRenderer(EclipsePremiumAddendum);
 const OnyxPremiumAddendumRenderer = makeAddendumRenderer(OnyxPremiumAddendum);
+const NewCarSaasAddendumRenderer = makeAddendumRenderer(NewCarSaasAddendum);
 
 // The 50-item used addendum catalog renders from the same SaturdaySticker shape,
 // so each catalog entry is a first-class studio renderer keyed by its catalog id.
@@ -231,6 +233,7 @@ const SATURDAY_RENDERERS: Record<string, (props: TemplateRenderProps) => JSX.Ele
   "addendum-saturday-midnight": MidnightPremiumAddendumRenderer,
   "addendum-saturday-eclipse": EclipsePremiumAddendumRenderer,
   "addendum-saturday-onyx": OnyxPremiumAddendumRenderer,
+  "addendum-new-car-saas": NewCarSaasAddendumRenderer,
 };
 
 const SATURDAY_CONFIGS: Record<string, StickerTemplateConfig> = {
@@ -274,6 +277,13 @@ const SATURDAY_CONFIGS: Record<string, StickerTemplateConfig> = {
     styleTags: ["Modern", "Readability", "Compliance"],
     useCase: "4.25x11 premium branded addendum variant — independently editable Onyx layout.",
     complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
+  }),
+  "addendum-new-car-saas": saturdayAddendumConfig({
+    id: "addendum-new-car-saas",
+    name: "New Car SaaS Template",
+    styleTags: ["Modern", "SaaS", "Readability"],
+    useCase: "4.25x11 new vehicle addendum — independently editable duplicate of the Saturday Premium Addendum.",
+    complianceNote: "New vehicle addendum supplements the federal Monroney label; it never replaces it.",
   }),
 };
 
