@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
 import {
+import { newCallMeter, recordCall, estimateCost } from "../_shared/mcCost.ts";
   classifyListing, isStrictRooftop, normStreet, normZip, prunePreflight,
   type ListingIdentity, type Rooftop,
 } from "../_shared/rooftopMatch.ts";
@@ -129,8 +130,13 @@ async function resolveDealerId(
 
 // Low-level MarketCheck GET. Coerces num_found (the syndication feed returns it
 // as a string) and returns the listings array + http status.
+// Per-run call meter. Operator-facing only: these are public list prices, not a
+// bill, and the figures never reach a dealer-visible surface.
+let callMeter = newCallMeter();
+
 async function mcFetch(base: string, query: string): Promise<{ listings: MCListing[]; numFound: number; http: number }> {
   const url = `${base}?api_key=${encodeURIComponent(MC_KEY)}&${query}`;
+  recordCall(callMeter, base);
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) return { listings: [], numFound: 0, http: res.status };
@@ -180,6 +186,7 @@ async function resolveDealership(domain: string): Promise<Dealership> {
   if (!domain) return empty;
   try {
     const url = `${DEALERSHIPS_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}&inventory_url=${encodeURIComponent(domain)}&rows=5`;
+    recordCall(callMeter, DEALERSHIPS_ENDPOINT);
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) return { ...empty, http: res.status };
     // deno-lint-ignore no-explicit-any
@@ -514,6 +521,8 @@ serve(async (req) => {
   const ENRICH_CAP = Number(Deno.env.get("ENRICH_PER_RUN") || "10");
 
   for (const cfg of due as SyncConfig[]) {
+    // Meter each tenant's run independently — the loop can cover many tenants.
+    callMeter = newCallMeter();
     const source = toSourceHost(cfg.source);
     const manualDealerId = (cfg.dealer_id || "").trim();
     // A domain OR a chosen dealer_id is enough — the finder gives an id even
@@ -1371,7 +1380,9 @@ serve(async (req) => {
       }
 
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, prune_skipped: pruneSkipped, pinned: cleanRun };
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, prune_skipped: pruneSkipped, pinned: cleanRun,
+        // Operator-only. Public list prices, so an estimate rather than a bill.
+        api_usage: estimateCost(callMeter, 30) };
       diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: manualId, matched_dealer: verifiedName || "(by domain)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })
