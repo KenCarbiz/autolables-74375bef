@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
+import {
+  classifyListing, isStrictRooftop, normStreet, normZip,
+  type ListingIdentity, type Rooftop,
+} from "../_shared/rooftopMatch.ts";
 
 // Artifact posts are queued and paced, so they can still be in flight when the
 // handler returns. Without this the isolate is torn down mid-queue and the
@@ -169,7 +173,9 @@ async function resolveDealership(domain: string): Promise<Dealership> {
     const rows: any[] = Array.isArray(data?.mc_dealerships) ? data.mc_dealerships
       : Array.isArray(data?.dealerships) ? data.dealerships : [];
     const host = (s: unknown) => toSourceHost(String(s || ""));
-    const hit = rows.find((d) => host(d?.inventory_url) === domain) || rows[0];
+    // Never fall back to rows[0]: for a group domain that is an arbitrary
+    // sibling rooftop, and its ids would then be trusted downstream.
+    const hit = rows.find((d) => host(d?.inventory_url) === domain);
     if (!hit) return { ...empty, http: res.status };
     const probes: Array<{ param: string; value: string }> = [];
     const push = (param: string, v: unknown) => { const s = String(v ?? "").trim(); if (s) probes.push({ param, value: s }); };
@@ -246,10 +252,15 @@ const toPrice = (v: unknown): number | null => {
 };
 
 // ── Rooftop ownership validation ───────────────────────────────────────────
-// A single mc_dealer_id can span many rooftops across states, so a pull MUST be
-// validated: each listing advertises a source domain (and a dealer state); we
-// keep only cars whose domain matches the dealer's configured website (or, when
-// no domain signal exists, whose state matches) and reject the rest.
+// A single mc_dealer_id can span many rooftops, and sibling stores in a dealer
+// group syndicate each other's cars, so a pull MUST be validated per listing.
+//
+// The decisive signal is the rooftop's STREET ADDRESS. Domain and state cannot
+// separate siblings: group rooftops share a state, and a listing that carries no
+// host signal used to fall through to a state comparison — which passes every
+// dealer in Connecticut. Street + ZIP is the only field that identifies one
+// physical rooftop, so when it is configured it is authoritative and a listing
+// that cannot be positively matched to it is never ingested.
 const listingHosts = (l: MCListing): string[] => {
   const out: string[] = [];
   // deno-lint-ignore no-explicit-any
@@ -263,17 +274,18 @@ const listingHosts = (l: MCListing): string[] => {
 // deno-lint-ignore no-explicit-any
 const listingState = (l: MCListing): string => String((l?.dealer as any)?.state || "").trim().toUpperCase();
 
-type Ownership = "match" | "mismatch" | "unknown";
-const classifyListing = (l: MCListing, domain: string, state: string): Ownership => {
-  const hosts = listingHosts(l);
-  if (domain) {
-    if (hosts.includes(domain)) return "match";
-    if (hosts.length > 0) return "mismatch";   // belongs to a different domain
-  }
-  const st = listingState(l);
-  if (state && st) return st === state ? "match" : "mismatch";
-  return "unknown";
-};
+// Address/host normalization and the ownership decision live in
+// _shared/rooftopMatch.ts so they are unit-tested rather than only exercised
+// against live inventory each night.
+const listingIdentity = (l: MCListing): ListingIdentity => ({
+  hosts: listingHosts(l),
+  // deno-lint-ignore no-explicit-any
+  state: String((l?.dealer as any)?.state || "").trim().toUpperCase(),
+  // deno-lint-ignore no-explicit-any
+  street: normStreet((l?.dealer as any)?.street),
+  // deno-lint-ignore no-explicit-any
+  zip: normZip((l?.dealer as any)?.zip),
+});
 
 interface SyncConfig {
   tenant_id: string; allowed: boolean; enabled: boolean; source: string;
@@ -587,6 +599,19 @@ serve(async (req) => {
       // this dealer's local market radius (not a national average).
       const tenantZip = (pset.dealer_zip || "").trim();
 
+      // The rooftop this tenant IS. Street + ZIP come from the dealership
+      // profile the dealer already maintains, so no extra configuration is
+      // needed for the address assertion to take effect. When both are present
+      // the pull runs strict: only cars positively at this address are kept.
+      const rooftop: Rooftop = {
+        domain: source,
+        state: dealerState,
+        street: normStreet(pset.dealer_address),
+        zip: normZip(pset.dealer_zip),
+      };
+      const strict = isStrictRooftop(rooftop);
+      let rejected = 0;
+
       // Resolve the rooftop from its website domain via the NEW Dealerships
       // Search API, which returns the canonical mc_* ids the syndication feed
       // scopes on correctly (the legacy /dealers/car id collides with other
@@ -613,17 +638,20 @@ serve(async (req) => {
       // Validate every feed against the dealer's domain/state. source= and the
       // mc_website_id resolved from the domain are trusted single-rooftop scopes;
       // any other id must be predominantly THIS rooftop's cars or it's rejected.
+      // Every identifier earns its place on sampled purity — including source
+      // and mc_website_id, which used to be accepted unconditionally. That
+      // blanket trust is why a wrong feed could win once and then stick.
+      const minPurity = strict ? 0.95 : 0.6;
       const recordHit = (param: string, value: string, r: { listings: MCListing[]; numFound: number; http: number }, label: string) => {
-        let match = 0, mismatch = 0;
+        let match = 0, mismatch = 0, unknown = 0;
         for (const l of r.listings) {
-          const c = classifyListing(l, source, dealerState);
-          if (c === "match") match++; else if (c === "mismatch") mismatch++;
+          const c = classifyListing(listingIdentity(l), rooftop);
+          if (c === "match") match++; else if (c === "mismatch") mismatch++; else unknown++;
         }
         const decided = match + mismatch;
         const purity = decided === 0 ? 0 : match / decided;
-        attempts.push({ feed: label, param, id: value, http: r.http, num_found: r.numFound, got: r.listings.length, match, mismatch, purity: Math.round(purity * 100) / 100 });
-        const trusted = param === "source" || param === "mc_website_id";
-        if (r.listings.length > 0 && (trusted || (match > 0 && purity >= 0.6))) hits.push({ param, value, r, purity });
+        attempts.push({ feed: label, param, id: value, http: r.http, num_found: r.numFound, got: r.listings.length, match, mismatch, unknown, purity: Math.round(purity * 100) / 100 });
+        if (r.listings.length > 0 && match > 0 && purity >= minPurity) hits.push({ param, value, r, purity });
       };
 
       // Probe order, highest-confidence first: source=<domain>, then the rooftop's
@@ -734,9 +762,11 @@ serve(async (req) => {
               if (!vin || vin.length < 11) continue;
             }
             if (!vin || vin.length < 11) continue;
-            // Drop any car that positively belongs to a different domain/state —
-            // never ingest another dealer's vehicle into this tenant.
-            if (classifyListing(l, source, dealerState) === "mismatch") continue;
+            // With a verified rooftop address, a car must positively match it.
+            // Unproven listings are dropped rather than assumed ours — that
+            // assumption is what let sibling stores drift in.
+            const own = classifyListing(listingIdentity(l), rooftop);
+            if (own === "mismatch" || (strict && own !== "match")) { rejected++; continue; }
             tenantSeen++; seen++;
             liveVins.add(vin);
             const price = toPrice(l.price);
@@ -1256,7 +1286,7 @@ serve(async (req) => {
       }
 
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName };
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected };
       diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: manualId, matched_dealer: verifiedName || "(by domain)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })
