@@ -7923,7 +7923,7 @@ export type Database = {
       vehicle_addendum_items: {
         Row: {
           created_at: string
-          customer_status: string
+          customer_status: string | null
           description: string | null
           disclosure_text: string | null
           display_order: number
@@ -7945,7 +7945,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          customer_status?: string
+          customer_status?: string | null
           description?: string | null
           disclosure_text?: string | null
           display_order?: number
@@ -7967,7 +7967,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          customer_status?: string
+          customer_status?: string | null
           description?: string | null
           disclosure_text?: string | null
           display_order?: number
@@ -10904,7 +10904,7 @@ export type Database = {
         Args: { _item_id: string; _source?: string; _status: string }
         Returns: {
           created_at: string
-          customer_status: string
+          customer_status: string | null
           description: string | null
           disclosure_text: string | null
           display_order: number
