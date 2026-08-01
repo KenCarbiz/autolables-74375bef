@@ -47,6 +47,12 @@ export interface StickerLineItem {
   name: string;
   price?: string;
   note?: string;
+  /**
+   * Stable vehicle_addendum_items id once the row is backed by the shared
+   * equipment record. Held so a rename can never detach the row from the
+   * record that carries its proof state and get-ready work.
+   */
+  equipmentId?: string;
 }
 
 export interface StickerData {

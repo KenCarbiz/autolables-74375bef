@@ -355,8 +355,14 @@ const StickerStudioGenerator = () => {
   // editor are matched to it so a status change writes the authoritative record
   // every other module reads, instead of a private array.
   const equipment = useVehicleEquipment(prefill.vehicle?.id, tenant?.id, data.msrp || data.price);
-  const equipmentRecordFor = (name: string) =>
-    name.trim() ? equipment.items.find((e) => e.name.trim().toLowerCase() === name.trim().toLowerCase()) : undefined;
+  // Identity first, name only as the initial binding for a row the record has
+  // not adopted yet — so renaming an item can never detach it.
+  const equipmentRecordFor = (item: StickerLineItem | string) => {
+    const row = typeof item === "string" ? { name: item, equipmentId: undefined } : item;
+    if (row.equipmentId) return equipment.items.find((e) => e.id === row.equipmentId);
+    const name = row.name?.trim().toLowerCase();
+    return name ? equipment.items.find((e) => e.name.trim().toLowerCase() === name) : undefined;
+  };
 
   // The authoritative record can change without this page doing anything — the
   // 96-hour proof sweep demotes an unproven item, a late proof restores it. Pull
@@ -366,14 +372,34 @@ const StickerStudioGenerator = () => {
     setData((d) => {
       let changed = false;
       const next = { ...d };
-      for (const record of equipment.items) {
-        const target = RECORD_TO_STATUS[record.customerStatus];
+      const findRow = (record: (typeof equipment.items)[number]) => {
         for (const key of STATUS_KEYS) {
-          if (key === target) continue;
-          const idx = next[key].findIndex((it) => it.name.trim().toLowerCase() === record.name.trim().toLowerCase());
-          if (idx < 0) continue;
-          const [moved] = next[key].splice(idx, 1);
-          next[key] = [...next[key]];
+          const byId = next[key].findIndex((it) => it.equipmentId === record.id);
+          if (byId >= 0) return { key, idx: byId };
+        }
+        for (const key of STATUS_KEYS) {
+          // Only adopt an un-linked row by name; a row already bound to another
+          // record must never be stolen by a same-named one.
+          const byName = next[key].findIndex(
+            (it) => !it.equipmentId && it.name.trim().toLowerCase() === record.name.trim().toLowerCase(),
+          );
+          if (byName >= 0) return { key, idx: byName };
+        }
+        return null;
+      };
+
+      for (const record of equipment.items) {
+        const found = findRow(record);
+        if (!found) continue;
+        const target = RECORD_TO_STATUS[record.customerStatus];
+        const row = next[found.key][found.idx];
+        if (row.equipmentId !== record.id) {
+          next[found.key] = next[found.key].map((it, i) => (i === found.idx ? { ...it, equipmentId: record.id } : it));
+          changed = true;
+        }
+        if (found.key !== target) {
+          const moved = { ...next[found.key][found.idx], equipmentId: record.id };
+          next[found.key] = next[found.key].filter((_, i) => i !== found.idx);
           next[target] = [...next[target], moved];
           changed = true;
         }
@@ -457,6 +483,29 @@ const StickerStudioGenerator = () => {
     setData((d) => (JSON.stringify(d.valueProps || []) === JSON.stringify(next) ? d : { ...d, valueProps: next }));
   }, [stickerPrograms]);
 
+  // Pointer reordering. Dropping a row onto another section is a status change,
+  // so the drop routes through changeStatus and picks up the same persistence,
+  // sync, and undo a dropdown change does.
+  const [dragRow, setDragRow] = useState<{ key: EquipmentStatusKey; index: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  const handleDrop = (key: EquipmentStatusKey, index: number) => {
+    const from = dragRow;
+    setDragRow(null);
+    setDropTarget(null);
+    if (!from) return;
+    if (from.key !== key) { changeStatus(from.key, key, from.index); return; }
+    if (from.index === index) return;
+    setData((d) => {
+      const list = [...d[key]];
+      const [moved] = list.splice(from.index, 1);
+      list.splice(index, 0, moved);
+      return { ...d, [key]: list };
+    });
+    const record = equipmentRecordFor(data[key][from.index]);
+    if (record) void equipment.reorder(record.id, index > from.index ? 1 : -1);
+  };
+
   const nameInputFocus = (key: EquipmentStatusKey, i: number) => {
     const el = document.querySelector<HTMLInputElement>(`[data-equipment-name="${key}-${i}"]`);
     el?.focus();
@@ -478,7 +527,7 @@ const StickerStudioGenerator = () => {
       [list[i], list[target]] = [list[target], list[i]];
       return { ...d, [key]: list };
     });
-    const record = equipmentRecordFor(data[key][i]?.name || "");
+    const record = equipmentRecordFor(data[key][i]);
     if (record) void equipment.reorder(record.id, direction);
   };
 
@@ -505,7 +554,7 @@ const StickerStudioGenerator = () => {
     // Authoritative write first when the row is backed by the shared record —
     // that is what carries the proof deadline, the audit entry, and every other
     // module. The snapshot sync keeps pre-migration databases correct too.
-    const record = equipmentRecordFor(item.name);
+    const record = equipmentRecordFor(item);
     const apply = async (target: EquipmentStatusKey, snapshot: StickerData) => {
       if (record) await equipment.setStatus(record.id, STATUS_TO_RECORD[target]);
       await persistEquipment(snapshot);
@@ -652,13 +701,22 @@ const StickerStudioGenerator = () => {
         <button onClick={() => addItem(keyName)} disabled={data[keyName].length >= cfg.maxItems[keyName]} className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 disabled:opacity-40"><Plus className="w-3 h-3" /> Add</button>
       </div>
       {data[keyName].map((it, i) => {
-        const record = equipmentRecordFor(it.name);
+        const record = equipmentRecordFor(it);
         const badge = proofBadge(
           record ?? { customerStatus: STATUS_TO_RECORD[keyName], workflowStatus: "not_applicable", proofDueAt: null },
           settings.dealer_timezone,
         );
         return (
-          <div key={i} className="grid grid-cols-[14px_minmax(0,1fr)_72px_124px_112px_32px] items-center gap-1.5 rounded-md py-0.5 transition-all duration-200">
+          <div
+            key={i}
+            draggable
+            onDragStart={() => setDragRow({ key: keyName, index: i })}
+            onDragOver={(e) => { e.preventDefault(); setDropTarget(`${keyName}-${i}`); }}
+            onDragLeave={() => setDropTarget((t) => (t === `${keyName}-${i}` ? null : t))}
+            onDrop={(e) => { e.preventDefault(); handleDrop(keyName, i); }}
+            onDragEnd={() => { setDragRow(null); setDropTarget(null); }}
+            className={`grid grid-cols-[14px_minmax(0,1fr)_72px_124px_112px_32px] items-center gap-1.5 rounded-md py-0.5 transition-all duration-200 ${dropTarget === `${keyName}-${i}` ? "ring-2 ring-blue-400" : ""} ${dragRow?.key === keyName && dragRow.index === i ? "opacity-40" : ""}`}
+          >
             <span aria-hidden className="text-muted-foreground/50 cursor-grab active:cursor-grabbing"><GripVertical className="w-3.5 h-3.5" /></span>
             <input data-equipment-name={`${keyName}-${i}`} value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} min-w-0`} />
             <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} min-w-0`} inputMode="decimal" />
