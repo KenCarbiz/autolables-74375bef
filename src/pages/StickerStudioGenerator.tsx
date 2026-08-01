@@ -16,7 +16,7 @@ import { useLatestAddendum } from "@/lib/stickerStudio/useLatestAddendum";
 import { mapProductsToStickerItems } from "@/lib/stickerStudio/addendumMapping";
 import { validateStickerPacketMatch, type PacketContext } from "@/lib/stickerStudio/validateStickerPacketMatch";
 import StickerPacketReviewPanel from "@/components/sticker/StickerPacketReviewPanel";
-import { FileCheck2, QrCode as QrIcon, AlertTriangle } from "lucide-react";
+import { FileCheck2, QrCode as QrIcon, AlertTriangle, Search } from "lucide-react";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
 import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode } from "@/lib/stickerStudio/templates";
 import { resolvePriceLabel } from "@/lib/priceModel";
@@ -64,10 +64,10 @@ const RECORD_TO_STATUS: Record<CustomerStatus, EquipmentStatusKey> = {
   included_benefit: "benefits",
 };
 const BADGE_TONE = {
-  verified: "text-emerald-600",
-  awaiting: "text-amber-600",
-  overdue: "text-rose-600",
-  none: "text-muted-foreground",
+  verified: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  awaiting: "border-amber-200 bg-amber-50 text-amber-700",
+  overdue: "border-rose-200 bg-rose-50 text-rose-700",
+  none: "border-border bg-muted/50 text-muted-foreground",
 } as const;
 
 const StickerStudioGenerator = () => {
@@ -381,6 +381,35 @@ const StickerStudioGenerator = () => {
     });
   }, [equipment.items]);
 
+  // Accessory catalog search. Adding from the catalog carries the dealership's
+  // own price and lands in the same equipment record a typed row does.
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const defaultAddSection: EquipmentStatusKey = cfg.sections.includes("installed") ? "installed" : "upgrades";
+  const catalogMatches = useMemo(() => {
+    const q = catalogQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const taken = new Set(STATUS_KEYS.flatMap((k) => data[k].map((it) => it.name.trim().toLowerCase())));
+    return (products || [])
+      .filter((p) => p.name?.toLowerCase().includes(q) && !taken.has(p.name.trim().toLowerCase()))
+      .slice(0, 8);
+  }, [catalogQuery, products, data]);
+
+  const addFromCatalog = (product: { name: string; price?: number | string; badge_type?: string }) => {
+    const section: EquipmentStatusKey =
+      product.badge_type === "installed" ? "installed" : product.badge_type === "optional" ? "upgrades" : defaultAddSection;
+    const price = Number(String(product.price ?? "").replace(/[^0-9.]/g, ""));
+    setData((d) => {
+      if (d[section].filter((it) => it.name.trim()).length >= cfg.maxItems[section]) {
+        toast.error(`${SECTION_LABEL[section]} is full (${cfg.maxItems[section]} max)`);
+        return d;
+      }
+      const row = { name: product.name, price: price > 0 ? String(price) : "", note: "" };
+      return { ...d, [section]: [...d[section].filter((it) => it.name.trim()), row] };
+    });
+    setCatalogQuery("");
+    toast.success(`${product.name} added to ${SECTION_LABEL[section]}`);
+  };
+
   const nameInputFocus = (key: EquipmentStatusKey, i: number) => {
     const el = document.querySelector<HTMLInputElement>(`[data-equipment-name="${key}-${i}"]`);
     el?.focus();
@@ -566,9 +595,13 @@ const StickerStudioGenerator = () => {
   const previewScale = zoomPreset === "fit" ? fitScale : Number(zoomPreset) / 100;
 
   const ItemEditor = ({ keyName }: { keyName: EquipmentStatusKey }) => (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <label className={label}>{SECTION_LABEL[keyName]} <span className="text-muted-foreground/60">({data[keyName].length}/{cfg.maxItems[keyName]})</span></label>
+    <div>
+      {/* The three sections stay visible as groups inside the one table, so a
+          row's status and where it sits always agree. */}
+      <div className="flex items-center justify-between border-t border-border px-1 pt-2 pb-1 first:border-t-0">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          {SECTION_LABEL[keyName]} <span className="text-muted-foreground/60">({data[keyName].filter((it) => it.name.trim()).length}/{cfg.maxItems[keyName]})</span>
+        </span>
         <button onClick={() => addItem(keyName)} disabled={data[keyName].length >= cfg.maxItems[keyName]} className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 disabled:opacity-40"><Plus className="w-3 h-3" /> Add</button>
       </div>
       {data[keyName].map((it, i) => {
@@ -578,25 +611,28 @@ const StickerStudioGenerator = () => {
           settings.dealer_timezone,
         );
         return (
-          <div key={i} className="flex items-center gap-1.5 rounded-md transition-all duration-200">
-            <span aria-hidden className="flex-none text-muted-foreground/50 cursor-grab active:cursor-grabbing"><GripVertical className="w-3.5 h-3.5" /></span>
-            <input data-equipment-name={`${keyName}-${i}`} value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} flex-1 min-w-0`} />
-            <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} !w-24 flex-none`} inputMode="decimal" />
+          <div key={i} className="grid grid-cols-[16px_1fr_84px_150px_150px_36px] items-center gap-1.5 rounded-md py-0.5 transition-all duration-200">
+            <span aria-hidden className="text-muted-foreground/50 cursor-grab active:cursor-grabbing"><GripVertical className="w-3.5 h-3.5" /></span>
+            <input data-equipment-name={`${keyName}-${i}`} value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} min-w-0`} />
+            <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} min-w-0`} inputMode="decimal" />
             {/* The status names the outcome, so nobody has to guess what an
                 arrow does to pricing, get-ready, or the signing addendum. */}
             <select
               value={keyName}
               onChange={(e) => changeStatus(keyName, e.target.value as EquipmentStatusKey, i)}
               aria-label={`Status for ${it.name || "new item"}`}
-              className={`${input} !w-36 flex-none cursor-pointer`}
+              className={`${input} min-w-0 cursor-pointer`}
             >
               {STATUS_KEYS.map((k) => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}
             </select>
             {/* Internal proof state. Never rendered on a customer document. */}
-            <span className={`flex-none w-36 truncate text-[11px] font-semibold ${BADGE_TONE[badge.tone]}`} title={badge.label}>
-              {badge.tone === "verified" && <CheckCircle2 className="inline w-3 h-3 mr-1" />}
-              {(badge.tone === "awaiting" || badge.tone === "overdue") && <AlertTriangle className="inline w-3 h-3 mr-1" />}
-              {badge.label}
+            <span
+              className={`inline-flex min-w-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${BADGE_TONE[badge.tone]}`}
+              title={badge.label}
+            >
+              {badge.tone === "verified" && <CheckCircle2 className="w-3 h-3 shrink-0" />}
+              {(badge.tone === "awaiting" || badge.tone === "overdue") && <AlertTriangle className="w-3 h-3 shrink-0" />}
+              <span className="truncate">{badge.label}</span>
             </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -683,11 +719,61 @@ const StickerStudioGenerator = () => {
 
           {packetCtx && <StickerPacketReviewPanel sticker={data} ctx={packetCtx} />}
 
-          <CfgCard title="Line items">
-            <div className="space-y-3">
-              {cfg.sections.includes("installed") && <ItemEditor keyName="installed" />}
-              {cfg.sections.includes("upgrades") && <ItemEditor keyName="upgrades" />}
-              {cfg.sections.includes("benefits") && <ItemEditor keyName="benefits" />}
+          <CfgCard title="Equipment & Accessories">
+            <div className="space-y-2">
+              {/* Add from the dealership's own product catalog, or type a
+                  one-off line. Both land in the same equipment record. */}
+              <div className="flex gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    value={catalogQuery}
+                    onChange={(e) => setCatalogQuery(e.target.value)}
+                    placeholder="Search accessory catalog…"
+                    className={`${input} !pl-8`}
+                  />
+                  {catalogMatches.length > 0 && (
+                    <div className="absolute z-20 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg max-h-56 overflow-auto">
+                      {catalogMatches.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => addFromCatalog(p)}
+                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted"
+                        >
+                          <span className="truncate">{p.name}</span>
+                          <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+                            {Number(p.price) > 0 ? `$${Number(p.price).toLocaleString()}` : "—"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => addItem(defaultAddSection)}
+                  className="h-9 shrink-0 inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add equipment
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <div className="min-w-[640px]">
+                  <div className="grid grid-cols-[16px_1fr_84px_150px_150px_36px] gap-1.5 px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span /><span>Item</span><span>Price</span><span>Status</span><span>Installation proof</span><span />
+                  </div>
+                  {STATUS_KEYS.filter((k) => cfg.sections.includes(k)).map((keyName) => (
+                    <ItemEditor key={keyName} keyName={keyName} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Says out loud what a status change already does, so nobody has
+                  to wonder whether the rest of the workflow heard about it. */}
+              <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-[11px] font-semibold text-blue-800">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                Synced with Get Ready, Vehicle Passport &amp; Signing Addendum
+              </div>
             </div>
           </CfgCard>
 
