@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { STUDIO_SATURDAY_TEMPLATES, saturdayTemplateFromConfig } from "./saturdayTemplates";
+import { STUDIO_SATURDAY_TEMPLATES, premiumTemplateFromConfig } from "./saturdayTemplates";
 import { renderToStaticMarkup } from "react-dom/server";
-import { getStudioTemplate, type StickerData, type StickerBranding, templateFromConfig } from "./templates";
+import { USED_ADDENDUM_CATALOG_50 } from "@/components/saturday/UsedAddendumCatalog";
+import { buildConfig, getStudioTemplate, type StickerData, type StickerBranding, type StickerTemplateConfig, templateFromConfig } from "./templates";
 
 const DATA: StickerData = {
   vehicleTitle: "2027 INFINITI QX60 LUXE", vin: "5N1AL1F87VC331335", stock: "I21567",
@@ -52,15 +53,43 @@ describe("premium window templates", () => {
   });
 });
 
-// StickerPrint resolves saturdayTemplateFromConfig first — a Saturday config
+// StickerPrint resolves premiumTemplateFromConfig first — a Saturday config
 // must never fall back to the generic engine or the printed sheet differs
 // from the studio preview.
 describe("saturday template print resolution", () => {
   it("resolves every saturday id to its saturday renderer", () => {
     for (const t of STUDIO_SATURDAY_TEMPLATES) {
-      const resolved = saturdayTemplateFromConfig(t.config) ?? templateFromConfig(t.config);
+      const resolved = premiumTemplateFromConfig(t.config) ?? templateFromConfig(t.config);
       expect(resolved.Render).toBe(t.Render);
       expect(templateFromConfig(t.config).Render).not.toBe(t.Render);
     }
+  });
+});
+
+// A duplicated template is a new row with its own key; until a dedicated
+// renderer is bound to that key it must render with the source layout.
+describe("duplicated template resolution", () => {
+  const resolve = (config: StickerTemplateConfig) => premiumTemplateFromConfig(config) ?? templateFromConfig(config);
+
+  it("renders a saturday copy with the source renderer", () => {
+    const source = STUDIO_SATURDAY_TEMPLATES.find((t) => t.config.id === "addendum-saturday-premium")!;
+    const copy = { ...source.config, id: "addendum-saturday-premium-copy", name: "Premium (Copy)", copyOfTemplateId: "addendum-saturday-premium" };
+    expect(resolve(copy).Render).toBe(source.Render);
+    expect(resolve(copy).config.id).toBe("addendum-saturday-premium-copy");
+  });
+
+  it("renders a used addendum catalog copy with the catalog layout", () => {
+    const source = USED_ADDENDUM_CATALOG_50[0];
+    const copy = buildConfig("addendum", { id: `${source.id}-copy`, name: `${source.name} (Copy)`, copyOfTemplateId: source.id });
+    const resolved = resolve(copy);
+    expect(resolved.Render).not.toBe(templateFromConfig(copy).Render);
+    const html = renderToStaticMarkup(<resolved.Render config={resolved.config} data={DATA} branding={BRAND} />);
+    expect(html).toContain("5N1AL1F87VC331335");
+  });
+
+  it("falls back to the generic engine when the source has no dedicated layout", () => {
+    const copy = buildConfig("addendum", { id: "new-addendum-core-msrp-plus-accessories-copy", name: "Stub (Copy)", copyOfTemplateId: "new-addendum-core-msrp-plus-accessories" });
+    expect(premiumTemplateFromConfig(copy)).toBeUndefined();
+    expect(resolve(copy).config.id).toBe("new-addendum-core-msrp-plus-accessories-copy");
   });
 });

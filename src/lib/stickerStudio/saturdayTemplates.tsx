@@ -4,6 +4,7 @@ import SaturdayPremiumAddendum from "@/components/saturday/SaturdayPremiumAddend
 import MidnightPremiumAddendum from "@/components/saturday/MidnightPremiumAddendum";
 import EclipsePremiumAddendum from "@/components/saturday/EclipsePremiumAddendum";
 import OnyxPremiumAddendum from "@/components/saturday/OnyxPremiumAddendum";
+import { USED_ADDENDUM_CATALOG_50 } from "@/components/saturday/UsedAddendumCatalog";
 import type { SaturdaySticker } from "@/components/saturday/types";
 import type {
   StickerBranding,
@@ -217,6 +218,12 @@ const MidnightPremiumAddendumRenderer = makeAddendumRenderer(MidnightPremiumAdde
 const EclipsePremiumAddendumRenderer = makeAddendumRenderer(EclipsePremiumAddendum);
 const OnyxPremiumAddendumRenderer = makeAddendumRenderer(OnyxPremiumAddendum);
 
+// The 50-item used addendum catalog renders from the same SaturdaySticker shape,
+// so each catalog entry is a first-class studio renderer keyed by its catalog id.
+const USED_CATALOG_RENDERERS: Record<string, (props: TemplateRenderProps) => JSX.Element> = Object.fromEntries(
+  USED_ADDENDUM_CATALOG_50.map((template) => [template.id, makeAddendumRenderer(template.component)]),
+);
+
 const SATURDAY_RENDERERS: Record<string, (props: TemplateRenderProps) => JSX.Element> = {
   "window-saturday-hero": SaturdayHeroRenderer,
   "window-saturday-classic": SaturdayClassicRenderer,
@@ -277,9 +284,18 @@ export const STUDIO_SATURDAY_TEMPLATES: StudioTemplate[] = Object.keys(SATURDAY_
 
 export const isSaturdayTemplateId = (id?: string) => !!id && id in SATURDAY_CONFIGS;
 
-export function saturdayTemplateFromConfig(config: StickerTemplateConfig): StudioTemplate | undefined {
-  if (!isSaturdayTemplateId(config.id)) return undefined;
-  const base = SATURDAY_CONFIGS[config.id];
+// Resolve a stored config to a premium layout: the Saturday hero/addendum pack or
+// the used addendum catalog. A duplicated template carries copyOfTemplateId and
+// renders with its source layout until a dedicated renderer is bound to its own id.
+export function premiumTemplateFromConfig(config: StickerTemplateConfig): StudioTemplate | undefined {
+  const sourceId = config.copyOfTemplateId || config.id;
+  const Render =
+    SATURDAY_RENDERERS[config.id] ||
+    USED_CATALOG_RENDERERS[config.id] ||
+    SATURDAY_RENDERERS[sourceId] ||
+    USED_CATALOG_RENDERERS[sourceId];
+  if (!Render) return undefined;
+  const base = SATURDAY_CONFIGS[config.id] || SATURDAY_CONFIGS[sourceId] || config;
   return {
     config: {
       ...base,
@@ -287,6 +303,6 @@ export function saturdayTemplateFromConfig(config: StickerTemplateConfig): Studi
       maxItems: { ...base.maxItems, ...config.maxItems },
       optionalFields: Array.from(new Set([...(base.optionalFields || []), ...(config.optionalFields || [])])),
     },
-    Render: SATURDAY_RENDERERS[config.id],
+    Render,
   };
 }

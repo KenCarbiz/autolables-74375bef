@@ -4,7 +4,7 @@ import {
   templateFromConfig, TemplateRenderer,
   type StickerData, type StickerBranding, type StickerTemplateConfig, type StickerRenderOptions,
 } from "@/lib/stickerStudio/templates";
-import { saturdayTemplateFromConfig } from "@/lib/stickerStudio/saturdayTemplates";
+import { premiumTemplateFromConfig } from "@/lib/stickerStudio/saturdayTemplates";
 import { buildPrintCss, normalizeCalibration, PAPER, type PrintCalibration } from "@/lib/stickerStudio/printConfig";
 import { PrintGuides } from "@/lib/stickerStudio/PrintGuides";
 
@@ -61,7 +61,7 @@ const StickerPrint = () => {
   // (same chain as useStickerCatalog) or the print falls back to the plain
   // engine and prints a different sheet than the studio preview.
   const template = useMemo(
-    () => (payload ? saturdayTemplateFromConfig(payload.config) ?? templateFromConfig(payload.config) : null),
+    () => (payload ? premiumTemplateFromConfig(payload.config) ?? templateFromConfig(payload.config) : null),
     [payload],
   );
 

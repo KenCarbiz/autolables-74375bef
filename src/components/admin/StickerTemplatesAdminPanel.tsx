@@ -9,7 +9,7 @@ import {
   type StickerType,
   type StudioTemplate,
 } from "@/lib/stickerStudio/templates";
-import { saturdayTemplateFromConfig } from "@/lib/stickerStudio/saturdayTemplates";
+import { premiumTemplateFromConfig } from "@/lib/stickerStudio/saturdayTemplates";
 import {
   USED_ADDENDUM_CATALOG_50,
   type UsedAddendumTemplateDefinition,
@@ -20,7 +20,7 @@ import {
   type NewVehicleTemplateDefinition,
 } from "@/components/saturday/NewVehicleCatalog";
 import type { SaturdaySticker } from "@/components/saturday/types";
-import { Check, History, LayoutTemplate, Search, Star, X } from "lucide-react";
+import { ClipboardCopy, Copy, History, LayoutTemplate, Search, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface Row {
@@ -38,6 +38,7 @@ interface Row {
 
 type SectionId =
   | "all"
+  | "copies"
   | "featured"
   | "saturday"
   | "used-addendums"
@@ -86,6 +87,7 @@ type LibraryItem =
 
 const SECTIONS: { id: SectionId; label: string; helper: string }[] = [
   { id: "all", label: "All", helper: "Every active library item" },
+  { id: "copies", label: "My Copies", helper: "Duplicates you can safely edit" },
   { id: "featured", label: "Featured", helper: "Promoted dealer choices" },
   { id: "saturday", label: "Saturday Premium", helper: "Hero windows and matching addendums" },
   { id: "used-addendums", label: "Used Addendums", helper: "Used vehicle addendum library" },
@@ -162,7 +164,7 @@ const SATURDAY_SAMPLE: SaturdaySticker & { installed: { name: string; price: str
 
 const buildTemplateForRow = (r: Row) => {
   const cfg = buildConfig(r.type as StickerType, { ...(r.config || {}), id: r.template_key, name: r.name });
-  return saturdayTemplateFromConfig(cfg) || templateFromConfig(cfg);
+  return premiumTemplateFromConfig(cfg) || templateFromConfig(cfg);
 };
 
 const hasAny = (tags: string[], needles: string[]) => needles.some((n) => tags.some((t) => t.toLowerCase().includes(n)));
@@ -186,10 +188,21 @@ const sectionForNew = (template: NewVehicleTemplateDefinition): SectionId => {
   return template.kind === "new_monroney" ? "new-stickers" : "new-addendums";
 };
 
+// A duplicate keeps a pointer to the template it was cloned from; the copy owns
+// its own key so a dedicated renderer can later be bound to it without touching
+// the original.
+const copySourceId = (row: Row): string | undefined => {
+  const source = (row.config as { copyOfTemplateId?: unknown } | null)?.copyOfTemplateId;
+  return typeof source === "string" && source ? source : undefined;
+};
+
+const stripCopySuffix = (name: string) => name.replace(/\s*\(Copy(?:\s+\d+)?\)\s*$/i, "").trim();
+
 const sectionForDb = (row: Row): SectionId => {
   const key = row.template_key.toLowerCase();
   const tags = (row.style_tags || []).map((t) => t.toLowerCase());
   if (!row.is_active) return "archived";
+  if (copySourceId(row)) return "copies";
   if (row.is_featured) return "featured";
   if (key.includes("saturday")) return "saturday";
   if (row.type === "addendum") return "used-addendums";
@@ -204,6 +217,8 @@ export default function StickerTemplatesAdminPanel() {
   const [preview, setPreview] = useState<LibraryItem | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>("all");
   const [query, setQuery] = useState("");
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -226,6 +241,76 @@ export default function StickerTemplatesAdminPanel() {
     const { error } = await (supabase as any).from("sticker_templates").update(p).eq("id", id);
     if (error) { toast.error("Update failed — admin access required"); return; }
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)));
+  };
+
+  const duplicate = async (item: LibraryItem) => {
+    const sourceId = item.source === "database" ? copySourceId(item.row) || item.row.template_key : item.id;
+    const taken = new Set(rows.map((r) => r.template_key));
+    let ordinal = 1;
+    let key = `${sourceId}-copy`;
+    while (taken.has(key)) { ordinal += 1; key = `${sourceId}-copy-${ordinal}`; }
+
+    const name = `${stripCopySuffix(item.name)} (Copy${ordinal > 1 ? ` ${ordinal}` : ""})`;
+    const type = item.source === "database" ? item.row.type : item.format;
+    const size = item.source === "database" ? item.row.size : type === "addendum" ? "4.5x11" : "8.5x11";
+    const baseConfig = item.source === "database" ? { ...(item.row.config || {}) } : {};
+    const styleTags = item.source === "database" ? item.row.style_tags || [] : item.tags.slice(0, 8);
+
+    setCopyingId(item.id);
+    // deno-lint-ignore no-explicit-any
+    const { data, error } = await (supabase as any).from("sticker_templates")
+      .insert({
+        template_key: key,
+        name,
+        type,
+        size,
+        style_tags: styleTags,
+        config: { ...baseConfig, id: key, name, copyOfTemplateId: sourceId },
+        is_active: true,
+        is_featured: false,
+      })
+      .select("id, template_key, name, type, size, style_tags, config, is_active, is_featured, current_version")
+      .single();
+    setCopyingId(null);
+
+    if (error || !data) { toast.error(error?.message || "Copy failed — admin access required"); return; }
+    setRows((rs) => [...rs, data as Row]);
+    setActiveSection("copies");
+    setPreview(null);
+    toast.success(`Copied as ${key}`);
+  };
+
+  const removeCopy = async (r: Row) => {
+    if (!window.confirm(`Delete "${r.name}"? This removes the copy and its versions.`)) return;
+    // deno-lint-ignore no-explicit-any
+    const { error } = await (supabase as any).from("sticker_templates").delete().eq("id", r.id);
+    if (error) { toast.error(error.message); return; }
+    setRows((rs) => rs.filter((row) => row.id !== r.id));
+    setPreview((p) => (p && p.source === "database" && p.row.id === r.id ? null : p));
+    toast.success("Copy deleted");
+  };
+
+  const rename = async (r: Row, next: string) => {
+    const name = next.trim();
+    if (!name || name === r.name) return;
+    await patch(r.id, { name, config: { ...(r.config || {}), name } });
+    toast.success("Renamed");
+  };
+
+  const copyBrief = async (r: Row) => {
+    const brief = [
+      `Template key: ${r.template_key}`,
+      `Name: ${r.name}`,
+      `Copied from: ${copySourceId(r) || "n/a"}`,
+      `Format: ${r.type} · ${r.size}`,
+      "Change this copy only — leave the source template untouched.",
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(brief);
+      toast.success("Handoff brief copied");
+    } catch {
+      toast.error("Clipboard blocked — template key is " + r.template_key);
+    }
   };
 
   const snapshot = async (r: Row) => {
@@ -331,6 +416,15 @@ export default function StickerTemplatesAdminPanel() {
     );
   };
 
+  const openPreview = (item: LibraryItem) => {
+    setPreview(item);
+    setRenameDraft(item.name);
+  };
+
+  // Read the live row so feature/active/rename edits show without reopening.
+  const previewRow = preview && preview.source === "database" ? rows.find((r) => r.id === preview.row.id) || preview.row : null;
+  const previewCopySource = previewRow ? copySourceId(previewRow) : undefined;
+
   if (loading) return <p className="p-4 text-sm text-muted-foreground">Loading templates…</p>;
   if (err && rows.length === 0) {
     return (
@@ -349,7 +443,7 @@ export default function StickerTemplatesAdminPanel() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700">Template Library</div>
             <h2 className="mt-3 text-2xl font-black tracking-tight text-foreground">Sticker & Addendum Library</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Browse the restored 100+ catalog by purpose, OEM fit, pricing strategy, and customer Passport flow. Click any card for a larger preview.</p>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Browse the restored 100+ catalog by purpose, OEM fit, pricing strategy, and customer Passport flow. Click any card for a larger preview, or Duplicate to get an editable copy that renders exactly like its source.</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center sm:grid-cols-5">
             <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{items.length}</p><p className="text-[10px] font-bold uppercase text-muted-foreground">Total</p></div>
@@ -382,7 +476,7 @@ export default function StickerTemplatesAdminPanel() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredItems.map((item) => (
               <div key={`${item.source}-${item.id}`} className="rounded-2xl border border-border bg-card p-3">
-                <button type="button" onClick={() => setPreview(item)} className="group relative flex h-56 w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <button type="button" onClick={() => openPreview(item)} className="group relative flex h-56 w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400">
                   {renderMiniPreview(item)}
                   <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-slate-950/85 px-2.5 py-1 text-[10px] font-black text-white opacity-0 shadow-lg transition group-hover:opacity-100"><Search className="h-3 w-3" /> View larger</span>
                 </button>
@@ -394,8 +488,14 @@ export default function StickerTemplatesAdminPanel() {
                   {item.source === "database" ? <button onClick={() => patch(item.row.id, { is_featured: !item.row.is_featured })} className={`rounded p-1 ${item.row.is_featured ? "text-amber-500" : "text-muted-foreground hover:text-foreground"}`}><Star className="h-4 w-4" fill={item.row.is_featured ? "currentColor" : "none"} /></button> : null}
                 </div>
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+                {item.source === "database" && copySourceId(item.row) ? <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wide text-blue-600">Copy of {copySourceId(item.row)} · key {item.row.template_key}</p> : null}
                 <div className="mt-2 flex flex-wrap gap-1">{item.tags.slice(0, 5).map((tag) => <span key={tag} className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{tag}</span>)}</div>
-                {item.source === "database" ? <div className="mt-3 flex gap-2"><button onClick={() => patch(item.row.id, { is_active: !item.row.is_active })} className={`h-8 flex-1 rounded-lg border text-xs font-bold ${item.row.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-border bg-muted text-muted-foreground"}`}>{item.row.is_active ? "Active" : "Inactive"}</button><button onClick={() => snapshot(item.row)} className="h-8 rounded-lg border border-border px-3 text-xs font-bold"><History className="inline h-3.5 w-3.5" /> Version</button></div> : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button onClick={() => duplicate(item)} disabled={copyingId === item.id} className="h-8 flex-1 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 disabled:opacity-60"><Copy className="inline h-3.5 w-3.5" /> {copyingId === item.id ? "Copying…" : "Duplicate"}</button>
+                  {item.source === "database" ? <button onClick={() => patch(item.row.id, { is_active: !item.row.is_active })} className={`h-8 flex-1 rounded-lg border text-xs font-bold ${item.row.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-border bg-muted text-muted-foreground"}`}>{item.row.is_active ? "Active" : "Inactive"}</button> : null}
+                  {item.source === "database" ? <button onClick={() => snapshot(item.row)} className="h-8 rounded-lg border border-border px-3 text-xs font-bold"><History className="inline h-3.5 w-3.5" /> Version</button> : null}
+                  {item.source === "database" && copySourceId(item.row) ? <button onClick={() => removeCopy(item.row)} aria-label="Delete copy" className="h-8 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-bold text-red-700"><Trash2 className="inline h-3.5 w-3.5" /></button> : null}
+                </div>
               </div>
             ))}
           </div>
@@ -409,15 +509,29 @@ export default function StickerTemplatesAdminPanel() {
             <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
               <div>
                 <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Template Preview</div>
-                <h3 className="text-lg font-black text-foreground">{preview.name}</h3>
-                <p className="text-xs text-muted-foreground">{preview.format} · {preview.source} · {preview.id}</p>
+                <h3 className="text-lg font-black text-foreground">{previewRow?.name || preview.name}</h3>
+                <p className="text-xs text-muted-foreground">{preview.format} · {preview.source} · {previewRow?.template_key || preview.id}</p>
+                {previewCopySource ? <p className="mt-0.5 text-[11px] font-bold text-blue-600">Copy of {previewCopySource}</p> : null}
               </div>
               <button onClick={() => setPreview(null)} className="rounded-full border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close preview"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex-1 overflow-auto bg-slate-100 p-6"><div className="mx-auto flex min-h-[70vh] items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 shadow-inner">{renderLargePreview(preview)}</div></div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
               <div className="flex flex-wrap gap-1">{preview.tags.slice(0, 12).map((tag) => <span key={tag} className="rounded bg-muted px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tag}</span>)}</div>
-              {preview.source === "database" ? <div className="flex gap-2"><button onClick={() => patch(preview.row.id, { is_featured: !preview.row.is_featured })} className="h-9 rounded-lg border border-border px-3 text-xs font-bold">{preview.row.is_featured ? "Featured" : "Feature"}</button><button onClick={() => patch(preview.row.id, { is_active: !preview.row.is_active })} className="h-9 rounded-lg border border-border px-3 text-xs font-bold">{preview.row.is_active ? "Active" : "Inactive"}</button><button onClick={() => snapshot(preview.row)} className="h-9 rounded-lg border border-border px-3 text-xs font-bold">New version</button></div> : <p className="text-xs font-semibold text-muted-foreground">Recovered catalog item · seed/activation wiring comes next.</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                {previewCopySource && previewRow ? (
+                  <>
+                    <input value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} className="h-9 w-56 rounded-lg border border-border bg-background px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-400" aria-label="Copy name" />
+                    <button onClick={() => rename(previewRow, renameDraft)} className="h-9 rounded-lg border border-border px-3 text-xs font-bold">Save name</button>
+                    <button onClick={() => copyBrief(previewRow)} className="h-9 rounded-lg border border-border px-3 text-xs font-bold"><ClipboardCopy className="inline h-3.5 w-3.5" /> Brief</button>
+                  </>
+                ) : null}
+                <button onClick={() => duplicate(preview)} disabled={copyingId === preview.id} className="h-9 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 disabled:opacity-60"><Copy className="inline h-3.5 w-3.5" /> {copyingId === preview.id ? "Copying…" : "Duplicate"}</button>
+                {previewRow ? <button onClick={() => patch(previewRow.id, { is_featured: !previewRow.is_featured })} className="h-9 rounded-lg border border-border px-3 text-xs font-bold">{previewRow.is_featured ? "Featured" : "Feature"}</button> : null}
+                {previewRow ? <button onClick={() => patch(previewRow.id, { is_active: !previewRow.is_active })} className="h-9 rounded-lg border border-border px-3 text-xs font-bold">{previewRow.is_active ? "Active" : "Inactive"}</button> : null}
+                {previewRow ? <button onClick={() => snapshot(previewRow)} className="h-9 rounded-lg border border-border px-3 text-xs font-bold">New version</button> : null}
+                {previewCopySource && previewRow ? <button onClick={() => removeCopy(previewRow)} className="h-9 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-bold text-red-700"><Trash2 className="inline h-3.5 w-3.5" /> Delete</button> : null}
+              </div>
             </div>
           </div>
         </div>

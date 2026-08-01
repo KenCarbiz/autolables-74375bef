@@ -38,6 +38,9 @@ export interface StickerTemplateConfig {
   useCase?: string;
   complianceNote?: string;
   blackLabelReady?: boolean;
+  // Set on a duplicated template. The copy owns its id/name/config but borrows
+  // the source template's layout until a dedicated renderer is bound to its id.
+  copyOfTemplateId?: string;
 }
 
 export interface StickerLineItem {
@@ -623,7 +626,8 @@ export function buildConfig(type: StickerType, over: Partial<StickerTemplateConf
 }
 
 export function templateFromConfig(config: StickerTemplateConfig): StudioTemplate {
-  const Render = PREMIUM_RENDERERS[config.id] || RENDER_ENGINES[config.type] || WindowSheet;
+  const sourceId = config.copyOfTemplateId || config.id;
+  const Render = PREMIUM_RENDERERS[config.id] || PREMIUM_RENDERERS[sourceId] || RENDER_ENGINES[config.type] || WindowSheet;
   return { config, Render };
 }
 

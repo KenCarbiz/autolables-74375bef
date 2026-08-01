@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { STUDIO_TEMPLATES, buildConfig, templateFromConfig, type StudioTemplate, type StickerType } from "./templates";
-import { STUDIO_SATURDAY_TEMPLATES, saturdayTemplateFromConfig } from "./saturdayTemplates";
+import { STUDIO_SATURDAY_TEMPLATES, premiumTemplateFromConfig } from "./saturdayTemplates";
 
 const BUILT_IN_TEMPLATES: StudioTemplate[] = [...STUDIO_TEMPLATES, ...STUDIO_SATURDAY_TEMPLATES];
 
@@ -29,7 +29,7 @@ export function useStickerCatalog(): { templates: StudioTemplate[]; loading: boo
         const built: StudioTemplate[] = data.map((r: any) => {
           const over = (r.config || {}) as Partial<{ id: string; name: string }>;
           const cfg = buildConfig(r.type as StickerType, { ...(r.config || {}), id: over.id || r.template_key, name: over.name || r.name });
-          return saturdayTemplateFromConfig(cfg) || templateFromConfig(cfg);
+          return premiumTemplateFromConfig(cfg) || templateFromConfig(cfg);
         });
         if (!cancelled && built.length) setTemplates(built);
       } catch {
