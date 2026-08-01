@@ -137,3 +137,48 @@ describe("duplicated template resolution", () => {
     expect(resolve(copy).config.id).toBe("new-addendum-core-msrp-plus-accessories-copy");
   });
 });
+
+// Value propositions are the dealership's own programs, merchandised on the
+// sticker. The claim and its disclosure must always travel together.
+describe("value propositions on the addendum", () => {
+  const vp = {
+    id: "vp-1",
+    headline: "Lifetime Powertrain Warranty",
+    supportingLine: "Included with qualifying vehicles",
+    disclosure: "Available on qualifying vehicles. See dealer for complete terms.",
+    imageUrl: "https://cdn.example.com/lifetime.png",
+    displayStyle: "image_text" as const,
+    showAskForDetails: true,
+  };
+  const render = (id: string, valueProps: (typeof vp)[]) => {
+    const t = STUDIO_SATURDAY_TEMPLATES.find((x) => x.config.id === id)!;
+    return renderToStaticMarkup(<t.Render config={t.config} data={{ ...DATA, valueProps }} branding={BRAND} />);
+  };
+
+  for (const id of ["addendum-saturday-premium", "addendum-new-car-saas"]) {
+    it(`${id} prints the headline, supporting line, image, and disclosure`, () => {
+      const html = render(id, [vp]);
+      expect(html).toContain("Lifetime Powertrain Warranty");
+      expect(html).toContain("Included with qualifying vehicles");
+      expect(html).toContain("https://cdn.example.com/lifetime.png");
+      expect(html).toContain("Ask for details");
+      expect(html).toContain("See dealer for complete terms.");
+    });
+
+    it(`${id} still prints the disclosure when the dealer hides "Ask for details"`, () => {
+      const html = render(id, [{ ...vp, showAskForDetails: false }]);
+      expect(html).not.toContain("Ask for details");
+      expect(html).toContain("See dealer for complete terms.");
+    });
+
+    it(`${id} keeps the disclosure on an image-only proposition`, () => {
+      const html = render(id, [{ ...vp, displayStyle: "image" as const }]);
+      expect(html).not.toContain("Included with qualifying vehicles");
+      expect(html).toContain("See dealer for complete terms.");
+    });
+
+    it(`${id} renders nothing extra when no proposition is selected`, () => {
+      expect(render(id, [])).not.toContain("Ask for details");
+    });
+  }
+});

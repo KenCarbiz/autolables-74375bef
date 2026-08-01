@@ -37,7 +37,44 @@ export interface DealerProgram {
   termMiles?: number | null;
   lifetime?: boolean;
   showOnWarrantyPanel?: boolean;
+  // Sticker presentation. A program is the dealership's value proposition; these
+  // control how it is merchandised on a printed addendum. Stored on the same
+  // record as the FTC value/offer/benefit/disclosure so the claim and its
+  // disclosure can never be separated.
+  imageUrl?: string;
+  displayStyle?: ProgramDisplayStyle;
+  showAskForDetails?: boolean;
+  supportingLine?: string;
 }
+
+/** How a value proposition is laid out on the addendum. */
+export type ProgramDisplayStyle = "image" | "image_text" | "banner";
+export const PROGRAM_DISPLAY_STYLES: { id: ProgramDisplayStyle; label: string }[] = [
+  { id: "image", label: "Image only" },
+  { id: "image_text", label: "Image + text" },
+  { id: "banner", label: "Full-width banner" },
+];
+
+/** The value propositions a template should print, in dealer order. */
+export interface StickerValueProp {
+  id: string;
+  headline: string;
+  supportingLine: string;
+  disclosure: string;
+  imageUrl?: string;
+  displayStyle: ProgramDisplayStyle;
+  showAskForDetails: boolean;
+}
+
+export const toStickerValueProp = (p: DealerProgram): StickerValueProp => ({
+  id: p.id,
+  headline: p.title,
+  supportingLine: p.supportingLine || p.offer,
+  disclosure: p.disclosure,
+  imageUrl: p.imageUrl,
+  displayStyle: p.displayStyle || (p.imageUrl ? "image_text" : "banner"),
+  showAskForDetails: p.showAskForDetails !== false,
+});
 
 export const emptyProgram = (): DealerProgram => ({
   id: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `prog-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -51,6 +88,8 @@ export const emptyProgram = (): DealerProgram => ({
   requirementText: "",
   showOnSticker: false,
   showOnPacket: true,
+  displayStyle: "image_text",
+  showAskForDetails: true,
   mode: "included",
   price: null,
   isWarranty: false,

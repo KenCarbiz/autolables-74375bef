@@ -65,6 +65,18 @@ export interface StickerData {
   benefits: StickerLineItem[];
   notes?: string;
   qrUrl?: string;
+  /** Dealer value propositions the dealer selected for this document. */
+  valueProps?: StickerValuePropInput[];
+}
+
+export interface StickerValuePropInput {
+  id: string;
+  headline: string;
+  supportingLine: string;
+  disclosure: string;
+  imageUrl?: string;
+  displayStyle: "image" | "image_text" | "banner";
+  showAskForDetails: boolean;
 }
 
 export interface StickerBranding {

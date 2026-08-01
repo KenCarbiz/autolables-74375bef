@@ -135,6 +135,7 @@ function toSaturdaySticker(data: StickerData, branding: StickerBranding): Saturd
   const marketAverage = extended.marketPrice || data.msrp;
 
   return {
+    valueProps: data.valueProps,
     dealer: {
       name: branding.dealerName,
       address: branding.address,

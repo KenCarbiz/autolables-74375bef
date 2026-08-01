@@ -45,7 +45,7 @@ const SectionBar = ({ icon, title, tag, total, bg, fg }: { icon: AddendumIconKey
 );
 
 export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
-  const { dealer, vehicle, installed = [], upgrades = [], benefits, qrUrl, disclaimer } = data;
+  const { dealer, vehicle, installed = [], upgrades = [], benefits, qrUrl, disclaimer, valueProps = [] } = data;
   // Accent follows the dealer theme (populated by toSaturdaySticker from
   // branding.accentColor). Neutrals (navy, slate) stay fixed; installed
   // green and upgrades purple keep their semantic meaning.
@@ -217,6 +217,29 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
           </section>
         )}
 
+
+        {/* Value propositions — the dealership's own programs, merchandised.
+            The claim and its disclosure travel together so the disclosure can
+            never be dropped from a printed document. */}
+        {valueProps.length > 0 && (
+          <section className="mt-2.5 space-y-2">
+            {valueProps.map((vp) => (
+              <div key={vp.id} className="flex items-center gap-2.5 rounded-[10px] border-2 px-2.5 py-2" style={{ borderColor: T.navy }}>
+                {vp.imageUrl && vp.displayStyle !== "banner" ? (
+                  <img src={vp.imageUrl} alt="" crossOrigin="anonymous" className="h-[0.42in] w-auto max-w-[1.1in] shrink-0 object-contain" />
+                ) : null}
+                {vp.displayStyle !== "image" && (
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10.5px] font-black uppercase leading-tight tracking-[-0.01em]" style={{ color: T.navy }}>{vp.headline}</div>
+                    {vp.supportingLine && <div className="text-[8px] font-semibold leading-tight" style={{ color: T.muted }}>{vp.supportingLine}</div>}
+                    {vp.showAskForDetails && <div className="mt-[2px] text-[7px] font-black uppercase tracking-[0.14em]" style={{ color: accent }}>Ask for details</div>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
+        )}
+
         {/* Totals — installed equipment always adds to vehicle value. Left:
             the adjusted total with real gravity; right: the arithmetic a
             customer can follow line by line. */}
@@ -248,6 +271,12 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Disclaimer */}
         {disclaimer && <p className="mt-2 text-[6.4px] leading-snug" style={{ color: T.muted }}>{disclaimer}</p>}
+        {valueProps.some((vp) => vp.disclosure) && (
+          <p className="mt-1.5 text-[6.4px] leading-snug" style={{ color: T.muted }}>
+            {valueProps.map((vp) => vp.disclosure).filter(Boolean).join(" ")}
+          </p>
+        )}
+
 
         {/* Trust badge band — a meaningful benefit row above the footer */}
         <section className="mt-auto grid grid-cols-4 pt-2.5 pb-1.5">

@@ -108,8 +108,20 @@ export type SaturdayMarketData = {
   sourceLabel?: string;
 };
 
+export type SaturdayValueProp = {
+  id: string;
+  headline: string;
+  supportingLine: string;
+  disclosure: string;
+  imageUrl?: string;
+  displayStyle: "image" | "image_text" | "banner";
+  showAskForDetails: boolean;
+};
+
 export type SaturdaySticker = {
   dealer: SaturdayDealer;
+  /** Dealer value propositions selected for this printed document. */
+  valueProps?: SaturdayValueProp[];
   vehicle: SaturdayVehicle;
   specs: SaturdaySpec[];
   highlights: string[];
