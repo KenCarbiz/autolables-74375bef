@@ -290,7 +290,12 @@ BEGIN
   IF OLD.customer_signed_at IS NULL THEN RETURN NEW; END IF;
   IF NEW.products_snapshot IS DISTINCT FROM OLD.products_snapshot
      OR NEW.dealer_snapshot IS DISTINCT FROM OLD.dealer_snapshot
-     OR NEW.total_price IS DISTINCT FROM OLD.total_price
+     OR NEW.frozen_snapshot IS DISTINCT FROM OLD.frozen_snapshot
+     OR NEW.total_installed IS DISTINCT FROM OLD.total_installed
+     OR NEW.total_with_optional IS DISTINCT FROM OLD.total_with_optional
+     OR NEW.selling_price IS DISTINCT FROM OLD.selling_price
+     OR NEW.optional_selections IS DISTINCT FROM OLD.optional_selections
+     OR NEW.customer_signature_data IS DISTINCT FROM OLD.customer_signature_data
      OR NEW.customer_signed_at IS DISTINCT FROM OLD.customer_signed_at
      OR NEW.content_hash IS DISTINCT FROM OLD.content_hash THEN
     RAISE EXCEPTION 'signed addendum % is immutable; create a revision instead', OLD.id;
