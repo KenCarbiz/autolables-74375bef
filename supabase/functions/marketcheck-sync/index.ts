@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
-import {
 import { newCallMeter, recordCall, estimateCost } from "../_shared/mcCost.ts";
+import {
   classifyListing, isStrictRooftop, normStreet, normZip, prunePreflight,
   type ListingIdentity, type Rooftop,
 } from "../_shared/rooftopMatch.ts";
