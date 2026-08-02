@@ -111,7 +111,7 @@ const BRANDED_SOURCE = new RegExp(
     "driving assistant", "active driving assistant", "pilot assist", "city safety",
     "intellisafe", "smart ?sense", "highway driving assist", "autopilot",
     "travel assist", "iq\\.?drive", "audi pre ?sense", "i-?activsense", "mi-?pilot",
-    "activedriveassist", "nissan safety shield", "bsd", "hda",
+    "activedriveassist", "nissan safety shield", "\\bbsd\\b", "\\bhda\\b",
     "activeglide", "teammate", "dreamdrive", "innodrive", "drive wise",
     "lanesense", "driverfocus", "attention assist", "parktronic", "parksense",
     "parkview", "blis\\b", "side blind zone", "around view", "intellibeam",
@@ -282,9 +282,15 @@ const CONCEPT_RULES: ConceptRule[] = [
   },
   {
     concept: "premium_audio",
-    canonical: "Premium Audio System",
+    canonical: "Audio System",
     tier: 2,
     match: /\b(premium brand speakers?|surround sound|subwoofer|\d+ speakers?|bose|bang (&|and) olufsen|harman|klipsch|premium audio)\b/i,
+    // A speaker count alone does not make a system premium. The word is only
+    // printed when a source row supports it.
+    upgrade: {
+      match: /\b(premium|surround sound|subwoofer|bose|bang (&|and) olufsen|harman|klipsch|burmester|revel|meridian|mark levinson)\b/i,
+      canonical: "Premium Audio System",
+    },
   },
   {
     concept: "running_boards",
@@ -318,15 +324,20 @@ const CONCEPT_RULES: ConceptRule[] = [
   },
   {
     concept: "digital_radio",
-    canonical: "Digital & Satellite Radio",
+    canonical: "Digital Radio",
     tier: 3,
     match: /\b(rds audio|digital radio|satellite radio|siriusxm)\b/i,
+    upgrade: { match: /\b(satellite radio|siriusxm)\b/i, canonical: "Satellite Radio" },
   },
   {
     concept: "smartphone",
     canonical: "Smartphone Integration",
     tier: 2,
     match: /\b(bluetooth connection|built-?in apps|carplay|android auto|smartphone)\b/i,
+    upgrade: {
+      match: /\b(carplay|android auto)\b/i,
+      canonical: "Apple CarPlay and Android Auto",
+    },
   },
 ];
 

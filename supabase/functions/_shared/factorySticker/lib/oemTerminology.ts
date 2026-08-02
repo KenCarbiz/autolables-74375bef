@@ -8,9 +8,8 @@
 // Manufacturers name their own systems, and those names are the point. A GM
 // label says "Automatic Emergency Braking" and "IntelliBeam"; the same hardware
 // on a Nissan is "Intelligent Emergency Braking" and "High Beam Assist"; on a
-// Toyota it is "Pre-Collision System with Pedestrian Detection". Printing one
-// generic phrase across all of them is what makes a sticker read as generated
-// rather than factory.
+// Toyota it is "Pre-Collision System". Printing one generic phrase across all
+// of them is what makes a sticker read as generated rather than factory.
 //
 // Rules:
 //   1. A branded name found verbatim in the source always wins — nothing here
@@ -150,8 +149,7 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
     ford: "Pre-Collision Assist with Automatic Emergency Braking",
     stellantis: "Full-Speed Forward Collision Warning Plus",
     nissan: "Intelligent Emergency Braking",
-    toyota: "Pre-Collision System with Pedestrian Detection",
-    lexus: "Pre-Collision System",
+    toyota: "Pre-Collision System",
     honda: "Collision Mitigation Braking System",
     hyundai: "Forward Collision-Avoidance Assist",
     subaru: "EyeSight Pre-Collision Braking",
@@ -171,61 +169,51 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
   },
   adaptive_cruise: {
     gm: "Adaptive Cruise Control",
-    ford: "Adaptive Cruise Control with Stop-and-Go",
-    stellantis: "Adaptive Cruise Control with Stop and Go",
+    ford: "Adaptive Cruise Control",
+    stellantis: "Adaptive Cruise Control",
     nissan: "Intelligent Cruise Control",
     toyota: "Dynamic Radar Cruise Control",
-    honda: "Adaptive Cruise Control with Low-Speed Follow",
-    hyundai: "Smart Cruise Control with Stop & Go",
+    honda: "Adaptive Cruise Control",
+    hyundai: "Smart Cruise Control",
     subaru: "EyeSight Adaptive Cruise Control",
-    mazda: "Mazda Radar Cruise Control with Stop & Go",
-    mitsubishi: "MI-PILOT Assist",
+    mazda: "Mazda Radar Cruise Control",
     vw: "Adaptive Cruise Control",
-    audi: "Adaptive Cruise Assist",
     porsche: "Adaptive Cruise Control",
-    bmw: "Active Cruise Control with Stop & Go",
+    bmw: "Active Cruise Control",
     mercedes: "Active Distance Assist DISTRONIC",
-    volvo: "Pilot Assist",
-    jlr: "Adaptive Cruise Control",
+    volvo: "Adaptive Cruise Control",
     tesla: "Traffic-Aware Cruise Control",
-    lucid: "DreamDrive Adaptive Cruise Control",
-    rivian: "Adaptive Cruise Control",
     generic: "Adaptive Cruise Control",
   },
-  // Hands-off highway driving is a distinct product from adaptive cruise, and
-  // every maker that sells it has spent real money naming it. No generic term:
-  // if we cannot name it, the caller's own label is the honest output.
+  // Hands-OFF highway driving. Only makers who actually certify hands-off are
+  // listed: Hyundai/Kia HDA2, Volvo Pilot Assist, Tesla Autopilot and Nissan
+  // and Infiniti ProPILOT Assist all still require hands on the wheel, so
+  // naming them here would have printed a hands-free claim onto cars that do
+  // not have one. Mercedes DRIVE PILOT is eyes-off but sold in two states on
+  // two model lines, and Toyota/Lexus Teammate is narrower still — both reach
+  // the sticker through rule 1 when the decoder names them, not from here.
+  // No generic term: if we cannot name it, the caller's own label is honest.
   hands_free_driving: {
     gm: "Super Cruise",
     ford: "BlueCruise",
     lincoln: "ActiveGlide",
     stellantis: "Hands-Free Active Driving Assist",
-    nissan: "ProPILOT Assist 2.1",
-    infiniti: "ProPILOT Assist",
-    toyota: "Toyota Teammate Advanced Drive",
-    lexus: "Lexus Teammate Advanced Drive",
-    hyundai: "Highway Driving Assist 2",
-    kia: "Highway Driving Assist 2",
-    genesis: "Highway Driving Assist 2",
     bmw: "Highway Assistant",
-    mercedes: "DRIVE PILOT",
-    volvo: "Pilot Assist",
-    tesla: "Autopilot",
     rivian: "Highway Assist",
     lucid: "DreamDrive Pro",
   },
   // ── Vision and awareness ────────────────────────────────────────────
   blind_spot: {
-    gm: "Side Blind Zone Alert with Lane Change Alert",
-    ford: "BLIS with Cross-Traffic Alert",
-    stellantis: "Blind Spot Monitoring with Rear Cross Path Detection",
+    gm: "Side Blind Zone Alert",
+    ford: "BLIS (Blind Spot Information System)",
+    stellantis: "Blind Spot Monitoring",
     nissan: "Blind Spot Warning",
     toyota: "Blind Spot Monitor",
     honda: "Blind Spot Information System",
     hyundai: "Blind-Spot Collision-Avoidance Assist",
-    subaru: "Blind-Spot Detection with Lane Change Assist",
+    subaru: "Blind-Spot Detection",
     mazda: "Blind Spot Monitoring",
-    mitsubishi: "Blind Spot Warning with Lane Change Assist",
+    mitsubishi: "Blind Spot Warning",
     vw: "Side Assist",
     audi: "Audi side assist",
     porsche: "Lane Change Assist",
@@ -272,10 +260,10 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
   },
   surround_view: {
     gm: "HD Surround Vision",
-    ford: "360-Degree Camera with Split-View Display",
+    ford: "360-Degree Camera",
     stellantis: "360-Degree Surround View Camera",
     nissan: "Intelligent Around View Monitor",
-    infiniti: "Around View Monitor with Moving Object Detection",
+    infiniti: "Around View Monitor",
     toyota: "Panoramic View Monitor",
     honda: "Multi-View Camera System",
     acura: "Surround-View Camera System",
@@ -318,7 +306,6 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
     nissan: "ProPILOT Assist",
     toyota: "Lane Tracing Assist",
     hyundai: "Lane Following Assist",
-    subaru: "EyeSight Lane Centering Assist",
     mazda: "Cruising & Traffic Support",
     vw: "Travel Assist",
     audi: "Adaptive Cruise Assist",
@@ -403,8 +390,7 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
     jeep: "CommandView Dual-Pane Panoramic Sunroof",
     nissan: "Panoramic Moonroof",
     toyota: "Panoramic Moonroof",
-    lexus: "Panoramic Glass Roof",
-    honda: "Panoramic Roof",
+    honda: "Panoramic Moonroof",
     acura: "Panoramic Moonroof",
     hyundai: "Panoramic Sunroof",
     subaru: "Panoramic Moonroof",
@@ -416,8 +402,7 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
     volvo: "Panoramic Moonroof",
     jlr: "Sliding Panoramic Roof",
     tesla: "Glass Roof",
-    rivian: "Fixed Glass Roof",
-    lucid: "Glass Canopy Roof",
+    lucid: "Glass Canopy",
     generic: "Panoramic Sunroof",
   },
   // ── Access and convenience ──────────────────────────────────────────
@@ -460,7 +445,7 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
   hands_free_liftgate: {
     gm: "Hands-Free Power Liftgate",
     ford: "Hands-Free Foot-Activated Liftgate",
-    stellantis: "Power Liftgate with Hands-Free Activation",
+    stellantis: "Hands-Free Power Liftgate",
     nissan: "Motion Activated Liftgate",
     toyota: "Hands-Free Power Back Door",
     honda: "Hands-Free Access Power Tailgate",
@@ -468,7 +453,6 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
     hyundai: "Smart Power Liftgate",
     subaru: "Hands-Free Power Rear Gate",
     vw: "Easy Open Power Liftgate",
-    bmw: "Comfort Access Automatic Tailgate",
     mercedes: "HANDS-FREE ACCESS",
     volvo: "Hands-Free Power Tailgate",
     jlr: "Gesture Tailgate",
@@ -482,7 +466,6 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
     toyota: "Intuitive Parking Assist",
     honda: "Parking Sensors",
     hyundai: "Parking Distance Warning",
-    subaru: "Front and Rear Sonar",
     mazda: "Front and Rear Parking Sensors",
     vw: "Park Distance Control",
     audi: "Audi parking system",
@@ -495,7 +478,7 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
   },
   self_parking: {
     gm: "Automatic Parking Assist",
-    ford: "Active Park Assist 2.0",
+    ford: "Active Park Assist",
     stellantis: "ParkSense Automated Parking System",
     toyota: "Advanced Park",
     hyundai: "Remote Smart Parking Assist",
@@ -543,18 +526,12 @@ export const OEM_TERMS: Record<string, Partial<Record<OemBrand, string>>> = {
     generic: "Trailer Assist",
   },
   // ── Infotainment ────────────────────────────────────────────────────
-  // Audio brand IS the feature, and it is optional equipment on nearly every
-  // line. Naming a brand from a bare "14 Speakers" row would assert hardware
-  // the car may not have, so this stays neutral and rule 1 supplies the name.
-  premium_audio: {
-    generic: "Premium Audio System",
-  },
-  smartphone: {
-    generic: "Apple CarPlay and Android Auto",
-  },
-  digital_radio: {
-    generic: "SiriusXM Satellite Radio",
-  },
+  // Deliberately empty. Audio, smartphone and radio all failed rule 4: the
+  // audio brand IS the feature and is optional on nearly every line, a row
+  // reading "Bluetooth Connection" is not CarPlay, and "Digital Radio" is not
+  // a SiriusXM subscription. Each of those names now prints only when a source
+  // row says it — the concept rules earn them through an upgrade, or rule 1
+  // passes the brand through verbatim.
 };
 
 /** Walk marque -> corporate family -> generic. */

@@ -195,7 +195,7 @@ describe("OEM terminology", () => {
     const term = (make: string) => curateEquipment(AEB_ROWS, { make }).items[0].name;
     expect(term("GMC")).toBe("Automatic Emergency Braking");
     expect(term("Nissan")).toBe("Intelligent Emergency Braking");
-    expect(term("Toyota")).toBe("Pre-Collision System with Pedestrian Detection");
+    expect(term("Toyota")).toBe("Pre-Collision System");
     expect(term("Honda")).toBe("Collision Mitigation Braking System");
     expect(term("Subaru")).toBe("EyeSight Pre-Collision Braking");
     expect(term("Mercedes-Benz")).toBe("Active Brake Assist");
@@ -216,10 +216,11 @@ describe("OEM terminology", () => {
   });
 
   it("lets a marque override its family where the names genuinely differ", () => {
-    // Lexus badges the same Toyota hardware as plain "Pre-Collision System".
-    const term = (make: string) => curateEquipment(AEB_ROWS, { make }).items[0].name;
-    expect(term("Toyota")).toBe("Pre-Collision System with Pedestrian Detection");
-    expect(term("Lexus")).toBe("Pre-Collision System");
+    // Honda badges this "Multi-View Camera System"; Acura, "Surround-View".
+    const cam = (make: string) =>
+      curateEquipment(["360-Degree Camera"], { make }).items[0].name;
+    expect(cam("Honda")).toBe("Multi-View Camera System");
+    expect(cam("Acura")).toBe("Surround-View Camera System");
   });
 
   it("covers the makes sold in the US, not just the big families", () => {
@@ -276,6 +277,52 @@ describe("OEM terminology", () => {
     for (const make of ["GMC", "Nissan", "Honda", "Hyundai"]) {
       const name = curateEquipment([...AEB_ROWS, "Pedestrian & Cyclist Avoidance System"], { make }).items[0].name;
       expect(name).not.toMatch(/\bw\//);
+    }
+  });
+
+  // Everything below guards the same rule from a different angle: a printed
+  // claim must be supported by a source row. A sticker that overstates the car
+  // is worse than one that reads plainly.
+  it("does not assert an audio brand or the word premium from a speaker count", () => {
+    const plain = curateEquipment(["6 Speakers"], { make: "GMC" }).items[0].name;
+    expect(plain).toBe("Audio System");
+    // Earned two ways: a premium signal in the source...
+    expect(curateEquipment(["14 Speakers", "Subwoofer"], { make: "GMC" }).items[0].name)
+      .toBe("Premium Audio System");
+    // ...or the brand itself, which then prints verbatim.
+    expect(curateEquipment(["6 Speakers", "Bose Premium Audio"], { make: "GMC" }).items[0].name)
+      .toBe("Bose Premium Audio");
+  });
+
+  it("does not turn Bluetooth into CarPlay", () => {
+    expect(curateEquipment(["Bluetooth Connection"]).items[0].name).toBe("Smartphone Integration");
+    expect(curateEquipment(["Bluetooth Connection", "Apple CarPlay"]).items[0].name)
+      .toBe("Apple CarPlay and Android Auto");
+  });
+
+  it("does not turn digital radio into a satellite subscription", () => {
+    expect(curateEquipment(["Digital Radio", "RDS Audio"]).items[0].name).toBe("Digital Radio");
+    expect(curateEquipment(["Digital Radio", "Satellite Radio"]).items[0].name).toBe("Satellite Radio");
+  });
+
+  it("never claims hands-free driving for a system that requires hands", () => {
+    // Every one of these is hands-ON. Naming them here would print a
+    // hands-free claim onto a car that cannot do it.
+    const rows = ["Hands-Free Driving Assistance"];
+    for (const make of ["Nissan", "Infiniti", "Hyundai", "Kia", "Genesis", "Volvo", "Tesla", "Toyota"]) {
+      const name = curateEquipment(rows, { make }).items[0].name;
+      expect(name).not.toMatch(/ProPILOT|Highway Driving Assist|Pilot Assist|Autopilot|Teammate/);
+    }
+  });
+
+  it("does not append a bundled second feature we print on its own line", () => {
+    // "BLIS with Cross-Traffic Alert" next to a Cross-Traffic Alert row states
+    // the same equipment twice and asserts CTA on cars without it.
+    const rows = ["Blind Spot Monitoring", "Rear Cross Traffic Alert"];
+    for (const make of ["GMC", "Ford", "Jeep", "Subaru", "Mitsubishi"]) {
+      const names = curateEquipment(rows, { make }).items.map((i) => i.name);
+      expect(names).toHaveLength(2);
+      expect(names[0]).not.toMatch(/ with /i);
     }
   });
 
