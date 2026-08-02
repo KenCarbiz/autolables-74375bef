@@ -20,10 +20,11 @@ import { resolvePassportVersion } from "../_shared/passport-version.ts";
 //            { error: "rate_limited", retry_after } with 429, or
 //            { error: "not_found" } with 404.
 //
-// Rate limits (per client IP):
-//   - 30 distinct listing_viewed events per 5 minutes, OR
-//   - 120 events per hour.
+// Rate limits (anonymous callers only, per client IP):
+//   - 60 listing_viewed events per 5 minutes, OR
+//   - 300 events per hour.
 // Enforced via a simple SQL COUNT against public.audit_log.
+// A request carrying a valid user JWT is dealer staff and is never throttled.
 //
 // Every successful view is:
 //   1. Inserted into audit_log as "listing_viewed" so it counts
@@ -67,11 +68,25 @@ serve(async (req) => {
     const ua = req.headers.get("user-agent") || "";
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // ── Rate limit: 30 views / 5min, 120 views / hour per IP
+    // A signed-in user is dealer staff working their own inventory, not a
+    // scraper. They open passports far faster than any shopper, and throttling
+    // them made their own cars read as "sold or unpublished".
+    const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    let isAuthenticated = false;
+    if (bearer && bearer !== anonKey) {
+      const { data: who } = await admin.auth.getUser(bearer).catch(() => ({ data: null }));
+      isAuthenticated = !!who?.user;
+    }
+
+    // ── Rate limit (anon only): 60 views / 5min, 300 views / hour per IP.
+    // Sized so a shopper walking a whole lot never trips it, while a scraper
+    // pulling an entire feed still does. Shared NAT (dealership wifi, carrier
+    // CGNAT) puts many real shoppers behind one IP, so the floor cannot be low.
     const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
     const oneHrAgo = new Date(Date.now() - 60 * 60_000).toISOString();
 
-    const [fiveMinRes, oneHrRes] = await Promise.all([
+    const [fiveMinRes, oneHrRes] = isAuthenticated ? [{ count: 0 }, { count: 0 }] : await Promise.all([
       admin
         .from("audit_log")
         .select("id", { head: true, count: "exact" })
@@ -88,8 +103,8 @@ serve(async (req) => {
     const fiveMinCount = fiveMinRes.count ?? 0;
     const oneHrCount = oneHrRes.count ?? 0;
 
-    if (fiveMinCount >= 30 || oneHrCount >= 120) {
-      return json(429, { error: "rate_limited", retry_after: 300 }, { "Retry-After": "300" });
+    if (!isAuthenticated && (fiveMinCount >= 60 || oneHrCount >= 300)) {
+      return json(429, { error: "rate_limited", retry_after: 60 }, { "Retry-After": "60" });
     }
 
     // ── Fetch the listing

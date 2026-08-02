@@ -18,6 +18,18 @@ export interface UsePublicListingResult {
   listing: VehicleListing | null;
   loading: boolean;
   notFound: boolean;
+  /**
+   * The shopper tripped `public-listing-view`'s per-IP throttle. This is NOT a
+   * missing vehicle, and must never render as one — browsing a lot's inventory
+   * legitimately crosses the anon threshold, and telling that shopper the car
+   * was sold loses the sale.
+   */
+  rateLimited: boolean;
+}
+
+interface Fetched {
+  listing: VehicleListing | null;
+  rateLimited?: boolean;
 }
 
 export function usePublicListing(
@@ -30,8 +42,8 @@ export function usePublicListing(
     enabled: !!key && !opts?.preview,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    retry: 1,
-    queryFn: async () => {
+    retry: (count, err) => !(err as { rateLimited?: boolean })?.rateLimited && count < 1,
+    queryFn: async (): Promise<Fetched> => {
       const session = (() => { try { return passportSessionId(); } catch { return undefined; } })();
       const { data, error } = await supabase.functions.invoke("public-listing-view", { body: { slug: key, session } });
       // A 404 from the edge function means the slug isn't a real listing — surface
@@ -39,16 +51,23 @@ export function usePublicListing(
       // as an unhandled runtime error in project monitoring / blank-screen alerts).
       if (error) {
         const ctx = (error as { context?: { status?: number } }).context;
-        if (ctx?.status === 404) return null;
+        if (ctx?.status === 404) return { listing: null };
+        if (ctx?.status === 429) return { listing: null, rateLimited: true };
         throw error;
       }
       const row = (data as { listing?: VehicleListing } | null)?.listing ?? null;
-      return row;
+      return { listing: row };
     },
   });
 
   if (opts?.preview) {
-    return { listing: opts.previewData ?? null, loading: false, notFound: !opts.previewData };
+    return { listing: opts.previewData ?? null, loading: false, notFound: !opts.previewData, rateLimited: false };
   }
-  return { listing: query.data ?? null, loading: query.isLoading, notFound: !query.isLoading && (query.isError || query.data === null) };
+  const rateLimited = !!query.data?.rateLimited;
+  return {
+    listing: query.data?.listing ?? null,
+    loading: query.isLoading,
+    notFound: !query.isLoading && !rateLimited && (query.isError || query.data?.listing == null),
+    rateLimited,
+  };
 }

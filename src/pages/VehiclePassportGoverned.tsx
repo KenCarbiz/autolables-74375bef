@@ -221,7 +221,7 @@ export default function VehiclePassportGoverned() {
     : previewScenario === "newmsrp" ? MOCK_NEW_MSRP
     : previewScenario === "usedfee" ? MOCK_USED_FEE
     : MOCK_LISTING) as unknown as VehicleListing;
-  const { listing, loading, notFound } = usePublicListing(rawSlug, { preview: isPreview, previewData });
+  const { listing, loading, notFound, rateLimited } = usePublicListing(rawSlug, { preview: isPreview, previewData });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : []), [listing]);
@@ -315,6 +315,27 @@ export default function VehiclePassportGoverned() {
   }, [loading, isDesktop]);
 
   if (loading) return <Skeleton />;
+  // Throttled is not sold. Say so, and give the shopper the way back in.
+  if (rateLimited) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6" style={{ background: BG }}>
+        <div className="text-center max-w-sm">
+          <Clock className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <h1 className="text-xl font-bold" style={{ color: NAVY }}>One moment</h1>
+          <p className="text-sm mt-2" style={{ color: SUB }}>
+            You've opened a lot of vehicles in a short time. This one is still available — try again in a minute.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-5 h-11 px-5 rounded-xl text-[14px] font-bold text-white"
+            style={{ background: BLUE }}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (notFound || !listing || !d) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6" style={{ background: BG }}>
@@ -558,6 +579,15 @@ export default function VehiclePassportGoverned() {
     setIdx((i) => (i + dir + gallery.length) % gallery.length);
   };
 
+  // Tapping the photo opens the full viewer; tapping an arrow only advances it.
+  // The arrows already stop propagation, but the hero is the larger target and a
+  // near-miss on a 44px control lands on the image — so the container refuses
+  // any click that started inside a nav control, whatever the event took.
+  const openLightboxUnlessNav = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("[data-gallery-nav]")) return;
+    setGalleryOpen(true);
+  };
+
 
   return (
     <div className={`min-h-screen ${isDesktop ? "" : "pb-28"}`} style={{ background: BG, color: NAVY }}>
@@ -684,7 +714,7 @@ export default function VehiclePassportGoverned() {
             <div className="relative rounded-2xl overflow-hidden bg-white border" style={{ borderColor: BORDER }}>
               <div
                 className="relative aspect-[4/3] w-full overflow-hidden"
-                onClick={() => setGalleryOpen(true)}
+                onClick={openLightboxUnlessNav}
                 onTouchStart={(e) => { (e.currentTarget as HTMLDivElement).dataset.tsx = String(e.touches[0].clientX); }}
                 onTouchEnd={(e) => {
                   const start = Number((e.currentTarget as HTMLDivElement).dataset.tsx || 0);
@@ -704,13 +734,13 @@ export default function VehiclePassportGoverned() {
                   <span className="absolute top-3 left-3 h-7 px-2.5 rounded-full bg-white/95 text-[11px] font-bold inline-flex items-center gap-1" style={{ color: NAVY }}><Play className="w-3.5 h-3.5" /> Video</span>
                 )}
                 {gallery.length > 1 && <>
-                  <button type="button" aria-label="Previous photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(-1); }} className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronLeft className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
-                  <button type="button" aria-label="Next photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronRight className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
+                  <button type="button" data-gallery-nav aria-label="Previous photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(-1); }} className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronLeft className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
+                  <button type="button" data-gallery-nav aria-label="Next photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronRight className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
                 </>}
-                <button aria-label={isSaved ? "Saved" : "Save this vehicle"} aria-pressed={isSaved} onClick={(e) => { e.stopPropagation(); handleSave(); }} className="absolute bottom-3 right-3 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow">
+                <button data-gallery-nav aria-label={isSaved ? "Saved" : "Save this vehicle"} aria-pressed={isSaved} onClick={(e) => { e.stopPropagation(); handleSave(); }} className="absolute bottom-3 right-3 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow">
                   <Bookmark className="w-[22px] h-[22px]" style={{ color: isSaved ? BLUE : NAVY, fill: isSaved ? BLUE : "none" }} />
                 </button>
-                <button aria-label={`View all ${gallery.length} photos`} onClick={(e) => { e.stopPropagation(); setGalleryOpen(true); }} className="absolute bottom-3 left-3 h-9 px-3 rounded-full bg-black/60 text-white text-[12px] font-bold inline-flex items-center gap-1.5"><Eye className="w-4 h-4" /> All Photos</button>
+                <button data-gallery-nav aria-label={`View all ${gallery.length} photos`} onClick={(e) => { e.stopPropagation(); setGalleryOpen(true); }} className="absolute bottom-3 left-3 h-9 px-3 rounded-full bg-black/60 text-white text-[12px] font-bold inline-flex items-center gap-1.5"><Eye className="w-4 h-4" /> All Photos</button>
               </div>
             </div>
             {/* 3 — thumbnail strip */}
@@ -1190,12 +1220,12 @@ export default function VehiclePassportGoverned() {
                 {/* Hero: gallery | identity */}
                 <section className={`${CARD} p-5 grid grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)] gap-5`} aria-label="Vehicle overview">
                   <div className="min-w-0">
-                    <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 group cursor-pointer" onClick={() => setGalleryOpen(true)}>
+                    <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 group cursor-pointer" onClick={openLightboxUnlessNav}>
                       {heroImg ? <img src={heroImg} alt={listing.ymm || "Vehicle"} className="w-full h-full object-cover" /> : <div className="w-full h-full grid place-items-center text-slate-400"><Package className="w-10 h-10" /></div>}
                       {gallery.length > 1 && <span className="absolute top-3 right-3 h-7 px-2.5 rounded-full bg-black/60 text-white text-[11px] font-semibold inline-flex items-center">{idx + 1} / {gallery.length}</span>}
                       {gallery.length > 1 && <>
-                        <button type="button" aria-label="Previous photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(-1); }} className="absolute left-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 grid place-items-center rounded-full bg-white/90 shadow opacity-0 group-hover:opacity-100 transition"><ChevronLeft className="w-5 h-5" style={{ color: NAVY }} /></button>
-                        <button type="button" aria-label="Next photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(1); }} className="absolute right-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 grid place-items-center rounded-full bg-white/90 shadow opacity-0 group-hover:opacity-100 transition"><ChevronRight className="w-5 h-5" style={{ color: NAVY }} /></button>
+                        <button type="button" data-gallery-nav aria-label="Previous photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(-1); }} className="absolute left-2 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow hover:bg-white"><ChevronLeft className="w-[22px] h-[22px]" style={{ color: NAVY }} /></button>
+                        <button type="button" data-gallery-nav aria-label="Next photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(1); }} className="absolute right-2 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow hover:bg-white"><ChevronRight className="w-[22px] h-[22px]" style={{ color: NAVY }} /></button>
                       </>}
                     </div>
                     {gallery.length > 1 && (
