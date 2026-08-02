@@ -4701,11 +4701,20 @@ export type Database = {
           dealer_id: string
           enabled: boolean
           frequency: string
+          last_good_at: string | null
+          last_good_count: number
           last_run_at: string | null
           last_status: Json
           max_vehicles: number
+          mc_scope_param: string
+          mc_scope_value: string
+          rooftop_name: string
+          rooftop_street: string
+          rooftop_verified_at: string | null
+          rooftop_zip: string
           run_hour: number
           source: string
+          strict_rooftop: boolean
           tenant_id: string
           updated_at: string
           updated_by: string | null
@@ -4717,11 +4726,20 @@ export type Database = {
           dealer_id?: string
           enabled?: boolean
           frequency?: string
+          last_good_at?: string | null
+          last_good_count?: number
           last_run_at?: string | null
           last_status?: Json
           max_vehicles?: number
+          mc_scope_param?: string
+          mc_scope_value?: string
+          rooftop_name?: string
+          rooftop_street?: string
+          rooftop_verified_at?: string | null
+          rooftop_zip?: string
           run_hour?: number
           source?: string
+          strict_rooftop?: boolean
           tenant_id: string
           updated_at?: string
           updated_by?: string | null
@@ -4733,11 +4751,20 @@ export type Database = {
           dealer_id?: string
           enabled?: boolean
           frequency?: string
+          last_good_at?: string | null
+          last_good_count?: number
           last_run_at?: string | null
           last_status?: Json
           max_vehicles?: number
+          mc_scope_param?: string
+          mc_scope_value?: string
+          rooftop_name?: string
+          rooftop_street?: string
+          rooftop_verified_at?: string | null
+          rooftop_zip?: string
           run_hour?: number
           source?: string
+          strict_rooftop?: boolean
           tenant_id?: string
           updated_at?: string
           updated_by?: string | null
@@ -10434,6 +10461,20 @@ export type Database = {
       mark_vehicle_retail_ready: {
         Args: { p_note?: string; p_vehicle_id: string }
         Returns: Json
+      }
+      marketcheck_clear_scope: {
+        Args: { _tenant_id: string }
+        Returns: undefined
+      }
+      marketcheck_pin_scope: {
+        Args: {
+          _count: number
+          _name: string
+          _param: string
+          _tenant_id: string
+          _value: string
+        }
+        Returns: undefined
       }
       marketcheck_prune_inventory: {
         Args: { _live_vins: string[]; _tenant_id: string }
