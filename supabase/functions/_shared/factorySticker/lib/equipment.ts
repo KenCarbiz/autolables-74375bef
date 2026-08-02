@@ -2,6 +2,7 @@
 // Mirror of src/lib/factorySticker/equipment.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
+import { curateEquipment } from "./equipmentNoise.ts";
 import type {
   EquipmentCategory,
   PriceStatus,
@@ -148,6 +149,8 @@ export interface EquipmentBuildResult {
 }
 
 export interface EquipmentBuildInput {
+  /** Vehicle make, so equipment prints in that manufacturer's own terminology. */
+  make?: string;
   standard: Array<string | RawStandardItem>;
   packages: RawPackageInput[];
   options: RawOptionInput[];
@@ -229,22 +232,43 @@ export function buildEquipment(input: EquipmentBuildInput): EquipmentBuildResult
     });
   }
 
-  const buckets = new Map<EquipmentCategory, string[]>();
-  const standardKeys = new Map<string, string>();
-  for (const raw of input.standard) {
-    const item = typeof raw === "string" ? { name: raw } : raw;
-    const name = normalizeEquipmentName(item.name);
-    if (!name) continue;
-    const key = dedupeKey(name);
-    const existing = standardKeys.get(key);
-    if (existing) {
-      droppedDuplicates.push(name);
-      dedupeDecisions.push({ item: name, action: "DROPPED_DUPLICATE", keptIn: `standard:${existing}` });
-      continue;
+  // Curate before bucketing. A decoder emits implementation attributes, not
+  // equipment: one sunroof arrives as seven rows, one braking system as six,
+  // wheels as per-corner dimensions. Exact-string dedupe cannot see that they
+  // are the same feature, so every OEM template printed the raw list. This runs
+  // for all of them, since every template resolves through here.
+  const curated = curateEquipment(
+    input.standard.map((raw) => normalizeEquipmentName(typeof raw === "string" ? raw : raw.name)),
+    { make: input.make },
+  );
+  for (const noise of curated.dropped) {
+    droppedDuplicates.push(noise);
+    dedupeDecisions.push({ item: noise, action: "DROPPED_DUPLICATE", keptIn: "standard:decoder-noise" });
+  }
+  for (const dup of curated.duplicates) {
+    droppedDuplicates.push(dup.item);
+    dedupeDecisions.push({ item: dup.item, action: "DROPPED_DUPLICATE", keptIn: `standard:${dup.keptIn}` });
+  }
+  for (const [concept, sources] of Object.entries(curated.collapsed)) {
+    if (sources.length < 2) continue;
+    for (const src of sources.slice(1)) {
+      dedupeDecisions.push({ item: src, action: "DROPPED_DUPLICATE", keptIn: `standard:${concept}` });
     }
-    standardKeys.set(key, name);
-    const category =
-      (item.categoryHint ? categoryFromHint(item.categoryHint) : undefined) ?? categorizeEquipmentItem(name);
+  }
+
+  // Category hints stay keyed by the ORIGINAL row, so a curated row inherits
+  // the hint of whichever source produced it.
+  const hintBySource = new Map<string, string>();
+  for (const raw of input.standard) {
+    if (typeof raw === "string" || !raw.categoryHint) continue;
+    hintBySource.set(normalizeEquipmentName(raw.name), raw.categoryHint);
+  }
+
+  const buckets = new Map<EquipmentCategory, string[]>();
+  for (const item of curated.items) {
+    const name = item.name;
+    const hint = item.sources.map((src) => hintBySource.get(src)).find(Boolean);
+    const category = (hint ? categoryFromHint(hint) : undefined) ?? categorizeEquipmentItem(name);
     const bucket = buckets.get(category);
     if (bucket) bucket.push(name);
     else buckets.set(category, [name]);

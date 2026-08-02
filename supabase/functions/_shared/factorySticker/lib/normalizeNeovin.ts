@@ -193,7 +193,7 @@ export function normalizeNeovin(input: NormalizeNeovinInput): FactoryStickerData
     for (const name of nameList(listing.features)) standard.push({ name });
   }
 
-  const equipmentResult = buildEquipment({ standard, packages, options });
+  const equipmentResult = buildEquipment({ standard, packages, options, make });
 
   // marketcheck-specs extracts Monroney pricing into `build_sheet.pricing`,
   // while this normalizer historically read only the top level of

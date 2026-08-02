@@ -102,7 +102,8 @@ describe("isDecoderNoise", () => {
 });
 
 describe("curateEquipment on the Yukon fixture", () => {
-  const result = curateEquipment(YUKON_RAW);
+  // A 2021 GMC Yukon Denali, so GM's own terminology applies.
+  const result = curateEquipment(YUKON_RAW, { make: "GMC" });
   const names = result.items.map((i) => i.name);
 
   it("collapses seven sunroof rows into one", () => {
@@ -113,10 +114,10 @@ describe("curateEquipment on the Yukon fixture", () => {
     expect(result.collapsed.sunroof.length).toBeGreaterThanOrEqual(6);
   });
 
-  it("collapses the braking fragments into one accurate entry", () => {
+  it("collapses the braking fragments into GM's own term", () => {
     const braking = names.filter((n) => /brak/i.test(n));
     expect(braking).toHaveLength(1);
-    expect(braking[0]).toBe("Automatic Emergency Braking w/ Pedestrian Detection");
+    expect(braking[0]).toBe("Automatic Emergency Braking");
   });
 
   it("does not print contradictory wheel sizes", () => {
@@ -152,7 +153,7 @@ describe("curateEquipment on the Yukon fixture", () => {
   });
 
   it("is deterministic", () => {
-    expect(curateEquipment(YUKON_RAW).items.map((i) => i.name)).toEqual(names);
+    expect(curateEquipment(YUKON_RAW, { make: "GMC" }).items.map((i) => i.name)).toEqual(names);
   });
 
   it("orders the most meaningful equipment first", () => {
@@ -166,7 +167,7 @@ describe("curateEquipment on the Yukon fixture", () => {
 });
 
 describe("selectForPageOne", () => {
-  const { items } = curateEquipment(YUKON_RAW);
+  const { items } = curateEquipment(YUKON_RAW, { make: "GMC" });
 
   it("keeps everything when it fits", () => {
     const { pageOne, continuation } = selectForPageOne(items, 100);
@@ -182,5 +183,72 @@ describe("selectForPageOne", () => {
     expect(Math.min(...pageOne.map((i) => i.tier))).toBe(1);
     expect(Math.min(...continuation.map((i) => i.tier)))
       .toBeGreaterThanOrEqual(Math.max(...pageOne.map((i) => i.tier)));
+  });
+});
+
+// The manufacturers spend heavily naming these systems. Printing one generic
+// phrase across every brand is what makes a sticker read as generated.
+describe("OEM terminology", () => {
+  const AEB_ROWS = ["Automatic Braking", "Brakes At Low Speed"];
+
+  it("uses each manufacturer's own term for the same hardware", () => {
+    const term = (make: string) => curateEquipment(AEB_ROWS, { make }).items[0].name;
+    expect(term("GMC")).toBe("Automatic Emergency Braking");
+    expect(term("Nissan")).toBe("Intelligent Emergency Braking");
+    expect(term("Toyota")).toBe("Pre-Collision System with Pedestrian Detection");
+    expect(term("Honda")).toBe("Collision Mitigation Braking System");
+    expect(term("Subaru")).toBe("EyeSight Pre-Collision Braking");
+    expect(term("Mercedes-Benz")).toBe("Active Brake Assist");
+    expect(term("Volvo")).toBe("City Safety");
+  });
+
+  it("follows the corporate family, not just the badge", () => {
+    // Infiniti is Nissan; Lexus is Toyota; Acura is Honda; Genesis is Hyundai.
+    const term = (make: string) => curateEquipment(AEB_ROWS, { make }).items[0].name;
+    expect(term("Infiniti")).toBe(term("Nissan"));
+    expect(term("Lexus")).toBe(term("Toyota"));
+    expect(term("Acura")).toBe(term("Honda"));
+    expect(term("Genesis")).toBe(term("Hyundai"));
+    expect(term("Cadillac")).toBe(term("GMC"));
+  });
+
+  it("uses the OEM name for high beams rather than a description", () => {
+    const term = (make: string) =>
+      curateEquipment(["Auto High Beam", "Dusk Sensor"], { make }).items[0].name;
+    expect(term("Chevrolet")).toBe("IntelliBeam");        // GM's own name
+    expect(term("Nissan")).toBe("High Beam Assist");
+    expect(term("Mercedes-Benz")).toBe("Adaptive Highbeam Assist");
+  });
+
+  it("names a panoramic roof the way the maker does", () => {
+    const rows = ["Front Panoramic Roof", "Glass Sunroof"];
+    expect(curateEquipment(rows, { make: "Ford" }).items[0].name).toBe("Panoramic Vista Roof");
+    expect(curateEquipment(rows, { make: "Jeep" }).items[0].name)
+      .toBe("CommandView Dual-Pane Panoramic Sunroof");
+    expect(curateEquipment(rows, { make: "GMC" }).items[0].name).toBe("Panoramic Sunroof");
+  });
+
+  it("never overrides a branded system name found in the source", () => {
+    // Rule 1: what the decoder actually said outranks our table.
+    const nissan = curateEquipment(["ProPILOT Assist 2.1", "Adaptive Cruise Control"], { make: "Nissan" });
+    expect(nissan.items[0].name).toBe("ProPILOT Assist 2.1");
+    expect(nissan.items[0].branded).toBe(true);
+
+    const audio = curateEquipment(["Bose Performance Audio - 24 Speakers", "Subwoofer"], { make: "Infiniti" });
+    expect(audio.items[0].name).toBe("Bose Performance Audio - 24 Speakers");
+  });
+
+  it("does not append explanatory tails to an OEM term", () => {
+    // "w/ Pedestrian Detection" is our words, not the manufacturer's.
+    for (const make of ["GMC", "Nissan", "Honda", "Hyundai"]) {
+      const name = curateEquipment([...AEB_ROWS, "Pedestrian & Cyclist Avoidance System"], { make }).items[0].name;
+      expect(name).not.toMatch(/\bw\//);
+    }
+  });
+
+  it("falls back to a neutral term when the make is unknown", () => {
+    expect(curateEquipment(AEB_ROWS).items[0].name).toBe("Automatic Emergency Braking");
+    expect(curateEquipment(AEB_ROWS, { make: "Koenigsegg" }).items[0].name)
+      .toBe("Automatic Emergency Braking");
   });
 });

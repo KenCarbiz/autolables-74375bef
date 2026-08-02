@@ -16,6 +16,8 @@
 //      same order, so the rendered sticker is reproducible.
 // ──────────────────────────────────────────────────────────────────────
 
+import { brandForMake, oemTerm, type OemBrand } from "./oemTerminology.ts";
+
 /** Priority tier — page 1 fills from tier 1 up. */
 export type EquipmentTier = 1 | 2 | 3;
 
@@ -86,8 +88,51 @@ interface ConceptRule {
    * When present, the canonical label is only used if a source row matches —
    * lets "Panoramic" upgrade the generic sunroof label without inventing it.
    */
-  upgrade?: { match: RegExp; canonical: string };
+  upgrade?: { match: RegExp; canonical: string; concept?: string };
 }
+
+/**
+ * A branded OEM system name is MORE informative than the generic concept, so it
+ * is never flattened into one. "ProPILOT Assist 2.1" outranks "Adaptive Cruise
+ * Control"; "Bose Performance Audio - 24 Speakers" outranks "Premium Audio
+ * System". These rows still collapse their siblings — they just supply the
+ * label, verbatim, from the source.
+ */
+const BRANDED_SOURCE = new RegExp(
+  [
+    // Driver assistance suites — the OEM's own name for the system.
+    "propilot", "pro ?pilot", "safety shield", "super ?cruise", "bluecruise",
+    "co-?pilot ?360", "drive pilot", "honda sensing", "acurawatch", "eyesight",
+    "toyota safety sense", "lexus safety system", "distronic", "pre-?safe",
+    "driving assistant", "active driving assistant", "pilot assist", "city safety",
+    "intellisafe", "smartsense", "highway driving assist", "autopilot",
+    "travel assist", "iq\\.?drive", "audi pre ?sense", "i-?activsense", "mi-?pilot",
+    "activedriveassist", "nissan safety shield", "bsd", "hda",
+    // Audio — brand IS the feature.
+    "bose", "burmester", "mark levinson", "harman ?kardon", "meridian", "revel",
+    "bang (&|and) olufsen", "b&o", "naim", "akg", "sony", "jbl", "infinity",
+    "klipsch", "lexicon", "dynaudio", "focal", "els studio", "fender", "beats",
+    "alpine", "rockford fosgate", "mcintosh", "sennheiser",
+    // Infotainment and connected services.
+    "sync ?[0-9]?", "uconnect", "idrive", "mbux", "comand", "\\bmmi\\b", "entune",
+    "onstar", "blue ?link", "fordpass", "starlink", "nissanconnect", "kia connect",
+    "wireless (apple )?carplay", "android auto",
+    // Drivetrain, chassis, and powertrain technologies.
+    "quattro", "xdrive", "4matic", "sh-?awd", "real time awd", "terrain response",
+    "magnetic ride control", "magneride", "adaptive air suspension", "torsen",
+    "e-?lsd", "e-?4orce", "ecoboost", "powerboost", "hemi", "duramax",
+    "power ?stroke", "\\btdi\\b", "\\btfsi\\b", "i-?vtec", "\\bvtec\\b", "skyactiv",
+    "crawl control", "trail control", "terrain management", "selec-?terrain",
+    // Named body/roof/vision features.
+    "vista roof", "commandview", "panoramic vista", "magic body control",
+    "head-?up display", "night vision assist", "surround ?view", "birds-?eye view",
+    "around view monitor", "multi-?terrain monitor",
+  ].join("|"),
+  "i",
+);
+
+/** True when a source row names a specific branded system worth printing as-is. */
+export const isBrandedSource = (name: string): boolean => BRANDED_SOURCE.test(name);
 
 // Order matters: the first matching rule wins, so specific concepts precede
 // general ones.
@@ -97,17 +142,16 @@ const CONCEPT_RULES: ConceptRule[] = [
     canonical: "Automatic Emergency Braking",
     tier: 1,
     match: /\b(automatic braking|automatic emergency brak|brakes? at low speed|emergency brak|forward collision|pre-?collision|pedestrian (&|and)? ?cyclist|city brak)/i,
-    upgrade: {
-      match: /\bpedestrian\b/i,
-      canonical: "Automatic Emergency Braking w/ Pedestrian Detection",
-    },
   },
   {
     concept: "sunroof",
     canonical: "Power Sunroof",
     tier: 1,
     match: /\b(sunroofs?|moonroofs?|panoramic roof|glass roof)\b/i,
-    upgrade: { match: /\bpanoram/i, canonical: "Panoramic Sunroof" },
+    // A panoramic roof is a different product, so it swaps concept — and picks
+    // up that concept's OEM term (Ford's "Panoramic Vista Roof", Jeep's
+    // "CommandView", …) rather than a described variant of the plain one.
+    upgrade: { match: /\bpanoram/i, canonical: "Panoramic Sunroof", concept: "panoramic_sunroof" },
   },
   {
     concept: "adaptive_cruise",
@@ -191,12 +235,16 @@ export interface CuratedItem {
   concept: string | null;
   /** Source rows this row represents, for audit. */
   sources: string[];
+  /** The label came verbatim from a branded OEM system name. */
+  branded?: boolean;
 }
 
 export interface CurateResult {
   items: CuratedItem[];
   /** Rows discarded as decoder noise. */
   dropped: string[];
+  /** Exact repeats of a row already kept, with the row they folded into. */
+  duplicates: Array<{ item: string; keptIn: string }>;
   /** concept -> source rows collapsed into it. */
   collapsed: Record<string, string[]>;
 }
@@ -207,8 +255,17 @@ export interface CurateResult {
  * Noise is dropped, overlapping rows collapse to one concept, and the rest pass
  * through deduplicated. Output order is stable: tier, then first appearance.
  */
-export function curateEquipment(raw: string[]): CurateResult {
+export interface CurateOptions {
+  /** Vehicle make, so each concept prints in that manufacturer's own words. */
+  make?: string | null;
+}
+
+export function curateEquipment(raw: string[], opts: CurateOptions = {}): CurateResult {
+  const brand: OemBrand = brandForMake(opts.make);
+  /** Branded source > the make's own term > the rule's neutral fallback. */
+  const labelFor = (concept: string, fallback: string) => oemTerm(concept, brand) ?? fallback;
   const dropped: string[] = [];
+  const duplicates: Array<{ item: string; keptIn: string }> = [];
   const collapsed: Record<string, string[]> = {};
   const byConcept = new Map<string, CuratedItem>();
   const passthrough = new Map<string, CuratedItem>();
@@ -225,15 +282,27 @@ export function curateEquipment(raw: string[]): CurateResult {
       const existing = byConcept.get(rule.concept);
       if (existing) {
         existing.sources.push(name);
-        // An upgrade label only applies when a source row justifies it.
-        if (rule.upgrade?.match.test(name)) existing.name = rule.upgrade.canonical;
+        // A branded name always wins the label; otherwise an upgrade label
+        // applies only when a source row justifies it.
+        if (isBrandedSource(name)) { existing.name = name; existing.branded = true; }
+        else if (rule.upgrade?.match.test(name) && !existing.branded) {
+          const upConcept = rule.upgrade.concept ?? rule.concept;
+          existing.name = labelFor(upConcept, rule.upgrade.canonical);
+        }
         continue;
       }
+      const branded = isBrandedSource(name);
+      const upgraded = rule.upgrade?.match.test(name) ? rule.upgrade : undefined;
       const item: CuratedItem = {
-        name: rule.upgrade?.match.test(name) ? rule.upgrade.canonical : rule.canonical,
+        name: branded
+          ? name
+          : upgraded
+            ? labelFor(upgraded.concept ?? rule.concept, upgraded.canonical)
+            : labelFor(rule.concept, rule.canonical),
         tier: rule.tier,
         concept: rule.concept,
         sources: [name],
+        ...(branded ? { branded: true } : {}),
       };
       byConcept.set(rule.concept, item);
       order.push(item);
@@ -242,7 +311,7 @@ export function curateEquipment(raw: string[]): CurateResult {
 
     const key = norm(name).replace(/[^a-z0-9]+/g, "");
     const seen = passthrough.get(key);
-    if (seen) { seen.sources.push(name); dropped.push(name); continue; }
+    if (seen) { seen.sources.push(name); duplicates.push({ item: name, keptIn: seen.name }); continue; }
     const item: CuratedItem = { name, tier: 2, concept: null, sources: [name] };
     passthrough.set(key, item);
     order.push(item);
@@ -254,7 +323,7 @@ export function curateEquipment(raw: string[]): CurateResult {
     .sort((a, b) => a.item.tier - b.item.tier || a.i - b.i)
     .map(({ item }) => item);
 
-  return { items, dropped, collapsed };
+  return { items, dropped, duplicates, collapsed };
 }
 
 /** Rows that fit page 1, filling by priority tier. */
