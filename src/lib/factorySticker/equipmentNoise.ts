@@ -17,6 +17,9 @@
 // ──────────────────────────────────────────────────────────────────────
 
 import { brandForMake, oemTerm, type OemBrand } from "./oemTerminology.ts";
+import {
+  findForeignTechnology, findTechnology, officialTechnologyName, type OemTechnology,
+} from "./oemTechnology.ts";
 
 /** Priority tier — page 1 fills from tier 1 up. */
 export type EquipmentTier = 1 | 2 | 3;
@@ -347,6 +350,8 @@ export interface CuratedItem {
   sources: string[];
   /** The label came verbatim from a branded OEM system name. */
   branded?: boolean;
+  /** The catalogued manufacturer system this row names, when it names one. */
+  technology?: OemTechnology;
 }
 
 export interface CurateResult {
@@ -357,6 +362,12 @@ export interface CurateResult {
   duplicates: Array<{ item: string; keptIn: string }>;
   /** concept -> source rows collapsed into it. */
   collapsed: Record<string, string[]>;
+  /**
+   * Rows naming another manufacturer's technology. Almost always a crossed VIN
+   * or a description scraped from a different vehicle. Reported, never printed
+   * as though we had verified it.
+   */
+  foreign: Array<{ item: string; technology: string; owner: OemBrand }>;
 }
 
 /**
@@ -377,9 +388,32 @@ export function curateEquipment(raw: string[], opts: CurateOptions = {}): Curate
   const dropped: string[] = [];
   const duplicates: Array<{ item: string; keptIn: string }> = [];
   const collapsed: Record<string, string[]> = {};
+  const foreign: Array<{ item: string; technology: string; owner: OemBrand }> = [];
   const byConcept = new Map<string, CuratedItem>();
   const passthrough = new Map<string, CuratedItem>();
   const order: CuratedItem[] = [];
+
+  /**
+   * Resolve a row against the technology catalog.
+   *
+   * The catalog knows WHO owns a system, which the flat pattern list never
+   * did. A row naming another manufacturer's technology is recorded as a feed
+   * problem and treated as unbranded, so it can never supply a label — a Ford
+   * does not get to print "Mark Levinson" because a scraped description said
+   * so. A row we do own prints in the manufacturer's own rendering.
+   */
+  const resolve = (name: string): { label: string; branded: boolean; technology?: OemTechnology } => {
+    const tech = findTechnology(name, brand);
+    if (tech) return { label: officialTechnologyName(name, brand) ?? name, branded: true, technology: tech };
+    const alien = findForeignTechnology(name, brand);
+    if (alien) {
+      foreign.push({ item: name, technology: alien.technology.name, owner: alien.owner });
+      return { label: name, branded: false };
+    }
+    // Not catalogued either way. The flat list still recognises names we have
+    // not yet entered, so coverage gaps degrade to the old behaviour.
+    return { label: name, branded: isBrandedSource(name) };
+  };
 
   for (const source of raw) {
     const name = String(source ?? "").replace(/\s+/g, " ").trim();
@@ -394,25 +428,30 @@ export function curateEquipment(raw: string[], opts: CurateOptions = {}): Curate
         existing.sources.push(name);
         // A branded name always wins the label; otherwise an upgrade label
         // applies only when a source row justifies it.
-        if (isBrandedSource(name)) { existing.name = name; existing.branded = true; }
-        else if (rule.upgrade?.match.test(name) && !existing.branded) {
+        const r = resolve(name);
+        if (r.branded) {
+          existing.name = r.label;
+          existing.branded = true;
+          if (r.technology) existing.technology = r.technology;
+        } else if (rule.upgrade?.match.test(name) && !existing.branded) {
           const upConcept = rule.upgrade.concept ?? rule.concept;
           existing.name = labelFor(upConcept, rule.upgrade.canonical);
         }
         continue;
       }
-      const branded = isBrandedSource(name);
+      const r = resolve(name);
       const upgraded = rule.upgrade?.match.test(name) ? rule.upgrade : undefined;
       const item: CuratedItem = {
-        name: branded
-          ? name
+        name: r.branded
+          ? r.label
           : upgraded
             ? labelFor(upgraded.concept ?? rule.concept, upgraded.canonical)
             : labelFor(rule.concept, rule.canonical),
         tier: rule.tier,
         concept: rule.concept,
         sources: [name],
-        ...(branded ? { branded: true } : {}),
+        ...(r.branded ? { branded: true } : {}),
+        ...(r.technology ? { technology: r.technology } : {}),
       };
       byConcept.set(rule.concept, item);
       order.push(item);
@@ -422,7 +461,11 @@ export function curateEquipment(raw: string[], opts: CurateOptions = {}): Curate
     const key = norm(name).replace(/[^a-z0-9]+/g, "");
     const seen = passthrough.get(key);
     if (seen) { seen.sources.push(name); duplicates.push({ item: name, keptIn: seen.name }); continue; }
-    const item: CuratedItem = { name, tier: 2, concept: null, sources: [name] };
+    const r = resolve(name);
+    const item: CuratedItem = {
+      name: r.label, tier: 2, concept: null, sources: [name],
+      ...(r.technology ? { technology: r.technology } : {}),
+    };
     passthrough.set(key, item);
     order.push(item);
   }
@@ -433,7 +476,7 @@ export function curateEquipment(raw: string[], opts: CurateOptions = {}): Curate
     .sort((a, b) => a.item.tier - b.item.tier || a.i - b.i)
     .map(({ item }) => item);
 
-  return { items, dropped, duplicates, collapsed };
+  return { items, dropped, duplicates, collapsed, foreign };
 }
 
 /** Rows that fit page 1, filling by priority tier. */

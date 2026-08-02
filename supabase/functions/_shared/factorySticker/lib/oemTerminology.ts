@@ -128,6 +128,21 @@ const MAKE_TO_BRAND: Array<[RegExp, OemBrand]> = [
   [/^vinfast$/i, "vinfast"],
 ];
 
+/**
+ * A marque and every family it inherits from, nearest first. Ownership of a
+ * technology is tested against this chain: a GM system belongs to Chevrolet,
+ * a Cadillac-only system does not belong to GMC.
+ */
+export function brandChain(brand: OemBrand): OemBrand[] {
+  const chain: OemBrand[] = [];
+  let cursor: OemBrand | undefined = brand;
+  while (cursor && !chain.includes(cursor)) {
+    chain.push(cursor);
+    cursor = BRAND_PARENT[cursor];
+  }
+  return chain;
+}
+
 export function brandForMake(make?: string | null): OemBrand {
   const m = String(make ?? "").trim();
   if (!m) return "generic";
