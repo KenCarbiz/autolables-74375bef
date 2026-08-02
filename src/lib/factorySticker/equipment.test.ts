@@ -116,7 +116,7 @@ describe("buildEquipment", () => {
     expect(res.standard.flatMap((g) => g.items)).toEqual(["Power Liftgate"]);
     expect(res.debug.droppedDuplicates).toEqual(["Power Liftgate"]);
     expect(res.debug.dedupeDecisions).toEqual([
-      { item: "Power Liftgate", action: "DROPPED_DUPLICATE", keptIn: "standard:Power Liftgate" },
+      { item: "Power Liftgate", action: "DROPPED_DUPLICATE", keptIn: "standard:power_liftgate" },
     ]);
   });
 

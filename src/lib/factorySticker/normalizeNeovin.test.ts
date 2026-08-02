@@ -158,7 +158,7 @@ describe("normalizeNeovin — other fixtures", () => {
     expect(data.document.confidence).toBe("MEDIUM");
     expect(data.document.verificationStatus).toBe("REVIEW_REQUIRED");
     expect(data.equipment.standard.flatMap((g) => g.items)).toEqual(
-      expect.arrayContaining(["Power Liftgate", "Blind Spot Monitor"]),
+      expect.arrayContaining(["Power Back Door", "Blind Spot Monitor"]),
     );
   });
 

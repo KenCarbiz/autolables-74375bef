@@ -202,14 +202,47 @@ describe("OEM terminology", () => {
     expect(term("Volvo")).toBe("City Safety");
   });
 
-  it("follows the corporate family, not just the badge", () => {
-    // Infiniti is Nissan; Lexus is Toyota; Acura is Honda; Genesis is Hyundai.
+  it("inherits the corporate family when the marque has no term of its own", () => {
+    // Infiniti is Nissan; Acura is Honda; Genesis and Kia are Hyundai;
+    // Cadillac is GM. None of them rename this system, so they inherit.
     const term = (make: string) => curateEquipment(AEB_ROWS, { make }).items[0].name;
     expect(term("Infiniti")).toBe(term("Nissan"));
-    expect(term("Lexus")).toBe(term("Toyota"));
     expect(term("Acura")).toBe(term("Honda"));
     expect(term("Genesis")).toBe(term("Hyundai"));
+    expect(term("Kia")).toBe(term("Hyundai"));
     expect(term("Cadillac")).toBe(term("GMC"));
+    expect(term("Ram")).toBe(term("Jeep"));
+    expect(term("Mini")).toBe(term("BMW"));
+  });
+
+  it("lets a marque override its family where the names genuinely differ", () => {
+    // Lexus badges the same Toyota hardware as plain "Pre-Collision System".
+    const term = (make: string) => curateEquipment(AEB_ROWS, { make }).items[0].name;
+    expect(term("Toyota")).toBe("Pre-Collision System with Pedestrian Detection");
+    expect(term("Lexus")).toBe("Pre-Collision System");
+  });
+
+  it("covers the makes sold in the US, not just the big families", () => {
+    const term = (make: string) => curateEquipment(AEB_ROWS, { make }).items[0].name;
+    expect(term("Mitsubishi")).toBe("Forward Collision Mitigation");
+    expect(term("Volkswagen")).toBe("Front Assist");
+    expect(term("Audi")).toBe("Audi pre sense front");
+    expect(term("Porsche")).toBe("Warn and Brake Assist");
+    expect(term("Land Rover")).toBe("Emergency Braking");
+    expect(term("Jaguar")).toBe("Emergency Braking");
+    expect(term("Polestar")).toBe("City Safety");
+    expect(term("Rivian")).toBe("Automatic Emergency Braking");
+    expect(term("Lucid")).toBe("Automatic Emergency Braking");
+  });
+
+  it("does not promote a plain powered gate to hands-free", () => {
+    // Hands-free is a separate option on every one of these lines.
+    const gate = (make: string, rows: string[]) => curateEquipment(rows, { make }).items[0].name;
+    expect(gate("Toyota", ["Power Liftgate"])).toBe("Power Back Door");
+    expect(gate("GMC", ["Power Liftgate"])).toBe("Power Liftgate");
+    // ...but when the source says hands-free, the maker's own name for THAT wins.
+    expect(gate("Toyota", ["Power Liftgate", "Hands-Free Liftgate"])).toBe("Hands-Free Power Back Door");
+    expect(gate("Nissan", ["Power Liftgate", "Motion Activated Liftgate"])).toBe("Motion Activated Liftgate");
   });
 
   it("uses the OEM name for high beams rather than a description", () => {

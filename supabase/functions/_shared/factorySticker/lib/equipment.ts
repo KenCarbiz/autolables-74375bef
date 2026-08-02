@@ -252,6 +252,9 @@ export function buildEquipment(input: EquipmentBuildInput): EquipmentBuildResult
   for (const [concept, sources] of Object.entries(curated.collapsed)) {
     if (sources.length < 2) continue;
     for (const src of sources.slice(1)) {
+      // Collapsed rows are dropped rows — they belong in both audit lists, or a
+      // reader of droppedDuplicates cannot account for every input row.
+      droppedDuplicates.push(src);
       dedupeDecisions.push({ item: src, action: "DROPPED_DUPLICATE", keptIn: `standard:${concept}` });
     }
   }
