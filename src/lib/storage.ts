@@ -81,9 +81,12 @@ export const uploadPhoto = async (
     throw new Error(error.message || "Upload failed.");
   }
 
-  const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
+  const url = isPrivateBucket(bucket)
+    ? await signPhotoUrl(bucket, path)
+    : supabase.storage.from(bucket).getPublicUrl(path).data?.publicUrl || "";
   return {
-    url: pub?.publicUrl || "",
+    url,
+
     path,
     bucket,
     size: file.size,
