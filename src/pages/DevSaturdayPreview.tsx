@@ -1,6 +1,7 @@
 import SaturdayHeroWindow from "@/components/saturday/SaturdayHeroWindow";
 import SaturdayClassicWindow from "@/components/saturday/SaturdayClassicWindow";
 import SaturdayPremiumAddendum from "@/components/saturday/SaturdayPremiumAddendum";
+import NewCarSaasAddendum from "@/components/saturday/NewCarSaasAddendum";
 import { buildSaturdayStickerData } from "@/components/saturday/wiring";
 
 // Dev-only preview surface for the three Saturday templates.
@@ -165,9 +166,16 @@ const DevSaturdayPreview = () => {
         <h1 className="text-2xl font-bold text-slate-900">Addendum content-fit cases</h1>
         <div className="mt-6 flex flex-wrap items-start gap-8">
           {shown.map((c) => (
-            <Frame key={c.id} label={c.label}>
-              <div data-fit-case={c.id}>
+            <Frame key={c.id} label={`${c.label} · used`}>
+              <div data-fit-case={c.id} data-fit-template="premium">
                 <SaturdayPremiumAddendum data={{ ...ADDENDUM_DATA, ...c.data } as typeof ADDENDUM_DATA} />
+              </div>
+            </Frame>
+          ))}
+          {shown.map((c) => (
+            <Frame key={`new-${c.id}`} label={`${c.label} · new car`}>
+              <div data-fit-case={c.id} data-fit-template="newcar">
+                <NewCarSaasAddendum data={{ ...ADDENDUM_DATA, ...c.data } as typeof ADDENDUM_DATA} />
               </div>
             </Frame>
           ))}

@@ -135,6 +135,28 @@ describe("the template renders the section, not just its rows", () => {
   });
 });
 
+describe("the new-car sheet is the same sheet", () => {
+  // These two had already drifted once: the premium sheet got the content-fit
+  // fix while the new-car copy kept the fixed image height and the empty-state
+  // placeholders, so the same dealer data printed two different pages. The
+  // files are now kept identical below their header comment, and this is what
+  // catches an edit to one of them.
+  const newcar = readFileSync(join(__dirname, "NewCarSaasAddendum.tsx"), "utf8");
+  const body = (src: string, name: string) =>
+    src.slice(src.indexOf("import { useState }")).split(name).join("Addendum");
+
+  it("differs from the premium sheet only by name and header", () => {
+    expect(body(newcar, "NewCarSaasAddendum")).toBe(body(tpl, "SaturdayPremiumAddendum"));
+  });
+
+  it("carries the content-fit behaviour, not the old fixed sizing", () => {
+    expect(newcar).toMatch(/maxHeight: valuePropImageCeiling\(vp\.imageScale, sections\)/);
+    expect(newcar).not.toMatch(/VP_IMAGE_SIZE/);
+    expect(newcar).not.toMatch(/No configured benefits/);
+    expect(newcar).not.toMatch(/benefits\.slice\(/);
+  });
+});
+
 describe("required content cannot be squeezed by the artwork", () => {
   it("makes the artwork block the only flexible track", () => {
     // justify-start, not center: with little content the artwork used to float
