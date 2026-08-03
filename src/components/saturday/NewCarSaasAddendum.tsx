@@ -1,7 +1,12 @@
 // New Car SaaS Template — 4.25" x 11" new vehicle addendum.
-// A duplicate of SaturdayPremiumAddendum, kept structurally identical on
-// purpose so the new-vehicle build-out (factory options, market adjustment,
-// incentives) happens here without touching the approved premium addendum.
+//
+// Generated from SaturdayPremiumAddendum and kept byte-identical to it apart
+// from this header and the exported name. The two had already drifted once —
+// the premium sheet was fixed for content-fit while this one kept the old
+// fixed image height and the empty-section placeholders — so the layout is no
+// longer maintained twice. New-vehicle work (factory options, market
+// adjustment, incentives) belongs in the shared pieces, not in a fork of the
+// layout.
 
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -19,12 +24,12 @@ type Props = { data: Addendum };
 // AutoLabels brand blue. Fixed — the product wordmark is not dealer-themed.
 const BRAND_BLUE = "#0B6FEA";
 
-// Value-proposition image sizes. Aspect ratio is preserved at every step; the
-// image is contained, never stretched, and image-only propositions may use the
-// full width of the block.
-// Heights are ceilings, not fixed values — see addendumSections. A fixed
-// height let tall artwork claim its inches before the priced rows were laid
-// out, and the 11-inch page cropped whatever was left.
+// Widths for the value-proposition artwork. The HEIGHT is no longer fixed
+// here: a fixed height meant a tall promotional image claimed its inches
+// before the equipment, benefit and upgrade rows were laid out, and on an
+// 11-inch page with `overflow: hidden` whatever did not fit was cropped in
+// silence. Height is now a ceiling (see valuePropImageCeiling) inside a flex
+// track that can hand the image less.
 const VP_IMAGE_WIDTH: Record<"sm" | "md" | "lg" | "xl", string> = {
   sm: "max-w-[1.1in]",
   md: "max-w-[1.6in]",
@@ -45,6 +50,8 @@ const money = (n: string | number): string | null => {
   return `$${Math.round(v).toLocaleString()}`;
 };
 
+// Section header band: tinted strip with a white icon badge, status tag,
+// and an optional right-aligned section total.
 const SectionBar = ({ icon, title, tag, total, bg, fg }: { icon: AddendumIconKey; title: string; tag?: string; total?: string | null; bg: string; fg: string }) => (
   <div className="flex items-center justify-between gap-1.5 px-2.5 py-[7px] rounded-t-[10px]" style={{ background: bg }}>
     <span className="inline-flex items-center gap-1.5 min-w-0 text-[9px] font-black uppercase tracking-[0.12em]" style={{ color: fg }}>
@@ -60,11 +67,15 @@ const SectionBar = ({ icon, title, tag, total, bg, fg }: { icon: AddendumIconKey
 
 export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   const { dealer, vehicle, qrUrl, disclaimer } = data;
-  // Same shared resolver as the Saturday Premium sheet: a section is
-  // conditional, its rows are not.
+  // Section visibility is resolved once, from stored data only, and shared with
+  // the print and PDF paths so a section cannot appear in one and not another.
   const sections = resolveAddendumSections(data);
   const { installed, upgrades, benefits, valueProps } = sections;
+  // Spacing tightens before anything is cropped; see addendumDensity.
   const density = addendumDensity(sections);
+  // Accent follows the dealer theme (populated by toSaturdaySticker from
+  // branding.accentColor). Neutrals (navy, slate) stay fixed; installed
+  // green and upgrades purple keep their semantic meaning.
   // The dealer logo renders only when the dealership has one AND the template's
   // "Show dealer logo" choice is on. A broken URL falls back to the name block
   // rather than printing a broken-image box on a customer document.
@@ -85,6 +96,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   // out of the total because they are optional and not on the vehicle.
   const adjustedTotal = basePrice > 0 ? basePrice + installedTotal : 0;
   const adjustedDisplay = money(adjustedTotal);
+  // Vehicle title on two uppercase lines: "2027 INFINITI" / "QX60 LUXE".
   const words = (vehicle.title || "").trim().split(/\s+/);
   const line1 = words.slice(0, 2).join(" ");
   const line2 = words.slice(2).join(" ");
@@ -136,6 +148,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   return (
     <div className="bg-white shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "4.25in", height: "11in", fontFamily: "Inter, system-ui, sans-serif", color: T.text, boxSizing: "border-box", overflow: "hidden" }}>
       <div className="flex h-full flex-col" style={{ padding: "0.17in" }}>
+        {/* Header — anchored AutoLabels lockup left, dealer block right of a vertical divider */}
         <header className="shrink-0 flex items-stretch justify-between gap-2.5 pb-1">
           <div className="flex items-center gap-1.5 min-w-0">
             {/* The AutoLabels wordmark is fixed brand identity: it never takes
@@ -163,6 +176,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </div>
         </header>
 
+        {/* Passport badge + hero title stack */}
         <div className="shrink-0 mt-2.5 inline-flex items-center gap-1.5">
           <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full shrink-0" style={{ background: accentSoft }}>
             <AutoLabelsAddendumIcon iconKey="vehicle-passport" size={12} color={T.navy} />
@@ -174,6 +188,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           {line1 || "VEHICLE DETAILS"}<br />{line2 || (line1 ? "" : "PENDING")}
         </div>
 
+        {/* Vehicle info grid */}
         <section className="shrink-0 mt-2.5 grid grid-cols-2 rounded-[10px] border" style={{ borderColor: T.border }}>
           <div className="border-b border-r" style={{ borderColor: T.border }}>{infoCell("stock-number", "Stock Number", vehicle.stock || null)}</div>
           <div className="border-b" style={{ borderColor: T.border }}>{infoCell("vin", "VIN", vehicle.vin || null, true)}</div>
@@ -181,6 +196,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           {infoCell("price-msrp", priceLabel, baseDisplay ?? "See Dealer")}
         </section>
 
+        {/* QR block — a major engagement point in the upper third */}
         <section className="shrink-0 mt-2.5 grid grid-cols-[1in_1fr] items-center gap-3 rounded-[10px] border p-2.5" style={{ borderColor: accentBorder, background: accentSoft }}>
           <div className="rounded-[7px] bg-white p-1.5 border" style={{ borderColor: T.border }}>
             <QRCodeSVG value={safeUrl} size={84} bgColor="#ffffff" fgColor={T.navy} level="M" style={{ width: "100%", height: "auto" }} />
@@ -197,6 +213,8 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </div>
         </section>
 
+        {/* Installed Equipment — green. Absent, not empty, when unconfigured:
+            a heading-only box is dead weight on a page with a hard ceiling. */}
         {sections.hasInstalled && (
           <section className={`shrink-0 ${density.sectionGap} rounded-[10px] border overflow-hidden`} style={{ borderColor: "#BFE3CD" }}>
             <SectionBar icon="protection-products" title="Installed Equipment" tag="Included" total={money(installedTotal)} bg={T.greenSoft} fg={T.green} />
@@ -204,6 +222,9 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </section>
         )}
 
+        {/* Included Benefits — blue. Every stored benefit prints; the list is
+            no longer truncated at six, because a benefit the dealer configured
+            and the customer is being sold should not vanish silently. */}
         {sections.hasBenefits && (
           <section className={`shrink-0 ${density.sectionGap} rounded-[10px] border overflow-hidden`} style={{ borderColor: "#BBD8F5" }}>
             <SectionBar icon="benefits" title="Included Benefits" bg={accentSoft} fg={accent} />
@@ -218,6 +239,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </section>
         )}
 
+        {/* Available Upgrades — purple, NOT INSTALLED */}
         {sections.hasUpgrades && (
           <section className={`shrink-0 ${density.sectionGap} rounded-[10px] border overflow-hidden`} style={{ borderColor: "#DCCBF5" }}>
             <SectionBar icon="remote-start" title="Available Upgrades" tag="Not Installed" total={money(upgradesTotal)} bg={T.purpleSoft} fg={T.purple} />
@@ -230,6 +252,9 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
             The claim and its disclosure travel together so the disclosure can
             never be dropped from a printed document. */}
         {sections.hasValueProps && (
+          // flex-1 with min-h-0: this block takes the slack the structured
+          // sections leave, and — crucially — is the only thing that gives
+          // space back when they need more.
           <section className={`${density.sectionGap} space-y-2 flex-1 min-h-0 flex flex-col justify-start`} data-overflow-risk={density.overflowRisk || undefined}>
             {valueProps.map((vp) => (
               <div key={vp.id} className={`rounded-[10px] border-2 px-2.5 py-2 min-h-0 ${vp.displayStyle === "image" ? "block" : "flex items-center gap-2.5"}`} style={{ borderColor: T.navy }}>
@@ -238,6 +263,9 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
                     src={vp.imageUrl}
                     alt=""
                     crossOrigin="anonymous"
+                    // h-auto + a max-height ceiling: the artwork keeps its
+                    // aspect ratio and is never stretched, cropped, or allowed
+                    // to push a priced row off the sheet.
                     style={{ maxHeight: valuePropImageCeiling(vp.imageScale, sections) }}
                     className={`h-auto w-auto object-contain ${VP_IMAGE_WIDTH[vp.imageScale || "sm"]} ${vp.displayStyle === "image" ? "mx-auto max-w-full" : "shrink"}`}
                   />
@@ -254,6 +282,9 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </section>
         )}
 
+        {/* Totals — installed equipment always adds to vehicle value. Left:
+            the adjusted total with real gravity; right: the arithmetic a
+            customer can follow line by line. */}
         <section className="shrink-0 mt-2.5 grid grid-cols-[1fr_1.3fr] rounded-[10px] border-2 overflow-hidden" style={{ borderColor: T.navy }}>
           <div className="px-2.5 py-2.5 border-r flex flex-col justify-center" style={{ borderColor: T.border }}>
             <div className="text-[7.4px] font-black uppercase tracking-[0.14em]" style={{ color: T.gold }}>Adjusted Total</div>
@@ -280,6 +311,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </div>
         </section>
 
+        {/* Disclaimer */}
         {disclaimer && <p className="mt-2 text-[6.4px] leading-snug" style={{ color: T.muted }}>{disclaimer}</p>}
         {valueProps.some((vp) => vp.disclosure) && (
           <p className="mt-1.5 text-[6.4px] leading-snug" style={{ color: T.muted }}>
@@ -288,6 +320,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
         )}
 
 
+        {/* Trust badge band — a meaningful benefit row above the footer */}
         <section className={`shrink-0 mt-auto grid grid-cols-4 ${density.compact ? "pt-1.5 pb-1" : "pt-2.5 pb-1.5"}`}>
           {TRUST.map((t, i) => (
             <div key={t.t} className="flex flex-col items-center text-center gap-1 px-1.5" style={i > 0 ? { borderLeft: `1px solid ${T.border}` } : undefined}>
@@ -298,6 +331,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           ))}
         </section>
 
+        {/* Dark branded footer */}
         <footer className={`shrink-0 ${density.compact ? "mt-1 py-1.5" : "mt-2 py-2.5"} flex items-center justify-between gap-2.5 rounded-[9px] px-3`} style={{ background: T.navy }}>
           <span className="flex items-center gap-1.5 min-w-0">
             <AutoLabelsAddendumIcon iconKey="autolabels-powered" size={15} variant="light" />
