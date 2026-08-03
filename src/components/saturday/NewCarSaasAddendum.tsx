@@ -10,6 +10,7 @@ import {
   AutoLabelsAddendumIcon, resolveAddendumProductIcon, getAddendumIconColor,
   type AddendumIconKey,
 } from "@/components/icons/AutoLabelsAddendumIcons";
+import { resolveAddendumSections, valuePropImageCeiling, addendumDensity } from "./addendumSections";
 
 type Line = { name: string; price: string; description?: string; iconKey?: string };
 type Addendum = SaturdaySticker & { installed?: Line[]; upgrades?: Line[] };
@@ -21,11 +22,14 @@ const BRAND_BLUE = "#0B6FEA";
 // Value-proposition image sizes. Aspect ratio is preserved at every step; the
 // image is contained, never stretched, and image-only propositions may use the
 // full width of the block.
-const VP_IMAGE_SIZE: Record<"sm" | "md" | "lg" | "xl", string> = {
-  sm: "h-[0.42in] max-w-[1.1in]",
-  md: "h-[0.62in] max-w-[1.6in]",
-  lg: "h-[0.85in] max-w-[2.2in]",
-  xl: "h-[1.15in] max-w-[2.9in]",
+// Heights are ceilings, not fixed values — see addendumSections. A fixed
+// height let tall artwork claim its inches before the priced rows were laid
+// out, and the 11-inch page cropped whatever was left.
+const VP_IMAGE_WIDTH: Record<"sm" | "md" | "lg" | "xl", string> = {
+  sm: "max-w-[1.1in]",
+  md: "max-w-[1.6in]",
+  lg: "max-w-[2.2in]",
+  xl: "max-w-[2.9in]",
 };
 
 
@@ -55,7 +59,12 @@ const SectionBar = ({ icon, title, tag, total, bg, fg }: { icon: AddendumIconKey
 );
 
 export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
-  const { dealer, vehicle, installed = [], upgrades = [], benefits, qrUrl, disclaimer, valueProps = [] } = data;
+  const { dealer, vehicle, qrUrl, disclaimer } = data;
+  // Same shared resolver as the Saturday Premium sheet: a section is
+  // conditional, its rows are not.
+  const sections = resolveAddendumSections(data);
+  const { installed, upgrades, benefits, valueProps } = sections;
+  const density = addendumDensity(sections);
   // The dealer logo renders only when the dealership has one AND the template's
   // "Show dealer logo" choice is on. A broken URL falls back to the name block
   // rather than printing a broken-image box on a customer document.
@@ -127,7 +136,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   return (
     <div className="bg-white shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "4.25in", height: "11in", fontFamily: "Inter, system-ui, sans-serif", color: T.text, boxSizing: "border-box", overflow: "hidden" }}>
       <div className="flex h-full flex-col" style={{ padding: "0.17in" }}>
-        <header className="flex items-stretch justify-between gap-2.5 pb-1">
+        <header className="shrink-0 flex items-stretch justify-between gap-2.5 pb-1">
           <div className="flex items-center gap-1.5 min-w-0">
             {/* The AutoLabels wordmark is fixed brand identity: it never takes
                 the dealer's accent color. */}
@@ -154,25 +163,25 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </div>
         </header>
 
-        <div className="mt-2.5 inline-flex items-center gap-1.5">
+        <div className="shrink-0 mt-2.5 inline-flex items-center gap-1.5">
           <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full shrink-0" style={{ background: accentSoft }}>
             <AutoLabelsAddendumIcon iconKey="vehicle-passport" size={12} color={T.navy} />
           </span>
           <span className="text-[8.5px] font-black uppercase tracking-[0.2em]" style={{ color: accent }}>Vehicle Passport™</span>
         </div>
         <h1 className="mt-1 text-[34px] font-black leading-[0.95] tracking-[-0.02em]" style={{ color: T.navy }}>ADDENDUM</h1>
-        <div className="mt-1.5 text-[15px] font-black uppercase leading-[1.12] tracking-[-0.01em]" style={{ color: T.text }}>
+        <div className="shrink-0 mt-1.5 text-[15px] font-black uppercase leading-[1.12] tracking-[-0.01em]" style={{ color: T.text }}>
           {line1 || "VEHICLE DETAILS"}<br />{line2 || (line1 ? "" : "PENDING")}
         </div>
 
-        <section className="mt-2.5 grid grid-cols-2 rounded-[10px] border" style={{ borderColor: T.border }}>
+        <section className="shrink-0 mt-2.5 grid grid-cols-2 rounded-[10px] border" style={{ borderColor: T.border }}>
           <div className="border-b border-r" style={{ borderColor: T.border }}>{infoCell("stock-number", "Stock Number", vehicle.stock || null)}</div>
           <div className="border-b" style={{ borderColor: T.border }}>{infoCell("vin", "VIN", vehicle.vin || null, true)}</div>
           <div className="border-r" style={{ borderColor: T.border }}>{infoCell("date", "Date", today)}</div>
           {infoCell("price-msrp", priceLabel, baseDisplay ?? "See Dealer")}
         </section>
 
-        <section className="mt-2.5 grid grid-cols-[1in_1fr] items-center gap-3 rounded-[10px] border p-2.5" style={{ borderColor: accentBorder, background: accentSoft }}>
+        <section className="shrink-0 mt-2.5 grid grid-cols-[1in_1fr] items-center gap-3 rounded-[10px] border p-2.5" style={{ borderColor: accentBorder, background: accentSoft }}>
           <div className="rounded-[7px] bg-white p-1.5 border" style={{ borderColor: T.border }}>
             <QRCodeSVG value={safeUrl} size={84} bgColor="#ffffff" fgColor={T.navy} level="M" style={{ width: "100%", height: "auto" }} />
           </div>
@@ -188,30 +197,29 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </div>
         </section>
 
-        <section className="mt-2.5 rounded-[10px] border overflow-hidden" style={{ borderColor: "#BFE3CD" }}>
-          <SectionBar icon="protection-products" title="Installed Equipment" tag="Included" total={money(installedTotal)} bg={T.greenSoft} fg={T.green} />
-          {installed.length ? installed.map((l) => lineRow(l, "green")) : (
-            <div className="px-2.5 py-2 text-[7.6px] font-semibold" style={{ color: T.muted }}>No installed equipment configured.</div>
-          )}
-        </section>
+        {sections.hasInstalled && (
+          <section className={`shrink-0 ${density.sectionGap} rounded-[10px] border overflow-hidden`} style={{ borderColor: "#BFE3CD" }}>
+            <SectionBar icon="protection-products" title="Installed Equipment" tag="Included" total={money(installedTotal)} bg={T.greenSoft} fg={T.green} />
+            {installed.map((l) => lineRow(l, "green"))}
+          </section>
+        )}
 
-        <section className="mt-2.5 rounded-[10px] border overflow-hidden" style={{ borderColor: "#BBD8F5" }}>
-          <SectionBar icon="benefits" title="Included Benefits" bg={accentSoft} fg={accent} />
-          {benefits.length ? (
-            <div className="px-2.5 py-2 grid grid-cols-1 gap-[5px]">
-              {benefits.slice(0, 6).map((b) => (
-                <span key={b} className="inline-flex items-center gap-2 text-[8.6px] font-bold leading-tight" style={{ color: T.text }}>
-                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={11} color={accent} /> {b}
+        {sections.hasBenefits && (
+          <section className={`shrink-0 ${density.sectionGap} rounded-[10px] border overflow-hidden`} style={{ borderColor: "#BBD8F5" }}>
+            <SectionBar icon="benefits" title="Included Benefits" bg={accentSoft} fg={accent} />
+            <div className={`px-2.5 py-2 grid grid-cols-1 ${density.benefitGap}`}>
+              {benefits.map((b) => (
+                <span key={b} className="inline-flex items-start gap-2 text-[8.6px] font-bold leading-tight" style={{ color: T.text }}>
+                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={11} color={accent} />
+                  <span className="min-w-0">{b}</span>
                 </span>
               ))}
             </div>
-          ) : (
-            <div className="px-2.5 py-2 text-[7.6px] font-semibold" style={{ color: T.muted }}>No configured benefits.</div>
-          )}
-        </section>
+          </section>
+        )}
 
-        {upgrades.length > 0 && (
-          <section className="mt-2.5 rounded-[10px] border overflow-hidden" style={{ borderColor: "#DCCBF5" }}>
+        {sections.hasUpgrades && (
+          <section className={`shrink-0 ${density.sectionGap} rounded-[10px] border overflow-hidden`} style={{ borderColor: "#DCCBF5" }}>
             <SectionBar icon="remote-start" title="Available Upgrades" tag="Not Installed" total={money(upgradesTotal)} bg={T.purpleSoft} fg={T.purple} />
             {upgrades.map((l) => lineRow(l, "purple"))}
           </section>
@@ -221,16 +229,17 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
         {/* Value propositions — the dealership's own programs, merchandised.
             The claim and its disclosure travel together so the disclosure can
             never be dropped from a printed document. */}
-        {valueProps.length > 0 && (
-          <section className="mt-2.5 space-y-2">
+        {sections.hasValueProps && (
+          <section className={`${density.sectionGap} space-y-2 flex-1 min-h-0 flex flex-col justify-start`} data-overflow-risk={density.overflowRisk || undefined}>
             {valueProps.map((vp) => (
-              <div key={vp.id} className={`rounded-[10px] border-2 px-2.5 py-2 ${vp.displayStyle === "image" ? "block" : "flex items-center gap-2.5"}`} style={{ borderColor: T.navy }}>
+              <div key={vp.id} className={`rounded-[10px] border-2 px-2.5 py-2 min-h-0 ${vp.displayStyle === "image" ? "block" : "flex items-center gap-2.5"}`} style={{ borderColor: T.navy }}>
                 {vp.imageUrl && vp.displayStyle !== "banner" ? (
                   <img
                     src={vp.imageUrl}
                     alt=""
                     crossOrigin="anonymous"
-                    className={`w-auto shrink-0 object-contain ${VP_IMAGE_SIZE[vp.imageScale || "sm"]} ${vp.displayStyle === "image" ? "mx-auto max-w-full" : ""}`}
+                    style={{ maxHeight: valuePropImageCeiling(vp.imageScale, sections) }}
+                    className={`h-auto w-auto object-contain ${VP_IMAGE_WIDTH[vp.imageScale || "sm"]} ${vp.displayStyle === "image" ? "mx-auto max-w-full" : "shrink"}`}
                   />
                 ) : null}
                 {vp.displayStyle !== "image" && (
@@ -245,7 +254,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </section>
         )}
 
-        <section className="mt-2.5 grid grid-cols-[1fr_1.3fr] rounded-[10px] border-2 overflow-hidden" style={{ borderColor: T.navy }}>
+        <section className="shrink-0 mt-2.5 grid grid-cols-[1fr_1.3fr] rounded-[10px] border-2 overflow-hidden" style={{ borderColor: T.navy }}>
           <div className="px-2.5 py-2.5 border-r flex flex-col justify-center" style={{ borderColor: T.border }}>
             <div className="text-[7.4px] font-black uppercase tracking-[0.14em]" style={{ color: T.gold }}>Adjusted Total</div>
             <div className="mt-1 font-black leading-none tracking-tight" style={{ color: T.gold, fontSize: adjustedDisplay ? "24px" : "11px" }}>{adjustedDisplay ?? "See Dealer for Pricing"}</div>
@@ -279,7 +288,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
         )}
 
 
-        <section className="mt-auto grid grid-cols-4 pt-2.5 pb-1.5">
+        <section className={`shrink-0 mt-auto grid grid-cols-4 ${density.compact ? "pt-1.5 pb-1" : "pt-2.5 pb-1.5"}`}>
           {TRUST.map((t, i) => (
             <div key={t.t} className="flex flex-col items-center text-center gap-1 px-1.5" style={i > 0 ? { borderLeft: `1px solid ${T.border}` } : undefined}>
               <AutoLabelsAddendumIcon iconKey={t.icon} size={20} color={T.navy} />
@@ -289,7 +298,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           ))}
         </section>
 
-        <footer className="mt-2 flex items-center justify-between gap-2.5 rounded-[9px] px-3 py-2.5" style={{ background: T.navy }}>
+        <footer className={`shrink-0 ${density.compact ? "mt-1 py-1.5" : "mt-2 py-2.5"} flex items-center justify-between gap-2.5 rounded-[9px] px-3`} style={{ background: T.navy }}>
           <span className="flex items-center gap-1.5 min-w-0">
             <AutoLabelsAddendumIcon iconKey="autolabels-powered" size={15} variant="light" />
             <span className="min-w-0">

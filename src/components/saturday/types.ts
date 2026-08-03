@@ -123,6 +123,12 @@ export type SaturdaySticker = {
   dealer: SaturdayDealer;
   /** Dealer value propositions selected for this printed document. */
   valueProps?: SaturdayValueProp[];
+  /**
+   * How a benefit that also has promotional artwork is presented. Omitted
+   * means "list_and_image", which is what every existing tenant was already
+   * getting — the stored benefit is never deleted to resolve the overlap.
+   */
+  benefitDisplayMode?: "list_and_image" | "image_only" | "list_only";
   vehicle: SaturdayVehicle;
   specs: SaturdaySpec[];
   highlights: string[];

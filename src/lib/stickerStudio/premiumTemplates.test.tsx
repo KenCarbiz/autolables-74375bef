@@ -209,15 +209,24 @@ describe("addendum wordmark and value-prop sizing", () => {
     });
 
     it(`${id} scales the value-prop image independently of the text`, () => {
+      // The scale is now a max-height CEILING, not a fixed height. A fixed
+      // height meant the artwork claimed its inches before the equipment,
+      // benefit and upgrade rows were laid out, and whatever did not fit on
+      // the 11-inch sheet was cropped in silence.
       const small = renderAddendum(id, { ...DATA, valueProps: [{ ...logoVp, imageScale: "sm" }] });
       const xl = renderAddendum(id, { ...DATA, valueProps: [{ ...logoVp, imageScale: "xl" }] });
-      expect(small).toContain("h-[0.42in]");
-      expect(xl).toContain("h-[1.15in]");
+      expect(small).toMatch(/max-height:\s*0\.42in/);
+      expect(small).toContain("max-w-[1.1in]");
+      expect(xl).toContain("max-w-[2.9in]");
+      // Aspect ratio is preserved and the artwork is never stretched.
+      expect(xl).toContain("h-auto");
+      expect(xl).toContain("object-contain");
+      expect(xl).not.toMatch(/class="[^"]*h-\[1\.15in\]/);
       const xlWithText = renderAddendum(id, {
         ...DATA,
         valueProps: [{ ...logoVp, displayStyle: "image_text", imageScale: "xl" }],
       });
-      expect(xlWithText).toContain("h-[1.15in]");
+      expect(xlWithText).toContain("max-w-[2.9in]");
       expect(xlWithText).toContain("On qualifying vehicles");
     });
   }

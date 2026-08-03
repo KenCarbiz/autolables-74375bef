@@ -120,6 +120,35 @@ const ADDENDUM_DATA = {
   ],
 };
 
+// Content-fit validation cases. The addendum prints at a fixed 4.25 x 11
+// inches, so the only honest way to check that nothing is being cropped is to
+// render the combinations side by side and look at them.
+const BIG_IMAGE = {
+  id: "vp-lifetime",
+  headline: "Includes Lifetime Powertrain",
+  supportingLine: "Ask for details",
+  disclosure: "Lifetime powertrain coverage subject to program terms. See dealer.",
+  imageUrl: "/lifetime-powertrain.png",
+  displayStyle: "image_text" as const,
+  showAskForDetails: true,
+  imageScale: "xl" as const,
+};
+const BENEFITS = ["Lifetime Powertrain Warranty", "Complimentary State Inspections", "Loaner Vehicle Program"];
+const UPGRADES = [{ name: "ValueShield — Market Value Protection Program", price: "494" }];
+const INSTALLED = [
+  { name: "Ceramic Protection Package", price: "1495" },
+  { name: "Door Edge Guard & Handle Cup Protection Package", price: "500" },
+];
+
+const CASES: { id: string; label: string; data: Record<string, unknown> }[] = [
+  { id: "A", label: "A — big image + benefits + upgrades", data: { valueProps: [BIG_IMAGE], benefits: BENEFITS, upgrades: UPGRADES, installed: INSTALLED } },
+  { id: "B", label: "B — big image, NO benefits", data: { valueProps: [BIG_IMAGE], benefits: [], upgrades: UPGRADES, installed: INSTALLED } },
+  { id: "C", label: "C — big image, NO upgrades", data: { valueProps: [BIG_IMAGE], benefits: BENEFITS, upgrades: [], installed: INSTALLED } },
+  { id: "D", label: "D — big image, neither", data: { valueProps: [BIG_IMAGE], benefits: [], upgrades: [], installed: INSTALLED } },
+  { id: "E", label: "E — many benefits + many upgrades", data: { valueProps: [BIG_IMAGE], benefits: [...BENEFITS, "Free Car Washes for Life", "Roadside Assistance", "Priority Service Scheduling", "Annual Detail"], upgrades: [...UPGRADES, { name: "Tire & Wheel Protection", price: "1295" }, { name: "Key Replacement", price: "499" }], installed: INSTALLED } },
+  { id: "F", label: "F — no promotional image", data: { valueProps: [], benefits: BENEFITS, upgrades: UPGRADES, installed: INSTALLED } },
+];
+
 const Frame: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => (
   <div className="flex flex-col items-start gap-2">
     <div className="font-mono text-xs text-slate-600">{label}</div>
@@ -128,6 +157,24 @@ const Frame: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, ch
 );
 
 const DevSaturdayPreview = () => {
+  const fitCase = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("fit") : null;
+  if (fitCase) {
+    const shown = fitCase === "all" ? CASES : CASES.filter((c) => c.id === fitCase.toUpperCase());
+    return (
+      <div className="min-h-screen bg-slate-100 p-8">
+        <h1 className="text-2xl font-bold text-slate-900">Addendum content-fit cases</h1>
+        <div className="mt-6 flex flex-wrap items-start gap-8">
+          {shown.map((c) => (
+            <Frame key={c.id} label={c.label}>
+              <div data-fit-case={c.id}>
+                <SaturdayPremiumAddendum data={{ ...ADDENDUM_DATA, ...c.data } as typeof ADDENDUM_DATA} />
+              </div>
+            </Frame>
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-slate-100 p-8">
       <h1 className="text-2xl font-bold text-slate-900">Saturday Templates — Preview</h1>
