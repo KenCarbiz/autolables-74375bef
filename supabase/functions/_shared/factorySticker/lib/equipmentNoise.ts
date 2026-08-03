@@ -96,6 +96,52 @@ interface ConceptRule {
    * lets "Panoramic" upgrade the generic sunroof label without inventing it.
    */
   upgrade?: { match: RegExp; canonical: string; concept?: string };
+  /**
+   * The WEAKER claim this rule's match also catches.
+   *
+   * The rule's `match` deliberately casts wide so related rows land on one
+   * concept, but that meant a row saying only "Forward Collision Warning"
+   * printed as "Automatic Emergency Braking", and "Lane Departure Warning"
+   * printed as "Lane Keep Assist". A warning is evidence that the car warns.
+   * It is not evidence that the car brakes or steers, and a sticker is not the
+   * place to guess: the shopper reads it as a capability the vehicle has.
+   *
+   * A row matching `match` here supports only `canonical`, unless it ALSO
+   * matches `strongEvidence` (so "forward collision warning with automatic
+   * braking" still earns the strong label). `concept` keeps the weak and
+   * strong forms in separate buckets so they never collapse into each other.
+   */
+  weaker?: { match: RegExp; canonical: string; concept: string; strongEvidence?: RegExp };
+}
+
+/**
+ * Pick the strongest label a source row actually supports.
+ *
+ * Returns the weak form when the row only evidences the weak form, the
+ * declared upgrade when the row evidences it, otherwise the rule's own
+ * canonical. A source may map to an equal-or-weaker claim, never a stronger
+ * one.
+ */
+function evidenceLevel(rule: ConceptRule, name: string, alt = name): { bucket: string; concept: string; canonical: string } {
+  // Both spellings, because the feed uses both and the patterns are written
+  // for one or the other: "hands-?free" does not match "Hands Free", and
+  // "blind ?spot" does not match "Blind-Spot".
+  const hit = (re?: RegExp) => !!re && (re.test(name) || re.test(alt));
+  const w = rule.weaker;
+  if (w && hit(w.match) && !hit(w.strongEvidence)) {
+    // A weaker claim gets its OWN bucket: a warning row and a braking row are
+    // different facts, and sharing a bucket would let whichever arrived first
+    // name both.
+    return { bucket: w.concept, concept: w.concept, canonical: w.canonical };
+  }
+  const up = rule.upgrade;
+  if (up && hit(up.match)) {
+    // An upgrade keeps the rule's bucket. "Power Liftgate" and "Hands-Free
+    // Liftgate" are the same fitting described twice, so they must collapse to
+    // one row that takes the better label — splitting them printed both.
+    return { bucket: rule.concept, concept: up.concept ?? rule.concept, canonical: up.canonical };
+  }
+  return { bucket: rule.concept, concept: rule.concept, canonical: rule.canonical };
 }
 
 /**
@@ -159,6 +205,14 @@ const CONCEPT_RULES: ConceptRule[] = [
     canonical: "Automatic Emergency Braking",
     tier: 1,
     match: /\b(automatic braking|automatic emergency brak|brakes? at low speed|emergency brak|forward collision|pre-?collision|pedestrian (&|and)? ?cyclist|city brak)/i,
+    weaker: {
+      // Forward-collision WARNING does not prove the car brakes itself. The
+      // strong label is earned only when the row says so.
+      match: /\b(forward collision|pre-?collision)\b/i,
+      strongEvidence: /\bbrak/i,
+      canonical: "Forward Collision Warning",
+      concept: "fcw",
+    },
   },
   {
     concept: "sunroof",
@@ -193,6 +247,14 @@ const CONCEPT_RULES: ConceptRule[] = [
     canonical: "Lane Keep Assist",
     tier: 1,
     match: /\b(lane keep|lane-?keeping|lane departure|lane intervention|lanesense)\b/i,
+    weaker: {
+      // A departure WARNING is evidence the car warns. It is not evidence the
+      // car steers, and a shopper reads the printed label as a capability.
+      match: /\blane departure\b/i,
+      strongEvidence: /\b(keep|keeping|assist|intervention|steer|centering)/i,
+      canonical: "Lane Departure Warning",
+      concept: "ldw",
+    },
   },
   {
     concept: "lane_centering",
@@ -270,18 +332,41 @@ const CONCEPT_RULES: ConceptRule[] = [
     canonical: "Cruise Control",
     tier: 2,
     match: /\b(cruise controls?|speed limiter|steering wheel mounted cruise)\b/i,
+    weaker: {
+      // A limiter caps speed. It does not hold one.
+      match: /\bspeed limiter\b/i,
+      strongEvidence: /\bcruise\b/i,
+      canonical: "Speed Limiter",
+      concept: "speed_limiter",
+    },
   },
   {
     concept: "led_headlights",
     canonical: "LED Headlights",
     tier: 2,
-    match: /\b(led headlights?|led head ?lamps?|complex surface headlights?|headlights?-(low|high) beam)\b/i,
+    match: /\b(led headlights?|led head ?lamps?|complex surface headlights?|headlights?[- ](low|high) beam)\b/i,
+    weaker: {
+      // "Headlights-Low Beam" is a decoder field name. It records which beam,
+      // not what the bulb is made of.
+      match: /\bheadlights?[- ](low|high) beam\b/i,
+      strongEvidence: /\bled\b/i,
+      canonical: "Headlamps",
+      concept: "headlamps",
+    },
   },
   {
     concept: "auto_high_beam",
     canonical: "Automatic High Beams",
     tier: 3,
     match: /\b(auto high beams?|automatic high beams?|high beam assist|dusk sensor)\b/i,
+    weaker: {
+      // An ambient-light sensor switches the lamps on. It says nothing about
+      // dipping the high beams for oncoming traffic.
+      match: /\bdusk sensor\b/i,
+      strongEvidence: /\bhigh beam\b/i,
+      canonical: "Automatic Headlamp Control",
+      concept: "auto_headlamps",
+    },
   },
   {
     concept: "premium_audio",
@@ -300,6 +385,13 @@ const CONCEPT_RULES: ConceptRule[] = [
     canonical: "Power Retractable Running Boards",
     tier: 2,
     match: /\b(running boards?|assist steps?|illuminated steps?|side steps?)\b/i,
+    weaker: {
+      // A fixed step that lights up is not a step that deploys.
+      match: /\b(illuminated steps?|side steps?|assist steps?|running boards?)\b/i,
+      strongEvidence: /\b(power|retract|deploy|automatic)/i,
+      canonical: "Running Boards",
+      concept: "fixed_running_boards",
+    },
   },
   {
     concept: "anti_theft",
@@ -336,11 +428,12 @@ const CONCEPT_RULES: ConceptRule[] = [
     concept: "smartphone",
     canonical: "Smartphone Integration",
     tier: 2,
-    match: /\b(bluetooth connection|built-?in apps|carplay|android auto|smartphone)\b/i,
-    upgrade: {
-      match: /\b(carplay|android auto)\b/i,
-      canonical: "Apple CarPlay and Android Auto",
-    },
+    // CarPlay and Android Auto are deliberately NOT matched here. They used to
+    // fold into this concept and print "Apple CarPlay and Android Auto" from
+    // either one alone, asserting a platform the car may not support. A row
+    // naming a platform is already the exact printable name, so it passes
+    // through verbatim and says only what the source said.
+    match: /\b(bluetooth connection|built-?in apps|smartphone)\b/i,
   },
 ];
 
@@ -372,6 +465,12 @@ export interface CurateResult {
    * as though we had verified it.
    */
   foreign: Array<{ item: string; technology: string; owner: OemBrand }>;
+  /**
+   * Rows withheld from print because they name another manufacturer's system.
+   * Non-empty means the feed is crossed and the sticker needs review before
+   * anyone hands it to a customer.
+   */
+  quarantined: string[];
 }
 
 /**
@@ -393,6 +492,7 @@ export function curateEquipment(raw: string[], opts: CurateOptions = {}): Curate
   const duplicates: Array<{ item: string; keptIn: string }> = [];
   const collapsed: Record<string, string[]> = {};
   const foreign: Array<{ item: string; technology: string; owner: OemBrand }> = [];
+  const quarantined: string[] = [];
   const byConcept = new Map<string, CuratedItem>();
   const passthrough = new Map<string, CuratedItem>();
   const order: CuratedItem[] = [];
@@ -406,13 +506,19 @@ export function curateEquipment(raw: string[], opts: CurateOptions = {}): Curate
    * does not get to print "Mark Levinson" because a scraped description said
    * so. A row we do own prints in the manufacturer's own rendering.
    */
-  const resolve = (name: string): { label: string; branded: boolean; technology?: OemTechnology } => {
+  const resolve = (name: string): { label: string; branded: boolean; foreign?: boolean; technology?: OemTechnology } => {
     const tech = findTechnology(name, brand);
     if (tech) return { label: officialTechnologyName(name, brand) ?? name, branded: true, technology: tech };
     const alien = findForeignTechnology(name, brand);
     if (alien) {
       foreign.push({ item: name, technology: alien.technology.name, owner: alien.owner });
-      return { label: name, branded: false };
+      // No label. The old return handed the raw name back, which printed
+      // "AKG Studio Reference" on a GMC verbatim, and — worse — let the row
+      // fall into concept matching, where a Nissan "ProPILOT Assist" on a
+      // Lexus came out as that Lexus's own cruise-control term. Renaming a
+      // rival's system into our marque's vocabulary is not a smaller error
+      // than printing it; it is the same false claim, harder to spot.
+      return { label: "", branded: false, foreign: true };
     }
     // Not catalogued either way. The flat list still recognises names we have
     // not yet entered, so coverage gaps degrade to the old behaviour.
@@ -424,40 +530,49 @@ export function curateEquipment(raw: string[], opts: CurateOptions = {}): Curate
     if (!name) continue;
     if (isDecoderNoise(name)) { dropped.push(name); continue; }
 
-    const rule = CONCEPT_RULES.find((r) => r.match.test(name));
+    // Ownership first, always. Deciding this after concept matching is what
+    // allowed a foreign row to be translated instead of dropped.
+    const owned = resolve(name);
+    if (owned.foreign) { quarantined.push(name); continue; }
+
+    // The feed spells the same feature "Blind Spot", "Blind-Spot" and
+    // "BlindSpot", and only the first hit the rules — so the variants printed
+    // as separate rows. Try the hyphen-flattened copy TOO, never instead:
+    // patterns written as "hands-?free" stop matching once the hyphen is gone.
+    const matchable = name.replace(/[-\u2010-\u2015]/g, " ").replace(/\s+/g, " ");
+    const rule = CONCEPT_RULES.find((r) => r.match.test(name) || r.match.test(matchable));
     if (rule) {
-      (collapsed[rule.concept] ||= []).push(name);
-      const existing = byConcept.get(rule.concept);
+      // The bucket is the EVIDENCE level, not the rule. A warning row and a
+      // braking row are different claims and must not fold together, or the
+      // first one seen would decide the label for both.
+      const level = evidenceLevel(rule, name, matchable);
+      (collapsed[level.bucket] ||= []).push(name);
+      const existing = byConcept.get(level.bucket);
       if (existing) {
         existing.sources.push(name);
-        // A branded name always wins the label; otherwise an upgrade label
-        // applies only when a source row justifies it.
-        const r = resolve(name);
+        // A branded name the marque actually owns always wins the label.
+        const r = owned;
         if (r.branded) {
           existing.name = r.label;
           existing.branded = true;
           if (r.technology) existing.technology = r.technology;
-        } else if (rule.upgrade?.match.test(name) && !existing.branded) {
-          const upConcept = rule.upgrade.concept ?? rule.concept;
-          existing.name = labelFor(upConcept, rule.upgrade.canonical);
+        } else if (!existing.branded && level.canonical !== rule.canonical) {
+          // The upgrade label, earned by THIS row's evidence.
+          existing.name = labelFor(level.concept, level.canonical);
+          existing.concept = level.concept;
         }
         continue;
       }
-      const r = resolve(name);
-      const upgraded = rule.upgrade?.match.test(name) ? rule.upgrade : undefined;
+      const r = owned;
       const item: CuratedItem = {
-        name: r.branded
-          ? r.label
-          : upgraded
-            ? labelFor(upgraded.concept ?? rule.concept, upgraded.canonical)
-            : labelFor(rule.concept, rule.canonical),
+        name: r.branded ? r.label : labelFor(level.concept, level.canonical),
         tier: rule.tier,
-        concept: rule.concept,
+        concept: level.concept,
         sources: [name],
         ...(r.branded ? { branded: true } : {}),
         ...(r.technology ? { technology: r.technology } : {}),
       };
-      byConcept.set(rule.concept, item);
+      byConcept.set(level.bucket, item);
       order.push(item);
       continue;
     }
@@ -465,9 +580,9 @@ export function curateEquipment(raw: string[], opts: CurateOptions = {}): Curate
     const key = norm(name).replace(/[^a-z0-9]+/g, "");
     const seen = passthrough.get(key);
     if (seen) { seen.sources.push(name); duplicates.push({ item: name, keptIn: seen.name }); continue; }
-    const r = resolve(name);
+    const r = owned;
     const item: CuratedItem = {
-      name: r.label, tier: 2, concept: null, sources: [name],
+      name: r.label || name, tier: 2, concept: null, sources: [name],
       ...(r.technology ? { technology: r.technology } : {}),
     };
     passthrough.set(key, item);
@@ -480,7 +595,7 @@ export function curateEquipment(raw: string[], opts: CurateOptions = {}): Curate
     .sort((a, b) => a.item.tier - b.item.tier || a.i - b.i)
     .map(({ item }) => item);
 
-  return { items, dropped, duplicates, collapsed, foreign };
+  return { items, dropped, duplicates, collapsed, foreign, quarantined };
 }
 
 /** Rows that fit page 1, filling by priority tier. */

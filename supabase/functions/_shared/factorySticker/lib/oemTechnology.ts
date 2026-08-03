@@ -38,7 +38,7 @@
 //     signal that the feed is crossed.
 // ──────────────────────────────────────────────────────────────────────
 
-import { brandChain, type OemBrand } from "./oemTerminology.ts";
+import { brandChain, technologyOwners, type OemBrand } from "./oemTerminology.ts";
 
 export type TechCategory =
   | "adas_suite"
@@ -68,6 +68,18 @@ interface TechEntry {
   suite?: string;
   /** Extra source spellings beyond the name (abbreviations, legacy names). */
   aka?: string[];
+  /**
+   * Sibling marques that genuinely print this exact name on their own labels.
+   *
+   * Per-TECHNOLOGY, not per-brand, because the answer differs inside one
+   * corporate family: INFINITI really does sell and print "ProPILOT Assist",
+   * while "Nissan Safety Shield 360" never appears on an INFINITI label. A
+   * brand-level rule gets one of those two wrong whichever way it is set.
+   *
+   * Only add a marque here against a real label. Corporate ownership is not
+   * evidence.
+   */
+  sharedWith?: OemBrand[];
 }
 
 export interface OemTechnology extends TechEntry {
@@ -187,7 +199,7 @@ const CATALOG: Partial<Record<OemBrand, TechEntry[]>> = {
   // ── Nissan Motor ────────────────────────────────────────────────────
   nissan: [
     { name: "Nissan Safety Shield 360", category: "adas_suite", fitment: "lineup", aka: ["Safety Shield"] },
-    { name: "ProPILOT Assist", category: "driver_assist", fitment: "optional" },
+    { name: "ProPILOT Assist", category: "driver_assist", fitment: "optional", sharedWith: ["infiniti"] },
     { name: "Intelligent Emergency Braking", category: "driver_assist", concept: "aeb", fitment: "lineup", suite: "Nissan Safety Shield 360" },
     { name: "Intelligent Cruise Control", category: "driver_assist", concept: "adaptive_cruise", fitment: "optional" },
     { name: "Intelligent Around View Monitor", category: "driver_assist", concept: "surround_view", fitment: "optional", aka: ["Around View Monitor"] },
@@ -599,10 +611,17 @@ export function technologiesFor(brand: OemBrand): OemTechnology[] {
 
 const matches = (tech: CompiledTechnology, row: string) => tech.patterns.some((p) => p.test(row));
 
-/** The technology this row names, if the make actually sells it. */
+/**
+ * The technology this row names, if the MARQUE actually sells it under that
+ * name.
+ *
+ * Deliberately not the corporate chain. Lexus rolling up to Toyota is a fact
+ * about ownership of the company, not permission to print "Toyota Safety
+ * Sense" on a Lexus label — Lexus does not use that name.
+ */
 export function findTechnology(row: string, brand: OemBrand): OemTechnology | undefined {
-  const owners = new Set<OemBrand>([...brandChain(brand), "generic"]);
-  return COMPILED.find((t) => owners.has(t.brand) && matches(t, row));
+  const owners = new Set<OemBrand>(technologyOwners(brand));
+  return COMPILED.find((t) => (owners.has(t.brand) || t.sharedWith?.includes(brand)) && matches(t, row));
 }
 
 /**
@@ -613,6 +632,49 @@ export function findTechnology(row: string, brand: OemBrand): OemTechnology | un
  * almost always a crossed VIN or a scraped description from another vehicle.
  * We surface it; we never silently print it as though it were true.
  */
+/**
+ * Plain automotive vocabulary. A catalog name built ONLY from these words is a
+ * description every maker uses, not a coined brand.
+ *
+ * This distinction is load-bearing. Several makers file the generic phrase in
+ * their own catalog — "Blind Spot Monitor" sits under Toyota, "Blind Spot
+ * Monitoring" under Stellantis — so treating any non-owned catalog hit as
+ * foreign quarantined a GMC's perfectly real blind-spot monitor. Withholding
+ * genuine equipment is its own kind of wrong sticker.
+ *
+ * "ProPILOT", "IntelliBeam", "AKG", "Mark Levinson", "Safety Sense" survive
+ * this filter because they carry a coined token no one else prints.
+ */
+const COMMON_EQUIPMENT_WORDS = new Set([
+  "a", "and", "with", "the", "of", "for", "system", "systems", "package",
+  "front", "rear", "side", "left", "right", "outboard", "inboard", "all",
+  "blind", "spot", "zone", "monitor", "monitoring", "detection", "alert",
+  "warning", "assist", "assistance", "control", "controls", "sensor", "sensors",
+  "camera", "cameras", "view", "vision", "mirror", "mirrors",
+  "lane", "departure", "keeping", "keep", "centering", "change",
+  "cruise", "adaptive", "intelligent", "automatic", "automated", "auto",
+  "emergency", "braking", "brake", "brakes", "collision", "forward", "pre",
+  "parking", "park", "distance", "cross", "traffic", "sign", "recognition",
+  "driver", "attention", "drowsiness", "surround", "panoramic", "high", "low",
+  "beam", "beams", "headlight", "headlights", "headlamp", "headlamps",
+  "light", "lights", "lighting", "led",
+  "heated", "cooled", "ventilated", "seat", "seats", "steering", "wheel",
+  "power", "manual", "remote", "engine", "start", "keyless", "entry", "access",
+  "liftgate", "tailgate", "hands", "free", "sunroof", "moonroof", "roof",
+  "audio", "premium", "speaker", "speakers", "sound", "navigation", "display",
+  "touchscreen", "screen", "bluetooth", "wireless", "charging", "usb",
+  "climate", "zone", "air", "conditioning", "cargo", "tow", "towing", "trailer",
+  "hitch", "running", "boards", "board", "step", "steps", "illuminated",
+  "alloy", "wheels", "tire", "tires", "pressure", "spare",
+  "safety", "security", "theft", "anti", "airbag", "airbags", "backup",
+  "speed", "limiter", "limit", "reminder", "exit", "occupant",
+]);
+
+const isGenericDescription = (name: string): boolean => {
+  const tokens = name.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t && !/^\d+$/.test(t));
+  return tokens.length > 0 && tokens.every((t) => COMMON_EQUIPMENT_WORDS.has(t));
+};
+
 export function findForeignTechnology(
   row: string,
   brand: OemBrand,
@@ -622,8 +684,11 @@ export function findForeignTechnology(
   // this guard every legitimate Bose row on a Chevrolet would be called
   // foreign. Only a row we can find NO home for is a crossed feed.
   if (findTechnology(row, brand)) return undefined;
-  const owners = new Set<OemBrand>([...brandChain(brand), "generic"]);
-  const hit = COMPILED.find((t) => !owners.has(t.brand) && matches(t, row));
+  const owners = new Set<OemBrand>(technologyOwners(brand));
+  const hit = COMPILED.find((t) => !owners.has(t.brand) && !t.sharedWith?.includes(brand) && matches(t, row));
+  // A generic descriptor filed in someone else's catalog is not a crossed
+  // feed; it is the industry's shared vocabulary.
+  if (hit && isGenericDescription(hit.name)) return undefined;
   return hit ? { technology: hit, owner: hit.brand } : undefined;
 }
 

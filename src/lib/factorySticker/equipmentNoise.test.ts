@@ -296,8 +296,11 @@ describe("OEM terminology", () => {
 
   it("does not turn Bluetooth into CarPlay", () => {
     expect(curateEquipment(["Bluetooth Connection"]).items[0].name).toBe("Smartphone Integration");
-    expect(curateEquipment(["Bluetooth Connection", "Apple CarPlay"]).items[0].name)
-      .toBe("Apple CarPlay and Android Auto");
+    // Naming one platform is not evidence of the other: this used to print
+    // "Apple CarPlay and Android Auto" from a CarPlay-only row.
+    const both = curateEquipment(["Bluetooth Connection", "Apple CarPlay"]).items.map((i) => i.name);
+    expect(both).toContain("Apple CarPlay");
+    expect(both.join(" | ")).not.toMatch(/android/i);
   });
 
   it("does not turn digital radio into a satellite subscription", () => {

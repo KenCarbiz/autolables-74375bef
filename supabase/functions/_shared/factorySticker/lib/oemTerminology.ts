@@ -143,6 +143,54 @@ export function brandChain(brand: OemBrand): OemBrand[] {
   return chain;
 }
 
+/**
+ * Who may PRINT a technology name, which is not the same question as who owns
+ * the company.
+ *
+ * brandChain answers corporate structure: Lexus rolls up to Toyota, Infiniti to
+ * Nissan. Using it to decide equipment ownership let a Lexus print "Toyota
+ * Safety Sense" and an Infiniti print "Nissan Safety Shield 360" — names those
+ * marques do not use on their own labels. A shopper reading a Lexus sticker
+ * that says Toyota has been told something false about the car.
+ *
+ * Ownership is therefore per-MARQUE. `generic` covers genuinely unbranded
+ * concepts. Anything a sibling marque owns is foreign until an explicit
+ * sharedWith entry says the two really do share a public name.
+ */
+const SHARED_CATALOG_PARENTS = new Set<OemBrand>([
+  // Pure corporate umbrellas: they sell nothing under their own name, and the
+  // technologies filed under them genuinely carry the SAME public name on
+  // every marque beneath. A GMC really does print OnStar and IntelliBeam.
+  "gm",
+  "stellantis",
+  "jlr",
+]);
+
+/**
+ * Marques permitted to print a technology filed under `brand`.
+ *
+ * The walk stops at the first parent that is itself a selling marque. Toyota,
+ * Nissan, Honda, Hyundai, Ford, VW, BMW, Volvo and Mercedes all sell cars, and
+ * the entries filed under them are THEIR branded names — Lexus does not print
+ * "Toyota Safety Sense", Infiniti does not print "Nissan Safety Shield 360",
+ * Acura does not print "Honda Sensing". Inheriting those was how a sibling's
+ * marketing name reached the wrong label.
+ *
+ * A marque that consequently loses coverage degrades to "not catalogued",
+ * which is a softer failure than asserting the wrong brand: the row falls back
+ * to the flat branded-source test instead of being renamed.
+ */
+export function technologyOwners(brand: OemBrand): OemBrand[] {
+  const owners: OemBrand[] = [brand];
+  let cursor = BRAND_PARENT[brand];
+  while (cursor && SHARED_CATALOG_PARENTS.has(cursor) && !owners.includes(cursor)) {
+    owners.push(cursor);
+    cursor = BRAND_PARENT[cursor];
+  }
+  owners.push("generic");
+  return owners;
+}
+
 export function brandForMake(make?: string | null): OemBrand {
   const m = String(make ?? "").trim();
   if (!m) return "generic";
