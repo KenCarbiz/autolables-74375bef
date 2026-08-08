@@ -310,9 +310,14 @@ export default function MarketcheckDataHealthCard() {
           {stats.archivedNew > 0 && (
             <> <span className="font-semibold">{stats.archivedNew} of them are new cars.</span> A whole new-car segment
             going archived usually means the provider dropped that segment from the owned feed rather than the cars
-            being sold. Check the last run&rsquo;s <code className="font-mono text-[12px]">new_units</code> and{" "}
-            <code className="font-mono text-[12px]">supplemental_new</code> before re-pulling.</>
+            being sold.</>
           )}
+          <span className="mt-2 block">
+            These are rows already in your database, not cars the last sync found — the feed is still returning{" "}
+            {stats.total}. The buttons above only re-run enrichment on active inventory and cannot bring a retired car
+            back. Only <span className="font-semibold">Sync now</span> can, and only once the feed returns that VIN
+            again.
+          </span>
         </div>
       )}
 
