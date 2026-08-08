@@ -29,6 +29,7 @@ interface Row {
   enriched_at: string | null;
   source_url: string | null;
   mc_attributes: { msrp?: number | null } | null;
+  status: string | null;
 }
 
 type PriceFlag = "ok" | "missing" | "nonpositive" | "equals_msrp";
@@ -75,7 +76,7 @@ const needsEnrich = (r: Row, sources: Sources): boolean => {
 };
 
 const SELECT =
-  "vin, ymm, condition, price, market_value, market_meta, comparables, history_payload, recall_status, open_recall_count, blackbook, enriched_at, source_url, mc_attributes";
+  "vin, ymm, condition, price, market_value, market_meta, comparables, history_payload, recall_status, open_recall_count, blackbook, enriched_at, source_url, mc_attributes, status";
 
 interface SyncState {
   last_run_at: string | null;
@@ -120,7 +121,10 @@ export default function MarketcheckDataHealthCard() {
   const enrichLoop = useCallback(async (sources: Sources, scope: "all" | "incomplete"): Promise<number> => {
     if (!tenantId) return 0;
     const fetchRows = async (): Promise<Row[]> => {
-      const { data } = await (supabase as any).from("vehicle_listings").select(SELECT).eq("tenant_id", tenantId).limit(2000);
+      // Retired cars are excluded: a full pull that enriches archived rows
+      // spends metered provider calls on inventory the dealer no longer has.
+      const { data } = await (supabase as any).from("vehicle_listings").select(SELECT)
+        .eq("tenant_id", tenantId).neq("status", "archived").limit(2000);
       return (data as Row[]) || [];
     };
     const runBatch = async (list: Row[]) => {
@@ -213,14 +217,23 @@ export default function MarketcheckDataHealthCard() {
     load();
   };
 
+  // A car the prune retired is not inventory. Counting archived rows here is
+  // what made this card claim 174 vehicles while the inventory page showed 55 —
+  // the same disagreement that hid an entire new-car segment being archived
+  // when MarketCheck dropped it from the owned feed. Retired cars get their own
+  // number instead, because that number IS the alarm.
+  const active = useMemo(() => (rows || []).filter((r) => r.status !== "archived"), [rows]);
+
   const stats = useMemo(() => {
     if (!rows) return null;
-    const total = rows.length;
-    const fully = rows.filter((r) => CORE.every((s) => s.has(r))).length;
-    const never = rows.filter((r) => !r.enriched_at).length;
-    const priceProblems = rows.filter((r) => priceFlag(r) !== "ok").length;
-    return { total, fully, never, priceProblems };
-  }, [rows]);
+    const total = active.length;
+    const fully = active.filter((r) => CORE.every((s) => s.has(r))).length;
+    const never = active.filter((r) => !r.enriched_at).length;
+    const priceProblems = active.filter((r) => priceFlag(r) !== "ok").length;
+    const archived = rows.length - active.length;
+    const archivedNew = rows.filter((r) => r.status === "archived" && r.condition === "new").length;
+    return { total, fully, never, priceProblems, archived, archivedNew };
+  }, [rows, active]);
 
   if (!tenantId) return null;
 
@@ -290,6 +303,19 @@ export default function MarketcheckDataHealthCard() {
         </div>
       )}
 
+      {stats && stats.archived > 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-200">
+          <span className="font-semibold">{stats.archived} retired</span> {stats.archived === 1 ? "vehicle is" : "vehicles are"} held out of
+          active inventory — they left the feed and were archived, so they do not appear on the Inventory page.
+          {stats.archivedNew > 0 && (
+            <> <span className="font-semibold">{stats.archivedNew} of them are new cars.</span> A whole new-car segment
+            going archived usually means the provider dropped that segment from the owned feed rather than the cars
+            being sold. Check the last run&rsquo;s <code className="font-mono text-[12px]">new_units</code> and{" "}
+            <code className="font-mono text-[12px]">supplemental_new</code> before re-pulling.</>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="text-sm text-muted-foreground py-6 text-center">Loading inventory…</div>
       ) : !rows?.length ? (
@@ -306,7 +332,7 @@ export default function MarketcheckDataHealthCard() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {active.map((r) => {
                 const pf = priceFlag(r);
                 return (
                   <tr key={r.vin} className="border-b border-border/60 hover:bg-muted/30">
