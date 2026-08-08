@@ -148,15 +148,36 @@ describe("Market verdict basis governance", () => {
     expect(d.belowMarket).toBe(4000);
   });
 
-  it("model-wide stats never punish a price above the blended median without a like-for-like basis", () => {
-    // 12k-mile top trim at 75k vs a 58k median built from 60k-mile base cars:
-    // no like subset -> no price score at all, never a low one.
+  it("model-wide stats never punish when the comp blend's mileage is far from ours", () => {
+    // 12k-mile car at 75k vs a 58k median built from ~55k-mile cars: the
+    // blend demonstrably misrepresents this car -> no price score at all,
+    // never a low one.
     const l = listing({
       price: 75000, mileage: 12000,
-      market_meta: { price_stats: { median: 58000 } },
+      market_meta: { price_stats: { median: 58000 }, miles_mean: 55000 },
     });
     const price = deriveRating(l, derivePassport(l)).factors.find((f) => f.key === "price");
     expect(price?.score ?? null).toBeNull();
+  });
+
+  it("model-wide stats never punish a known trim the comp search could not match", () => {
+    const l = listing({
+      price: 75000, mileage: 12000, trim: "Autograph",
+      market_meta: { price_stats: { median: 58000 }, trim_matched: false },
+    });
+    const price = deriveRating(l, derivePassport(l)).factors.find((f) => f.key === "price");
+    expect(price?.score ?? null).toBeNull();
+  });
+
+  it("model-wide stats still anchor when nothing distinguishes the car from the blend", () => {
+    // No trim, no odometer mismatch evidence: the blended median is the best
+    // available comparison and keeps the monotone score contract.
+    const l = listing({
+      price: 46000,
+      market_meta: { price_stats: { median: 40000 }, similar_count: 30 },
+    });
+    const price = deriveRating(l, derivePassport(l)).factors.find((f) => f.key === "price");
+    expect(price?.score ?? null).not.toBeNull();
   });
 
   it("a like-for-like median outranks the model-wide median as the price anchor", () => {

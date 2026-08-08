@@ -893,11 +893,20 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
     && m.soldScope === "model_year_state" && m.soldPriceMedian != null && soldMilesOk ? m.soldPriceMedian : null;
   const likeAnchor = m.likeCount != null && m.likeCount >= 3 ? m.likeMedian : null;
   const statsRaw = m.priceMedian ?? m.priceMean;
-  // Model-wide stats may support a favorable score but never punish: with no
-  // like-for-like basis, a price above the blended median is what a
-  // low-mileage or top-trim car is SUPPOSED to look like, not evidence of
-  // over-pricing.
-  const statsAnchor = statsRaw != null && d.price != null && d.price > statsRaw && likeAnchor == null ? null : statsRaw;
+  // Model-wide stats may punish a price above the blended median only when
+  // nothing shows the blend misrepresents this car. A known trim the comp
+  // search could not match, or a blended mileage far from this car's
+  // odometer, is such a mismatch — a 12k-mile top trim priced above a
+  // median built from 60k-mile base cars is what correct pricing LOOKS
+  // like. Distinguished cars fall through to the like/predict anchors or
+  // stay unmeasured, never scored low against cars they don't compete with.
+  const subjTrim = String((listing as { trim?: string | null }).trim || "").trim();
+  const trimRepresentative = !subjTrim || m.trimMatched !== false;
+  const milesRepresentative = subjMileage == null || m.milesMean == null || m.milesMean <= 0
+    || Math.abs(subjMileage - m.milesMean) <= m.milesMean * 0.25;
+  const statsMayPunish = trimRepresentative && milesRepresentative;
+  const statsAnchor = statsRaw != null && d.price != null && d.price > statsRaw
+    && likeAnchor == null && !statsMayPunish ? null : statsRaw;
   const anchor = soldAnchor ?? likeAnchor ?? statsAnchor ?? (d.marketBasisWeak ? null : d.marketAvg) ?? (isNew ? d.msrp : null);
   const priceEvidence: string[] = [];
   let priceScore: number | null = null;
