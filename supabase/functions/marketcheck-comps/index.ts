@@ -123,6 +123,10 @@ Deno.serve(async (req) => {
         if (Number(l.dist) === 0) return false;
         // A branded/dirty-title car is never a fair comp for a retail car.
         if (l.carfax_clean_title === false) return false;
+        // Private-party/auction rows are not retail comps (no recon, no
+        // warranty, no compliance overhead).
+        const st = String(l.seller_type || "").toLowerCase();
+        if (st && st !== "dealer") return false;
         return true;
       });
 

@@ -225,7 +225,7 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     const medDom = domVals.length ? domVals[Math.floor(domVals.length / 2)] : null;
     const staleCutoff = Math.max(90, medDom != null ? Math.round(medDom * 2) : 180);
     const nowSec = Date.now() / 1000;
-    let staleExcluded = 0, phantomExcluded = 0, titleExcluded = 0;
+    let staleExcluded = 0, phantomExcluded = 0, titleExcluded = 0, sellerExcluded = 0;
     // deno-lint-ignore no-explicit-any
     r.rows = deduped.filter((l: any) => {
       // A listing not crawled in 2+ weeks is likely already sold or
@@ -236,6 +236,11 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       if (d != null && d > staleCutoff) { staleExcluded++; return false; }
       // A branded/dirty-title car is never fair evidence against a retail car.
       if (l.carfax_clean_title === false) { titleExcluded++; return false; }
+      // Private-party and auction rows are not retail evidence: no recon, no
+      // warranty obligation, no compliance overhead — structurally cheaper
+      // than any dealer's retail price. Only dealer listings compare.
+      const st = String(l.seller_type || "").toLowerCase();
+      if (st && st !== "dealer") { sellerExcluded++; return false; }
       return true;
     });
 
@@ -481,7 +486,7 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       like_median: likeMedian,
       miles_band_percent: likeRules.bandPercent,
       stale_dom_cutoff: staleCutoff,
-      evidence_excluded: { duplicates: dupExcluded, phantom: phantomExcluded, stale: staleExcluded, dirty_title: titleExcluded },
+      evidence_excluded: { duplicates: dupExcluded, phantom: phantomExcluded, stale: staleExcluded, dirty_title: titleExcluded, non_dealer: sellerExcluded },
       avg_dom: avgDom,
       market_days_supply: null as number | null,  // filled by fetchMds when the plan supports it
       inventory_count: count,
