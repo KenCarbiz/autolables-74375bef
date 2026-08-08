@@ -62,3 +62,35 @@ describe("helpers", () => {
     expect(isWithinMileageBand(null, 36000, 25)).toBe(true);
   });
 });
+
+describe("stale comp exclusion", () => {
+  it("drops a comp far beyond the set's own market pace, regardless of price side", () => {
+    const set = [
+      comp({ daysOnMarket: 30 }), comp({ daysOnMarket: 35 }), comp({ daysOnMarket: 41 }),
+      comp({ daysOnMarket: 45 }), comp({ daysOnMarket: 50 }),
+      comp({ daysOnMarket: 150, price: 26500 }),          // stale, above our price
+      comp({ daysOnMarket: 155, price: 25100 }),          // stale, near our price
+    ];
+    const out = filterCompsForValueStory(set, vehicle, DEFAULT_COMP_SETTINGS);
+    // median DOM ~45 -> cutoff max(90, 90) = 90; both 150+ day comps are out.
+    expect(out).toHaveLength(5);
+    expect(out.every((c) => (c.daysOnMarket ?? 0) <= 90)).toBe(true);
+  });
+
+  it("adapts the cutoff to a genuinely slow market instead of gutting it", () => {
+    const slow = [80, 85, 90, 95, 100, 120, 150].map((d) => comp({ daysOnMarket: d }));
+    // median 95 -> cutoff 190: nothing here is stale.
+    expect(filterCompsForValueStory(slow, vehicle, DEFAULT_COMP_SETTINGS)).toHaveLength(7);
+  });
+
+  it("keeps comps with unknown DOM", () => {
+    expect(filterCompsForValueStory([comp({ daysOnMarket: null })], vehicle, DEFAULT_COMP_SETTINGS)).toHaveLength(1);
+  });
+
+  it("penalizes very stale comps in the value ranking", () => {
+    const fresh = comp({ daysOnMarket: 20 });
+    const stale = comp({ daysOnMarket: 200 });
+    const ranked = rankCompsForValueStory([stale, fresh], vehicle);
+    expect(ranked[0]).toBe(fresh);
+  });
+});

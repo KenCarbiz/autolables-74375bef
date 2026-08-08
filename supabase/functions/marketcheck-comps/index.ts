@@ -121,6 +121,8 @@ Deno.serve(async (req) => {
         const cn = normDealer((l.dealer as Record<string, unknown>)?.name ?? l.seller_name);
         if (ownName && cn && (cn.includes(ownName) || ownName.includes(cn))) return false;
         if (Number(l.dist) === 0) return false;
+        // A branded/dirty-title car is never a fair comp for a retail car.
+        if (l.carfax_clean_title === false) return false;
         return true;
       });
 
@@ -175,7 +177,14 @@ Deno.serve(async (req) => {
       return v;
     };
     const inBand = (m: number | null) => m == null || ourMiles == null || Math.abs(m - ourMiles) <= ourMiles * (cs.mileageBandPercent / 100);
+    // Stale comps (distress-priced / auction-bound / phantom) are excluded in
+    // BOTH directions — mirrors compStrategy.staleCompCutoff: twice the set's
+    // median DOM, 90-day floor.
+    const domsSorted = mapped.map((c) => c.dom).filter((n): n is number => n != null && n > 0).sort((a, z) => a - z);
+    const medDom = domsSorted.length ? domsSorted[Math.floor(domsSorted.length / 2)] : null;
+    const staleCutoff = Math.max(90, medDom != null ? Math.round(medDom * 2) : 180);
     const valueFiltered = cs.compStrategy === "all_comps" ? mapped : mapped.filter((c) => {
+      if (c.dom != null && c.dom > staleCutoff) return false;
       let priceOk = true;
       if (ourPrice != null && c.price != null) {
         if (cs.compStrategy === "value_building") {

@@ -377,18 +377,18 @@ export const computePriceHistory = (listing: VehicleListing): { valueHistory: Pr
     position: (h.position as string) ?? null,
   })).filter((h) => h.captured_at);
 
-  // Data-integrity guard: drop transient single-capture UP-spikes in the
-  // dealer-price series. A dealer's price steps down or holds — it does not
-  // blip up for one capture and immediately fall back. Such a point (strictly
-  // above BOTH neighbors by a meaningful amount) is a scrape artifact
-  // (MSRP/market-value contaminating listing_price) that otherwise inflates the
-  // chart, the "highest price", and manufactures a phantom reduction event.
+  // Data-integrity guard: drop transient single-capture spikes in the
+  // dealer-price series, in BOTH directions. A dealer's price steps down or
+  // holds — it does not blip for one capture and immediately revert. An
+  // up-spike (MSRP/market-value contaminating listing_price) inflates the
+  // chart and manufactures a phantom reduction; a down-spike (fee-stripped
+  // scrape) fabricates a "just reduced" event and a false price floor.
   const SPIKE = 250;
   const rawPriced = rawHistory.filter((h) => h.listing_price != null);
   const spikeAts = new Set<string>();
   for (let i = 1; i < rawPriced.length - 1; i++) {
     const p = rawPriced[i].listing_price!, prev = rawPriced[i - 1].listing_price!, next = rawPriced[i + 1].listing_price!;
-    if (p - prev > SPIKE && p - next > SPIKE) spikeAts.add(rawPriced[i].captured_at);
+    if ((p - prev > SPIKE && p - next > SPIKE) || (prev - p > SPIKE && next - p > SPIKE)) spikeAts.add(rawPriced[i].captured_at);
   }
   const valueHistory = rawHistory.filter((h) => !spikeAts.has(h.captured_at));
 
@@ -907,7 +907,14 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
   const statsMayPunish = trimRepresentative && milesRepresentative;
   const statsAnchor = statsRaw != null && d.price != null && d.price > statsRaw
     && likeAnchor == null && !statsMayPunish ? null : statsRaw;
-  const anchor = soldAnchor ?? likeAnchor ?? statsAnchor ?? (d.marketBasisWeak ? null : d.marketAvg) ?? (isNew ? d.msrp : null);
+  // A well-fed like-for-like median (5+ true peers) outranks the sold median:
+  // sold data is real transactions but model-wide — trim- and condition-blind
+  // — while the like set matches this car's actual configuration. A thin like
+  // set (3-4) still anchors when nothing stronger exists, capped below.
+  const likeWellFed = likeAnchor != null && m.likeCount != null && m.likeCount >= 5;
+  const anchor = (likeWellFed ? likeAnchor : null) ?? soldAnchor ?? likeAnchor ?? statsAnchor ?? (d.marketBasisWeak ? null : d.marketAvg) ?? (isNew ? d.msrp : null);
+  const anchorIsSold = anchor != null && soldAnchor != null && !likeWellFed && anchor === soldAnchor;
+  const anchorIsThinLike = anchor != null && likeAnchor != null && !likeWellFed && !anchorIsSold && anchor === likeAnchor;
   const priceEvidence: string[] = [];
   let priceScore: number | null = null;
   if (anchor != null && anchor > 0 && d.price != null) {
@@ -915,7 +922,7 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
     // 80 at the anchor, +2 per percent below (cap 98), -2 per percent above
     // (floor 55) — continuous, so a $200 move can never flip a whole band.
     priceScore = clampScore(55, 98, 80 - pct * 2);
-    if (soldAnchor != null) {
+    if (anchorIsSold) {
       priceEvidence.push(`Median of ${m.soldCount!.toLocaleString()} recently sold in ${m.soldState ?? "your state"}, 90 days`);
     } else if (likeAnchor != null || statsAnchor != null || (!d.marketBasisWeak && d.marketAvg != null)) {
       priceEvidence.push(likeAnchor != null && m.likeCount != null
@@ -938,6 +945,12 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
       priceEvidence.push(pct < 3
         ? `Within ${Math.max(1, Math.round(pct))}% of the market benchmark`
         : "Priced above the market benchmark for the model line");
+    }
+    // 3-4 true peers is enough to be directional, not enough for a confident
+    // top score or an authoritative-sounding claim.
+    if (anchorIsThinLike && priceScore != null) {
+      priceScore = Math.min(priceScore, 88);
+      priceEvidence.push("Small comparable sample — directional");
     }
   }
 

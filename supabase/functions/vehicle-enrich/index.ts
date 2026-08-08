@@ -118,8 +118,8 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     // large local market (e.g. an INFINITI dealer's own QX60/QX80, 140+ in 100mi)
     // returns the count but ZERO listing records when stats are requested. We
     // compute the price/DOM stats ourselves from the returned listings instead.
-    const run = async (opts: { useYear: boolean; band: boolean; useTrim: boolean }) => {
-      const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "50", sort_by: "price", sort_order: "asc", start: "0" });
+    const run = async (opts: { useYear: boolean; band: boolean; useTrim: boolean; desc?: boolean }) => {
+      const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "50", sort_by: "price", sort_order: opts.desc ? "desc" : "asc", start: "0" });
       if (opts.useYear && year) p.set("year", year);
       if (make) p.set("make", make);
       if (model) p.set("model", model);
@@ -174,13 +174,70 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     // tighter pass yields no usable comps. The winning tier is persisted so the
     // client can caveat a trim-blind comp set instead of presenting it as exact.
     let tier = trim ? "trim_year_band" : "year_band";
-    let r = await run({ useYear: true, band: true, useTrim: true });
-    if (r && r.rows.length === 0) { r = (await run({ useYear: true, band: true, useTrim: false })) ?? r; tier = "year_band"; }
-    if (r && r.rows.length === 0) { r = (await run({ useYear: true, band: false, useTrim: false })) ?? r; tier = "year"; }
-    if (r && r.rows.length === 0) { r = (await run({ useYear: false, band: true, useTrim: false })) ?? r; tier = "band"; }
-    if (r && r.rows.length === 0) { r = (await run({ useYear: false, band: false, useTrim: false })) ?? r; tier = "model"; }
+    let winOpts = { useYear: true, band: true, useTrim: true };
+    let r = await run(winOpts);
+    const relax = async (opts: { useYear: boolean; band: boolean; useTrim: boolean }, t: string) => {
+      if (r && r.rows.length === 0) { r = (await run(opts)) ?? r; tier = t; winOpts = opts; }
+    };
+    await relax({ useYear: true, band: true, useTrim: false }, "year_band");
+    await relax({ useYear: true, band: false, useTrim: false }, "year");
+    await relax({ useYear: false, band: true, useTrim: false }, "band");
+    await relax({ useYear: false, band: false, useTrim: false }, "model");
     if (!r) return null;
     const debug = { num_found: r.numFound, listings_returned: r.rawCount, http: r.http, radius: zip ? 100 : null };
+
+    // ── Evidence hygiene ─────────────────────────────────────────────
+    // Everything below (stats, like set, rank samples, stored comparables)
+    // reads r.rows, so the row set is cleaned ONCE, before any price split —
+    // the same hand removes a suspect cheap row and a suspect expensive one.
+
+    // The search returns the CHEAPEST page first. On a market bigger than one
+    // page, every "market median" would be the median of the cheapest 50 —
+    // exactly where bait lowballs and distress prices live. Merge the top of
+    // the price range so the sample covers both tails instead of one.
+    if ((r.numFound ?? 0) > r.rawCount && r.rawCount > 0) {
+      const top = await run({ ...winOpts, desc: true });
+      if (top && top.rows.length > 0) r.rows = [...r.rows, ...top.rows];
+    }
+
+    // deno-lint-ignore no-explicit-any
+    const seenAt = (l: any): number => { const v = Number(l.last_seen_at); return Number.isFinite(v) && v > 0 ? v : 0; };
+    // One car, one vote: a VIN syndicated on several sites returns one row per
+    // source; keep the freshest copy so a single car cannot be counted twice.
+    // deno-lint-ignore no-explicit-any
+    const byVin = new Map<string, any>();
+    for (const l of r.rows) {
+      const v = String(l.vin || "").toUpperCase();
+      if (!v) continue;
+      const prev = byVin.get(v);
+      if (!prev || seenAt(l) > seenAt(prev)) byVin.set(v, l);
+    }
+    const deduped = Array.from(byVin.values());
+    const dupExcluded = r.rows.length - deduped.length;
+
+    // Stale-comp cutoff — symmetric and velocity-relative. Dealers work a
+    // 60/90-day turn: a comp far beyond the market's own pace is distress
+    // priced, auction bound, or a phantom, and its price is not one a real
+    // buyer of a healthy car transacts at — in either direction. The median
+    // (not mean) sets the pace so stale rows cannot inflate their own cutoff,
+    // and the 90-day floor keeps thin or slow markets from being gutted.
+    const domVals = deduped.map((l) => num(l.dom)).filter((n): n is number => n != null && n > 0).sort((a, z) => a - z);
+    const medDom = domVals.length ? domVals[Math.floor(domVals.length / 2)] : null;
+    const staleCutoff = Math.max(90, medDom != null ? Math.round(medDom * 2) : 180);
+    const nowSec = Date.now() / 1000;
+    let staleExcluded = 0, phantomExcluded = 0, titleExcluded = 0;
+    // deno-lint-ignore no-explicit-any
+    r.rows = deduped.filter((l: any) => {
+      // A listing not crawled in 2+ weeks is likely already sold or
+      // wholesaled; its price is not available to any real buyer.
+      const ls = Number(l.last_seen_at);
+      if (Number.isFinite(ls) && ls > 1e9 && nowSec - ls > 14 * 86400) { phantomExcluded++; return false; }
+      const d = num(l.dom);
+      if (d != null && d > staleCutoff) { staleExcluded++; return false; }
+      // A branded/dirty-title car is never fair evidence against a retail car.
+      if (l.carfax_clean_title === false) { titleExcluded++; return false; }
+      return true;
+    });
 
     // The rows arrive price-ASCENDING, so an unfiltered slice stores the
     // CHEAPEST page of the market — exactly the sample a value-building
@@ -241,6 +298,10 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       dealer: l.dealer?.name ?? l.seller_name ?? null,
       dom: num(l.dom),
       image: l.media?.photo_links?.[0] ?? null,
+      // Condition flags, so comp surfaces can badge or segregate honestly.
+      carfax_1_owner: l.carfax_1_owner ?? null,
+      carfax_clean_title: l.carfax_clean_title ?? null,
+      certified: l.is_certified ?? null,
     })).filter((c) => c.price != null);
 
     // Stats computed from ALL returned rows (not the value-floored stored
@@ -288,7 +349,14 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       if (likeRules.sameDrivetrain && subjectDrivetrain && ld && normDt(ld) !== normDt(subjectDrivetrain)) return false;
       return inBand(num(l.miles));
     };
-    const likeRows = r.rows.filter(isLike);
+    let likeRows = r.rows.filter(isLike);
+    // A CPO car carries a certification warranty premium; judge it against
+    // certified peers whenever enough exist, never against plain used cars.
+    if (condition === "cpo") {
+      // deno-lint-ignore no-explicit-any
+      const certified = likeRows.filter((l: any) => l.is_certified === true);
+      if (certified.length >= 3) likeRows = certified;
+    }
     const likePrices = likeRows.map((l) => num(l.price)).filter((n): n is number => n != null && n > 0).sort((a, z) => a - z);
     const likeMedian = likePrices.length ? likePrices[Math.floor(likePrices.length / 2)] : null;
     const likeCount = likePrices.length;
@@ -320,7 +388,7 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       ? `${Math.max(0, Math.floor(subjMiles * (1 - likeRules.bandPercent / 100)))}-${Math.ceil(subjMiles * (1 + likeRules.bandPercent / 100))}`
       : null;
     let cheaperCount: number | null = null;
-    let rankTotal: number | null = milesBandParam ? null : count;
+    let rankTotal: number | null = null;
     if (listingPrice != null && listingPrice > 0 && count > 0) {
       const rankParams = () => {
         const cp = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "1", start: "0" });
@@ -330,24 +398,33 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
         if (tier === "trim_year_band" && trim) cp.set("trim", trim);
         if (zip) { cp.set("zip", zip); cp.set("radius", "100"); }
         if (milesBandParam) cp.set("miles_range", milesBandParam);
+        // Stale comps are excluded server-side with the SAME cutoff the row
+        // hygiene applies, so counted rank and sampled evidence agree.
+        cp.set("dom_range", `0-${staleCutoff}`);
         return cp;
       };
-      const banded = tier === "trim_year_band" || tier === "year_band" || tier === "band";
+      // Bait floor on EVERY tier: a $1,000 typo/bait listing is not "cheaper
+      // competition". The floor also bounds the denominator so numerator and
+      // denominator share one price geometry.
+      const floor = Math.max(1, Math.round(listingPrice * 0.65));
       const cp = rankParams();
-      const floor = banded ? Math.round(listingPrice * 0.65) : 1;
-      cp.set("price_range", `${floor}-${Math.max(Math.round(listingPrice) - 1, 1)}`);
+      cp.set("price_range", `${floor}-${Math.max(Math.round(listingPrice) - 1, floor)}`);
       const res = await mcFetch(`${MC_BASE}/search/car/active?${cp.toString()}`, 10000);
       if (res && res.ok) {
         // deno-lint-ignore no-explicit-any
         const cb: any = await res.json().catch(() => ({}));
         cheaperCount = num(cb?.num_found);
       }
-      if (milesBandParam && cheaperCount != null) {
-        const tot = await mcFetch(`${MC_BASE}/search/car/active?${rankParams().toString()}`, 10000);
+      if (cheaperCount != null) {
+        const tp = rankParams();
+        tp.set("price_range", `${floor}-9999999`);
+        const tot = await mcFetch(`${MC_BASE}/search/car/active?${tp.toString()}`, 10000);
         if (tot && tot.ok) {
           // deno-lint-ignore no-explicit-any
           const tb: any = await tot.json().catch(() => ({}));
           rankTotal = num(tb?.num_found);
+        } else {
+          rankTotal = null;
         }
       }
     }
@@ -377,6 +454,7 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
         if (make) tp.set("make", make);
         if (model) tp.set("model", model);
         tp.set("trim", trim);
+        tp.set("dom_range", `0-${staleCutoff}`);
         if (zip) { tp.set("zip", zip); tp.set("radius", "100"); }
         if ((tier === "year_band" || tier === "band") && listingPrice && listingPrice > 0) {
           tp.set("price_range", `${Math.round(listingPrice * 0.65)}-${Math.round(listingPrice * 1.35)}`);
@@ -402,6 +480,8 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       like_count: likeCount,
       like_median: likeMedian,
       miles_band_percent: likeRules.bandPercent,
+      stale_dom_cutoff: staleCutoff,
+      evidence_excluded: { duplicates: dupExcluded, phantom: phantomExcluded, stale: staleExcluded, dirty_title: titleExcluded },
       avg_dom: avgDom,
       market_days_supply: null as number | null,  // filled by fetchMds when the plan supports it
       inventory_count: count,
