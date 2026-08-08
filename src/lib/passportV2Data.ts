@@ -226,6 +226,11 @@ export interface PassportData {
   marketLow: number | null;
   marketHigh: number | null;
   belowMarket: number | null;
+  // True when marketAvg came from the legacy model-wide comps median —
+  // mileage- and trim-blind, so no customer-facing over/under-market claim
+  // may render from it. The VIN-level predict and the like-for-like comps
+  // median (source "comps_median_like") are strong bases.
+  marketBasisWeak: boolean;
   viewCount: number | null;
   dom: number | null;
   // Enrichment (pulled at ingest by vehicle-enrich)
@@ -233,6 +238,9 @@ export interface PassportData {
     percentile: number | null; radius: number | null; similarCount: number | null; avgDom: number | null;
     daysSupply: number | null; inventoryCount: number | null; checkedAt: string | null; trimMatched: boolean | null;
     priceMedian: number | null; priceMean: number | null; milesMean: number | null;
+    // Like-for-like subset (same trim/drivetrain where known, mileage inside
+    // the dealer's comp band) — the only comp aggregate a price verdict may use.
+    likeCount: number | null; likeMedian: number | null;
     // market_meta.sold_stats — recently-delisted medians from the enrich pass.
     soldCount: number | null; soldPriceMedian: number | null; soldDomMedian: number | null; soldMilesMedian: number | null;
     soldScope: string | null; soldState: string | null; soldCheckedAt: string | null;
@@ -448,6 +456,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     checkedAt: (mm.checked_at as string) || null,
     trimMatched: typeof mm.trim_matched === "boolean" ? mm.trim_matched : null,
     priceMedian: n(ps.median), priceMean: n(ps.mean), milesMean: n(mm.miles_mean),
+    likeCount: n(mm.like_count), likeMedian: n(mm.like_median),
     soldCount, soldPriceMedian: n(ss.price_median), soldDomMedian: n(ss.dom_median), soldMilesMedian: n(ss.miles_median),
     soldScope, soldState: (ss.state as string) || null, soldCheckedAt,
     // Make-level scope is too loose for a customer claim, and stale sold data
@@ -521,7 +530,11 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // market_value is the freshest VIN-level predict; the stored
   // market_payload.belowMarket was frozen at enrich time against a price that
   // may since have changed, so it only serves as a fallback.
-  const belowMarket = marketAvg != null
+  const marketBasisWeak = ((mp as Record<string, unknown>).source as string | undefined) === "comps_median";
+  // On a weak basis there is no belowMarket at all — every downstream claim
+  // ("$X Below Market" chip, why-buy line, Great Price badge, card scoring)
+  // flows from this one value, so nulling it here gates them all.
+  const belowMarket = marketBasisWeak ? null : marketAvg != null
     ? (price != null && price < marketAvg ? marketAvg - price : null)
     : (mp.belowMarket as number) ?? null;
   // Server-resolved price label (public-listing-view resolves the dealer's
@@ -771,7 +784,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     docFee, websiteSalePrice, priceMode, priceIncludesDoc, priceBreakdown,
     dealerDiscount: lp.dealer_discount ?? null, retailCash: lp.retail_cash ?? null,
     recon: (listing as unknown as { recon?: PassportData["recon"] }).recon ?? null,
-    marketAvg, marketLow, marketHigh, belowMarket,
+    marketAvg, marketLow, marketHigh, belowMarket, marketBasisWeak,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
     ownerCount, accidentCount, cleanTitle, titleStatus, titleVerifiedAt, titleVerifiedSource, serviceCount, recallClear, openRecalls, hasRecallCheck,
@@ -868,12 +881,24 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
   const m = d.marketMeta;
 
   // Price vs Market — continuous around a real anchor. Anchor preference:
-  // recently-sold median (strict gate), full-market median/mean from the same
-  // enrich pass, live market average, MSRP for a new car. No anchor, no score.
+  // recently-sold median (strict gate, and never when this car's odometer is
+  // far below the sold median's — low-mileage cars are not priced by
+  // high-mileage sales), like-for-like comp median (same trim/drivetrain
+  // where known, mileage inside the comp band), full-market median/mean,
+  // live market average, MSRP for a new car. No anchor, no score.
+  const subjMileage = (listing as { mileage?: number | null }).mileage ?? null;
+  const soldMilesOk = subjMileage == null || m.soldMilesMedian == null || m.soldMilesMedian <= 0
+    || (subjMileage >= m.soldMilesMedian * 0.75 && subjMileage <= m.soldMilesMedian * 1.25);
   const soldAnchor = m.soldDisplayable && m.soldCount != null && m.soldCount >= 8
-    && m.soldScope === "model_year_state" && m.soldPriceMedian != null ? m.soldPriceMedian : null;
-  const statsAnchor = m.priceMedian ?? m.priceMean;
-  const anchor = soldAnchor ?? statsAnchor ?? d.marketAvg ?? (isNew ? d.msrp : null);
+    && m.soldScope === "model_year_state" && m.soldPriceMedian != null && soldMilesOk ? m.soldPriceMedian : null;
+  const likeAnchor = m.likeCount != null && m.likeCount >= 3 ? m.likeMedian : null;
+  const statsRaw = m.priceMedian ?? m.priceMean;
+  // Model-wide stats may support a favorable score but never punish: with no
+  // like-for-like basis, a price above the blended median is what a
+  // low-mileage or top-trim car is SUPPOSED to look like, not evidence of
+  // over-pricing.
+  const statsAnchor = statsRaw != null && d.price != null && d.price > statsRaw && likeAnchor == null ? null : statsRaw;
+  const anchor = soldAnchor ?? likeAnchor ?? statsAnchor ?? (d.marketBasisWeak ? null : d.marketAvg) ?? (isNew ? d.msrp : null);
   const priceEvidence: string[] = [];
   let priceScore: number | null = null;
   if (anchor != null && anchor > 0 && d.price != null) {
@@ -883,10 +908,12 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
     priceScore = clampScore(55, 98, 80 - pct * 2);
     if (soldAnchor != null) {
       priceEvidence.push(`Median of ${m.soldCount!.toLocaleString()} recently sold in ${m.soldState ?? "your state"}, 90 days`);
-    } else if (statsAnchor != null || d.marketAvg != null) {
-      priceEvidence.push(m.similarCount != null
-        ? `Checked against ${m.similarCount.toLocaleString()} similar listings${m.radius != null ? ` within ${m.radius} miles` : ""}`
-        : "Checked against live local market data");
+    } else if (likeAnchor != null || statsAnchor != null || (!d.marketBasisWeak && d.marketAvg != null)) {
+      priceEvidence.push(likeAnchor != null && m.likeCount != null
+        ? `Checked against ${m.likeCount.toLocaleString()} closely matched listings${m.radius != null ? ` within ${m.radius} miles` : ""}`
+        : m.similarCount != null
+          ? `Checked against ${m.similarCount.toLocaleString()} similar listings${m.radius != null ? ` within ${m.radius} miles` : ""}`
+          : "Checked against live local market data");
     } else {
       priceEvidence.push(d.msrp != null && d.price <= d.msrp
         ? `Compared against the ${fmt$(d.msrp)} factory sticker for this build`

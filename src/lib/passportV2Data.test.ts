@@ -117,3 +117,69 @@ describe("cleanEquipmentList", () => {
     expect(cleanEquipmentList(["B10", "MSRP", "Engine", ""])).toEqual([]);
   });
 });
+
+describe("Market verdict basis governance", () => {
+  const listing = (over: Record<string, unknown>): VehicleListing => over as unknown as VehicleListing;
+
+  it("weak basis (legacy model-wide comps median) nulls belowMarket and flags the basis", () => {
+    const d = derivePassport(listing({
+      price: 58000, market_value: 62000,
+      market_payload: { source: "comps_median", marketValue: 62000 },
+    }));
+    expect(d.marketBasisWeak).toBe(true);
+    expect(d.belowMarket).toBeNull();
+  });
+
+  it("VIN-level predict stays a strong basis", () => {
+    const d = derivePassport(listing({
+      price: 58000, market_value: 62000,
+      market_payload: { marketValue: 62000, low: 55000, high: 68000 },
+    }));
+    expect(d.marketBasisWeak).toBe(false);
+    expect(d.belowMarket).toBe(4000);
+  });
+
+  it("like-for-like comps median is a strong basis", () => {
+    const d = derivePassport(listing({
+      price: 58000, market_value: 62000,
+      market_payload: { source: "comps_median_like", like_count: 5, marketValue: 62000 },
+    }));
+    expect(d.marketBasisWeak).toBe(false);
+    expect(d.belowMarket).toBe(4000);
+  });
+
+  it("model-wide stats never punish a price above the blended median without a like-for-like basis", () => {
+    // 12k-mile top trim at 75k vs a 58k median built from 60k-mile base cars:
+    // no like subset -> no price score at all, never a low one.
+    const l = listing({
+      price: 75000, mileage: 12000,
+      market_meta: { price_stats: { median: 58000 } },
+    });
+    const price = deriveRating(l, derivePassport(l)).factors.find((f) => f.key === "price");
+    expect(price?.score ?? null).toBeNull();
+  });
+
+  it("a like-for-like median outranks the model-wide median as the price anchor", () => {
+    const l = listing({
+      price: 75000, mileage: 12000,
+      market_meta: { price_stats: { median: 58000 }, like_count: 6, like_median: 76000 },
+    });
+    const rating = deriveRating(l, derivePassport(l));
+    const price = rating.factors.find((f) => f.key === "price");
+    // Anchored at the like median (76k) our 75k price scores at/above the
+    // 80-point anchor line, not floored by the blended 58k median.
+    expect(price?.score ?? 0).toBeGreaterThanOrEqual(80);
+    expect((price?.evidence ?? []).some((e) => e.includes("closely matched"))).toBe(true);
+  });
+
+  it("a sold median from far-higher-mileage sales is not the price anchor", () => {
+    const l = listing({
+      price: 75000, mileage: 12000,
+      market_meta: {
+        sold_stats: { count: 20, scope: "model_year_state", price_median: 58000, miles_median: 55000, dom_median: 30, state: "CT", checked_at: new Date().toISOString() },
+      },
+    });
+    const price = deriveRating(l, derivePassport(l)).factors.find((f) => f.key === "price");
+    expect((price?.evidence ?? []).some((e) => e.includes("recently sold"))).toBe(false);
+  });
+});
