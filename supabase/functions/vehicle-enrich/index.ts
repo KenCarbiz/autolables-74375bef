@@ -96,7 +96,12 @@ async function fetchPredict(vin: string, miles: number | null, carType: string, 
 // NOT the subject VIN — searching active listings by `vin` returns only that
 // one car, which is why this used to come back empty. Search by ymm, then drop
 // the subject VIN from the results.
-async function fetchComps(ymm: string | null, condition: string, zip: string | null, listingPrice: number | null, subjectVin: string, subjectTrim: string | null, dealerName: string | null, subjectMileage: number | null) {
+// Like-for-like rules for the VALUE verdict, resolved from the dealer's comp
+// settings (same keys the Comparable Vehicles panel honors). bandPercent null
+// means the dealer disabled the mileage band.
+interface LikeRules { bandPercent: number | null; sameTrim: boolean; sameDrivetrain: boolean }
+
+async function fetchComps(ymm: string | null, condition: string, zip: string | null, listingPrice: number | null, subjectVin: string, subjectTrim: string | null, dealerName: string | null, subjectMileage: number | null, subjectDrivetrain: string | null, likeRules: LikeRules) {
   try {
     if (!ymm) return null;
     const { year } = parseYmm(ymm);
@@ -253,6 +258,40 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     const milesMean = milesAll.length ? Math.round(milesAll.reduce((a, b) => a + b, 0) / milesAll.length) : null;
     const domsSorted = [...doms].sort((a, z) => a - z);
     const domMedian = domsSorted.length ? domsSorted[Math.floor(domsSorted.length / 2)] : null;
+
+    // ── Like-for-like subset for the VALUE verdict ────────────────────
+    // The over/under-market verdict must judge this car against ITS peers:
+    // same trim and drivetrain when both sides carry one, mileage inside the
+    // dealer's comp band — the same standard the Comparable Vehicles panel
+    // already enforces (src/lib/compStrategy.ts). Without this, a 12k-mile
+    // top-trim car gets called over-market against 60k-mile base-trim cars.
+    // The model-wide stats above stay stored as context; the verdict never
+    // reads them.
+    const normalize = (s: unknown) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const normDt = (s: unknown) => {
+      const v = normalize(s);
+      if (/^(4wd|4x4|fourwheeldrive)$/.test(v)) return "4wd";
+      if (/^(awd|allwheeldrive)$/.test(v)) return "awd";
+      if (/^(fwd|frontwheeldrive)$/.test(v)) return "fwd";
+      if (/^(rwd|rearwheeldrive)$/.test(v)) return "rwd";
+      return v;
+    };
+    const subjMiles = num(subjectMileage);
+    const inBand = (m: number | null) =>
+      likeRules.bandPercent == null || m == null || subjMiles == null || subjMiles <= 0 ||
+      Math.abs(m - subjMiles) <= subjMiles * (likeRules.bandPercent / 100);
+    // deno-lint-ignore no-explicit-any
+    const isLike = (l: any): boolean => {
+      const lt = l.build?.trim;
+      if (likeRules.sameTrim && trim && lt && normalize(lt) !== normalize(trim)) return false;
+      const ld = l.build?.drivetrain;
+      if (likeRules.sameDrivetrain && subjectDrivetrain && ld && normDt(ld) !== normDt(subjectDrivetrain)) return false;
+      return inBand(num(l.miles));
+    };
+    const likeRows = r.rows.filter(isLike);
+    const likePrices = likeRows.map((l) => num(l.price)).filter((n): n is number => n != null && n > 0).sort((a, z) => a - z);
+    const likeMedian = likePrices.length ? likePrices[Math.floor(likePrices.length / 2)] : null;
+    const likeCount = likePrices.length;
     // Price-cut signal across the full returned sample: MarketCheck rows carry
     // ref_price (prior price) and price_change_percent when a listing has
     // moved. Cuts among competitors are urgency evidence for OUR car.
@@ -271,15 +310,30 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     // winning-tier search (rows=1, we only read num_found) — the 16-row page
     // must never be the percentile denominator. Falls back to the page-derived
     // number only when the count call fails.
+    //
+    // The rank is mileage-banded: "cheaper than ours" only counts cars whose
+    // odometer sits inside the dealer's comp band, and the denominator is a
+    // second count with the SAME band so numerator and denominator share one
+    // geometry. A 60k-mile car undercutting a 12k-mile car is not a rank
+    // signal, it is depreciation.
+    const milesBandParam = likeRules.bandPercent != null && subjMiles != null && subjMiles > 0
+      ? `${Math.max(0, Math.floor(subjMiles * (1 - likeRules.bandPercent / 100)))}-${Math.ceil(subjMiles * (1 + likeRules.bandPercent / 100))}`
+      : null;
     let cheaperCount: number | null = null;
+    let rankTotal: number | null = milesBandParam ? null : count;
     if (listingPrice != null && listingPrice > 0 && count > 0) {
-      const cp = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "1", start: "0" });
+      const rankParams = () => {
+        const cp = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "1", start: "0" });
+        if ((tier === "trim_year_band" || tier === "year_band" || tier === "year") && year) cp.set("year", year);
+        if (make) cp.set("make", make);
+        if (model) cp.set("model", model);
+        if (tier === "trim_year_band" && trim) cp.set("trim", trim);
+        if (zip) { cp.set("zip", zip); cp.set("radius", "100"); }
+        if (milesBandParam) cp.set("miles_range", milesBandParam);
+        return cp;
+      };
       const banded = tier === "trim_year_band" || tier === "year_band" || tier === "band";
-      if ((tier === "trim_year_band" || tier === "year_band" || tier === "year") && year) cp.set("year", year);
-      if (make) cp.set("make", make);
-      if (model) cp.set("model", model);
-      if (tier === "trim_year_band" && trim) cp.set("trim", trim);
-      if (zip) { cp.set("zip", zip); cp.set("radius", "100"); }
+      const cp = rankParams();
       const floor = banded ? Math.round(listingPrice * 0.65) : 1;
       cp.set("price_range", `${floor}-${Math.max(Math.round(listingPrice) - 1, 1)}`);
       const res = await mcFetch(`${MC_BASE}/search/car/active?${cp.toString()}`, 10000);
@@ -288,15 +342,27 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
         const cb: any = await res.json().catch(() => ({}));
         cheaperCount = num(cb?.num_found);
       }
+      if (milesBandParam && cheaperCount != null) {
+        const tot = await mcFetch(`${MC_BASE}/search/car/active?${rankParams().toString()}`, 10000);
+        if (tot && tot.ok) {
+          // deno-lint-ignore no-explicit-any
+          const tb: any = await tot.json().catch(() => ({}));
+          rankTotal = num(tb?.num_found);
+        }
+      }
     }
-    const sampleCheaper = listingPrice != null && allPrices.length
-      ? allPrices.filter((n) => n < listingPrice).length : null;
+    const bandedSamplePrices = r.rows
+      .filter((l) => inBand(num(l.miles)))
+      // deno-lint-ignore no-explicit-any
+      .map((l: any) => num(l.price)).filter((n): n is number => n != null && n > 0);
+    const sampleCheaper = listingPrice != null && bandedSamplePrices.length
+      ? bandedSamplePrices.filter((n) => n < listingPrice).length : null;
     const cheaper = cheaperCount ?? sampleCheaper;
     // Percentile only from the market-wide count: the sample fallback mixes a
     // 50-row-page numerator with a whole-market denominator, which understates
     // the rank. Better null (honest pending) than a fabricated number.
-    const percentile = listingPrice != null && cheaperCount != null && count > 0
-      ? Math.min(100, Math.round((cheaperCount / count) * 100)) : null;
+    const percentile = listingPrice != null && cheaperCount != null && rankTotal != null && rankTotal > 0
+      ? Math.min(100, Math.round((cheaperCount / rankTotal) * 100)) : null;
 
     // Trim scarcity: how many of THIS trim exist in the same geometry. When
     // the winning tier already trim-matched, similar_count IS the trim count;
@@ -330,8 +396,12 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       price_percentile: percentile,
       cheaper_count: cheaper,
       rank_basis: cheaperCount != null ? "market" : "sample",
+      rank_miles_banded: milesBandParam != null,
       relaxation_tier: tier,
       trim_matched: tier === "trim_year_band",
+      like_count: likeCount,
+      like_median: likeMedian,
+      miles_band_percent: likeRules.bandPercent,
       avg_dom: avgDom,
       market_days_supply: null as number | null,  // filled by fetchMds when the plan supports it
       inventory_count: count,
@@ -342,9 +412,10 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       ...(trimCount != null ? { trim_count: trimCount } : {}),
       checked_at: new Date().toISOString(),
     };
-    // median (fallback to mean) lets the caller backfill market_value when
-    // MarketCheck's price prediction has no value for an older/rare car.
-    return { comparables, groupSimilar, meta, stats, debug, median: median ?? mean };
+    // likeMedian/likeCount let the caller backfill market_value when
+    // MarketCheck's price prediction has no value for an older/rare car —
+    // only ever from the like-for-like subset, never the model-wide median.
+    return { comparables, groupSimilar, meta, stats, debug, median: median ?? mean, likeMedian, likeCount };
   } catch { return null; }
 }
 
@@ -655,7 +726,7 @@ serve(async (req) => {
   }
 
   const { data: row } = await admin.from("vehicle_listings")
-    .select("id, vin, ymm, trim, condition, price, mileage, dealer_snapshot, market_meta")
+    .select("id, vin, ymm, trim, condition, price, mileage, dealer_snapshot, market_meta, drivetrain:mc_attributes->>drivetrain")
     .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!row) return json(404, { error: "listing_not_found" });
   // What is already stored, so a pass that returns only part of the picture
@@ -676,15 +747,27 @@ serve(async (req) => {
   // snapshot-then-profile fallback as zip. No state → sold stats skip entirely.
   // deno-lint-ignore no-explicit-any
   let dealerState: string | null = String((row.dealer_snapshot as any)?.state || "").trim().toUpperCase() || null;
-  if (!zip || !dealerState) {
-    const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
-    const pset = (prof?.settings || {}) as Record<string, string>;
-    if (!zip) zip = pset.dealer_zip || pset.zip || pset.doc_fee_zip || null;
-    if (!dealerState) dealerState = (pset.dealer_state || pset.doc_fee_state || "").trim().toUpperCase() || null;
-  }
+  // Always read the profile: besides the zip/state fallback it carries the
+  // dealer's comp settings, which the like-for-like value verdict honors.
+  const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+  const pset = (prof?.settings || {}) as Record<string, unknown>;
+  if (!zip) zip = String(pset.dealer_zip || pset.zip || pset.doc_fee_zip || "") || null;
+  if (!dealerState) dealerState = String(pset.dealer_state || pset.doc_fee_state || "").trim().toUpperCase() || null;
+  // Same keys and defaults as the Comparable Vehicles panel (compStrategy.ts):
+  // ±25% mileage band, same trim / drivetrain when both sides are known.
+  const cset = (pset.comp_settings || {}) as Record<string, unknown>;
+  const bandPct = Number(cset.mileageBandPercent);
+  const likeRules: LikeRules = {
+    bandPercent: cset.requireSimilarMileageBand !== false
+      ? (Number.isFinite(bandPct) && bandPct > 0 ? bandPct : 25)
+      : null,
+    sameTrim: cset.requireSameTrimWhenAvailable !== false,
+    sameDrivetrain: cset.requireSameDrivetrainWhenAvailable !== false,
+  };
 
   const ymm = (row.ymm as string | null) || null;
   const subjectTrim = (row.trim as string | null) || null;
+  const subjectDrivetrain = ((row as unknown as { drivetrain?: string | null }).drivetrain || null);
   // The dealer's own rooftop name, so we never show the customer the dealer's
   // OWN inventory as "competition" in the comp set.
   // deno-lint-ignore no-explicit-any
@@ -703,7 +786,7 @@ serve(async (req) => {
   // moment, which can't trip the RPS limit. (fetchRecalls tries MarketCheck
   // then falls back to free NHTSA.) Skipped entirely on a Black-Book-only run.
   const predict = wantMC ? await fetchPredict(vin, miles, condition, zip) : null;
-  const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName, miles) : null;
+  const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName, miles, subjectDrivetrain, likeRules) : null;
   const mds = wantMC && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
   const soldStats = wantMC ? await fetchSoldStats(ymm, condition, dealerState) : null;
   const history = wantMC ? await fetchHistory(vin) : null;
@@ -720,17 +803,21 @@ serve(async (req) => {
     patch.market_position = position;
     patch.market_checked_at = new Date().toISOString();
     patch.market_payload = { marketValue: mv, low: predict.low, high: predict.high, belowMarket, position, checked_at: new Date().toISOString(), raw: predict.raw };
-  } else if (comps?.median != null && comps.median > 0) {
+  } else if (comps?.likeMedian != null && comps.likeMedian > 0 && (comps.likeCount ?? 0) >= 3) {
     // Fallback: MarketCheck has no predicted price for this VIN (older/rarer
-    // car). Use the median of the local comparable listings as the market value
-    // so the signal lands instead of staying grey.
-    const mv = comps.median;
+    // car). Use the median of the LIKE-FOR-LIKE local comps — same trim and
+    // drivetrain where known, mileage inside the dealer's comp band, and at
+    // least 3 of them — never the model-wide median: judging a low-mileage
+    // top trim against high-mileage base cars reads "over market" when the
+    // car is priced right. Fewer than 3 true peers → no market value at all;
+    // the Passport shows its honest pending state instead of a wrong verdict.
+    const mv = comps.likeMedian;
     const belowMarket = price != null ? Math.round(mv - price) : 0;
     const position = price == null ? "unknown" : price <= mv * 0.97 ? "below_market" : price >= mv * 1.03 ? "above_market" : "at_market";
     patch.market_value = mv;
     patch.market_position = position;
     patch.market_checked_at = new Date().toISOString();
-    patch.market_payload = { marketValue: mv, belowMarket, position, source: "comps_median", checked_at: new Date().toISOString() };
+    patch.market_payload = { marketValue: mv, belowMarket, position, source: "comps_median_like", like_count: comps.likeCount, checked_at: new Date().toISOString() };
   }
   if (comps) {
     // Only overwrite comparables when this pass actually returned listings, so a

@@ -881,7 +881,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
     title: "Market Price Analysis",
     render: ({ d }) => {
       const hasRange = d.marketLow != null && d.marketHigh != null;
-      const showAvg = d.marketAvg != null && d.price != null && d.price <= d.marketAvg;
+      const showAvg = d.marketAvg != null && d.price != null && d.price <= d.marketAvg && !d.marketBasisWeak;
       return (
         <>
           <SectionHeading icon={DollarSign} title="Market Price Analysis" subtitle="How this vehicle's price compares to the market." />

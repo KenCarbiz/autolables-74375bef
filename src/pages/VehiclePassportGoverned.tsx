@@ -521,7 +521,11 @@ export default function VehiclePassportGoverned() {
 
   // ── Market position
   const marketPos = (() => {
-    if (d.price == null || d.marketAvg == null) return null;
+    // A weak basis (legacy model-wide comps median — mileage/trim-blind) may
+    // never place the car on the market scale: a 12k-mile top trim judged
+    // against 60k-mile base cars reads "Above Market" when it is priced
+    // right. Re-enrichment restores the module on a like-for-like basis.
+    if (d.price == null || d.marketAvg == null || d.marketBasisWeak) return null;
     // -1..+1 where 0 = market avg. Clamp using low/high range.
     const low = d.marketLow ?? d.marketAvg * 0.85;
     const high = d.marketHigh ?? d.marketAvg * 1.15;
@@ -1181,11 +1185,12 @@ export default function VehiclePassportGoverned() {
         const label3 = "text-[11px] font-semibold uppercase tracking-wider";
         // Dollar amount the price sits ABOVE normalized market value (past a $250
         // rounding tolerance), used by the Market Comparison module. Null when at
-        // or below market.
-        const aboveMarket = price != null && d.marketAvg != null && price - d.marketAvg > 250 ? price - d.marketAvg : null;
+        // or below market — and always null on a weak (mileage/trim-blind) basis,
+        // which may never assert the car is priced above its market.
+        const aboveMarket = !d.marketBasisWeak && price != null && d.marketAvg != null && price - d.marketAvg > 250 ? price - d.marketAvg : null;
         // ── Phase E view models (governed, presentation-only) ──
         const mc = resolveMarketComparison({
-          valueHistory: d.valueHistory, advertisedPrice: price, normalizedMarketValue: d.marketAvg,
+          valueHistory: d.valueHistory, advertisedPrice: price, normalizedMarketValue: d.marketBasisWeak ? null : d.marketAvg,
           sampleSize: d.marketMeta.similarCount, radiusMiles: d.marketMeta.radius, checkedAt: d.marketCheckedAt,
         });
         const subjectYear = Number((listing.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0]) || null;
