@@ -158,14 +158,21 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
 // One page of a rooftop's inventory from the syndication feed. owned=true drops
 // the duplicate non-owned copies that have no price/stock, but it's only honored
 // for source/dealer_id/mc_website_id — so append it only for those params.
-const syndPage = (param: string, value: string, rows: number, start: number) => {
-  const owned = OWNED_PARAMS.has(param) ? "&owned=true" : "";
+const syndPage = (
+  param: string, value: string, rows: number, start: number,
+  opts?: { carType?: "new" | "used" | "certified"; owned?: boolean },
+) => {
+  // opts.owned=false deliberately omits owned=true: the unowned feed includes
+  // syndicated and non-attributed records, which is where a segment that lost
+  // its physically-owned attribution (see the new-car coverage backstop) lives.
+  const owned = (opts?.owned ?? OWNED_PARAMS.has(param)) ? "&owned=true" : "";
+  const carType = opts?.carType ? `&car_type=${opts.carType}` : "";
   // append_api_key=false keeps the secret out of image/VDP URLs in the payload.
   // include_non_vin_listings=false: a VIN-less row cannot be deduplicated or
   // enriched, and has no place in a strict inventory pipeline.
   return mcFetch(
     SYND_ENDPOINT,
-    `${param}=${encodeURIComponent(value)}${owned}&rows=${rows}&start=${start}` +
+    `${param}=${encodeURIComponent(value)}${owned}${carType}&rows=${rows}&start=${start}` +
     `&append_api_key=false&include_non_vin_listings=false`,
   );
 };
@@ -653,6 +660,19 @@ serve(async (req) => {
       let rejected = 0;
       // True once every page of the feed has been fetched. Prune requires it.
       let feedWalked = false;
+      // New units ingested this run — the signal the coverage backstop watches.
+      let newTypeSeen = 0;
+      // Only tenants that have ever carried new inventory get the backstop, so
+      // a used-only independent never spends extra metered calls probing for a
+      // segment it does not sell. Archived rows count: the failure mode is
+      // exactly that every new unit got pruned into 'archived'.
+      let tenantSellsNew = false;
+      try {
+        const { data: newRow } = await admin.from("vehicle_listings")
+          .select("id").eq("tenant_id", cfg.tenant_id).eq("condition", "new")
+          .limit(1).maybeSingle();
+        tenantSellsNew = !!newRow;
+      } catch { /* coverage backstop is optional */ }
 
       // Resolve the rooftop from its website domain via the NEW Dealerships
       // Search API, which returns the canonical mc_* ids the syndication feed
@@ -692,7 +712,11 @@ serve(async (req) => {
         }
         const decided = match + mismatch;
         const purity = decided === 0 ? 0 : match / decided;
-        attempts.push({ feed: label, param, id: value, http: r.http, num_found: r.numFound, got: r.listings.length, match, mismatch, unknown, purity: Math.round(purity * 100) / 100 });
+        // new_units makes a segment gap visible in the admin card: a feed that
+        // answers with cars but zero new units is how the whole new-car lot
+        // silently vanished on 2026-08-01.
+        const newUnits = r.listings.filter((l) => String(l.inventory_type || "").toLowerCase() === "new").length;
+        attempts.push({ feed: label, param, id: value, http: r.http, num_found: r.numFound, got: r.listings.length, new_units: newUnits, match, mismatch, unknown, purity: Math.round(purity * 100) / 100 });
         if (r.listings.length > 0 && match > 0 && purity >= minPurity) hits.push({ param, value, r, purity });
       };
 
@@ -787,6 +811,463 @@ serve(async (req) => {
         continue;
       }
 
+      // The full per-listing ingest (files + listings + prices + change
+      // detection), shared by the primary feed walk and the new-car coverage
+      // backstop below. rtOverride lets the backstop validate against the
+      // address-only rooftop (rooftop-id equality relaxed) while everything
+      // else stays identical.
+      const ingestListing = async (l: MCListing, rtOverride?: Rooftop): Promise<"capped" | "skipped" | "ok"> => {
+        if (tenantSeen >= cfg.max_vehicles) return "capped";
+        const rawVin = String(l.vin || "").toUpperCase().trim();
+        const vin = normVin(l.vin);
+        // Invalid VIN (fails 17-char/format check): log an exception then skip.
+        const validVin = /^[A-HJ-NPR-Z0-9]{17}$/.test(rawVin);
+        if (!validVin) {
+          try {
+            if (rawVin) {
+              await emitException({
+                tenant_id: cfg.tenant_id, vin: rawVin, exception_type: "invalid_vin",
+                severity: "high", title: `Invalid VIN "${rawVin}"`,
+                explanation: "VIN failed 17-character format check. The feed row was skipped.",
+                source_values: { vin: rawVin, source: "marketcheck" },
+                recommended_action: "Confirm the VIN with the source system; the listing was not ingested.",
+                status: "open",
+              });
+            }
+          } catch { /* best-effort */ }
+          if (!vin || vin.length < 11) return "skipped";
+        }
+        if (!vin || vin.length < 11) return "skipped";
+        // With a verified rooftop address, a car must positively match it.
+        // Unproven listings are dropped rather than assumed ours — that
+        // assumption is what let sibling stores drift in.
+        const rt = rtOverride ?? rooftop;
+        const rtStrict = cfg.strict_rooftop !== false && isStrictRooftop(rt);
+        const own = classifyListing(listingIdentity(l), rt);
+        if (own === "mismatch" || (rtStrict && own !== "match")) { rejected++; return "skipped"; }
+        tenantSeen++; seen++;
+        liveVins.add(vin);
+        const price = toPrice(l.price);
+        const stockNo = String(l.stock_no ?? (l.dealer && l.dealer.stock_no) ?? "").trim();
+        const b = l.build || {};
+        const ymm = [b.year, b.make, b.model].filter(Boolean).join(" ") || null;
+        const condition = l.is_certified ? "cpo" : (l.inventory_type === "new" ? "new" : "used");
+        if (condition === "new") newTypeSeen++;
+        const miles = typeof l.miles === "number" ? Math.round(l.miles) : 0;
+        if (stockNo) {
+          const arr = stockMap.get(stockNo) || [];
+          if (!arr.includes(vin)) arr.push(vin);
+          stockMap.set(stockNo, arr);
+        }
+
+        // ── Change detection — capture prior state before any write ──
+        // deno-lint-ignore no-explicit-any
+        let priorListing: any = null;
+        // deno-lint-ignore no-explicit-any
+        let priorFile: any = null;
+        try {
+          const { data: pl } = await admin.from("vehicle_listings")
+            .select("id, price, mileage, condition, ymm")
+            .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+          priorListing = pl || null;
+          const { data: pf } = await admin.from("vehicle_files")
+            .select("id, stock_number, condition, mileage")
+            .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+          priorFile = pf || null;
+        } catch { /* diff best-effort */ }
+
+
+        // 1) vehicle_files — the inventory-of-record / addendum hub. NEW
+        // VINs create a fresh file; existing files only refresh inventory
+        // fields (never deal_status / customer data).
+        const { data: vf } = await admin.from("vehicle_files")
+          .select("id").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+        if (vf) {
+          await admin.from("vehicle_files").update({
+            year: String(b.year || ""), make: b.make || "", model: b.model || "",
+            trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
+            feed_source: "marketcheck",
+          }).eq("id", vf.id);
+        } else {
+          const { error } = await admin.from("vehicle_files").insert({
+            tenant_id: cfg.tenant_id, vin,
+            year: String(b.year || ""), make: b.make || "", model: b.model || "",
+            trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
+            feed_source: "marketcheck",
+          });
+          if (!error) { tenantNew++; newVehicles++; }
+        }
+
+        // 2) vehicle_listings — sticker / public packet + lot price view.
+        // NOTE: vehicle_listings has no stock_number column (that lives on
+        // vehicle_files); including it fails the whole write.
+        const { data: vl } = await admin.from("vehicle_listings")
+          .select("id").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+        const patch: Record<string, unknown> = {
+          tenant_id: cfg.tenant_id, vin, condition, feed_source: "marketcheck",
+          // Keep the VDP url even when the feed carried no price, so the
+          // advertised-price crawler can seed a first price off the dealer's
+          // own page (Your Price / <Dealer> Deal).
+          source_url: l.vdp_url || null,
+        };
+        // Only set inventory fields the feed actually carried. A feed row
+        // that reappears WITHOUT a price/mileage/ymm must never null out a
+        // good value on an existing listing — and a nulled price would also
+        // disable the FTC advertised-price guard, which reads
+        // vehicle_listings.price as the feed baseline.
+        if (ymm) patch.ymm = ymm;
+        if (b.trim) patch.trim = b.trim;
+        if (miles) patch.mileage = miles;
+        // Price/doc-fee breakdown: the feed price is advertised-before-doc;
+        // website sale price = advertised + the tenant doc fee (added once).
+        // The nightly advertised-price crawl refines these from the live VDP.
+        if (price != null) {
+          patch.price = price;
+          patch.doc_fee = tenantDocFee;
+          if (advertisedInclDocFee && tenantDocFee > 0) {
+            // Feed price is the fee-INCLUSIVE website price; derive before-doc.
+            patch.advertised_price_before_doc = price - tenantDocFee;
+            patch.website_sale_price = price;
+            patch.price_parse_notes = "From MarketCheck feed; advertised price includes the tenant doc fee (not added again).";
+          } else {
+            // Feed price is BEFORE doc; website sale price adds the fee once.
+            patch.advertised_price_before_doc = price;
+            patch.website_sale_price = price + tenantDocFee;
+            patch.price_parse_notes = "From MarketCheck feed; sale price = advertised + tenant doc fee.";
+          }
+          patch.price_source_url = l.vdp_url || null;
+          patch.price_parse_status = "ok";
+          patch.price_last_verified_at = new Date().toISOString();
+        }
+        // First-pass photos from the feed; the crawler later upgrades the
+        // hero to the dealer's own og:image. Only set hero when present so we
+        // never null out a better image captured by a previous run.
+        // Prefer the dealer's own website photos (photo_links); fall back to
+        // MarketCheck's cached copies only when the dealer set is missing.
+        const gallery: string[] = (l.media?.photo_links?.length ? l.media.photo_links : l.media?.photo_links_cached) || [];
+        if (gallery[0]) patch.hero_image_url = gallery[0];
+        if (vl) {
+          const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
+          if (!error) {
+            listingsUpserted++;
+            updatedListingIds.push(vl.id);
+            // A VIN that left the feed is retired, not deleted, so a car
+            // that comes back is an UPDATE now where it used to be a fresh
+            // INSERT. Without this it would keep the archived status it was
+            // given on the way out and stay invisible to its own dealer.
+            await admin.rpc("marketcheck_revive_listing", { _tenant_id: cfg.tenant_id, _vin: vin })
+              .then(({ error: e }) => { if (e) console.warn("revive_failed", vin, e.message); });
+            // Back-fill the Get-Ready hub token for cars that predate this
+            // feature or were first ingested by another path (autocurb-sync,
+            // manual add) so they never fall out of the get-ready flow.
+            await ensureReadyToken(admin, cfg.tenant_id, vin, ymm, vl.id);
+            // Backfill the compliance drafts for existing inventory
+            // (idempotent) — with the render target, so a draft newly
+            // created on this resync path also gets its form PDFs instead
+            // of sitting file-less forever.
+            await ensureComplianceDrafts(admin, cfg.tenant_id, vin, { supabaseUrl, serviceKey });
+          } else if (!firstWriteErr) firstWriteErr = error.message;
+        } else {
+          const ins = await admin.from("vehicle_listings").insert({
+            ...patch, store_id: cfg.tenant_id, slug: makeSlug(vin, ymm || undefined), status: "draft", sticker_snapshot: {},
+          }).select("id").maybeSingle();
+          if (!ins.error) {
+            listingsUpserted++;
+            // New car → auto-preload its Get-Ready QR + OEM window sticker.
+            await autoPreload(admin, supabaseUrl, serviceKey, {
+              tenantId: cfg.tenant_id, vin, ymm, listingId: ins.data?.id ?? null,
+              emailTitle: String(pset.title_email_on_intake) !== "false",
+            });
+          } else if (!firstWriteErr) firstWriteErr = ins.error.message;
+        }
+
+        // Best-effort enrichment (full gallery + structured feed attributes),
+        // isolated so a not-yet-migrated column can never break the core
+        // listing write above.
+        try {
+          // Capture the entire MarketCheck build object so every data point
+          // the feed carries (mpg, engine size, seating, dimensions, …) is
+          // retained for any surface that needs it later, then layer the
+          // normalized aliases the app reads on top.
+          // Preserve options/features previously decoded by "Pull factory
+          // options" (marketcheck-specs) — the syndication feed usually omits
+          // them, so writing null on every sync was wiping that decoded data.
+          const { data: priorRow } = await admin.from("vehicle_listings")
+            .select("mc_attributes").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+          const priorMc = (priorRow?.mc_attributes || {}) as Record<string, unknown>;
+          const mcAttrs = {
+            ...(b as Record<string, unknown>),
+            msrp: toPrice(l.msrp), exterior_color: l.exterior_color || null,
+            interior_color: l.interior_color || null,
+            base_ext_color: l.base_ext_color || null, base_int_color: l.base_int_color || null,
+            engine: b.engine || null, transmission: b.transmission || null,
+            drivetrain: b.drivetrain || null, fuel_type: b.fuel_type || null,
+            body_type: b.body_type || null, doors: b.doors ?? null,
+            cylinders: b.cylinders ?? null, vehicle_type: b.vehicle_type || null,
+            city_mpg: b.city_mpg ?? null, highway_mpg: b.highway_mpg ?? null,
+            engine_size: b.engine_size ?? null,
+            // Alias to the keys the passport's specs/highlights actually read.
+            seating: (b as Record<string, unknown>).std_seating ?? (b as Record<string, unknown>).seating ?? null,
+            horsepower: (b as Record<string, unknown>).horsepower ?? (b as Record<string, unknown>).engine_power ?? null,
+            // Market & history signals (days-on-market, price movement,
+            // listing age, CARFAX badge flags, seller type).
+            dom: l.dom ?? null, dom_active: l.dom_active ?? null, dom_180: l.dom_180 ?? null,
+            price_change_percent: l.price_change_percent ?? null,
+            ref_price: toPrice(l.ref_price), ref_miles: l.ref_miles ?? null,
+            first_seen_at: l.first_seen_at ?? null, last_seen_at: l.last_seen_at ?? null,
+            scraped_at: l.scraped_at ?? null,
+            carfax_1_owner: l.carfax_1_owner ?? null, carfax_clean_title: l.carfax_clean_title ?? null,
+            seller_type: l.seller_type || null, in_transit: l.in_transit ?? null,
+            vdp_url: l.vdp_url || null,
+            // Survives the rebuild only because it is named here.
+            mc_listing_id: l.id ?? priorMc.mc_listing_id ?? null,
+            // OEM equipment / options & packages when present in the feed.
+            features: ((l.extra?.features ?? l.features) ?? priorMc.features) ?? null,
+            options: ((l.extra?.options ?? l.options) ?? priorMc.options) ?? null,
+            // Everything the VIN decode owns. mcAttrs is rebuilt from
+            // scratch rather than spread over the prior value, so a key
+            // that is not named here is DESTROYED on every sync.
+            //
+            // Carrying only options/features forward was not enough: the
+            // syndication feed never carries a build sheet, so every night
+            // this wiped build_sheet and the lifted factory pricing that
+            // marketcheck-specs had written. The window sticker gates on
+            // exactly that key, so the whole fleet fell back to
+            // "awaiting_build_sheet: no saved NeoVIN build sheet on this
+            // listing yet" — while vehicle_facts, which is an append-only
+            // ledger, kept showing the same vehicle's MSRP as VERIFIED.
+            //
+            // It also wiped specs_attempts/specs_decoded_at, so the sweeps
+            // saw an undecoded VIN again and RE-PAID the provider for an
+            // answer we already had, every single night.
+            ...decodeOwned(priorMc),
+          };
+          const enrich: Record<string, unknown> = { mc_attributes: mcAttrs };
+          if (gallery.length) { enrich.photos = gallery; enrich.photo_count = gallery.length; }
+          await admin.from("vehicle_listings").update(enrich)
+            .eq("tenant_id", cfg.tenant_id).eq("vin", vin);
+        } catch { /* photos / mc_attributes columns may not be migrated yet */ }
+
+        // Keep the complete feed payload on the car and append a value
+        // snapshot so the customer's value can be tracked over time.
+        // Best-effort: the mc_raw column / history table may not exist yet.
+        await admin.from("vehicle_listings").update({ mc_raw: l })
+          .eq("tenant_id", cfg.tenant_id).eq("vin", vin)
+          .then(() => undefined, () => undefined);
+        // Skip the snapshot when the price hasn't moved since the last
+        // capture — a nightly sync of an unchanged lot was appending an
+        // identical row per car per run, bloating the timeline table.
+        const { data: lastSnap } = await admin.from("vehicle_value_history")
+          .select("listing_price, market_value")
+          .eq("tenant_id", cfg.tenant_id).eq("vin", vin)
+          .order("captured_at", { ascending: false }).limit(1)
+          .then((r) => r, () => ({ data: null }));
+        const last = Array.isArray(lastSnap) ? lastSnap[0] as { listing_price?: number | null; market_value?: number | null } | undefined : undefined;
+        const lastPrice = last?.listing_price != null ? Number(last.listing_price) : null;
+        const samePrice = last !== undefined && lastPrice === (price ?? null) && last.market_value == null;
+        if (!samePrice) {
+          await admin.from("vehicle_value_history").insert({
+            tenant_id: cfg.tenant_id, vin, source: "marketcheck_sync",
+            listing_price: price ?? null, payload: l, captured_at: new Date().toISOString(),
+          }).then(() => undefined, () => undefined);
+        }
+
+        // 3) advertised_prices — website price snapshot on change.
+        if (price != null) {
+          const prev = latestWebsite.get(vin);
+          if (prev == null || Math.abs(prev - price) >= 1) {
+            const { error } = await admin.from("advertised_prices").insert({
+              tenant_id: cfg.tenant_id, store_id: "", vin,
+              source_url: l.vdp_url || "", source_channel: "website",
+              advertised_price: price, captured_by: "marketcheck",
+              notes: prev == null
+                ? `MarketCheck ${l.inventory_type || ""} · $${price.toLocaleString()}`
+                : `MarketCheck ${l.inventory_type || ""} · $${prev.toLocaleString()} → $${price.toLocaleString()}`,
+            });
+            if (!error) { tenantPrices++; pricesRecorded++; latestWebsite.set(vin, price); }
+            // New or price-changed VIN → queue a full enrichment pull,
+            // ZIP-anchored to the tenant's local market.
+            if (enrichQueue.length < ENRICH_CAP) enrichQueue.push({ tenant_id: cfg.tenant_id, vin, zip: tenantZip || undefined });
+          }
+        }
+
+        // ── Emit change_history + exceptions ──────────────────────
+        // Wrapped so a logging failure never breaks the ingest loop.
+        try {
+          // Resolve the current listing id (for the FK on change_history).
+          const listingId = priorListing?.id
+            || (await admin.from("vehicle_listings").select("id")
+              .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle()).data?.id
+            || null;
+
+          if (!priorListing) {
+            // Brand-new VIN — or a reappearance of a previously-removed one.
+            if (previouslyRemovedVins.has(vin)) {
+              await emitChange({
+                tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                field_key: "_lifecycle", previous_value: "removed_from_feed",
+                new_value: "relisted", source: "marketcheck", change_origin: "automatic",
+              });
+              await emitException({
+                tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                exception_type: "relisted", severity: "low",
+                title: `${ymm || vin} is back on the feed`,
+                explanation: "This VIN was previously removed from the feed and is now live again.",
+                source_values: { price, miles, condition }, recommended_action: "Confirm status and refresh price/label if needed.",
+                status: "open",
+              });
+            } else {
+              await emitChange({
+                tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                field_key: "_lifecycle", previous_value: null,
+                new_value: "new_vehicle", source: "marketcheck", change_origin: "automatic",
+              });
+              await emitException({
+                tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                exception_type: "new_vehicle", severity: "info",
+                title: `${ymm || vin} added to inventory`,
+                explanation: "First time this VIN has been seen from the feed.",
+                source_values: { price, miles, condition },
+                recommended_action: "Generate required documents (window sticker, addendum, buyers guide).",
+                status: "open",
+              });
+            }
+          } else {
+            // Field-level diff on an existing listing.
+            const prevPriceRaw = priorListing.price;
+            const prevPrice = prevPriceRaw == null ? null : Number(prevPriceRaw);
+            if (price != null && prevPrice != null && Math.abs(prevPrice - price) >= 1) {
+              const a = applyAuthority("price", { severity: "medium", requires_new_document: true });
+              if (!a.skip) {
+                const ex = await emitException({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                  exception_type: "price_change", severity: a.severity,
+                  title: `Price ${price > prevPrice ? "raised" : "lowered"}: $${prevPrice.toLocaleString()} → $${price.toLocaleString()}`,
+                  explanation: `The advertised price for ${ymm || vin} moved.`,
+                  source_values: { previous: prevPrice, next: price, source: "marketcheck" },
+                  recommended_action: "Regenerate & reprint the price label / addendum.",
+                  requires_new_document: a.requires_new_document, status: "open",
+                });
+                await emitChange({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                  field_key: "price", previous_value: String(prevPrice), new_value: String(price),
+                  source: "marketcheck", change_origin: "automatic",
+                  requires_new_document: a.requires_new_document, created_exception_id: ex,
+                });
+              }
+            }
+
+            const prevMilesRaw = priorListing.mileage;
+            const prevMiles = prevMilesRaw == null ? null : Number(prevMilesRaw);
+            if (miles > 0 && prevMiles != null && prevMiles !== miles) {
+              const rolledBack = miles < prevMiles - 50;
+              const type = rolledBack ? "mileage_rollback" : "mileage_change";
+              const base = { severity: rolledBack ? "high" : "low", requires_new_document: rolledBack };
+              const a = applyAuthority("mileage", base);
+              if (!a.skip) {
+                const ex = await emitException({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                  exception_type: type, severity: a.severity,
+                  title: rolledBack
+                    ? `Mileage decreased: ${prevMiles.toLocaleString()} → ${miles.toLocaleString()}`
+                    : `Mileage updated: ${prevMiles.toLocaleString()} → ${miles.toLocaleString()}`,
+                  explanation: rolledBack
+                    ? "Odometer reading dropped from the last sync. Verify the source before publishing."
+                    : "Odometer reading changed on the feed.",
+                  source_values: { previous: prevMiles, next: miles, source: "marketcheck" },
+                  recommended_action: rolledBack ? "Verify the odometer with the source system and update the disclosure if needed."
+                    : "Confirm the update and refresh printed materials on next print.",
+                  requires_new_document: a.requires_new_document, status: "open",
+                });
+                await emitChange({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                  field_key: "mileage", previous_value: String(prevMiles), new_value: String(miles),
+                  source: "marketcheck", change_origin: "automatic",
+                  requires_new_document: a.requires_new_document, created_exception_id: ex,
+                });
+              }
+            }
+
+            const prevCondition = priorListing.condition || null;
+            if (prevCondition && prevCondition !== condition) {
+              const a = applyAuthority("condition", { severity: "medium", requires_new_document: true });
+              if (!a.skip) {
+                const ex = await emitException({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                  exception_type: condition === "cpo" || prevCondition === "cpo" ? "certification_change" : "vehicle_type_change",
+                  severity: a.severity,
+                  title: `Vehicle type changed: ${prevCondition} → ${condition}`,
+                  explanation: "The feed reports a different new/used/CPO classification than the last run.",
+                  source_values: { previous: prevCondition, next: condition, source: "marketcheck" },
+                  recommended_action: "Confirm the correct classification; regenerate documents that vary by type.",
+                  requires_new_document: a.requires_new_document, status: "open",
+                });
+                await emitChange({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                  field_key: "condition", previous_value: prevCondition, new_value: condition,
+                  source: "marketcheck", change_origin: "automatic",
+                  requires_new_document: a.requires_new_document, created_exception_id: ex,
+                });
+              }
+            }
+
+            const prevStock = String(priorFile?.stock_number ?? "").trim();
+            if (stockNo && prevStock && prevStock !== stockNo) {
+              const a = applyAuthority("stock_number", { severity: "low" });
+              if (!a.skip) {
+                const ex = await emitException({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo,
+                  exception_type: "stock_number_change", severity: a.severity,
+                  title: `Stock # changed: ${prevStock} → ${stockNo}`,
+                  explanation: "The DMS stock number on the feed changed for this VIN.",
+                  source_values: { previous: prevStock, next: stockNo }, recommended_action: "Confirm the stock number in the DMS.",
+                  requires_new_document: a.requires_new_document, status: "open",
+                });
+                await emitChange({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                  field_key: "stock_number", previous_value: prevStock, new_value: stockNo,
+                  source: "marketcheck", change_origin: "automatic",
+                  requires_new_document: a.requires_new_document, created_exception_id: ex,
+                });
+              }
+            }
+          }
+
+          // Missing required fields (used vehicles need price + mileage).
+          if (condition === "used") {
+            if (price == null) {
+              const a = applyAuthority("price", { severity: "medium" });
+              if (!a.skip) {
+                await emitException({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                  exception_type: "missing_required_field", severity: a.severity,
+                  title: `Missing price on used vehicle ${ymm || vin}`,
+                  explanation: "The feed row has no advertised price. A used vehicle must be published with a price.",
+                  source_values: { field: "price", source: "marketcheck" },
+                  recommended_action: "Set the advertised price at the source (DMS / website).",
+                  requires_new_document: a.requires_new_document, status: "open",
+                });
+              }
+            }
+            if (!miles) {
+              const a = applyAuthority("mileage", { severity: "medium" });
+              if (!a.skip) {
+                await emitException({
+                  tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                  exception_type: "missing_required_field", severity: a.severity,
+                  title: `Missing mileage on used vehicle ${ymm || vin}`,
+                  explanation: "The feed row has no odometer reading for a used vehicle.",
+                  source_values: { field: "mileage", source: "marketcheck" },
+                  recommended_action: "Enter the odometer reading at the source system.",
+                  requires_new_document: a.requires_new_document, status: "open",
+                });
+              }
+            }
+          }
+        } catch { /* change detection is best-effort */ }
+        return "ok";
+      };
+
       // Page by the ACTUAL number of rows returned, not the requested size — a
       // low-tier MarketCheck key silently caps rows (e.g. to 10) even when we
       // ask for more, so we must advance `start` by what we really got and keep
@@ -795,466 +1276,80 @@ serve(async (req) => {
       let pageGuard = 0;
       pages:
       while (tenantSeen < cfg.max_vehicles && pageGuard < 500) {
-        {
-          pageGuard++;
-          const pageData = start === 0
-            ? firstPage
-            : await syndPage(chosen.param, chosen.value, synRows, start);
-          const listings: MCListing[] = pageData.listings;
-          numFound = pageData.numFound || numFound;
-          if (listings.length === 0) break;
+        pageGuard++;
+        const pageData = start === 0
+          ? firstPage
+          : await syndPage(chosen.param, chosen.value, synRows, start);
+        const listings: MCListing[] = pageData.listings;
+        numFound = pageData.numFound || numFound;
+        if (listings.length === 0) break;
 
-          for (const l of listings) {
-            if (tenantSeen >= cfg.max_vehicles) break pages;
-            const rawVin = String(l.vin || "").toUpperCase().trim();
-            const vin = normVin(l.vin);
-            // Invalid VIN (fails 17-char/format check): log an exception then skip.
-            const validVin = /^[A-HJ-NPR-Z0-9]{17}$/.test(rawVin);
-            if (!validVin) {
-              try {
-                if (rawVin) {
-                  await emitException({
-                    tenant_id: cfg.tenant_id, vin: rawVin, exception_type: "invalid_vin",
-                    severity: "high", title: `Invalid VIN "${rawVin}"`,
-                    explanation: "VIN failed 17-character format check. The feed row was skipped.",
-                    source_values: { vin: rawVin, source: "marketcheck" },
-                    recommended_action: "Confirm the VIN with the source system; the listing was not ingested.",
-                    status: "open",
-                  });
-                }
-              } catch { /* best-effort */ }
-              if (!vin || vin.length < 11) continue;
-            }
-            if (!vin || vin.length < 11) continue;
-            // With a verified rooftop address, a car must positively match it.
-            // Unproven listings are dropped rather than assumed ours — that
-            // assumption is what let sibling stores drift in.
-            const own = classifyListing(listingIdentity(l), rooftop);
-            if (own === "mismatch" || (strict && own !== "match")) { rejected++; continue; }
-            tenantSeen++; seen++;
-            liveVins.add(vin);
-            const price = toPrice(l.price);
-            const stockNo = String(l.stock_no ?? (l.dealer && l.dealer.stock_no) ?? "").trim();
-            const b = l.build || {};
-            const ymm = [b.year, b.make, b.model].filter(Boolean).join(" ") || null;
-            const condition = l.is_certified ? "cpo" : (l.inventory_type === "new" ? "new" : "used");
-            const miles = typeof l.miles === "number" ? Math.round(l.miles) : 0;
-            if (stockNo) {
-              const arr = stockMap.get(stockNo) || [];
-              if (!arr.includes(vin)) arr.push(vin);
-              stockMap.set(stockNo, arr);
-            }
-
-            // ── Change detection — capture prior state before any write ──
-            // deno-lint-ignore no-explicit-any
-            let priorListing: any = null;
-            // deno-lint-ignore no-explicit-any
-            let priorFile: any = null;
-            try {
-              const { data: pl } = await admin.from("vehicle_listings")
-                .select("id, price, mileage, condition, ymm")
-                .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
-              priorListing = pl || null;
-              const { data: pf } = await admin.from("vehicle_files")
-                .select("id, stock_number, condition, mileage")
-                .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
-              priorFile = pf || null;
-            } catch { /* diff best-effort */ }
-
-
-            // 1) vehicle_files — the inventory-of-record / addendum hub. NEW
-            // VINs create a fresh file; existing files only refresh inventory
-            // fields (never deal_status / customer data).
-            const { data: vf } = await admin.from("vehicle_files")
-              .select("id").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
-            if (vf) {
-              await admin.from("vehicle_files").update({
-                year: String(b.year || ""), make: b.make || "", model: b.model || "",
-                trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
-                feed_source: "marketcheck",
-              }).eq("id", vf.id);
-            } else {
-              const { error } = await admin.from("vehicle_files").insert({
-                tenant_id: cfg.tenant_id, vin,
-                year: String(b.year || ""), make: b.make || "", model: b.model || "",
-                trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
-                feed_source: "marketcheck",
-              });
-              if (!error) { tenantNew++; newVehicles++; }
-            }
-
-            // 2) vehicle_listings — sticker / public packet + lot price view.
-            // NOTE: vehicle_listings has no stock_number column (that lives on
-            // vehicle_files); including it fails the whole write.
-            const { data: vl } = await admin.from("vehicle_listings")
-              .select("id").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
-            const patch: Record<string, unknown> = {
-              tenant_id: cfg.tenant_id, vin, condition, feed_source: "marketcheck",
-              // Keep the VDP url even when the feed carried no price, so the
-              // advertised-price crawler can seed a first price off the dealer's
-              // own page (Your Price / <Dealer> Deal).
-              source_url: l.vdp_url || null,
-            };
-            // Only set inventory fields the feed actually carried. A feed row
-            // that reappears WITHOUT a price/mileage/ymm must never null out a
-            // good value on an existing listing — and a nulled price would also
-            // disable the FTC advertised-price guard, which reads
-            // vehicle_listings.price as the feed baseline.
-            if (ymm) patch.ymm = ymm;
-            if (b.trim) patch.trim = b.trim;
-            if (miles) patch.mileage = miles;
-            // Price/doc-fee breakdown: the feed price is advertised-before-doc;
-            // website sale price = advertised + the tenant doc fee (added once).
-            // The nightly advertised-price crawl refines these from the live VDP.
-            if (price != null) {
-              patch.price = price;
-              patch.doc_fee = tenantDocFee;
-              if (advertisedInclDocFee && tenantDocFee > 0) {
-                // Feed price is the fee-INCLUSIVE website price; derive before-doc.
-                patch.advertised_price_before_doc = price - tenantDocFee;
-                patch.website_sale_price = price;
-                patch.price_parse_notes = "From MarketCheck feed; advertised price includes the tenant doc fee (not added again).";
-              } else {
-                // Feed price is BEFORE doc; website sale price adds the fee once.
-                patch.advertised_price_before_doc = price;
-                patch.website_sale_price = price + tenantDocFee;
-                patch.price_parse_notes = "From MarketCheck feed; sale price = advertised + tenant doc fee.";
-              }
-              patch.price_source_url = l.vdp_url || null;
-              patch.price_parse_status = "ok";
-              patch.price_last_verified_at = new Date().toISOString();
-            }
-            // First-pass photos from the feed; the crawler later upgrades the
-            // hero to the dealer's own og:image. Only set hero when present so we
-            // never null out a better image captured by a previous run.
-            // Prefer the dealer's own website photos (photo_links); fall back to
-            // MarketCheck's cached copies only when the dealer set is missing.
-            const gallery: string[] = (l.media?.photo_links?.length ? l.media.photo_links : l.media?.photo_links_cached) || [];
-            if (gallery[0]) patch.hero_image_url = gallery[0];
-            if (vl) {
-              const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
-              if (!error) {
-                listingsUpserted++;
-                updatedListingIds.push(vl.id);
-                // A VIN that left the feed is retired, not deleted, so a car
-                // that comes back is an UPDATE now where it used to be a fresh
-                // INSERT. Without this it would keep the archived status it was
-                // given on the way out and stay invisible to its own dealer.
-                await admin.rpc("marketcheck_revive_listing", { _tenant_id: cfg.tenant_id, _vin: vin })
-                  .then(({ error: e }) => { if (e) console.warn("revive_failed", vin, e.message); });
-                // Back-fill the Get-Ready hub token for cars that predate this
-                // feature or were first ingested by another path (autocurb-sync,
-                // manual add) so they never fall out of the get-ready flow.
-                await ensureReadyToken(admin, cfg.tenant_id, vin, ymm, vl.id);
-                // Backfill the compliance drafts for existing inventory
-                // (idempotent) — with the render target, so a draft newly
-                // created on this resync path also gets its form PDFs instead
-                // of sitting file-less forever.
-                await ensureComplianceDrafts(admin, cfg.tenant_id, vin, { supabaseUrl, serviceKey });
-              } else if (!firstWriteErr) firstWriteErr = error.message;
-            } else {
-              const ins = await admin.from("vehicle_listings").insert({
-                ...patch, store_id: cfg.tenant_id, slug: makeSlug(vin, ymm || undefined), status: "draft", sticker_snapshot: {},
-              }).select("id").maybeSingle();
-              if (!ins.error) {
-                listingsUpserted++;
-                // New car → auto-preload its Get-Ready QR + OEM window sticker.
-                await autoPreload(admin, supabaseUrl, serviceKey, {
-                  tenantId: cfg.tenant_id, vin, ymm, listingId: ins.data?.id ?? null,
-                  emailTitle: String(pset.title_email_on_intake) !== "false",
-                });
-              } else if (!firstWriteErr) firstWriteErr = ins.error.message;
-            }
-
-            // Best-effort enrichment (full gallery + structured feed attributes),
-            // isolated so a not-yet-migrated column can never break the core
-            // listing write above.
-            try {
-              // Capture the entire MarketCheck build object so every data point
-              // the feed carries (mpg, engine size, seating, dimensions, …) is
-              // retained for any surface that needs it later, then layer the
-              // normalized aliases the app reads on top.
-              // Preserve options/features previously decoded by "Pull factory
-              // options" (marketcheck-specs) — the syndication feed usually omits
-              // them, so writing null on every sync was wiping that decoded data.
-              const { data: priorRow } = await admin.from("vehicle_listings")
-                .select("mc_attributes").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
-              const priorMc = (priorRow?.mc_attributes || {}) as Record<string, unknown>;
-              const mcAttrs = {
-                ...(b as Record<string, unknown>),
-                msrp: toPrice(l.msrp), exterior_color: l.exterior_color || null,
-                interior_color: l.interior_color || null,
-                base_ext_color: l.base_ext_color || null, base_int_color: l.base_int_color || null,
-                engine: b.engine || null, transmission: b.transmission || null,
-                drivetrain: b.drivetrain || null, fuel_type: b.fuel_type || null,
-                body_type: b.body_type || null, doors: b.doors ?? null,
-                cylinders: b.cylinders ?? null, vehicle_type: b.vehicle_type || null,
-                city_mpg: b.city_mpg ?? null, highway_mpg: b.highway_mpg ?? null,
-                engine_size: b.engine_size ?? null,
-                // Alias to the keys the passport's specs/highlights actually read.
-                seating: (b as Record<string, unknown>).std_seating ?? (b as Record<string, unknown>).seating ?? null,
-                horsepower: (b as Record<string, unknown>).horsepower ?? (b as Record<string, unknown>).engine_power ?? null,
-                // Market & history signals (days-on-market, price movement,
-                // listing age, CARFAX badge flags, seller type).
-                dom: l.dom ?? null, dom_active: l.dom_active ?? null, dom_180: l.dom_180 ?? null,
-                price_change_percent: l.price_change_percent ?? null,
-                ref_price: toPrice(l.ref_price), ref_miles: l.ref_miles ?? null,
-                first_seen_at: l.first_seen_at ?? null, last_seen_at: l.last_seen_at ?? null,
-                scraped_at: l.scraped_at ?? null,
-                carfax_1_owner: l.carfax_1_owner ?? null, carfax_clean_title: l.carfax_clean_title ?? null,
-                seller_type: l.seller_type || null, in_transit: l.in_transit ?? null,
-                vdp_url: l.vdp_url || null,
-                // Survives the rebuild only because it is named here.
-                mc_listing_id: l.id ?? priorMc.mc_listing_id ?? null,
-                // OEM equipment / options & packages when present in the feed.
-                features: ((l.extra?.features ?? l.features) ?? priorMc.features) ?? null,
-                options: ((l.extra?.options ?? l.options) ?? priorMc.options) ?? null,
-                // Everything the VIN decode owns. mcAttrs is rebuilt from
-                // scratch rather than spread over the prior value, so a key
-                // that is not named here is DESTROYED on every sync.
-                //
-                // Carrying only options/features forward was not enough: the
-                // syndication feed never carries a build sheet, so every night
-                // this wiped build_sheet and the lifted factory pricing that
-                // marketcheck-specs had written. The window sticker gates on
-                // exactly that key, so the whole fleet fell back to
-                // "awaiting_build_sheet: no saved NeoVIN build sheet on this
-                // listing yet" — while vehicle_facts, which is an append-only
-                // ledger, kept showing the same vehicle's MSRP as VERIFIED.
-                //
-                // It also wiped specs_attempts/specs_decoded_at, so the sweeps
-                // saw an undecoded VIN again and RE-PAID the provider for an
-                // answer we already had, every single night.
-                ...decodeOwned(priorMc),
-              };
-              const enrich: Record<string, unknown> = { mc_attributes: mcAttrs };
-              if (gallery.length) { enrich.photos = gallery; enrich.photo_count = gallery.length; }
-              await admin.from("vehicle_listings").update(enrich)
-                .eq("tenant_id", cfg.tenant_id).eq("vin", vin);
-            } catch { /* photos / mc_attributes columns may not be migrated yet */ }
-
-            // Keep the complete feed payload on the car and append a value
-            // snapshot so the customer's value can be tracked over time.
-            // Best-effort: the mc_raw column / history table may not exist yet.
-            await admin.from("vehicle_listings").update({ mc_raw: l })
-              .eq("tenant_id", cfg.tenant_id).eq("vin", vin)
-              .then(() => undefined, () => undefined);
-            // Skip the snapshot when the price hasn't moved since the last
-            // capture — a nightly sync of an unchanged lot was appending an
-            // identical row per car per run, bloating the timeline table.
-            const { data: lastSnap } = await admin.from("vehicle_value_history")
-              .select("listing_price, market_value")
-              .eq("tenant_id", cfg.tenant_id).eq("vin", vin)
-              .order("captured_at", { ascending: false }).limit(1)
-              .then((r) => r, () => ({ data: null }));
-            const last = Array.isArray(lastSnap) ? lastSnap[0] as { listing_price?: number | null; market_value?: number | null } | undefined : undefined;
-            const lastPrice = last?.listing_price != null ? Number(last.listing_price) : null;
-            const samePrice = last !== undefined && lastPrice === (price ?? null) && last.market_value == null;
-            if (!samePrice) {
-              await admin.from("vehicle_value_history").insert({
-                tenant_id: cfg.tenant_id, vin, source: "marketcheck_sync",
-                listing_price: price ?? null, payload: l, captured_at: new Date().toISOString(),
-              }).then(() => undefined, () => undefined);
-            }
-
-            // 3) advertised_prices — website price snapshot on change.
-            if (price != null) {
-              const prev = latestWebsite.get(vin);
-              if (prev == null || Math.abs(prev - price) >= 1) {
-                const { error } = await admin.from("advertised_prices").insert({
-                  tenant_id: cfg.tenant_id, store_id: "", vin,
-                  source_url: l.vdp_url || "", source_channel: "website",
-                  advertised_price: price, captured_by: "marketcheck",
-                  notes: prev == null
-                    ? `MarketCheck ${l.inventory_type || ""} · $${price.toLocaleString()}`
-                    : `MarketCheck ${l.inventory_type || ""} · $${prev.toLocaleString()} → $${price.toLocaleString()}`,
-                });
-                if (!error) { tenantPrices++; pricesRecorded++; latestWebsite.set(vin, price); }
-                // New or price-changed VIN → queue a full enrichment pull,
-                // ZIP-anchored to the tenant's local market.
-                if (enrichQueue.length < ENRICH_CAP) enrichQueue.push({ tenant_id: cfg.tenant_id, vin, zip: tenantZip || undefined });
-              }
-            }
-
-            // ── Emit change_history + exceptions ──────────────────────
-            // Wrapped so a logging failure never breaks the ingest loop.
-            try {
-              // Resolve the current listing id (for the FK on change_history).
-              const listingId = priorListing?.id
-                || (await admin.from("vehicle_listings").select("id")
-                  .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle()).data?.id
-                || null;
-
-              if (!priorListing) {
-                // Brand-new VIN — or a reappearance of a previously-removed one.
-                if (previouslyRemovedVins.has(vin)) {
-                  await emitChange({
-                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
-                    field_key: "_lifecycle", previous_value: "removed_from_feed",
-                    new_value: "relisted", source: "marketcheck", change_origin: "automatic",
-                  });
-                  await emitException({
-                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
-                    exception_type: "relisted", severity: "low",
-                    title: `${ymm || vin} is back on the feed`,
-                    explanation: "This VIN was previously removed from the feed and is now live again.",
-                    source_values: { price, miles, condition }, recommended_action: "Confirm status and refresh price/label if needed.",
-                    status: "open",
-                  });
-                } else {
-                  await emitChange({
-                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
-                    field_key: "_lifecycle", previous_value: null,
-                    new_value: "new_vehicle", source: "marketcheck", change_origin: "automatic",
-                  });
-                  await emitException({
-                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
-                    exception_type: "new_vehicle", severity: "info",
-                    title: `${ymm || vin} added to inventory`,
-                    explanation: "First time this VIN has been seen from the feed.",
-                    source_values: { price, miles, condition },
-                    recommended_action: "Generate required documents (window sticker, addendum, buyers guide).",
-                    status: "open",
-                  });
-                }
-              } else {
-                // Field-level diff on an existing listing.
-                const prevPriceRaw = priorListing.price;
-                const prevPrice = prevPriceRaw == null ? null : Number(prevPriceRaw);
-                if (price != null && prevPrice != null && Math.abs(prevPrice - price) >= 1) {
-                  const a = applyAuthority("price", { severity: "medium", requires_new_document: true });
-                  if (!a.skip) {
-                    const ex = await emitException({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
-                      exception_type: "price_change", severity: a.severity,
-                      title: `Price ${price > prevPrice ? "raised" : "lowered"}: $${prevPrice.toLocaleString()} → $${price.toLocaleString()}`,
-                      explanation: `The advertised price for ${ymm || vin} moved.`,
-                      source_values: { previous: prevPrice, next: price, source: "marketcheck" },
-                      recommended_action: "Regenerate & reprint the price label / addendum.",
-                      requires_new_document: a.requires_new_document, status: "open",
-                    });
-                    await emitChange({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
-                      field_key: "price", previous_value: String(prevPrice), new_value: String(price),
-                      source: "marketcheck", change_origin: "automatic",
-                      requires_new_document: a.requires_new_document, created_exception_id: ex,
-                    });
-                  }
-                }
-
-                const prevMilesRaw = priorListing.mileage;
-                const prevMiles = prevMilesRaw == null ? null : Number(prevMilesRaw);
-                if (miles > 0 && prevMiles != null && prevMiles !== miles) {
-                  const rolledBack = miles < prevMiles - 50;
-                  const type = rolledBack ? "mileage_rollback" : "mileage_change";
-                  const base = { severity: rolledBack ? "high" : "low", requires_new_document: rolledBack };
-                  const a = applyAuthority("mileage", base);
-                  if (!a.skip) {
-                    const ex = await emitException({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
-                      exception_type: type, severity: a.severity,
-                      title: rolledBack
-                        ? `Mileage decreased: ${prevMiles.toLocaleString()} → ${miles.toLocaleString()}`
-                        : `Mileage updated: ${prevMiles.toLocaleString()} → ${miles.toLocaleString()}`,
-                      explanation: rolledBack
-                        ? "Odometer reading dropped from the last sync. Verify the source before publishing."
-                        : "Odometer reading changed on the feed.",
-                      source_values: { previous: prevMiles, next: miles, source: "marketcheck" },
-                      recommended_action: rolledBack ? "Verify the odometer with the source system and update the disclosure if needed."
-                        : "Confirm the update and refresh printed materials on next print.",
-                      requires_new_document: a.requires_new_document, status: "open",
-                    });
-                    await emitChange({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
-                      field_key: "mileage", previous_value: String(prevMiles), new_value: String(miles),
-                      source: "marketcheck", change_origin: "automatic",
-                      requires_new_document: a.requires_new_document, created_exception_id: ex,
-                    });
-                  }
-                }
-
-                const prevCondition = priorListing.condition || null;
-                if (prevCondition && prevCondition !== condition) {
-                  const a = applyAuthority("condition", { severity: "medium", requires_new_document: true });
-                  if (!a.skip) {
-                    const ex = await emitException({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
-                      exception_type: condition === "cpo" || prevCondition === "cpo" ? "certification_change" : "vehicle_type_change",
-                      severity: a.severity,
-                      title: `Vehicle type changed: ${prevCondition} → ${condition}`,
-                      explanation: "The feed reports a different new/used/CPO classification than the last run.",
-                      source_values: { previous: prevCondition, next: condition, source: "marketcheck" },
-                      recommended_action: "Confirm the correct classification; regenerate documents that vary by type.",
-                      requires_new_document: a.requires_new_document, status: "open",
-                    });
-                    await emitChange({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
-                      field_key: "condition", previous_value: prevCondition, new_value: condition,
-                      source: "marketcheck", change_origin: "automatic",
-                      requires_new_document: a.requires_new_document, created_exception_id: ex,
-                    });
-                  }
-                }
-
-                const prevStock = String(priorFile?.stock_number ?? "").trim();
-                if (stockNo && prevStock && prevStock !== stockNo) {
-                  const a = applyAuthority("stock_number", { severity: "low" });
-                  if (!a.skip) {
-                    const ex = await emitException({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo,
-                      exception_type: "stock_number_change", severity: a.severity,
-                      title: `Stock # changed: ${prevStock} → ${stockNo}`,
-                      explanation: "The DMS stock number on the feed changed for this VIN.",
-                      source_values: { previous: prevStock, next: stockNo }, recommended_action: "Confirm the stock number in the DMS.",
-                      requires_new_document: a.requires_new_document, status: "open",
-                    });
-                    await emitChange({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
-                      field_key: "stock_number", previous_value: prevStock, new_value: stockNo,
-                      source: "marketcheck", change_origin: "automatic",
-                      requires_new_document: a.requires_new_document, created_exception_id: ex,
-                    });
-                  }
-                }
-              }
-
-              // Missing required fields (used vehicles need price + mileage).
-              if (condition === "used") {
-                if (price == null) {
-                  const a = applyAuthority("price", { severity: "medium" });
-                  if (!a.skip) {
-                    await emitException({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
-                      exception_type: "missing_required_field", severity: a.severity,
-                      title: `Missing price on used vehicle ${ymm || vin}`,
-                      explanation: "The feed row has no advertised price. A used vehicle must be published with a price.",
-                      source_values: { field: "price", source: "marketcheck" },
-                      recommended_action: "Set the advertised price at the source (DMS / website).",
-                      requires_new_document: a.requires_new_document, status: "open",
-                    });
-                  }
-                }
-                if (!miles) {
-                  const a = applyAuthority("mileage", { severity: "medium" });
-                  if (!a.skip) {
-                    await emitException({
-                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
-                      exception_type: "missing_required_field", severity: a.severity,
-                      title: `Missing mileage on used vehicle ${ymm || vin}`,
-                      explanation: "The feed row has no odometer reading for a used vehicle.",
-                      source_values: { field: "mileage", source: "marketcheck" },
-                      recommended_action: "Enter the odometer reading at the source system.",
-                      requires_new_document: a.requires_new_document, status: "open",
-                    });
-                  }
-                }
-              }
-            } catch { /* change detection is best-effort */ }
-          }
-
-          start += listings.length;
-          if (start >= numFound) { feedWalked = true; break; }
+        for (const l of listings) {
+          if (await ingestListing(l) === "capped") break pages;
         }
+
+        start += listings.length;
+        if (start >= numFound) { feedWalked = true; break; }
+      }
+
+      // ── New-car coverage backstop ─────────────────────────────────────
+      // MarketCheck's owned attribution can silently drop an entire segment:
+      // on 2026-08-01 the owned feed for this rooftop lost every new unit
+      // (120 -> 56 cars with no query change on our side), the nightly kept
+      // syncing used/CPO, and the prune archived the whole new-car lot. When
+      // a tenant that has ever carried new inventory walks a FULL feed with
+      // zero new units, probe the other scopes with car_type=new — ending
+      // with the unowned feed, which includes syndicated/non-attributed
+      // records and is where units that lost the physically-owned flag live.
+      // Every row still passes the strict street+ZIP ownership check; only
+      // the rooftop-id equality is relaxed, because MarketCheck re-attributes
+      // rooftop ids and the street address is the physical truth.
+      const primaryNewUnits = newTypeSeen;
+      let supplementalNew: Record<string, unknown> | null = null;
+      if (feedWalked && newTypeSeen === 0 && tenantSellsNew && tenantSeen < cfg.max_vehicles) {
+        const addrRooftop: Rooftop = { ...rooftop, rooftopId: undefined };
+        const tried: Array<Record<string, unknown>> = [];
+        const supProbes: Array<{ param: string; value: string; owned: boolean }> = [];
+        const pushProbe = (param: string, value: string, owned: boolean) => {
+          if (!value) return;
+          // The primary feed was walked in full, so re-probing the chosen
+          // scope owned is provably empty.
+          if (param === chosen.param && value === chosen.value && owned) return;
+          if (supProbes.some((p) => p.param === param && p.value === value && p.owned === owned)) return;
+          supProbes.push({ param, value, owned });
+        };
+        for (const p of dealership.probes) pushProbe(p.param, p.value, true);
+        if (source) pushProbe("source", source, true);
+        if (source) pushProbe("source", source, false);
+        pushProbe(chosen.param, chosen.value, false);
+        for (const p of supProbes.slice(0, 5)) {
+          const r = await syndPage(p.param, p.value, synRows, 0, { carType: "new", owned: p.owned });
+          // The unowned feed can return several copies per VIN; prefer the
+          // copy with a price and the dealer's own VDP so its url/price wins.
+          const score = (x: MCListing) => (toPrice(x.price) != null ? 2 : 0) + (source && listingHosts(x).includes(source) ? 1 : 0);
+          const rowsSorted = [...r.listings].sort((a, b) => score(b) - score(a));
+          let matched = 0, ingested = 0;
+          let capped = false;
+          for (const l of rowsSorted) {
+            // car_type=new asked, but never trust the filter: only new units,
+            // never a VIN the primary walk already ingested.
+            if (String(l.inventory_type || "").toLowerCase() !== "new") continue;
+            const v = normVin(l.vin);
+            if (!v || liveVins.has(v)) continue;
+            const own = classifyListing(listingIdentity(l), addrRooftop);
+            if (own === "mismatch" || (cfg.strict_rooftop !== false && isStrictRooftop(addrRooftop) && own !== "match")) continue;
+            matched++;
+            const res = await ingestListing(l, addrRooftop);
+            if (res === "capped") { capped = true; break; }
+            if (res === "ok") ingested++;
+          }
+          tried.push({ param: p.param, id: p.value, owned: p.owned, http: r.http, num_found: r.numFound, got: r.listings.length, matched, ingested });
+          if (ingested > 0 || capped) {
+            supplementalNew = { param: p.param, id: p.value, owned: p.owned, ingested, attempts: tried };
+            break;
+          }
+        }
+        if (!supplementalNew) supplementalNew = { exhausted: true, attempts: tried };
       }
 
       // ── Duplicate stock_number across live VINs ────────────────────
@@ -1381,6 +1476,7 @@ serve(async (req) => {
 
       tenantsSynced++;
       const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, prune_skipped: pruneSkipped, pinned: cleanRun,
+        new_units: { primary_feed: primaryNewUnits, total: newTypeSeen }, supplemental_new: supplementalNew,
         // Operator-only. Public list prices, so an estimate rather than a bill.
         api_usage: estimateCost(callMeter, 30) };
       diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: manualId, matched_dealer: verifiedName || "(by domain)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });
@@ -1409,7 +1505,7 @@ serve(async (req) => {
         prices_recorded: tenantPrices, removed: pruned?.listings_deleted ?? 0,
         http_status: httpStatus, matched_dealer: verifiedName || null,
         error_summary: firstWriteErr,
-        raw: { source, dealer_id: manualId, mc_param: chosen.param, mc_value: chosen.value, ...probe, pruned },
+        raw: { source, dealer_id: manualId, mc_param: chosen.param, mc_value: chosen.value, ...probe, pruned, new_units: { primary_feed: primaryNewUnits, total: newTypeSeen }, supplemental_new: supplementalNew },
         errors: firstWriteErr ? [{ code: "write_error", message: firstWriteErr }] : [],
       });
     } catch (err) {
