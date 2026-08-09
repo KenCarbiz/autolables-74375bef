@@ -305,7 +305,7 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 md:w-[440px] shrink-0">
           <button onClick={goReserve} className="h-11 rounded-xl bg-[#0B6FEA] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-[#095CC4]">
-            <AutoLabelsSpecIcon name="reserve" className="w-4 h-4" accent="#FFFFFF" /> Reserve This Vehicle
+            <AutoLabelsSpecIcon name="reserve" className="w-4 h-4" accent="#FFFFFF" /> Request Vehicle Hold
           </button>
           <button onClick={goTrade} className="h-11 rounded-xl border-2 border-[#0B6FEA] text-[#0B6FEA] text-[13px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-blue-50">
             <AutoLabelsSpecIcon name="trade" className="w-4 h-4" /> Get Trade Value

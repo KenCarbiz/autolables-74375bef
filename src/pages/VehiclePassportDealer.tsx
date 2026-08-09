@@ -353,7 +353,7 @@ const VehiclePassportDealer = () => {
             </div>
 
             <div className="flex flex-wrap gap-3 mt-7 xl:mt-0 xl:absolute xl:right-[42px] xl:bottom-[30px] xl:justify-end">
-              <button onClick={() => go("reserve")} className={`${heroBtn} px-5 bg-[#0B6FEA] hover:bg-[#0a63d2] text-white shadow-[0_10px_24px_rgba(11,111,234,0.32)]`}><DealerPageIcon iconKey="reserve-vehicle" size={16} color="currentColor" /> Reserve This Vehicle</button>
+              <button onClick={() => go("reserve")} className={`${heroBtn} px-5 bg-[#0B6FEA] hover:bg-[#0a63d2] text-white shadow-[0_10px_24px_rgba(11,111,234,0.32)]`}><DealerPageIcon iconKey="reserve-vehicle" size={16} color="currentColor" /> Request Vehicle Hold</button>
               <button onClick={() => go("test-drive")} className={`${heroBtn} px-[18px] bg-white/[0.96] border border-white/80 text-[#0B3B78] hover:bg-white`}><DealerPageIcon iconKey="schedule-test-drive" size={16} color="currentColor" /> Schedule Test Drive</button>
               <a href={mapsUrl} target="_blank" rel="noreferrer" className={`${heroBtn} px-[18px] bg-white/[0.96] border border-white/80 text-[#0B3B78] hover:bg-white`}><DealerPageIcon iconKey="get-directions" size={16} color="currentColor" /> Get Directions</a>
             </div>
@@ -465,7 +465,7 @@ const VehiclePassportDealer = () => {
         <section className={`${CARD} p-6 sm:p-7 text-center`}>
           <h2 className="text-[20px] font-extrabold tracking-tight">Ready to experience the difference?</h2>
           <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
-            <button onClick={() => go("reserve")} className="h-12 px-6 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13.5px] font-bold inline-flex items-center gap-2"><DealerPageIcon iconKey="reserve-vehicle" size={16} color="currentColor" /> Reserve This Vehicle</button>
+            <button onClick={() => go("reserve")} className="h-12 px-6 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13.5px] font-bold inline-flex items-center gap-2"><DealerPageIcon iconKey="reserve-vehicle" size={16} color="currentColor" /> Request Vehicle Hold</button>
             <button onClick={() => go("test-drive")} className="h-12 px-5 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-blue-50"><DealerPageIcon iconKey="schedule-test-drive" size={16} color="currentColor" /> Schedule Test Drive</button>
             <button onClick={() => go("contact")} className="h-12 px-5 rounded-xl border border-[#E6E8EC] text-[13.5px] font-bold inline-flex items-center gap-2 hover:border-[#2563EB]"><DealerPageIcon iconKey="message-team" size={16} color="#2563EB" /> Message Our Team</button>
             <a href={mapsUrl} target="_blank" rel="noreferrer" className="h-12 px-5 rounded-xl border border-[#E6E8EC] text-[13.5px] font-bold inline-flex items-center gap-2 hover:border-[#2563EB]"><DealerPageIcon iconKey="get-directions" size={16} color="#2563EB" /> Get Directions</a>

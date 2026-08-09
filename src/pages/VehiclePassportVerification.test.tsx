@@ -107,9 +107,9 @@ describe("VehiclePassportVerification — rendered report", () => {
     expect(navigateSpy).toHaveBeenCalledWith(expect.stringContaining("about="));
   });
 
-  it("the report help bubble never defaults to 'Reserve This Vehicle'", () => {
+  it("the report help bubble never defaults to 'Request Vehicle Hold'", () => {
     renderReport();
-    expect(screen.queryByText(/Reserve This Vehicle/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Request Vehicle Hold/i)).not.toBeInTheDocument();
     expect(screen.getByText("Questions about this report?")).toBeInTheDocument();
   });
 

@@ -722,6 +722,16 @@ export default function VehiclePassportGoverned() {
         ];
         if (watchEnabled) actionTiles.push({ label: "Watch Price", icon: Eye, active: watchOpen, onClick: () => { if (!watchOpen) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "watch_price" } }); setWatchOpen(true); } });
 
+        // Only from a real check date — never "today" as a stand-in.
+        const marketCheckedLabel = (() => {
+          const iso = d.marketCheckedAt || d.marketMeta.checkedAt;
+          if (!iso) return null;
+          const t = new Date(iso);
+          return Number.isFinite(t.getTime())
+            ? t.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : null;
+        })();
+
         const UTILITY_LABELS = new Set(["Save", "Share", "Watch Price"]);
         const primaryTools = actionTiles.filter((t) => !UTILITY_LABELS.has(t.label));
         const utilityTools = actionTiles.filter((t) => UTILITY_LABELS.has(t.label));
@@ -803,7 +813,7 @@ export default function VehiclePassportGoverned() {
             {saleCard
               ? <VehiclePriceBreakdown
                   card={saleCard}
-                  heading="Current Dealer Price"
+                  heading="Current Price"
                   lineLabels={{ "Market Value": "Market Reference" }}
                   anchorInfo={
                     <button
@@ -820,7 +830,7 @@ export default function VehiclePassportGoverned() {
                   }
                 />
               : <>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Current Dealer Price</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Current Price</div>
                   <div className="mt-0.5 text-[32px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
                 </>}
 
@@ -854,7 +864,7 @@ export default function VehiclePassportGoverned() {
           {/* 7 — Primary + secondary actions (open the complete V2 destination pages) */}
           <section className="px-4 pt-4" data-module="primary-actions">
             <button onClick={() => { trackPassportEvent("test_drive_started", { placement: "action_center" }); go("test-drive"); }} className="w-full h-14 rounded-2xl inline-flex items-center justify-center gap-2 text-[15px] font-bold text-white" style={{ background: BLUE }}><Clock className="w-[22px] h-[22px]" /> Schedule Test Drive</button>
-            <button onClick={() => { trackPassportEvent("reservation_started", { placement: "action_center" }); go("reserve"); }} className="mt-2.5 w-full h-14 rounded-2xl border inline-flex items-center justify-center gap-2 text-[15px] font-bold" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-[22px] h-[22px]" /> Reserve This Vehicle</button>
+            <button onClick={() => { trackPassportEvent("reservation_started", { placement: "action_center" }); go("reserve"); }} className="mt-2.5 w-full h-14 rounded-2xl border inline-flex items-center justify-center gap-2 text-[15px] font-bold" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-[22px] h-[22px]" /> Request Vehicle Hold</button>
           </section>
 
           {/* 8 — Supporting action tiles */}
@@ -895,7 +905,14 @@ export default function VehiclePassportGoverned() {
           {/* 10 — Market Intelligence */}
           {pv("marketValue") && marketPos && (
             <section className="px-4 pt-6" data-module="market">
-              <H>Market Intelligence</H>
+              <div className="flex items-baseline justify-between gap-3">
+                <H>Market Intelligence</H>
+                {/* Freshness, not methodology. A market read is only as good as
+                    its date, and the shopper cannot judge it without one. */}
+                {marketCheckedLabel && (
+                  <span className="shrink-0 text-[11px] font-medium" style={{ color: SUB }}>Updated {marketCheckedLabel}</span>
+                )}
+              </div>
               <div className={`${CARD} mt-3 p-4`}>
                 <div className="grid grid-cols-3 gap-3">
                   <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Analyzed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "nearby"}</div></div>
@@ -1211,7 +1228,7 @@ export default function VehiclePassportGoverned() {
         // implied it was being withheld pending their contact details. The
         // destination is a payment builder, and it now says so.
         const actPrimary = { label: "Schedule Test Drive", onClick: () => { trackPassportEvent("test_drive_started", { placement: "action_center" }); go("test-drive"); } };
-        const actReserve = { label: "Reserve This Vehicle", onClick: () => { trackPassportEvent("reservation_started", { placement: "action_center" }); go("reserve"); } };
+        const actReserve = { label: "Request Vehicle Hold", onClick: () => { trackPassportEvent("reservation_started", { placement: "action_center" }); go("reserve"); } };
         const actGrid1 = [
           { label: "Value My Trade", icon: RefreshCw, onClick: () => openTrade() },
           { label: "Build My Payment", icon: DollarSign, onClick: () => { trackPassportEvent("payment_builder_started", { placement: "action_center" }); go("todays-price"); } },

@@ -881,7 +881,7 @@ const VehiclePassportV3 = () => {
         );
       })()}
       <button onClick={() => go("todays-price")} className="mt-4 w-full h-12 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14px] font-bold inline-flex items-center justify-center gap-2"><DollarSign className="w-4 h-4" /> See My Price</button>
-      <button onClick={() => go("reserve")} className="mt-2 w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13.5px] font-bold inline-flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"><BadgeCheck className="w-4 h-4" /> Reserve This Vehicle</button>
+      <button onClick={() => go("reserve")} className="mt-2 w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13.5px] font-bold inline-flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"><BadgeCheck className="w-4 h-4" /> Request Vehicle Hold</button>
       <div className="grid grid-cols-2 gap-2 mt-3">
         {[
           { icon: RefreshCw, label: "Value My Trade", onClick: () => go("trade") },
@@ -1546,7 +1546,7 @@ const VehiclePassportV3 = () => {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
-              <button onClick={() => go("reserve")} className="h-11 px-5 rounded-xl bg-white text-[#2563EB] text-[13.5px] font-bold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5"><BadgeCheck className="w-[18px] h-[18px]" /> Reserve This Vehicle</button>
+              <button onClick={() => go("reserve")} className="h-11 px-5 rounded-xl bg-white text-[#2563EB] text-[13.5px] font-bold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5"><BadgeCheck className="w-[18px] h-[18px]" /> Request Vehicle Hold</button>
               <button onClick={() => go("test-drive")} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><Clock className="w-[18px] h-[18px]" /> Schedule Test Drive</button>
               <button onClick={() => go("contact")} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><MessageSquare className="w-[18px] h-[18px]" /> Contact Dealer</button>
               <button onClick={() => window.print()} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><Printer className="w-[18px] h-[18px]" /> Print Vehicle Passport</button>

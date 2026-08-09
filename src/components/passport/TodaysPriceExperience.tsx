@@ -342,7 +342,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
         </div>
         <div className="flex flex-wrap gap-2 justify-center mt-6">
           <button onClick={() => navigate(resolvePassportBack(window.location.search, listing.slug, isPreview))} className="h-11 px-5 rounded-xl bg-[#0B6FEA] text-white text-sm font-bold inline-flex items-center gap-2"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
-          <button onClick={() => navigate(passportForwardPath(listing.slug, "reserve", window.location.search, isPreview))} className="h-11 px-5 rounded-xl border border-[#DDE5EE] text-sm font-bold text-[#334155]">Reserve This Vehicle</button>
+          <button onClick={() => navigate(passportForwardPath(listing.slug, "reserve", window.location.search, isPreview))} className="h-11 px-5 rounded-xl border border-[#DDE5EE] text-sm font-bold text-[#334155]">Request Vehicle Hold</button>
         </div>
       </div>
     </div>

@@ -574,7 +574,7 @@ const VehiclePassportGreatBuy = () => {
                   </div>
                 )}
                 <div className="flex flex-col sm:flex-row gap-2.5 mt-5 justify-center sm:justify-start">
-                  <button onClick={() => go("reserve")} className="h-11 px-5 rounded-xl bg-[#2563EB] text-white text-[13.5px] font-bold inline-flex items-center justify-center gap-2 hover:bg-[#1e50c8] transition-colors"><ShieldCheck className="w-4 h-4" /> Reserve This Vehicle</button>
+                  <button onClick={() => go("reserve")} className="h-11 px-5 rounded-xl bg-[#2563EB] text-white text-[13.5px] font-bold inline-flex items-center justify-center gap-2 hover:bg-[#1e50c8] transition-colors"><ShieldCheck className="w-4 h-4" /> Request Vehicle Hold</button>
                   <button onClick={() => go("test-drive")} className="h-11 px-5 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13.5px] font-bold inline-flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"><Clock className="w-4 h-4" /> Schedule Test Drive</button>
                 </div>
                 <details className="mt-4 text-left">
@@ -619,7 +619,7 @@ const VehiclePassportGreatBuy = () => {
               </div>
             )}
             <div className="flex flex-col items-center gap-1.5">
-              <button onClick={() => go("reserve")} className="h-11 px-5 w-full rounded-xl bg-[#2563EB] text-white text-[14px] font-bold inline-flex items-center justify-center gap-2 hover:bg-[#1e50c8] transition-colors"><ShieldCheck className="w-4 h-4" /> Reserve This Vehicle</button>
+              <button onClick={() => go("reserve")} className="h-11 px-5 w-full rounded-xl bg-[#2563EB] text-white text-[14px] font-bold inline-flex items-center justify-center gap-2 hover:bg-[#1e50c8] transition-colors"><ShieldCheck className="w-4 h-4" /> Request Vehicle Hold</button>
               <p className="text-[11px] text-[#64748B]">No obligation. No payment required.</p>
             </div>
           </div>
@@ -794,7 +794,7 @@ const VehiclePassportGreatBuy = () => {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
-              <button onClick={() => go("reserve")} className="h-11 px-5 rounded-xl bg-white text-[#2563EB] text-[13.5px] font-bold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5"><ShieldCheck className="w-[18px] h-[18px]" /> Reserve This Vehicle</button>
+              <button onClick={() => go("reserve")} className="h-11 px-5 rounded-xl bg-white text-[#2563EB] text-[13.5px] font-bold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5"><ShieldCheck className="w-[18px] h-[18px]" /> Request Vehicle Hold</button>
               <button onClick={() => go("test-drive")} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><Clock className="w-[18px] h-[18px]" /> Schedule Test Drive</button>
               <button onClick={() => go("contact")} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><MessageSquare className="w-[18px] h-[18px]" /> Contact Dealer</button>
               <button onClick={() => window.print()} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><Download className="w-[18px] h-[18px]" /> Download Report</button>

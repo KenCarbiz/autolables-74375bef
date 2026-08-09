@@ -102,7 +102,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         : mpOptValue ? `This build carries ${fmt$(mpOptValue)} in factory options` : "Priced to today's market";
       return {
         title: "Market Pricing Analysis", subtitle: "How this price compares to the market",
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         body: <>
           <div className="md:hidden"><MHero tone={isGreat ? "green" : "blue"} icon={ShieldCheck} eyebrow={isGreat ? "Great Price" : "Today's Price"} title={isGreat ? `${fmt$(below)} Below Market` : price != null ? fmt$(price) : "Priced to Today's Market"} note={mpNote} /></div>
           <div className="hidden md:block">
@@ -266,7 +266,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const goodTime = isGreat || (score ?? 0) >= 66;
       return {
         title: "Market Demand Analysis", subtitle: "How popular this vehicle is in your market",
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         body: <>
           {/* ── Mobile (<768px) — premium market-intelligence dashboard ── */}
           <div className="md:hidden space-y-4">
@@ -501,7 +501,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       ) : null;
       return {
         title: "Price Confidence Report", subtitle: "Why this vehicle's price is supported by verified market data",
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         footerQuestion: "Want to see it in person?", specialistLabel: "Talk to a vehicle specialist",
         footerNote: "No obligation · Dealer confirmed",
         body: <>
@@ -621,7 +621,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const goodTime = isGreat || (total != null && total < 0);
       return {
         title: "Price History", subtitle: "See how this vehicle's price has changed over time",
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         body: <>
           {/* ── Mobile (<768px) — premium pricing-intelligence dashboard ── */}
           <div className="md:hidden space-y-4">
@@ -803,7 +803,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       return {
         title: "Similar Vehicles In Stock",
         subtitle: `More options at ${d.dealerName || "this dealership"} — compare builds and package levels`,
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         footerQuestion: "Want to compare these in person?", specialistLabel: "Talk to a Vehicle Specialist",
         body: <>
           {alts.length ? (
@@ -859,7 +859,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       if (isPreview) invInsights.push({ icon: Flame, text: "Similar vehicles are selling faster than last month." });
       return {
         title: "Inventory Trends", subtitle: "Understand local inventory and market availability",
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         body: <>
           {/* ── Mobile (<768px) — premium market-availability dashboard ── */}
           <div className="md:hidden space-y-4">
@@ -1455,7 +1455,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const recsU = Array.from(new Set(recs));
       return {
         title: "What Owners Say", subtitle: "Real owner feedback from trusted automotive sources",
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         secondary: { label: "Read all reviews", onClick: () => go("owner-reviews") },
         footerQuestion: "Have questions about ownership?",
         body: (hasReviewData || hasNhtsaData) ? <>
@@ -1639,7 +1639,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       ];
       return {
         title: "Vehicle Overview", subtitle: "A complete look at this vehicle's design, technology, and ownership experience",
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         secondary: { label: "View specifications", onClick: () => openPanel("key-specs") },
         footerQuestion: "Questions about this vehicle?", specialistLabel: "Talk to a Product Specialist",
         body: <>
@@ -1872,7 +1872,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         title: "Technical Specifications",
         subtitle: "Everything you need to know about this vehicle's engineering, size, and capability.",
         xl: true,
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         secondary: { label: "View Equipment", onClick: () => openPanel("equipment") },
         footerQuestion: "Questions about the specifications?", specialistLabel: "Talk to a Product Specialist",
         body: <>
@@ -2025,7 +2025,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         title: "Features & Equipment",
         subtitle: "Everything this vehicle was built with, from the factory and dealership.",
         xl: true,
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         secondary: { label: "View Full Specifications", onClick: () => openPanel("key-specs") },
         footerQuestion: "Questions about the equipment?", specialistLabel: "Talk to a Product Specialist",
         body: <>
@@ -2827,22 +2827,22 @@ interface CtaSignals { greatPrice: boolean; highDemand: boolean; highConf: boole
 interface CtaDef { badge: string; btn: string; sub: string; action: "reserve" | "protect" | "warranty_question"; tone: "green" | "orange" | "blue" }
 const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
   switch (panelKey) {
-    case "market-price": return { badge: s.greatPrice ? "Great Price Available Today" : "Vehicle Available Today", btn: s.greatPrice ? "Reserve at This Price" : "Reserve This Vehicle", sub: s.greatPrice ? "The dealership confirms availability." : "Secure this vehicle while it's still available.", action: "reserve", tone: s.greatPrice ? "green" : "blue" };
-    case "market-demand": return { badge: s.highDemand ? "High Demand In Your Market" : "Vehicle Available Today", btn: "Reserve This Vehicle", sub: s.highDemand ? "High-demand vehicles go fast." : "Secure this vehicle while it's still available.", action: "reserve", tone: "green" };
+    case "market-price": return { badge: s.greatPrice ? "Great Price Available Today" : "Vehicle Available Today", btn: s.greatPrice ? "Reserve at This Price" : "Request Vehicle Hold", sub: s.greatPrice ? "The dealership confirms availability." : "Secure this vehicle while it's still available.", action: "reserve", tone: s.greatPrice ? "green" : "blue" };
+    case "market-demand": return { badge: s.highDemand ? "High Demand In Your Market" : "Vehicle Available Today", btn: "Request Vehicle Hold", sub: s.highDemand ? "High-demand vehicles go fast." : "Secure this vehicle while it's still available.", action: "reserve", tone: "green" };
     // Urgency copy only when the data supports it — a fabricated scarcity badge
     // above an honest empty state poisons the page's verification premise.
     case "comparable-vehicles": return s.highDemand
-      ? { badge: "In Demand", btn: "Reserve This Vehicle", sub: "This vehicle is drawing strong shopper interest.", action: "reserve", tone: "blue" }
-      : { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
+      ? { badge: "In Demand", btn: "Request Vehicle Hold", sub: "This vehicle is drawing strong shopper interest.", action: "reserve", tone: "blue" }
+      : { badge: "Vehicle Available Today", btn: "Request Vehicle Hold", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
     case "inventory-trend": return s.highDemand
-      ? { badge: "Strong Local Interest", btn: "Reserve This Vehicle", sub: "Shopper activity on this vehicle is above average.", action: "reserve", tone: "orange" }
-      : { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
-    case "price-confidence": return { badge: "Supported by Market Data", btn: s.highConf ? "Reserve With Confidence" : "Reserve This Vehicle", sub: "This price is supported by live market data.", action: "reserve", tone: "green" };
+      ? { badge: "Strong Local Interest", btn: "Request Vehicle Hold", sub: "Shopper activity on this vehicle is above average.", action: "reserve", tone: "orange" }
+      : { badge: "Vehicle Available Today", btn: "Request Vehicle Hold", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
+    case "price-confidence": return { badge: "Supported by Market Data", btn: s.highConf ? "Reserve With Confidence" : "Request Vehicle Hold", sub: "This price is supported by live market data.", action: "reserve", tone: "green" };
     // Factory coverage is INCLUDED with the vehicle — never sold. CTA is a
     // request to confirm coverage, not a purchase (16 CFR 239).
-    case "factory-warranty": return { badge: s.hasWarranty ? "Warranty Coverage Included" : "Vehicle Available Today", btn: s.hasWarranty ? "Confirm Warranty Coverage" : "Reserve This Vehicle", sub: s.hasWarranty ? "Ask the dealer to confirm the exact start date and included coverage." : "Secure this vehicle while it's still available.", action: s.hasWarranty ? "warranty_question" : "reserve", tone: "blue" };
-    case "owner-reviews": return { badge: s.highlyRated ? "Highly Rated By Owners" : "Trusted Dealer Reviews", btn: "Reserve This Vehicle", sub: "Shoppers rate this dealership highly.", action: "reserve", tone: "green" };
-    default: return { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
+    case "factory-warranty": return { badge: s.hasWarranty ? "Warranty Coverage Included" : "Vehicle Available Today", btn: s.hasWarranty ? "Confirm Warranty Coverage" : "Request Vehicle Hold", sub: s.hasWarranty ? "Ask the dealer to confirm the exact start date and included coverage." : "Secure this vehicle while it's still available.", action: s.hasWarranty ? "warranty_question" : "reserve", tone: "blue" };
+    case "owner-reviews": return { badge: s.highlyRated ? "Highly Rated By Owners" : "Trusted Dealer Reviews", btn: "Request Vehicle Hold", sub: "Shoppers rate this dealership highly.", action: "reserve", tone: "green" };
+    default: return { badge: "Vehicle Available Today", btn: "Request Vehicle Hold", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
   }
 };
 // One line rather than three icon columns: the footer is fixed, so every pixel
@@ -2877,7 +2877,7 @@ function MobileCtaFooter({ variant, panelKey, go, signals }: { variant: string; 
       <div>
         <p className="text-[12px] font-semibold text-[#0F172A]">Questions about this vehicle?</p>
         <button onClick={() => go("contact")} className="text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 mb-3"><MessageSquare className="w-3.5 h-3.5" /> Talk to a Vehicle Specialist</button>
-        <BlueBtn label="Reserve This Vehicle" />
+        <BlueBtn label="Request Vehicle Hold" />
       </div>
     );
   }
@@ -2890,7 +2890,7 @@ function MobileCtaFooter({ variant, panelKey, go, signals }: { variant: string; 
       <div>
         <p className="text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-2">You're looking at</p>
         <div className="flex flex-wrap gap-1.5 mb-3">{chips.map((c) => <span key={c} className="text-[11px] font-semibold text-[#16A34A] bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">{c}</span>)}</div>
-        <button onClick={primary} className="w-full min-h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-all active:scale-[0.99]">Reserve This Vehicle</button>
+        <button onClick={primary} className="w-full min-h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-all active:scale-[0.99]">Request Vehicle Hold</button>
         <TrustRow items={TRUST_PROGRESSIVE} />
       </div>
     );
@@ -3075,7 +3075,7 @@ function VisitDealerBody({ d, listing, go, isPreview }: { d: PassportData; listi
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
-            <button onClick={() => go("reserve")} className="h-10 rounded-xl bg-[#2563EB] text-white text-[12.5px] font-bold hover:bg-[#1d4fd7]">Reserve This Vehicle</button>
+            <button onClick={() => go("reserve")} className="h-10 rounded-xl bg-[#2563EB] text-white text-[12.5px] font-bold hover:bg-[#1d4fd7]">Request Vehicle Hold</button>
             <button onClick={() => go("test-drive")} className="h-10 rounded-xl border border-[#2563EB] text-[#2563EB] text-[12.5px] font-bold hover:bg-blue-50">Schedule Test Drive</button>
             {dealerTel ? <a href={`tel:${dealerTel}`} className="h-10 rounded-xl border border-[#E6E8EC] text-[12.5px] font-bold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Phone className="w-3.5 h-3.5 text-[#2563EB]" /> Call Dealer</a> : <button onClick={() => go("contact")} className="h-10 rounded-xl border border-[#E6E8EC] text-[12.5px] font-bold hover:border-[#2563EB]">Message Dealer</button>}
           </div>

@@ -676,7 +676,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
           </ul>
           <div className="mt-4 space-y-2 border-t border-[#F1F5F9] pt-4">
             <button onClick={goBack} className="w-full h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
-            <button onClick={goReserve} className="w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-blue-50"><BadgeCheck className="w-4 h-4" /> Reserve This Vehicle</button>
+            <button onClick={goReserve} className="w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-blue-50"><BadgeCheck className="w-4 h-4" /> Request Vehicle Hold</button>
             <button onClick={goTrade} className="w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-blue-50"><RefreshCw className="w-4 h-4" /> Get Trade Value</button>
           </div>
         </>
@@ -723,7 +723,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
           <button onClick={goBack} className="h-11 px-5 rounded-xl bg-[#2563EB] text-white text-sm font-bold inline-flex items-center justify-center gap-2"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
           {dealerTel && <a href={`tel:${dealerTel}`} onClick={trackCall} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><Phone className="w-4 h-4" /> Call Dealer</a>}
           {dealerTel && <a href={`sms:${dealerTel}`} onClick={trackText} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><MessageSquare className="w-4 h-4" /> Text Dealer</a>}
-          <button onClick={goReserve} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><BadgeCheck className="w-4 h-4" /> Reserve This Vehicle</button>
+          <button onClick={goReserve} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><BadgeCheck className="w-4 h-4" /> Request Vehicle Hold</button>
           <button onClick={goTestDrive} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><Calendar className="w-4 h-4" /> Schedule Test Drive</button>
         </div>
       </Card>
@@ -1265,7 +1265,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
     render: ({ listing, d }) => (<><SectionHeading icon={GaugeIcon} title="Value My Trade" subtitle="Know your trade value in minutes." /><DealRecap listing={listing} d={d} className="mb-3" /><LeadForm listing={listing} intent="trade" label="Value My Trade" cta="Get my trade value" dealerPhone={d.dealerPhone} /></>),
   },
   "reserve": {
-    title: "Reserve This Vehicle",
+    title: "Request Vehicle Hold",
     wide: true,
     hideCrossCta: true,
     headerPill: "Currently Listed",

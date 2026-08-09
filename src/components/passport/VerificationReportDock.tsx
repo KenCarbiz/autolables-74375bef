@@ -5,7 +5,7 @@ import { MessageSquare, TriangleAlert, ChevronLeft, X } from "lucide-react";
 // VerificationReportDock — the contextual help bubble for the
 // Data-Verified Report. Deliberately NOT the conversion dock: on a
 // trust report the actions are "review the recall / contact the
-// dealer / go back", never "Reserve This Vehicle" while a material
+// dealer / go back", never "Request Vehicle Hold" while a material
 // item still needs confirmation. Hidden in print + PDF.
 // ──────────────────────────────────────────────────────────────
 

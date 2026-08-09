@@ -27,7 +27,7 @@ import TodaysPriceExperience from "@/components/passport/TodaysPriceExperience";
 export type PassportActionKey = "reserve" | "test-drive" | "trade" | "contact" | "payment" | "availability";
 
 const ACTION_META: Record<PassportActionKey, { title: string; subtitle: string; intent: string; cta: string; label: string }> = {
-  reserve: { title: "Reserve This Vehicle", subtitle: "Ask the dealership to hold this vehicle for you.", intent: "reserve", cta: "Reserve This Vehicle", label: "Reserve" },
+  reserve: { title: "Request Vehicle Hold", subtitle: "Ask the dealership to hold this vehicle for you.", intent: "reserve", cta: "Request Vehicle Hold", label: "Reserve" },
   contact: { title: "Contact Dealer", subtitle: "Send a question — the dealership will follow up.", intent: "contact", cta: "Send message", label: "Contact" },
   trade: { title: "Value My Trade", subtitle: "Tell the dealer about your trade to get an estimate.", intent: "trade", cta: "Get my trade value", label: "Trade" },
   availability: { title: "Check Availability", subtitle: "Confirm this vehicle is still available.", intent: "check_availability", cta: "Check availability", label: "Availability" },

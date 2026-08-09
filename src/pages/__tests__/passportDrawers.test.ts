@@ -266,9 +266,13 @@ describe("the Customer Action Center says what it does", () => {
     expect(passport).toMatch(/Build My Payment <ChevronRight/);
   });
 
-  it("leads with Schedule Test Drive, then Reserve", () => {
+  it("leads with Schedule Test Drive, then the hold request", () => {
+    // "Reserve" promised the car was already held. The dealer still has to
+    // confirm availability, so the copy says what actually happens. The intent,
+    // the route and the analytics name are unchanged — this is wording only.
     expect(passport).toMatch(/const actPrimary = \{ label: "Schedule Test Drive"/);
-    expect(passport).toMatch(/const actReserve = \{ label: "Reserve This Vehicle"/);
+    expect(passport).toMatch(/const actReserve = \{ label: "Request Vehicle Hold"/);
+    expect(passport).not.toMatch(/label: "Reserve This Vehicle"/);
     expect(passport.indexOf("const actPrimary")).toBeLessThan(passport.indexOf("const actReserve"));
   });
 
