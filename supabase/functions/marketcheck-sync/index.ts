@@ -8,7 +8,7 @@ import {
   type ListingIdentity, type Rooftop,
 } from "../_shared/rooftopMatch.ts";
 import { classifyCondition } from "../_shared/vehicleCondition.ts";
-import { isDue, overdueBy, skipReason } from "../_shared/syncSchedule.ts";
+import { isDue, overdueBy, skipReason, hoursSinceSlot, CATCH_UP_HOURS } from "../_shared/syncSchedule.ts";
 
 // Artifact posts are queued and paced, so they can still be in flight when the
 // handler returns. Without this the isolate is torn down mid-queue and the
@@ -137,20 +137,44 @@ async function resolveDealerId(
 // bill, and the figures never reach a dealer-visible surface.
 let callMeter = newCallMeter();
 
-async function mcFetch(base: string, query: string): Promise<{ listings: MCListing[]; numFound: number; http: number }> {
+async function mcFetch(base: string, query: string): Promise<{ listings: MCListing[]; numFound: number; http: number; refused?: boolean }> {
   const url = `${base}?api_key=${encodeURIComponent(MC_KEY)}&${query}`;
-  recordCall(callMeter, base);
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
-    if (!res.ok) return { listings: [], numFound: 0, http: res.status };
-    // deno-lint-ignore no-explicit-any
-    const data: any = await res.json().catch(() => ({}));
-    const listings: MCListing[] = Array.isArray(data?.listings) ? data.listings : [];
-    const nf = typeof data?.num_found === "number" ? data.num_found : parseInt(String(data?.num_found ?? ""), 10);
-    const numFound = Number.isFinite(nf) ? nf : listings.length;
-    return { listings, numFound, http: res.status };
-  } catch {
-    return { listings: [], numFound: 0, http: 0 };
+  // A provider refusal is not an answer. Returning an empty page for a 429 or a
+  // quota block makes it indistinguishable from "this dealer has no more cars",
+  // and the page loop reads an empty page as the end of the feed. That is the
+  // chain that emptied a lot: three days of 429s, then a truncated feed the
+  // prune read as 68 sales.
+  //
+  // Retry the way the sibling MarketCheck functions already do, and when the
+  // provider still refuses, say so — `refused` is what lets the caller stop
+  // rather than conclude the lot shrank.
+  const BACKOFF_MS = [1200, 2500];
+  for (let attempt = 0; ; attempt++) {
+    recordCall(callMeter, base);
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (res.status === 429 || res.status === 401 || res.status === 403 || res.status >= 500) {
+        if (attempt < BACKOFF_MS.length) {
+          await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
+          continue;
+        }
+        return { listings: [], numFound: 0, http: res.status, refused: true };
+      }
+      if (!res.ok) return { listings: [], numFound: 0, http: res.status };
+      // deno-lint-ignore no-explicit-any
+      const data: any = await res.json().catch(() => ({}));
+      const listings: MCListing[] = Array.isArray(data?.listings) ? data.listings : [];
+      const nf = typeof data?.num_found === "number" ? data.num_found : parseInt(String(data?.num_found ?? ""), 10);
+      const numFound = Number.isFinite(nf) ? nf : listings.length;
+      return { listings, numFound, http: res.status };
+    } catch {
+      if (attempt < BACKOFF_MS.length) {
+        await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
+        continue;
+      }
+      // A timeout is a refusal too: we did not learn the lot is empty.
+      return { listings: [], numFound: 0, http: 0, refused: true };
+    }
   }
 }
 
@@ -527,11 +551,20 @@ serve(async (req) => {
   const scheduleClock = () => (forced ? {} : { last_run_at: now.toISOString() });
 
   for (const sk of skipped) {
-    // Every skip is recorded, not just the overdue ones. An on-time skip is
-    // exactly the case an operator cannot otherwise see: no run row is written,
-    // so a tenant that was deliberately passed over is indistinguishable from
-    // one whose run died partway through.
+    // Record a skip only when it MEANS something: the tenant is inside its own
+    // slot window and was passed over anyway, or it is overdue. Outside the
+    // window a skip just says "not your hour", and the cron ticks hourly — so
+    // logging those would write ~23 empty rows per tenant per day into a table
+    // that has no purge.
+    //
+    // The case this exists to catch: a manual "Sync now" during the day leaves
+    // last_run_at inside the 20-hour cadence gap, the slot is declined, and no
+    // run row is written at all — the nightly's absence is then indistinguisha-
+    // ble from a run that died partway through.
     if (!sk.reason || sk.reason === "due") continue;
+    const cfgRow = reachable.find((c: SyncConfig) => c.tenant_id === sk.tenant_id);
+    const inWindow = cfgRow ? hoursSinceSlot(cfgRow.run_hour, now) < CATCH_UP_HOURS : true;
+    if (!inWindow && sk.overdue_hours <= 0) continue;
     await logSyncRun({
       tenant_id: sk.tenant_id, started_at: now.toISOString(), status: "skipped",
       error_summary: sk.overdue_hours > 0 ? `overdue by ${sk.overdue_hours}h (${sk.reason})` : `skipped: ${sk.reason}`,
@@ -691,6 +724,9 @@ serve(async (req) => {
       let rejected = 0;
       // True once every page of the feed has been fetched. Prune requires it.
       let feedWalked = false;
+      // Set when the provider rate-limited, blocked or timed out mid-walk. The
+      // run is then incomplete by evidence, not by inference.
+      let providerRefused = 0;
       // New units ingested this run — the signal the coverage backstop watches.
       let newTypeSeen = 0;
       // Only tenants that have ever carried new inventory get the backstop, so
@@ -1314,6 +1350,10 @@ serve(async (req) => {
           : await syndPage(chosen.param, chosen.value, synRows, start);
         const listings: MCListing[] = pageData.listings;
         numFound = pageData.numFound || numFound;
+        // An empty page from a provider that REFUSED is not the end of the
+        // feed. Leaving feedWalked false blocks the prune, so a rate limit can
+        // never again be read as the dealer selling the rest of the lot.
+        if (pageData.refused) { providerRefused = pageData.http || 429; break; }
         if (listings.length === 0) break;
 
         for (const l of listings) {
@@ -1542,7 +1582,7 @@ serve(async (req) => {
       }
 
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, prune_skipped: pruneSkipped,
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, provider_refused: providerRefused || null, prune_skipped: pruneSkipped,
         segments: { new: { accepted: segAccepted.new, reported: segReported.new, prior: priorSegVins.new.size, skipped: segSkipped.new }, rest: { accepted: segAccepted.rest, reported: segReported.rest, prior: priorSegVins.rest.size, skipped: segSkipped.rest } }, pinned: cleanRun,
         new_units: { primary_feed: primaryNewUnits, total: newTypeSeen }, supplemental_new: supplementalNew,
         // Operator-only. Public list prices, so an estimate rather than a bill.

@@ -11,7 +11,14 @@ const sync = readFileSync(join(__dirname, "..", "marketcheck-sync", "index.ts"),
 
 describe("the sync reads its schedule from the tested module", () => {
   it("imports the shared scheduler", () => {
-    expect(sync).toMatch(/import \{ isDue, overdueBy, skipReason \} from "\.\.\/_shared\/syncSchedule\.ts";/);
+    // Assert the symbols come from the tested module, not the exact spelling of
+    // the import line — pinning the literal breaks the moment another export is
+    // needed, which says nothing about whether the wiring is right.
+    expect(sync).toMatch(/import \{[^}]*\bisDue\b[^}]*\} from "\.\.\/_shared\/syncSchedule\.ts";/);
+    for (const sym of ["isDue", "overdueBy", "skipReason"]) {
+      expect(sync, `${sym} must come from the shared scheduler`)
+        .toMatch(new RegExp(`import \\{[^}]*\\b${sym}\\b[^}]*\\} from "\\.\\./_shared/syncSchedule\\.ts";`));
+    }
   });
 
   it("no longer carries a local exact-hour gate", () => {
