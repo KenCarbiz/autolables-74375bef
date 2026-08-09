@@ -23,7 +23,7 @@ export interface BuyingCandidateResult {
   aboveMarket: number | null;
   aboveMarketPct: number | null;
   subcopy: string;
-  primaryCtaLabel: "Reserve This Vehicle" | "Ask Dealer About This Vehicle";
+  primaryCtaLabel: "Request Vehicle Hold" | "Ask Dealer About This Vehicle";
 }
 
 export function resolveBuyingCandidate(input: BuyingCandidateInput): BuyingCandidateResult {
@@ -51,6 +51,6 @@ export function resolveBuyingCandidate(input: BuyingCandidateInput): BuyingCandi
     subcopy: hasQuestions
       ? `Dealer verification and vehicle history are favorable. ${concerns.join(". ")}.`
       : "Pricing, verification and market position compare favorably.",
-    primaryCtaLabel: hasQuestions ? "Ask Dealer About This Vehicle" : "Reserve This Vehicle",
+    primaryCtaLabel: hasQuestions ? "Ask Dealer About This Vehicle" : "Request Vehicle Hold",
   };
 }

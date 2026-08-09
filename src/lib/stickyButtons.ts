@@ -26,7 +26,7 @@ export const STICKY_BUTTON_OPTIONS: { key: string; label: string }[] = [
   { key: "contact_dealer", label: "Contact Dealer" },
   { key: "trade_appraisal", label: "Trade Appraisal" },
   { key: "value_trade", label: "Value My Trade" },
-  { key: "reserve", label: "Reserve This Vehicle" },
+  { key: "reserve", label: "Request Vehicle Hold" },
   { key: "pre_qualified", label: "Get Pre-Qualified" },
   { key: "apply_financing", label: "Apply for Financing" },
   { key: "check_availability", label: "Check Availability" },

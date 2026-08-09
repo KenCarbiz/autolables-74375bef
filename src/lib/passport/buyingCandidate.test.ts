@@ -18,7 +18,7 @@ describe("resolveBuyingCandidate — conditioned recommendation", () => {
     expect(r.headline).toBe("Strong Buying Candidate");
     expect(r.hasQuestions).toBe(false);
     expect(r.aboveMarket).toBeNull();
-    expect(r.primaryCtaLabel).toBe("Reserve This Vehicle");
+    expect(r.primaryCtaLabel).toBe("Request Vehicle Hold");
   });
 
   it("at/near market with no pending checks stays strong (within tolerance)", () => {
