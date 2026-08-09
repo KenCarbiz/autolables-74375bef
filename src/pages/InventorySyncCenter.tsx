@@ -184,11 +184,19 @@ export default function InventorySyncCenter() {
 
   const health: { tone: "healthy" | "warning" | "failed"; label: string } = useMemo(() => {
     if (!latest) return { tone: "warning", label: "No runs yet" };
+    // A skip is not a healthy run, and it must not stand in for the last real
+    // one: the sync writes a skip row every time it passes a tenant over, so a
+    // Tuesday skip would otherwise bury Monday's failure behind "Healthy".
+    if (latest.status === "skipped") {
+      const real = runs.find((r) => r.status !== "skipped");
+      if (real?.status === "failed") return { tone: "failed", label: "Failed" };
+      return { tone: "warning", label: "Skipped" };
+    }
     if (latest.status === "failed") return { tone: "failed", label: "Failed" };
     if (latest.status === "partial") return { tone: "warning", label: "Warning" };
     if (latest.status === "empty_valid" && prevWithInventory) return { tone: "warning", label: "Warning" };
     return { tone: "healthy", label: "Healthy" };
-  }, [latest, prevWithInventory]);
+  }, [latest, prevWithInventory, runs]);
 
   const warnings = useMemo(() => {
     const out: { level: "red" | "amber" | "blue"; title: string; body: string }[] = [];

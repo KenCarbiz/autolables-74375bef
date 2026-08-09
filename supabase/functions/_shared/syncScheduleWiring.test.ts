@@ -54,8 +54,14 @@ describe("a skipped tenant leaves a trace", () => {
     // "Sync now" during the dealership's day used to write it, silently
     // cancelling that night's run — so troubleshooting a quiet nightly
     // guaranteed the next one never happened.
-    expect(sync).toMatch(/const clockPatch = forced \? \{\} : \{ last_run_at: now\.toISOString\(\) \}/);
-    expect(sync).toMatch(/\.update\(\{ \.\.\.clockPatch, last_status: status \}\)/);
+    expect(sync).toMatch(/const scheduleClock = \(\) => \(forced \? \{\} : \{ last_run_at: now\.toISOString\(\) \}\)/);
+    // Counting the writers, not just confirming one is guarded. The first
+    // attempt at this fix guarded the success path and left the two failure
+    // paths writing the clock raw — and a presence-only assertion passed,
+    // certifying a fix that did not work on the paths that produce the bug.
+    // A dealer presses Sync now precisely BECAUSE the feed is not resolving.
+    expect(sync.match(/last_run_at: now\.toISOString\(\)/g) ?? []).toHaveLength(1);
+    expect(sync.match(/\.\.\.scheduleClock\(\)/g) ?? []).toHaveLength(2);
   });
 
   it("returns the skip list so an empty run is readable without a query", () => {

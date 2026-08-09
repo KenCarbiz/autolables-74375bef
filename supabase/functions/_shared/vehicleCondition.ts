@@ -21,10 +21,11 @@ export type VehicleCondition = "new" | "used" | "cpo";
  */
 export const isTruthyFlag = (v: unknown): boolean => {
   if (typeof v === "boolean") return v;
-  if (typeof v === "number") return v !== 0;
+  if (typeof v === "number") return Number.isFinite(v) && v !== 0;
   if (typeof v === "string") {
     const s = v.trim().toLowerCase();
-    return s === "true" || s === "1" || s === "y" || s === "yes";
+    // "t"/"f" is how Postgres and PostgREST render a boolean as text.
+    return s === "true" || s === "1" || s === "y" || s === "yes" || s === "t";
   }
   return false;
 };

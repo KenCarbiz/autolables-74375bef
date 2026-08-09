@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { artifactPostsIdle, autoPreload } from "../_shared/intake-autoprovision.ts";
+import { classifyCondition } from "../_shared/vehicleCondition.ts";
 
 // Artifact posts are queued and paced, so they can still be in flight when the
 // handler returns. Without this the isolate is torn down mid-queue and the
@@ -110,7 +111,7 @@ const mapVauto = (raw: any): InboundVehicle[] => {
     ymm: [v.year, v.make, v.model].filter(Boolean).join(" "),
     trim: v.trim,
     mileage: typeof v.odometer === "number" ? v.odometer : undefined,
-    condition: v.type === "New" ? "new" : v.certified ? "cpo" : "used",
+    condition: classifyCondition({ inventoryType: v.type, certified: v.certified }),
     price: typeof v.price === "number" ? v.price : undefined,
     stock_number: v.stockNumber,
     photos: Array.isArray(v.photoUrls) ? v.photoUrls : undefined,
@@ -124,7 +125,7 @@ const mapVinSolutions = (raw: any): InboundVehicle[] => {
     ymm: [v.Year, v.Make, v.Model].filter(Boolean).join(" "),
     trim: v.Trim,
     mileage: v.Mileage,
-    condition: v.NewUsed === "N" ? "new" : v.Certified === "Y" ? "cpo" : "used",
+    condition: classifyCondition({ inventoryType: v.NewUsed === "N" ? "new" : "used", certified: v.Certified }),
     price: v.SellingPrice,
     stock_number: v.StockNumber,
     photos: typeof v.PhotoURLs === "string"
@@ -141,7 +142,7 @@ const mapCdk = (raw: any): InboundVehicle[] => {
     ymm: [v.modelYear, v.makeName, v.modelName].filter(Boolean).join(" "),
     trim: v.trimDescription,
     mileage: v.odometer,
-    condition: v.vehicleType === "NEW" ? "new" : v.cpoFlag ? "cpo" : "used",
+    condition: classifyCondition({ inventoryType: v.vehicleType, certified: v.cpoFlag }),
     price: v.askingPrice,
     stock_number: v.stockNumber,
     photos: Array.isArray(v.images) ? v.images.map((img: any) => img.url || img) : undefined,
@@ -156,7 +157,7 @@ const mapReynolds = (raw: any): InboundVehicle[] => {
     ymm: [v.MODEL_YEAR, v.VEH_MAKE, v.VEH_MODEL].filter(Boolean).join(" "),
     trim: v.VEH_TRIM,
     mileage: v.MILEAGE,
-    condition: v.NEW_USED === "N" ? "new" : v.CPO === "Y" ? "cpo" : "used",
+    condition: classifyCondition({ inventoryType: v.NEW_USED === "N" ? "new" : "used", certified: v.CPO }),
     price: v.SALE_PRICE,
     stock_number: v.STOCK_NO,
     photos: undefined,

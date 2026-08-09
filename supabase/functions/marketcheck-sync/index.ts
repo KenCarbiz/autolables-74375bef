@@ -519,6 +519,12 @@ serve(async (req) => {
       overdue_hours: overdueBy(c, now),
       last_run_at: c.last_run_at,
     }));
+  // last_run_at paces the SCHEDULE; only a scheduled run may advance it. A
+  // forced "Sync now" that lands on a failure path must not consume the slot
+  // either — that is the case a dealer actually hits, since they press the
+  // button precisely because the feed is not resolving.
+  const scheduleClock = () => (forced ? {} : { last_run_at: now.toISOString() });
+
   for (const sk of skipped) {
     // Every skip is recorded, not just the overdue ones. An on-time skip is
     // exactly the case an operator cannot otherwise see: no run row is written,
@@ -776,7 +782,7 @@ serve(async (req) => {
       // A pinned feed that no longer proves out is an alert, not a fallback.
       if (pinBroken) {
         await admin.from("marketcheck_sync_config").update({
-          last_run_at: now.toISOString(),
+          ...scheduleClock(),
           last_status: {
             ran_at: now.toISOString(), seen: 0, error: "pinned_scope_failed_validation",
             note: `Pinned feed ${pinnedParam}=${pinnedValue} no longer matches ${rooftop.street} ${rooftop.zip}. Inventory left untouched. Clear the pin to re-resolve.`,
@@ -817,7 +823,7 @@ serve(async (req) => {
           attempts, note,
         });
         await admin.from("marketcheck_sync_config").update({
-          last_run_at: now.toISOString(),
+          ...scheduleClock(),
           last_status: { ran_at: now.toISOString(), seen: 0, new_vehicles: 0, prices_recorded: 0, error: contaminated ? "no_owned_match" : "no_listings", note, matched_dealer: verifiedName, attempts: attempts.slice(0, 8) },
         }).eq("tenant_id", cfg.tenant_id);
         await logSyncRun({
@@ -1504,7 +1510,7 @@ serve(async (req) => {
       // silently cancelled that night's run — with no skip row, since skips
       // under the overdue threshold are not logged. A dealer troubleshooting
       // a quiet nightly was guaranteeing the next one never happened.
-      const clockPatch = forced ? {} : { last_run_at: now.toISOString() };
+      const clockPatch = scheduleClock();
       await admin.from("marketcheck_sync_config")
         .update({ ...clockPatch, last_status: status })
         .eq("tenant_id", cfg.tenant_id);
