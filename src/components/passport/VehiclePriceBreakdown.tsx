@@ -27,16 +27,25 @@ interface Props {
   card: SalePriceCard;
   heading?: string;
   priceClassName?: string;
+  /**
+   * Display-only relabelling of the itemized rows, keyed by the label the price
+   * model produced. Presentation only: the card, its arithmetic and its line
+   * keys are untouched, so a caller can say "Market Reference" without any
+   * other surface — sticker, addendum, desktop — changing wording with it.
+   */
+  lineLabels?: Record<string, string>;
+  /** Optional control rendered beside the anchor row (e.g. an info affordance). */
+  anchorInfo?: React.ReactNode;
 }
 
-const Row = ({ label, value, bold, color }: { label: string; value: string; bold?: boolean; color: string }) => (
+const Row = ({ label, value, bold, color, after }: { label: string; value: string; bold?: boolean; color: string; after?: React.ReactNode }) => (
   <div className="flex items-baseline justify-between gap-4">
-    <span className={`text-[13.5px] ${bold ? "font-bold" : "font-medium"}`} style={{ color: bold ? PRIMARY : color }}>{label}</span>
+    <span className={`inline-flex items-center gap-1 text-[13.5px] ${bold ? "font-bold" : "font-medium"}`} style={{ color: bold ? PRIMARY : color }}>{label}{after}</span>
     <span className={`text-[14px] tabular-nums ${bold ? "font-extrabold" : "font-semibold"}`} style={{ color }}>{value}</span>
   </div>
 );
 
-const VehiclePriceBreakdown = ({ card, heading = "Today's Sale Price", priceClassName = "text-[32px]" }: Props) => {
+const VehiclePriceBreakdown = ({ card, heading = "Today's Sale Price", priceClassName = "text-[32px]", lineLabels, anchorInfo }: Props) => {
   // Renders whenever the total reconciles. Optional rows (anchor, rebates,
   // discount, fee) render individually; the minimum truthful card is Vehicle
   // Selling Price → Total Advertised Price. Only a non-reconciling/non-finite
@@ -55,9 +64,10 @@ const VehiclePriceBreakdown = ({ card, heading = "Today's Sale Price", priceClas
                 {card.lines.map((l) => (
                   <Row
                     key={l.key}
-                    label={l.label}
+                    label={lineLabels?.[l.label] ?? l.label}
                     value={l.role === "discount" ? `−${fmt$(l.amount)}` : fmt$(l.amount)}
                     color={l.role === "discount" ? DISCOUNT : MUTED}
+                    after={l.role === "anchor" ? anchorInfo : undefined}
                   />
                 ))}
               </div>

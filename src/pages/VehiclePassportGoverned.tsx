@@ -638,11 +638,23 @@ export default function VehiclePassportGoverned() {
       {/* ── Mobile / tablet column (< xl) — the approved mobile V3, only mounts below xl ── */}
       {!isDesktop && (() => {
         const conditionLabel = isNew ? "New" : condition === "cpo" ? "Certified Pre-Owned" : "Used";
+        // The three facts a shopper actually weighs, in that order. Every one is
+        // read from data — the title chip appears only when the canonical title
+        // check came back clean or the dealer attested it, never because the
+        // store is a franchise. When a fact is unavailable the older verified
+        // signals fill the gap rather than leaving the row short.
+        const titleCheckStatus = report.checks.find((c) => c.key === "title")?.status;
         const trustBadges = [
           d.ownerCount === 1 ? "One Owner" : null,
+          titleCheckStatus === "verified" || titleCheckStatus === "dealer_attested" ? "Clean Title" : null,
+          condition === "cpo" ? "CPO Certified" : null,
+        ].filter(Boolean) as string[];
+        for (const fallback of [
           (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) ? "Dealer Verified" : null,
           d.marketAvg != null ? "Market Data Verified" : null,
-        ].filter(Boolean) as string[];
+        ]) {
+          if (fallback && trustBadges.length < 3) trustBadges.push(fallback);
+        }
 
         // Recall stays governed — amber "Needs confirmation" when sources conflict,
         // never a green "no open recalls", by reading the canonical report.
@@ -709,6 +721,10 @@ export default function VehiclePassportGoverned() {
           { label: "Share", icon: Upload, onClick: handleShare },
         ];
         if (watchEnabled) actionTiles.push({ label: "Watch Price", icon: Eye, active: watchOpen, onClick: () => { if (!watchOpen) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "watch_price" } }); setWatchOpen(true); } });
+
+        const UTILITY_LABELS = new Set(["Save", "Share", "Watch Price"]);
+        const primaryTools = actionTiles.filter((t) => !UTILITY_LABELS.has(t.label));
+        const utilityTools = actionTiles.filter((t) => UTILITY_LABELS.has(t.label));
 
         const overviewText = d.overview && d.overview.length > 320 ? `${d.overview.slice(0, 320).trimEnd()}…` : d.overview;
         const H = ({ children }: { children: React.ReactNode }) => <h2 className="text-[19px] font-extrabold leading-tight" style={{ color: NAVY }}>{children}</h2>;
@@ -780,17 +796,31 @@ export default function VehiclePassportGoverned() {
                 ))}
               </div>
             )}
-            {d.viewCount != null && d.viewCount > 0 && (
-              <div className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium" style={{ color: SUB }}><Eye className="w-4 h-4" style={{ color: BLUE }} /> {d.viewCount.toLocaleString()} recent shopper views</div>
-            )}
           </section>
 
           {/* 5 — Today's Sale Price + itemized breakdown (new → MSRP, used/CPO → Market Value) */}
           <section className="px-4 pt-4" data-module="price">
             {saleCard
-              ? <VehiclePriceBreakdown card={saleCard} />
+              ? <VehiclePriceBreakdown
+                  card={saleCard}
+                  heading="Current Dealer Price"
+                  lineLabels={{ "Market Value": "Market Reference" }}
+                  anchorInfo={
+                    <button
+                      type="button"
+                      // Points at the Market Intelligence module already on this
+                      // page — real explanatory context that exists, rather than
+                      // a new route or an invented methodology blurb.
+                      onClick={() => document.querySelector('[data-module="market"]')?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      aria-label="How Market Reference is determined — see Market Intelligence"
+                      className="inline-flex items-center justify-center align-middle"
+                    >
+                      <Info className="w-3.5 h-3.5" style={{ color: SUB }} />
+                    </button>
+                  }
+                />
               : <>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Today's Sale Price</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Current Dealer Price</div>
                   <div className="mt-0.5 text-[32px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
                 </>}
 
@@ -830,13 +860,26 @@ export default function VehiclePassportGoverned() {
           {/* 8 — Supporting action tiles */}
           <section className="px-4 pt-3" data-module="action-tiles">
             <div className="grid grid-cols-4 gap-2.5">
-              {actionTiles.map((t) => (
+              {primaryTools.map((t) => (
                 <button key={t.label} onClick={t.onClick} aria-pressed={t.active} className={`${CARD} h-[74px] flex flex-col items-center justify-center gap-1.5`}>
                   <t.icon className="w-[24px] h-[24px]" style={{ color: BLUE, fill: t.label === "Save" && t.active ? BLUE : "none" }} />
                   <span className="text-[10.5px] font-bold leading-none text-center px-0.5" style={{ color: t.active ? BLUE : NAVY }}>{t.label}</span>
                 </button>
               ))}
             </div>
+            {utilityTools.length > 0 && (
+              // Same actions, lighter weight: these are utilities, not the
+              // shopping tools above, and the card treatment made them compete.
+              <div className="mt-2 flex items-stretch justify-around rounded-xl border" style={{ borderColor: "#E6E8EC" }}>
+                {utilityTools.map((t) => (
+                  <button key={t.label} onClick={t.onClick} aria-pressed={t.active}
+                    className="flex-1 h-11 inline-flex items-center justify-center gap-1.5 text-[12px] font-semibold">
+                    <t.icon className="w-4 h-4" style={{ color: t.active ? BLUE : SUB, fill: t.label === "Save" && t.active ? BLUE : "none" }} />
+                    <span style={{ color: t.active ? BLUE : NAVY }}>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {watchOpen && watchEnabled && (
               <div className="mt-3" data-module="watch-price"><PriceDropWatch slug={listing.slug || rawSlug} /></div>
             )}
