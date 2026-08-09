@@ -130,6 +130,18 @@ export function derivePassportVerification(d: PassportData, listing: VehicleList
 
 export type VerificationStatus =
   | "verified"
+  /**
+   * A named dealer has staked their own claim on this, and no source contradicts
+   * it. Deliberately NOT "verified": a franchise store that never retails
+   * branded titles is stating a policy about its lot, not evidence about this
+   * VIN. Presenting the two identically would make AutoLabels the author of a
+   * per-VIN title claim it never checked — and title branding is a legally
+   * disclosable fact. The dealer's name carries it, which is where the claim is
+   * both defensible and correctly placed.
+   *
+   * Attestation only ever fills the ABSENCE of data. Any reported brand wins.
+   */
+  | "dealer_attested"
   | "needs_attention"
   | "needs_confirmation"
   | "pending"
@@ -207,6 +219,9 @@ export interface VerificationReport {
   totalChecks: number;
   completedChecks: number;
   verifiedChecks: number;
+  /** Positive, but the dealer is the author. Counted apart from verifiedChecks
+   *  so a shopper is never told N sources checked when one of them was us. */
+  dealerAttestedChecks: number;
   needsAttentionChecks: number;
   needsConfirmationChecks: number;
   pendingChecks: number;
@@ -389,8 +404,14 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   // 5 — Title & brand (Vehicle history) — MATERIAL
   checks.push((() => {
     const s = src("vehicle_history");
+    // Order is the whole safeguard. A reported brand is evaluated FIRST, so a
+    // dealer policy can never bury one: attestation only ever answers a
+    // question no source answered.
     const status: VerificationStatus =
-      d.titleStatus === "clean" ? "verified" : d.titleStatus === "branded" ? "needs_attention" : "pending";
+      d.titleStatus === "branded" ? "needs_attention"
+        : d.titleStatus === "clean" ? "verified"
+        : d.titlePolicyAttested ? "dealer_attested"
+        : "pending";
     // When the dealer pulled the national title record (NMVTIS) and attested,
     // cite that authoritative source + the verification date explicitly.
     const nmvtis = d.titleVerifiedSource === "nmvtis";
@@ -406,6 +427,9 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
           : "Clean title on record — no salvage, flood, lemon, or rebuilt brands found."
         : status === "needs_attention"
           ? "A title brand is on record for this vehicle — review the brand details with the dealer."
+        : status === "dealer_attested"
+          // Says exactly what it is and what it is not, and names the author.
+          ? `${d.titlePolicyAttestedBy ?? "This dealer"} states they do not retail branded-title vehicles, and no source has reported a brand on this VIN. This is the dealer's own statement, not an independent title-record check.`
           : null,
       reviewNote: status === "pending"
         ? "the title and brand check is still pending"
@@ -413,8 +437,8 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
       evidence: [
         { label: "Title status", value: d.titleStatus === "clean" ? "Clean" : d.titleStatus === "branded" ? "Brand on record" : null },
         { label: "Brands checked", value: status !== "pending" ? "Salvage, flood, lemon, rebuilt" : null },
-        { label: "Verification", value: nmvtis ? `Dealer-verified via NMVTIS${verifiedOn ? ` on ${verifiedOn}` : ""}` : null },
-        { label: "Source", value: nmvtis ? "NMVTIS national title record" : FAMILY_META.vehicle_history.label },
+        { label: "Verification", value: nmvtis ? `Dealer-verified via NMVTIS${verifiedOn ? ` on ${verifiedOn}` : ""}` : status === "dealer_attested" ? "Dealer statement — no title record was pulled for this VIN" : null },
+        { label: "Source", value: status === "dealer_attested" ? (d.titlePolicyAttestedBy ?? "The selling dealer") : nmvtis ? "NMVTIS national title record" : FAMILY_META.vehicle_history.label },
         // Required NMVTIS caveat — disclosed wherever the NMVTIS-derived result appears.
         { label: "Note", value: nmvtis ? "NMVTIS title data may be incomplete; state participation and reporting timeframes vary. Not a substitute for an independent inspection." : null },
       ],
@@ -513,12 +537,13 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   })());
 
   const verifiedChecks = checks.filter((c) => c.status === "verified").length;
+  const dealerAttestedChecks = checks.filter((c) => c.status === "dealer_attested").length;
   const needsAttentionChecks = checks.filter((c) => c.status === "needs_attention").length;
   const needsConfirmationChecks = checks.filter((c) => c.status === "needs_confirmation").length;
   const pendingChecks = checks.filter((c) => c.status === "pending").length;
   const unavailableChecks = checks.filter((c) => c.status === "unavailable").length;
   const totalChecks = checks.length;
-  const completedChecks = verifiedChecks + needsAttentionChecks + needsConfirmationChecks;
+  const completedChecks = verifiedChecks + dealerAttestedChecks + needsAttentionChecks + needsConfirmationChecks;
 
   // sourceCount = unique FAMILIES that returned anything (not unavailable),
   // never the number of checks.
@@ -539,10 +564,10 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   // Arithmetic invariants. If the raw data cannot satisfy them, we refuse to
   // render a valid-looking equation and fall back to a neutral state.
   const valid =
-    totalChecks === verifiedChecks + needsAttentionChecks + needsConfirmationChecks + pendingChecks + unavailableChecks &&
-    completedChecks === verifiedChecks + needsAttentionChecks + needsConfirmationChecks;
+    totalChecks === verifiedChecks + dealerAttestedChecks + needsAttentionChecks + needsConfirmationChecks + pendingChecks + unavailableChecks &&
+    completedChecks === verifiedChecks + dealerAttestedChecks + needsAttentionChecks + needsConfirmationChecks;
   if (!valid && typeof console !== "undefined") {
-    console.warn("[verificationReport] arithmetic invariant violated", { totalChecks, verifiedChecks, needsAttentionChecks, needsConfirmationChecks, pendingChecks, unavailableChecks, completedChecks });
+    console.warn("[verificationReport] arithmetic invariant violated", { totalChecks, verifiedChecks, dealerAttestedChecks, needsAttentionChecks, needsConfirmationChecks, pendingChecks, unavailableChecks, completedChecks });
   }
 
   const anyHighSeverity = checks.some((c) => c.highSeverity && (c.status === "needs_attention" || c.status === "needs_confirmation"));
@@ -550,7 +575,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
 
   return {
     valid,
-    totalChecks, completedChecks, verifiedChecks, needsAttentionChecks, needsConfirmationChecks,
+    totalChecks, completedChecks, verifiedChecks, dealerAttestedChecks, needsAttentionChecks, needsConfirmationChecks,
     pendingChecks, unavailableChecks, sourceCount, checks, sources, banner,
     lastCheckedAt: latestDate(checks.map((c) => c.checkedAt)),
   };
@@ -619,9 +644,12 @@ function joinList(items: string[]): string {
 // module (mobile + desktop) and the full Data-Verified Report all render these
 // EXACT words for a given VerificationStatus so a status can never be phrased
 // differently (or upgraded to green) on one surface. "verified" is the only
-// status that ever reads as a positive pass.
+// status that ever reads as an INDEPENDENTLY sourced pass; "dealer_attested"
+// reads as a positive too, but it names the dealer so a shopper can tell who is
+// standing behind it.
 export const VERIFICATION_STATUS_LABEL: Record<VerificationStatus, string> = {
   verified: "Verified",
+  dealer_attested: "Dealer attested",
   needs_attention: "Needs attention",
   needs_confirmation: "Needs confirmation",
   pending: "Pending",

@@ -250,3 +250,54 @@ describe("passport surfaces consume the canonical report (cross-surface consiste
     expect(summarizeVerificationExceptions(conflictReport())).toBe("1 needs confirmation · 1 pending");
   });
 });
+
+
+// ── Dealer title attestation ──────────────────────────────────────────
+// A franchise store that never retails branded titles is stating a policy
+// about its lot, not evidence about a VIN. It may fill a gap; it may never
+// bury a finding, and it may never read as an independent check.
+
+describe("a dealer's policy fills a gap and never buries a finding", () => {
+  const withPolicy = (over: Record<string, unknown> = {}) =>
+    dOf({ titleStatus: "unknown", titlePolicyAttested: true, titlePolicyAttestedBy: "Harte INFINITI", ...over });
+  const titleOf = (d: PassportData) =>
+    deriveVerificationReport(d, lOf({})).checks.find((c) => c.key === "title")!;
+
+  it("answers an unanswered title check with the dealer's own statement", () => {
+    expect(titleOf(withPolicy()).status).toBe("dealer_attested");
+  });
+
+  it("NEVER buries a reported brand", () => {
+    // The safeguard. A branded trade slipping onto a franchise lot must still
+    // surface, policy or no policy.
+    const c = titleOf(withPolicy({ titleStatus: "branded" }));
+    expect(c.status).toBe("needs_attention");
+  });
+
+  it("does not downgrade a title a source already proved clean", () => {
+    expect(titleOf(withPolicy({ titleStatus: "clean" })).status).toBe("verified");
+  });
+
+  it("leaves the check pending for a dealer with no such policy", () => {
+    expect(titleOf(dOf({ titleStatus: "unknown" })).status).toBe("pending");
+  });
+
+  it("names the dealer in the finding, so the claim has an author", () => {
+    const c = titleOf(withPolicy());
+    expect(c.finding).toContain("Harte INFINITI");
+    expect(c.finding).toMatch(/not an independent title-record check/i);
+  });
+
+  it("is counted apart from independently verified checks", () => {
+    // A shopper must never be told N sources checked when one of them was the
+    // seller.
+    const r = deriveVerificationReport(withPolicy(), lOf({}));
+    expect(r.dealerAttestedChecks).toBe(1);
+    expect(r.checks.filter((c) => c.status === "verified").map((c) => c.key)).not.toContain("title");
+  });
+
+  it("still counts as resolved, so the shopper sees no open item", () => {
+    const r = deriveVerificationReport(withPolicy(), lOf({}));
+    expect(r.pendingChecks).toBe(deriveVerificationReport(dOf({ titleStatus: "unknown" }), lOf({})).pendingChecks - 1);
+  });
+});

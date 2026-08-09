@@ -148,6 +148,9 @@ const CARD = "bg-white border border-[#E6EAF0] rounded-2xl shadow-[0_1px_2px_rgb
 // needs-attention / unavailable never render green.
 const V_STATUS_ICON: Record<VerificationStatus, { color: string; bg: string; Icon: React.ElementType }> = {
   verified: { color: GREEN, bg: "#FFFFFF", Icon: CircleCheck },
+  // Teal + shield, not green + tick: a positive answer whose author is the
+  // dealer, distinguishable at a glance from an independent source check.
+  dealer_attested: { color: "#0F766E", bg: "#FFFFFF", Icon: ShieldCheck },
   needs_attention: { color: "#DC2626", bg: "#FEF2F2", Icon: CircleAlert },
   needs_confirmation: { color: AMBER, bg: "#FFFBEB", Icon: TriangleAlert },
   pending: { color: SUB, bg: "#F8FAFC", Icon: Clock },

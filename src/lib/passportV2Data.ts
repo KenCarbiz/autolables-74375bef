@@ -265,6 +265,15 @@ export interface PassportData {
   // Present only when the dealer published an NMVTIS title attestation.
   titleVerifiedAt: string | null;
   titleVerifiedSource: "nmvtis" | null;
+  /**
+   * The dealer states as policy that they do not retail branded-title vehicles,
+   * and no source reported a brand on this VIN. A claim about their lot, not
+   * evidence about this car — which is why it never becomes titleStatus
+   * "clean" and never reads as "Verified".
+   */
+  titlePolicyAttested: boolean;
+  /** Who is making that claim. Rendered beside it; never omitted. */
+  titlePolicyAttestedBy: string | null;
   serviceCount: number;
   recallClear: boolean;
   openRecalls: number | null;
@@ -584,6 +593,14 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
         : mc.carfax_clean_title === false || (titleBrand !== "" && !/^clean/i.test(titleBrand)) ? "branded" : "unknown";
   const titleVerifiedAt = titleAttest?.verified_at || null;
   const titleVerifiedSource: PassportData["titleVerifiedSource"] = titleAttest ? "nmvtis" : null;
+  // A franchise store's blanket policy fills the gap ONLY where no source
+  // spoke. It cannot reach a VIN that any source flagged, and it cannot reach
+  // one already proven clean — there is nothing to fill in either case.
+  const titlePolicyAttested = titleStatus === "unknown"
+    && (dealer.title_policy_no_branded === true || (lp as Record<string, unknown>).title_policy_no_branded === true);
+  const titlePolicyAttestedBy = titlePolicyAttested
+    ? ((dealer.dealership_name as string) || (dealer.name as string) || null)
+    : null;
   const serviceCount = listing.service_records?.length ?? 0;
   const recallClear = listing.recall_status === "clear";
   const openRecalls = listing.open_recall_count ?? null;
@@ -787,7 +804,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     marketAvg, marketLow, marketHigh, belowMarket, marketBasisWeak,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
-    ownerCount, accidentCount, cleanTitle, titleStatus, titleVerifiedAt, titleVerifiedSource, serviceCount, recallClear, openRecalls, hasRecallCheck,
+    ownerCount, accidentCount, cleanTitle, titleStatus, titleVerifiedAt, titleVerifiedSource, titlePolicyAttested, titlePolicyAttestedBy, serviceCount, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr, warrantyExpired,
     oemWarranty: ((listing as unknown as { oem_warranty?: OemWarrantyView }).oem_warranty) || null,
     confScore, confLabel, confDeductions, confBlockedBy, verifiedBy, dealerVerified, verifyRows,

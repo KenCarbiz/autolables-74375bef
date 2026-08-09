@@ -38,6 +38,9 @@ const BLUE = "#2563EB";
 
 const STATUS_TONE: Record<VerificationStatus, { bg: string; border: string; text: string; icon: React.ElementType }> = {
   verified: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", icon: CheckCircle2 },
+  // Green, because it IS a positive answer — but a different green, and a
+  // different icon, so it never reads as an independent source check.
+  dealer_attested: { bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-700", icon: ShieldCheck },
   needs_attention: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", icon: AlertTriangle },
   needs_confirmation: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", icon: HelpCircle },
   pending: { bg: "bg-slate-50", border: "border-[#E6E8EC]", text: "text-slate-600", icon: Clock },
@@ -49,6 +52,7 @@ const STATUS_TONE: Record<VerificationStatus, { bg: string; border: string; text
 // wrong" either — both are statements about the SOURCE, not the vehicle.
 const STATUS_MEANING: Record<VerificationStatus, string> = {
   verified: "A source returned a result and it checked out.",
+  dealer_attested: "The dealer has stated this themselves and no source contradicts it. It is their claim, not an independent record check.",
   needs_attention: "A source reported something worth reviewing with the dealer before you buy.",
   needs_confirmation: "Two sources disagree. That is not a finding against the vehicle — it means the answer has to be confirmed.",
   pending: "This check has not returned yet. Pending is not a negative result — no conclusion has been reached either way.",

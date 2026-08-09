@@ -57,6 +57,7 @@ export const MOCK_REVIEW_LISTING = {
 
 const STATUS_UI: Record<VerificationStatus, { label: string; icon: React.ElementType; fg: string; bg: string; ring: string }> = {
   verified:          { label: "Verified",          icon: CircleCheck,   fg: "text-[#16A34A]", bg: "bg-emerald-50", ring: "border-emerald-200" },
+  dealer_attested:   { label: "Dealer attested",   icon: ShieldCheck,   fg: "text-[#0F766E]", bg: "bg-teal-50",    ring: "border-teal-200" },
   needs_attention:   { label: "Needs attention",   icon: CircleAlert,   fg: "text-[#DC2626]", bg: "bg-red-50",     ring: "border-red-200" },
   needs_confirmation:{ label: "Needs confirmation", icon: TriangleAlert, fg: "text-[#D97706]", bg: "bg-amber-50",   ring: "border-amber-200" },
   pending:           { label: "Pending",           icon: Clock,         fg: "text-[#64748B]", bg: "bg-slate-100",  ring: "border-slate-200" },
@@ -91,6 +92,7 @@ const ORDER: VerificationStatus[] = ["verified", "needs_attention", "needs_confi
 const statusSegments = (report: VerificationReport): { status: VerificationStatus; count: number }[] => {
   const counts: Record<VerificationStatus, number> = {
     verified: report.verifiedChecks,
+    dealer_attested: report.dealerAttestedChecks ?? 0,
     needs_attention: report.needsAttentionChecks,
     needs_confirmation: report.needsConfirmationChecks,
     pending: report.pendingChecks,
