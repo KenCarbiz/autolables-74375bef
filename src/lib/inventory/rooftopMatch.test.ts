@@ -181,3 +181,72 @@ describe("mc_rooftop_id invariant", () => {
     expect(shouldIngest(listing({ rooftopId: "RT-100" }), idOnly)).toBe(true);
   });
 });
+
+// ── Per-segment retirement ────────────────────────────────────────────
+// The 2026-08-01 incident, as an executable assertion. The feed stopped
+// returning new units, the walk completed, every used car came back, and the
+// prune read the absence as 39 sales.
+
+import { segmentOf, segmentPrunePreflight, type SegmentGateInput } from "../../../supabase/functions/_shared/rooftopMatch";
+
+const seg = (over: Partial<SegmentGateInput> = {}): SegmentGateInput => ({
+  segment: "new", feedWalked: true, writeError: false,
+  feedReported: 39, accepted: 39, priorInventory: 39, ...over,
+});
+
+describe("a certification flip is not a segment change", () => {
+  it("keeps cpo with used, because CPO is a grade of used", () => {
+    expect(segmentOf("cpo")).toBe("rest");
+    expect(segmentOf("used")).toBe("rest");
+    expect(segmentOf("new")).toBe("new");
+  });
+
+  it("puts an unknown or missing condition where the old prune put it", () => {
+    for (const v of [null, undefined, "", "certified", "demo"]) expect(segmentOf(v)).toBe("rest");
+  });
+
+  it("reads the segment case-insensitively", () => {
+    for (const v of ["New", "NEW", " new "]) expect(segmentOf(v)).toBe("new");
+  });
+});
+
+describe("a segment the run did not observe is never retired", () => {
+  it("retires nothing when the provider stopped listing a segment the dealer still stocks", () => {
+    // The incident. Everything else about the run was healthy.
+    expect(segmentPrunePreflight(seg({ feedReported: 0, accepted: 0, priorInventory: 39 })))
+      .toBe("segment_vanished:new:0_vs_39");
+  });
+
+  it("still retires the segment that WAS observed on the same run", () => {
+    // The used walk succeeding must not be held hostage by the new segment.
+    expect(segmentPrunePreflight(seg({ segment: "rest", feedReported: 55, accepted: 55, priorInventory: 55 })))
+      .toBeNull();
+  });
+
+  it("separates the provider having none from us rejecting all of them", () => {
+    // Same visible outcome, opposite cause: one is a provider gap, the other is
+    // our own address gate. They must not print as the same thing.
+    expect(segmentPrunePreflight(seg({ feedReported: 39, accepted: 0, priorInventory: 39 })))
+      .toBe("segment_all_rejected:new:0_of_39");
+  });
+
+  it("fails closed when the provider could not be asked", () => {
+    expect(segmentPrunePreflight(seg({ feedReported: null, accepted: 0, priorInventory: 39 })))
+      .toBe("segment_unverified:new");
+  });
+
+  it("allows a genuine sell-down to complete", () => {
+    // Nothing on the ground and nothing in the feed is a finished segment, not
+    // an outage — otherwise the last car of a segment could never be retired.
+    expect(segmentPrunePreflight(seg({ feedReported: 0, accepted: 0, priorInventory: 0 }))).toBeNull();
+  });
+
+  it("allows normal movement inside a segment", () => {
+    expect(segmentPrunePreflight(seg({ feedReported: 30, accepted: 30, priorInventory: 39 }))).toBeNull();
+  });
+
+  it("keeps the run-level gates binding on every segment", () => {
+    expect(segmentPrunePreflight(seg({ feedWalked: false }))).toBe("partial_feed");
+    expect(segmentPrunePreflight(seg({ writeError: true }))).toBe("write_error");
+  });
+});

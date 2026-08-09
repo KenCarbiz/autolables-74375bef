@@ -4,6 +4,7 @@ import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToke
 import { newCallMeter, recordCall, estimateCost } from "../_shared/mcCost.ts";
 import {
   classifyListing, isStrictRooftop, normStreet, normZip, prunePreflight,
+  segmentOf, segmentPrunePreflight, type InventorySegment,
   type ListingIdentity, type Rooftop,
 } from "../_shared/rooftopMatch.ts";
 import { classifyCondition } from "../_shared/vehicleCondition.ts";
@@ -574,6 +575,10 @@ serve(async (req) => {
     let excInserts = 0;
     const stockMap = new Map<string, string[]>();     // live stock_number -> vins seen
     const priorExistingVins = new Set<string>();       // vehicle_listings VINs before this pull
+    // Per-segment state. A segment the run did not observe must not be retired,
+    // so each one carries its own accepted count and its own prior VIN set.
+    const segAccepted: Record<InventorySegment, number> = { new: 0, rest: 0 };
+    const priorSegVins: Record<InventorySegment, Set<string>> = { new: new Set(), rest: new Set() };
     const previouslyRemovedVins = new Set<string>();   // VINs with a prior 'removed_from_feed' change
     const authorityRules = new Map<string, { conflict_behavior?: string | null }>();
     // deno-lint-ignore no-explicit-any
@@ -621,9 +626,11 @@ serve(async (req) => {
     } catch { /* rules table optional */ }
     try {
       const { data: existingRows } = await admin.from("vehicle_listings")
-        .select("vin").eq("tenant_id", cfg.tenant_id).limit(20000);
-      for (const r of (existingRows || []) as Array<{ vin: string }>) {
-        if (r.vin) priorExistingVins.add(normVin(r.vin));
+        .select("vin, condition, status").eq("tenant_id", cfg.tenant_id).limit(20000);
+      for (const r of (existingRows || []) as Array<{ vin: string; condition?: string | null; status?: string | null }>) {
+        if (!r.vin) continue;
+        priorExistingVins.add(normVin(r.vin));
+        if (r.status !== "archived") priorSegVins[segmentOf(r.condition)].add(normVin(r.vin));
       }
     } catch { /* diff best-effort */ }
     try {
@@ -877,6 +884,7 @@ serve(async (req) => {
         const ymm = [b.year, b.make, b.model].filter(Boolean).join(" ") || null;
         const condition = classifyCondition({ inventoryType: l.inventory_type, certified: l.is_certified });
         if (condition === "new") newTypeSeen++;
+        segAccepted[segmentOf(condition)]++;
         const miles = typeof l.miles === "number" ? Math.round(l.miles) : 0;
         if (stockNo) {
           const arr = stockMap.get(stockNo) || [];
@@ -1438,6 +1446,41 @@ serve(async (req) => {
       //     cars than the last good run, treat it as a feed fault and skip the
       //     prune. Better to carry a stale car for a day than to delete a live
       //     lot because a feed hiccuped.
+      // ── Per-segment retirement gate ────────────────────────────────
+      // The prune reads ONE live-VIN set, so "the provider stopped listing a
+      // segment" and "the dealer sold every car in it" arrive identically.
+      // That is what archived a whole new-car lot on 2026-08-01.
+      //
+      // Ask the provider what it thinks it holds. One metered call, and it is
+      // the only thing that separates a sell-down from an outage — and a
+      // provider gap from our own address gate rejecting every row.
+      let feedReportedNew: number | null = null;
+      if (feedWalked && chosen.param && chosen.value) {
+        const probe = await syndPage(chosen.param, chosen.value, 1, 0, { carType: "new" });
+        // A refusal is not an answer. Only a real response sets a count; a 429
+        // or a timeout leaves it null so the gate fails closed.
+        if (probe.http >= 200 && probe.http < 300) feedReportedNew = probe.numFound;
+      }
+
+      const segReported: Record<InventorySegment, number | null> = {
+        new: feedReportedNew,
+        // The provider does not report "not new" directly; derive it, and only
+        // when both numbers are trustworthy.
+        rest: feedReportedNew == null || numFound <= 0 ? null : Math.max(0, numFound - feedReportedNew),
+      };
+      const segSkipped: Record<InventorySegment, string | null> = { new: null, rest: null };
+      for (const sgm of ["new", "rest"] as InventorySegment[]) {
+        segSkipped[sgm] = segmentPrunePreflight({
+          segment: sgm, feedWalked, writeError: !!firstWriteErr,
+          feedReported: segReported[sgm], accepted: segAccepted[sgm],
+          priorInventory: priorSegVins[sgm].size,
+        });
+        // Protect the blocked segment by making its cars look live to the
+        // prune. The other segment still retires normally, so one segment
+        // failing never costs the dealer the whole night's cleanup.
+        if (segSkipped[sgm]) for (const v of priorSegVins[sgm]) liveVins.add(v);
+      }
+
       let pruned: { listings_deleted?: number; files_deleted?: number } | null = null;
       const lastGood = Number(cfg.last_good_count || 0);
       const pruneSkipped = prunePreflight({
@@ -1499,7 +1542,8 @@ serve(async (req) => {
       }
 
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, prune_skipped: pruneSkipped, pinned: cleanRun,
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, prune_skipped: pruneSkipped,
+        segments: { new: { accepted: segAccepted.new, reported: segReported.new, prior: priorSegVins.new.size, skipped: segSkipped.new }, rest: { accepted: segAccepted.rest, reported: segReported.rest, prior: priorSegVins.rest.size, skipped: segSkipped.rest } }, pinned: cleanRun,
         new_units: { primary_feed: primaryNewUnits, total: newTypeSeen }, supplemental_new: supplementalNew,
         // Operator-only. Public list prices, so an estimate rather than a bill.
         api_usage: estimateCost(callMeter, 30) };

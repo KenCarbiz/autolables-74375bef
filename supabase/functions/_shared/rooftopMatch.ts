@@ -146,3 +146,72 @@ export function prunePreflight(i: PruneGateInput): string | null {
   }
   return null;
 }
+
+// ── Per-segment safety ────────────────────────────────────────────────
+//
+// The prune reads one undifferentiated live-VIN set, so "the provider stopped
+// listing this segment" and "the dealer sold every car in it" arrive as the
+// same input. On 2026-08-01 the owned feed stopped returning new units for a
+// rooftop; the walk completed, every used car came back, the run reported
+// success, and the whole new-car lot was archived.
+//
+// The fix is not to trust our own ingest count. A segment we accepted nothing
+// from is ambiguous — the provider may have had none, or the address gate may
+// have rejected every one. Only the provider's OWN reported count separates
+// those, and it is the difference between a sell-down and an outage.
+
+/** A car is new, or it is not. CPO is a grade of used, and `is_certified`
+ *  flips week to week — that must never read as a segment change. */
+export type InventorySegment = "new" | "rest";
+
+export const segmentOf = (condition: unknown): InventorySegment =>
+  String(condition ?? "").trim().toLowerCase() === "new" ? "new" : "rest";
+
+export interface SegmentGateInput {
+  segment: InventorySegment;
+  /** Run-level: every page was fetched. */
+  feedWalked: boolean;
+  /** Run-level: a write failed somewhere this run. */
+  writeError: boolean;
+  /**
+   * What the PROVIDER said it holds for this segment, from its own num_found.
+   * null when we could not ask — which is not the same as zero.
+   */
+  feedReported: number | null;
+  /** Rows of this segment we accepted after the ownership gate. */
+  accepted: number;
+  /** Non-archived rows of this segment the dealer has right now. */
+  priorInventory: number;
+}
+
+/**
+ * Null when retiring this segment is safe, otherwise the reason to skip it.
+ *
+ * The invariant, in one line: a segment may only be retired by a run that
+ * positively observed it. Absence is never evidence of a sale.
+ */
+export function segmentPrunePreflight(i: SegmentGateInput): string | null {
+  if (i.writeError) return "write_error";
+  if (!i.feedWalked) return "partial_feed";
+
+  // We could not ask the provider what it holds, so we cannot tell an empty
+  // segment from an unasked one. Fail closed.
+  if (i.feedReported === null && i.accepted === 0) {
+    return `segment_unverified:${i.segment}`;
+  }
+
+  // The provider says it has cars here and we kept none of them. That is our
+  // ownership gate rejecting them, not the dealer selling them.
+  if (i.feedReported !== null && i.feedReported > 0 && i.accepted === 0) {
+    return `segment_all_rejected:${i.segment}:0_of_${i.feedReported}`;
+  }
+
+  // A provider that reports zero for a segment the dealer still stocks is the
+  // 2026-08-01 shape exactly. A genuine sell-down reaches zero stocked too, so
+  // this only blocks while the dealer still has cars on the ground.
+  if (i.accepted === 0 && i.priorInventory > 0) {
+    return `segment_vanished:${i.segment}:0_vs_${i.priorInventory}`;
+  }
+
+  return null;
+}
