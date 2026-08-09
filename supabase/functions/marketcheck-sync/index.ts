@@ -1443,6 +1443,41 @@ serve(async (req) => {
         }
       } catch { /* dupe scan best-effort */ }
 
+      // ── Per-segment retirement gate ────────────────────────────────
+      // The prune reads ONE live-VIN set, so "the provider stopped listing a
+      // segment" and "the dealer sold every car in it" arrive identically.
+      // That is what archived a whole new-car lot on 2026-08-01.
+      //
+      // Ask the provider what it thinks it holds. One metered call, and it is
+      // the only thing that separates a sell-down from an outage — and a
+      // provider gap from our own address gate rejecting every row.
+      let feedReportedNew: number | null = null;
+      if (feedWalked && chosen.param && chosen.value) {
+        const probe = await syndPage(chosen.param, chosen.value, 1, 0, { carType: "new" });
+        // A refusal is not an answer. Only a real response sets a count; a 429
+        // or a timeout leaves it null so the gate fails closed.
+        if (probe.http >= 200 && probe.http < 300) feedReportedNew = probe.numFound;
+      }
+
+      const segReported: Record<InventorySegment, number | null> = {
+        new: feedReportedNew,
+        // The provider does not report "not new" directly; derive it, and only
+        // when both numbers are trustworthy.
+        rest: feedReportedNew == null || numFound <= 0 ? null : Math.max(0, numFound - feedReportedNew),
+      };
+      const segSkipped: Record<InventorySegment, string | null> = { new: null, rest: null };
+      for (const sgm of ["new", "rest"] as InventorySegment[]) {
+        segSkipped[sgm] = segmentPrunePreflight({
+          segment: sgm, feedWalked, writeError: !!firstWriteErr,
+          feedReported: segReported[sgm], accepted: segAccepted[sgm],
+          priorInventory: priorSegVins[sgm].size,
+        });
+        // Protect the blocked segment by making its cars look live to the
+        // prune. The other segment still retires normally, so one segment
+        // failing never costs the dealer the whole night's cleanup.
+        if (segSkipped[sgm]) for (const v of priorSegVins[sgm]) liveVins.add(v);
+      }
+
       // ── Removed-from-feed detection (before the prune deletes the rows) ──
       // Only run when we pulled a FULL inventory successfully. Failed/partial
       // pulls never mark cars as removed — the prune guard already blocks that.
@@ -1486,41 +1521,6 @@ serve(async (req) => {
       //     cars than the last good run, treat it as a feed fault and skip the
       //     prune. Better to carry a stale car for a day than to delete a live
       //     lot because a feed hiccuped.
-      // ── Per-segment retirement gate ────────────────────────────────
-      // The prune reads ONE live-VIN set, so "the provider stopped listing a
-      // segment" and "the dealer sold every car in it" arrive identically.
-      // That is what archived a whole new-car lot on 2026-08-01.
-      //
-      // Ask the provider what it thinks it holds. One metered call, and it is
-      // the only thing that separates a sell-down from an outage — and a
-      // provider gap from our own address gate rejecting every row.
-      let feedReportedNew: number | null = null;
-      if (feedWalked && chosen.param && chosen.value) {
-        const probe = await syndPage(chosen.param, chosen.value, 1, 0, { carType: "new" });
-        // A refusal is not an answer. Only a real response sets a count; a 429
-        // or a timeout leaves it null so the gate fails closed.
-        if (probe.http >= 200 && probe.http < 300) feedReportedNew = probe.numFound;
-      }
-
-      const segReported: Record<InventorySegment, number | null> = {
-        new: feedReportedNew,
-        // The provider does not report "not new" directly; derive it, and only
-        // when both numbers are trustworthy.
-        rest: feedReportedNew == null || numFound <= 0 ? null : Math.max(0, numFound - feedReportedNew),
-      };
-      const segSkipped: Record<InventorySegment, string | null> = { new: null, rest: null };
-      for (const sgm of ["new", "rest"] as InventorySegment[]) {
-        segSkipped[sgm] = segmentPrunePreflight({
-          segment: sgm, feedWalked, writeError: !!firstWriteErr,
-          feedReported: segReported[sgm], accepted: segAccepted[sgm],
-          priorInventory: priorSegVins[sgm].size,
-        });
-        // Protect the blocked segment by making its cars look live to the
-        // prune. The other segment still retires normally, so one segment
-        // failing never costs the dealer the whole night's cleanup.
-        if (segSkipped[sgm]) for (const v of priorSegVins[sgm]) liveVins.add(v);
-      }
-
       let pruned: { listings_deleted?: number; files_deleted?: number } | null = null;
       const lastGood = Number(cfg.last_good_count || 0);
       const pruneSkipped = prunePreflight({
