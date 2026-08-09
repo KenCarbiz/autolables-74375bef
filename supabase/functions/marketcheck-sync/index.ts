@@ -6,6 +6,7 @@ import {
   classifyListing, isStrictRooftop, normStreet, normZip, prunePreflight,
   type ListingIdentity, type Rooftop,
 } from "../_shared/rooftopMatch.ts";
+import { classifyCondition } from "../_shared/vehicleCondition.ts";
 import { isDue, overdueBy, skipReason } from "../_shared/syncSchedule.ts";
 
 // Artifact posts are queued and paced, so they can still be in flight when the
@@ -519,10 +520,14 @@ serve(async (req) => {
       last_run_at: c.last_run_at,
     }));
   for (const sk of skipped) {
-    if (sk.overdue_hours <= 0) continue;
+    // Every skip is recorded, not just the overdue ones. An on-time skip is
+    // exactly the case an operator cannot otherwise see: no run row is written,
+    // so a tenant that was deliberately passed over is indistinguishable from
+    // one whose run died partway through.
+    if (!sk.reason || sk.reason === "due") continue;
     await logSyncRun({
       tenant_id: sk.tenant_id, started_at: now.toISOString(), status: "skipped",
-      error_summary: `overdue by ${sk.overdue_hours}h (${sk.reason})`,
+      error_summary: sk.overdue_hours > 0 ? `overdue by ${sk.overdue_hours}h (${sk.reason})` : `skipped: ${sk.reason}`,
       raw: { reason: sk.reason, overdue_hours: sk.overdue_hours, last_run_at: sk.last_run_at },
     });
   }
@@ -864,7 +869,7 @@ serve(async (req) => {
         const stockNo = String(l.stock_no ?? (l.dealer && l.dealer.stock_no) ?? "").trim();
         const b = l.build || {};
         const ymm = [b.year, b.make, b.model].filter(Boolean).join(" ") || null;
-        const condition = l.is_certified ? "cpo" : (l.inventory_type === "new" ? "new" : "used");
+        const condition = classifyCondition({ inventoryType: l.inventory_type, certified: l.is_certified });
         if (condition === "new") newTypeSeen++;
         const miles = typeof l.miles === "number" ? Math.round(l.miles) : 0;
         if (stockNo) {
@@ -1493,8 +1498,15 @@ serve(async (req) => {
         // Operator-only. Public list prices, so an estimate rather than a bill.
         api_usage: estimateCost(callMeter, 30) };
       diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: manualId, matched_dealer: verifiedName || "(by domain)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });
+      // last_run_at paces the SCHEDULE, so only a scheduled run advances it.
+      // A manual "Sync now" used to write it too, and because the nightly
+      // requires a 20-hour gap, any manual run during the dealership's day
+      // silently cancelled that night's run — with no skip row, since skips
+      // under the overdue threshold are not logged. A dealer troubleshooting
+      // a quiet nightly was guaranteeing the next one never happened.
+      const clockPatch = forced ? {} : { last_run_at: now.toISOString() };
       await admin.from("marketcheck_sync_config")
-        .update({ last_run_at: now.toISOString(), last_status: status })
+        .update({ ...clockPatch, last_status: status })
         .eq("tenant_id", cfg.tenant_id);
       await admin.from("audit_log").insert({
         action: "marketcheck_sync", entity_type: "tenant", entity_id: cfg.tenant_id,

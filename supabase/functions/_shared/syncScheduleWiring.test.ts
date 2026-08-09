@@ -35,12 +35,27 @@ describe("a skipped tenant leaves a trace", () => {
 
   it("writes an overdue tenant to the same table a failure lands in", () => {
     expect(sync).toMatch(/status: "skipped"/);
-    expect(sync).toMatch(/error_summary: `overdue by \$\{sk\.overdue_hours\}h/);
+    expect(sync).toMatch(/overdue by \$\{sk\.overdue_hours\}h/);
   });
 
-  it("does not write a row for a tenant that is merely waiting for its slot", () => {
-    // Otherwise every tenant writes ~23 rows a day and the signal is buried.
-    expect(sync).toMatch(/if \(sk\.overdue_hours <= 0\) continue;/);
+  it("records an on-time skip too, not just an overdue one", () => {
+    // This filter used to be `sk.overdue_hours <= 0`, written when the cron ran
+    // hourly and would have logged ~23 no-op rows a day. The cron has been
+    // daily since 20260620030000, so the filter now only hides the one skip an
+    // operator actually needs: a tenant passed over because a manual run reset
+    // its clock leaves NO run row, and is indistinguishable from a run that
+    // died partway through.
+    expect(sync).toMatch(/if \(!sk\.reason \|\| sk\.reason === "due"\) continue;/);
+    expect(sync).not.toMatch(/if \(sk\.overdue_hours <= 0\) continue;/);
+  });
+
+  it("does not let a manual run reset the schedule clock", () => {
+    // last_run_at paces the nightly, which requires a 20-hour gap. A manual
+    // "Sync now" during the dealership's day used to write it, silently
+    // cancelling that night's run — so troubleshooting a quiet nightly
+    // guaranteed the next one never happened.
+    expect(sync).toMatch(/const clockPatch = forced \? \{\} : \{ last_run_at: now\.toISOString\(\) \}/);
+    expect(sync).toMatch(/\.update\(\{ \.\.\.clockPatch, last_status: status \}\)/);
   });
 
   it("returns the skip list so an empty run is readable without a query", () => {
