@@ -1,0 +1,17 @@
+:root {
+  /* auto(LABELS) brand system v2.0 */
+  --al-blue: #2563EB;
+  --al-navy: #0B2041;
+  --al-navy-700: #102F60;
+  --al-sky: #608DF0;          /* 'auto' on dark backgrounds only */
+  --al-paper: #F7F8FA;
+  --al-rule: #C7CEDA;
+  --al-white: #FFFFFF;
+
+  --al-font: Inter, system-ui, 'Helvetica Neue', Arial, sans-serif;
+  --al-logo-weight: 800;
+  --al-logo-tracking: -0.02em;
+  --al-logo-ratio: 7.1320;
+  --al-logo-min-width: 96px;
+  --al-mark-radius: 20.31%;
+}

@@ -15,34 +15,19 @@
 
 import { useState } from "react";
 import type { SaturdayDealer } from "./types";
+import { AutoLabelsWordmarkArt } from "@/components/brand/AutoLabelsWordmarkArt";
 
-// Site wordmark colors (see components/brand/Logo.tsx). "auto" switches to the
-// bright accent on dark grounds so it survives the navy footer.
-const CURB = "#2563EB";
-const CYAN = "#3BB4FF";
-const NAVY = "#0B2041";
-
-export const AutoLabelsWordmark = ({
-  fontSize,
-  inverted,
-}: {
-  fontSize: number;
-  inverted?: boolean;
-}) => (
-  <span
-    className="block leading-none"
-    style={{ fontWeight: 800, fontSize, letterSpacing: "-0.02em" }}
-  >
-    <span style={{ color: inverted ? CYAN : CURB }}>auto</span>
-    <span style={{ color: inverted ? "#FFFFFF" : NAVY }}>(LABELS)</span>
-  </span>
-);
-
-/** The navy "Powered by auto(LABELS)" footer lockup. No glyph beside it. */
+/**
+ * The navy "Powered by auto(LABELS)" footer lockup. No glyph beside it.
+ *
+ * The wordmark is the official outlined artwork, not text set in Inter: this
+ * block prints, and a customer document must not render a different logo
+ * depending on which fonts the rendering machine happens to have.
+ */
 export const AddendumPoweredBy = () => (
   <span className="min-w-0">
     <span className="block text-[5.4px] font-bold uppercase tracking-[0.18em] text-white/70">Powered by</span>
-    <AutoLabelsWordmark fontSize={9.5} inverted />
+    <AutoLabelsWordmarkArt height={11} reverse className="mt-[1.5px]" />
   </span>
 );
 

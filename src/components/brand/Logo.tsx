@@ -20,7 +20,7 @@ interface LogoProps {
 
 const NAVY = "#0B2041"; // Label Navy — "(LABELS)"
 const CURB = "#2563EB"; // Autocurb blue — "auto"
-const CYAN = "#3BB4FF"; // bright accent — "auto" on dark backgrounds
+const SKY = "#608DF0";  // "auto" on dark backgrounds — same hue as CURB
 const INTER = "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
 // Square "a" tile — favicon / app icon. White lowercase "a" on a
@@ -63,7 +63,7 @@ const Wordmark = ({
   align: "left" | "center";
 }) => {
   const fontSize = Math.round(size * 0.78);
-  const autoColor = inverted ? CYAN : CURB;
+  const autoColor = inverted ? SKY : CURB;
   const labelsColor = inverted ? "#FFFFFF" : NAVY;
   return (
     <span

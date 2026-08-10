@@ -31,7 +31,7 @@ const FamilyWordmark = ({ mark, size = 13, inverted = false }: { mark: string; s
     aria-label={`auto(${mark})`}
     style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontWeight: 800, fontSize: size, letterSpacing: "-0.02em", lineHeight: 1, whiteSpace: "nowrap" }}
   >
-    <span style={{ color: inverted ? "#3BB4FF" : "#2563EB" }}>auto</span>
+    <span style={{ color: inverted ? "#608DF0" : "#2563EB" }}>auto</span>
     <span style={{ color: inverted ? "#FFFFFF" : "#0B2041" }}>({mark})</span>
   </span>
 );

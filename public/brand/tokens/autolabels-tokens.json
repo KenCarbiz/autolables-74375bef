@@ -1,0 +1,48 @@
+{
+  "brand": "auto(LABELS)",
+  "version": "2.1",
+  "color": {
+    "blue": {
+      "hex": "#2563EB",
+      "role": "primary \u2014 'auto', buttons, links, primary mark tile"
+    },
+    "navy": {
+      "hex": "#0B2041",
+      "role": "'(LABELS)', headings, dark surfaces"
+    },
+    "navy-700": {
+      "hex": "#102F60",
+      "role": "raised surface on navy"
+    },
+    "sky": {
+      "hex": "#608DF0",
+      "role": "'auto' on dark backgrounds only"
+    },
+    "paper": {
+      "hex": "#F7F8FA",
+      "role": "page and card background"
+    },
+    "rule": {
+      "hex": "#C7CEDA",
+      "role": "hairlines, table rules, disabled"
+    },
+    "white": {
+      "hex": "#FFFFFF"
+    }
+  },
+  "type": {
+    "family": "Inter",
+    "logo_weight": 800,
+    "optical_size": 14,
+    "fallback": "system-ui, 'Helvetica Neue', Arial, sans-serif"
+  },
+  "logo": {
+    "wordmark_ratio": 7.132,
+    "tracking_em": -0.02,
+    "lockup_kern_em": -0.04,
+    "clear_space": "0.5 x wordmark height, all sides",
+    "min_wordmark_px": 96,
+    "min_mark_px": 24,
+    "mark_corner_radius": 0.2031
+  }
+}

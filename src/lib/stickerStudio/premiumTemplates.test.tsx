@@ -244,12 +244,15 @@ describe("addendum wordmark and value-prop sizing", () => {
       const red = renderAddendum(id, DATA, { ...BRAND, accentColor: "#b91c1c" });
       expect(red).not.toContain("labels.io<");
       expect(red).not.toContain("AI-Powered Vehicle Transparency");
-      // The footer lockup is the site wordmark, inverted for the navy bar, and
-      // carries no glyph beside it.
-      expect(red).toContain(">auto</span>");
-      expect(red).toContain(">(LABELS)</span>");
-      expect(red).toContain("#3BB4FF");   // "auto" on dark
+      // The footer lockup is the official wordmark artwork, reversed for the
+      // navy bar, with no glyph beside it. Outlined paths rather than live
+      // text: this block prints, and a customer document must not render a
+      // different logo depending on the fonts the rendering machine has.
+      expect(red).toContain('aria-label="auto(LABELS)"');
+      expect(red).toContain("#608DF0");   // Sky — "auto" on dark
       expect(red).toContain("Powered by");
+      expect(red).not.toContain(">auto</span>");   // never live text
+      expect(red).not.toContain("#3BB4FF");        // retired in brand v2.1
     });
 
     it(`${id} renders an image-only value proposition without its text`, () => {
