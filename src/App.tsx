@@ -155,6 +155,9 @@ const PublicListing = lazy(() => import("./pages/PublicListing"));
 const VehiclePassportV2Detail = lazy(() => import("./pages/VehiclePassportV2Detail"));
 const VehiclePassportV3 = lazy(() => import("./pages/VehiclePassportV3"));
 const VehiclePassportRoute = lazy(() => import("./pages/VehiclePassportRoute"));
+// Draft next-version passport. Lazy + noindex; never linked from the customer
+// passport, and /v/:slug is unaffected by anything it does.
+const VehiclePassportNext = lazy(() => import("./pages/VehiclePassportNext"));
 const VehiclePassportGoverned = lazy(() => import("./pages/VehiclePassportGoverned"));
 const VehiclePassportVerification = lazy(() => import("./pages/VehiclePassportVerification"));
 const VehiclePassportDocuments = lazy(() => import("./pages/VehiclePassportDocuments"));
@@ -244,6 +247,9 @@ const App = () => (
                           "view" links. /v/:slug stays the canonical customer URL the
                           window-sticker QR encodes; both render V3. */}
                       <Route path="/v3/:slug" element={<VehiclePassportRoute />} />
+                      {/* Draft only — the next-version design against real
+                          vehicle data. Not the customer URL. */}
+                      <Route path="/v-next/:slug" element={<VehiclePassportNext />} />
                       <Route path="/v/:slug/verification" element={<VehiclePassportVerification />} />
                       <Route path="/v/:slug/documents" element={<VehiclePassportDocuments />} />
                       <Route path="/v/:slug/great-buy" element={<VehiclePassportGreatBuy />} />
