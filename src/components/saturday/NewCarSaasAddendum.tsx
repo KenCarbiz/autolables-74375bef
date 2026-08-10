@@ -1,4 +1,4 @@
-// New Car SaaS Template — 4.25" x 11" new vehicle addendum.
+// New Car SaaS Template (V2) — 4.5" x 11" new vehicle addendum.
 //
 // Generated from SaturdayPremiumAddendum and kept byte-identical to it apart
 // from this header and the exported name. The two had already drifted once —
@@ -20,8 +20,6 @@ import { AddendumDealerMasthead, AddendumPoweredBy, addendumDealerName, masthead
 type Line = { name: string; price: string; description?: string; iconKey?: string };
 type Addendum = SaturdaySticker & { installed?: Line[]; upgrades?: Line[] };
 type Props = { data: Addendum };
-
-// AutoLabels brand blue. Fixed — the product wordmark is not dealer-themed.
 
 // Widths for the value-proposition artwork. The HEIGHT is no longer fixed
 // here: a fixed height meant a tall promotional image claimed its inches
@@ -69,9 +67,16 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   // Section visibility is resolved once, from stored data only, and shared with
   // the print and PDF paths so a section cannot appear in one and not another.
   const sections = resolveAddendumSections(data);
-  const { installed, upgrades, benefits, valueProps } = sections;
+  const { installed, upgrades, valueProps } = sections;
   // Spacing tightens before anything is cropped; see addendumDensity.
-  const density = addendumDensity(sections);
+  // V2 drops the standalone Included Benefits panel: the one benefit it carried
+  // for most dealers — lifetime powertrain — is already the subject of its own
+  // value-proposition panel below, and printing it twice cost an inch of a
+  // sheet with a hard ceiling. Stored benefit data is untouched; only this
+  // template stops rendering the box. Density is recomputed without those rows
+  // so the artwork and spacing are not still budgeting for them.
+  const v2Sections = { ...sections, benefits: [], hasBenefits: false };
+  const density = addendumDensity(v2Sections);
   // Accent follows the dealer theme (populated by toSaturdaySticker from
   // branding.accentColor). Neutrals (navy, slate) stay fixed; installed
   // green and upgrades purple keep their semantic meaning.
@@ -98,9 +103,19 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   const line1 = words.slice(0, 2).join(" ");
   const line2 = words.slice(2).join(" ");
   const today = new Date().toLocaleDateString(undefined, { month: "2-digit", day: "2-digit", year: "numeric" });
+  // The vehicle sits beside ADDENDUM on one band, so its type has to answer to
+  // the longest of the two lines rather than to a fixed size. Steps down, never
+  // truncates: a trim the customer cannot read is not a shorter title.
+  const titleSize = (() => {
+    const longest = Math.max(line1.length, line2.length);
+    const steps = ["text-[10px]", "text-[11px]", "text-[13px]", "text-[15.5px]"];
+    const i = (longest > 22 ? 1 : longest > 17 ? 2 : 3) - (density.compact ? 1 : 0);
+    return steps[Math.max(0, i)];
+  })();
+
 
   const infoCell = (icon: AddendumIconKey, label: string, value: string | null, mono = false) => (
-    <div className="flex items-center gap-2 px-2.5 py-[9px]">
+    <div className={`flex items-center gap-2 px-2.5 ${density.compact ? "py-[6px]" : "py-[9px]"}`}>
       <span className="flex h-[24px] w-[24px] items-center justify-center rounded-[7px] shrink-0" style={{ background: accentSoft }}>
         <AutoLabelsAddendumIcon iconKey={icon} size={15} color={T.navy} />
       </span>
@@ -117,7 +132,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
     const fg = getAddendumIconColor(iconKey, ctx);
     const priceStr = money(l.price);
     return (
-      <div key={l.name} className="flex items-center gap-2 px-2.5 py-[6px] border-b last:border-b-0" style={{ borderColor: "#EDF2F8" }}>
+      <div key={l.name} className={`flex items-center gap-2 px-2.5 border-b last:border-b-0 ${density.compact ? "py-[3.5px]" : "py-[6px]"}`} style={{ borderColor: "#EDF2F8" }}>
         <span className="flex h-[20px] w-[20px] items-center justify-center rounded-[6px] shrink-0" style={{ background: tone === "green" ? T.greenSoft : T.purpleSoft }}>
           <AutoLabelsAddendumIcon iconKey={iconKey} size={13} color={fg} />
         </span>
@@ -143,37 +158,55 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   const QR_BULLETS = ["Photos", "Service History", "Ownership Information", "Benefits", "Documents", "Protection Products"];
 
   return (
-    <div className="bg-white shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "4.25in", height: "11in", fontFamily: "Inter, system-ui, sans-serif", color: T.text, boxSizing: "border-box", overflow: "hidden" }}>
+    <div className="bg-white shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "4.5in", height: "11in", fontFamily: "Inter, system-ui, sans-serif", color: T.text, boxSizing: "border-box", overflow: "hidden" }}>
       <div className="flex h-full flex-col" style={{ padding: "0.17in" }}>
-        {/* Header — the dealer's own masthead left, their contact block right of
-            a vertical divider. AutoLabels attribution is footer-only. */}
-        <header className="shrink-0 flex items-stretch justify-between gap-2.5 pb-1">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <AddendumDealerMasthead dealer={dealer} navy={T.navy} muted={T.muted} />
+        {/* Masthead — the dealership's logo is the page's primary branding and
+            gets the room to read as such; their contact block sits right of a
+            hairline, deliberately subordinate. AutoLabels is footer-only. */}
+        <header className="shrink-0 flex items-center justify-between gap-3 pb-1.5">
+          <div className="flex items-center min-w-0 flex-1">
+            <AddendumDealerMasthead dealer={dealer} navy={T.navy} muted={T.muted} size={density.compact ? "md" : "lg"} />
           </div>
-          <div className="text-right text-[7.2px] font-semibold leading-[1.4] min-w-0 pl-2.5" style={{ color: T.muted, borderLeft: `1px solid ${T.border}` }}>
-            {showLogo && <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{addendumDealerName(dealer)}</div>}
+          <div className="text-right text-[7.4px] font-semibold leading-[1.45] shrink-0 max-w-[1.85in] pl-2.5" style={{ color: T.muted, borderLeft: `1px solid ${T.border}` }}>
+            {showLogo && <div className="text-[8.6px] font-black uppercase tracking-wide break-words" style={{ color: T.navy }}>{addendumDealerName(dealer)}</div>}
             {dealer.address && <div className="break-words">{dealer.address}</div>}
             {dealer.addressLine2 && <div className="break-words">{dealer.addressLine2}</div>}
             {dealer.phone && <div>{dealer.phone}</div>}
-            {dealer.website && <div>{dealer.website}</div>}
+            {dealer.website && <div className="break-all">{dealer.website}</div>}
           </div>
         </header>
 
-        {/* Passport badge + hero title stack */}
-        <div className="shrink-0 mt-2.5 inline-flex items-center gap-1.5">
-          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full shrink-0" style={{ background: accentSoft }}>
-            <AutoLabelsAddendumIcon iconKey="vehicle-passport" size={12} color={T.navy} />
+        {/* Vehicle Passport — the platform's branded element, given real
+            presence in V2 but still second to the dealership's own logo. */}
+        {/* V2's enlarged branding is the first thing to give height back. A
+            dealer with 13 priced rows still gets a whole sheet: the masthead,
+            this badge, the title and the QR all step down long before a row,
+            the totals or the footer are allowed off the page. */}
+        <div className={`shrink-0 ${density.compact ? "mt-1.5" : "mt-2.5"} inline-flex items-center gap-2`}>
+          <span
+            className={`flex items-center justify-center rounded-full shrink-0 ${density.compact ? "h-[18px] w-[18px]" : "h-[24px] w-[24px]"}`}
+            style={{ background: accentSoft }}
+          >
+            <AutoLabelsAddendumIcon iconKey="vehicle-passport" size={density.compact ? 12 : 16} color={T.navy} />
           </span>
-          <span className="text-[8.5px] font-black uppercase tracking-[0.2em]" style={{ color: accent }}>Vehicle Passport™</span>
+          <span className={`font-black uppercase tracking-[0.17em] ${density.compact ? "text-[9px]" : "text-[12.5px]"}`} style={{ color: accent }}>Vehicle Passport™</span>
         </div>
-        <h1 className="mt-1 text-[34px] font-black leading-[0.95] tracking-[-0.02em]" style={{ color: T.navy }}>ADDENDUM</h1>
-        <div className="shrink-0 mt-1.5 text-[15px] font-black uppercase leading-[1.12] tracking-[-0.01em]" style={{ color: T.text }}>
-          {line1 || "VEHICLE DETAILS"}<br />{line2 || (line1 ? "" : "PENDING")}
+
+        {/* ADDENDUM and the vehicle share one horizontal band, split by a
+            hairline. Stacked, they cost an inch of height and said no more.
+            The vehicle side is dynamic, so its type steps down for a long
+            name instead of forcing the divider off a 4.5-inch sheet. */}
+        <div className="shrink-0 mt-1.5 flex items-stretch gap-2.5">
+          <h1 className={`shrink-0 font-black leading-[0.92] tracking-[-0.03em] ${density.compact ? "text-[26px]" : "text-[33px]"}`} style={{ color: T.navy }}>ADDENDUM</h1>
+          <div className="w-px shrink-0 self-stretch" style={{ background: T.border }} />
+          <div className={`min-w-0 flex flex-col justify-center font-black uppercase leading-[1.06] tracking-[-0.015em] ${titleSize}`} style={{ color: T.text }}>
+            <span className="block break-words">{line1 || "VEHICLE DETAILS"}</span>
+            {(line2 || !line1) && <span className="block break-words">{line2 || "PENDING"}</span>}
+          </div>
         </div>
 
         {/* Vehicle info grid */}
-        <section className="shrink-0 mt-2.5 grid grid-cols-2 rounded-[10px] border" style={{ borderColor: T.border }}>
+        <section className={`shrink-0 ${density.sectionGap} grid grid-cols-2 rounded-[10px] border`} style={{ borderColor: T.border }}>
           <div className="border-b border-r" style={{ borderColor: T.border }}>{infoCell("stock-number", "Stock Number", vehicle.stock || null)}</div>
           <div className="border-b" style={{ borderColor: T.border }}>{infoCell("vin", "VIN", vehicle.vin || null, true)}</div>
           <div className="border-r" style={{ borderColor: T.border }}>{infoCell("date", "Date", today)}</div>
@@ -181,12 +214,18 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
         </section>
 
         {/* QR block — a major engagement point in the upper third */}
-        <section className="shrink-0 mt-2.5 grid grid-cols-[1in_1fr] items-center gap-3 rounded-[10px] border p-2.5" style={{ borderColor: accentBorder, background: accentSoft }}>
+        <section
+          className={`shrink-0 ${density.sectionGap} grid items-center gap-3 rounded-[10px] border p-2.5 ${density.compact ? "grid-cols-[0.92in_1fr]" : "grid-cols-[1.18in_1fr]"}`}
+          style={{ borderColor: accentBorder, background: accentSoft }}
+        >
+          {/* The QR is the point of this panel: it has to survive being read
+              through glass from arm's length, so it takes the extra width the
+              wider sheet freed up rather than the copy beside it. */}
           <div className="rounded-[7px] bg-white p-1.5 border" style={{ borderColor: T.border }}>
-            <QRCodeSVG value={safeUrl} size={84} bgColor="#ffffff" fgColor={T.navy} level="M" style={{ width: "100%", height: "auto" }} />
+            <QRCodeSVG value={safeUrl} size={density.compact ? 78 : 100} bgColor="#ffffff" fgColor={T.navy} level="M" style={{ width: "100%", height: "auto" }} />
           </div>
           <div className="min-w-0">
-            <div className="text-[12px] font-black uppercase leading-[1.15] tracking-wide" style={{ color: accent }}>Scan to View<br />Vehicle Passport</div>
+            <div className={`font-black uppercase leading-[1.1] tracking-[0.01em] ${density.compact ? "text-[11px]" : "text-[14px]"}`} style={{ color: accent }}>Scan to View<br />Your Vehicle Passport</div>
             <div className="mt-2 grid grid-cols-2 gap-x-2.5 gap-y-[5px]">
               {QR_BULLETS.map((b) => (
                 <span key={b} className="inline-flex items-center gap-1.5 text-[7.4px] font-bold leading-tight" style={{ color: T.text }}>
@@ -206,22 +245,6 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           </section>
         )}
 
-        {/* Included Benefits — blue. Every stored benefit prints; the list is
-            no longer truncated at six, because a benefit the dealer configured
-            and the customer is being sold should not vanish silently. */}
-        {sections.hasBenefits && (
-          <section className={`shrink-0 ${density.sectionGap} rounded-[10px] border overflow-hidden`} style={{ borderColor: "#BBD8F5" }}>
-            <SectionBar icon="benefits" title="Included Benefits" bg={accentSoft} fg={accent} />
-            <div className={`px-2.5 py-2 grid grid-cols-1 ${density.benefitGap}`}>
-              {benefits.map((b) => (
-                <span key={b} className="inline-flex items-start gap-2 text-[8.6px] font-bold leading-tight" style={{ color: T.text }}>
-                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={11} color={accent} />
-                  <span className="min-w-0">{b}</span>
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Available Upgrades — purple, NOT INSTALLED */}
         {sections.hasUpgrades && (
@@ -235,11 +258,13 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
         {/* Value propositions — the dealership's own programs, merchandised.
             The claim and its disclosure travel together so the disclosure can
             never be dropped from a printed document. */}
-        {sections.hasValueProps && (
+        {sections.hasValueProps && density.artworkFits && (
           // flex-1 with min-h-0: this block takes the slack the structured
           // sections leave, and — crucially — is the only thing that gives
-          // space back when they need more.
-          <section className={`${density.sectionGap} space-y-2 flex-1 min-h-0 flex flex-col justify-start`} data-overflow-risk={density.overflowRisk || undefined}>
+          // space back when they need more. Centred, not top-anchored: when the
+          // page is light the leftover height splits above and below the
+          // artwork instead of becoming one dead band above the totals.
+          <section className={`${density.sectionGap} space-y-2 flex-1 min-h-0 overflow-hidden flex flex-col justify-center`} data-overflow-risk={density.overflowRisk || undefined}>
             {valueProps.map((vp) => (
               <div key={vp.id} className={`rounded-[10px] border-2 px-2.5 py-2 min-h-0 ${vp.displayStyle === "image" ? "block" : "flex items-center gap-2.5"}`} style={{ borderColor: T.navy }}>
                 {vp.imageUrl && vp.displayStyle !== "banner" ? (
@@ -250,7 +275,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
                     // h-auto + a max-height ceiling: the artwork keeps its
                     // aspect ratio and is never stretched, cropped, or allowed
                     // to push a priced row off the sheet.
-                    style={{ maxHeight: valuePropImageCeiling(vp.imageScale, sections) }}
+                    style={{ maxHeight: valuePropImageCeiling(vp.imageScale, v2Sections) }}
                     className={`h-auto w-auto object-contain ${VP_IMAGE_WIDTH[vp.imageScale || "sm"]} ${vp.displayStyle === "image" ? "mx-auto max-w-full" : "shrink"}`}
                   />
                 ) : null}

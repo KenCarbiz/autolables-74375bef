@@ -269,7 +269,7 @@ describe("addendum wordmark and value-prop sizing", () => {
       // the 11-inch sheet was cropped in silence.
       const small = renderAddendum(id, { ...DATA, valueProps: [{ ...logoVp, imageScale: "sm" }] });
       const xl = renderAddendum(id, { ...DATA, valueProps: [{ ...logoVp, imageScale: "xl" }] });
-      expect(small).toMatch(/max-height:\s*0\.42in/);
+      expect(small).toMatch(/max-height:\s*0\.62in/);
       expect(small).toContain("max-w-[1.1in]");
       expect(xl).toContain("max-w-[2.9in]");
       // Aspect ratio is preserved and the artwork is never stretched.

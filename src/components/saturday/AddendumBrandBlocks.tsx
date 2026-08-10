@@ -40,10 +40,14 @@ export const AddendumDealerMasthead = ({
   dealer,
   navy,
   muted,
+  size = "md",
 }: {
   dealer: SaturdayDealer;
   navy: string;
   muted: string;
+  /** "lg" is the V2 masthead, where the dealership logo is the page's primary
+   *  branding element rather than a label above the address. */
+  size?: "md" | "lg";
 }) => {
   const [failed, setFailed] = useState(false);
   const logoUrl = addendumLogoUrl(dealer);
@@ -55,14 +59,19 @@ export const AddendumDealerMasthead = ({
         alt={addendumDealerName(dealer)}
         crossOrigin="anonymous"
         onError={() => setFailed(true)}
-        className="h-[0.44in] w-auto max-w-[1.9in] object-contain object-left"
+        className={size === "lg"
+          ? "h-[0.82in] w-auto max-w-[2.45in] object-contain object-left"
+          : "h-[0.44in] w-auto max-w-[1.9in] object-contain object-left"}
       />
     );
   }
 
   return (
     <span className="min-w-0">
-      <span className="block text-[14px] font-black uppercase leading-none tracking-[-0.01em]" style={{ color: navy }}>
+      <span
+        className={`block font-black uppercase leading-[1.02] tracking-[-0.015em] ${size === "lg" ? "text-[22px]" : "text-[14px]"}`}
+        style={{ color: navy }}
+      >
         {addendumDealerName(dealer)}
       </span>
       {dealer.slogan && (

@@ -151,6 +151,9 @@ export function valuePropImageCeiling(
   const rows = structuredRowCount(sections);
   if (rows > 9) idx -= 1;
   if (rows > 12) idx -= 1;
+  // The inverse of the pressure rules: a light page has height going spare, and
+  // the artwork is the one element that can absorb it without stretching type.
+  if (structuredSections <= 2 && rows <= 7) idx += 1;
   return VP_IMAGE_MAX_HEIGHT[order[Math.max(0, Math.min(order.length - 1, idx))]];
 }
 
@@ -165,6 +168,19 @@ export function valuePropImageCeiling(
 export interface AddendumDensity {
   /** Vertical gap class between sections. */
   sectionGap: string;
+  /** True when the configured content leaves the sheet with room to spare, so
+   *  the sections breathe instead of pooling the slack in one gap. */
+  roomy: boolean;
+  /**
+   * True when the promotional artwork still has a track to live in.
+   *
+   * Past this point the flex track collapses to nothing while the panel inside
+   * keeps its own height, so the artwork paints straight over the adjusted
+   * total. Dropping decoration is the correct trade — a shopper losing the
+   * promo panel is a smaller failure than a shopper reading a price with a
+   * warranty stamp across it — and overflowRisk still flags the page.
+   */
+  artworkFits: boolean;
   /** Gap between benefit rows. */
   benefitGap: string;
   /** True when the row count is beyond what normal spacing fits. */
@@ -187,9 +203,18 @@ export function addendumDensity(s: ResolvedAddendumSections): AddendumDensity {
   // Thresholds come from the printed sheet: ~9 rows fit at normal spacing
   // alongside artwork, ~13 at compact spacing.
   const compact = rows > 9;
+  // Below ~7 rows an 11-inch sheet has real slack. Left alone it pools into one
+  // gap above the totals and reads as an unfinished page, so the gap between
+  // every section widens instead — the slack is spread rather than parked.
+  const roomy = !compact && rows <= 7;
+  // Measured on the printed sheet: past ~10 priced rows the structured content
+  // plus the totals, trust band and footer consume the full 11 inches.
+  const artworkFits = rows <= 10;
   return {
     compact,
-    sectionGap: compact ? "mt-1.5" : "mt-2.5",
+    roomy,
+    artworkFits,
+    sectionGap: compact ? "mt-1.5" : roomy ? "mt-3.5" : "mt-2.5",
     benefitGap: compact ? "gap-[2px]" : "gap-[5px]",
     overflowRisk: rows > 13,
   };

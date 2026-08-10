@@ -113,10 +113,23 @@ describe("the artwork yields space, the priced rows do not", () => {
 const tpl = readFileSync(join(__dirname, "SaturdayPremiumAddendum.tsx"), "utf8");
 
 describe("the template renders the section, not just its rows", () => {
-  it("gates all three conditional sections on resolved data", () => {
+  it("gates its conditional sections on resolved data", () => {
     expect(tpl).toMatch(/\{sections\.hasInstalled && \(/);
-    expect(tpl).toMatch(/\{sections\.hasBenefits && \(/);
     expect(tpl).toMatch(/\{sections\.hasUpgrades && \(/);
+  });
+
+  // V2 removed the standalone Included Benefits panel. The resolver still
+  // computes benefits — other templates render them, and the dealer's stored
+  // data is untouched — but this sheet must not budget space for rows it does
+  // not print, or the artwork and spacing shrink for content that is not there.
+  it("does not render a benefits panel, and does not count benefits toward density", () => {
+    expect(tpl).not.toMatch(/\{sections\.hasBenefits && \(/);
+    expect(tpl).not.toMatch(/title="Included Benefits"/);
+    expect(tpl).toMatch(/const v2Sections = \{ \.\.\.sections, benefits: \[\], hasBenefits: false \};/);
+    expect(tpl).toMatch(/addendumDensity\(v2Sections\)/);
+    expect(tpl).toMatch(/valuePropImageCeiling\(vp\.imageScale, v2Sections\)/);
+    // v2Sections has to exist before the density call that reads it.
+    expect(tpl.indexOf("const v2Sections")).toBeLessThan(tpl.indexOf("addendumDensity(v2Sections)"));
   });
 
   it("has no empty-state placeholder left to print", () => {
@@ -131,7 +144,7 @@ describe("the template renders the section, not just its rows", () => {
 
   it("reads its data from the one shared resolver", () => {
     expect(tpl).toMatch(/const sections = resolveAddendumSections\(data\);/);
-    expect(tpl).toMatch(/const \{ installed, upgrades, benefits, valueProps \} = sections;/);
+    expect(tpl).toMatch(/const \{ installed, upgrades, valueProps \} = sections;/);
   });
 });
 
@@ -143,14 +156,14 @@ describe("the new-car sheet is the same sheet", () => {
   // catches an edit to one of them.
   const newcar = readFileSync(join(__dirname, "NewCarSaasAddendum.tsx"), "utf8");
   const body = (src: string, name: string) =>
-    src.slice(src.indexOf("import { useState }")).split(name).join("Addendum");
+    src.slice(src.indexOf("import { QRCodeSVG }")).split(name).join("Addendum");
 
   it("differs from the premium sheet only by name and header", () => {
     expect(body(newcar, "NewCarSaasAddendum")).toBe(body(tpl, "SaturdayPremiumAddendum"));
   });
 
   it("carries the content-fit behaviour, not the old fixed sizing", () => {
-    expect(newcar).toMatch(/maxHeight: valuePropImageCeiling\(vp\.imageScale, sections\)/);
+    expect(newcar).toMatch(/maxHeight: valuePropImageCeiling\(vp\.imageScale, v2Sections\)/);
     expect(newcar).not.toMatch(/VP_IMAGE_SIZE/);
     expect(newcar).not.toMatch(/No configured benefits/);
     expect(newcar).not.toMatch(/benefits\.slice\(/);
@@ -159,10 +172,15 @@ describe("the new-car sheet is the same sheet", () => {
 
 describe("required content cannot be squeezed by the artwork", () => {
   it("makes the artwork block the only flexible track", () => {
-    // justify-start, not center: with little content the artwork used to float
-    // with dead space above AND below it. Anchoring it consolidates the slack
-    // into one gap above the totals.
-    expect(tpl).toMatch(/flex-1 min-h-0 flex flex-col justify-start/);
+    // justify-center: V2 removed the benefits panel, which freed roughly an
+    // inch. Top-anchored, that inch became one dead band above the totals and
+    // read as an unfinished page; centred, it splits above and below the
+    // artwork. addendumDensity spreads the rest across the section gaps.
+    expect(tpl).toMatch(/flex-1 min-h-0 overflow-hidden flex flex-col justify-center/);
+    // overflow-hidden matters: min-h-0 lets the track collapse, but the panel
+    // inside keeps its own height and painted straight over the adjusted total.
+    // artworkFits drops it before that happens; this is the backstop.
+    expect(tpl).toMatch(/density\.artworkFits/);
   });
 
   it("pins every structured block against shrinking", () => {
@@ -172,10 +190,25 @@ describe("required content cannot be squeezed by the artwork", () => {
   });
 
   it("sizes the image by ceiling, not by fixed height", () => {
-    expect(tpl).toMatch(/maxHeight: valuePropImageCeiling\(vp\.imageScale, sections\)/);
+    expect(tpl).toMatch(/maxHeight: valuePropImageCeiling\(vp\.imageScale, v2Sections\)/);
     expect(tpl).toMatch(/h-auto w-auto object-contain/);
     // The old fixed-height classes are gone.
     expect(tpl).not.toMatch(/VP_IMAGE_SIZE/);
     expect(tpl).not.toMatch(/h-\[0\.42in\]/);
   });
+});
+
+
+describe("the sheet is the size the registry says it is", () => {
+  // config.size is "4.5x11" and config.widthIn is 4.5, but both components
+  // hardcoded 4.25in — a quarter inch narrower than the page they are placed
+  // on. Pinned here because the number lives in two files that cannot see
+  // each other.
+  const newcar = readFileSync(join(__dirname, "NewCarSaasAddendum.tsx"), "utf8");
+  for (const [name, src] of [["premium", tpl], ["new-car", newcar]] as const) {
+    it(`${name} draws 4.5in x 11in`, () => {
+      expect(src).toMatch(/width: "4\.5in", height: "11in"/);
+      expect(src).not.toMatch(/4\.25in/);
+    });
+  }
 });
