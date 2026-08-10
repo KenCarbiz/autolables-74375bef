@@ -89,6 +89,28 @@ describe("dealer logo toggle", () => {
       expect(html).toContain("Hartford, CT 06120");
       expect(html).toContain("harteinfiniti.com");
     });
+
+    // The logo is the masthead, so it belongs in the FIRST slot of the header,
+    // ahead of the vertical divider. It used to sit above the contact block on
+    // the right, which read as a footnote rather than as letterhead.
+    it(`${id} puts the logo in the header's left slot`, () => {
+      const html = render(id, { ...withLogo, showLogo: true });
+      const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+      const divider = header.indexOf("border-left");
+      expect(divider).toBeGreaterThan(-1);
+      expect(header.indexOf("https://cdn.example.com/dealer.png")).toBeLessThan(divider);
+    });
+
+    // The dealership name is stated once. With a logo it stays on the contact
+    // block; without one it becomes the masthead itself.
+    it(`${id} states the dealership name exactly once in the header`, () => {
+      for (const showLogo of [true, false]) {
+        const html = render(id, { ...withLogo, showLogo });
+        const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+        // Text nodes only — the logo's alt text legitimately repeats the name.
+        expect(header.split(">Harte Infiniti<").length - 1, `showLogo=${showLogo}`).toBe(1);
+      }
+    });
   }
 });
 
@@ -195,10 +217,20 @@ describe("addendum wordmark and value-prop sizing", () => {
   };
 
   for (const id of ["addendum-saturday-premium", "addendum-new-car-saas"]) {
-    it(`${id} keeps the autolabels wordmark fixed regardless of the dealer accent`, () => {
+    // The masthead is the DEALER's. AutoLabels attribution lives in the footer
+    // lockup and nowhere else — the platform prints the document, it does not
+    // sell the car. A header that led with the AutoLabels wordmark made a
+    // dealer's addendum look like it came from a third party.
+    it(`${id} gives the masthead to the dealer, not to AutoLabels`, () => {
       const red = renderAddendum(id, DATA, { ...BRAND, accentColor: "#b91c1c" });
-      expect(red).toContain("#0B6FEA");   // wordmark stays brand blue
-      expect(red).toContain("#0D1B2A");   // "labels.io" stays black
+      expect(red).not.toContain("labels.io<");
+      expect(red).not.toContain("AI-Powered Vehicle Transparency");
+      // The footer lockup is the site wordmark, inverted for the navy bar, and
+      // carries no glyph beside it.
+      expect(red).toContain(">auto</span>");
+      expect(red).toContain(">(LABELS)</span>");
+      expect(red).toContain("#3BB4FF");   // "auto" on dark
+      expect(red).toContain("Powered by");
     });
 
     it(`${id} renders an image-only value proposition without its text`, () => {

@@ -7,6 +7,7 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import type { SaturdaySticker } from "./types";
+import { AddendumDealerMasthead, AddendumPoweredBy, mastheadShowsLogo } from "./AddendumBrandBlocks";
 import {
   AutoLabelsAddendumIcon, resolveAddendumProductIcon, getAddendumIconColor,
   type AddendumIconKey,
@@ -115,17 +116,14 @@ export const MidnightPremiumAddendum: React.FC<Props> = ({ data }) => {
   return (
     <div className="bg-white shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "4.25in", height: "11in", fontFamily: "Inter, system-ui, sans-serif", color: T.text, boxSizing: "border-box", overflow: "hidden" }}>
       <div className="flex h-full flex-col" style={{ padding: "0.17in" }}>
-        {/* Header — anchored AutoLabels lockup left, dealer block right of a vertical divider */}
+        {/* Header — the dealer's own masthead left, their contact block right of
+            a vertical divider. AutoLabels attribution is footer-only. */}
         <header className="flex items-stretch justify-between gap-2.5 pb-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            <AutoLabelsAddendumIcon iconKey="autolabels-powered" size={20} color={accent} />
-            <span>
-              <span className="block text-[15px] font-black tracking-tight leading-none"><span style={{ color: accent }}>auto</span><span style={{ color: T.navy }}>labels.io</span></span>
-              <span className="block mt-[3px] text-[6px] font-bold uppercase tracking-[0.16em]" style={{ color: T.muted }}>AI-Powered Vehicle Transparency</span>
-            </span>
+            <AddendumDealerMasthead dealer={dealer} navy={T.navy} muted={T.muted} />
           </div>
           <div className="text-right text-[7.2px] font-semibold leading-[1.4] min-w-0 pl-2.5" style={{ color: T.muted, borderLeft: `1px solid ${T.border}` }}>
-            <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{dealer.name}</div>
+            {mastheadShowsLogo(dealer) && <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{dealer.name}</div>}
             {dealer.address && <div className="break-words">{dealer.address}</div>}
             {dealer.phone && <div>{dealer.phone}</div>}
             {dealer.website && <div>{dealer.website}</div>}
@@ -246,13 +244,7 @@ export const MidnightPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Dark branded footer */}
         <footer className="mt-2 flex items-center justify-between gap-2.5 rounded-[9px] px-3 py-2.5" style={{ background: T.navy }}>
-          <span className="flex items-center gap-1.5 min-w-0">
-            <AutoLabelsAddendumIcon iconKey="autolabels-powered" size={15} variant="light" />
-            <span className="min-w-0">
-              <span className="block text-[5.4px] font-bold uppercase tracking-[0.18em] text-white/70">Powered by</span>
-              <span className="block text-[9.5px] font-black leading-tight text-white">autolabels.io</span>
-            </span>
-          </span>
+          <AddendumPoweredBy />
           <span className="flex items-center gap-3.5">
             {FOOTER_BADGES.map((b) => (
               <span key={b.t} className="flex flex-col items-center gap-[2px]">

@@ -5,7 +5,6 @@
 // Available Upgrades, weighted totals, trust badge band, dark branded
 // footer. All icons come from the AutoLabels Addendum Icon Library.
 
-import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { SaturdaySticker } from "./types";
 import {
@@ -13,13 +12,11 @@ import {
   type AddendumIconKey,
 } from "@/components/icons/AutoLabelsAddendumIcons";
 import { resolveAddendumSections, valuePropImageCeiling, addendumDensity } from "./addendumSections";
+import { AddendumDealerMasthead, AddendumPoweredBy, mastheadShowsLogo } from "./AddendumBrandBlocks";
 
 type Line = { name: string; price: string; description?: string; iconKey?: string };
 type Addendum = SaturdaySticker & { installed?: Line[]; upgrades?: Line[] };
 type Props = { data: Addendum };
-
-// AutoLabels brand blue. Fixed — the product wordmark is not dealer-themed.
-const BRAND_BLUE = "#0B6FEA";
 
 // Widths for the value-proposition artwork. The HEIGHT is no longer fixed
 // here: a fixed height meant a tall promotional image claimed its inches
@@ -73,11 +70,9 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
   // Accent follows the dealer theme (populated by toSaturdaySticker from
   // branding.accentColor). Neutrals (navy, slate) stay fixed; installed
   // green and upgrades purple keep their semantic meaning.
-  // The dealer logo renders only when the dealership has one AND the template's
-  // "Show dealer logo" choice is on. A broken URL falls back to the name block
-  // rather than printing a broken-image box on a customer document.
-  const [logoFailed, setLogoFailed] = useState(false);
-  const showLogo = dealer.logoEnabled !== false && !!dealer.logoUrl && !logoFailed;
+  // The masthead prints the dealership's logo when they have one; the contact
+  // block then drops the name so it is not stated twice.
+  const showLogo = mastheadShowsLogo(dealer);
   const accent = dealer.theme?.accentColor || "#0B6FEA";
   const accentSoft = `${accent}14`;
   const accentBorder = `${accent}40`;
@@ -145,27 +140,14 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
   return (
     <div className="bg-white shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "4.25in", height: "11in", fontFamily: "Inter, system-ui, sans-serif", color: T.text, boxSizing: "border-box", overflow: "hidden" }}>
       <div className="flex h-full flex-col" style={{ padding: "0.17in" }}>
-        {/* Header — anchored AutoLabels lockup left, dealer block right of a vertical divider */}
+        {/* Header — the dealer's own masthead left, their contact block right of
+            a vertical divider. AutoLabels attribution is footer-only. */}
         <header className="shrink-0 flex items-stretch justify-between gap-2.5 pb-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            {/* The AutoLabels wordmark is fixed brand identity: it never takes
-                the dealer's accent color. */}
-            <span>
-              <span className="block text-[15px] font-black tracking-tight leading-none"><span style={{ color: BRAND_BLUE }}>auto</span><span style={{ color: T.navy }}>labels.io</span></span>
-              <span className="block mt-[3px] text-[6px] font-bold uppercase tracking-[0.16em]" style={{ color: T.muted }}>AI-Powered Vehicle Transparency</span>
-            </span>
+            <AddendumDealerMasthead dealer={dealer} navy={T.navy} muted={T.muted} />
           </div>
           <div className="text-right text-[7.2px] font-semibold leading-[1.4] min-w-0 pl-2.5" style={{ color: T.muted, borderLeft: `1px solid ${T.border}` }}>
-            {showLogo ? (
-              <img
-                src={dealer.logoUrl}
-                alt={dealer.name}
-                crossOrigin="anonymous"
-                onError={() => setLogoFailed(true)}
-                className="ml-auto mb-1 h-[0.34in] w-auto max-w-[1.5in] object-contain object-right"
-              />
-            ) : null}
-            <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{dealer.name}</div>
+            {showLogo && <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{dealer.name}</div>}
             {dealer.address && <div className="break-words">{dealer.address}</div>}
             {dealer.addressLine2 && <div className="break-words">{dealer.addressLine2}</div>}
             {dealer.phone && <div>{dealer.phone}</div>}
@@ -330,13 +312,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Dark branded footer */}
         <footer className={`shrink-0 ${density.compact ? "mt-1 py-1.5" : "mt-2 py-2.5"} flex items-center justify-between gap-2.5 rounded-[9px] px-3`} style={{ background: T.navy }}>
-          <span className="flex items-center gap-1.5 min-w-0">
-            <AutoLabelsAddendumIcon iconKey="autolabels-powered" size={15} variant="light" />
-            <span className="min-w-0">
-              <span className="block text-[5.4px] font-bold uppercase tracking-[0.18em] text-white/70">Powered by</span>
-              <span className="block text-[9.5px] font-black leading-tight text-white">autolabels.io</span>
-            </span>
-          </span>
+          <AddendumPoweredBy />
           <span className="flex items-center gap-3.5">
             {FOOTER_BADGES.map((b) => (
               <span key={b.t} className="flex flex-col items-center gap-[2px]">
