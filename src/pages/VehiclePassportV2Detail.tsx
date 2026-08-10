@@ -692,7 +692,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
         {dealerTel && <a href={`tel:${dealerTel}`} onClick={trackCall} className="h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Phone className="w-4 h-4 text-[#2563EB]" /> Call Dealer</a>}
         {dealerTel && <a href={`sms:${dealerTel}`} onClick={trackText} className="h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><MessageSquare className="w-4 h-4 text-[#2563EB]" /> Text Dealer</a>}
         <button onClick={goTestDrive} className="h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Calendar className="w-4 h-4 text-[#2563EB]" /> Schedule Test Drive</button>
-        <button onClick={goReserve} className="h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><BadgeCheck className="w-4 h-4 text-[#2563EB]" /> Reserve Vehicle</button>
+        <button onClick={goReserve} className="h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><BadgeCheck className="w-4 h-4 text-[#2563EB]" /> Request Vehicle Hold</button>
       </div>
     </Card>
   );
@@ -1563,7 +1563,7 @@ const VehiclePassportV2Detail = () => {
               // On the action pages (reserve / contact) the primary bar action IS
               // the page goal — Today's Price would compete with it.
               section === "reserve"
-                ? { key: "hold", icon: ShieldCheck, label: "Request Hold", primary: true, onClick: () => { const el = document.getElementById("reserve-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("rsv-name")?.focus({ preventScroll: true }), 450); } }
+                ? { key: "hold", icon: ShieldCheck, label: "Request Vehicle Hold", primary: true, onClick: () => { const el = document.getElementById("reserve-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("rsv-name")?.focus({ preventScroll: true }), 450); } }
                 : section === "contact"
                 ? { key: "contact", icon: Mail, label: "Contact Dealer", primary: true, onClick: () => { const el = document.getElementById("contact-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("ct-name")?.focus({ preventScroll: true }), 450); } }
                 : section === "todays-price"

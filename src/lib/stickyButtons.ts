@@ -73,6 +73,26 @@ export function validateStickyButtons(cfg: StickyBottomButtons): string | null {
 }
 
 // Resolve the ordered, capped, enabled buttons for rendering on the passport.
+
+// Wording we have retired. A dealer's saved config stores the LABEL, not just
+// the key, and a stored label wins over the catalog — so a store that once
+// enabled this button keeps showing the old copy forever, no matter what the
+// catalog says. Treating an exact match for retired wording as "not
+// customized" heals those rows on the next render instead of stranding them
+// behind a migration. A genuinely custom label is still respected.
+const RETIRED_LABELS = new Set([
+  "reserve this vehicle",
+  "reserve vehicle",
+  "request hold",
+  "request a hold",
+]);
+
+const stickyLabel = (b: StickyButton): string => {
+  const stored = (b.label || "").trim();
+  if (stored && !RETIRED_LABELS.has(stored.toLowerCase())) return stored;
+  return STICKY_LABELS[b.key] || b.key;
+};
+
 export function resolveStickyButtons(cfg?: StickyBottomButtons | null): { items: ResolvedStickyButton[]; enabled: boolean } {
   const c = cfg && Array.isArray(cfg.buttons) && cfg.buttons.length ? cfg : DEFAULT_STICKY_BUTTONS;
   if (c.enabled === false) return { items: [], enabled: false };
@@ -80,7 +100,7 @@ export function resolveStickyButtons(cfg?: StickyBottomButtons | null): { items:
     .filter((b) => b.enabled && STICKY_KEYS.has(b.key))
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .slice(0, MAX_STICKY_BUTTONS)
-    .map((b) => ({ key: b.key, label: (b.label || STICKY_LABELS[b.key] || b.key), primary: b.key === c.primary_key }));
+    .map((b) => ({ key: b.key, label: stickyLabel(b), primary: b.key === c.primary_key }));
   if (items.length && !items.some((i) => i.primary)) items[items.length - 1].primary = true;
   return { items, enabled: items.length > 0 };
 }

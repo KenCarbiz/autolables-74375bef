@@ -13,7 +13,7 @@ describe("resolveBuyingCandidate — conditioned recommendation", () => {
     expect(r.primaryCtaLabel).toBe("Ask Dealer About This Vehicle");
   });
 
-  it("below market + all checks complete => Strong Buying Candidate, Reserve", () => {
+  it("below market + all checks complete => Strong Buying Candidate, hold request", () => {
     const r = resolveBuyingCandidate({ advertisedPrice: 58140, normalizedMarketValue: 61300, pendingMaterialLabels: [] });
     expect(r.headline).toBe("Strong Buying Candidate");
     expect(r.hasQuestions).toBe(false);
