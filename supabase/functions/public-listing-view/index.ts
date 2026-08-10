@@ -158,6 +158,11 @@ serve(async (req) => {
         // Dealer payment-estimate display toggles (payment / down / term / APR).
         if (s.passport_payment_display && typeof s.passport_payment_display === "object") row.payment_display = s.passport_payment_display;
         if (s.price_label && typeof s.price_label === "object") priceLabelSetting = s.price_label as Record<string, unknown>;
+        // Franchise title policy. A store that never retails branded-title cars
+        // may say so, and the passport prints it as the DEALER'S statement —
+        // never as a verified title-record check, and never over a reported
+        // brand. See the title check in verificationSummary.ts.
+        if (s.title_policy_no_branded === true) row.title_policy_no_branded = true;
         // Today's Price page wording mode + custom copy (compliance-safe
         // defaults resolve client-side when absent).
         if (s.todays_price_mode) row.todays_price_mode = s.todays_price_mode;

@@ -1538,7 +1538,7 @@ const VehiclePassportV2Detail = () => {
           <Card className="p-5">
             <p className="text-[13px] font-semibold text-slate-700 mb-3">Ready to move forward?</p>
             <div className="grid grid-cols-2 gap-2.5">
-              <button onClick={() => navigate(`/${base}/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#2563EB] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Reserve</button>
+              <button onClick={() => navigate(`/${base}/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#2563EB] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Request Hold</button>
               <button onClick={() => navigate(`/${base}/${vehicleSlug}/trade`)} className="h-11 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Trade value</button>
             </div>
             <button onClick={back} className="w-full mt-2.5 h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>

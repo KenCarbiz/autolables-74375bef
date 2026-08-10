@@ -340,6 +340,10 @@ export interface DealerSettings {
   inventory_show_quick_actions: boolean;
   // Vehicle Passport — dealer-configurable sticky bottom CTA bar (max 4).
   sticky_bottom_buttons: StickyBottomButtons;
+  /** Franchise stores that never retail branded-title vehicles may state so.
+   *  Surfaced on the passport as the dealer's own claim, never as a verified
+   *  title-record check, and never over a reported brand. */
+  title_policy_no_branded: boolean;
   // Vehicle Passport dealership-trust content (dealer-entered; rendered on the
   // public passport's "Why Buy From This Dealership" + "What Owners Say"). All
   // optional — each badge/review only shows when the dealer provides it.
@@ -529,6 +533,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   privacy_notice_url: "",
   inventory_show_quick_actions: false,
   sticky_bottom_buttons: DEFAULT_STICKY_BUTTONS,
+  title_policy_no_branded: false,
   dealer_years_in_business: "",
   dealer_satisfaction: "",
   dealer_bbb_rating: "",

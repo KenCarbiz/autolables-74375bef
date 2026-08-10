@@ -2407,6 +2407,29 @@ const Admin = () => {
             the price audit/integrity panels (moved here from the audit tab). */}
         {tab === "incentives" && (
           <div className="space-y-4">
+            <div id="title-policy" className="bg-card rounded-lg p-4 shadow-sm">
+              <h4 className="text-sm font-bold text-foreground mb-2">Branded-title policy</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Franchise stores that never retail salvage, flood, lemon or rebuilt vehicles can state that on the
+                Vehicle Passport. It appears as <strong>your</strong> statement — &ldquo;Dealer attested&rdquo; — not as a
+                verified title-record check, and it never overrides a brand a source actually reports. Any VIN with a
+                reported brand still shows that brand.
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-foreground">We do not retail branded-title vehicles</span>
+                <Switch
+                  checked={!!settings.title_policy_no_branded}
+                  onCheckedChange={(v) => updateSettings({ title_policy_no_branded: v })}
+                  className="data-[state=checked]:bg-teal"
+                />
+              </div>
+              {settings.title_policy_no_branded && (
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  You are making this claim on every vehicle where no title record has come back. Turn it off for any
+                  store that takes branded-title trades to retail.
+                </p>
+              )}
+            </div>
             <div id="doc-fee" className="bg-card rounded-lg p-4 shadow-sm">
               <h4 className="text-sm font-bold text-foreground mb-2">Dealer Documentation Fee</h4>
               <p className="text-xs text-muted-foreground mb-3">Add a state-compliant documentation fee to every addendum. The correct terminology auto-applies based on your state.</p>
