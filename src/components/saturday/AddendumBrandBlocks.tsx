@@ -2,8 +2,12 @@
 // Header identity + footer attribution, shared by every addendum template.
 //
 // The addendum is the DEALER's document, so the top-left masthead is the
-// dealer's own logo. AutoLabels attribution lives in the footer lockup and
-// nowhere else — the platform is the printer, not the seller.
+// dealer's own logo and the block beside it is the dealership name. Both come
+// from Admin > Branding rather than from the location chain: a rooftop row can
+// carry a group trading name and a placeholder logo, and the addendum is the
+// dealership's letterhead, not a per-rooftop document. AutoLabels attribution
+// lives in the footer lockup and nowhere else — the platform is the printer,
+// not the seller.
 //
 // These live in one module because the five addendum templates already
 // drifted apart once. A header change made in five places gets made in four.
@@ -57,12 +61,13 @@ export const AddendumDealerMasthead = ({
   muted: string;
 }) => {
   const [failed, setFailed] = useState(false);
+  const logoUrl = addendumLogoUrl(dealer);
 
-  if (dealer.logoEnabled !== false && !!dealer.logoUrl && !failed) {
+  if (logoUrl && !failed) {
     return (
       <img
-        src={dealer.logoUrl}
-        alt={dealer.name}
+        src={logoUrl}
+        alt={addendumDealerName(dealer)}
         crossOrigin="anonymous"
         onError={() => setFailed(true)}
         className="h-[0.44in] w-auto max-w-[1.9in] object-contain object-left"
@@ -73,7 +78,7 @@ export const AddendumDealerMasthead = ({
   return (
     <span className="min-w-0">
       <span className="block text-[14px] font-black uppercase leading-none tracking-[-0.01em]" style={{ color: navy }}>
-        {dealer.name}
+        {addendumDealerName(dealer)}
       </span>
       {dealer.slogan && (
         <span className="block mt-[3px] text-[6px] font-bold uppercase tracking-[0.16em]" style={{ color: muted }}>
@@ -84,6 +89,15 @@ export const AddendumDealerMasthead = ({
   );
 };
 
+/** The logo the masthead prints: the one saved on Admin > Branding, falling
+ *  back to whatever the location chain resolved. Empty when the dealer turned
+ *  the logo off for this template. */
+export const addendumLogoUrl = (dealer: SaturdayDealer): string =>
+  dealer.logoEnabled === false ? "" : (dealer.tenantLogoUrl || dealer.logoUrl || "");
+
+/** The dealership name the addendum prints, top right. */
+export const addendumDealerName = (dealer: SaturdayDealer): string =>
+  dealer.tenantName || dealer.name;
+
 /** True when the masthead will render the dealer logo rather than the name. */
-export const mastheadShowsLogo = (dealer: SaturdayDealer): boolean =>
-  dealer.logoEnabled !== false && !!dealer.logoUrl;
+export const mastheadShowsLogo = (dealer: SaturdayDealer): boolean => !!addendumLogoUrl(dealer);

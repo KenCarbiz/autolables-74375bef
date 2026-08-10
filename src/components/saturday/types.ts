@@ -61,6 +61,11 @@ export type SaturdayDealer = {
   logoUrl?: string;
   /** Dealer's "Show dealer logo" choice for this template. */
   logoEnabled?: boolean;
+  /** Account-level name + logo from Admin > Branding, ignoring any location
+   *  override. The addendum masthead prefers these: the addendum is the
+   *  dealership's letterhead, not a per-rooftop document. */
+  tenantName?: string;
+  tenantLogoUrl?: string;
   /** Optional dealer slogan/tagline, for example "Driven by trust. Backed by service." */
   slogan?: string;
   /** Optional dealer-specific pricing terminology, for example "Best Price", "One Price", "Market Price", or "Selling Price". */

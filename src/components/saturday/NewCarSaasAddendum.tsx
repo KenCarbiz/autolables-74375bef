@@ -15,7 +15,7 @@ import {
   type AddendumIconKey,
 } from "@/components/icons/AutoLabelsAddendumIcons";
 import { resolveAddendumSections, valuePropImageCeiling, addendumDensity } from "./addendumSections";
-import { AddendumDealerMasthead, AddendumPoweredBy, mastheadShowsLogo } from "./AddendumBrandBlocks";
+import { AddendumDealerMasthead, AddendumPoweredBy, addendumDealerName, mastheadShowsLogo } from "./AddendumBrandBlocks";
 
 type Line = { name: string; price: string; description?: string; iconKey?: string };
 type Addendum = SaturdaySticker & { installed?: Line[]; upgrades?: Line[] };
@@ -152,7 +152,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
             <AddendumDealerMasthead dealer={dealer} navy={T.navy} muted={T.muted} />
           </div>
           <div className="text-right text-[7.2px] font-semibold leading-[1.4] min-w-0 pl-2.5" style={{ color: T.muted, borderLeft: `1px solid ${T.border}` }}>
-            {showLogo && <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{dealer.name}</div>}
+            {showLogo && <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{addendumDealerName(dealer)}</div>}
             {dealer.address && <div className="break-words">{dealer.address}</div>}
             {dealer.addressLine2 && <div className="break-words">{dealer.addressLine2}</div>}
             {dealer.phone && <div>{dealer.phone}</div>}

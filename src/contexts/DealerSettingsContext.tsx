@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { mapAutocurbProfile } from "@/lib/autocurbProfile";
+import { isPlatformLogoAsset } from "@/lib/dealerIdentity";
 import type { DealerProgram } from "@/lib/dealerPrograms";
 import type { OemFactoryWarranty, CpoProgram } from "@/lib/oemWarranty";
 import type { DocumentRules } from "@/lib/documentRules";
@@ -627,7 +628,7 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
     if (tenant && tenant.id !== "house") {
       if (tenant.name && tenant.name !== "AutoLabels.io") tenantBasics.dealer_name = tenant.name;
       const tl = tenant.logo_url || "";
-      if (tl && !tl.includes("autolabels-mark") && !tl.includes("logo-mark")) tenantBasics.dealer_logo_url = tl;
+      if (tl && !isPlatformLogoAsset(tl)) tenantBasics.dealer_logo_url = tl;
     }
 
     // Signed-in + tenant: read from Supabase.

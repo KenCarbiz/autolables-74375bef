@@ -96,6 +96,11 @@ export interface StickerBranding {
   /** Real destination for the displayed website text (never the printed text). */
   websiteHref?: string;
   logoUrl?: string;
+  /** Name + logo saved on Admin > Branding, ignoring any location override.
+   *  The addendum masthead uses these; the window stickers keep the
+   *  location-resolved values above. */
+  tenantName?: string;
+  tenantLogoUrl?: string;
   showLogo: boolean;
   valueProp: string;
   disclaimer: string;

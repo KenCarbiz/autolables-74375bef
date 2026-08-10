@@ -101,6 +101,25 @@ describe("dealer logo toggle", () => {
       expect(header.indexOf("https://cdn.example.com/dealer.png")).toBeLessThan(divider);
     });
 
+    // A rooftop row can carry the group's trading name and a placeholder logo.
+    // The addendum is the dealership's letterhead, so Admin > Branding wins:
+    // this is the exact shape that printed the AutoLabels "a" mark and
+    // "HARTE AUTO GROUP" over the dealer's own saved INFINITI logo and name.
+    it(`${id} prints the Branding-page name and logo over a location override`, () => {
+      const html = render(id, {
+        ...withLogo,
+        showLogo: true,
+        dealerName: "Harte Auto Group",
+        logoUrl: "/autolabels-mark.svg",
+        tenantName: "Harte Infiniti Inc.",
+        tenantLogoUrl: "https://cdn.example.com/harte-infiniti.png",
+      });
+      expect(html).toContain("https://cdn.example.com/harte-infiniti.png");
+      expect(html).not.toContain("/autolabels-mark.svg");
+      expect(html).toContain("Harte Infiniti Inc.");
+      expect(html).not.toContain("Harte Auto Group");
+    });
+
     // The dealership name is stated once. With a logo it stays on the contact
     // block; without one it becomes the masthead itself.
     it(`${id} states the dealership name exactly once in the header`, () => {

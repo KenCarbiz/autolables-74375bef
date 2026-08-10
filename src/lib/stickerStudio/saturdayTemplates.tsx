@@ -144,6 +144,8 @@ function toSaturdaySticker(data: StickerData, branding: StickerBranding): Saturd
       website: branding.website,
       logoUrl: branding.logoUrl,
       logoEnabled: branding.showLogo,
+      tenantName: branding.tenantName,
+      tenantLogoUrl: branding.tenantLogoUrl,
       slogan: branding.valueProp,
       pricingLabel: extended.marketStatus || "Best Price",
       valueProps: benefits,

@@ -46,6 +46,11 @@ export interface DealerIdentity {
   /** Where the link actually goes. Empty when unknown. */
   websiteHref: string;
   logoUrl: string;
+  /** The dealership name saved on Admin > Branding, ignoring any location
+   *  override. Documents that speak for the whole dealer group use this. */
+  tenantName: string;
+  /** The logo saved on Admin > Branding, ignoring any location override. */
+  tenantLogoUrl: string;
   tagline: string;
   accentColor: string;
   locationId: string;
@@ -53,6 +58,32 @@ export interface DealerIdentity {
   sources: Record<"name" | "address" | "phone" | "website" | "logo", IdentitySource>;
   warnings: IdentityWarning[];
 }
+
+// ── Logo ──────────────────────────────────────────────────────────────
+
+// AutoLabels' and Autocurb's own marks. TenantContext defaults a tenant with
+// no uploaded logo to "/autolabels-mark.svg", and the same placeholder reaches
+// store rows through onboarding and the Autocurb mirror. Printed on a dealer's
+// addendum it reads as though AutoLabels sold the car, so it is filtered out of
+// every logo candidate: the document then falls back to the dealership NAME,
+// which is always true, instead of to a platform asset, which never is.
+const PLATFORM_LOGO_PATTERNS = [
+  "autolabels-mark", "autolabels-logo", "autolabels-wordmark",
+  "autocurb-logo", "logo-mark", "logo-full", "favicon", "apple-touch-icon",
+];
+
+/** True when the URL points at an AutoLabels/Autocurb brand asset rather than
+ *  at a dealership's own logo. */
+export function isPlatformLogoAsset(url?: string | null): boolean {
+  const v = String(url || "").trim().toLowerCase();
+  if (!v) return false;
+  return PLATFORM_LOGO_PATTERNS.some((p) => v.includes(p));
+}
+
+const dealerLogo = (url?: string | null): string | undefined => {
+  const v = String(url || "").trim();
+  return v && !isPlatformLogoAsset(v) ? v : undefined;
+};
 
 // ── Phone ─────────────────────────────────────────────────────────────
 
@@ -207,7 +238,12 @@ export function resolveDealerIdentity(args: ResolveIdentityArgs): DealerIdentity
   const state = pick("state", args.settings.dealer_state);
   const zip = pick("zip", args.settings.dealer_zip);
   const phoneRaw = pick("phone", args.settings.dealer_phone);
-  const logo = pick("logo_url", args.settings.dealer_logo_url);
+  // Logo candidates are screened first, so a location row carrying the
+  // AutoLabels placeholder cannot outrank the dealer's real uploaded logo.
+  const logo = firstNonEmpty<string>([
+    ...chain.map((c) => ({ value: dealerLogo(c.store?.logo_url), source: c.source })),
+    { value: dealerLogo(args.settings.dealer_logo_url), source: "tenant" as const },
+  ]);
   const tagline = pick("tagline", args.settings.dealer_tagline);
   const accent = pick("primary_color", args.settings.primary_color);
 
@@ -245,8 +281,19 @@ export function resolveDealerIdentity(args: ResolveIdentityArgs): DealerIdentity
     warnings.push({ code: "unassigned_vehicle", message: "This vehicle is not assigned to a dealership location.", settingsPath: "/inventory" });
   }
 
+  // Account-level identity, kept separate from the location chain. The
+  // addendum masthead speaks for the dealership as the customer knows it —
+  // the name and logo saved on Admin > Branding — not for whichever rooftop
+  // row happens to sit first in the store list.
+  const tenantName = firstNonEmpty<string>([
+    { value: args.settings.dealer_name, source: "tenant" as const },
+    { value: args.tenantName ?? undefined, source: "tenant" as const },
+  ]);
+
   return {
     displayName: name.value || "",
+    tenantName: tenantName.value || name.value || "",
+    tenantLogoUrl: dealerLogo(args.settings.dealer_logo_url) || logo.value || "",
     addressLine1: address.value || "",
     addressLine2: cityStateZip,
     phone,

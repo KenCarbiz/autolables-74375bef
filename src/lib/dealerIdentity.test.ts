@@ -4,6 +4,7 @@ import {
   formatDealerPhone,
   normalizeDealerWebsite,
   resolveDealerIdentity,
+  isPlatformLogoAsset,
   type DealerIdentityStore,
 } from "./dealerIdentity";
 
@@ -193,5 +194,67 @@ describe("assessIdentityOverflow", () => {
 
   it("does not warn merely because an optional line is missing", () => {
     expect(assessIdentityOverflow(identity({ phone: "", websiteDisplay: "" })).overflows).toBe(false);
+  });
+});
+
+
+describe("a platform brand asset is never a dealership logo", () => {
+  // TenantContext defaults a tenant with no uploaded logo to
+  // "/autolabels-mark.svg", and the placeholder reaches store rows through
+  // onboarding and the Autocurb mirror. Printed on an addendum it reads as
+  // though AutoLabels sold the car.
+  it("recognises the AutoLabels and Autocurb marks", () => {
+    for (const v of [
+      "/autolabels-mark.svg", "/logo-mark.svg", "/logo-full.svg",
+      "https://autolabels.io/autolabels-logo.svg", "/autocurb-logo.svg",
+      "/favicon.ico", "/apple-touch-icon.svg", "/AutoLabels-Mark.SVG",
+    ]) expect(isPlatformLogoAsset(v), v).toBe(true);
+  });
+
+  it("leaves a dealership's own upload alone", () => {
+    for (const v of [
+      "https://cdn.example.com/harte-infiniti.png", "", null, undefined,
+      "https://x.supabase.co/storage/v1/object/public/dealer-logos/t/logo.png",
+    ]) expect(isPlatformLogoAsset(v), String(v)).toBe(false);
+  });
+
+  it("skips a location whose logo is the platform placeholder", () => {
+    const id = resolveDealerIdentity({
+      settings, stores: [store({ logo_url: "/autolabels-mark.svg" })], activeStoreId: "loc-1",
+    });
+    expect(id.logoUrl).toBe("https://cdn.example.com/group.png");
+    expect(id.sources.logo).toBe("tenant");
+  });
+
+  it("reports a missing logo rather than falling back to the platform mark", () => {
+    const id = resolveDealerIdentity({
+      settings: { ...settings, dealer_logo_url: "/autolabels-mark.svg" },
+      stores: [store({ logo_url: "/logo-mark.svg" })], activeStoreId: "loc-1",
+    });
+    expect(id.logoUrl).toBe("");
+    expect(id.warnings.map((w) => w.code)).toContain("missing_logo");
+  });
+});
+
+describe("account-level identity, for documents that are dealership letterhead", () => {
+  it("keeps the Branding-page name and logo separate from the location chain", () => {
+    const id = resolveDealerIdentity({
+      settings, stores: [store({ name: "Example Auto Group Hartford" })], activeStoreId: "loc-1",
+    });
+    // The location still wins for the resolved identity the stickers use...
+    expect(id.displayName).toBe("Example Auto Group Hartford");
+    expect(id.logoUrl).toBe("https://cdn.example.com/import.png");
+    // ...while the addendum masthead reads the account-level values.
+    expect(id.tenantName).toBe("Example Auto Group");
+    expect(id.tenantLogoUrl).toBe("https://cdn.example.com/group.png");
+  });
+
+  it("falls back to the tenant name, then to the resolved name", () => {
+    expect(resolveDealerIdentity({
+      settings: { ...settings, dealer_name: undefined }, tenantName: "Tenant Row Name",
+    }).tenantName).toBe("Tenant Row Name");
+    expect(resolveDealerIdentity({
+      settings: { ...settings, dealer_name: undefined }, stores: [store({})], activeStoreId: "loc-1",
+    }).tenantName).toBe("Example Import");
   });
 });

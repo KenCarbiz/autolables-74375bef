@@ -7,7 +7,7 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import type { SaturdaySticker } from "./types";
-import { AddendumDealerMasthead, AddendumPoweredBy, mastheadShowsLogo } from "./AddendumBrandBlocks";
+import { AddendumDealerMasthead, AddendumPoweredBy, addendumDealerName, mastheadShowsLogo } from "./AddendumBrandBlocks";
 import {
   AutoLabelsAddendumIcon, resolveAddendumProductIcon, getAddendumIconColor,
   type AddendumIconKey,
@@ -123,7 +123,7 @@ export const EclipsePremiumAddendum: React.FC<Props> = ({ data }) => {
             <AddendumDealerMasthead dealer={dealer} navy={T.navy} muted={T.muted} />
           </div>
           <div className="text-right text-[7.2px] font-semibold leading-[1.4] min-w-0 pl-2.5" style={{ color: T.muted, borderLeft: `1px solid ${T.border}` }}>
-            {mastheadShowsLogo(dealer) && <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{dealer.name}</div>}
+            {mastheadShowsLogo(dealer) && <div className="text-[9px] font-black uppercase tracking-wide truncate" style={{ color: T.navy }}>{addendumDealerName(dealer)}</div>}
             {dealer.address && <div className="break-words">{dealer.address}</div>}
             {dealer.phone && <div>{dealer.phone}</div>}
             {dealer.website && <div>{dealer.website}</div>}

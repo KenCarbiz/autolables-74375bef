@@ -45,6 +45,8 @@ export function brandingFromIdentity(
     website: identity.websiteDisplay,
     websiteHref: identity.websiteHref,
     logoUrl: identity.logoUrl,
+    tenantName: identity.tenantName,
+    tenantLogoUrl: identity.tenantLogoUrl,
     showLogo,
     valueProp: settings.why_buy_here || "",
     disclaimer: "Prices exclude tax, title, registration, and dealer documentary fees. See dealer for complete details.",
