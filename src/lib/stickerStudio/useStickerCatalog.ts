@@ -31,7 +31,14 @@ export function useStickerCatalog(): { templates: StudioTemplate[]; loading: boo
           const cfg = buildConfig(r.type as StickerType, { ...(r.config || {}), id: over.id || r.template_key, name: over.name || r.name });
           return premiumTemplateFromConfig(cfg) || templateFromConfig(cfg);
         });
-        if (!cancelled && built.length) setTemplates(built);
+        // MERGE, never replace. A DB row overrides the built-in of the same id;
+        // a built-in with no DB row survives. Replacing outright meant any
+        // template whose sticker_templates row had not been seeded vanished
+        // from the picker even though its renderer shipped in the build — the
+        // dealer simply could not see a template that existed.
+        const byKey = new Map(BUILT_IN_TEMPLATES.map((t) => [t.config.id, t]));
+        for (const t of built) byKey.set(t.config.id, t);
+        if (!cancelled) setTemplates([...byKey.values()]);
       } catch {
         if (!cancelled) setLoading(false);
       }

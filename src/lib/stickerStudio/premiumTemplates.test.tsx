@@ -138,7 +138,7 @@ describe("new car SaaS template", () => {
 
   it("is registered with its own renderer and name", () => {
     expect(template).toBeDefined();
-    expect(template.config.name).toBe("New Car SaaS Template");
+    expect(template.config.name).toBe("New Car SaaS Template V2");
     expect(template.config.type).toBe("addendum");
   });
 

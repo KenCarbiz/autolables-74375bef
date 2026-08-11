@@ -258,9 +258,9 @@ const SATURDAY_CONFIGS: Record<string, StickerTemplateConfig> = {
   }),
   "addendum-saturday-premium": saturdayAddendumConfig({
     id: "addendum-saturday-premium",
-    name: "Saturday Premium Addendum",
+    name: "Saturday Premium Addendum V2",
     styleTags: ["Modern", "Readability", "Compliance"],
-    useCase: "4.25x11 premium branded addendum with passport QR, equipment, benefits, and upgrades",
+    useCase: "4.5x11 premium branded addendum — V2 icon tile system, dealer masthead, passport QR, equipment and upgrades",
     complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
   }),
   "addendum-saturday-midnight": saturdayAddendumConfig({
@@ -286,9 +286,9 @@ const SATURDAY_CONFIGS: Record<string, StickerTemplateConfig> = {
   }),
   "addendum-new-car-saas": saturdayAddendumConfig({
     id: "addendum-new-car-saas",
-    name: "New Car SaaS Template",
+    name: "New Car SaaS Template V2",
     styleTags: ["Modern", "SaaS", "Readability"],
-    useCase: "4.25x11 new vehicle addendum — independently editable duplicate of the Saturday Premium Addendum.",
+    useCase: "4.5x11 new vehicle addendum — V2 icon tile system, shares the premium layout, own data behaviour.",
     complianceNote: "New vehicle addendum supplements the federal Monroney label; it never replaces it.",
   }),
 };

@@ -16,6 +16,7 @@ import {
 } from "@/components/icons/AutoLabelsAddendumIcons";
 import { resolveAddendumSections, valuePropImageCeiling, addendumDensity } from "./addendumSections";
 import { AddendumDealerMasthead, AddendumPoweredBy, addendumDealerName, mastheadShowsLogo } from "./AddendumBrandBlocks";
+import { AddendumIconTileV2, AddendumIconV2, AddendumCheckV2 } from "@/components/icons/AddendumIconSystemV2";
 
 type Line = { name: string; price: string; description?: string; iconKey?: string };
 type Addendum = SaturdaySticker & { installed?: Line[]; upgrades?: Line[] };
@@ -116,9 +117,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
 
   const infoCell = (icon: AddendumIconKey, label: string, value: string | null, mono = false) => (
     <div className={`flex items-center gap-2 px-2.5 ${density.compact ? "py-[6px]" : "py-[9px]"}`}>
-      <span className="flex h-[24px] w-[24px] items-center justify-center rounded-[7px] shrink-0" style={{ background: accentSoft }}>
-        <AutoLabelsAddendumIcon iconKey={icon} size={15} color={T.navy} />
-      </span>
+      <AddendumIconTileV2 iconKey={icon} tone="info" size={density.compact ? 26 : 32} />
       <span className="min-w-0">
         <span className="block text-[6.8px] font-black uppercase tracking-[0.13em]" style={{ color: T.muted }}>{label}</span>
         <span className={`block font-extrabold leading-tight break-all ${mono ? "text-[9px]" : "text-[10.5px]"}`} style={{ color: T.text }}>{value || "—"}</span>
@@ -127,15 +126,11 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   );
 
   const lineRow = (l: Line, tone: "green" | "purple") => {
-    const ctx = tone === "green" ? "installed" as const : "upgrade" as const;
     const iconKey = resolveAddendumProductIcon(l.name, l.iconKey);
-    const fg = getAddendumIconColor(iconKey, ctx);
     const priceStr = money(l.price);
     return (
       <div key={l.name} className={`flex items-center gap-2 px-2.5 border-b last:border-b-0 ${density.compact ? "py-[3.5px]" : "py-[6px]"}`} style={{ borderColor: "#EDF2F8" }}>
-        <span className="flex h-[20px] w-[20px] items-center justify-center rounded-[6px] shrink-0" style={{ background: tone === "green" ? T.greenSoft : T.purpleSoft }}>
-          <AutoLabelsAddendumIcon iconKey={iconKey} size={13} color={fg} />
-        </span>
+        <AddendumIconTileV2 iconKey={iconKey} tone={tone === "green" ? "included" : "upgrade"} size={density.compact ? 20 : 24} />
         <span className="min-w-0 flex-1">
           <span className="block text-[9.5px] font-extrabold leading-tight" style={{ color: T.text }}>{l.name}</span>
           {l.description && <span className="block text-[7px] font-medium leading-tight mt-[1px]" style={{ color: T.muted }}>{l.description}</span>}
@@ -229,7 +224,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
             <div className="mt-2 grid grid-cols-2 gap-x-2.5 gap-y-[5px]">
               {QR_BULLETS.map((b) => (
                 <span key={b} className="inline-flex items-center gap-1.5 text-[7.4px] font-bold leading-tight" style={{ color: T.text }}>
-                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={10} color={accent} /> {b}
+                  <AddendumCheckV2 size={10} color={accent} /> {b}
                 </span>
               ))}
             </div>
@@ -333,7 +328,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
         <section className={`shrink-0 mt-auto grid grid-cols-4 ${density.compact ? "pt-1.5 pb-1" : "pt-2.5 pb-1.5"}`}>
           {TRUST.map((t, i) => (
             <div key={t.t} className="flex flex-col items-center text-center gap-1 px-1.5" style={i > 0 ? { borderLeft: `1px solid ${T.border}` } : undefined}>
-              <AutoLabelsAddendumIcon iconKey={t.icon} size={20} color={T.navy} />
+              <AddendumIconV2 iconKey={t.icon} size={20} color={T.navy} />
               <span className="text-[6.8px] font-black uppercase tracking-wide leading-tight" style={{ color: T.navy }}>{t.t}</span>
               <span className="text-[5.8px] font-medium leading-[1.3]" style={{ color: T.muted }}>{t.s}</span>
             </div>
@@ -346,7 +341,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
           <span className="flex items-center gap-3.5">
             {FOOTER_BADGES.map((b) => (
               <span key={b.t} className="flex flex-col items-center gap-[2px]">
-                <AutoLabelsAddendumIcon iconKey={b.icon} size={12} variant="light" />
+                <AddendumIconV2 iconKey={b.icon} size={12} color="#FFFFFF" />
                 <span className="text-[5.2px] font-bold text-white/85 whitespace-nowrap">{b.t}</span>
               </span>
             ))}
