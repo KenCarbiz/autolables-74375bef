@@ -148,7 +148,7 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
   ];
   const FOOTER_BADGES: { icon: AddendumIconKey; t: string }[] = [
     { icon: "ai-powered", t: "AI Powered" }, { icon: "ftc-aligned", t: "FTC Aligned" },
-    { icon: "real-time-updates", t: "Real-Time Updates" }, { icon: "print-ready", t: "Print Ready" },
+    { icon: "real-time-updates", t: "Real-Time Updates" },
   ];
   const QR_BULLETS = ["Photos", "Service History", "Ownership Information", "Benefits", "Documents", "Protection Products"];
 
@@ -158,12 +158,12 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
         {/* Masthead — the dealership's logo is the page's primary branding and
             gets the room to read as such; their contact block sits right of a
             hairline, deliberately subordinate. AutoLabels is footer-only. */}
-        <header className="shrink-0 flex items-center justify-between gap-3 pb-1.5">
+        <header className="shrink-0 flex items-center justify-between gap-3 pb-1">
           <div className="flex items-center min-w-0 flex-1">
             <AddendumDealerMasthead dealer={dealer} navy={T.navy} muted={T.muted} size={density.compact ? "md" : "lg"} />
           </div>
-          <div className="text-right text-[7.4px] font-semibold leading-[1.45] shrink-0 max-w-[1.85in] pl-2.5" style={{ color: T.muted, borderLeft: `1px solid ${T.border}` }}>
-            {showLogo && <div className="text-[8.6px] font-black uppercase tracking-wide break-words" style={{ color: T.navy }}>{addendumDealerName(dealer)}</div>}
+          <div className="text-right text-[7.4px] font-medium leading-[1.5] shrink-0 max-w-[1.85in] pl-2.5" style={{ color: T.muted, borderLeft: `1px solid ${T.border}` }}>
+            {showLogo && <div className="text-[9.2px] font-black uppercase tracking-wide leading-[1.25] break-words mb-[1px]" style={{ color: T.navy }}>{addendumDealerName(dealer)}</div>}
             {dealer.address && <div className="break-words">{dealer.address}</div>}
             {dealer.addressLine2 && <div className="break-words">{dealer.addressLine2}</div>}
             {dealer.phone && <div>{dealer.phone}</div>}
@@ -177,14 +177,14 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
             dealer with 13 priced rows still gets a whole sheet: the masthead,
             this badge, the title and the QR all step down long before a row,
             the totals or the footer are allowed off the page. */}
-        <div className={`shrink-0 ${density.compact ? "mt-1.5" : "mt-2.5"} inline-flex items-center gap-2`}>
+        <div className={`shrink-0 ${density.compact ? "mt-0.5" : "mt-1"} inline-flex items-center gap-2`}>
           <span
             className={`flex items-center justify-center rounded-full shrink-0 ${density.compact ? "h-[18px] w-[18px]" : "h-[24px] w-[24px]"}`}
             style={{ background: accentSoft }}
           >
             <AutoLabelsAddendumIcon iconKey="vehicle-passport" size={density.compact ? 12 : 16} color={T.navy} />
           </span>
-          <span className={`font-black uppercase tracking-[0.17em] ${density.compact ? "text-[9px]" : "text-[12.5px]"}`} style={{ color: accent }}>Vehicle Passport™</span>
+          <span className={`font-black uppercase tracking-[0.17em] ${density.compact ? "text-[9.9px]" : "text-[13.75px]"}`} style={{ color: accent }}>Vehicle Passport™</span>
         </div>
 
         {/* ADDENDUM and the vehicle share one horizontal band, split by a
@@ -338,11 +338,11 @@ export const NewCarSaasAddendum: React.FC<Props> = ({ data }) => {
         {/* Dark branded footer */}
         <footer className={`shrink-0 ${density.compact ? "mt-1 py-1.5" : "mt-2 py-2.5"} flex items-center justify-between gap-2.5 rounded-[9px] px-3`} style={{ background: T.navy }}>
           <AddendumPoweredBy />
-          <span className="flex items-center gap-3.5">
+          <span className="flex flex-1 items-center justify-evenly gap-2 pl-2">
             {FOOTER_BADGES.map((b) => (
-              <span key={b.t} className="flex flex-col items-center gap-[2px]">
-                <AddendumIconV2 iconKey={b.icon} size={12} color="#FFFFFF" />
-                <span className="text-[5.2px] font-bold text-white/85 whitespace-nowrap">{b.t}</span>
+              <span key={b.t} className="inline-flex items-center gap-[3px]">
+                <AddendumIconV2 iconKey={b.icon} size={9} color="#FFFFFF" />
+                <span className="text-[5.6px] font-bold text-white/85 whitespace-nowrap">{b.t}</span>
               </span>
             ))}
           </span>
