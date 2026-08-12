@@ -31,10 +31,13 @@ export type { OemDocKey };
 
 export type OemDocKind = "brochure" | "owners_manual";
 
-export const OEM_DOC_TABLE: Record<OemDocKind, string> = {
+// `as const` so the values stay literal table names. Widened to `string` the
+// typed Supabase client cannot resolve the row shape and silently degrades to
+// an any-ish union of every table in the schema.
+export const OEM_DOC_TABLE = {
   brochure: "oem_brochure_links",
   owners_manual: "oem_owners_manual_links",
-};
+} as const satisfies Record<OemDocKind, string>;
 
 export interface OemDocLinkRow {
   url: string;
@@ -75,19 +78,7 @@ export async function fetchHarvestedOemDocLink(
   const key = oemDocKeyFromYmm(ymm);
   if (!key) return null;
   try {
-    const { data, error } = await (supabase as unknown as {
-      from: (t: string) => {
-        select: (c: string) => {
-          ilike: (c: string, v: string) => {
-            ilike: (c: string, v: string) => {
-              order: (c: string, o: Record<string, unknown>) => {
-                limit: (n: number) => Promise<{ data: OemDocLinkRow[] | null; error: unknown }>;
-              };
-            };
-          };
-        };
-      };
-    })
+    const { data, error } = await supabase
       .from(OEM_DOC_TABLE[kind])
       .select("url, year, title, verified_at")
       .ilike("make", key.make)
@@ -121,21 +112,7 @@ export async function hasStoredOemDocCopy(
   const key = oemDocKeyFromYmm(ymm);
   if (!key || !tenantId) return false;
   try {
-    const { data, error } = await (supabase as unknown as {
-      from: (t: string) => {
-        select: (c: string) => {
-          eq: (c: string, v: string) => {
-            eq: (c: string, v: string) => {
-              ilike: (c: string, v: string) => {
-                ilike: (c: string, v: string) => {
-                  limit: (n: number) => Promise<{ data: unknown[] | null; error: unknown }>;
-                };
-              };
-            };
-          };
-        };
-      };
-    })
+    const { data, error } = await supabase
       .from("oem_hosted_documents")
       .select("id")
       .eq("tenant_id", tenantId)
