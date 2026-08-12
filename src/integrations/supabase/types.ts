@@ -5063,6 +5063,73 @@ export type Database = {
           },
         ]
       }
+      oem_hosted_documents: {
+        Row: {
+          authorised_by: string
+          brand: string
+          byte_size: number | null
+          content_type: string | null
+          document_kind: string
+          id: string
+          model: string
+          model_year: number | null
+          source_url: string
+          storage_path: string
+          stored_at: string
+          tenant_id: string
+        }
+        Insert: {
+          authorised_by: string
+          brand: string
+          byte_size?: number | null
+          content_type?: string | null
+          document_kind: string
+          id?: string
+          model: string
+          model_year?: number | null
+          source_url: string
+          storage_path: string
+          stored_at?: string
+          tenant_id: string
+        }
+        Update: {
+          authorised_by?: string
+          brand?: string
+          byte_size?: number | null
+          content_type?: string | null
+          document_kind?: string
+          id?: string
+          model?: string
+          model_year?: number | null
+          source_url?: string
+          storage_path?: string
+          stored_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_hosted_documents_authorised_by_fkey"
+            columns: ["authorised_by"]
+            isOneToOne: false
+            referencedRelation: "oem_distribution_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_hosted_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_hosted_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oem_owners_manual_links: {
         Row: {
           cover_generated_at: string | null
@@ -9903,6 +9970,24 @@ export type Database = {
       claim_listing_orchestration: {
         Args: { _listing_id: string }
         Returns: boolean
+      }
+      claim_oem_document_hosting: {
+        Args: {
+          _brand: string
+          _document_kind: string
+          _model: string
+          _model_year?: number
+          _source_url: string
+          _store_id?: string
+          _tenant_id: string
+          _vehicle_listing_id?: string
+          _vin: string
+        }
+        Returns: {
+          already_stored_path: string
+          decision: string
+          event_id: string
+        }[]
       }
       claim_platform: { Args: never; Returns: Json }
       close_resolved_description_exceptions: {
