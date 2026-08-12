@@ -534,7 +534,12 @@ export default function VehiclePassportGoverned() {
     const high = d.marketHigh ?? d.marketAvg * 1.15;
     const span = Math.max(1, high - low);
     const t = Math.max(0, Math.min(1, (d.price - low) / span));
-    return { t, label: d.belowMarket != null && d.belowMarket > 250 ? "Best Value" : d.belowMarket != null && d.belowMarket < -250 ? "Above Market" : "Fair Market" };
+    // Label from the SIGNED price-vs-value diff. belowMarket is null (not
+    // negative) when the price sits above market, so keying the label on it
+    // made "Above Market" unreachable — an overpriced car rendered its dot at
+    // the red end captioned "Fair Market".
+    const diff = d.price - d.marketAvg;
+    return { t, label: diff <= -250 ? "Best Value" : diff >= 250 ? "Above Market" : "Fair Market" };
   })();
 
   // ── Sticky CTA (existing dealer-configurable button set)
@@ -916,7 +921,7 @@ export default function VehiclePassportGoverned() {
               <div className={`${CARD} mt-3 p-4`}>
                 <div className="grid grid-cols-3 gap-3">
                   <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Analyzed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "nearby"}</div></div>
-                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>vs market</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : d.marketAvg != null && price != null && price - d.marketAvg > 250 ? fmt$(price - d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below value" : "vs value"}</div></div>
+                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>vs market</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : d.marketAvg != null && price != null && price - d.marketAvg > 250 ? AMBER : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : d.marketAvg != null && price != null && price - d.marketAvg > 250 ? fmt$(price - d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below value" : d.marketAvg != null && price != null && price - d.marketAvg > 250 ? "above value" : "vs value"}</div></div>
                   <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Days listed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.dom != null ? d.dom : d.marketMeta.avgDom != null ? d.marketMeta.avgDom : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.dom != null ? "this car" : "market avg"}</div></div>
                 </div>
                 <div className="mt-4">
