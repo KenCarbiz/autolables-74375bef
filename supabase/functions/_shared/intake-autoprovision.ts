@@ -603,13 +603,15 @@ export async function ensureComplianceDrafts(
   let needsFormRender = false;
   let needsFactorySticker = false;
   let listingId: string | null = null;
+  let listingYmm: string | null = null;
   if (render) {
     try {
       const { data: listing } = await admin.from("vehicle_listings")
-        .select("id, condition")
+        .select("id, condition, ymm")
         .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
       const cond = String(listing?.condition || "used").toLowerCase();
       listingId = (listing?.id as string | undefined) ?? null;
+      listingYmm = (listing?.ymm as string | undefined) ?? null;
       if (listing?.id && ["used", "cpo", "certified"].includes(cond)) {
         const { data: formDocs, error } = await admin.from("generated_documents")
           .select("id, document_type, online_url, pdf_url")
@@ -663,6 +665,18 @@ export async function ensureComplianceDrafts(
       `${render.supabaseUrl}/functions/v1/factory-sticker-orchestrate`,
       { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "resync" },
       20000, "factory_sticker");
+  }
+
+  // Back-fill the dealer's own copy of their brand's documents for inventory
+  // that was already on the lot. autoPreload only runs on a genuinely new
+  // listing, so without this the copy step would reach next week's arrivals
+  // and never the fleet standing outside today. Cheap and idempotent by
+  // construction: it reads the link cache, dedupes per model-year inside the
+  // isolate, and every vehicle after the first gets already_stored.
+  if (render) {
+    await ensureOemDocCopies(
+      admin, render.supabaseUrl, render.serviceKey, tenantId, vin, listingYmm, listingId, null,
+    );
   }
 }
 

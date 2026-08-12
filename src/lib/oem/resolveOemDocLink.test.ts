@@ -116,10 +116,13 @@ describe("ingest keeps the dealer's own copy", () => {
   it("runs on every intake, after the link step", () => {
     expect(harvester).toMatch(/export async function ensureOemDocCopies\(/);
     expect(harvester).toMatch(/await ensureOemDocCopies\(/);
-    // The copy reads the link cache, so it has to come second or it finds
-    // nothing on the very first vehicle of a model.
-    expect(harvester.indexOf("await ensureOemDocLinks("))
-      .toBeLessThan(harvester.indexOf("await ensureOemDocCopies("));
+    // Ordering matters inside autoPreload specifically: the copy reads the
+    // link cache, so on a genuinely new model the harvest has to be dispatched
+    // first. (The resync path calls the copy on its own and relies on links
+    // harvested when the vehicle was first inserted.)
+    const preload = harvester.slice(harvester.indexOf("export async function autoPreload("));
+    expect(preload.indexOf("await ensureOemDocLinks("))
+      .toBeLessThan(preload.indexOf("await ensureOemDocCopies("));
   });
 
   it("calls the one function allowed to fetch manufacturer bytes", () => {
@@ -152,6 +155,31 @@ describe("ingest keeps the dealer's own copy", () => {
     );
     expect(body).toMatch(/maxRetries:\s*0/);       // a retry re-downloads tens of MB
     expect(body).toMatch(/catch\s*\{[^}]*\}/);      // swallows, per the surrounding doctrine
+  });
+
+  it("also back-fills inventory that was already on the lot", () => {
+    // autoPreload only runs on a genuinely new listing. Without the resync
+    // path the copy step would reach next week's arrivals and never the fleet
+    // standing outside today.
+    const resync = harvester.slice(
+      harvester.indexOf("export async function ensureComplianceDrafts("),
+      harvester.indexOf("export async function autoPreload("),
+    );
+    expect(resync).toMatch(/await ensureOemDocCopies\(/);
+    // It needs the ymm, and takes it from a select that already runs.
+    expect(resync).toMatch(/select\("id, condition, ymm"\)/);
+  });
+
+  it("does not fire twice for a genuinely new listing", () => {
+    // autoPreload calls ensureComplianceDrafts without a render target, and
+    // the back-fill is gated on render — so a new car gets exactly one copy
+    // pass, from autoPreload's own call.
+    expect(harvester).toMatch(/await ensureComplianceDrafts\(admin, tenantId, vin\);/);
+    const resync = harvester.slice(
+      harvester.indexOf("export async function ensureComplianceDrafts("),
+      harvester.indexOf("export async function autoPreload("),
+    );
+    expect(resync).toMatch(/if \(render\) \{\s*await ensureOemDocCopies\(/);
   });
 
   it("only stores a real PDF, under the tenant's own folder", () => {
