@@ -419,6 +419,105 @@ function fireOemHarvest(
   });
 }
 
+// ── Keeping the dealer's own copy ─────────────────────────────────────
+//
+// A link is a promise somebody else keeps. Manufacturers reorganise their
+// sites, and the passport is meant to outlive the sale by years, so a
+// franchised dealer keeps their own copy of their own brand's documents.
+//
+// oem-document-store is the only place in the system that fetches
+// manufacturer bytes, and it claims before it fetches: the gate decides, the
+// decision is recorded, and the stored row cites it. So this does not repeat
+// the franchise check — it asks, and a "link" answer costs one cheap call and
+// no download. A Honda store's used Toyota gets "link" here, every time.
+//
+// Copies are keyed (tenant, brand, model, model-year, kind), so a fleet costs
+// its distinct model-years once, not once per car; every vehicle after the
+// first gets "already_stored".
+
+/** Store copies this isolate may dispatch, ever. Same reasoning as the link
+ *  harvest cap: a feed outlives the isolate, and the sweep is the retry. */
+const OEM_COPY_DISPATCH_CAP = 4;
+
+const oemCopyAttempted = new Set<string>();
+let oemCopyDispatched = 0;
+
+/** Test hook: both are per isolate and leak across cases. */
+export function resetOemCopyDedupe(): void {
+  oemCopyAttempted.clear();
+  oemCopyDispatched = 0;
+}
+
+/** The harvested link for this model, or null when nothing is cached yet. */
+async function cachedOemLinkUrl(admin: Admin, table: string, key: OemDocKey): Promise<string | null> {
+  try {
+    const { data, error } = await admin.from(table)
+      .select("url, year")
+      .ilike("make", key.make).ilike("model", key.model)
+      .order("year", { ascending: false, nullsFirst: false })
+      .limit(6);
+    if (error) return null;
+    const rows = ((data || []) as { url: string; year: number | null }[]);
+    const yr = key.year;
+    const pick = (yr ? rows.find((r) => r.year === yr) : rows[0])
+      || rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2)
+      || rows.find((r) => r.year == null);
+    const url = pick?.url?.trim();
+    return url && /^https:\/\//i.test(url) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Keep this dealer's own copy of their own brand's brochure and owner's
+ * manual, where the gate allows it.
+ *
+ * Reads the harvested link rather than harvesting: on the very first vehicle
+ * of a model the link is still in flight, and this run simply skips — the next
+ * pass or the sweep stores it. Chasing the harvest here would mean holding the
+ * isolate open on somebody else's provider call.
+ *
+ * Never throws. A stored copy is a durability upgrade on a link that already
+ * works, so nothing here may cost an ingest.
+ */
+export async function ensureOemDocCopies(
+  admin: Admin, supabaseUrl: string, serviceKey: string,
+  tenantId: string, vin: string, ymm: string | null, listingId: string | null, storeId: string | null,
+): Promise<void> {
+  try {
+    const key = oemDocKeyFromYmm(ymm);
+    if (!key || !vin) return;
+    for (const spec of OEM_DOCS) {
+      const dedupe = `copy:${spec.kind}:${tenantId}:${oemDocKeyString(key)}`;
+      if (oemCopyAttempted.has(dedupe)) continue;
+      const sourceUrl = await cachedOemLinkUrl(admin, spec.table, key);
+      // Mark attempted either way: with no link there is nothing to store, and
+      // a second vehicle of this model must not repeat even the read.
+      oemCopyAttempted.add(dedupe);
+      if (!sourceUrl) continue;
+      if (oemCopyDispatched >= OEM_COPY_DISPATCH_CAP) continue;
+      oemCopyDispatched++;
+      trackDetached((async () => {
+        // A manual can be tens of megabytes over somebody else's CDN, so this
+        // gets a real deadline and no retries — a retry re-downloads.
+        await invokeFunction(`${supabaseUrl}/functions/v1/oem-document-store`, serviceKey, {
+          body: {
+            tenant_id: tenantId, vin, brand: key.make, model: key.model,
+            model_year: key.year, document_kind: spec.kind, source_url: sourceUrl,
+            vehicle_listing_id: listingId, store_id: storeId,
+          },
+          timeoutMs: 120_000, maxRetries: 0, deadlineMs: 125_000,
+        });
+        // Deliberately no failure row. "link" is the correct answer for every
+        // vehicle outside the dealer's franchise and is by far the common
+        // case; a too-large or unreachable PDF still leaves the shopper the
+        // manufacturer link, which is what they had before this step existed.
+      })());
+    }
+  } catch { /* keeping a copy is never allowed to break ingest */ }
+}
+
 /**
  * Ensure the passport's Documents page has this model's official OEM brochure
  * and owner's manual, without an admin pressing a button.
@@ -637,4 +736,8 @@ export async function autoPreload(
   // in the order because it is the only step whose cost is a provider bill —
   // everything above it should already be dispatched if this one stalls.
   await ensureOemDocLinks(admin, supabaseUrl, serviceKey, tenantId, vin, ymm);
+  // And the dealer's own copy of their own brand's documents, so the record
+  // survives the manufacturer reorganising their site. Runs after the link
+  // step and reads its cache; it never waits on a harvest in flight.
+  await ensureOemDocCopies(admin, supabaseUrl, serviceKey, tenantId, vin, ymm, listingId, null);
 }

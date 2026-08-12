@@ -96,3 +96,63 @@ describe("reader and harvester agree", () => {
     expect(harvester).toMatch(/await ensureOemDocLinks\(/);
   });
 });
+
+
+describe("ingest keeps the dealer's own copy", () => {
+  const harvester = readFileSync(
+    join(__dirname, "../../../supabase/functions/_shared/intake-autoprovision.ts"),
+    "utf8",
+  );
+  const store = readFileSync(
+    join(__dirname, "../../../supabase/functions/oem-document-store/index.ts"),
+    "utf8",
+  );
+
+  it("runs on every intake, after the link step", () => {
+    expect(harvester).toMatch(/export async function ensureOemDocCopies\(/);
+    expect(harvester).toMatch(/await ensureOemDocCopies\(/);
+    // The copy reads the link cache, so it has to come second or it finds
+    // nothing on the very first vehicle of a model.
+    expect(harvester.indexOf("await ensureOemDocLinks("))
+      .toBeLessThan(harvester.indexOf("await ensureOemDocCopies("));
+  });
+
+  it("calls the one function allowed to fetch manufacturer bytes", () => {
+    expect(harvester).toContain("functions/v1/oem-document-store");
+    // Anything else fetching OEM bytes would bypass the claim/evidence chain.
+    expect(harvester).not.toMatch(/fetch\(\s*sourceUrl/);
+  });
+
+  it("does not re-implement the franchise gate", () => {
+    // oem-document-store claims BEFORE it fetches and the stored row cites the
+    // decision, so a second copy of that check here could only drift from it.
+    expect(store).toContain("claim_oem_document_hosting");
+    expect(store).toMatch(/decision !== "host"/);
+    expect(harvester).not.toContain("claim_oem_document_hosting");
+    expect(harvester).not.toContain("tenant_may_host_oem_documents");
+  });
+
+  it("bounds what one run may download and dedupes per model-year", () => {
+    expect(harvester).toMatch(/OEM_COPY_DISPATCH_CAP\s*=\s*\d+/);
+    expect(harvester).toMatch(/oemCopyDispatched >= OEM_COPY_DISPATCH_CAP/);
+    // Keyed by tenant too: storage is tenant-scoped, so one dealer's copy
+    // says nothing about another's.
+    expect(harvester).toMatch(/`copy:\$\{spec\.kind\}:\$\{tenantId\}:/);
+  });
+
+  it("never retries a download and never throws into ingest", () => {
+    const body = harvester.slice(
+      harvester.indexOf("export async function ensureOemDocCopies("),
+      harvester.indexOf("Ensure the passport's Documents page"),
+    );
+    expect(body).toMatch(/maxRetries:\s*0/);       // a retry re-downloads tens of MB
+    expect(body).toMatch(/catch\s*\{[^}]*\}/);      // swallows, per the surrounding doctrine
+  });
+
+  it("only stores a real PDF, under the tenant's own folder", () => {
+    // A manufacturer bot-wall answers 200 with HTML; storing that as "the
+    // owner's manual" is worse than storing nothing.
+    expect(store).toMatch(/0x25 && bytes\[1\] === 0x50/);
+    expect(store).toMatch(/const path = `\$\{tenantId\}\//);
+  });
+});

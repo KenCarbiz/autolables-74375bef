@@ -24,7 +24,7 @@ import { listingGallery, listingHero } from "@/lib/photos";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { assessListingDecodeHealth, HEALTH_TONE, type DataHealthReport } from "@/lib/vehicleData/dataContract";
 import { harvestVerdict, type HarvestResponse, type HarvestVerdict } from "@/lib/ingest/harvestVerdict";
-import { fetchHarvestedOemDocLink } from "@/lib/oem/resolveOemDocLink";
+import { fetchHarvestedOemDocLink, hasStoredOemDocCopy } from "@/lib/oem/resolveOemDocLink";
 import { recordIngestStep } from "@/lib/ingest/recordIngestStep";
 import type { VehicleListing, TitleVerification } from "@/hooks/useVehicleListing";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -1426,6 +1426,8 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
   const year = Number.parseInt(parts[0] || "", 10) || null;
   const make = parts[1] || "";
   const model = parts.slice(2).join(" ");
+  // A stored copy is the durable record; the link is what it was made from.
+  const [stored, setStored] = useState(false);
   useEffect(() => {
     let cancelled = false;
     void fetchHarvestedOemDocLink("brochure", vehicle.ymm).then((row) => {
@@ -1433,8 +1435,11 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
       setFound({ url: row.url, year: row.year });
       setFromIngest(true);
     });
+    void hasStoredOemDocCopy("brochure", vehicle.tenant_id, vehicle.ymm).then((held) => {
+      if (!cancelled) setStored(held);
+    });
     return () => { cancelled = true; };
-  }, [vehicle.ymm]);
+  }, [vehicle.ymm, vehicle.tenant_id]);
   const find = async () => {
     if (!make || !model) { toast.error("Vehicle year/make/model is incomplete"); return; }
     setBusy(true);
@@ -1458,7 +1463,7 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
         <h3 className="text-[15px] font-bold text-foreground">OEM Brochure</h3>
         <p className="text-[13px] text-slate-500 mt-0.5">
           {found
-            ? <>{fromIngest ? "Found automatically at intake" : "Linked"} to the manufacturer's official brochure{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a></>
+            ? <>{fromIngest ? "Found automatically at intake" : "Linked"} to the manufacturer's official brochure{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a>{stored ? " — a copy is stored for this dealership, so the packet keeps working if the manufacturer moves the file." : ""}</>
             : <>No official {make || "model"} brochure has been found yet. Intake looks for one automatically; search now to try again.</>}
         </p>
       </div>
@@ -1477,6 +1482,7 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
   const [found, setFound] = useState<{ url: string; year?: number | null } | null>(null);
   const [fromIngest, setFromIngest] = useState(false);
   const savedInDocs = (vehicle.documents || []).some((d) => d?.type === "owners_manual");
+  const [stored, setStored] = useState(false);
   useEffect(() => {
     let cancelled = false;
     void fetchHarvestedOemDocLink("owners_manual", vehicle.ymm).then((row) => {
@@ -1484,8 +1490,11 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
       setFound({ url: row.url, year: row.year });
       setFromIngest(true);
     });
+    void hasStoredOemDocCopy("owners_manual", vehicle.tenant_id, vehicle.ymm).then((held) => {
+      if (!cancelled) setStored(held);
+    });
     return () => { cancelled = true; };
-  }, [vehicle.ymm]);
+  }, [vehicle.ymm, vehicle.tenant_id]);
   const parts = (vehicle.ymm || "").trim().split(/\s+/);
   const year = Number.parseInt(parts[0] || "", 10) || null;
   const make = parts[1] || "";
@@ -1511,7 +1520,9 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
           {savedInDocs
             ? <>Saved to this vehicle's documents.</>
             : found
-            ? <>{fromIngest ? "Found automatically at intake" : "Linked"} to the manufacturer's official manual{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a> — the shopper packet links straight to the manufacturer; no copy is stored here.</>
+            ? <>{fromIngest ? "Found automatically at intake" : "Linked"} to the manufacturer's official manual{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a>{stored
+                ? " — a copy is stored for this dealership, so the packet keeps working if the manufacturer moves the file."
+                : " — the shopper packet links straight to the manufacturer."}</>
             : <>No official {make || "model"} owner's manual has been found yet. Intake looks for one automatically; search now to try again.</>}
         </p>
       </div>

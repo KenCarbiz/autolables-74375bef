@@ -113,3 +113,51 @@ export async function fetchHarvestedOemDocLink(
     return null;
   }
 }
+
+// ── The dealer's own stored copy ──────────────────────────────────────
+
+/**
+ * Does this dealership hold its own copy of this document for this vehicle?
+ *
+ * Only ever a yes/no for the UI. The URL is deliberately NOT resolved here:
+ * the bucket is private and a signed URL has a lifetime, and storing one on a
+ * row is exactly what made published cars serve dead links once it aged out.
+ * The shopper's copy is signed per request by public-listing-view; this only
+ * tells an operator that a copy exists.
+ */
+export async function hasStoredOemDocCopy(
+  kind: OemDocKind,
+  tenantId: string | null | undefined,
+  ymm: string | null | undefined,
+): Promise<boolean> {
+  const key = oemDocKeyFromYmm(ymm);
+  if (!key || !tenantId) return false;
+  try {
+    const { data, error } = await (supabase as unknown as {
+      from: (t: string) => {
+        select: (c: string) => {
+          eq: (c: string, v: string) => {
+            eq: (c: string, v: string) => {
+              ilike: (c: string, v: string) => {
+                ilike: (c: string, v: string) => {
+                  limit: (n: number) => Promise<{ data: unknown[] | null; error: unknown }>;
+                };
+              };
+            };
+          };
+        };
+      };
+    })
+      .from("oem_hosted_documents")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("document_kind", kind === "brochure" ? "brochure" : "owners_manual")
+      .ilike("brand", key.make)
+      .ilike("model", key.model)
+      .limit(1);
+    if (error || !Array.isArray(data)) return false;
+    return data.length > 0;
+  } catch {
+    return false;
+  }
+}
