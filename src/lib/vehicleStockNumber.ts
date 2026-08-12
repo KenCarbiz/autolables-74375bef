@@ -13,6 +13,9 @@
 // ──────────────────────────────────────────────────────────────────────
 
 interface StockSources {
+  /** vehicle_files.stock_number — the DMS number, and where the nightly
+   *  website crawler files one the feed didn't carry. */
+  stock_number?: string | null;
   mc_attributes?: Record<string, unknown> | null;
   sticker_snapshot?: Record<string, unknown> | null;
 }
@@ -35,6 +38,7 @@ export function vehicleStockNumber(vehicle: StockSources | null | undefined): st
   return (
     str(mc.stock_no)
     || str(dealer.stock_no)
+    || str(vehicle.stock_number)
     || str(snap.stock_number)
     || str(snap.stock)
     || str(decoded.stock_number)

@@ -230,6 +230,20 @@ const VehicleFile = () => {
     }
     setVehicle(data as VehicleRow);
     setLoading(false);
+    // vehicle_listings has no stock_number column — the DMS number lives on
+    // vehicle_files, and the nightly crawler fills it there from the dealer's
+    // own VDP for cars the feed didn't carry one for. Fetched separately so a
+    // missing file row can never keep the page from rendering.
+    try {
+      const { data: file } = await (supabase as any)
+        .from("vehicle_files")
+        .select("stock_number")
+        .eq("tenant_id", data.tenant_id)
+        .eq("vin", data.vin)
+        .maybeSingle();
+      const filed = String(file?.stock_number || "").trim();
+      if (filed) setVehicle((v) => (v && v.id === data.id ? { ...v, stock_number: filed } : v));
+    } catch { /* the header falls back to whatever the listing carries */ }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);

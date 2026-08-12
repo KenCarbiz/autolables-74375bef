@@ -1185,7 +1185,7 @@ const SHOWCASE_ADDENDUM = {
     addressLine2: "Hartford, Connecticut 06120",
     phone: "(203) 509-5054",
     website: "www.harteinfiniti.com",
-    logoEnabled: false,
+    logoUrl: "/harte-infiniti-logo.png",
   },
   vehicle: {
     title: "2027 INFINITI QX60 LUXE",
@@ -1206,7 +1206,14 @@ const SHOWCASE_ADDENDUM = {
     headline: "Includes Lifetime Powertrain",
     supportingLine: "",
     disclosure: "",
-    displayStyle: "text" as const,
+    // image_text is what dealerPrograms.ts defaults a program with artwork to,
+    // so the showcase composes the same way a real dealer's does. The stamp
+    // does not replace "Ask for details" — that line is the pointer to the
+    // written limited warranty (16 CFR 239.4), and displayStyle "image" would
+    // drop it.
+    imageUrl: "/lifetime-powertrain-warranty.png",
+    imageScale: "md" as const,
+    displayStyle: "image_text" as const,
     showAskForDetails: true,
   }],
   qrUrl: "https://autolabels.io/v/demo",

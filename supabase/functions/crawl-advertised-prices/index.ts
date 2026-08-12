@@ -137,6 +137,41 @@ const extractHeroImage = (html: string, baseUrl: string): string | null => {
   return /^https?:\/\//i.test(url) ? url : null;
 };
 
+// The dealer's own stock number, off their own VDP.
+//
+// The syndication feed carries stock_no for most cars but not all — a unit the
+// dealer merchandised on their site before it reached the feed has one on the
+// page and none in our record, and the whole lot refers to that car by it.
+// The crawler is already on the page every night, so it reads it.
+//
+// Deliberately narrow: only an explicitly LABELLED number is taken. A bare
+// alphanumeric token near the price is as likely to be a trim code, a lease
+// offer id, or another car in a "similar vehicles" rail, and a wrong stock
+// number is worse than none — it is what someone walks the lot with.
+// The label must carry a real delimiter (":" / "#") or the word number/no —
+// "in stock now" is prose, not a label, and a pattern loose enough to read it
+// files whatever word follows.
+const STOCK_LABEL_RE =
+  /\b(?:stock|stk)\s*(?:(?:number|no\.?|#)\s*[:#]?|[:#])\s*([A-Z0-9][A-Z0-9-]{1,11})\b/i;
+const STOCK_JSON_RE =
+  /"(?:stock_?number|stockNum|sku)"\s*:\s*"([A-Z0-9][A-Z0-9-]{1,11})"/i;
+
+export const extractStockNumber = (html: string, vin: string): string | null => {
+  const text = html.replace(/<[^>]+>/g, " ").replace(/&nbsp;?/gi, " ");
+  const raw = (STOCK_JSON_RE.exec(html)?.[1] || STOCK_LABEL_RE.exec(text)?.[1] || "").trim().toUpperCase();
+  if (!raw) return null;
+  // Some sites put the VIN — or its last 8 — in the stock slot. That is the
+  // VIN, not a stock number, and filing it as one makes the two look
+  // inconsistent on every document that prints both. Containment rather than
+  // equality: the capture is length-capped, so a full VIN arrives truncated.
+  const v = (vin || "").toUpperCase();
+  if (v && raw.length >= 6 && v.includes(raw)) return null;
+  // A pure model year, or a number long enough to be a price or a phone
+  // number, is a mis-read of the surrounding page rather than a stock number.
+  if (/^(19|20)\d{2}$/.test(raw)) return null;
+  return raw;
+};
+
 // Dealer-paid vehicle history report links (CARFAX Report.cfx / cfx.link
 // shorts / AutoCheck FastLink) embedded on the dealer's own VDP. Only a link
 // whose vin param matches the crawled row's VIN is trusted — group sites
@@ -959,6 +994,25 @@ serve(async (req) => {
             .eq("tenant_id", row.tenant_id).eq("vin", row.vin).is("hero_image_url", null);
         }
       } catch { /* hero_image_url column may not be migrated yet */ }
+
+      // The dealer's stock number, when their own page states one and our
+      // record doesn't. Website channel only — a marketplace listing shows the
+      // marketplace's id, not the dealership's.
+      //
+      // Gap-fill only: stock_number is left alone when it already has a value,
+      // so the DMS number on the syndication feed always wins over a scrape.
+      // The file row exists for every synced VIN (marketcheck-sync creates it),
+      // so this updates and never inserts.
+      try {
+        if (String(row.source_label || "") === "website") {
+          const stock = extractStockNumber(html, row.vin);
+          if (stock) {
+            await admin.from("vehicle_files").update({ stock_number: stock })
+              .eq("tenant_id", row.tenant_id).eq("vin", row.vin)
+              .or("stock_number.is.null,stock_number.eq.");
+          }
+        }
+      } catch { /* stock number is a nicety — never fail a price run over it */ }
 
       // Harvest the dealer's own CARFAX/AutoCheck report link off their VDP —
       // website channel only (marketplace pages embed the marketplace's own
