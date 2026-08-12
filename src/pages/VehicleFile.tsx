@@ -21,6 +21,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRecallTask";
 import { listingGallery, listingHero } from "@/lib/photos";
+import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { assessListingDecodeHealth, HEALTH_TONE, type DataHealthReport } from "@/lib/vehicleData/dataContract";
 import { harvestVerdict, type HarvestResponse, type HarvestVerdict } from "@/lib/ingest/harvestVerdict";
@@ -368,7 +369,7 @@ const VehicleFile = () => {
   ];
 
   const heroMc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
-  const stockNo = (heroMc.stock_no as string) || ((vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string) || null;
+  const stockNo = vehicleStockNumber(vehicle);
   const gallery: string[] = listingGallery(vehicle);
   const safeImg = gallery.length ? Math.min(imgIdx, gallery.length - 1) : 0;
 
@@ -453,10 +454,26 @@ const VehicleFile = () => {
                     {vehicle.ymm || "(needs VIN decode)"}
                   </h1>
                   {vehicle.trim ? <p className="text-2xl text-slate-600 font-normal leading-tight">{vehicle.trim}</p> : null}
-                  {/* Stock + VIN, one row, with copy */}
+                  {/* Stock + VIN, one row, with copy. The stock number is how
+                      the lot, the DMS and the desk all refer to this car, so it
+                      is always stated — an absent one says so rather than
+                      leaving a gap that reads as "no stock number field". */}
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm pt-0.5">
-                    {stockNo && (
-                      <span className="text-muted-foreground"><span className="font-semibold text-foreground">Stock #</span> {stockNo}</span>
+                    {stockNo ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2 py-1 ring-1 ring-blue-100">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Stock #</span>
+                        <span className="font-mono text-base font-black tracking-tight text-blue-900">{stockNo}</span>
+                        <button
+                          onClick={() => { navigator.clipboard?.writeText(stockNo); toast.success("Stock number copied"); }}
+                          title="Copy stock number"
+                          aria-label="Copy stock number"
+                          className="text-blue-500 hover:text-blue-800 shrink-0"
+                        ><Copy className="w-3.5 h-3.5" /></button>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 ring-1 ring-amber-100 text-[11px] font-semibold text-amber-700">
+                        Stock # not on the feed
+                      </span>
                     )}
                     <span className="inline-flex items-center gap-1.5 min-w-0">
                       <span className="font-semibold text-foreground">VIN</span>
@@ -734,7 +751,7 @@ const OverviewPanel = ({ vehicle, onTab, recall, onPublish, publishing }: { vehi
   // VIN's equipment/specs decode has degraded so a regression is visible here
   // instead of silently blanking the customer passport panels.
   const decodeHealth = assessListingDecodeHealth(vehicle as unknown as VehicleListing);
-  const stockNo = (mc.stock_no as string) || ((vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string) || null;
+  const stockNo = vehicleStockNumber(vehicle);
   const sourceLabel = (() => { const v = mc.source ?? mc.seller_type ?? mc.inventory_type; return v ? String(v).toUpperCase() : null; })();
   const lastShopperView = events.find((e) => e.action === "listing_viewed")?.created_at || null;
 
@@ -3145,8 +3162,7 @@ const focusLabel = (k: string) => FOCUS_MODULE_LABEL[k] || k.replace(/[-_]/g, " 
 const ShopperFocusCard = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: TabId) => void }) => {
   const [stats, setStats] = useState<{ totalSeconds: number; sessions: number; topModule: string | null; lastEvent: string | null; ctaClicks: number; leads: number } | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
-  const focusStock = ((vehicle.mc_attributes || {}) as Record<string, unknown>).stock_no as string
-    || ((vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string) || null;
+  const focusStock = vehicleStockNumber(vehicle);
 
   useEffect(() => {
     let cancelled = false;

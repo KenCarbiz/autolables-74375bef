@@ -12,6 +12,7 @@ import RegenerateStickerDrawer from "./RegenerateStickerDrawer";
 import StickerVersionHistory from "./StickerVersionHistory";
 import { useWindowSticker } from "@/hooks/useWindowSticker";
 import { promptRegenerationReason } from "@/lib/factorySticker/regenerationReason";
+import { freshFiledDocumentAssets } from "@/lib/filedDocumentUrl";
 
 // Factory Build Record card for the Vehicle File's Documents tab. Reads the
 // per-vehicle factory_sticker_records row plus its current generated_documents
@@ -126,6 +127,7 @@ export default function FactoryStickerCard({
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [regenOpen, setRegenOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const { documentAssets } = useWindowSticker();
@@ -165,18 +167,29 @@ export default function FactoryStickerCard({
 
   // The card thumbnail is the first page of THIS vehicle's own filed
   // document, rendered from the same immutable snapshot as its PDF.
+  //
+  // Both URLs are minted here rather than read off generated_documents: the
+  // stored pdf_url is a seven-day credential, so an untouched sticker's
+  // "View PDF" button used to start returning an InvalidJWT page after a
+  // week and read as "needs regenerating" when the file had never moved.
   useEffect(() => {
     let cancelled = false;
     setThumbUrl(null);
+    setFileUrl(null);
     if (!tenantId || !doc?.id) return;
+    const cachedPdf = doc.pdf_url || doc.online_url || null;
     (async () => {
-      try {
-        const assets = await documentAssets(tenantId, vehicleId, doc.id);
-        if (!cancelled) setThumbUrl(assets.preview_url);
-      } catch { /* the card stands without a thumbnail */ }
+      const assets = await freshFiledDocumentAssets(
+        (documentId) => documentAssets(tenantId, vehicleId, documentId),
+        doc.id,
+        cachedPdf,
+      );
+      if (cancelled) return;
+      setThumbUrl(assets.preview_url);
+      setFileUrl(assets.pdf_url);
     })();
     return () => { cancelled = true; };
-  }, [tenantId, vehicleId, doc?.id, documentAssets]);
+  }, [tenantId, vehicleId, doc?.id, doc?.pdf_url, doc?.online_url, documentAssets]);
 
   const regenerate = async (action: "regenerate" | "orchestrate") => {
     if (!tenantId) { toast.error("Vehicle has no tenant"); return; }
@@ -223,7 +236,6 @@ export default function FactoryStickerCard({
   const recon = record?.reconciliation_status || null;
   const reconTone: keyof typeof PILL_TONE =
     recon === "MATCHED" ? "emerald" : recon === "MINOR_VARIANCE" ? "amber" : recon === "REVIEW_REQUIRED" ? "rose" : "slate";
-  const fileUrl = doc?.pdf_url || doc?.online_url || null;
   const docPublished = doc?.document_status === "published";
   const failed = record?.generation_status === "FAILED_RETRYABLE" || record?.generation_status === "FAILED_PERMANENT";
 
@@ -365,9 +377,9 @@ export default function FactoryStickerCard({
                 >
                   <ExternalLink className="w-3 h-3" /> View
                 </a>
-                {doc?.pdf_url && (
+                {fileUrl && (
                   <a
-                    href={doc.pdf_url}
+                    href={fileUrl}
                     download
                     target="_blank"
                     rel="noreferrer"
