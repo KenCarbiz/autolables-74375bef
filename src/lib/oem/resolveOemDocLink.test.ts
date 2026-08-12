@@ -11,25 +11,30 @@ import { oemDocKeyFromYmm, pickOemDocRow, OEM_DOC_TABLE } from "./resolveOemDocL
 //
 // These tests hold the reader and the harvester to the same rule.
 
-describe("the harvest key is only built from a usable year/make/model", () => {
-  it("splits a stored ymm", () => {
+describe("the key comes from the shared derivation, not a local copy", () => {
+  // resolveOemDocLink re-exports supabase/functions/_shared/oemDocKey so the
+  // Vehicle File, the harvester and the passport ask the same question. These
+  // pin the behaviour that a local copy would have got wrong.
+  it("keeps the trim in the model, exactly as the passport queries it", () => {
+    // public-listing-view takes everything after the make as the model, so a
+    // key that helpfully stripped "LUXE" would file a row nothing looks up.
     expect(oemDocKeyFromYmm("2027 INFINITI QX60 LUXE")).toEqual({ make: "INFINITI", model: "QX60 LUXE", year: 2027 });
   });
 
-  it("accepts a ymm with no leading year", () => {
-    expect(oemDocKeyFromYmm("INFINITI QX60")).toEqual({ make: "INFINITI", model: "QX60", year: null });
+  it("refuses a ymm with no leading model year", () => {
+    // Without a year the passport reads the make out of the model position,
+    // so every key derived from it is wrong.
+    expect(oemDocKeyFromYmm("INFINITI QX60")).toBeNull();
   });
 
   it("refuses anything that cannot identify a model", () => {
-    // A lookup with no model matches the first row of some other model line,
-    // which would put another vehicle's brochure on this car.
-    for (const v of ["", "   ", "INFINITI", "2027", null, undefined]) {
+    for (const v of ["", "   ", "INFINITI", "2027", "2027 INFINITI", null, undefined]) {
       expect(oemDocKeyFromYmm(v), `${JSON.stringify(v)} must not produce a key`).toBeNull();
     }
   });
 
   it("does not mistake a model number for a model year", () => {
-    expect(oemDocKeyFromYmm("911 Porsche Carrera")?.year).toBeNull();
+    expect(oemDocKeyFromYmm("911 Porsche Carrera")).toBeNull();
   });
 });
 
@@ -154,5 +159,18 @@ describe("ingest keeps the dealer's own copy", () => {
     // owner's manual" is worse than storing nothing.
     expect(store).toMatch(/0x25 && bytes\[1\] === 0x50/);
     expect(store).toMatch(/const path = `\$\{tenantId\}\//);
+  });
+});
+
+
+describe("no second derivation of the lookup key", () => {
+  const reader = readFileSync(join(__dirname, "resolveOemDocLink.ts"), "utf8");
+
+  it("imports the shared key module rather than re-implementing it", () => {
+    expect(reader).toMatch(/from "\.\.\/\.\.\/\.\.\/supabase\/functions\/_shared\/oemDocKey"/);
+    // A local re-implementation is how the reader and the harvester end up
+    // disagreeing about which row serves a vehicle.
+    expect(reader).not.toMatch(/export function oemDocKeyFromYmm/);
+    expect(reader).not.toMatch(/split\(\/\\s\+\//);
   });
 });

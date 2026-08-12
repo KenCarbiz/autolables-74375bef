@@ -16,6 +16,18 @@
 // ──────────────────────────────────────────────────────────────────────
 
 import { supabase } from "@/integrations/supabase/client";
+// The ONE derivation. supabase/functions/_shared/oemDocKey.ts exists precisely
+// so the harvester, the passport and anything else asking "which row serves
+// this vehicle" cannot drift apart, and it reproduces public-listing-view's
+// split verbatim — second word is the make, everything after it is the model,
+// trim included. A local copy here would have been the third one, and it
+// disagreed: it accepted a ymm with no model year, which the harvester refuses
+// outright because the passport would then read the make out of the model
+// position.
+import { oemDocKeyFromYmm, type OemDocKey } from "../../../supabase/functions/_shared/oemDocKey";
+
+export { oemDocKeyFromYmm };
+export type { OemDocKey };
 
 export type OemDocKind = "brochure" | "owners_manual";
 
@@ -24,35 +36,11 @@ export const OEM_DOC_TABLE: Record<OemDocKind, string> = {
   owners_manual: "oem_owners_manual_links",
 };
 
-export interface OemDocKey {
-  make: string;
-  model: string;
-  year: number | null;
-}
-
 export interface OemDocLinkRow {
   url: string;
   year: number | null;
   title?: string | null;
   verified_at?: string | null;
-}
-
-/**
- * Split a stored "2027 INFINITI QX60 LUXE" into its harvest key.
- *
- * Returns null when either half is missing: a lookup with no make or no model
- * would match the first row of some other vehicle's model line.
- */
-export function oemDocKeyFromYmm(ymm: string | null | undefined): OemDocKey | null {
-  const parts = String(ymm || "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length < 2) return null;
-  const yearRaw = Number.parseInt(parts[0] || "", 10);
-  const hasYear = Number.isFinite(yearRaw) && yearRaw > 1900;
-  const rest = hasYear ? parts.slice(1) : parts;
-  const make = rest[0] || "";
-  const model = rest.slice(1).join(" ");
-  if (!make || !model) return null;
-  return { make, model, year: hasYear ? yearRaw : null };
 }
 
 /**
