@@ -24,6 +24,7 @@ import { listingGallery, listingHero } from "@/lib/photos";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { assessListingDecodeHealth, HEALTH_TONE, type DataHealthReport } from "@/lib/vehicleData/dataContract";
 import { harvestVerdict, type HarvestResponse, type HarvestVerdict } from "@/lib/ingest/harvestVerdict";
+import { fetchHarvestedOemDocLink } from "@/lib/oem/resolveOemDocLink";
 import { recordIngestStep } from "@/lib/ingest/recordIngestStep";
 import type { VehicleListing, TitleVerification } from "@/hooks/useVehicleListing";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -1416,10 +1417,24 @@ const recordHarvestVerdict = async (vehicle: VehicleRow, verdict: HarvestVerdict
 const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
   const [busy, setBusy] = useState(false);
   const [found, setFound] = useState<{ url: string; year?: number | null } | null>(null);
+  // Harvested at ingest, not by this button. Without this read the card asked
+  // the operator to search for a document the pipeline had already filed —
+  // and the harvester would refuse to look again precisely because it is
+  // cached, so pressing the button changed nothing either.
+  const [fromIngest, setFromIngest] = useState(false);
   const parts = (vehicle.ymm || "").trim().split(/\s+/);
   const year = Number.parseInt(parts[0] || "", 10) || null;
   const make = parts[1] || "";
   const model = parts.slice(2).join(" ");
+  useEffect(() => {
+    let cancelled = false;
+    void fetchHarvestedOemDocLink("brochure", vehicle.ymm).then((row) => {
+      if (cancelled || !row) return;
+      setFound({ url: row.url, year: row.year });
+      setFromIngest(true);
+    });
+    return () => { cancelled = true; };
+  }, [vehicle.ymm]);
   const find = async () => {
     if (!make || !model) { toast.error("Vehicle year/make/model is incomplete"); return; }
     setBusy(true);
@@ -1431,6 +1446,7 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
       await recordHarvestVerdict(vehicle, verdict);
       if (verdict.status !== "succeeded") { toast.error(verdict.toastMessage); return; }
       setFound({ url: String(data.url), year: data.year });
+      setFromIngest(false);
       toast.success(verdict.toastMessage);
     } finally {
       setBusy(false);
@@ -1442,8 +1458,8 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
         <h3 className="text-[15px] font-bold text-foreground">OEM Brochure</h3>
         <p className="text-[13px] text-slate-500 mt-0.5">
           {found
-            ? <>Linked to the manufacturer's official brochure{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a></>
-            : <>Search the manufacturer's own site for the official {make || "model"} brochure and link it on the shopper packet.</>}
+            ? <>{fromIngest ? "Found automatically at intake" : "Linked"} to the manufacturer's official brochure{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a></>
+            : <>No official {make || "model"} brochure has been found yet. Intake looks for one automatically; search now to try again.</>}
         </p>
       </div>
       <button onClick={find} disabled={busy} className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-border text-[13px] font-semibold hover:bg-muted disabled:opacity-60">
@@ -1459,7 +1475,17 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [found, setFound] = useState<{ url: string; year?: number | null } | null>(null);
+  const [fromIngest, setFromIngest] = useState(false);
   const savedInDocs = (vehicle.documents || []).some((d) => d?.type === "owners_manual");
+  useEffect(() => {
+    let cancelled = false;
+    void fetchHarvestedOemDocLink("owners_manual", vehicle.ymm).then((row) => {
+      if (cancelled || !row) return;
+      setFound({ url: row.url, year: row.year });
+      setFromIngest(true);
+    });
+    return () => { cancelled = true; };
+  }, [vehicle.ymm]);
   const parts = (vehicle.ymm || "").trim().split(/\s+/);
   const year = Number.parseInt(parts[0] || "", 10) || null;
   const make = parts[1] || "";
@@ -1473,6 +1499,7 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
       await recordHarvestVerdict(vehicle, verdict);
       if (verdict.status !== "succeeded") { toast.error(verdict.toastMessage); return; }
       setFound({ url: String(data.url), year: data.year });
+      setFromIngest(false);
       toast.success(verdict.toastMessage);
     } finally { setBusy(false); }
   };
@@ -1484,8 +1511,8 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
           {savedInDocs
             ? <>Saved to this vehicle's documents.</>
             : found
-            ? <>Linked to the manufacturer's official manual{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a> — the shopper packet links straight to the manufacturer; no copy is stored here.</>
-            : <>Search the manufacturer's own site for the official {make || "model"} owner's manual and link it on the shopper packet.</>}
+            ? <>{fromIngest ? "Found automatically at intake" : "Linked"} to the manufacturer's official manual{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a> — the shopper packet links straight to the manufacturer; no copy is stored here.</>
+            : <>No official {make || "model"} owner's manual has been found yet. Intake looks for one automatically; search now to try again.</>}
         </p>
       </div>
       <div className="shrink-0 flex items-center gap-2">
