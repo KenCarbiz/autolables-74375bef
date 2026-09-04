@@ -844,19 +844,28 @@ serve(async (req) => {
 
   const limit = Math.max(1, Math.min(body.limit ?? 200, 1000));
 
-  // Pull rows with a real source_url, newest first, and dedupe to the
-  // latest per (tenant, VIN). Reads the real table with column aliases —
-  // the live schema uses source_channel/captured_at, and there is no
-  // latest_advertised_prices view.
-  let query = admin
-    .from("advertised_prices")
-    .select("id, tenant_id, store_id, vin, source_url, source_label:source_channel, advertised_price, snapshot_at:captured_at")
-    .neq("source_url", "")
-    .order("captured_at", { ascending: false })
-    .limit(2000);
-  if (body.tenant_id) query = query.eq("tenant_id", body.tenant_id);
+  // ── The work list ───────────────────────────────────────────────────
+  // Ordered by STALENESS, least recently crawled first. It used to be ordered
+  // newest-captured_at first and cut at `limit`; crawling a vehicle writes a
+  // snapshot, which lifted that VIN straight back to the top, so the same head
+  // of the list was re-crawled every night and every vehicle past the cut was
+  // never reached again. A dealer with more inventory than `limit` had a fixed
+  // set of cars that were silently never scraped.
+  //
+  // advertised_price_crawl_queue does the latest-per-VIN pick server-side over
+  // the WHOLE table, because a vehicle whose last snapshot has aged out of a
+  // client-side window is exactly the vehicle that needs finding.
+  const seen = new Set<string>();
+  const rows: LatestRow[] = [];
+  const pricedKeys = new Set<string>();
 
-  const { data: all, error: listErr } = await query;
+  const { data: queued, error: listErr } = await admin.rpc("advertised_price_crawl_queue", {
+    _tenant_id: body.tenant_id ?? null,
+    // Over-fetch so pricedKeys can tell a never-priced vehicle from one that is
+    // simply below today's cut — a seed row must not be created for a VIN that
+    // already has a snapshot.
+    _limit: Math.max(limit * 4, 2000),
+  });
   if (listErr) {
     return new Response(JSON.stringify({ error: listErr.message }), {
       status: 500,
@@ -864,26 +873,35 @@ serve(async (req) => {
     });
   }
 
-  const seen = new Set<string>();
-  const rows: LatestRow[] = [];
-  for (const r of (all || []) as LatestRow[]) {
+  type QueueRow = {
+    id: string; tenant_id: string; store_id: string | null; vin: string;
+    source_url: string | null; source_channel: string | null;
+    advertised_price: number | null; captured_at: string | null;
+  };
+  for (const q of (queued || []) as QueueRow[]) {
+    const key = q.tenant_id + "|" + (q.vin || "").toUpperCase();
+    pricedKeys.add(key);
     // Single-VIN re-scrape (Ready-for-Signatures verify) only touches that VIN.
-    if (targetVin && (r.vin || "").toUpperCase() !== targetVin) continue;
-    const k = r.tenant_id + "|" + (r.vin || "").toUpperCase();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    rows.push(r);
-    if (rows.length >= limit) break;
+    if (targetVin && (q.vin || "").toUpperCase() !== targetVin) continue;
+    if (seen.has(key) || rows.length >= limit) continue;
+    seen.add(key);
+    rows.push({
+      id: q.id, tenant_id: q.tenant_id, store_id: q.store_id || "", vin: q.vin,
+      source_url: q.source_url || "", source_label: q.source_channel || "website",
+      advertised_price: q.advertised_price ?? 0, snapshot_at: q.captured_at,
+    });
   }
 
   // Seed pass: synced vehicle_listings that carry a VDP source_url but have no
   // advertised_prices snapshot yet (MarketCheck delivered the car without a feed
   // price). Crawl the dealer's own VDP to capture a FIRST advertised price.
-  if (rows.length < limit) {
-    const pricedKeys = new Set<string>();
-    for (const r of (all || []) as LatestRow[]) {
-      pricedKeys.add(r.tenant_id + "|" + (r.vin || "").toUpperCase());
-    }
+  //
+  // Runs unconditionally, and seeds go to the FRONT. It used to be gated on
+  // `rows.length < limit`, so once there were `limit` priced VINs a car that
+  // had never been priced could never enter the queue at all — no snapshot, so
+  // nothing to age, so no way in. A vehicle with no price at all is the most
+  // urgent thing on the list, not the least.
+  {
     let seedQuery = admin
       .from("vehicle_listings")
       .select("tenant_id, store_id, vin, source_url")
@@ -892,6 +910,7 @@ serve(async (req) => {
       .limit(2000);
     if (body.tenant_id) seedQuery = seedQuery.eq("tenant_id", body.tenant_id);
     const { data: seedRows } = await seedQuery;
+    const seeds: LatestRow[] = [];
     for (const s of (seedRows || []) as Array<{ tenant_id: string; store_id: string | null; vin: string; source_url: string }>) {
       const vin = (s.vin || "").toUpperCase();
       if (!vin || !s.source_url) continue;
@@ -899,22 +918,53 @@ serve(async (req) => {
       const k = s.tenant_id + "|" + vin;
       if (pricedKeys.has(k) || seen.has(k)) continue;
       seen.add(k);
-      rows.push({
+      seeds.push({
         id: "", tenant_id: s.tenant_id, store_id: s.store_id || "", vin: s.vin,
         source_url: s.source_url, source_label: "website", advertised_price: 0,
         snapshot_at: null, seed: true,
       });
-      if (rows.length >= limit) break;
     }
+    rows.unshift(...seeds);
+    if (rows.length > limit) rows.length = limit;
   }
+
+  // A single-VIN re-scrape that matched nothing means the vehicle has no
+  // address to crawl — no advertised_prices row carrying a source_url and no
+  // source_url on the listing. Reported plainly: "picked 0" looked identical to
+  // a successful no-op, which is how a car sits un-scraped for weeks while the
+  // nightly run reports success.
+  if (targetVin && rows.length === 0) {
+    return new Response(JSON.stringify({
+      ok: true,
+      picked: 0,
+      vin: targetVin,
+      reason: "no_source_url",
+      detail: "This VIN has no VDP url to crawl. Seed one from Admin > Price Integrity (\"Seed website URLs\"), or set vehicle_listings.source_url for it.",
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const queueDepth = pricedKeys.size + rows.filter((r) => r.seed).length;
 
   let updated = 0;
   let unchanged = 0;
   let failed = 0;
   let skipped = 0;
   let discovered = 0;
+  let processed = 0;
+  let ranOutOfTime = false;
+
+  // Each row is a serial fetch with a 12s timeout, optionally a Firecrawl
+  // render on top. 500 of those cannot finish inside an edge function's wall
+  // clock, so the run used to be killed mid-loop — no summary, no audit row,
+  // and no signal that the tail of the list had not been touched. Stopping
+  // deliberately keeps the reporting honest; the staleness ordering means
+  // whatever is left is simply first in line tomorrow.
+  const RUN_BUDGET_MS = 220_000;
+  const startedAt = Date.now();
 
   for (const row of rows) {
+    if (Date.now() - startedAt > RUN_BUDGET_MS) { ranOutOfTime = true; break; }
+    processed++;
     try {
       if (!isUrlSafe(row.source_url)) {
         failed++;
@@ -1295,6 +1345,12 @@ serve(async (req) => {
   return new Response(JSON.stringify({
     ok: true,
     picked: rows.length,
+    processed,
+    // Coverage, stated plainly. "picked 500, updated 40" never said whether the
+    // other vehicles were fine or simply never looked at.
+    queue_depth: queueDepth,
+    unvisited: Math.max(queueDepth - processed, 0),
+    ran_out_of_time: ranOutOfTime,
     updated,
     unchanged,
     failed,

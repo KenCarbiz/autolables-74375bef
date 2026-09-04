@@ -5,6 +5,7 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { ShieldCheck, AlertTriangle, ExternalLink, Globe } from "lucide-react";
 import { toast } from "sonner";
 import CronStatusBadge from "@/components/admin/CronStatusBadge";
+import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
 
 // PriceIntegrityPanel — reconciles each VIN's lot/sticker price
 // (vehicle_listings.price) against the latest advertised price per
@@ -17,6 +18,13 @@ const TOLERANCE = 1;
 
 interface Listing { vin: string; price: number | null; status: string }
 interface AdRow { vin: string; advertised_price: number; source_channel: string; source_url: string | null; captured_at: string }
+interface VehicleSeedRow {
+  vin: string;
+  mc_attributes: Record<string, unknown> | null;
+  sticker_snapshot: Record<string, unknown> | null;
+  price: number | null;
+  condition: string | null;
+}
 interface Mismatch { vin: string; lot: number; advertised: number; channel: string; delta: number; url: string | null }
 
 const fmtMoney = (n: number) => "$" + Math.round(n).toLocaleString();
@@ -51,32 +59,51 @@ export const PriceIntegrityPanel = () => {
     }
     localStorage.setItem(patternKey, p);
     setSeeding(true);
+    // Every live vehicle, priced or not. The price filter used to be
+    // `.not("price", "is", null)`, which silently excluded exactly the cars a
+    // price crawl is for — a new arrival the feed delivered without a price
+    // got no source_url, so the nightly crawler had no target and it was never
+    // scraped. advertised_price falls back to 0 as a "no baseline yet" marker,
+    // which is what a seed row already means to the crawler.
     const { data: listings } = await (supabase as any)
       .from("vehicle_listings")
-      .select("vin, sticker_snapshot, price, condition")
-      .not("price", "is", null)
+      .select("vin, mc_attributes, sticker_snapshot, price, condition")
       .limit(1000);
     // Tokens: {CONDITION} → new/used, {VIN} → uppercase, {vin} → lowercase
     // (dealer VDP urls are usually lowercase), {STOCK} → stock number.
-    const rows = ((listings as { vin: string; sticker_snapshot: Record<string, unknown> | null; price: number; condition: string | null }[]) || [])
-      .filter((l) => l.vin)
-      .map((l) => ({
-        vin: l.vin.toUpperCase(),
-        source_channel: "website",
-        source_url: p
-          .replace(/\{CONDITION\}/gi, l.condition === "new" ? "new" : "used")
-          .replace(/\{VIN\}/g, l.vin.toUpperCase())
-          .replace(/\{vin\}/g, l.vin.toLowerCase())
-          .replace(/\{STOCK\}/gi, (l.sticker_snapshot?.["stock_number"] as string) || ""),
-        advertised_price: l.price,
-        captured_by: "seed",
-        notes: "Seeded website URL for nightly crawl",
-      }));
-    if (rows.length === 0) { setSeeding(false); toast.error("No priced inventory to seed."); return; }
+    const needsStock = /\{stock\}/i.test(p);
+    const all = ((listings as VehicleSeedRow[]) || []).filter((l) => l.vin);
+    // A pattern that needs a stock number and a vehicle that has none produced
+    // a URL with the token replaced by an empty string — a real-looking address
+    // that 404s, re-fetched every night, recorded as a generic failure. Skipped
+    // and counted instead, so the gap is visible rather than disguised.
+    const seedable = needsStock ? all.filter((l) => !!vehicleStockNumber(l)) : all;
+    const withoutStock = all.length - seedable.length;
+    const rows = seedable.map((l) => ({
+      vin: l.vin.toUpperCase(),
+      source_channel: "website",
+      source_url: p
+        .replace(/\{CONDITION\}/gi, l.condition === "new" ? "new" : "used")
+        .replace(/\{VIN\}/g, l.vin.toUpperCase())
+        .replace(/\{vin\}/g, l.vin.toLowerCase())
+        .replace(/\{STOCK\}/gi, vehicleStockNumber(l) || ""),
+      advertised_price: l.price ?? 0,
+      captured_by: "seed",
+      notes: "Seeded website URL for nightly crawl",
+    }));
+    if (rows.length === 0) {
+      setSeeding(false);
+      toast.error(needsStock && withoutStock
+        ? `No inventory to seed — ${withoutStock} vehicle(s) have no stock number for the {STOCK} token.`
+        : "No inventory to seed.");
+      return;
+    }
     const { error } = await (supabase as any).from("advertised_prices").insert(rows);
     setSeeding(false);
     if (error) { toast.error("Seed failed: " + error.message); return; }
-    toast.success(`Seeded ${rows.length} website URL(s). The nightly crawler will verify them.`);
+    toast.success(withoutStock
+      ? `Seeded ${rows.length} website URL(s). ${withoutStock} skipped — no stock number for the {STOCK} token.`
+      : `Seeded ${rows.length} website URL(s). The nightly crawler will verify them.`);
   };
 
   useEffect(() => {
