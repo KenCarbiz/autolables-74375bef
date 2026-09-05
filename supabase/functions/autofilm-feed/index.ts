@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  shapeLotRow, identityIncomplete, type LotFeedFile,
+} from "../_shared/lotFeedRow.ts";
 
 // ──────────────────────────────────────────────────────────────
 // autofilm-feed
@@ -18,12 +21,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 // Returns: {
 //   total: number,           // live vehicles for the tenant
 //   next_cursor: string | null, // pass back as ?cursor= to continue
-//   vehicles: [{ vin, ymm, trim, condition, mileage, stock_number,
-//     status, price, advertised_price_before_doc, doc_fee,
-//     website_sale_price, dealer_discount, retail_cash, market_value,
-//     market_position, hero_image_url, photo_count,
-//     passport_url, oem_sticker_url, factory_sticker_url, updated_at }]
+//   identity_incomplete: number, // rows with no discrete make (see below)
+//   vehicles: [ the listing row, minus LOT_FEED_DENY, plus discrete
+//     year/make/model, trim, stock_number, body_style, msrp, market_value,
+//     savings, photos[], passport_url, documents_url, window_sticker_url ]
 // }
+//
+// The row goes out whole rather than field by field. Naming fields is what
+// shipped 140 vehicles with no `make` — the consumer filters on
+// make IS NOT NULL, so every one synced clean and was then invisible on every
+// screen, which looks identical to the feed not working at all.
 //
 // Security model:
 //   - Shared-secret key, timing-safe compared. Read-only; the key
@@ -89,16 +96,15 @@ serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
+    // select("*"), not a named list. The named list is what shipped 140
+    // vehicles with no `make`: nothing named it, so nothing carried it, and
+    // AutoFilm's screens filter on make IS NOT NULL — every car synced clean
+    // and was then invisible. What may NOT go out is named instead, in
+    // LOT_FEED_DENY, where withholding a field is a deliberate act.
     const base = () =>
       admin
         .from("vehicle_listings")
-        .select(
-          "vin, ymm, trim, condition, mileage, status, price," +
-          " advertised_price_before_doc, doc_fee, website_sale_price," +
-          " dealer_discount, retail_cash, market_value, market_position," +
-          " hero_image_url, photo_count, slug, oem_sticker_url," +
-          " factory_sticker_url, mc_attributes, updated_at",
-        )
+        .select("*")
         .eq("tenant_id", tenantId)
         .is("archived_at", null)
         .in("status", ["published", "active"]);
@@ -116,35 +122,42 @@ serve(async (req) => {
     const { data, error } = await pageQuery;
     if (error) return json(500, { error: error.message });
 
-    const rows = data ?? [];
+    const rows = (data ?? []) as Record<string, unknown>[];
     const hasMore = rows.length > limit;
-    const vehicles = rows.slice(0, limit).map((r) => ({
-      vin: r.vin,
-      ymm: r.ymm,
-      trim: r.trim,
-      condition: r.condition,
-      mileage: r.mileage,
-      status: r.status,
-      stock_number: (r.mc_attributes as Record<string, unknown> | null)?.stock_no ?? null,
-      price: r.price,
-      advertised_price_before_doc: r.advertised_price_before_doc,
-      doc_fee: r.doc_fee,
-      website_sale_price: r.website_sale_price,
-      dealer_discount: r.dealer_discount,
-      retail_cash: r.retail_cash,
-      market_value: r.market_value,
-      market_position: r.market_position,
-      hero_image_url: r.hero_image_url,
-      photo_count: r.photo_count,
-      passport_url: r.slug ? `https://autolabels.io/v/${r.slug}` : null,
-      oem_sticker_url: r.oem_sticker_url,
-      factory_sticker_url: r.factory_sticker_url,
-      updated_at: r.updated_at,
-    }));
+    const page = rows.slice(0, limit);
+
+    // vehicle_listings holds neither the discrete year/make/model nor the DMS
+    // stock number as columns; vehicle_files holds both. marketcheck-sync
+    // composes ymm from exactly these three and writes them here at the same
+    // time, so they are read rather than parsed back out of the display string.
+    const filesByVin = new Map<string, LotFeedFile>();
+    const vins = page.map((r) => r.vin).filter(Boolean) as string[];
+    if (vins.length) {
+      const { data: files } = await admin
+        .from("vehicle_files")
+        .select("vin, year, make, model, trim, stock_number")
+        .eq("tenant_id", tenantId)
+        .in("vin", vins);
+      for (const f of (files ?? []) as (LotFeedFile & { vin: string })[]) {
+        if (f.vin) filesByVin.set(f.vin, f);
+      }
+    }
+
+    const vehicles = page.map((r) =>
+      shapeLotRow(r, filesByVin.get(String(r.vin)) ?? null)
+    );
+
+    // A vehicle with no discrete make is filtered off the consumer's screens.
+    // Counted here so that shows up as a number in the response rather than as
+    // an empty page nobody can explain.
+    const identity_incomplete = page.filter((r) =>
+      identityIncomplete(r, filesByVin.get(String(r.vin)) ?? null)
+    ).length;
 
     return json(200, {
       total: count ?? 0,
-      next_cursor: hasMore ? vehicles[vehicles.length - 1]?.vin ?? null : null,
+      next_cursor: hasMore ? String(vehicles[vehicles.length - 1]?.vin ?? "") || null : null,
+      identity_incomplete,
       vehicles,
     });
   } catch (e) {

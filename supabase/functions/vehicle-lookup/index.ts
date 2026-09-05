@@ -15,6 +15,7 @@
 // Both carry a canonical passport_url of https://autolabels.io/v/<slug>.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { shapeLotRow, type LotFeedFile } from "../_shared/lotFeedRow.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -147,84 +148,11 @@ const shape = (r: any, stockFromFiles?: string | null) => {
 // clean answer for weeks — a 132-car lot syncing as 5 cars looks exactly like a
 // 5-car dealership.
 //
-// The list rows are the LISTING ROW ITSELF, minus a denylist, rather than a
-// projection picked field by field. A projection drifts the first time somebody
-// adds a column, and the drift is silent: a field the feed forgot looks
-// identical to a vehicle that has no value for it. Allow-by-default inverts
-// that — a new column reaches AutoFilm on its own, and the only way to withhold
-// one is to name it here deliberately.
-const LIST_DENY = new Set([
-  // Credential.
-  "install_token",
-  // Internal actors and operational notes — not the sister app's business and
-  // never a customer's.
-  "created_by", "assigned_agent_id",
-  "recall_override_by", "recall_override_at", "recall_override_notes",
-  "price_parse_notes",
-  // Licensed or bulky provider payloads. Black Book in particular is paid
-  // valuation data; redistributing it to another product is a licensing
-  // question, and AutoFilm renders none of it.
-  "blackbook", "mc_raw", "market_payload", "comparables",
-  "history_payload", "recall_payload",
-]);
-
+// The row shape comes from _shared/lotFeedRow.ts, which autofilm-feed also
+// uses. Two endpoints that both answer "the whole lot" and each shape their own
+// rows is how one of them ends up missing `make` while the other carries it.
 const MAX_LIST_LIMIT = 500;
 const DEFAULT_LIST_LIMIT = 200;
-
-// A page renders in a browser, so an http URL is a mixed-content block. Dropped
-// rather than upgraded — guessing that a host serves TLS is how you trade a
-// blocked image for a broken one.
-const httpsOnly = (u: unknown): string | null =>
-  typeof u === "string" && /^https:\/\//i.test(u.trim()) ? u.trim() : null;
-
-// The window sticker AutoFilm can persist and re-serve.
-//
-// Deliberately NOT the generated factory sticker's PDF: that one is filed in a
-// private bucket and served through short-lived signed URLs, so a stored copy
-// would open fine the day it syncs and return InvalidJWT a week later — the
-// exact failure the dealer side just had to be fixed for. The OEM document is
-// signed for five years and is the genuine Monroney, so it is the one that
-// travels. Everything else routes to the passport documents page, which mints
-// its own URL per view and carries the reproduction disclosure that a raw PDF
-// deep link would strip.
-const windowStickerUrl = (r: any): string | null => httpsOnly(r.oem_sticker_url);
-
-const documentsUrl = (slug: string | null): string | null =>
-  slug ? `${PASSPORT_BASE}/${slug}/documents` : null;
-
-const shapeListRow = (r: any, stockFromFiles?: string | null) => {
-  const { year, make, model } = splitYmm(r.ymm);
-  const slug = r.slug || null;
-  const mc = (r.mc_attributes || {}) as Record<string, unknown>;
-
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(r)) {
-    if (LIST_DENY.has(k)) continue;
-    out[k] = v;
-  }
-
-  // Derived on top of the row, never in place of it.
-  out.year = year ?? null;
-  out.make = make ?? null;
-  out.model = model ?? null;
-  out.photos = normalizePhotos(r.photos);
-  out.stock = pickStock(r) ?? stockFromFiles ?? null;
-  out.stock_number = out.stock;
-  out.passport_url = slug ? `${PASSPORT_BASE}/${slug}` : null;
-  out.documents_url = documentsUrl(slug);
-
-  // The four the passport shows and the feed never carried.
-  out.window_sticker_url = windowStickerUrl(r);
-  // MSRP is not a column; the passport reads it off mc_attributes and so does
-  // this, from the same place, so the two cannot disagree.
-  out.msrp = typeof mc.msrp === "number" ? mc.msrp : null;
-  out.market_value = r.market_value ?? null;
-  // Stated, never computed. A savings figure derived from msrp - price would be
-  // our arithmetic presented as the dealership's claim.
-  out.savings = r.dealer_discount ?? null;
-
-  return out;
-};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
@@ -313,19 +241,18 @@ Deno.serve(async (req) => {
       }
       const rows = (rowsRes.data as any[]) || [];
 
-      // vehicle_listings has no stock_number column; the DMS number lives on
-      // vehicle_files. Backfilled per page so a caller keying on stock always
-      // gets one where the dealer records it.
-      const stockByVin = new Map<string, string>();
+      // vehicle_listings carries neither the discrete year/make/model nor the
+      // DMS stock number as columns; vehicle_files carries both.
+      const filesByVin = new Map<string, LotFeedFile>();
       const vins = rows.map((r) => r.vin).filter(Boolean);
       if (vins.length) {
         const filesRes = await (supabase as any)
           .from("vehicle_files")
-          .select("vin, stock_number")
+          .select("vin, year, make, model, trim, stock_number")
           .or(tenantFilter)
           .in("vin", vins);
         for (const f of (filesRes?.data as any[]) || []) {
-          if (f.vin && f.stock_number) stockByVin.set(f.vin, f.stock_number);
+          if (f.vin) filesByVin.set(f.vin, f as LotFeedFile);
         }
       }
 
@@ -336,7 +263,7 @@ Deno.serve(async (req) => {
         // Derived from the count, so it stays honest even when the page size
         // was capped below what the caller asked for.
         has_more: from + rows.length < total,
-        matches: rows.map((r) => shapeListRow(r, stockByVin.get(r.vin) ?? null)),
+        matches: rows.map((r) => shapeLotRow(r, filesByVin.get(r.vin) ?? null)),
       });
     }
 
