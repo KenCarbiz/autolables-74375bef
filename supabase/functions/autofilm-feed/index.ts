@@ -103,8 +103,12 @@ serve(async (req) => {
         .is("archived_at", null)
         .in("status", ["published", "active"]);
 
-    const { count, error: countErr } = await base()
-      .select("vin", { count: "exact", head: true });
+    const { count, error: countErr } = await admin
+      .from("vehicle_listings")
+      .select("vin", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .is("archived_at", null)
+      .in("status", ["published", "active"]);
     if (countErr) return json(500, { error: countErr.message });
 
     let pageQuery = base().order("vin", { ascending: true }).limit(limit + 1);
