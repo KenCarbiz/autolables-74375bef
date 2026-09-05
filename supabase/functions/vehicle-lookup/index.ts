@@ -293,7 +293,7 @@ Deno.serve(async (req) => {
       }
     };
 
-    const safe = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
+    const safe = async (fn: () => Promise<any>): Promise<any> => {
       try { return await fn(); } catch { return null; }
     };
 
