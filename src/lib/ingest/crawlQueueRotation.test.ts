@@ -96,7 +96,7 @@ describe("the seeder gives every live vehicle a target", () => {
     // producing a real-looking address that 404s every night and is recorded
     // as a generic failure.
     expect(panel).toMatch(/const needsStock = \/\\\{stock\\\}\/i\.test\(p\)/);
-    expect(panel).toMatch(/needsStock \? all\.filter\(\(l\) => !!vehicleStockNumber\(l\)\) : all/);
+    expect(panel).toMatch(/needsStock \? all\.filter\(\(l\) => !!stockFor\(l\)\) : all/);
   });
 
   it("finds the stock number wherever it is filed", () => {
@@ -104,6 +104,16 @@ describe("the seeder gives every live vehicle a target", () => {
     // places a stock number lands.
     expect(panel).toMatch(/import \{ vehicleStockNumber \}/);
     expect(panel).not.toMatch(/sticker_snapshot\?\.\["stock_number"\] as string/);
+  });
+
+  it("reads vehicle_files, where the number often ONLY lives", () => {
+    // Harte's 2027 QX80: mc_attributes.stock_no null, sticker_snapshot null,
+    // vehicle_files.stock_number "4648N". A seeder reading the listing alone
+    // finds nothing and skips exactly the car that needs a URL most.
+    expect(panel).toMatch(/from\("vehicle_files"\)/);
+    expect(panel).toMatch(/const stockFor = /);
+    expect(panel).toMatch(/needsStock \? all\.filter\(\(l\) => !!stockFor\(l\)\) : all/);
+    expect(panel).toContain('stockFor(l) || ""');
   });
 
   it("says how many it skipped instead of reporting a clean seed", () => {

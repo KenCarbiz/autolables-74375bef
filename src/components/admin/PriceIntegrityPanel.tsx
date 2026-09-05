@@ -69,6 +69,23 @@ export const PriceIntegrityPanel = () => {
       .from("vehicle_listings")
       .select("vin, mc_attributes, sticker_snapshot, price, condition")
       .limit(1000);
+    // vehicle_listings has no stock_number column. On this lot the number is
+    // frequently ONLY on vehicle_files — mc_attributes.stock_no and the sticker
+    // snapshot are both null for it — so a seeder reading the listing alone
+    // finds nothing and skips exactly the cars that need a URL most.
+    const { data: files } = await (supabase as any)
+      .from("vehicle_files")
+      .select("vin, stock_number")
+      .limit(2000);
+    const stockByVin = new Map<string, string>();
+    for (const f of (files as { vin: string; stock_number: string | null }[]) || []) {
+      const sn = (f?.stock_number || "").trim();
+      if (f?.vin && sn) stockByVin.set(f.vin.toUpperCase(), sn);
+    }
+    // The one derivation, plus the file row the listing cannot see.
+    const stockFor = (l: VehicleSeedRow): string | null =>
+      vehicleStockNumber(l) ?? stockByVin.get(l.vin.toUpperCase()) ?? null;
+
     // Tokens: {CONDITION} → new/used, {VIN} → uppercase, {vin} → lowercase
     // (dealer VDP urls are usually lowercase), {STOCK} → stock number.
     const needsStock = /\{stock\}/i.test(p);
@@ -77,7 +94,7 @@ export const PriceIntegrityPanel = () => {
     // a URL with the token replaced by an empty string — a real-looking address
     // that 404s, re-fetched every night, recorded as a generic failure. Skipped
     // and counted instead, so the gap is visible rather than disguised.
-    const seedable = needsStock ? all.filter((l) => !!vehicleStockNumber(l)) : all;
+    const seedable = needsStock ? all.filter((l) => !!stockFor(l)) : all;
     const withoutStock = all.length - seedable.length;
     const rows = seedable.map((l) => ({
       vin: l.vin.toUpperCase(),
@@ -86,7 +103,7 @@ export const PriceIntegrityPanel = () => {
         .replace(/\{CONDITION\}/gi, l.condition === "new" ? "new" : "used")
         .replace(/\{VIN\}/g, l.vin.toUpperCase())
         .replace(/\{vin\}/g, l.vin.toLowerCase())
-        .replace(/\{STOCK\}/gi, vehicleStockNumber(l) || ""),
+        .replace(/\{STOCK\}/gi, stockFor(l) || ""),
       advertised_price: l.price ?? 0,
       captured_by: "seed",
       notes: "Seeded website URL for nightly crawl",
