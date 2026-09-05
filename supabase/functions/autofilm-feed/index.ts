@@ -26,7 +26,8 @@ import {
 //   identity_incomplete: number, // rows with no discrete make (see below)
 //   vehicles: [ the listing row, minus LOT_FEED_DENY, plus discrete
 //     year/make/model, trim, stock_number, body_style, msrp, market_value,
-//     savings, photos[], passport_url, documents_url, window_sticker_url ]
+//     savings, photos[], passport_url, documents_url, window_sticker_url,
+//     window_sticker_kind ]
 // }
 //
 // The row goes out whole rather than field by field. Naming fields is what
@@ -151,8 +152,31 @@ serve(async (req) => {
       }
     }
 
+    // Which of these vehicles actually have a published factory sticker on
+    // file. The oem_sticker_url column is empty on every row of this lot while
+    // 102 of 140 have a filed, published PDF — reading the column alone
+    // reported "no window sticker" for three quarters of the cars that have
+    // one.
+    const stickerVehicleIds = new Set<string>();
+    const ids = page.map((r) => r.id).filter(Boolean) as string[];
+    if (ids.length) {
+      const { data: docs } = await admin
+        .from("generated_documents")
+        .select("vehicle_id")
+        .eq("tenant_id", tenantId)
+        .eq("document_type", "factory_sticker")
+        .eq("document_status", "published")
+        .in("vehicle_id", ids);
+      for (const d of (docs ?? []) as { vehicle_id: string | null }[]) {
+        if (d.vehicle_id) stickerVehicleIds.add(d.vehicle_id);
+      }
+    }
+
     const vehicles = page.map((r) =>
-      shapeLotRow(r, filesByVin.get(String(r.vin)) ?? null)
+      shapeLotRow(r, filesByVin.get(String(r.vin)) ?? null, {
+        supabaseUrl,
+        hasFactorySticker: stickerVehicleIds.has(String(r.id)),
+      })
     );
 
     // A vehicle with no discrete make is filtered off the consumer's screens.

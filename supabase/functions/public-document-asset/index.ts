@@ -66,6 +66,12 @@ serve(async (req) => {
     const slug = String(body.slug || "").trim();
     const documentType = String(body.document_type || "factory_sticker").trim();
     const assetType = String(body.asset_type || "pdf").trim();
+    // ?redirect=1 makes this a STABLE ADDRESS for a document rather than a
+    // JSON lookup: one URL per vehicle that a sister app or a customer page can
+    // store and link, resolving to a freshly signed object on every visit.
+    // The signed URL itself must never be the stored address — that is what
+    // made published vehicles serve dead links once the signature aged out.
+    const wantsRedirect = body.redirect === "1" || body.redirect === "true" || body.redirect === true;
 
     if (!SLUG_RE.test(slug)) return json({ error: "invalid_slug" }, 400);
     if (!PUBLIC_DOCUMENT_TYPES.has(documentType)) return json({ error: "unsupported_document_type" }, 400);
@@ -94,6 +100,19 @@ serve(async (req) => {
       .from(row.storage_bucket)
       .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS);
     if (signErr || !signed?.signedUrl) return json({ error: "not_available" }, 404);
+
+    if (wantsRedirect) {
+      // 302, not 301: the target is a short-lived credential and must never be
+      // cached by a browser or a CDN as this URL's permanent answer.
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...cors,
+          Location: signed.signedUrl,
+          "Cache-Control": "no-store",
+        },
+      });
+    }
 
     return json({
       success: true,

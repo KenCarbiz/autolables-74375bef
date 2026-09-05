@@ -256,6 +256,20 @@ Deno.serve(async (req) => {
         }
       }
 
+      const stickerVehicleIds = new Set<string>();
+      const ids = rows.map((r) => r.id).filter(Boolean);
+      if (ids.length) {
+        const docsRes = await (supabase as any)
+          .from("generated_documents")
+          .select("vehicle_id")
+          .eq("document_type", "factory_sticker")
+          .eq("document_status", "published")
+          .in("vehicle_id", ids);
+        for (const d of (docsRes?.data as any[]) || []) {
+          if (d.vehicle_id) stickerVehicleIds.add(String(d.vehicle_id));
+        }
+      }
+
       return json(200, {
         total,
         page,
@@ -263,7 +277,10 @@ Deno.serve(async (req) => {
         // Derived from the count, so it stays honest even when the page size
         // was capped below what the caller asked for.
         has_more: from + rows.length < total,
-        matches: rows.map((r) => shapeLotRow(r, filesByVin.get(r.vin) ?? null)),
+        matches: rows.map((r) => shapeLotRow(r, filesByVin.get(r.vin) ?? null, {
+          supabaseUrl: Deno.env.get("SUPABASE_URL") ?? "",
+          hasFactorySticker: stickerVehicleIds.has(String(r.id)),
+        })),
       });
     }
 

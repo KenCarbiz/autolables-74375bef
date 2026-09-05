@@ -167,20 +167,77 @@ describe("both lot endpoints shape rows the same way", () => {
   });
 });
 
-describe("the window sticker a consumer may persist", () => {
-  it("is the OEM document, https only", () => {
-    expect(shapeLotRow({ vin: "1", oem_sticker_url: "https://x/s.pdf" }).window_sticker_url).toBe("https://x/s.pdf");
-    expect(shapeLotRow({ vin: "1", oem_sticker_url: "http://x/s.pdf" }).window_sticker_url).toBeNull();
+describe("the window sticker a consumer may link", () => {
+  const SB = "https://proj.supabase.co";
+  const resolver = (slug: string) =>
+    `${SB}/functions/v1/public-document-asset?slug=${slug}&document_type=factory_sticker&asset_type=pdf&redirect=1`;
+
+  // Mirrors windowSticker().
+  const sticker = (row: Record<string, unknown>, opts?: { hasFactorySticker?: boolean }) => {
+    const oem = typeof row.oem_sticker_url === "string" && /^https:\/\//i.test(row.oem_sticker_url)
+      ? row.oem_sticker_url : null;
+    if (oem) return { url: oem, kind: "oem" };
+    if (opts?.hasFactorySticker && typeof row.slug === "string" && row.slug) {
+      return { url: resolver(row.slug), kind: "reproduction" };
+    }
+    return { url: null, kind: null };
+  };
+
+  it("prefers the genuine OEM document", () => {
+    const s2 = sticker({ oem_sticker_url: "https://x/oem.pdf", slug: "a" }, { hasFactorySticker: true });
+    expect(s2.url).toBe("https://x/oem.pdf");
+    expect(s2.kind).toBe("oem");
   });
 
-  it("is never the expiring generated sticker", () => {
-    // Private bucket, short-lived signed URL: a stored copy opens on sync day
-    // and returns InvalidJWT a week later.
-    expect(shared).toMatch(/export const windowStickerUrl = \(row: any\): string \| null =>\s*\n?\s*httpsOnly\(row\?\.oem_sticker_url\)/);
+  it("reaches the filed build record the sticker column never pointed at", () => {
+    // oem_sticker_url is null on all 140 of Harte's live vehicles while 102
+    // have a published factory sticker PDF filed. Reading the column alone
+    // reported "no window sticker" for three quarters of the lot that has one.
+    const s2 = sticker({ slug: "acura-tlx-624253" }, { hasFactorySticker: true });
+    expect(s2.url).toBe(resolver("acura-tlx-624253"));
+    expect(s2.kind).toBe("reproduction");
   });
 
-  it("still hands over a durable documents address", () => {
-    expect(shared).toMatch(/\/documents`/);
+  it("says nothing rather than guessing when no document is filed", () => {
+    expect(sticker({ slug: "a" }, { hasFactorySticker: false })).toEqual({ url: null, kind: null });
+  });
+
+  it("labels a reproduction as one", () => {
+    // A regenerated build record is not an original OEM-issued Monroney label
+    // and must never be presented as one. The kind travels with the URL rather
+    // than leaving the consumer to guess.
+    expect(shared).toMatch(/export type WindowStickerKind = "oem" \| "reproduction"/);
+    expect(feed).toMatch(/window_sticker_kind/);
+  });
+
+  it("is an address, never a signature", () => {
+    // The signed URL expires; storing one is what made published vehicles
+    // serve dead links once it aged out.
+    expect(shared).toMatch(/redirect=1/);
+    expect(shared).not.toMatch(/createSignedUrl/);
+  });
+
+  it("rejects a non-https OEM url", () => {
+    expect(sticker({ oem_sticker_url: "http://x/oem.pdf" }).url).toBeNull();
+  });
+
+  it("resolves through a route that re-checks publication on every visit", () => {
+    const asset = readFileSync(join(fnDir, "public-document-asset/index.ts"), "utf8");
+    expect(asset).toMatch(/const wantsRedirect =/);
+    // 302, not 301: the target is a short-lived credential and must not be
+    // cached as this URL's permanent answer.
+    expect(asset).toMatch(/status: 302/);
+    expect(asset).toMatch(/"Cache-Control": "no-store"/);
+    // The gate is unchanged — still published-only, still slug-keyed.
+    expect(asset).toMatch(/get_published_document_asset/);
+  });
+
+  it("both endpoints resolve stickers the same way", () => {
+    for (const [name, src] of [["autofilm-feed", feed], ["vehicle-lookup", lookup]] as const) {
+      expect(src, `${name} must look up published stickers`)
+        .toMatch(/document_status", "published"\)/);
+      expect(src, `${name} must pass hasFactorySticker`).toMatch(/hasFactorySticker:/);
+    }
   });
 });
 

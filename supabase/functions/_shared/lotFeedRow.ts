@@ -89,17 +89,47 @@ export const identityIncomplete = (row: any, file?: LotFeedFile | null): boolean
   !lotIdentity(row, file).make;
 
 /**
- * The window sticker a consumer may persist.
+ * A stable address for this vehicle's filed factory sticker.
  *
- * Deliberately NOT the generated factory sticker: that lives in a private
- * bucket behind short-lived signed URLs, so a stored copy opens on sync day
- * and returns InvalidJWT a week later. The OEM document is signed for five
- * years and is the genuine Monroney, so it is the one that travels. Everything
- * else routes to the passport documents page, which mints per view and carries
- * the reproduction disclosure a raw PDF deep link would strip.
+ * NOT the signed URL itself. The PDF lives in a private bucket and every
+ * signature expires; storing one is what made published vehicles serve dead
+ * links once it aged out. This address is permanent and resolves to a freshly
+ * signed object on each visit, and public-document-asset re-checks on every
+ * call that the document is still published.
  */
-export const windowStickerUrl = (row: any): string | null =>
-  httpsOnly(row?.oem_sticker_url);
+export const stickerResolverUrl = (supabaseUrl: string, slug: unknown): string | null => {
+  if (!supabaseUrl || typeof slug !== "string" || !slug) return null;
+  return `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/public-document-asset`
+    + `?slug=${encodeURIComponent(slug)}&document_type=factory_sticker&asset_type=pdf&redirect=1`;
+};
+
+/** What the window sticker actually IS. A regenerated build record is not an
+ *  original OEM-issued Monroney label and must never be labelled as one, so the
+ *  kind travels with the URL rather than leaving the consumer to guess. */
+export type WindowStickerKind = "oem" | "reproduction";
+
+/**
+ * The window sticker a consumer may link, and what it is.
+ *
+ * The OEM document wins when there is one: it is the genuine Monroney and its
+ * URL is signed for five years. Otherwise, when this vehicle has a published
+ * factory build record on file, the stable resolver above — 102 of Harte's 140
+ * live vehicles have one filed, while the oem_sticker_url column is empty on
+ * every single row, so reading that column alone reported "no window sticker"
+ * for three quarters of the lot that has one.
+ */
+export function windowSticker(
+  row: any,
+  opts?: { supabaseUrl?: string; hasFactorySticker?: boolean },
+): { url: string | null; kind: WindowStickerKind | null } {
+  const oem = httpsOnly(row?.oem_sticker_url);
+  if (oem) return { url: oem, kind: "oem" };
+  if (opts?.hasFactorySticker) {
+    const url = stickerResolverUrl(opts.supabaseUrl ?? "", row?.slug);
+    if (url) return { url, kind: "reproduction" };
+  }
+  return { url: null, kind: null };
+}
 
 export const documentsUrl = (slug: unknown): string | null =>
   typeof slug === "string" && slug ? `${PASSPORT_BASE}/${slug}/documents` : null;
@@ -119,7 +149,11 @@ export const normalizePhotos = (photos: unknown): string[] =>
  * The listing row as it goes out: everything it has, minus the denylist, plus
  * the fields that are derived from a real source rather than invented.
  */
-export function shapeLotRow(row: any, file?: LotFeedFile | null): Record<string, unknown> {
+export function shapeLotRow(
+  row: any,
+  file?: LotFeedFile | null,
+  opts?: { supabaseUrl?: string; hasFactorySticker?: boolean },
+): Record<string, unknown> {
   const mc = (row?.mc_attributes || {}) as Record<string, unknown>;
   const { year, make, model } = lotIdentity(row, file);
 
@@ -155,7 +189,9 @@ export function shapeLotRow(row: any, file?: LotFeedFile | null): Record<string,
   out.photos = normalizePhotos(row?.photos);
   out.passport_url = passportUrl(row?.slug);
   out.documents_url = documentsUrl(row?.slug);
-  out.window_sticker_url = windowStickerUrl(row);
+  const sticker = windowSticker(row, opts);
+  out.window_sticker_url = sticker.url;
+  out.window_sticker_kind = sticker.kind;
 
   return out;
 }
