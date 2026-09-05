@@ -120,19 +120,71 @@ async function loadSettings(admin: any, tenantId: string) {
  * The dealership voice. Version is recomputed from the resolved content on
  * every run: an approved description keeps the version it was written under,
  * so editing the profile marks descendants stale rather than rewriting history.
+ *
+ * When no approved profile exists, one is DERIVED from description_settings and
+ * approved automatically. resolveVoiceProfile already reads every field it
+ * needs out of settings — dealer name, city, state, brand_voice, tone, CTA,
+ * prohibited phrases, disclosures — and then labelled the result "draft" purely
+ * because no row was stored. Preflight blocks on that label, so a dealership
+ * that had configured its voice in settings still generated nothing and was
+ * told its profile was a draft it had never created. Harte sat at zero
+ * descriptions across 130 vehicles for that reason alone.
+ *
+ * Auto-approval is safe here and nowhere else: approvedClaims has NO settings
+ * fallback, so a derived profile carries an empty claim list and cannot state a
+ * single dealership benefit. It can describe the vehicle; it cannot promise
+ * anything about the store. A human editing the profile later supersedes this
+ * row through save_description_voice_profile, which archives the prior approval.
  */
 async function loadVoiceProfile(
   admin: any, tenantId: string, settings: Record<string, any>, dealer: Record<string, any> | null,
 ): Promise<VoiceProfile> {
-  const { data } = await admin.from("description_voice_profiles")
-    .select("*").eq("tenant_id", tenantId).eq("status", "approved")
-    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const read = async () =>
+    (await admin.from("description_voice_profiles")
+      .select("*").eq("tenant_id", tenantId).eq("status", "approved")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle()).data;
+
+  let data = await read();
   const voice = resolveVoiceProfile(tenantId, data, settings, dealer);
   voice.version = await computeVoiceProfileVersion(voice);
-  if (data && data.version !== voice.version) {
+
+  if (!data) {
+    voice.status = "approved";
+    const { error } = await admin.from("description_voice_profiles").insert({
+      tenant_id: tenantId,
+      version: voice.version,
+      status: "approved",
+      profile_json: voiceProfileJson(voice),
+      dealer_name: voice.dealerName || null,
+      city: voice.city || null,
+      state: voice.state || null,
+      // Empty on purpose — see above. Never seeded from settings.
+      approved_claims: [],
+      change_reason: "Derived automatically from the dealership's description settings.",
+    });
+    if (error) {
+      // A concurrent run won the partial unique index (one approved profile per
+      // tenant). Its row is as good as ours; adopt it rather than failing a
+      // generation over a race.
+      data = await read();
+      if (!data) throw error;
+      const adopted = resolveVoiceProfile(tenantId, data, settings, dealer);
+      adopted.version = await computeVoiceProfileVersion(adopted);
+      return adopted;
+    }
+    return voice;
+  }
+
+  if (data.version !== voice.version) {
     await admin.from("description_voice_profiles").update({ version: voice.version }).eq("id", data.id);
   }
   return voice;
+}
+
+/** The editable shape the voice screen reads back out of profile_json. */
+function voiceProfileJson(v: VoiceProfile): Record<string, unknown> {
+  const { tenantId: _t, version: _v, status: _s, approvedBy: _b, approvedAt: _a, ...rest } = v;
+  return { ...rest, derivedFromSettings: true };
 }
 
 async function loadChannelOverrides(admin: any, tenantId: string): Promise<Map<string, Record<string, unknown>>> {
