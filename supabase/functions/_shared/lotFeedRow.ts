@@ -228,3 +228,55 @@ export function shapeLotRow(
 
   return out;
 }
+
+
+// ── detail_version ────────────────────────────────────────────────────
+//
+// A token that changes when a vehicle's DEEP record changes and not otherwise,
+// so a consumer can cache each detail response and re-fetch only when this
+// moves. Without one there are two options and both are wrong: re-fetch every
+// deep record on every sync, or serve equipment that quietly went stale — which
+// puts a salesperson at a car describing a feature it does not have.
+//
+// It is a content hash, deliberately not vehicle_listings.updated_at. That
+// column is touched by the nightly inventory sync whether or not anything about
+// the build changed, so a version derived from it would move every night for
+// every car and cache nothing.
+//
+// What is IN the hash: equipment and specs (mc_attributes, which carries the
+// NeoVIN build sheet), photos, EPA, warranty, recalls, history, accessories,
+// the OEM sticker address, condition, slug, and the truth snapshot's own
+// checksum and version — so a change in the fact ledger moves it too.
+//
+// What is deliberately OUT: price, mileage, market value, status. Those move
+// often, are carried fresh in the LIST response on every sync, and a consumer
+// re-reading a whole build sheet because a price dropped $200 is exactly the
+// churn this exists to prevent.
+const DETAIL_VERSION_FIELDS = [
+  "mc_attributes", "photos", "epa_economy", "warranty_info",
+  "recall_payload", "history_payload", "key_specs", "features",
+  "available_accessories", "oem_sticker_url", "slug", "condition",
+] as const;
+
+export interface DetailVersionSnapshot {
+  content_checksum?: string | null;
+  snapshot_version?: number | null;
+}
+
+const hex = (buf: ArrayBuffer): string =>
+  Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+export async function detailVersion(
+  row: any,
+  snapshot?: DetailVersionSnapshot | null,
+): Promise<string> {
+  // jsonb comes back with normalised key order, so stringify is stable for a
+  // given stored value.
+  const material = JSON.stringify([
+    ...DETAIL_VERSION_FIELDS.map((k) => row?.[k] ?? null),
+    snapshot?.content_checksum ?? null,
+    snapshot?.snapshot_version ?? null,
+  ]);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+  return hex(digest).slice(0, 32);
+}

@@ -268,7 +268,7 @@ describe("the contract AutoFilm probes against", () => {
 
 describe("detail mode: everything we hold about one vehicle", () => {
   it("is a mode on the same route and credential, keyed by VIN", () => {
-    expect(feed).toMatch(/const detailVin = \(url\.searchParams\.get\("vin"\) \?\? ""\)\.toUpperCase\(\)/);
+    expect(feed).toMatch(/const detailVin = \(pathVin \|\| url\.searchParams\.get\("vin"\) \|\| ""\)\.toUpperCase\(\)/);
     expect(feed).toMatch(/vin must be a 17-character VIN/);
     expect(feed).toMatch(/if \(detailVin\) \{/);
   });
@@ -349,5 +349,81 @@ describe("recall and history reach the consumer", () => {
 
   it("caps a long history rather than shipping it whole", () => {
     expect(shared).toMatch(/entries_truncated: entries\.length > cap/);
+  });
+});
+
+describe("detail_version: cache the deep record, refetch only when it moves", () => {
+  it("is a content hash, not the listing's updated_at", () => {
+    // updated_at is touched by the nightly sync whether or not the build
+    // changed, so a version derived from it moves every night for every car
+    // and caches nothing.
+    expect(shared).toMatch(/export async function detailVersion/);
+    expect(shared).toMatch(/crypto\.subtle\.digest\("SHA-256"/);
+    const block = shared.slice(shared.indexOf("const DETAIL_VERSION_FIELDS"), shared.indexOf("export async function detailVersion"));
+    expect(block).not.toContain('"updated_at"');
+  });
+
+  it("covers the equipment a walkaround describes", () => {
+    const block = shared.slice(shared.indexOf("const DETAIL_VERSION_FIELDS"), shared.indexOf("] as const;"));
+    for (const f of ["mc_attributes", "photos", "epa_economy", "warranty_info",
+                     "recall_payload", "history_payload", "available_accessories"]) {
+      expect(block, `${f} missing from detail_version`).toContain(`"${f}"`);
+    }
+  });
+
+  it("moves when the fact ledger moves, not only when the listing row does", () => {
+    expect(shared).toMatch(/snapshot\?\.content_checksum \?\? null/);
+    expect(shared).toMatch(/snapshot\?\.snapshot_version \?\? null/);
+  });
+
+  it("deliberately ignores price and mileage", () => {
+    // Both move often, are carried fresh in the list on every sync, and a
+    // consumer re-reading a whole build sheet because a price dropped $200 is
+    // the churn this exists to prevent.
+    const block = shared.slice(shared.indexOf("const DETAIL_VERSION_FIELDS"), shared.indexOf("] as const;"));
+    for (const f of ["price", "mileage", "market_value", "status"]) {
+      expect(block, `${f} must not move detail_version`).not.toContain(`"${f}"`);
+    }
+  });
+
+  it("is on every list row and echoed by the detail call", () => {
+    expect(feed).toMatch(/shaped\.detail_version = await detailVersion\(/);
+    expect(feed).toMatch(/detail_version: vehicle\.detail_version,/);
+  });
+
+  it("loads snapshots once per page, not once per row", () => {
+    const listPart = feed.slice(feed.indexOf("const snapByVehicle"));
+    expect(listPart).toMatch(/\.in\("vehicle_id", ids\)/);
+  });
+});
+
+describe("the addressing AutoFilm actually uses", () => {
+  it("accepts /vehicle/{vin} as well as ?vin=", () => {
+    expect(feed).toMatch(/\/vehicle\\\/\(\[\^\/\?#\]\+\)/);
+    expect(feed).toMatch(/pathVin \|\| url\.searchParams\.get\("vin"\)/);
+  });
+
+  it("is exempted from the JWT gateway", () => {
+    // AutoFilm sends no Authorization header. Left to the platform default this
+    // 401s at the gateway before the function's own auth ever runs, and the
+    // failure looks like a broken feed rather than a config gap.
+    const cfg = readFileSync(join(fnDir, "../config.toml"), "utf8");
+    const block = cfg.slice(cfg.indexOf("[functions.autofilm-feed]"));
+    expect(block.slice(0, 60)).toMatch(/verify_jwt = false/);
+  });
+});
+
+describe("updated_since narrows the count too", () => {
+  it("filters the total and the page together", () => {
+    // A total counting the whole lot while the rows carried only the changed
+    // ones would fail the caller's "rows must equal total" check on every
+    // incremental pull.
+    expect(feed).toMatch(/const scoped = \(q: any\) => \(updatedSince \? q\.gte\("updated_at", updatedSince\) : q\)/);
+    expect(feed).toMatch(/const \{ count, error: countErr \} = await scoped\(/);
+    expect(feed).toMatch(/const base = \(\) =>\s*\n?\s*scoped\(/);
+  });
+
+  it("rejects a timestamp it cannot parse", () => {
+    expect(feed).toMatch(/updated_since must be ISO-8601/);
   });
 });

@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
-  shapeLotRow, identityIncomplete, type LotFeedFile,
+  shapeLotRow, identityIncomplete, detailVersion,
+  type LotFeedFile, type DetailVersionSnapshot,
 } from "../_shared/lotFeedRow.ts";
 
 // ──────────────────────────────────────────────────────────────
@@ -14,8 +15,10 @@ import {
 // AutoLabels data.
 //
 // Contract:
-//   LIST   GET ?tenant_id=<uuid>[&cursor=<vin>][&limit=500]
-//   DETAIL GET ?tenant_id=<uuid>&vin=<17-char VIN>
+//   LIST   GET ?tenant_id=<uuid>[&cursor=<vin>][&limit=500][&updated_since=<iso>]
+//          Every row carries detail_version — a content hash of the deep
+//          record. Re-fetch a detail only when it moves.
+//   DETAIL GET /vehicle/<17-char VIN>?tenant_id=<uuid>   (or ?vin=)
 //          One vehicle plus its verified-fact ledger — the call that backs
 //          generated talking points.
 //          { vin, vehicle, facts[], fact_count, verified_fact_count, truth }
@@ -102,9 +105,21 @@ serve(async (req) => {
     if (cursor && !/^[A-HJ-NPR-Z0-9]{17}$/.test(cursor)) {
       return json(400, { error: "cursor must be a 17-character VIN" });
     }
-    const detailVin = (url.searchParams.get("vin") ?? "").toUpperCase();
+    // AutoFilm addresses this as {base}/vehicle/{vin}. Supabase routes on the
+    // function name and hands the remaining path through, so the segment form
+    // and ?vin= are the same call; both are accepted rather than making the
+    // caller care which.
+    const pathVin = (/\/vehicle\/([^/?#]+)/i.exec(url.pathname)?.[1] ?? "").toUpperCase();
+    const detailVin = (pathVin || url.searchParams.get("vin") || "").toUpperCase();
     if (detailVin && !/^[A-HJ-NPR-Z0-9]{17}$/.test(detailVin)) {
       return json(400, { error: "vin must be a 17-character VIN" });
+    }
+    const updatedSinceRaw = url.searchParams.get("updated_since") ?? "";
+    let updatedSince: string | null = null;
+    if (updatedSinceRaw) {
+      const t = Date.parse(updatedSinceRaw);
+      if (Number.isNaN(t)) return json(400, { error: "updated_since must be ISO-8601" });
+      updatedSince = new Date(t).toISOString();
     }
     const limitParam = Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT);
     const limit = Number.isInteger(limitParam) && limitParam > 0
@@ -179,8 +194,12 @@ serve(async (req) => {
       }));
 
       const snap = snapRes.data as Record<string, unknown> | null;
+      // Same value the list carried, computed from the same inputs, so a caller
+      // can confirm what it just stored matches what it was told to expect.
+      vehicle.detail_version = await detailVersion(row, snap as DetailVersionSnapshot | null);
       return json(200, {
         vin: detailVin,
+        detail_version: vehicle.detail_version,
         vehicle,
         facts,
         fact_count: facts.length,
@@ -204,20 +223,29 @@ serve(async (req) => {
     // AutoFilm's screens filter on make IS NOT NULL — every car synced clean
     // and was then invisible. What may NOT go out is named instead, in
     // LOT_FEED_DENY, where withholding a field is a deliberate act.
+    // updated_since narrows the count as well as the page. A total that counted
+    // the whole lot while the rows carried only the changed ones would make the
+    // caller's "rows must equal total" check fail every incremental pull.
+    const scoped = (q: any) => (updatedSince ? q.gte("updated_at", updatedSince) : q);
+
     const base = () =>
+      scoped(
+        admin
+          .from("vehicle_listings")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .is("archived_at", null)
+          .in("status", ["published", "active"]),
+      );
+
+    const { count, error: countErr } = await scoped(
       admin
         .from("vehicle_listings")
-        .select("*")
+        .select("vin", { count: "exact", head: true })
         .eq("tenant_id", tenantId)
         .is("archived_at", null)
-        .in("status", ["published", "active"]);
-
-    const { count, error: countErr } = await admin
-      .from("vehicle_listings")
-      .select("vin", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .is("archived_at", null)
-      .in("status", ["published", "active"]);
+        .in("status", ["published", "active"]),
+    );
     if (countErr) return json(500, { error: countErr.message });
 
     let pageQuery = base().order("vin", { ascending: true }).limit(limit + 1);
@@ -266,12 +294,37 @@ serve(async (req) => {
       }
     }
 
-    const vehicles = page.map((r) =>
-      shapeLotRow(r, filesByVin.get(String(r.vin)) ?? null, {
+    // The truth snapshot feeds detail_version, so a change in the fact ledger
+    // moves it even when the listing row itself did not change. One query for
+    // the page, not one per row.
+    const snapByVehicle = new Map<string, DetailVersionSnapshot>();
+    if (ids.length) {
+      const { data: snaps } = await admin
+        .from("vehicle_snapshots")
+        .select("vehicle_id, snapshot_version, content_checksum")
+        .eq("tenant_id", tenantId)
+        .in("vehicle_id", ids)
+        .order("snapshot_version", { ascending: false });
+      for (const sn of (snaps ?? []) as Record<string, unknown>[]) {
+        const k = String(sn.vehicle_id);
+        // Ordered newest-first, so the first one seen per vehicle is current.
+        if (!snapByVehicle.has(k)) {
+          snapByVehicle.set(k, {
+            snapshot_version: sn.snapshot_version as number,
+            content_checksum: sn.content_checksum as string,
+          });
+        }
+      }
+    }
+
+    const vehicles = await Promise.all(page.map(async (r) => {
+      const shaped = shapeLotRow(r, filesByVin.get(String(r.vin)) ?? null, {
         supabaseUrl,
         hasFactorySticker: stickerVehicleIds.has(String(r.id)),
-      })
-    );
+      });
+      shaped.detail_version = await detailVersion(r, snapByVehicle.get(String(r.id)) ?? null);
+      return shaped;
+    }));
 
     // A vehicle with no discrete make is filtered off the consumer's screens.
     // Counted here so that shows up as a number in the response rather than as

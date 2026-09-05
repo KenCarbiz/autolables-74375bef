@@ -10,6 +10,15 @@ verify_jwt = false
 [functions.vehicle-lookup]
 verify_jwt = false
 
+# autofilm-feed is the sister-app inventory feed, authenticated by the same
+# shared secret header vehicle-lookup uses (x-lookup-secret, or x-autofilm-key).
+# AutoFilm sends no Authorization header and mints no Supabase JWT, so leaving
+# this to the platform default would 401 every call at the gateway before the
+# function's own auth ever ran — and the failure would look like a broken feed
+# rather than a config gap.
+[functions.autofilm-feed]
+verify_jwt = false
+
 # public-document-asset mints a short-lived signed URL for one asset of one
 # currently PUBLISHED vehicle document. Shoppers on /v/:slug are anonymous,
 # so JWT verification is off; the function guards itself (slug is the only
