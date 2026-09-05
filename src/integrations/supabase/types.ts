@@ -9878,6 +9878,32 @@ export type Database = {
         Args: { _patch: Json; _tenant_id: string }
         Returns: undefined
       }
+      advertised_price_crawl_queue: {
+        Args: { _limit?: number; _tenant_id?: string }
+        Returns: {
+          advertised_price: number
+          captured_at: string
+          captured_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          screenshot_bucket: string
+          screenshot_sha256: string | null
+          screenshot_url: string | null
+          source_channel: string
+          source_url: string | null
+          store_id: string | null
+          tenant_id: string
+          updated_at: string
+          vin: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "advertised_prices"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       append_vehicle_document: {
         Args: { _doc: Json; _vehicle_id: string }
         Returns: Json
