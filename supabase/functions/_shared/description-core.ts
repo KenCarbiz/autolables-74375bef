@@ -323,13 +323,37 @@ export function buildFactSnapshot(
     excluded.push({ field: "cpo_status", reason: "cpo_language_disabled", claim: "certified" });
   }
 
-  // Warranty — requires verified eligibility and dealer permission.
+  // Warranty — FACT-GATED, not permission-gated.
+  //
+  // This used to sit behind a blanket warranty_language_allowed flag that
+  // defaulted off, so a dealership with genuine verified remaining coverage
+  // could not mention it while a dealership with none was equally silent — the
+  // setting decided, not the vehicle. The gate is now the data: coverage is
+  // stated only when the record actually carries it, and the specific terms are
+  // stated only when the specific terms are known.
+  //
+  // The flag survives as an explicit suppression switch for a dealership that
+  // chooses never to discuss warranty, which is a legitimate legal preference.
+  // Absent an explicit false, verified facts speak.
   const w = (listing.warranty_info || {}) as Record<string, any>;
-  if (w && (w.months_remaining || w.miles_remaining || w.program)) {
-    if (settings.warranty_language_allowed) {
-      put("warranty_eligible", w.program || "remaining factory coverage", "oem_warranty", "verified");
-    } else {
+  const warrantySuppressed = settings.warranty_language_allowed === false
+    && settings.warranty_language_suppressed_explicitly === true;
+  const months = Number(w?.months_remaining) || 0;
+  const miles = Number(w?.miles_remaining) || 0;
+  const program = String(w?.program || "").trim();
+  if (months > 0 || miles > 0 || program) {
+    if (warrantySuppressed) {
       excluded.push({ field: "warranty_eligible", reason: "warranty_language_disabled", claim: "warranty" });
+    } else {
+      // The value carries only what is known. A writer given "remaining
+      // factory coverage" cannot honestly produce "5 years / 60,000 miles";
+      // one given the months and miles can state them exactly.
+      const terms = [
+        months > 0 ? `${months} months remaining` : "",
+        miles > 0 ? `${miles.toLocaleString("en-US")} miles remaining` : "",
+      ].filter(Boolean).join(", ");
+      put("warranty_eligible", [program, terms].filter(Boolean).join(" — ") || "remaining factory coverage",
+          "oem_warranty", "verified");
     }
   }
 
@@ -584,7 +608,7 @@ ABSOLUTE RULES
 
 STYLE
 - Tone: ${settings.default_tone || "professional"}. ${settings.brand_voice ? `Brand voice: ${settings.brand_voice}.` : ""}
-- Length: between ${settings.min_length || 400} and ${settings.max_length || 2400} characters.
+- Length: aim for ${preferredLengthBand(settings).min}-${preferredLengthBand(settings).max} characters, and never exceed ${LENGTH_POLICY.absoluteMax}. This is a target, not a quota: write as much as the VERIFIED facts above genuinely support and no more. A vehicle with little verified data gets a shorter description. Never pad, repeat a feature, restate a fact in different words, or add generic dealership filler to reach a length.
 - Structure: a strong opening, the most important verified qualities, high-priority verified equipment, practical ownership detail, then the closing call to action.
 - Close with this call to action: ${settings.cta_template || `Contact ${snap.facts.dealer_name?.value || "our team"} to schedule a test drive.`}
 ${settings.required_legal_text ? `- Include verbatim: ${settings.required_legal_text}` : ""}
@@ -636,7 +660,7 @@ ${toneInstruction(packet.tone)}
 ${voiceInstruction(packet.voice)}
 
 STRUCTURE
-- Length: between ${settings.min_length || 400} and ${settings.max_length || 2400} characters.
+- Length: aim for ${preferredLengthBand(settings).min}-${preferredLengthBand(settings).max} characters, and never exceed ${LENGTH_POLICY.absoluteMax}. This is a target, not a quota: write as much as the VERIFIED facts above genuinely support and no more. A vehicle with little verified data gets a shorter description. Never pad, repeat a feature, restate a fact in different words, or add generic dealership filler to reach a length.
 - A strong opening that names the vehicle, then the qualities that matter most, then the prioritized equipment grouped sensibly, then practical ownership detail, then the close.
 ${kw}
 
@@ -973,13 +997,61 @@ export function validateContentV3(
   return out;
 }
 
+// ── Length policy ────────────────────────────────────────────────────
+//
+// Quality-guided, not hard compliance. A dealership was configured with
+// min_length 3750 / max_length 3922 — a 172-character window — which can only
+// be satisfied by padding a finished description or truncating a detailed one.
+// Both produce exactly the generic boilerplate the writer is supposed to avoid.
+//
+// The band below is a TARGET, not a gate. Length is the last of the six
+// generation priorities, beneath factual accuracy, differentiation,
+// readability, voice and SEO. A lightly equipped car with little verified data
+// should be shorter than a loaded one with a full NeoVIN package list, and
+// nothing may be invented, repeated or padded to close the gap.
+//
+// Only absoluteMax is a real boundary, and it is a safety ceiling rather than a
+// quality judgement. Channel policies still impose their own limits on
+// derivatives; the master carries the richest appropriate story and is never
+// made worse to satisfy the smallest channel.
+export const LENGTH_POLICY = {
+  softMin: 1800,
+  preferredMin: 2400,
+  preferredMax: 3200,
+  softMax: 3800,
+  absoluteMax: 4500,
+} as const;
+
+/** The dealer's preferred band, falling back to the platform target. A tenant
+ *  that configured an unreachably narrow window gets the platform band: the
+ *  setting expresses a preference, not a contract the copy must satisfy. */
+export function preferredLengthBand(settings: Record<string, any>): { min: number; max: number } {
+  const min = Number(settings?.min_length) || LENGTH_POLICY.preferredMin;
+  const max = Number(settings?.max_length) || LENGTH_POLICY.preferredMax;
+  // A window too tight to write in is a misconfiguration, not an instruction.
+  if (max <= min || max - min < 400) {
+    return { min: LENGTH_POLICY.preferredMin, max: LENGTH_POLICY.preferredMax };
+  }
+  return { min, max };
+}
+
+/** Graduated, so a good 2,000-character description is not scored as harshly
+ *  as a 6,000-character one. Full marks inside the band, most marks inside the
+ *  soft bounds, and a real penalty only past the safety ceiling. */
+export function lengthScore(len: number, settings: Record<string, any>): number {
+  const { min, max } = preferredLengthBand(settings);
+  if (len >= min && len <= max) return 30;
+  if (len >= LENGTH_POLICY.softMin && len <= LENGTH_POLICY.softMax) return 24;
+  if (len <= LENGTH_POLICY.absoluteMax) return 16;
+  return 6;
+}
+
 // Content quality is deliberately SEPARATE from factual validity: a
 // description can score well and still be blocked.
 export function qualityScore(text: string, snap: FactSnapshot, settings: Record<string, any>): number {
   let s = 0;
   const len = text.length;
-  const target = settings.max_length || 2400;
-  s += len >= (settings.min_length || 400) && len <= target ? 30 : 12;
+  s += lengthScore(len, settings);
   const equip = String(snap.facts.equipment?.value || "").split(",").filter(Boolean).length;
   s += Math.min(20, equip * 2);
   if (/\b(contact|call|visit|schedule|test drive)\b/i.test(text)) s += 15;
