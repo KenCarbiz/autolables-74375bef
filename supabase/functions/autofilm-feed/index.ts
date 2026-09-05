@@ -103,7 +103,7 @@ serve(async (req) => {
         .is("archived_at", null)
         .in("status", ["published", "active"]);
 
-    const { count, error: countErr } = await supabase
+    const { count, error: countErr } = await admin
       .from("vehicle_listings")
       .select("vin", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
