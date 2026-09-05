@@ -183,3 +183,28 @@ describe("the window sticker a consumer may persist", () => {
     expect(shared).toMatch(/\/documents`/);
   });
 });
+
+describe("the contract AutoFilm probes against", () => {
+  it("accepts either header name for the same secret", () => {
+    // A 401 over which of two names carried the identical value is a wasted
+    // round trip, not a security boundary.
+    expect(feed).toMatch(/req\.headers\.get\("x-lookup-secret"\)/);
+    expect(feed).toMatch(/req\.headers\.get\("x-autofilm-key"\)/);
+    // CORS has to allow it too, or a browser preflight strips it.
+    expect(feed).toMatch(/x-lookup-secret, x-autofilm-key/);
+  });
+
+  it("states how far it got as well as how to continue", () => {
+    expect(feed).toMatch(/has_more: hasMore,/);
+    expect(feed).toMatch(/next_cursor: hasMore \?/);
+    expect(feed).toMatch(/^\s+limit,$/m);
+    expect(feed).toMatch(/total: count \?\? 0,/);
+  });
+
+  it("pages by VIN cursor, which cannot skip a row between requests", () => {
+    expect(feed).toMatch(/\.order\("vin", \{ ascending: true \}\)/);
+    expect(feed).toMatch(/pageQuery\.gt\("vin", cursor\)/);
+    // limit + 1 is how it knows there is another page without a second count.
+    expect(feed).toMatch(/\.limit\(limit \+ 1\)/);
+  });
+});

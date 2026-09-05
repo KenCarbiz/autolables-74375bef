@@ -16,10 +16,12 @@ import {
 // Contract:
 //   GET /functions/v1/autofilm-feed?tenant_id=<uuid>[&cursor=<vin>][&limit=500]
 //   Headers: x-lookup-secret: <AUTOLABELS_LOOKUP_SECRET>
-//   (same shared credential vehicle-lookup already validates)
+//            (x-autofilm-key is accepted as an alias for the same value)
 //
 // Returns: {
 //   total: number,           // live vehicles for the tenant
+//   limit: number,
+//   has_more: boolean,
 //   next_cursor: string | null, // pass back as ?cursor= to continue
 //   identity_incomplete: number, // rows with no discrete make (see below)
 //   vehicles: [ the listing row, minus LOT_FEED_DENY, plus discrete
@@ -46,7 +48,7 @@ import {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-lookup-secret",
+    "authorization, x-client-info, apikey, content-type, x-lookup-secret, x-autofilm-key",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
@@ -77,7 +79,13 @@ serve(async (req) => {
     if (!supabaseUrl || !serviceKey) return json(500, { error: "server misconfigured" });
     if (!feedSecret) return json(503, { error: "feed not enabled" });
 
-    const key = req.headers.get("x-lookup-secret") ?? "";
+    // x-autofilm-key is accepted as an alias for x-lookup-secret. Same value,
+    // same credential — AutoFilm's config named the header after itself and a
+    // 401 over which of two names carried the identical secret is a wasted
+    // round trip, not a security boundary.
+    const key = req.headers.get("x-lookup-secret")
+      ?? req.headers.get("x-autofilm-key")
+      ?? "";
     if (!timingSafeEqual(key, feedSecret)) return json(401, { error: "unauthorized" });
 
     const url = new URL(req.url);
@@ -156,6 +164,11 @@ serve(async (req) => {
 
     return json(200, {
       total: count ?? 0,
+      limit,
+      // Both, so a caller can stop on whichever it already reads. next_cursor
+      // is the one to page with; has_more only says whether another page
+      // exists.
+      has_more: hasMore,
       next_cursor: hasMore ? String(vehicles[vehicles.length - 1]?.vin ?? "") || null : null,
       identity_incomplete,
       vehicles,
