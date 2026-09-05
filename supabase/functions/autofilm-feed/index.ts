@@ -14,7 +14,11 @@ import {
 // AutoLabels data.
 //
 // Contract:
-//   GET /functions/v1/autofilm-feed?tenant_id=<uuid>[&cursor=<vin>][&limit=500]
+//   LIST   GET ?tenant_id=<uuid>[&cursor=<vin>][&limit=500]
+//   DETAIL GET ?tenant_id=<uuid>&vin=<17-char VIN>
+//          One vehicle plus its verified-fact ledger — the call that backs
+//          generated talking points.
+//          { vin, vehicle, facts[], fact_count, verified_fact_count, truth }
 //   Headers: x-lookup-secret: <AUTOLABELS_LOOKUP_SECRET>
 //            (x-autofilm-key is accepted as an alias for the same value)
 //
@@ -98,12 +102,102 @@ serve(async (req) => {
     if (cursor && !/^[A-HJ-NPR-Z0-9]{17}$/.test(cursor)) {
       return json(400, { error: "cursor must be a 17-character VIN" });
     }
+    const detailVin = (url.searchParams.get("vin") ?? "").toUpperCase();
+    if (detailVin && !/^[A-HJ-NPR-Z0-9]{17}$/.test(detailVin)) {
+      return json(400, { error: "vin must be a 17-character VIN" });
+    }
     const limitParam = Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT);
     const limit = Number.isInteger(limitParam) && limitParam > 0
       ? Math.min(limitParam, MAX_LIMIT)
       : DEFAULT_LIMIT;
 
     const admin = createClient(supabaseUrl, serviceKey);
+
+    // ── Detail: one vehicle, everything we hold ───────────────────────
+    //
+    // The list answers "what is on the lot". This answers "tell me everything
+    // about the one the salesperson just picked", and it is the call that backs
+    // generated talking points.
+    //
+    // The facts block is the point. vehicle_facts is a ledger of individually
+    // sourced claims — each one carries where it came from, how confident we
+    // are, whose authority it rests on, and whether it may appear in copy at
+    // all. Generating a talking point from THAT rather than from a prose blob
+    // is the difference between a claim that can be traced and a sentence a
+    // salesperson has to defend on the lot.
+    if (detailVin) {
+      const { data: rowData, error: rowErr } = await admin
+        .from("vehicle_listings")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("vin", detailVin)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (rowErr) return json(500, { error: rowErr.message });
+      if (!rowData) return json(404, { error: "not_found", vin: detailVin });
+      const row = rowData as Record<string, unknown>;
+
+      const [fileRes, docRes, factRes, snapRes] = await Promise.all([
+        admin.from("vehicle_files")
+          .select("vin, year, make, model, trim, stock_number")
+          .eq("tenant_id", tenantId).eq("vin", detailVin).maybeSingle(),
+        admin.from("generated_documents")
+          .select("id")
+          .eq("tenant_id", tenantId).eq("vehicle_id", String(row.id))
+          .eq("document_type", "factory_sticker").eq("document_status", "published")
+          .limit(1),
+        // usable_in_copy is the gate the ledger already carries; a fact flagged
+        // off is one somebody decided must not be repeated, and no consumer
+        // gets to reverse that.
+        admin.from("vehicle_facts")
+          .select("fact_key, fact_value, source_kind, confidence, authority, evidence, observed_at")
+          .eq("tenant_id", tenantId).eq("vehicle_id", String(row.id))
+          .eq("usable_in_copy", true),
+        admin.from("vehicle_snapshots")
+          .select("snapshot_version, content_checksum, has_unresolved_conflicts, created_at")
+          .eq("tenant_id", tenantId).eq("vehicle_id", String(row.id))
+          .order("snapshot_version", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+
+      const vehicle = shapeLotRow(row, (fileRes.data as LotFeedFile | null) ?? null, {
+        supabaseUrl,
+        hasFactorySticker: ((docRes.data as unknown[]) ?? []).length > 0,
+      });
+
+      // Confidence travels with every fact rather than being filtered here.
+      // VERIFIED-only would drop engine, drivetrain, transmission and trim —
+      // all HIGH from the provider — and a talking-point writer that cannot see
+      // the engine is not much of one. Labelled, so the consumer decides what
+      // it is willing to assert.
+      const facts = ((factRes.data as Record<string, unknown>[]) ?? []).map((f) => ({
+        key: f.fact_key,
+        value: (f.fact_value as { v?: unknown } | null)?.v ?? f.fact_value,
+        source: f.source_kind,
+        confidence: f.confidence,
+        authority: f.authority,
+        observed_at: f.observed_at,
+      }));
+
+      const snap = snapRes.data as Record<string, unknown> | null;
+      return json(200, {
+        vin: detailVin,
+        vehicle,
+        facts,
+        fact_count: facts.length,
+        verified_fact_count: facts.filter((f) => f.confidence === "VERIFIED").length,
+        // A vehicle whose truth record still has an unresolved conflict is one
+        // where two sources disagree. Stated, not hidden: a consumer generating
+        // copy should know before it writes a sentence.
+        truth: snap
+          ? {
+            snapshot_version: snap.snapshot_version,
+            content_checksum: snap.content_checksum,
+            has_unresolved_conflicts: snap.has_unresolved_conflicts === true,
+            created_at: snap.created_at,
+          }
+          : null,
+      });
+    }
 
     // select("*"), not a named list. The named list is what shipped 140
     // vehicles with no `make`: nothing named it, so nothing carried it, and

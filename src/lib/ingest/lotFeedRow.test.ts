@@ -22,7 +22,7 @@ const DENY = new Set([
   "install_token", "created_by", "assigned_agent_id",
   "recall_override_by", "recall_override_at", "recall_override_notes",
   "price_parse_notes", "blackbook", "mc_raw", "market_payload",
-  "comparables", "history_payload", "recall_payload",
+  "comparables",
 ]);
 const str = (v: unknown): string | null =>
   typeof v === "string" ? (v.trim() || null)
@@ -263,5 +263,91 @@ describe("the contract AutoFilm probes against", () => {
     expect(feed).toMatch(/pageQuery\.gt\("vin", cursor\)/);
     // limit + 1 is how it knows there is another page without a second count.
     expect(feed).toMatch(/\.limit\(limit \+ 1\)/);
+  });
+});
+
+describe("detail mode: everything we hold about one vehicle", () => {
+  it("is a mode on the same route and credential, keyed by VIN", () => {
+    expect(feed).toMatch(/const detailVin = \(url\.searchParams\.get\("vin"\) \?\? ""\)\.toUpperCase\(\)/);
+    expect(feed).toMatch(/vin must be a 17-character VIN/);
+    expect(feed).toMatch(/if \(detailVin\) \{/);
+  });
+
+  it("answers 404 for a VIN this tenant does not have", () => {
+    // Not an empty vehicle object — a consumer must not write copy about a car
+    // that returned nothing.
+    expect(feed).toMatch(/error: "not_found", vin: detailVin/);
+    expect(feed).toMatch(/\.eq\("tenant_id", tenantId\)\s*\n?\s*\.eq\("vin", detailVin\)/);
+  });
+
+  it("serves facts through the ledger's own copy gate", () => {
+    // usable_in_copy is a decision already recorded against the fact. A
+    // consumer does not get to reverse it.
+    expect(feed).toMatch(/from\("vehicle_facts"\)/);
+    expect(feed).toMatch(/\.eq\("usable_in_copy", true\)/);
+  });
+
+  it("labels every fact instead of filtering to VERIFIED", () => {
+    // VERIFIED-only would drop engine, drivetrain, transmission and trim — all
+    // HIGH from the provider — and a talking-point writer that cannot see the
+    // engine is not much of one.
+    for (const field of ["confidence:", "authority:", "source:", "observed_at:"]) {
+      expect(feed, `fact ${field} missing`).toContain(field);
+    }
+    expect(feed).toMatch(/verified_fact_count: facts\.filter\(\(f\) => f\.confidence === "VERIFIED"\)\.length/);
+  });
+
+  it("unwraps the ledger's value envelope", () => {
+    // fact_value is stored as {"v": 59390}; handing a consumer the envelope
+    // makes every reader unwrap it, and one of them eventually will not.
+    expect(feed).toMatch(/\(f\.fact_value as \{ v\?: unknown \} \| null\)\?\.v \?\? f\.fact_value/);
+  });
+
+  it("says when two sources still disagree about this car", () => {
+    // A consumer generating copy should know before it writes a sentence.
+    expect(feed).toMatch(/has_unresolved_conflicts: snap\.has_unresolved_conflicts === true/);
+    expect(feed).toMatch(/from\("vehicle_snapshots"\)/);
+    expect(feed).toMatch(/order\("snapshot_version", \{ ascending: false \}\)/);
+  });
+
+  it("shapes the vehicle through the same shaper as the list", () => {
+    // A detail call that built its own row shape would be the projection bug
+    // again, one endpoint further along.
+    const block = feed.slice(feed.indexOf("if (detailVin) {"), feed.indexOf("const base = ()"));
+    expect(block).toMatch(/shapeLotRow\(row,/);
+  });
+
+  it("does not load facts for every row of a list page", () => {
+    // 20 facts x 500 vehicles is a different endpoint's job.
+    const listPart = feed.slice(feed.indexOf("const base = ()"));
+    expect(listPart).not.toMatch(/from\("vehicle_facts"\)/);
+  });
+});
+
+describe("recall and history reach the consumer", () => {
+  it("are no longer withheld", () => {
+    // "No open recalls" and "one owner, no accidents reported" are the most
+    // load-bearing things said about a used car, and the summary columns alone
+    // cannot support the claim.
+    const denyBlock = shared.slice(shared.indexOf("export const LOT_FEED_DENY"), shared.indexOf("]);"));
+    expect(denyBlock).not.toContain('"recall_payload"');
+    expect(denyBlock).not.toContain('"history_payload"');
+    // Still withheld: licensed and bulky.
+    expect(denyBlock).toContain('"blackbook"');
+    expect(denyBlock).toContain('"mc_raw"');
+  });
+
+  it("strips competitors' listing URLs out of the history", () => {
+    // The timeline is the talking point. A live link to another dealer's VDP
+    // on a customer-facing page is an own goal.
+    expect(shared).toMatch(/export function scrubHistory/);
+    expect(shared).toMatch(/const \{ vdp_url: _dropped, \.\.\.rest \}/);
+    // The dealer name stays — the timeline is meaningless without knowing a
+    // change of hands happened.
+    expect(shared).not.toMatch(/dealer: _drop/);
+  });
+
+  it("caps a long history rather than shipping it whole", () => {
+    expect(shared).toMatch(/entries_truncated: entries\.length > cap/);
   });
 });

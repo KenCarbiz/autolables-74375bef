@@ -26,10 +26,41 @@ export const LOT_FEED_DENY = new Set([
   "recall_override_by", "recall_override_at", "recall_override_notes",
   "price_parse_notes",
   // Licensed or bulky provider payloads. Black Book is paid valuation data;
-  // redistributing it to another product is a licensing question.
+  // redistributing it to another product is a licensing question, and nothing
+  // downstream renders any of these.
+  //
+  // recall_payload and history_payload are deliberately NOT here. They were,
+  // and that was too strict: "no open recalls" and "one owner, no accidents
+  // reported" are the most load-bearing things a salesperson says about a used
+  // car, and the summary columns alone cannot support the claim. history_payload
+  // is scrubbed rather than withheld — see scrubHistory.
   "blackbook", "mc_raw", "market_payload", "comparables",
-  "history_payload", "recall_payload",
 ]);
+
+/**
+ * Listing history, minus other dealers' addresses.
+ *
+ * The payload is this VIN's own listing history, which for a used car includes
+ * the stores that listed it before. The price and mileage timeline is exactly
+ * what a talking point is made of; a live link to a competitor's VDP is not,
+ * and putting one on a customer-facing page is an own goal. The dealer name
+ * stays — it is provenance, and the timeline is meaningless without knowing a
+ * change of hands happened.
+ */
+export function scrubHistory(payload: any, cap = 40): any {
+  if (!payload || typeof payload !== "object") return null;
+  const entries = Array.isArray(payload.entries) ? payload.entries : null;
+  if (!entries) return payload;
+  return {
+    ...payload,
+    entries: entries.slice(0, cap).map((e: any) => {
+      if (!e || typeof e !== "object") return e;
+      const { vdp_url: _dropped, ...rest } = e as Record<string, unknown>;
+      return rest;
+    }),
+    entries_truncated: entries.length > cap ? entries.length - cap : 0,
+  };
+}
 
 export const PASSPORT_BASE = "https://autolabels.io/v";
 
@@ -189,6 +220,8 @@ export function shapeLotRow(
   out.photos = normalizePhotos(row?.photos);
   out.passport_url = passportUrl(row?.slug);
   out.documents_url = documentsUrl(row?.slug);
+  if (row?.history_payload) out.history_payload = scrubHistory(row.history_payload);
+
   const sticker = windowSticker(row, opts);
   out.window_sticker_url = sticker.url;
   out.window_sticker_kind = sticker.kind;
