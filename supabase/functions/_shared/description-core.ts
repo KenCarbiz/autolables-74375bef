@@ -1003,6 +1003,10 @@ export function validateContentV3(
 // min_length 3750 / max_length 3922 — a 172-character window — which can only
 // be satisfied by padding a finished description or truncating a detailed one.
 // Both produce exactly the generic boilerplate the writer is supposed to avoid.
+// That row has since been corrected (migration
+// 20260905233000_harte_description_settings_correction), so this guard is a
+// general defence against a malformed window rather than a standing override
+// of live data.
 //
 // The band below is a TARGET, not a gate. Length is the last of the six
 // generation priorities, beneath factual accuracy, differentiation,
