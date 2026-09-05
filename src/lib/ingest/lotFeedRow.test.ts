@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+// The REAL module, not a copy of it. _shared/lotFeedRow.ts has no imports, so
+// it loads under vitest unchanged — which means a rename in the shaper fails
+// here instead of silently emptying a screen in the consumer. A mirror would
+// have kept passing, which is the whole failure this file exists to prevent.
+import {
+  shapeLotRow, windowSticker, detailVersion, scrubHistory,
+  LOT_FEED_DENY, identityIncomplete, lotIdentity,
+} from "../../../supabase/functions/_shared/lotFeedRow.ts";
 
 // autofilm-feed named its output fields one by one and therefore shipped 140
 // vehicles with no `make` — nothing named it, so nothing carried it. AutoFilm's
@@ -15,47 +23,6 @@ const fnDir = join(__dirname, "../../../supabase/functions");
 const shared = readFileSync(join(fnDir, "_shared/lotFeedRow.ts"), "utf8");
 const feed = readFileSync(join(fnDir, "autofilm-feed/index.ts"), "utf8");
 const lookup = readFileSync(join(fnDir, "vehicle-lookup/index.ts"), "utf8");
-
-// Mirrors shapeLotRow in _shared/lotFeedRow.ts. Deno source, so the behaviour
-// is reproduced here and the contract is asserted against the file below.
-const DENY = new Set([
-  "install_token", "created_by", "assigned_agent_id",
-  "recall_override_by", "recall_override_at", "recall_override_notes",
-  "price_parse_notes", "blackbook", "mc_raw", "market_payload",
-  "comparables",
-]);
-const str = (v: unknown): string | null =>
-  typeof v === "string" ? (v.trim() || null)
-    : typeof v === "number" && Number.isFinite(v) ? String(v) : null;
-const num = (v: unknown): number | null =>
-  typeof v === "number" && Number.isFinite(v) ? v
-    : typeof v === "string" && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null;
-
-type Row = Record<string, unknown>;
-type File = Record<string, unknown> | null;
-
-const shapeLotRow = (row: Row, file?: File) => {
-  const mc = (row.mc_attributes || {}) as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) {
-    if (DENY.has(k)) continue;
-    out[k] = v;
-  }
-  out.year = num(mc.year) ?? num(file?.year) ?? null;
-  out.make = str(mc.make) ?? str(file?.make) ?? null;
-  out.model = str(mc.model) ?? str(file?.model) ?? null;
-  out.trim = str(row.trim) ?? str(file?.trim) ?? null;
-  out.stock_number = str(mc.stock_no) ?? str(mc.stock) ?? str(mc.stock_number)
-    ?? str(file?.stock_number) ?? null;
-  out.body_style = str(mc.body_type) ?? str(mc.body_style) ?? null;
-  out.msrp = num(mc.msrp);
-  out.market_value = num(row.market_value);
-  out.savings = num(row.dealer_discount);
-  out.window_sticker_url =
-    typeof row.oem_sticker_url === "string" && /^https:\/\//i.test(row.oem_sticker_url)
-      ? row.oem_sticker_url : null;
-  return out;
-};
 
 describe("the blocker: a vehicle with no discrete make is invisible", () => {
   it("carries make, model and year as their own fields", () => {
@@ -144,9 +111,14 @@ describe("the shape is allow-by-default", () => {
     }
   });
 
-  it("keeps the module's denylist and this mirror in step", () => {
-    const block = shared.slice(shared.indexOf("export const LOT_FEED_DENY"), shared.indexOf("]);"));
-    for (const key of DENY) expect(block, `${key} missing`).toContain(`"${key}"`);
+  it("withholds exactly what it means to, and nothing more", () => {
+    // Asserted against the real exported Set, so adding a field to the denylist
+    // is a deliberate act somebody has to change this list to make.
+    expect([...LOT_FEED_DENY].sort()).toEqual([
+      "assigned_agent_id", "blackbook", "comparables", "created_by",
+      "install_token", "mc_raw", "market_payload", "price_parse_notes",
+      "recall_override_at", "recall_override_by", "recall_override_notes",
+    ].sort());
   });
 });
 
@@ -425,5 +397,77 @@ describe("updated_since narrows the count too", () => {
 
   it("rejects a timestamp it cannot parse", () => {
     expect(feed).toMatch(/updated_since must be ISO-8601/);
+  });
+});
+
+
+// ── The consumer contract ─────────────────────────────────────────────
+//
+// AutoFilm's reader silently drops fields it has no reader for. That makes a
+// rename on this side indistinguishable from a field that was never sent:
+// nothing errors, nothing logs, the sync reports success, and a screen is
+// quietly empty. A markdown handover cannot prevent that — it is the first
+// thing to go stale when somebody renames a key.
+//
+// These are the exact names from AutoFilm's reader. Renaming one here fails
+// CI rather than emptying a screen over there.
+describe("every field name AutoFilm reads is emitted", () => {
+  // A row carrying a value for everything, so absence in the output means the
+  // shaper does not emit that key rather than that this fixture lacked it.
+  const full = shapeLotRow({
+    vin: "1C4HJXDN4PW657311",
+    ymm: "2023 Jeep Wrangler 4-Door",
+    trim: "Altitude",
+    condition: "used",
+    price: 32876,
+    mileage: 36087,
+    market_value: 31495,
+    dealer_discount: 1500,
+    slug: "2023-jeep-wrangler-4-door-657311",
+    hero_image_url: "https://x/hero.jpg",
+    photos: ["https://x/1.jpg"],
+    oem_sticker_url: "https://x/oem.pdf",
+    mc_attributes: {
+      year: 2023, make: "Jeep", model: "Wrangler 4-Door",
+      msrp: 51225, body_type: "SUV", stock_no: "H4821",
+    },
+  });
+
+  // name -> the alternates AutoFilm's reader accepts. We must emit at least one.
+  const READS: Record<string, string[]> = {
+    vin: ["vin"],
+    year: ["year"], make: ["make"], model: ["model"], trim: ["trim"],
+    stock: ["stock", "stock_number"],
+    price: ["price", "list_price"],
+    mileage: ["mileage", "odometer"],
+    condition: ["condition"],
+    hero: ["hero_image_url", "photo", "image_url"],
+    slug: ["slug", "public_slug"],
+    ymm: ["ymm"],
+    body_style: ["body_style", "bodyStyle", "body_type", "style"],
+    msrp: ["msrp", "MSRP", "retail_price", "sticker_price"],
+    market_value: ["market_value", "marketValue", "market_price", "book_value"],
+    savings: ["savings", "dealer_savings", "discount", "dealer_discount"],
+    window_sticker: ["window_sticker_url", "sticker_url", "monroney_url", "window_sticker"],
+  };
+
+  for (const [label, names] of Object.entries(READS)) {
+    it(`emits ${label} as one of ${names.join(" | ")}`, () => {
+      const hit = names.find((n) => full[n] !== undefined && full[n] !== null);
+      expect(hit, `${label}: none of ${names.join(", ")} were emitted`).toBeTruthy();
+    });
+  }
+
+  it("emits photos as an array the reader can index", () => {
+    // photos[0] is one of the accepted hero alternates.
+    expect(Array.isArray(full.photos)).toBe(true);
+    expect((full.photos as string[])[0]).toMatch(/^https:\/\//);
+  });
+
+  it("emits detail_version, without which caching is unsafe", () => {
+    // Its absence leaves a consumer choosing between re-fetching every deep
+    // record constantly and showing a rep equipment that has gone stale.
+    expect(feed).toMatch(/shaped\.detail_version = await detailVersion\(/);
+    expect(shared).toMatch(/export async function detailVersion/);
   });
 });
