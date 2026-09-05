@@ -12,7 +12,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 //
 // Contract:
 //   GET /functions/v1/autofilm-feed?tenant_id=<uuid>[&cursor=<vin>][&limit=500]
-//   Headers: X-Autofilm-Key: <AUTOFILM_FEED_SECRET>
+//   Headers: x-lookup-secret: <AUTOLABELS_LOOKUP_SECRET>
+//   (same shared credential vehicle-lookup already validates)
 //
 // Returns: {
 //   total: number,           // live vehicles for the tenant
@@ -38,7 +39,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-autofilm-key",
+    "authorization, x-client-info, apikey, content-type, x-lookup-secret",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
