@@ -66,11 +66,11 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const feedSecret = Deno.env.get("AUTOFILM_FEED_SECRET");
+    const feedSecret = Deno.env.get("AUTOLABELS_LOOKUP_SECRET");
     if (!supabaseUrl || !serviceKey) return json(500, { error: "server misconfigured" });
     if (!feedSecret) return json(503, { error: "feed not enabled" });
 
-    const key = req.headers.get("x-autofilm-key") ?? "";
+    const key = req.headers.get("x-lookup-secret") ?? "";
     if (!timingSafeEqual(key, feedSecret)) return json(401, { error: "unauthorized" });
 
     const url = new URL(req.url);
