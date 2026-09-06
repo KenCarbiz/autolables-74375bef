@@ -3280,6 +3280,7 @@ export type Database = {
           candidate_json: Json | null
           channel_policy_version: string | null
           character_count: number | null
+          claimed_fact_ids: string[]
           compliance_review_state: string
           configuration_version: string | null
           content: string
@@ -3289,10 +3290,14 @@ export type Database = {
           created_by_user_id: string | null
           description_case_id: string
           edit_reason: string | null
+          evidence_audit_json: Json
+          fact_roles_json: Json
           fact_snapshot_id: string | null
           generation_model: string | null
+          headline: string | null
           id: string
           input_checksum: string | null
+          knowledge_revision: string | null
           language: string
           locale: string
           manual_edit: boolean
@@ -3300,6 +3305,7 @@ export type Database = {
           parent_version_id: string | null
           pipeline_stage: string | null
           prompt_checksum: string | null
+          prompt_profile: string | null
           prompt_version: string | null
           quality_score: number | null
           read_time_seconds: number | null
@@ -3312,11 +3318,13 @@ export type Database = {
           source_data_version: string | null
           tenant_id: string
           tone: string | null
+          truth_snapshot_id: string | null
           uniqueness_json: Json | null
           validation_status: string
           vehicle_id: string
           version_number: number
           version_type: string
+          voice_profile_id: string | null
           voice_profile_version: string | null
           word_count: number | null
         }
@@ -3327,6 +3335,7 @@ export type Database = {
           candidate_json?: Json | null
           channel_policy_version?: string | null
           character_count?: number | null
+          claimed_fact_ids?: string[]
           compliance_review_state?: string
           configuration_version?: string | null
           content: string
@@ -3336,10 +3345,14 @@ export type Database = {
           created_by_user_id?: string | null
           description_case_id: string
           edit_reason?: string | null
+          evidence_audit_json?: Json
+          fact_roles_json?: Json
           fact_snapshot_id?: string | null
           generation_model?: string | null
+          headline?: string | null
           id?: string
           input_checksum?: string | null
+          knowledge_revision?: string | null
           language?: string
           locale?: string
           manual_edit?: boolean
@@ -3347,6 +3360,7 @@ export type Database = {
           parent_version_id?: string | null
           pipeline_stage?: string | null
           prompt_checksum?: string | null
+          prompt_profile?: string | null
           prompt_version?: string | null
           quality_score?: number | null
           read_time_seconds?: number | null
@@ -3359,11 +3373,13 @@ export type Database = {
           source_data_version?: string | null
           tenant_id: string
           tone?: string | null
+          truth_snapshot_id?: string | null
           uniqueness_json?: Json | null
           validation_status?: string
           vehicle_id: string
           version_number: number
           version_type?: string
+          voice_profile_id?: string | null
           voice_profile_version?: string | null
           word_count?: number | null
         }
@@ -3374,6 +3390,7 @@ export type Database = {
           candidate_json?: Json | null
           channel_policy_version?: string | null
           character_count?: number | null
+          claimed_fact_ids?: string[]
           compliance_review_state?: string
           configuration_version?: string | null
           content?: string
@@ -3383,10 +3400,14 @@ export type Database = {
           created_by_user_id?: string | null
           description_case_id?: string
           edit_reason?: string | null
+          evidence_audit_json?: Json
+          fact_roles_json?: Json
           fact_snapshot_id?: string | null
           generation_model?: string | null
+          headline?: string | null
           id?: string
           input_checksum?: string | null
+          knowledge_revision?: string | null
           language?: string
           locale?: string
           manual_edit?: boolean
@@ -3394,6 +3415,7 @@ export type Database = {
           parent_version_id?: string | null
           pipeline_stage?: string | null
           prompt_checksum?: string | null
+          prompt_profile?: string | null
           prompt_version?: string | null
           quality_score?: number | null
           read_time_seconds?: number | null
@@ -3406,11 +3428,13 @@ export type Database = {
           source_data_version?: string | null
           tenant_id?: string
           tone?: string | null
+          truth_snapshot_id?: string | null
           uniqueness_json?: Json | null
           validation_status?: string
           vehicle_id?: string
           version_number?: number
           version_type?: string
+          voice_profile_id?: string | null
           voice_profile_version?: string | null
           word_count?: number | null
         }
