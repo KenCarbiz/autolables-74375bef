@@ -228,9 +228,31 @@ export function buildFactSnapshot(
   put("engine", mc.engine, decoded ? "vin_decode" : "marketcheck_feed", decoded ? "verified" : "feed_provided");
   put("transmission", mc.transmission, decoded ? "vin_decode" : "marketcheck_feed", decoded ? "verified" : "feed_provided");
   put("drivetrain", mc.drivetrain, decoded ? "vin_decode" : "marketcheck_feed", decoded ? "verified" : "feed_provided");
-  put("fuel_type", mc.fuel_type, "marketcheck_feed", "feed_provided");
-  put("body_style", mc.body_type, "marketcheck_feed", "feed_provided");
-  put("seating", mc.seating ?? mc.std_seating, "marketcheck_feed", "feed_provided");
+  // These come from the same decoded mc_attributes as engine/transmission
+  // above and were nonetheless pinned to feed_provided, which under-credited
+  // the decode on three facts per vehicle and pushed fact_confidence down for
+  // the whole lot.
+  const src = decoded ? "vin_decode" : "marketcheck_feed";
+  const st = decoded ? "verified" as const : "feed_provided" as const;
+  put("fuel_type", mc.fuel_type, src, st);
+  put("body_style", mc.body_type, src, st);
+  put("seating", mc.seating ?? mc.std_seating, src, st);
+
+  // Decoded detail that reached no fact at all, so the writer could not use
+  // it and the ABSOLUTE RULES forbid inventing it. Fuel economy in particular
+  // is on the customer-packet roadmap as missing while sitting in the decode
+  // on 264 of 271 vehicles.
+  put("doors", mc.doors, src, st);
+  put("cylinders", mc.cylinders, src, st);
+  put("engine_size", mc.engine_size ? `${mc.engine_size}L` : null, src, st);
+  put("made_in", mc.made_in, src, st);
+  const city = Number(mc.city_mpg), hwy = Number(mc.highway_mpg);
+  if (Number.isFinite(city) && city > 0 && Number.isFinite(hwy) && hwy > 0) {
+    // One fact, already worded as an estimate. Two bare numbers invite copy
+    // that states mileage as a guarantee, which is the kind of claim the
+    // dealer would have to stand behind.
+    put("fuel_economy", `${city} city / ${hwy} highway MPG (EPA estimate)`, src, st);
+  }
   put("exterior_color", mc.exterior_color ?? mc.base_ext_color, "marketcheck_feed", "feed_provided");
   put("interior_color", mc.interior_color ?? mc.base_int_color, "marketcheck_feed", "feed_provided");
 

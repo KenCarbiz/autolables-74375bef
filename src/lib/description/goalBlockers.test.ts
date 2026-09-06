@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  withRequiredDisclosure, featureBudgetForLength,
+  withRequiredDisclosure, featureBudgetForLength, buildFactSnapshot,
 } from "../../../supabase/functions/_shared/description-core.ts";
 import {
   evaluateBudget, collectTriggeredLimits, unpricedCallCeiling,
@@ -263,5 +263,82 @@ describe("the master is supplied enough material for its own band", () => {
     expect(vauto).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
     expect(vauto).toMatch(/featureBudget: 35/);
     expect(vauto).not.toMatch(/featureBudget: 10/);
+  });
+});
+
+// ── 6. Facts the decode already had ──────────────────────────────────
+//
+// Every vehicle carried the same 18 facts and the same 29% confidence, and
+// only 6 of the 18 were verified. Three of the nine "feed_provided" facts --
+// fuel_type, body_style, seating -- came from the very same decoded
+// mc_attributes as engine/transmission/drivetrain, which were correctly
+// upgraded to verified two lines above. And fuel economy, doors, cylinders,
+// engine size and country of manufacture reached NO fact at all, so the
+// writer could not use them and the ABSOLUTE RULES forbid inventing them.
+
+describe("the decode's own facts reach the writer", () => {
+  const decodedListing = {
+    vin: "1C6SRFFT2NN400176", ymm: "2022 RAM Ram 1500", trim: "Big Horn",
+    condition: "used", mileage: 107506,
+    mc_attributes: {
+      specs_source: "neovin", options: ["Level 2 Equipment Group"],
+      engine: "5.7L V8", transmission: "Automatic", drivetrain: "4WD",
+      fuel_type: "Unleaded", body_type: "Pickup", std_seating: 6,
+      doors: 4, cylinders: 8, engine_size: 5.7, made_in: "United States",
+      city_mpg: 17, highway_mpg: 22,
+    },
+  };
+  const facts = (l: Record<string, unknown>) =>
+    buildFactSnapshot(l as never, {} as never, null).facts as Record<string, {
+      value: unknown; status: string; source: string }>;
+
+  it("credits the decode on facts that came from it", () => {
+    const f = facts(decodedListing);
+    for (const k of ["fuel_type", "body_style", "seating"]) {
+      expect(f[k]?.status).toBe("verified");
+      expect(f[k]?.source).toBe("vin_decode");
+    }
+  });
+
+  it("still says feed_provided when the VIN was never decoded", () => {
+    const f = facts({ ...decodedListing,
+      mc_attributes: { fuel_type: "Unleaded", body_type: "Pickup" } });
+    expect(f.fuel_type?.status).toBe("feed_provided");
+    expect(f.body_style?.source).toBe("marketcheck_feed");
+  });
+
+  it("supplies fuel economy, which the writer may not invent", () => {
+    const f = facts(decodedListing);
+    // Worded as an estimate in the fact itself. Two bare numbers invite copy
+    // that states mileage as a guarantee the dealer has to stand behind.
+    expect(f.fuel_economy?.value).toBe("17 city / 22 highway MPG (EPA estimate)");
+  });
+
+  it("omits fuel economy rather than reporting half of it", () => {
+    const half = { ...decodedListing,
+      mc_attributes: { ...decodedListing.mc_attributes, highway_mpg: null } };
+    expect(facts(half).fuel_economy).toBeUndefined();
+    const zero = { ...decodedListing,
+      mc_attributes: { ...decodedListing.mc_attributes, city_mpg: 0 } };
+    expect(facts(zero).fuel_economy).toBeUndefined();
+  });
+
+  it("adds the rest of the decoded detail", () => {
+    const f = facts(decodedListing);
+    expect(f.doors?.value).toBe(4);
+    expect(f.cylinders?.value).toBe(8);
+    expect(f.engine_size?.value).toBe("5.7L");
+    expect(f.made_in?.value).toBe("United States");
+  });
+
+  it("raises how much of the packet is verified", () => {
+    // More verified facts is the only honest route to both a higher
+    // confidence score and a longer description.
+    const before = Object.values(facts({ ...decodedListing,
+      mc_attributes: { engine: "5.7L V8", fuel_type: "Unleaded", body_type: "Pickup" } }))
+      .filter((v) => v.status === "verified").length;
+    const after = Object.values(facts(decodedListing))
+      .filter((v) => v.status === "verified").length;
+    expect(after).toBeGreaterThan(before + 5);
   });
 });
