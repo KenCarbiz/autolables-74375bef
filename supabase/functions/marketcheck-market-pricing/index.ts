@@ -85,17 +85,17 @@ const persist = async (admin: any, tenantId: string | null, vin: string, m: Mark
     market_position: m.position,
     market_checked_at: m.checkedAt,
     market_payload: m,          // full normalized result + raw provider response
-    mc_raw: m,                  // keep the complete payload on the car
+    // Deliberately NOT written to mc_raw. That column belongs to
+    // marketcheck-sync, which stores the feed listing there — including the
+    // build object the lot feed reads specs out of. Writing the price
+    // prediction over it replaced the column outright, so whichever cars this
+    // job happened to write last each night lost their manufacturing spec,
+    // and which 30% of the lot that was moved from night to night. The
+    // identical object is already on market_payload above and appended to
+    // vehicle_value_history below; nothing reads market data out of mc_raw.
   }).eq("vin", vin);
   if (tenantId) q = q.eq("tenant_id", tenantId);
-  try { await q; } catch {
-    // mc_raw column may not be migrated yet — retry without it.
-    let q2 = admin.from("vehicle_listings").update({
-      market_value: m.marketValue, market_position: m.position, market_checked_at: m.checkedAt, market_payload: m,
-    }).eq("vin", vin);
-    if (tenantId) q2 = q2.eq("tenant_id", tenantId);
-    try { await q2; } catch { /* market_* columns may not be migrated yet */ }
-  }
+  try { await q; } catch { /* market_* columns may not be migrated yet */ }
   // Append a time-series snapshot so value can be charted over time for the
   // customer. Best-effort: the history table may not be migrated yet.
   await admin.from("vehicle_value_history").insert({

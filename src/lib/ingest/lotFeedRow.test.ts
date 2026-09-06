@@ -522,10 +522,9 @@ describe("AutoFilm receives the full vehicle detail", () => {
     expect(out.mc_attributes.build_sheet.options).toContain("Level 2 Equipment Group");
   });
 
-  it("carries the manufacturing spec that was locked inside the raw payload", () => {
-    // Fuel economy, cylinders, doors, seating and dimensions all live in
-    // mc_raw.build, and mc_raw is withheld wholesale — so none of it reached
-    // AutoFilm despite being ordinary vehicle detail.
+  it("carries the manufacturing spec, which no field named individually", () => {
+    // Fuel economy, cylinders, doors, seating and dimensions are ordinary
+    // vehicle detail a walkaround needs, and none of it reached AutoFilm.
     const spec = (shapeLotRow(withBuild) as Record<string, any>).specifications;
     expect(spec.city_mpg).toBe(17);
     expect(spec.highway_mpg).toBe(22);
@@ -555,7 +554,55 @@ describe("AutoFilm receives the full vehicle detail", () => {
   });
 
   it("reports null when the vehicle was never decoded", () => {
-    const out = shapeLotRow({ ...withBuild, mc_raw: null }) as Record<string, any>;
+    const out = shapeLotRow({ ...withBuild, mc_attributes: {}, mc_raw: null }) as Record<string, any>;
     expect(out.specifications).toBeNull();
+  });
+
+  // Production, 2026-09-06: 81 of Harte's 269 decoded cars had no mc_raw.build
+  // at all. Not a decode failure — marketcheck-market-pricing REPLACES mc_raw
+  // with a price prediction, and both jobs run in the same nightly window, so
+  // whichever cars it wrote last lost their spec. All 269 were market-checked
+  // within the same minute. Which 30% of the lot went blank moved night to
+  // night, which is the worst shape a data bug can take: it looks like a flaky
+  // provider rather than a race between two of our own writers.
+  const clobbered = {
+    ...withBuild,
+    mc_attributes: {
+      ...withBuild.mc_attributes,
+      body_type: "Pickup", doors: 4, std_seating: 5, engine: "5.7L V8",
+      cylinders: 8, drivetrain: "4WD", city_mpg: 17, highway_mpg: 22,
+      overall_length: 232.9, made_in: "United States",
+    },
+    mc_raw: {
+      vin: "1C6SRFFT2NN400176", checkedAt: "2026-09-06T03:17:18.029Z",
+      listingPrice: 41995, marketValue: 43100, low: 40500, high: 45200,
+      position: "below", belowMarket: true, rawProvider: "marketcheck_predict",
+      raw: { predicted_price: 43100 },
+    },
+  };
+
+  it("still reports the spec after the pricing job has overwritten mc_raw", () => {
+    const spec = (shapeLotRow(clobbered) as Record<string, any>).specifications;
+    expect(spec.city_mpg).toBe(17);
+    expect(spec.cylinders).toBe(8);
+    expect(spec.drivetrain).toBe("4WD");
+    expect(spec.made_in).toBe("United States");
+  });
+
+  it("does not leak the price prediction into the spec", () => {
+    const out = shapeLotRow(clobbered) as Record<string, any>;
+    expect(out.specifications.marketValue).toBeUndefined();
+    expect(out.mc_raw).toBeUndefined();
+  });
+
+  it("stops the pricing job from writing mc_raw at all", () => {
+    // The fix above makes the feed survive the clobber. This stops the clobber:
+    // the identical object is already written to market_payload on the same
+    // update and appended to vehicle_value_history, and nothing reads market
+    // data back out of mc_raw.
+    const pricing = readFileSync(
+      join(fnDir, "marketcheck-market-pricing/index.ts"), "utf8");
+    expect(pricing).toMatch(/market_payload: m,/);
+    expect(pricing).not.toMatch(/^\s*mc_raw: m,/m);
   });
 });
