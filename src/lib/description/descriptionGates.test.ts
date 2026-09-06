@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  runGates, countCharacters, countWords, vehicleClassOf, CHAR_BANDS, GATE_ORDER,
+  runGates, countCharacters, countWords, vehicleClassOf, CHAR_BANDS, TARGET_BAND, GATE_ORDER,
 } from "../../../supabase/functions/_shared/description-gates.ts";
 import { DRIVESIGNAL_V3_SYSTEM } from "../../../supabase/functions/_shared/prompts/drivesignal-v3-system.ts";
 
@@ -22,10 +22,10 @@ const output = (o: Record<string, string[]> = {}) => ({
   used_fact_ids: [], hero_fact_ids: [], warranty_fact_ids: [], history_fact_ids: [], ...o,
 });
 
-// Seven paragraphs of five sentences, about 2,900 characters: inside the
+// Eight paragraphs of five sentences, about 3,300 characters: inside the
 // mainstream band and inside the paragraph standard, so a PASS means the gates
 // found nothing rather than that the fixture dodged them.
-const CLEAN = Array.from({ length: 7 }, (_, p) =>
+const CLEAN = Array.from({ length: 8 }, (_, p) =>
   Array.from({ length: 5 }, (_, i) =>
     `Paragraph ${p} sentence ${i} explains a verified feature and why it matters to an owner.`)
     .join(" ")).join("\n\n");
@@ -87,16 +87,22 @@ describe("gate 2 — completeness", () => {
     expect(runGates({ ...base }).characterCount).toBe(CLEAN.length);
   });
 
-  it("keeps the ladder inside the dealership's own operating window", () => {
-    // A literal conversion of the manual's word bands would put luxury above
-    // both the platform ceiling and this tenant's stored max_length of 3800.
+  it("targets one band for every vehicle, per the owner", () => {
+    // 3,000-3,879 across the lot, deliberately overriding the manual's
+    // per-class word guidance for marketplace parity. Class is still resolved
+    // and recorded, so restoring a ladder later is a data change.
     for (const band of Object.values(CHAR_BANDS)) {
-      expect(band.min).toBeGreaterThanOrEqual(1800);
-      expect(band.max).toBeLessThanOrEqual(3800);
-      expect(band.max - band.min).toBeGreaterThanOrEqual(400);
+      expect(band).toEqual({ min: 3000, max: 3879 });
     }
-    expect(CHAR_BANDS.economy.max).toBeLessThan(CHAR_BANDS.mainstream.max);
-    expect(CHAR_BANDS.mainstream.max).toBeLessThan(CHAR_BANDS.luxury.max);
+    expect(TARGET_BAND.max - TARGET_BAND.min).toBeGreaterThanOrEqual(400);
+  });
+
+  it("treats the floor as a target rather than a gate", () => {
+    // A vehicle without enough verified data to reach 3,000 characters is
+    // flagged, never padded: section 24 forbids padding outright.
+    const short = runGates({ ...base, content: "Short but honest copy. Contact us." });
+    expect(short.findings.find((f) => f.code === "BELOW_CLASS_CHAR_BAND")?.blocking).toBe(false);
+    expect(short.decision).not.toBe("REJECT");
   });
 });
 

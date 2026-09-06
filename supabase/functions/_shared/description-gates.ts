@@ -68,31 +68,36 @@ const VALIDATOR_GATE: Record<string, GateId> = {
   CHANNEL_FORMAT_INVALID: "marketplace",
 };
 
-// ── Vehicle class length bands ───────────────────────────────────────
+// ── Length band ──────────────────────────────────────────────────────
 //
-// Length is measured in TOTAL CHARACTERS INCLUDING SPACES, by owner decision.
-// That is also the unit every downstream limit already uses — the tenant row's
-// min_length and max_length, LENGTH_POLICY, and the marketplace field caps —
-// so counting words here left two units in play that could disagree about the
-// same description.
+// Length is measured in TOTAL CHARACTERS INCLUDING SPACES, by owner decision,
+// and every vehicle targets the same band: 3,000 to 3,879. That is also the
+// unit every downstream limit uses — the tenant row's min_length and
+// max_length, LENGTH_POLICY, and the marketplace field caps — so counting
+// words here left two units able to disagree about one description.
 //
-// The manual expresses its guidance in words (section 24: economy 250-400,
-// mainstream 400-650, luxury and performance 600-900, heavy duty 600-850).
-// Those are converted here rather than transcribed. A literal conversion at
-// the measured ~6.9 characters per word would put luxury at 4,100-6,200,
-// which exceeds both the platform ceiling and this dealership's own stored
-// max_length of 3,800 — so the ladder is scaled into the operating window the
-// owner set, preserving the manual's intent that a richer vehicle earns longer
-// copy without inventing headroom nobody asked for.
+// This deliberately overrides the manual's per-class word guidance (section
+// 24: economy 250-400 words, luxury 600-900). The owner wants one consistent
+// length across the lot for marketplace parity. The class is still resolved
+// and still recorded, so restoring a per-class ladder later is a data change
+// rather than a rewrite.
+//
+// The floor is a TARGET, not a gate: a vehicle with too little verified data
+// to reach 3,000 characters honestly is flagged for review, never padded.
+// Section 24 is explicit that quality outranks length and that padding is
+// forbidden, and a writer told to hit a floor at any cost produces exactly the
+// boilerplate this system exists to avoid.
 
 export type VehicleClass = "economy" | "mainstream" | "luxury" | "performance" | "heavy_duty";
 
+export const TARGET_BAND = { min: 3000, max: 3879 } as const;
+
 export const CHAR_BANDS: Record<VehicleClass, { min: number; max: number }> = {
-  economy: { min: 1800, max: 2600 },
-  mainstream: { min: 2400, max: 3200 },
-  luxury: { min: 3000, max: 3800 },
-  performance: { min: 3000, max: 3800 },
-  heavy_duty: { min: 3000, max: 3800 },
+  economy: { ...TARGET_BAND },
+  mainstream: { ...TARGET_BAND },
+  luxury: { ...TARGET_BAND },
+  performance: { ...TARGET_BAND },
+  heavy_duty: { ...TARGET_BAND },
 };
 
 // ── Language the manual forbids outright ─────────────────────────────

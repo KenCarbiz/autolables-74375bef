@@ -185,6 +185,13 @@ describe("channel policy registry", () => {
     }
   });
 
+  it("carries exactly one policy per channel", () => {
+    // Adding a second entry for a key the registry already had is how a
+    // channel silently gets two different character limits.
+    const keys = DEFAULT_CHANNEL_POLICIES.map((p) => p.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   it("lets a tenant tighten a limit but never raise it", () => {
     const tighter = resolveChannelPolicy("autotrader", { characterLimit: 900 })!;
     const looser = resolveChannelPolicy("autotrader", { characterLimit: 99999 })!;
