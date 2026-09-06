@@ -766,7 +766,7 @@ async function orchestrateVehicle(
         blocking: g.blocking,
       }))];
     await audit(admin, tenantId, "description_gates_evaluated", caseId, {
-      vin: listing.vin, decision: gateReport.decision, words: gateReport.wordCount,
+      vin: listing.vin, decision: gateReport.decision, characters: gateReport.characterCount,
       by_gate: gateReport.byGate,
     });
 

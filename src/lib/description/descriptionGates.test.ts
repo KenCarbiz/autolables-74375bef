@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  runGates, countWords, vehicleClassOf, WORD_BANDS, GATE_ORDER,
+  runGates, countCharacters, countWords, vehicleClassOf, CHAR_BANDS, GATE_ORDER,
 } from "../../../supabase/functions/_shared/description-gates.ts";
 import { DRIVESIGNAL_V3_SYSTEM } from "../../../supabase/functions/_shared/prompts/drivesignal-v3-system.ts";
 
@@ -22,10 +22,10 @@ const output = (o: Record<string, string[]> = {}) => ({
   used_fact_ids: [], hero_fact_ids: [], warranty_fact_ids: [], history_fact_ids: [], ...o,
 });
 
-// Eight paragraphs of five sentences, about 520 words: inside the mainstream
-// band and inside the paragraph standard, so a PASS means the gates found
-// nothing rather than that the fixture dodged them.
-const CLEAN = Array.from({ length: 8 }, (_, p) =>
+// Seven paragraphs of five sentences, about 2,900 characters: inside the
+// mainstream band and inside the paragraph standard, so a PASS means the gates
+// found nothing rather than that the fixture dodged them.
+const CLEAN = Array.from({ length: 7 }, (_, p) =>
   Array.from({ length: 5 }, (_, i) =>
     `Paragraph ${p} sentence ${i} explains a verified feature and why it matters to an owner.`)
     .join(" ")).join("\n\n");
@@ -57,10 +57,10 @@ describe("gate 1 — evidence", () => {
 });
 
 describe("gate 2 — completeness", () => {
-  it("flags copy below the class word band without blocking it", () => {
+  it("flags copy below the class character band without blocking it", () => {
     // A sparse vehicle honestly described short is a review item, not a defect.
     const r = runGates({ ...base, content: "Short copy about a car. Contact us." });
-    const f = r.findings.find((x) => x.code === "BELOW_CLASS_WORD_BAND");
+    const f = r.findings.find((x) => x.code === "BELOW_CLASS_CHAR_BAND");
     expect(f?.blocking).toBe(false);
     expect(r.decision).toBe("REVIEW");
   });
@@ -68,7 +68,7 @@ describe("gate 2 — completeness", () => {
   it("flags padding above the band", () => {
     const long = Array.from({ length: 400 }, () => "padding words repeated here.").join(" ");
     expect(runGates({ ...base, content: long }).findings.some(
-      (f) => f.code === "ABOVE_CLASS_WORD_BAND")).toBe(true);
+      (f) => f.code === "ABOVE_CLASS_CHAR_BAND")).toBe(true);
   });
 
   it("notices short copy that ignored supplied facts", () => {
@@ -77,10 +77,26 @@ describe("gate 2 — completeness", () => {
     expect(r.findings.some((f) => f.code === "SUPPLIED_FACTS_UNUSED")).toBe(true);
   });
 
-  it("uses the manual's own bands", () => {
-    expect(WORD_BANDS.economy).toEqual({ min: 250, max: 400 });
-    expect(WORD_BANDS.luxury).toEqual({ min: 600, max: 900 });
-    expect(WORD_BANDS.heavy_duty).toEqual({ min: 600, max: 850 });
+  it("measures total characters including spaces, never words", () => {
+    // Owner decision, and it is the unit every other limit already uses: the
+    // tenant row's min_length and max_length, LENGTH_POLICY, and the
+    // marketplace field caps. Two units could disagree about one description.
+    expect(countCharacters("ab cd")).toBe(5);
+    expect(countCharacters("  ")).toBe(2);
+    expect(countCharacters("")).toBe(0);
+    expect(runGates({ ...base }).characterCount).toBe(CLEAN.length);
+  });
+
+  it("keeps the ladder inside the dealership's own operating window", () => {
+    // A literal conversion of the manual's word bands would put luxury above
+    // both the platform ceiling and this tenant's stored max_length of 3800.
+    for (const band of Object.values(CHAR_BANDS)) {
+      expect(band.min).toBeGreaterThanOrEqual(1800);
+      expect(band.max).toBeLessThanOrEqual(3800);
+      expect(band.max - band.min).toBeGreaterThanOrEqual(400);
+    }
+    expect(CHAR_BANDS.economy.max).toBeLessThan(CHAR_BANDS.mainstream.max);
+    expect(CHAR_BANDS.mainstream.max).toBeLessThan(CHAR_BANDS.luxury.max);
   });
 });
 
@@ -175,7 +191,7 @@ describe("class comes from the vehicle, not the copy", () => {
     expect(vehicleClassOf({ msrp: 41000 })).toBe("mainstream");
   });
 
-  it("counts words the way the manual does", () => {
+  it("still counts words, but only for sentence readability", () => {
     expect(countWords("  one two   three ")).toBe(3);
     expect(countWords("")).toBe(0);
   });

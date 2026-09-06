@@ -41,6 +41,7 @@ export interface GateReport {
   findings: GateFinding[];
   byGate: Record<GateId, { blocking: number; warnings: number }>;
   evidence: EvidenceAudit | null;
+  characterCount: number;
   wordCount: number;
 }
 
@@ -67,20 +68,31 @@ const VALIDATOR_GATE: Record<string, GateId> = {
   CHANNEL_FORMAT_INVALID: "marketplace",
 };
 
-// ── Vehicle class word bands (manual section 24) ─────────────────────
+// ── Vehicle class length bands ───────────────────────────────────────
 //
-// The manual counts WORDS; scoreVersion's lengthScore counts characters and
-// remains the quality dimension. They must agree in direction, and the gate is
-// the authority for the DriveSignal profile.
+// Length is measured in TOTAL CHARACTERS INCLUDING SPACES, by owner decision.
+// That is also the unit every downstream limit already uses — the tenant row's
+// min_length and max_length, LENGTH_POLICY, and the marketplace field caps —
+// so counting words here left two units in play that could disagree about the
+// same description.
+//
+// The manual expresses its guidance in words (section 24: economy 250-400,
+// mainstream 400-650, luxury and performance 600-900, heavy duty 600-850).
+// Those are converted here rather than transcribed. A literal conversion at
+// the measured ~6.9 characters per word would put luxury at 4,100-6,200,
+// which exceeds both the platform ceiling and this dealership's own stored
+// max_length of 3,800 — so the ladder is scaled into the operating window the
+// owner set, preserving the manual's intent that a richer vehicle earns longer
+// copy without inventing headroom nobody asked for.
 
 export type VehicleClass = "economy" | "mainstream" | "luxury" | "performance" | "heavy_duty";
 
-export const WORD_BANDS: Record<VehicleClass, { min: number; max: number }> = {
-  economy: { min: 250, max: 400 },
-  mainstream: { min: 400, max: 650 },
-  luxury: { min: 600, max: 900 },
-  performance: { min: 600, max: 900 },
-  heavy_duty: { min: 600, max: 850 },
+export const CHAR_BANDS: Record<VehicleClass, { min: number; max: number }> = {
+  economy: { min: 1800, max: 2600 },
+  mainstream: { min: 2400, max: 3200 },
+  luxury: { min: 3000, max: 3800 },
+  performance: { min: 3000, max: 3800 },
+  heavy_duty: { min: 3000, max: 3800 },
 };
 
 // ── Language the manual forbids outright ─────────────────────────────
@@ -105,6 +117,13 @@ function phraseHits(text: string, phrases: string[]): string[] {
   return phrases.filter((p) => lc.includes(norm(p)));
 }
 
+/** Total characters including spaces — the unit every length limit uses. */
+export function countCharacters(text: string): number {
+  return (text || "").length;
+}
+
+/** Words are still counted, but only for readability: the manual's 15-25 word
+ *  sentence standard is a legibility measure, not a length target. */
 export function countWords(text: string): number {
   return (text.trim().match(/\S+/g) || []).length;
 }
@@ -137,6 +156,7 @@ export function runGates(input: GateInput): GateReport {
     findings.push({ gate, code, blocking, message, origin });
 
   const text = input.content || "";
+  const characters = countCharacters(text);
   const words = countWords(text);
 
   // Gate 1 — Evidence.
@@ -159,15 +179,15 @@ export function runGates(input: GateInput): GateReport {
   }
 
   // Gate 2 — Completeness. Enough story for this vehicle, no padding.
-  const band = WORD_BANDS[input.vehicleClass];
-  if (words < band.min) {
-    add("completeness", "BELOW_CLASS_WORD_BAND", false,
-      `${words} words; a ${input.vehicleClass} vehicle typically supports ${band.min}-${band.max}.`);
-  } else if (words > band.max) {
-    add("completeness", "ABOVE_CLASS_WORD_BAND", false,
-      `${words} words; above the ${band.max}-word guidance for a ${input.vehicleClass} vehicle.`);
+  const band = CHAR_BANDS[input.vehicleClass];
+  if (characters < band.min) {
+    add("completeness", "BELOW_CLASS_CHAR_BAND", false,
+      `${characters} characters; a ${input.vehicleClass} vehicle typically supports ${band.min}-${band.max}.`);
+  } else if (characters > band.max) {
+    add("completeness", "ABOVE_CLASS_CHAR_BAND", false,
+      `${characters} characters; above the ${band.max}-character guidance for a ${input.vehicleClass} vehicle.`);
   }
-  if (evidence && evidence.unclaimed_supplied.length > 0 && words < band.min) {
+  if (evidence && evidence.unclaimed_supplied.length > 0 && characters < band.min) {
     // Short AND ignoring supplied facts is the shape of a lazy generation,
     // as opposed to a sparse vehicle honestly described.
     add("completeness", "SUPPLIED_FACTS_UNUSED", false,
@@ -223,7 +243,7 @@ export function runGates(input: GateInput): GateReport {
   const decision: GateReport["decision"] =
     blocking > 0 ? "REJECT" : warnings > 0 ? "REVIEW" : "PASS";
 
-  return { decision, findings, byGate, evidence, wordCount: words };
+  return { decision, findings, byGate, evidence, characterCount: characters, wordCount: words };
 }
 
 /** Vehicle class from resolved truth, never from the copy. */
