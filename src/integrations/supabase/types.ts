@@ -1914,6 +1914,7 @@ export type Database = {
           last_error_message: string | null
           last_failure_at: string | null
           last_orchestrated_at: string | null
+          last_refresh_milestone: number | null
           last_success_at: string | null
           lock_version: number
           master_lock_reason: string | null
@@ -1944,6 +1945,7 @@ export type Database = {
           last_error_message?: string | null
           last_failure_at?: string | null
           last_orchestrated_at?: string | null
+          last_refresh_milestone?: number | null
           last_success_at?: string | null
           lock_version?: number
           master_lock_reason?: string | null
@@ -1974,6 +1976,7 @@ export type Database = {
           last_error_message?: string | null
           last_failure_at?: string | null
           last_orchestrated_at?: string | null
+          last_refresh_milestone?: number | null
           last_success_at?: string | null
           lock_version?: number
           master_lock_reason?: string | null
