@@ -17,7 +17,13 @@ const executable = migration.split("\n").filter((l) => !l.trim().startsWith("--"
 describe("the orchestrator uses the pieces", () => {
   it("generates through the provider abstraction, not a hard-coded vendor", () => {
     expect(orch).toMatch(/import \{ createProvider/);
-    expect(orch).toMatch(/createProvider\(\s*\n?\s*settings\.generation_provider === "openai"/);
+    // The vendor is chosen from the tenant's setting and passed to the
+    // adapter. Asserted on the choice rather than on one inlined expression,
+    // so extracting it to a variable does not read as a regression.
+    expect(orch).toMatch(/settings\.generation_provider === "openai" \? "openai" : "anthropic"/);
+    expect(orch).toMatch(/createProvider\(providerKey, Deno\.env\)/);
+    // No vendor name reaches the adapter except through that choice.
+    expect(orch).not.toMatch(/createProvider\("(openai|anthropic)"/);
   });
 
   it("sends the pinned V3 instructions and the selected knowledge as the system slot", () => {

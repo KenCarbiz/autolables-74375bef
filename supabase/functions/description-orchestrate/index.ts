@@ -36,6 +36,7 @@ import { assembleKnowledge, vehicleSignals, KNOWLEDGE_REVISION } from "../_share
 import { DESCRIPTION_OUTPUT_SCHEMA, auditEvidence, factRoles } from "../_shared/description-evidence.ts";
 import { runGates, vehicleClassOf } from "../_shared/description-gates.ts";
 import { refreshDecision } from "../_shared/description-refresh.ts";
+import { computeCost, type CostRecord } from "../_shared/description-cost.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -117,6 +118,64 @@ export interface MasterGeneration {
    *  answerable six months later without knowing what the writer was given. */
   moduleKeys: string[];
   result: GenerationResult | null;
+  /** Row in description_model_executions, when a provider call was made. */
+  executionId?: string | null;
+}
+
+/**
+ * What the call cost, recorded whether or not it produced anything.
+ *
+ * The failure path matters more than the success path here. A structured
+ * response that truncates has already spent the entire output budget --
+ * mostly on reasoning tokens, which are billed as output -- and then throws.
+ * Recording only on success would hide precisely the calls worth seeing, which
+ * is why `cost_may_have_occurred` exists on the table: a request that left the
+ * process was probably billed even when we got nothing usable back.
+ *
+ * Best-effort by construction: accounting must never be the reason a
+ * description fails to generate.
+ */
+async function recordExecution(
+  admin: any, tenantId: string, vehicleId: string | null, caseId: string | null,
+  args: {
+    kind: "generation" | "repair" | "fallback" | "preview" | "evaluation";
+    outcome: "succeeded" | "failed" | "timeout";
+    provider: string; model: string;
+    result: GenerationResult | null;
+    errorCode?: string | null; errorCategory?: string | null;
+  },
+): Promise<string | null> {
+  try {
+    const usage = args.result?.usage;
+    const cost: CostRecord = computeCost(args.model, {
+      inputTokens: usage?.inputTokens ?? null,
+      outputTokens: usage?.outputTokens ?? null,
+      cachedInputTokens: usage?.cachedInputTokens ?? null,
+      reasoningTokens: usage?.reasoningTokens ?? null,
+    });
+    const { data } = await admin.from("description_model_executions").insert({
+      tenant_id: tenantId, vehicle_id: vehicleId, description_case_id: caseId,
+      execution_kind: args.kind,
+      provider: args.result?.provider ?? args.provider, model: args.model,
+      input_tokens: usage?.inputTokens ?? null,
+      output_tokens: usage?.outputTokens ?? null,
+      cached_input_tokens: usage?.cachedInputTokens ?? null,
+      reasoning_tokens: usage?.reasoningTokens ?? null,
+      cost_state: cost.state, cost_amount: cost.amount,
+      currency: cost.currency, pricing_version: cost.pricingVersion,
+      latency_ms: args.result?.latencyMs ?? null,
+      outcome: args.outcome,
+      error_code: args.errorCode ?? null,
+      error_category: args.errorCategory ?? null,
+      // The request left the process, so the provider may have billed for it
+      // regardless of what came back.
+      cost_may_have_occurred: true,
+      completed_at: new Date().toISOString(),
+    }).select("id").single();
+    return (data?.id as string) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -128,6 +187,7 @@ export interface MasterGeneration {
  */
 async function generateMaster(
   packet: any, snap: any, settings: Record<string, any>, listing: Record<string, any>,
+  ctx: { admin: any; tenantId: string; vehicleId: string; caseId: string },
 ): Promise<MasterGeneration> {
   if (settings.prompt_profile !== "drivesignal-v3-system") {
     const text = await callGenerator(buildMasterPromptV3(packet, settings), settings.generation_model);
@@ -148,26 +208,54 @@ async function generateMaster(
     needsChannelDerivatives: false,
   }));
 
-  const provider = createProvider(
-    settings.generation_provider === "openai" ? "openai" : "anthropic", Deno.env);
-  const result = await provider.generate({
-    systemPrompt: `${DRIVESIGNAL_V3_SYSTEM}\n\n${knowledge.text}`,
-    userContent: buildMasterPromptV3(packet, settings),
-    model: settings.generation_model,
-    schema: DESCRIPTION_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
-    schemaName: "drivesignal_vehicle_description",
-    maxOutputTokens: outputTokenBudget(
-      preferredLengthBand(settings).max, settings.reasoning_effort),
-    reasoningEffort: settings.reasoning_effort || null,
-    verbosity: settings.verbosity || null,
-  });
+  const providerKey = settings.generation_provider === "openai" ? "openai" : "anthropic";
+  const provider = createProvider(providerKey, Deno.env);
+  let result: GenerationResult;
+  try {
+    result = await provider.generate({
+      systemPrompt: `${DRIVESIGNAL_V3_SYSTEM}\n\n${knowledge.text}`,
+      userContent: buildMasterPromptV3(packet, settings),
+      model: settings.generation_model,
+      schema: DESCRIPTION_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+      schemaName: "drivesignal_vehicle_description",
+      maxOutputTokens: outputTokenBudget(
+        preferredLengthBand(settings).max, settings.reasoning_effort),
+      reasoningEffort: settings.reasoning_effort || null,
+      verbosity: settings.verbosity || null,
+    });
+  } catch (e) {
+    // The call still cost whatever it burned before it failed. There is no
+    // usage to report on a transport error, but the attempt itself is a fact
+    // the ledger should carry.
+    await recordExecution(ctx.admin, ctx.tenantId, ctx.vehicleId, ctx.caseId, {
+      kind: "generation", outcome: "failed",
+      provider: providerKey, model: settings.generation_model, result: null,
+      errorCode: (e as { code?: string }).code || "PROVIDER_ERROR",
+      errorCategory: "provider",
+    });
+    throw e;
+  }
 
   // A structured call that came back as prose is a failed structured call, not
   // copy to publish: the evidence ledger would have nothing to audit.
   if (!result.parsed) {
+    // Recorded before the throw. This is the most expensive outcome there is:
+    // the full output budget spent, mostly on reasoning, and nothing to show.
+    await recordExecution(ctx.admin, ctx.tenantId, ctx.vehicleId, ctx.caseId, {
+      kind: "generation", outcome: "failed",
+      provider: providerKey, model: settings.generation_model, result,
+      errorCode: "structured_output_missing", errorCategory: "provider",
+    });
     throw Object.assign(new Error("structured_output_missing"), { code: "PROVIDER_ERROR" });
   }
+
+  const executionId = await recordExecution(
+    ctx.admin, ctx.tenantId, ctx.vehicleId, ctx.caseId, {
+      kind: "generation", outcome: "succeeded",
+      provider: providerKey, model: settings.generation_model, result,
+    });
   return {
+    executionId,
     text: result.parsed.master_description,
     headline: result.parsed.headline,
     claimedFactIds: [...new Set([
@@ -712,7 +800,8 @@ async function orchestrateVehicle(
     await setCase(admin, caseId, { status: "GENERATING" });
     await audit(admin, tenantId, "description_generation_started", caseId,
       { vin: listing.vin, tone, voice_profile_version: voice.version, input_checksum: inputChecksum });
-    const generation = await generateMaster(packet, snap, settings, listing);
+    const generation = await generateMaster(packet, snap, settings, listing,
+      { admin, tenantId, vehicleId, caseId });
     const masterText = generation.text;
     const knowledgeModules = generation.moduleKeys;
 
@@ -727,6 +816,7 @@ async function orchestrateVehicle(
       version_number: nextNumber, version_type: opts.reason === "manual_regenerate" ? "regenerated" : "generated",
       content: masterText, word_count: masterText.split(/\s+/).filter(Boolean).length,
       character_count: masterText.length, generation_model: settings.generation_model,
+      model_execution_id: generation.executionId ?? null,
       prompt_version: settings.prompt_version, configuration_version: configVersion,
       prompt_profile: settings.prompt_profile,
       knowledge_revision: settings.prompt_profile === "drivesignal-v3-system"
@@ -976,6 +1066,15 @@ async function orchestrateVehicle(
         await raiseException(admin, ctx, "CHANNEL_GENERATION_FAILED", "medium", false,
           `${policy.label} variant could not be generated`, String((e as Error).message).slice(0, 200), {}, key);
       }
+    }
+
+    // The schema declares both directions. Closing the loop means a spend
+    // query can reach the copy it paid for without joining back through
+    // description_versions.
+    if (generation.executionId && version?.id) {
+      await admin.from("description_model_executions")
+        .update({ version_id: version.id }).eq("id", generation.executionId)
+        .then(() => undefined, () => undefined);
     }
 
     // 5 ── eligibility + honest publication
