@@ -159,12 +159,10 @@ describe("cost and concurrency guards", () => {
 
 describe("warnings inform without blocking", () => {
   it("warns about an unresolved conflict but still allows generation", () => {
-    // Feed and decode disagree on premium equipment; the packet already excludes
-    // it, so the copy is safe and the run should proceed.
-    const conflicted = buildFactSnapshot({
-      ...LISTING, features: ["Navigation System"],
-      mc_attributes: { ...LISTING.mc_attributes, options: ["Navigation System", "Bose Premium Audio"] },
-    }, SETTINGS, null);
+    // The feed asserts certification and no approved program source confirms
+    // it; the packet already excludes CPO language, so the copy is safe and the
+    // run should proceed.
+    const conflicted = buildFactSnapshot({ ...LISTING, condition: "cpo" }, SETTINGS, null);
     const r = preflight(base({ snapshot: conflicted }));
     expect(r.ok).toBe(true);
     expect(r.findings.some((x) => x.code === "UNRESOLVED_MATERIAL_CONFLICT" && !x.blocking)).toBe(true);

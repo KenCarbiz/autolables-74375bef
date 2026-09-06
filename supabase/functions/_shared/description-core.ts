@@ -232,8 +232,7 @@ export function buildFactSnapshot(
   put("exterior_color", mc.exterior_color ?? mc.base_ext_color, "marketcheck_feed", "feed_provided");
   put("interior_color", mc.interior_color ?? mc.base_int_color, "marketcheck_feed", "feed_provided");
 
-  // Equipment — feed list vs decoded list. Disagreement is a real conflict,
-  // and the disputed item is withheld from auto-published copy.
+  // Equipment — feed list vs decoded list.
   const feedFeatures: string[] = Array.isArray(listing.features)
     ? listing.features.map((f: any) => (typeof f === "string" ? f : f?.name)).filter(Boolean)
     : [];
@@ -249,31 +248,35 @@ export function buildFactSnapshot(
   const decodedOnly = decodedOptions.filter((o) => !feedLower.includes(o.toLowerCase().trim()));
   const feedOnly = feedFeatures.filter((f) => !decLower.includes(f.toLowerCase().trim()));
 
-  // Premium/named equipment claimed by exactly one source is material:
-  // it is the "Bose" case — exclude until a human resolves it.
+  // A feed that does not enumerate an option is SILENT about it, not denying
+  // it. Factory equipment is manufacturer-controlled, so the build sheet is
+  // authoritative and an option the feed merely omits is verified, not
+  // disputed. Every one of the 592 equipment conflicts standing in production
+  // was this shape: a decoded panoramic roof withheld from customer copy, and
+  // a manager asked to adjudicate it, because a marketing feed listed fewer
+  // options than the factory built. None was the reverse.
+  //
+  // The reverse is not symmetrical. An option only the feed claims has no
+  // factory record behind it — the "Bose" case — so it stays out of
+  // auto-published copy, but as a review item rather than a blocking conflict:
+  // a missing premium feature is a disappointed shopper, not a false claim.
   const PREMIUM = /\b(bose|harman|burmester|mark levinson|bang\s*&\s*olufsen|premium audio|panoramic|head-?up|massage|nappa|adaptive cruise|night vision)\b/i;
   const confirmedEquipment: string[] = [];
-  for (const item of [...decodedOnly, ...feedOnly]) {
+  for (const item of decodedOnly) {
+    const ov = overrideBy.get(`equipment:${item}`.toLowerCase().trim());
+    if (ov?.decision === "exclude") {
+      excluded.push({ field: `equipment:${item}`, reason: "resolved_excluded", claim: item });
+    }
+  }
+  for (const item of feedOnly) {
     if (!PREMIUM.test(item)) continue;
-    const fromDecode = decodedOnly.includes(item);
     const ov = overrideBy.get(`equipment:${item}`.toLowerCase().trim());
     if (ov?.decision === "include") { confirmedEquipment.push(item); continue; }
-    if (ov?.decision === "exclude") {
-      // decided by a manager — still withheld from copy, but no longer blocking
-      excluded.push({ field: `equipment:${item}`, reason: "resolved_excluded", claim: item });
-      continue;
-    }
-    conflicts.push({
+    excluded.push({
       field: `equipment:${item}`,
-      values: [
-        { value: fromDecode ? "not listed" : item, source: "marketcheck_feed",
-          observed_at: listing.scrape_last_synced_at || now },
-        { value: fromDecode ? item : "not listed", source: "vin_decode",
-          observed_at: mc.specs_decoded_at || listing.enriched_at || now },
-      ],
-      material: true,
+      reason: ov?.decision === "exclude" ? "resolved_excluded" : "unverified_feed_claim",
+      claim: item,
     });
-    excluded.push({ field: `equipment:${item}`, reason: "equipment_conflict", claim: item });
   }
   const excludedNames = new Set(excluded.map((e) => (e.claim || "").toLowerCase()));
   const safeEquipment = [...agreed, ...confirmedEquipment,
@@ -283,7 +286,7 @@ export function buildFactSnapshot(
     facts.equipment = {
       field: "equipment", value: safeEquipment.slice(0, 40).join(", "),
       source: decodedOnly.length ? "vin_decode+feed" : "marketcheck_feed",
-      status: agreed.length ? "verified" : "feed_provided",
+      status: agreed.length || decodedOnly.length ? "verified" : "feed_provided",
       observed_at: now, usable_in_copy: true,
     };
   }
