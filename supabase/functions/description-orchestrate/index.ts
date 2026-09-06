@@ -28,6 +28,7 @@ import { repairContent, hasRepairableFindings } from "../_shared/description-rep
 import { preflight, preflightSummary } from "../_shared/description-preflight.ts";
 import { evaluateBudget, DEFAULT_BUDGET } from "../_shared/description-budget.ts";
 import { can } from "../_shared/description-permissions.ts";
+import { buyersGuideDisposition } from "../_shared/description-warranty-policy.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -379,6 +380,17 @@ async function orchestrateVehicle(
   // A NULL-tenant listing must never be adopted by whoever asks first.
   if (listing.tenant_id !== tenantId) return { vehicle_id: vehicleId, skipped: "tenant_mismatch" };
   if (listing.status === "archived") return { vehicle_id: vehicleId, skipped: "archived" };
+
+  // The Buyers Guide the customer signs is the ceiling on warranty language.
+  // Copy implying coverage beside an AS-IS Guide puts the dealership in
+  // contradiction with its own paperwork, so the filed document decides.
+  const { data: guide } = await admin.from("generated_documents")
+    .select("data_snapshot")
+    .eq("vehicle_id", vehicleId).eq("document_type", "buyers_guide")
+    .is("superseded_at", null)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  (listing as Record<string, unknown>).buyers_guide_disposition =
+    buyersGuideDisposition(guide?.data_snapshot as Record<string, unknown> | null);
 
   const caseId = await rpc<string | null>(admin, "init_description_case", {
     p_tenant_id: tenantId, p_vehicle_id: vehicleId,

@@ -1,3 +1,4 @@
+import { decideWarrantyLanguage } from "./description-warranty-policy.ts";
 // ─────────────────────────────────────────────────────────────────────
 // Description Intelligence — server-side core.
 //
@@ -338,26 +339,20 @@ export function buildFactSnapshot(
   // The flag survives as an explicit suppression switch for a dealership that
   // chooses never to discuss warranty, which is a legitimate legal preference.
   // Absent an explicit false, verified facts speak.
-  const w = (listing.warranty_info || {}) as Record<string, any>;
-  const warrantySuppressed = settings.warranty_language_allowed === false
-    && settings.warranty_language_suppressed_explicitly === true;
-  const months = Number(w?.months_remaining) || 0;
-  const miles = Number(w?.miles_remaining) || 0;
-  const program = String(w?.program || "").trim();
-  if (months > 0 || miles > 0 || program) {
-    if (warrantySuppressed) {
-      excluded.push({ field: "warranty_eligible", reason: "warranty_language_disabled", claim: "warranty" });
-    } else {
-      // The value carries only what is known. A writer given "remaining
-      // factory coverage" cannot honestly produce "5 years / 60,000 miles";
-      // one given the months and miles can state them exactly.
-      const terms = [
-        months > 0 ? `${months} months remaining` : "",
-        miles > 0 ? `${miles.toLocaleString("en-US")} miles remaining` : "",
-      ].filter(Boolean).join(", ");
-      put("warranty_eligible", [program, terms].filter(Boolean).join(" — ") || "remaining factory coverage",
-          "oem_warranty", "verified");
-    }
+  const warrantyDecision = decideWarrantyLanguage({
+    buyersGuideDecision: listing.buyers_guide_disposition ?? null,
+    cpoVerified: feedSaysCpo && cpoConfirmed,
+    cpoProgram: certification?.program ?? null,
+    cpoLanguageAllowed: settings.cpo_language_allowed !== false,
+    warranty: (listing.warranty_info || {}) as Record<string, any>,
+    suppressedExplicitly: settings.warranty_language_allowed === false
+      && settings.warranty_language_suppressed_explicitly === true,
+  });
+  if (warrantyDecision.statement) {
+    put("warranty_eligible", warrantyDecision.statement, "oem_warranty", "verified");
+  } else if (warrantyDecision.disposition === "PROHIBITED") {
+    excluded.push({ field: "warranty_eligible", reason: "warranty_language_disabled",
+                    claim: "warranty" });
   }
 
   // Accessories — an accessory may only be described as installed once
