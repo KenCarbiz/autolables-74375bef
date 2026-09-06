@@ -158,11 +158,15 @@ export const DEFAULT_CHANNEL_POLICIES: ChannelPolicy[] = [
     // destination-specific formatting and no pricing, because vAuto is where
     // pricing is managed.
     key: "vauto", label: "vAuto", active: true,
-    // Owner decision: 3,879 is a CEILING, never a floor. A recommendedMin of
-    // zero means exactly that, and buildChannelPromptV3 renders a ceiling
-    // rather than a range when it sees one — so nothing instructs the writer
-    // to reach a length it has no verified facts for.
-    recommendedMin: 0, recommendedMax: 3879, characterLimit: 3879, limitVerified: false,
+    // Owner decision: vAuto targets 3,221-3,879 characters.
+    //
+    // The floor is a TARGET, not a quota. Channel variants are derived by
+    // trimming an approved master, and nothing in this system expands one, so
+    // a master with fewer verified facts than 3,221 characters can support
+    // produces a short vAuto version that is FLAGGED for review rather than
+    // padded to reach the number. The writing standard forbids padding
+    // outright, and a floor enforced by inventing content would breach it.
+    recommendedMin: 3221, recommendedMax: 3879, characterLimit: 3879, limitVerified: false,
     paragraphMin: 4, paragraphMax: 8, listsAllowed: false, htmlAllowed: false,
     markdownAllowed: false, emojiAllowed: false, linksAllowed: false, phoneAllowed: false,
     pricingPolicy: "never", keywordPolicy: "natural", ctaPolicy: "none",

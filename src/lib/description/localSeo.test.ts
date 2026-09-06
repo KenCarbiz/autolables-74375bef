@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   resolveVoiceProfile, voiceInstruction, checkLocalityUse,
 } from "../../../supabase/functions/_shared/description-voice.ts";
@@ -122,23 +124,40 @@ describe("the guardrail that makes permission safe still holds", () => {
   });
 });
 
-// ── Channel ceilings ─────────────────────────────────────────────────
+// ── Channel band ─────────────────────────────────────────────────
 
-describe("a channel ceiling is not a floor", () => {
+describe("the vAuto band", () => {
   const snap = buildFactSnapshot(LISTING, SETTINGS, null);
   const packet = buildDescriptionPacket(snap, SETTINGS, voiceOf(AREAS));
   const master = "An approved master description of moderate length.";
 
-  it("gives vAuto a ceiling and no minimum", () => {
-    // 3,879 is the export limit. Printing "0-3879" would read as a range and
-    // invite padding toward the top of it.
+  it("targets the owner's vAuto band", () => {
     const vauto = policyForChannel("vauto")!;
-    expect(vauto.recommendedMin).toBe(0);
+    expect(vauto.recommendedMin).toBe(3221);
+    expect(vauto.recommendedMax).toBe(3879);
     expect(vauto.characterLimit).toBe(3879);
-    const prompt = buildChannelPromptV3(master, vauto, packet);
-    expect(prompt).toMatch(/at most 3879 characters/);
-    expect(prompt).toMatch(/There is no minimum/);
-    expect(prompt).not.toMatch(/0-3879/);
+    expect(buildChannelPromptV3(master, vauto, packet))
+      .toMatch(/Length: 3221-3879 characters/);
+  });
+
+  it("still forbids padding to reach that floor", () => {
+    // The floor is a target. Derivation trims an approved master and nothing
+    // expands one, so a sparse vehicle yields a short vAuto version that is
+    // flagged rather than inflated with invented content.
+    const core = readFileSync(join(__dirname,
+      "../../../supabase/functions/_shared/description-core.ts"), "utf8");
+    expect(core).toMatch(/Never pad, repeat a feature, restate a fact in different words/);
+    const policy = readFileSync(join(__dirname,
+      "../../../supabase/functions/_shared/description-channel-policy.ts"), "utf8");
+    expect(policy).toMatch(/floor is a TARGET, not a quota/);
+  });
+
+  it("keeps a short channel version a warning, never a block", () => {
+    // A vehicle honestly described below the floor must not be unpublishable.
+    const core = readFileSync(join(__dirname,
+      "../../../supabase/functions/_shared/description-core.ts"), "utf8");
+    const below = core.slice(core.indexOf("LENGTH_BELOW_MINIMUM"));
+    expect(below.slice(0, 200)).toMatch(/severity: "warning", blocking: false/);
   });
 
   it("still states a range for a channel that has a floor", () => {
