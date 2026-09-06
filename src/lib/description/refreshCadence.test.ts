@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   refreshDecision, inventoryAge, REFRESH_MILESTONES,
 } from "../../../supabase/functions/_shared/description-refresh.ts";
@@ -103,5 +105,70 @@ describe("an unknown age does not trigger work", () => {
     const d = refreshDecision({ ...base, dom: null, ingestedAt: null });
     expect(d.due).toBe(false);
     expect(d.reason).toBe("unknown_age");
+  });
+});
+
+// ── The cadence has to be reachable ──────────────────────────────────
+//
+// refreshDecision was written, tested and imported by nothing. The reconcile
+// sweep's four candidate classes -- stalled, source_changed, retryable,
+// missing_case -- are all event-driven, so a vehicle whose description
+// succeeded on day one and whose source data never moved was never selected
+// again at any age. The rule was correct and unreachable, which is the same as
+// not having it.
+
+const fnDir = join(__dirname, "../../../supabase/functions");
+const orchestrator = readFileSync(join(fnDir, "description-orchestrate/index.ts"), "utf8");
+const migration = readFileSync(join(fnDir,
+  "../migrations/20260906193000_description_refresh_cadence.sql"), "utf8");
+
+describe("the cadence is wired to something that runs", () => {
+  it("is imported and called by the orchestrator", () => {
+    expect(orchestrator).toMatch(
+      /import \{ refreshDecision \} from "\.\.\/_shared\/description-refresh\.ts"/);
+    expect(orchestrator).toMatch(/refreshDecision\(\{/);
+  });
+
+  it("has a candidate class in the sweep that selects ageing vehicles", () => {
+    expect(migration).toMatch(/'refresh_due', 5/);
+    expect(migration).toMatch(/next_description_reconcile_batch/);
+  });
+
+  it("forces the run, because a time-based refresh is unchanged by definition", () => {
+    // Without force the orchestrator returns "unchanged" on identical source
+    // data and nothing would ever be rewritten on age alone.
+    expect(orchestrator).toMatch(/r\.reason === "refresh_due"/);
+  });
+
+  it("stamps the milestone it satisfied, so it is not re-selected nightly", () => {
+    expect(orchestrator).toMatch(/last_refresh_milestone: refreshMilestone/);
+    expect(migration).toMatch(/ADD COLUMN IF NOT EXISTS last_refresh_milestone integer/);
+  });
+
+  it("keeps the SQL bound in lockstep with the ladder", () => {
+    // The migration deliberately does NOT encode the ladder -- it is a coarse
+    // bound and refreshDecision picks the milestone. But the bound still has
+    // to bracket the real milestones, or the sweep hands over the wrong cars:
+    // too low and every fresh vehicle is examined nightly, too high and the
+    // ones that are due are never offered.
+    const lowest = Math.min(...REFRESH_MILESTONES);
+    const highest = Math.max(...REFRESH_MILESTONES);
+    expect(migration).toContain(`) >= ${lowest}`);
+    expect(migration).toContain(`COALESCE(dc.last_refresh_milestone, 0) < ${highest}`);
+  });
+
+  it("never rewrites copy a human locked", () => {
+    // Enforced twice on purpose: SQL keeps locked cases out of the batch at
+    // all, and refreshDecision refuses if one reaches it by another path.
+    expect(migration).toMatch(/dc\.master_locked IS NOT TRUE/);
+    expect(refreshDecision({ ...base, dom: 883, locked: true }).due).toBe(false);
+  });
+
+  it("prefers provider days-on-market in SQL too, as the module does", () => {
+    // Anchoring the sweep to created_at would have made every car on the lot
+    // look brand new at onboarding, so the 883-day vehicle would wait 60 more
+    // days for a refresh it was 14 months overdue for.
+    expect(migration).toMatch(/mc_attributes->>'dom'/);
+    expect(migration).toMatch(/vl\.created_at/);
   });
 });

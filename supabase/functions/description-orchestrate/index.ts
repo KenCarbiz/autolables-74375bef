@@ -35,6 +35,7 @@ import { DRIVESIGNAL_V3_SYSTEM } from "../_shared/prompts/drivesignal-v3-system.
 import { assembleKnowledge, vehicleSignals, KNOWLEDGE_REVISION } from "../_shared/description-knowledge.ts";
 import { DESCRIPTION_OUTPUT_SCHEMA, auditEvidence, factRoles } from "../_shared/description-evidence.ts";
 import { runGates, vehicleClassOf } from "../_shared/description-gates.ts";
+import { refreshDecision } from "../_shared/description-refresh.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -482,6 +483,31 @@ async function orchestrateVehicle(
 
   const { data: existing } = await admin.from("description_cases").select("*").eq("id", caseId).maybeSingle();
   await setCase(admin, caseId, { current_source_data_version: sdv, configuration_version: configVersion });
+
+  // Refresh cadence. The sweep's SQL predicate is a coarse bound -- old enough
+  // to possibly be owed a rewrite -- and this is the authority on whether one
+  // is actually due and which milestone it satisfies. A vehicle that is not due
+  // must leave with `skipped` so the sweep stamps its cursor; otherwise the
+  // next hop re-selects it and the same 85 cars burn the whole nightly budget.
+  let refreshMilestone: number | null = null;
+  if (opts.reason === "reconcile:refresh_due") {
+    const decision = refreshDecision({
+      dom: (listing.mc_attributes as Record<string, unknown> | null)?.dom as number | null | undefined,
+      ingestedAt: listing.created_at,
+      lastMilestone: existing?.last_refresh_milestone ?? null,
+      hasDescription: !!existing?.published_master_version_id,
+      locked: !!existing?.master_locked,
+    });
+    if (!decision.due) {
+      return { vehicle_id: vehicleId, case_id: caseId, skipped: `refresh_${decision.reason}`,
+               days_in_inventory: decision.daysInInventory, age_source: decision.ageSource };
+    }
+    refreshMilestone = decision.milestone;
+    await audit(admin, tenantId, "description_refresh_due", caseId, {
+      vin: listing.vin, milestone: decision.milestone,
+      days_in_inventory: decision.daysInInventory, age_source: decision.ageSource,
+    });
+  }
 
   // Idempotency: identical inputs + identical config → nothing to do.
   // Inputs changed under a locked or published case: flag it rather than
@@ -981,6 +1007,10 @@ async function orchestrateVehicle(
       fact_confidence: snap.fact_confidence, quality_score: quality,
       potentially_stale: false, last_orchestrated_at: new Date().toISOString(),
       last_success_at: new Date().toISOString(), last_error_message: null,
+      // Stamped when the rewrite exists, not when it publishes. A refresh held
+      // for review has still satisfied its milestone; stamping on publish
+      // instead would re-select the vehicle every night until a human acted.
+      ...(refreshMilestone ? { last_refresh_milestone: refreshMilestone } : {}),
     }, true);
 
     // Auto-publish only when eligible, permitted, and not manually locked.
@@ -1252,7 +1282,13 @@ serve(async (req) => {
           seenThisHop.add(r.vehicle_id);
           examined++;
           const out = await orchestrateVehicle(admin, r.tenant_id, r.vehicle_id, {
-            force: r.reason === "stalled" || r.reason === "retryable", reason: `reconcile:${r.reason}`,
+            // refresh_due is by definition unchanged source data -- that is the
+            // whole point of a time-based rewrite -- so without force it would
+            // return "unchanged" and no description would ever be refreshed.
+            // Whether it is genuinely due was already settled by
+            // refreshDecision inside orchestrateVehicle.
+            force: r.reason === "stalled" || r.reason === "retryable" || r.reason === "refresh_due",
+            reason: `reconcile:${r.reason}`,
           });
           if (results.length < 50) results.push(out);
           // Liveness: a vehicle that produced no new version must still leave
