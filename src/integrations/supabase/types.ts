@@ -3016,15 +3016,19 @@ export type Database = {
           default_tone: string
           enabled_channels: Json
           generation_model: string
+          generation_provider: string
           internal_publication_enabled: boolean
+          knowledge_revision: string | null
           market_context_allowed: boolean
           max_length: number
           min_length: number
           price_in_description: boolean
           primary_city: string | null
           prohibited_phrases: Json
+          prompt_profile: string
           prompt_version: string
           quality_threshold: number
+          reasoning_effort: string | null
           required_legal_text: string | null
           review_mode: string
           review_mode_by_class: Json
@@ -3033,6 +3037,7 @@ export type Database = {
           tenant_id: string
           updated_at: string
           updated_by: string | null
+          verbosity: string | null
           warranty_language_allowed: boolean
         }
         Insert: {
@@ -3047,15 +3052,19 @@ export type Database = {
           default_tone?: string
           enabled_channels?: Json
           generation_model?: string
+          generation_provider?: string
           internal_publication_enabled?: boolean
+          knowledge_revision?: string | null
           market_context_allowed?: boolean
           max_length?: number
           min_length?: number
           price_in_description?: boolean
           primary_city?: string | null
           prohibited_phrases?: Json
+          prompt_profile?: string
           prompt_version?: string
           quality_threshold?: number
+          reasoning_effort?: string | null
           required_legal_text?: string | null
           review_mode?: string
           review_mode_by_class?: Json
@@ -3064,6 +3073,7 @@ export type Database = {
           tenant_id: string
           updated_at?: string
           updated_by?: string | null
+          verbosity?: string | null
           warranty_language_allowed?: boolean
         }
         Update: {
@@ -3078,15 +3088,19 @@ export type Database = {
           default_tone?: string
           enabled_channels?: Json
           generation_model?: string
+          generation_provider?: string
           internal_publication_enabled?: boolean
+          knowledge_revision?: string | null
           market_context_allowed?: boolean
           max_length?: number
           min_length?: number
           price_in_description?: boolean
           primary_city?: string | null
           prohibited_phrases?: Json
+          prompt_profile?: string
           prompt_version?: string
           quality_threshold?: number
+          reasoning_effort?: string | null
           required_legal_text?: string | null
           review_mode?: string
           review_mode_by_class?: Json
@@ -3095,6 +3109,7 @@ export type Database = {
           tenant_id?: string
           updated_at?: string
           updated_by?: string | null
+          verbosity?: string | null
           warranty_language_allowed?: boolean
         }
         Relationships: [
