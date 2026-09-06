@@ -19,6 +19,7 @@ import {
 import {
   normalizeFeatures, prioritizeFeatures, splitByOrigin, featureChecksum,
   type NormalizedFeature, type PrioritizedFeature, type RawFeatureInput, type ToneKey,
+  FEATURE_CATALOG,
 } from "./description-features.ts";
 import { toneProfile, toneInstruction, checkTone, isToneKey, TONE_PROFILES } from "./description-tone.ts";
 import {
@@ -957,6 +958,47 @@ export function validateContentV3(
   for (const t of checkTone(content, packet.tone)) {
     out.push({ validator_code: t.code, severity: "blocking", blocking: true,
       message: t.message, claim_text: t.claim, fact_path: "tone" });
+  }
+
+  // Equipment the vehicle simply does not have.
+  //
+  // The check below this one is a DENYLIST: it catches a feature the packet
+  // deliberately excluded. It cannot catch equipment that was never in the
+  // data at all, because such a feature is in no list to be excluded from.
+  //
+  // That gap published "Apple CarPlay and Android Auto" on a Wrangler whose
+  // decode contained neither. The evidence audit passed too — the model
+  // asserted the feature in prose without citing a fact id, and a citation
+  // audit can only judge citations.
+  //
+  // So this is the positive form: anything in the canonical catalogue that
+  // appears in the copy must be backed by a feature the packet actually
+  // carries. Only catalogued equipment is checked, because those are the
+  // names with agreed synonyms; free prose is not second-guessed.
+  const supported = new Set(
+    [...packet.factoryFeatures, ...packet.dealerAddedFeatures]
+      .flatMap((f) => [f.display_name, ...(f.aliases_seen || [])])
+      .map((n) => String(n).toLowerCase().trim()),
+  );
+  // Support can come from ANY verified fact, not only the equipment list.
+  // All-wheel drive is a drivetrain fact; a nine-speed is a transmission fact.
+  // Checking equipment alone flagged "all-wheel drive" on a vehicle whose
+  // snapshot plainly recorded AWD.
+  const factBlob = packet.verifiedFacts
+    .map((f) => String(f.value ?? "")).join(" | ").toLowerCase();
+
+  for (const def of FEATURE_CATALOG) {
+    const names = [def.display.toLowerCase(), ...def.aliases];
+    const mentioned = names.find((n) =>
+      new RegExp(`(^|[^a-z0-9])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i")
+        .test(content || ""));
+    if (!mentioned) continue;
+    if (names.some((n) => supported.has(n) || factBlob.includes(n))) continue;
+    out.push({
+      validator_code: "UNSUPPORTED_FEATURE_CLAIM", severity: "blocking", blocking: true,
+      message: `"${def.display}" appears in the copy but no verified fact supports it.`,
+      claim_text: mentioned, fact_path: `feature:${def.id}`,
+    });
   }
 
   // Equipment attribution. A canonical feature the packet excluded (conflict,

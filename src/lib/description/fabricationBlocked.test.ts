@@ -69,6 +69,54 @@ const CLEAN_COPY = Array.from({ length: 8 }, (_, p) =>
     `Paragraph ${p} sentence ${i} explains a verified feature and why it matters.`)
     .join(" ")).join("\n\n");
 
+describe("equipment the vehicle does not have cannot be published", () => {
+  // The second Wrangler incident, 2026-09-06 18:34. The copy claimed Apple
+  // CarPlay and Android Auto; the decode contained neither. The evidence audit
+  // PASSED, because the model asserted them in prose without citing a fact id
+  // and a citation audit can only judge citations. The feature check was a
+  // denylist — it caught equipment the packet excluded, and equipment that was
+  // never in the data at all is in no list to be excluded from.
+  const withCarPlay = `${CLEAN_COPY}\n\nApple CarPlay and Android Auto keep phones connected.`;
+
+  it("blocks a catalogued feature no verified fact supports", () => {
+    const snap = buildFactSnapshot(WRANGLER, SETTINGS, null);
+    const voice = resolveVoiceProfile("t1",
+      { profile_json: {}, version: "vp_test", status: "approved" }, SETTINGS,
+      { dealer_name: "Harte Jeep", city: "Hartford", state: "CT" });
+    const packet = buildDescriptionPacket(snap, SETTINGS, voice);
+    const findings = validateContentV3(withCarPlay, snap, SETTINGS, packet);
+    const unsupported = findings.filter((f) => f.validator_code === "UNSUPPORTED_FEATURE_CLAIM");
+    expect(unsupported.length).toBeGreaterThanOrEqual(2);
+    expect(unsupported.every((f) => f.blocking)).toBe(true);
+    expect(unsupported.map((f) => f.claim_text?.toLowerCase()).join(" "))
+      .toMatch(/carplay/);
+  });
+
+  it("refuses publication for it", () => {
+    const snap = buildFactSnapshot(WRANGLER, SETTINGS, null);
+    const voice = resolveVoiceProfile("t1",
+      { profile_json: {}, version: "vp_test", status: "approved" }, SETTINGS,
+      { dealer_name: "Harte Jeep", city: "Hartford", state: "CT" });
+    const packet = buildDescriptionPacket(snap, SETTINGS, voice);
+    const findings = validateContentV3(withCarPlay, snap, SETTINGS, packet);
+    expect(decideEligibility(findings, SETTINGS, "used", 85).eligibility).toBe("blocked");
+  });
+
+  it("does not flag equipment a non-equipment fact supports", () => {
+    // All-wheel drive is a drivetrain fact, not an equipment list entry.
+    // Checking equipment alone flagged it on a vehicle that plainly has it.
+    const awd = { ...WRANGLER, mc_attributes: { ...WRANGLER.mc_attributes, drivetrain: "4WD" } };
+    const snap = buildFactSnapshot(awd, SETTINGS, null);
+    const voice = resolveVoiceProfile("t1",
+      { profile_json: {}, version: "vp_test", status: "approved" }, SETTINGS,
+      { dealer_name: "Harte Jeep", city: "Hartford", state: "CT" });
+    const packet = buildDescriptionPacket(snap, SETTINGS, voice);
+    const findings = validateContentV3(
+      `${CLEAN_COPY}\n\nFour-wheel drive suits the season.`, snap, SETTINGS, packet);
+    expect(findings.filter((f) => f.validator_code === "UNSUPPORTED_FEATURE_CLAIM")).toHaveLength(0);
+  });
+});
+
 describe("the Wrangler incident cannot publish again", () => {
   it("the snapshot never contained the five claimed features", () => {
     const snap = buildFactSnapshot(WRANGLER, SETTINGS, null);
