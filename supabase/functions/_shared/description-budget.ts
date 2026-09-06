@@ -40,6 +40,15 @@ export interface BudgetUsage {
   monthPreviewSpend: number;
   todayGenerationCount: number;
   userTodayGenerationCount: number;
+  /**
+   * Calls this month whose cost is not known -- the model has no entry in the
+   * pricing table, or the provider reported no usage. Their spend is missing
+   * from monthProductionSpend, so a dollar budget read on its own would
+   * report $0 forever and never bind. See unpricedCallCeiling.
+   */
+  unpricedExecutions?: number;
+  /** Production calls this month, priced or not. */
+  monthGenerationCount?: number;
 }
 
 export type BudgetVerdict = "allowed" | "warning" | "blocked";
@@ -49,7 +58,8 @@ export type BudgetLimitCode =
   | "daily_generation_limit"
   | "per_user_daily_limit"
   | "monthly_generation_budget"
-  | "monthly_preview_budget";
+  | "monthly_preview_budget"
+  | "unpriced_call_ceiling";
 
 export interface BudgetDecision {
   verdict: BudgetVerdict;
@@ -71,6 +81,7 @@ const LIMIT_LABELS: Record<BudgetLimitCode, string> = {
   per_user_daily_limit: "This user has reached their daily generation limit.",
   monthly_generation_budget: "The monthly generation budget is exhausted.",
   monthly_preview_budget: "The monthly preview budget is exhausted.",
+  unpriced_call_ceiling: "The configured model has no price on file, so spend cannot be measured. Generation is capped at the most calls the monthly budget could possibly afford.",
 };
 
 export const describeLimit = (code: string): string =>
@@ -79,6 +90,31 @@ export const describeLimit = (code: string): string =>
 /** Null, negative and non-finite all mean "no limit configured". */
 const configured = (v: number | null | undefined): v is number =>
   typeof v === "number" && Number.isFinite(v) && v >= 0;
+
+/**
+ * The most production calls the monthly budget could possibly afford, used
+ * when spend cannot be measured because some calls this month are unpriced.
+ *
+ * A dollar budget summed over NULL costs reports $0 and never binds, so an
+ * unpriced model silently disables the very control that exists to stop
+ * runaway spend. Blocking outright would be the other failure -- it would stop
+ * all work over a missing table row. Instead the budget is converted into the
+ * only bound that holds without knowing the real price: budget divided by the
+ * per-generation worst case the dealer has already configured. It cannot
+ * overspend, because no single call may exceed that cap either.
+ *
+ * Returns null when it does not apply: nothing unpriced, or no budget / no
+ * per-call cap configured, in which case there is nothing to derive from.
+ */
+export function unpricedCallCeiling(
+  cfg: TenantBudgetConfig, usage: BudgetUsage, isPreview: boolean,
+): number | null {
+  if (!(Number(usage.unpricedExecutions) > 0)) return null;
+  const budget = budgetFor(cfg, isPreview);
+  if (!configured(budget) || budget === 0) return null;
+  if (!configured(cfg.maxCostPerGeneration) || cfg.maxCostPerGeneration <= 0) return null;
+  return Math.floor(budget / cfg.maxCostPerGeneration);
+}
 
 /**
  * Which specific limits a request trips, so the UI can name the limit instead
@@ -107,6 +143,11 @@ export function collectTriggeredLimits(
   const pct = consumedPctFor(cfg, usage, req);
   if (pct !== null && pct >= cfg.hardStopPct) {
     out.push(req.isPreview ? "monthly_preview_budget" : "monthly_generation_budget");
+  }
+
+  const ceiling = unpricedCallCeiling(cfg, usage, req.isPreview);
+  if (ceiling !== null && Number(usage.monthGenerationCount ?? 0) >= ceiling) {
+    out.push("unpriced_call_ceiling");
   }
   return out;
 }

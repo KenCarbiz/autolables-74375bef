@@ -19,6 +19,7 @@ import {
   decideEligibility, type FactSnapshot, type Finding, type FactOverride,
   // ── V3 ──
   buildDescriptionPacket, buildMasterPromptV3, buildChannelPromptV3, validateContentV3,
+  withRequiredDisclosure,
   scoreVersion, computeInputChecksum, resolveChannelPolicy, computeChannelPolicyVersion,
   resolveVoiceProfile, computeVoiceProfileVersion, featureChecksum, isToneKey,
   type DescriptionPacket, type ChannelPolicy, type ComparisonDoc, type SeoTargeting,
@@ -727,6 +728,11 @@ async function orchestrateVehicle(
       monthPreviewSpend: Number((spend as any)?.month_preview_spend ?? 0),
       todayGenerationCount: Number((spend as any)?.today_generation_count ?? 0),
       userTodayGenerationCount: 0,
+      // Without these the dollar budget cannot bind: the configured model has
+      // no price on file, so every cost_amount is NULL, spend sums to 0, and
+      // the budget reports 0% consumed however many vehicles are generated.
+      unpricedExecutions: Number((spend as any)?.pending_cost_executions ?? 0),
+      monthGenerationCount: Number((spend as any)?.month_generation_count ?? 0),
     }, { isPreview: false, estimatedCost: null });
 
     const pf = preflight({
@@ -802,7 +808,11 @@ async function orchestrateVehicle(
       { vin: listing.vin, tone, voice_profile_version: voice.version, input_checksum: inputChecksum });
     const generation = await generateMaster(packet, snap, settings, listing,
       { admin, tenantId, vehicleId, caseId });
-    const masterText = generation.text;
+    // Appended here, not at render time, so ONE string flows through the
+    // version row, validation, the gates, scoring and the channel derivations.
+    // Appending later would have stored copy that differed from the copy we
+    // validated, which is the worse failure of the two.
+    const masterText = withRequiredDisclosure(generation.text, settings);
     const knowledgeModules = generation.moduleKeys;
 
     const { data: lastVer } = await admin.from("description_versions")
@@ -993,6 +1003,7 @@ async function orchestrateVehicle(
             metaDesc = parsed.meta_description ? String(parsed.meta_description) : null;
           } catch { /* fall back to raw text */ }
         }
+        content = withRequiredDisclosure(content, settings);
         let cFindings = validateContentV3(content, snap, settings, channelPacket, policy);
         let cRepair: Record<string, unknown> | null = null;
         // Same removal-only repair per channel. A channel variant is the most

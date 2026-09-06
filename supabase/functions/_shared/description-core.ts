@@ -623,6 +623,28 @@ Return ONLY the description text. No headings, no markdown, no preamble.`;
  * layers Phase 3 adds: canonical features with origin, the approval-gated
  * dealership voice, and tone as a wording-only instruction.
  */
+/**
+ * Appends the dealership's required legal disclosure, exactly as stored.
+ *
+ * Not asked of the writer. The text carries a specific dollar figure -- an
+ * $895 conveyance fee on this lot -- and the validator matches it with a
+ * literal includes(), so a model that paraphrases a single character both
+ * fails the check and misstates a fee in published copy. Appending it is the
+ * only way the published text is guaranteed to be the text legal approved.
+ *
+ * Idempotent: copy that already carries the disclosure is returned untouched,
+ * so a regeneration or a repair pass cannot stack it twice.
+ */
+export function withRequiredDisclosure(
+  text: string, settings: Record<string, any>,
+): string {
+  const legal = String(settings?.required_legal_text || "").trim();
+  if (!legal) return text;
+  const body = String(text || "").trimEnd();
+  if (body.includes(legal)) return body;
+  return `${body}\n\n${legal}`;
+}
+
 export function buildMasterPromptV3(packet: DescriptionPacket, settings: Record<string, any>): string {
   // The id is written first and labelled, because the writer has to cite these
   // back by id under the structured schema. When the line read
@@ -641,6 +663,13 @@ export function buildMasterPromptV3(packet: DescriptionPacket, settings: Record<
 - Do not invent an id for a feature. Equipment is covered by the fact whose id is "equipment"; cite that, not the feature's name.
 - used_fact_ids: every id whose value you actually used. hero_fact_ids: the few you led with. warranty_fact_ids and history_fact_ids: only ids about coverage and ownership/accident/service history, and leave them empty when you said nothing on those subjects.
 - If you cannot support a sentence with an id from that list, delete the sentence.`
+    : "";
+  // The V3 prompt never carried this and the validator blocks without it, so
+  // every vehicle failed REQUIRED_DISCLOSURE_MISSING on copy that had no way
+  // to include it. It is appended after generation rather than written by the
+  // model; this only stops the writer from producing a competing version.
+  const disclosureLine = String(settings.required_legal_text || "").trim()
+    ? `\n- A required legal disclosure is appended verbatim after your text. Do not write it, do not restate it, and do not close with your own note about taxes, fees, financing terms or price exclusions.`
     : "";
   const banned = [
     ...packet.voice.prohibitedPhrases,
@@ -679,7 +708,7 @@ ABSOLUTE RULES
 - Never claim the vehicle is below market, a great deal, the best price, rare, or loaded.
 - No exclamation marks, no unverifiable superlatives.
 - Do not include a price unless a price fact appears above.
-- Do not repeat the same feature under a second name.
+- Do not repeat the same feature under a second name.${disclosureLine}
 
 ${toneInstruction(packet.tone)}
 
@@ -922,11 +951,32 @@ export function validateContent(
       message: "Vehicle identity (VIN / year-make-model) is incomplete.", fact_path: "ymm" });
   }
 
-  // 10. Unresolved material conflicts block automatic publication.
+  // 10. Unresolved material conflicts.
+  //
+  // Blocking depends on whether the copy can actually express the
+  // disagreement. On this lot every CPO vehicle has one: the syndication feed
+  // says "CPO" and the CPO program source says "unconfirmed". The snapshot
+  // already resolves that the conservative way -- cpo_status is withheld, so
+  // the writer never receives it, and the CPO_CLAIM check above independently
+  // blocks any copy that says "certified" anyway. Blocking a second time on
+  // the same disagreement stopped descriptions that say nothing whatsoever
+  // about certification, which is the same mistake the equipment feed-silence
+  // bug made: refusing copy for a claim it never made.
+  //
+  // A conflict on a field the writer DID receive is different -- the copy may
+  // be built on the wrong one of two values -- and still blocks.
   for (const c of snap.conflicts.filter((c) => c.material)) {
-    out.push({ validator_code: "SOURCE_CONFLICT_UNRESOLVED", severity: "blocking", blocking: true,
-      message: `Unresolved source conflict on ${c.field}.`, fact_path: c.field,
-      source_reference: c.values.map((v) => `${v.source}=${v.value}`).join(" vs ") });
+    const reached = snap.facts[c.field] !== undefined && snap.facts[c.field] !== null;
+    out.push({
+      validator_code: "SOURCE_CONFLICT_UNRESOLVED",
+      severity: reached ? "blocking" : "warning",
+      blocking: reached,
+      message: reached
+        ? `Unresolved source conflict on ${c.field}.`
+        : `Unresolved source conflict on ${c.field}. The fact was withheld, so the description does not rely on it; the conflict still needs resolving in the source data.`,
+      fact_path: c.field,
+      source_reference: c.values.map((v) => `${v.source}=${v.value}`).join(" vs "),
+    });
   }
 
   return out;
