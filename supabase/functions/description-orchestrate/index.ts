@@ -23,6 +23,7 @@ import {
   resolveVoiceProfile, computeVoiceProfileVersion, featureChecksum, isToneKey,
   type DescriptionPacket, type ChannelPolicy, type ComparisonDoc, type SeoTargeting,
   type ToneKey, type VoiceProfile,
+  preferredLengthBand,
 } from "../_shared/description-core.ts";
 import { repairContent, hasRepairableFindings } from "../_shared/description-repair.ts";
 import { preflight, preflightSummary } from "../_shared/description-preflight.ts";
@@ -746,6 +747,7 @@ async function orchestrateVehicle(
         ? { used_fact_ids: generation.claimedFactIds, hero_fact_ids: [],
             warranty_fact_ids: [], history_fact_ids: [] }
         : null,
+      lengthBand: preferredLengthBand(settings),
       vehicleClass: vehicleClassOf({
         isTruck: /\b(pickup|truck|cab)\b/i.test(String(listing.mc_attributes?.body_type ?? "")),
         isLuxuryOrPerformance: knowledgeModules.includes("luxury"),

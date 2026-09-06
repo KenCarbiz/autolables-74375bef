@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
-  runGates, countCharacters, countWords, vehicleClassOf, CHAR_BANDS, TARGET_BAND, GATE_ORDER,
+  runGates, countCharacters, countWords, vehicleClassOf, GATE_ORDER,
 } from "../../../supabase/functions/_shared/description-gates.ts";
 import { DRIVESIGNAL_V3_SYSTEM } from "../../../supabase/functions/_shared/prompts/drivesignal-v3-system.ts";
 
@@ -30,8 +32,13 @@ const CLEAN = Array.from({ length: 8 }, (_, p) =>
     `Paragraph ${p} sentence ${i} explains a verified feature and why it matters to an owner.`)
     .join(" ")).join("\n\n");
 
+// The band now comes from the dealership's own settings, so the test supplies
+// it the same way the orchestrator does. There is no second constant to drift.
+const BAND = { min: 1800, max: 3800 };
+
 const base = {
   content: CLEAN, snapshot: SNAP, validatorFindings: [],
+  lengthBand: BAND,
   vehicleClass: "mainstream" as const,
 };
 
@@ -57,10 +64,10 @@ describe("gate 1 — evidence", () => {
 });
 
 describe("gate 2 — completeness", () => {
-  it("flags copy below the class character band without blocking it", () => {
+  it("flags copy below the configured band without blocking it", () => {
     // A sparse vehicle honestly described short is a review item, not a defect.
     const r = runGates({ ...base, content: "Short copy about a car. Contact us." });
-    const f = r.findings.find((x) => x.code === "BELOW_CLASS_CHAR_BAND");
+    const f = r.findings.find((x) => x.code === "BELOW_CONFIGURED_BAND");
     expect(f?.blocking).toBe(false);
     expect(r.decision).toBe("REVIEW");
   });
@@ -68,7 +75,7 @@ describe("gate 2 — completeness", () => {
   it("flags padding above the band", () => {
     const long = Array.from({ length: 400 }, () => "padding words repeated here.").join(" ");
     expect(runGates({ ...base, content: long }).findings.some(
-      (f) => f.code === "ABOVE_CLASS_CHAR_BAND")).toBe(true);
+      (f) => f.code === "ABOVE_CONFIGURED_BAND")).toBe(true);
   });
 
   it("notices short copy that ignored supplied facts", () => {
@@ -87,21 +94,28 @@ describe("gate 2 — completeness", () => {
     expect(runGates({ ...base }).characterCount).toBe(CLEAN.length);
   });
 
-  it("targets one band for every vehicle, per the owner", () => {
-    // 3,200-3,879 across the lot, deliberately overriding the manual's
-    // per-class word guidance for marketplace parity. Class is still resolved
-    // and recorded, so restoring a ladder later is a data change.
-    for (const band of Object.values(CHAR_BANDS)) {
-      expect(band).toEqual({ min: 3200, max: 3879 });
-    }
-    expect(TARGET_BAND.max - TARGET_BAND.min).toBeGreaterThanOrEqual(400);
+  it("reads the dealership's band rather than carrying its own", () => {
+    // Two length authorities is how a settings screen ends up showing one
+    // number while the gate enforces another.
+    const tight = runGates({ ...base, lengthBand: { min: 5000, max: 6000 } });
+    expect(tight.findings.some((f) => f.code === "BELOW_CONFIGURED_BAND")).toBe(true);
+    const wide = runGates({ ...base, lengthBand: { min: 100, max: 9000 } });
+    expect(wide.findings.some((f) => f.code.endsWith("CONFIGURED_BAND"))).toBe(false);
+  });
+
+  it("does not pin the master to any channel ceiling", () => {
+    // vAuto caps what it exports; it does not decide how long the master is.
+    // A master written to one destination's limit is not a master.
+    const gates = readFileSync(join(__dirname,
+      "../../../supabase/functions/_shared/description-gates.ts"), "utf8");
+    expect(gates).not.toMatch(/3879|3,879/);
   });
 
   it("treats the floor as a target rather than a gate", () => {
-    // A vehicle without enough verified data to reach 3,200 characters is
-    // flagged, never padded: section 24 forbids padding outright.
+    // A vehicle without enough verified data to reach the floor is flagged,
+    // never padded: section 24 forbids padding outright.
     const short = runGates({ ...base, content: "Short but honest copy. Contact us." });
-    expect(short.findings.find((f) => f.code === "BELOW_CLASS_CHAR_BAND")?.blocking).toBe(false);
+    expect(short.findings.find((f) => f.code === "BELOW_CONFIGURED_BAND")?.blocking).toBe(false);
     expect(short.decision).not.toBe("REJECT");
   });
 });

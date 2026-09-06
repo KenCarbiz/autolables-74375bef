@@ -691,7 +691,11 @@ export function buildChannelPromptV3(
   const rules = [
     `- ${policy.instruction}`,
     override?.instruction ? `- ${override.instruction}` : "",
-    `- Length: ${policy.recommendedMin}-${policy.recommendedMax} characters. Hard maximum ${policy.characterLimit}.`,
+    policy.recommendedMin > 0
+      ? `- Length: ${policy.recommendedMin}-${policy.recommendedMax} characters. Hard maximum ${policy.characterLimit}.`
+      // A destination with no floor gets a ceiling only. Printing "0-3879"
+      // would read as a range and invite padding toward the top of it.
+      : `- Length: at most ${policy.characterLimit} characters. There is no minimum — keep whatever the master genuinely supports and stop.`,
     `- ${policy.paragraphMin}-${policy.paragraphMax} paragraphs.`,
     `- Feature budget: name at most ${policy.featureBudget} pieces of equipment, chosen from the highest-priority ones in the master. Group the rest or leave them out.`,
     policy.markdownAllowed ? "" : "- Plain text only. No markdown, no headings, no bullet characters.",

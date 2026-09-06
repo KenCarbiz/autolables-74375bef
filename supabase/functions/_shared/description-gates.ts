@@ -68,37 +68,29 @@ const VALIDATOR_GATE: Record<string, GateId> = {
   CHANNEL_FORMAT_INVALID: "marketplace",
 };
 
-// ── Length band ──────────────────────────────────────────────────────
+// ── Length ───────────────────────────────────────────────────────────
+//
+// There is ONE length authority: the dealership's own configured band, read
+// through preferredLengthBand. This gate used to carry its own constant, which
+// meant two places could disagree about how long a description should be —
+// the settings screen showing a dealer one number while the gate enforced
+// another.
 //
 // Length is measured in TOTAL CHARACTERS INCLUDING SPACES, by owner decision,
-// and every vehicle targets the same band: 3,200 to 3,879. That is also the
-// unit every downstream limit uses — the tenant row's min_length and
-// max_length, LENGTH_POLICY, and the marketplace field caps — so counting
-// words here left two units able to disagree about one description.
+// which is also the unit the tenant row, LENGTH_POLICY and every marketplace
+// field cap already use.
 //
-// This deliberately overrides the manual's per-class word guidance (section
-// 24: economy 250-400 words, luxury 600-900). The owner wants one consistent
-// length across the lot for marketplace parity. The class is still resolved
-// and still recorded, so restoring a per-class ladder later is a data change
-// rather than a rewrite.
+// The master is deliberately NOT pinned to a channel's ceiling. Channel
+// variants are derived by trimming an approved master, so a master written to
+// vAuto's limit would be a master written for one destination. The master
+// follows the verified information; the channel caps what it exports.
 //
-// The floor is a TARGET, not a gate: a vehicle with too little verified data
-// to reach 3,000 characters honestly is flagged for review, never padded.
-// Section 24 is explicit that quality outranks length and that padding is
-// forbidden, and a writer told to hit a floor at any cost produces exactly the
-// boilerplate this system exists to avoid.
+// The floor is a target, not a gate: a vehicle with too little verified data
+// to reach it is flagged for review, never padded. Section 24 of the writing
+// standard forbids padding outright, and a writer told to hit a floor at any
+// cost produces exactly the boilerplate this system exists to avoid.
 
 export type VehicleClass = "economy" | "mainstream" | "luxury" | "performance" | "heavy_duty";
-
-export const TARGET_BAND = { min: 3200, max: 3879 } as const;
-
-export const CHAR_BANDS: Record<VehicleClass, { min: number; max: number }> = {
-  economy: { ...TARGET_BAND },
-  mainstream: { ...TARGET_BAND },
-  luxury: { ...TARGET_BAND },
-  performance: { ...TARGET_BAND },
-  heavy_duty: { ...TARGET_BAND },
-};
 
 // ── Language the manual forbids outright ─────────────────────────────
 
@@ -157,7 +149,10 @@ export interface GateInput {
   /** The model's structured output, if the call was structured. */
   output?: Pick<DescriptionModelOutput,
     "used_fact_ids" | "hero_fact_ids" | "warranty_fact_ids" | "history_fact_ids"> | null;
-  vehicleClass: VehicleClass;
+  /** The dealership's configured band. One authority, no second constant. */
+  lengthBand: { min: number; max: number };
+  /** Recorded for context in findings; it no longer decides the length. */
+  vehicleClass?: VehicleClass;
   /** Identity the copy must carry, for the SEO gate. */
   identity?: { year?: number | string | null; make?: string | null; model?: string | null };
 }
@@ -192,13 +187,13 @@ export function runGates(input: GateInput): GateReport {
   }
 
   // Gate 2 — Completeness. Enough story for this vehicle, no padding.
-  const band = CHAR_BANDS[input.vehicleClass];
+  const band = input.lengthBand;
   if (characters < band.min) {
-    add("completeness", "BELOW_CLASS_CHAR_BAND", false,
-      `${characters} characters; a ${input.vehicleClass} vehicle typically supports ${band.min}-${band.max}.`);
+    add("completeness", "BELOW_CONFIGURED_BAND", false,
+      `${characters} characters; this dealership targets ${band.min}-${band.max}.`);
   } else if (characters > band.max) {
-    add("completeness", "ABOVE_CLASS_CHAR_BAND", false,
-      `${characters} characters; above the ${band.max}-character guidance for a ${input.vehicleClass} vehicle.`);
+    add("completeness", "ABOVE_CONFIGURED_BAND", false,
+      `${characters} characters; above the ${band.max}-character target.`);
   }
   if (evidence && evidence.unclaimed_supplied.length > 0 && characters < band.min) {
     // Short AND ignoring supplied facts is the shape of a lazy generation,

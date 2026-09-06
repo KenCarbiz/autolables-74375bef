@@ -51,6 +51,7 @@ function runChain(claimed: string[], content: string) {
   const report = runGates({
     content, snapshot: snap, validatorFindings: validator,
     output: { used_fact_ids: claimed, hero_fact_ids: [], warranty_fact_ids: [], history_fact_ids: [] },
+    lengthBand: { min: 1800, max: 3800 },
     vehicleClass: vehicleClassOf({ isTruck: false, isLuxuryOrPerformance: false, msrp: null }),
   });
   const merged: Finding[] = [...validator, ...report.findings

@@ -4,6 +4,7 @@ import {
 } from "../../../supabase/functions/_shared/description-voice.ts";
 import {
   buildFactSnapshot, buildDescriptionPacket, buildMasterPromptV3,
+  buildChannelPromptV3, policyForChannel,
 } from "../../../supabase/functions/_shared/description-core.ts";
 
 // The 20 market areas resolved from the rooftop ZIP were an allowlist that
@@ -19,7 +20,7 @@ const AREAS = [
 
 const SETTINGS = {
   primary_city: "Hartford", state: "CT", selling_areas: AREAS,
-  min_length: 3000, max_length: 3879,
+  min_length: 1800, max_length: 3800,
 };
 
 const voiceOf = (areas: string[] = AREAS) =>
@@ -118,5 +119,39 @@ describe("the guardrail that makes permission safe still holds", () => {
     const f = checkLocalityUse(
       "This Wrangler is ready for a Hartford commute and weekend trails.", v);
     expect(f).toHaveLength(0);
+  });
+});
+
+// ── Channel ceilings ─────────────────────────────────────────────────
+
+describe("a channel ceiling is not a floor", () => {
+  const snap = buildFactSnapshot(LISTING, SETTINGS, null);
+  const packet = buildDescriptionPacket(snap, SETTINGS, voiceOf(AREAS));
+  const master = "An approved master description of moderate length.";
+
+  it("gives vAuto a ceiling and no minimum", () => {
+    // 3,879 is the export limit. Printing "0-3879" would read as a range and
+    // invite padding toward the top of it.
+    const vauto = policyForChannel("vauto")!;
+    expect(vauto.recommendedMin).toBe(0);
+    expect(vauto.characterLimit).toBe(3879);
+    const prompt = buildChannelPromptV3(master, vauto, packet);
+    expect(prompt).toMatch(/at most 3879 characters/);
+    expect(prompt).toMatch(/There is no minimum/);
+    expect(prompt).not.toMatch(/0-3879/);
+  });
+
+  it("still states a range for a channel that has a floor", () => {
+    const at = policyForChannel("autotrader")!;
+    expect(at.recommendedMin).toBeGreaterThan(0);
+    expect(buildChannelPromptV3(master, at, packet))
+      .toMatch(new RegExp(`Length: ${at.recommendedMin}-${at.recommendedMax} characters`));
+  });
+
+  it("never pins the master to a channel's limit", () => {
+    // The master follows the verified information; the channel caps what it
+    // exports. A master written to vAuto's ceiling is a master written for
+    // one destination.
+    expect(SETTINGS.max_length).toBeLessThan(policyForChannel("vauto")!.characterLimit);
   });
 });
