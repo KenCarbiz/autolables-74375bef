@@ -64,6 +64,38 @@
     --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 221 83% 53%;
+
+    /* ── Admin operating-system tokens ──────────────────────────────
+       The employee shell only. The customer Passport is owner-approved
+       and locked; do not reach for these there to make the system look
+       uniform.
+
+       Motion is enumerated so no screen invents its own timing. The
+       press curve already existed at 80ms and is reused rather than
+       redefined. Every duration pairs with an easing: entrances decelerate,
+       exits accelerate, and nothing springs or bounces. */
+    --al-motion-press: 80ms;
+    --al-ease-press: cubic-bezier(0.4, 0, 1, 1);
+    --al-motion-hover: 120ms;
+    --al-motion-select: 160ms;
+    --al-motion-expand: 180ms;
+    --al-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --al-motion-enter: 200ms;
+    --al-ease-enter: cubic-bezier(0, 0, 0.2, 1);
+    --al-motion-exit: 140ms;
+    --al-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+    /* Type scale as size/line-height/weight triples. Hierarchy is solved
+       by weight and spacing, never by shrinking secondary text until it
+       stops being readable. */
+    --al-type-page: 700 32px/38px;
+    --al-type-page-tracking: -0.02em;
+    --al-type-section: 700 22px/28px;
+    --al-type-card: 600 16px/22px;
+    --al-type-body: 400 14px/20px;
+    --al-type-body-emphasis: 500 14px/20px;
+    --al-type-button: 600 14px/20px;
+    --al-type-meta: 500 12px/16px;
   }
 
   .dark {
