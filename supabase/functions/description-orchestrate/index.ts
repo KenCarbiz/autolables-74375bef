@@ -111,6 +111,9 @@ export interface MasterGeneration {
   headline: string | null;
   claimedFactIds: string[];
   factRoles: Record<string, string[]>;
+  /** Which knowledge modules were loaded. "Why did it say that?" is not fully
+   *  answerable six months later without knowing what the writer was given. */
+  moduleKeys: string[];
   result: GenerationResult | null;
 }
 
@@ -126,7 +129,7 @@ async function generateMaster(
 ): Promise<MasterGeneration> {
   if (settings.prompt_profile !== "drivesignal-v3-system") {
     const text = await callGenerator(buildMasterPromptV3(packet, settings), settings.generation_model);
-    return { text, headline: null, claimedFactIds: [], factRoles: {}, result: null };
+    return { text, headline: null, claimedFactIds: [], factRoles: {}, moduleKeys: [], result: null };
   }
 
   const mc = (listing.mc_attributes || {}) as Record<string, any>;
@@ -168,6 +171,7 @@ async function generateMaster(
       ...result.parsed.warranty_fact_ids, ...result.parsed.history_fact_ids,
     ])],
     factRoles: factRoles(result.parsed),
+    moduleKeys: knowledge.moduleKeys,
     result,
   };
 }
@@ -681,6 +685,7 @@ async function orchestrateVehicle(
       { vin: listing.vin, tone, voice_profile_version: voice.version, input_checksum: inputChecksum });
     const generation = await generateMaster(packet, snap, settings, listing);
     const masterText = generation.text;
+    const knowledgeModules = generation.moduleKeys;
 
     const { data: lastVer } = await admin.from("description_versions")
       .select("id, version_number").eq("description_case_id", caseId)
@@ -697,6 +702,7 @@ async function orchestrateVehicle(
       prompt_profile: settings.prompt_profile,
       knowledge_revision: settings.prompt_profile === "drivesignal-v3-system"
         ? KNOWLEDGE_REVISION : null,
+      knowledge_modules: knowledgeModules,
       headline: generation.headline,
       claimed_fact_ids: generation.claimedFactIds,
       fact_roles_json: generation.factRoles,
@@ -722,6 +728,47 @@ async function orchestrateVehicle(
     let masterFinal = masterText;
     let findings: Finding[] = validateContentV3(masterFinal, snap, settings, packet);
     let repairLog: Record<string, unknown> | null = null;
+
+    // The DriveSignal QA gates contribute the checks the prose validator does
+    // not make: whether the writer cited evidence it was given, whether the
+    // length suits this class of vehicle, editorial standards, identity
+    // presence, and the prohibited hype and safety-overclaim libraries.
+    //
+    // They feed decideEligibility rather than deciding publication themselves.
+    // Two authorities over the same decision drift; this way the gates add
+    // findings and the existing engine keeps the verdict. Only gate-originated
+    // findings are merged — the routed validator ones are already in the list.
+    const gateReport = runGates({
+      content: masterFinal,
+      snapshot: snap,
+      validatorFindings: findings,
+      output: generation.result && generation.claimedFactIds.length
+        ? { used_fact_ids: generation.claimedFactIds, hero_fact_ids: [],
+            warranty_fact_ids: [], history_fact_ids: [] }
+        : null,
+      vehicleClass: vehicleClassOf({
+        isTruck: /\b(pickup|truck|cab)\b/i.test(String(listing.mc_attributes?.body_type ?? "")),
+        isLuxuryOrPerformance: knowledgeModules.includes("luxury"),
+        msrp: Number(listing.msrp) || null,
+      }),
+      identity: {
+        year: listing.mc_attributes?.year ?? null,
+        make: listing.mc_attributes?.make ?? null,
+        model: listing.mc_attributes?.model ?? null,
+      },
+    });
+    findings = [...findings, ...gateReport.findings
+      .filter((g) => g.origin === "gate")
+      .map((g) => ({
+        validator_code: g.code,
+        severity: (g.blocking ? "blocking" : "warning") as Finding["severity"],
+        message: `[${g.gate}] ${g.message}`,
+        blocking: g.blocking,
+      }))];
+    await audit(admin, tenantId, "description_gates_evaluated", caseId, {
+      vin: listing.vin, decision: gateReport.decision, words: gateReport.wordCount,
+      by_gate: gateReport.byGate,
+    });
 
     // Repair only ever DELETES the offending sentence, trims, or appends the
     // dealer's own disclosure. It never rewrites a claim and never calls the

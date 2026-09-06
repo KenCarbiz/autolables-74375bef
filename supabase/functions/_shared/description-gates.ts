@@ -29,6 +29,11 @@ export interface GateFinding {
   code: string;
   blocking: boolean;
   message: string;
+  /** "validator" findings were produced by validateContent and merely routed
+   *  to a gate for legibility. Only "gate" findings are new information, and
+   *  merging the routed ones back into the validator's list would double-count
+   *  every one of them. */
+  origin: "gate" | "validator";
 }
 
 export interface GateReport {
@@ -127,8 +132,9 @@ export interface GateInput {
 
 export function runGates(input: GateInput): GateReport {
   const findings: GateFinding[] = [];
-  const add = (gate: GateId, code: string, blocking: boolean, message: string) =>
-    findings.push({ gate, code, blocking, message });
+  const add = (gate: GateId, code: string, blocking: boolean, message: string,
+               origin: GateFinding["origin"] = "gate") =>
+    findings.push({ gate, code, blocking, message, origin });
 
   const text = input.content || "";
   const words = countWords(text);
@@ -149,7 +155,7 @@ export function runGates(input: GateInput): GateReport {
   // Existing validators, routed to their gate.
   for (const f of input.validatorFindings || []) {
     const gate = VALIDATOR_GATE[f.validator_code] || (f.blocking ? "evidence" : "editorial");
-    add(gate, f.validator_code, !!f.blocking, f.message || f.validator_code);
+    add(gate, f.validator_code, !!f.blocking, f.message || f.validator_code, "validator");
   }
 
   // Gate 2 — Completeness. Enough story for this vehicle, no padding.

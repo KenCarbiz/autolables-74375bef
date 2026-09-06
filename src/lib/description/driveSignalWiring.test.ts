@@ -36,10 +36,26 @@ describe("the orchestrator uses the pieces", () => {
   });
 
   it("writes the evidence ledger onto the version", () => {
-    for (const col of ["prompt_profile", "knowledge_revision", "headline",
-                       "claimed_fact_ids", "fact_roles_json", "evidence_audit_json"]) {
+    for (const col of ["prompt_profile", "knowledge_revision", "knowledge_modules",
+                       "headline", "claimed_fact_ids", "fact_roles_json",
+                       "evidence_audit_json"]) {
       expect(orch, col).toContain(`${col}:`);
     }
+  });
+
+  it("runs the QA gates and feeds them into the existing eligibility engine", () => {
+    // Imported-but-never-called is how the five orphan modules in this
+    // codebase happened; the gates were briefly the sixth.
+    expect(orch).toMatch(/const gateReport = runGates\(\{/);
+    expect(orch).toMatch(/findings = \[\.\.\.findings, \.\.\.gateReport\.findings/);
+    expect(orch).toMatch(/\.filter\(\(g\) => g\.origin === "gate"\)/);
+  });
+
+  it("does not let the gates decide publication themselves", () => {
+    // decideEligibility stays the single verdict; two authorities drift.
+    const after = orch.slice(orch.indexOf("const gateReport = runGates"));
+    expect(after).toMatch(/decideEligibility\(/);
+    expect(orch).not.toMatch(/gateReport\.decision === "REJECT"[\s\S]{0,80}return/);
   });
 
   it("leaves a tenant that is not on the profile completely alone", () => {

@@ -50,3 +50,10 @@ CREATE INDEX IF NOT EXISTS idx_description_versions_claimed_facts
 CREATE INDEX IF NOT EXISTS idx_description_versions_evidence_failed
   ON public.description_versions (tenant_id, created_at DESC)
   WHERE (evidence_audit_json->>'ok') = 'false';
+
+-- Which knowledge modules the writer was actually given. "Why did it say
+-- that?" is not fully answerable without it: the corpus is selected per
+-- vehicle, so two cars written under the same revision may have been handed
+-- different reference material.
+ALTER TABLE public.description_versions
+  ADD COLUMN IF NOT EXISTS knowledge_modules text[] NOT NULL DEFAULT '{}';
