@@ -3312,6 +3312,7 @@ export type Database = {
           headline: string | null
           id: string
           input_checksum: string | null
+          knowledge_modules: string[]
           knowledge_revision: string | null
           language: string
           locale: string
@@ -3367,6 +3368,7 @@ export type Database = {
           headline?: string | null
           id?: string
           input_checksum?: string | null
+          knowledge_modules?: string[]
           knowledge_revision?: string | null
           language?: string
           locale?: string
@@ -3422,6 +3424,7 @@ export type Database = {
           headline?: string | null
           id?: string
           input_checksum?: string | null
+          knowledge_modules?: string[]
           knowledge_revision?: string | null
           language?: string
           locale?: string
