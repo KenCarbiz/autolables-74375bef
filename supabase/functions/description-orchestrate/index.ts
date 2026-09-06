@@ -30,7 +30,7 @@ import { preflight, preflightSummary } from "../_shared/description-preflight.ts
 import { evaluateBudget, DEFAULT_BUDGET } from "../_shared/description-budget.ts";
 import { can } from "../_shared/description-permissions.ts";
 import { buyersGuideDisposition } from "../_shared/description-warranty-policy.ts";
-import { createProvider, type GenerationResult } from "../_shared/description-provider.ts";
+import { createProvider, outputTokenBudget, type GenerationResult } from "../_shared/description-provider.ts";
 import { DRIVESIGNAL_V3_SYSTEM } from "../_shared/prompts/drivesignal-v3-system.ts";
 import { assembleKnowledge, vehicleSignals, KNOWLEDGE_REVISION } from "../_shared/description-knowledge.ts";
 import { DESCRIPTION_OUTPUT_SCHEMA, auditEvidence, factRoles } from "../_shared/description-evidence.ts";
@@ -155,6 +155,8 @@ async function generateMaster(
     model: settings.generation_model,
     schema: DESCRIPTION_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
     schemaName: "drivesignal_vehicle_description",
+    maxOutputTokens: outputTokenBudget(
+      preferredLengthBand(settings).max, settings.reasoning_effort),
     reasoningEffort: settings.reasoning_effort || null,
     verbosity: settings.verbosity || null,
   });

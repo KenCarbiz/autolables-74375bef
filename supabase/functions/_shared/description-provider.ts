@@ -79,6 +79,41 @@ const EMPTY_USAGE: GenerationUsage = {
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 /** HTTP status to a category the retry policy understands. */
+/**
+ * How many output tokens to allow for one description.
+ *
+ * Two things share this budget on a reasoning model, and forgetting the second
+ * is what truncated the richest vehicles mid-JSON: the visible answer AND the
+ * model's reasoning tokens. Sending no budget at all leaves the provider
+ * default in charge, which is what happened — a BMW X7 with 24 options and a
+ * new QX60 both came back as unparseable partial documents while thinner cars
+ * succeeded.
+ *
+ * English runs about 3.5 characters per token, the structured wrapper adds the
+ * headline and four id arrays, and reasoning needs headroom of its own.
+ */
+export function outputTokenBudget(
+  targetChars: number,
+  reasoningEffort?: string | null,
+): number {
+  const prose = Math.ceil((Number(targetChars) || 3800) / 3.5);
+  const structuredOverhead = 400;
+  const reasoning = reasoningEffort === "high" ? 3000
+    : reasoningEffort === "medium" ? 1500
+    : reasoningEffort === "minimal" ? 250
+    : 800;
+  // A generous floor: an undersized budget fails the whole call, while an
+  // unused allowance costs nothing — only consumed tokens are billed.
+  return Math.max(2048, prose + structuredOverhead + reasoning);
+}
+
+/** The response stopped early rather than finishing its answer. */
+export function wasTruncated(result: GenerationResult): boolean {
+  const reason = String(result.finishReason || "").toLowerCase();
+  return reason.includes("incomplete") || reason.includes("max_output_tokens")
+    || reason.includes("max_tokens") || reason === "length";
+}
+
 export function classifyStatus(status: number): ProviderError["code"] {
   if (status === 429) return "RATE_LIMIT";
   if (status >= 500) return "PROVIDER_ERROR";
@@ -278,7 +313,21 @@ export function createProvider(
           classifyStatus(res.status), res.status, detail.slice(0, 400));
       }
       const result = spec.normalize(await res.json(), req.model, ms);
-      if (req.schema) result.parsed = parseStructured(result.text);
+      if (req.schema) {
+        result.parsed = parseStructured(result.text);
+        if (!result.parsed) {
+          // "It did not come back as JSON" is not a diagnosis. Truncation and
+          // a model ignoring the schema need different responses — more budget
+          // versus a different model — and they are indistinguishable without
+          // the finish reason.
+          const why = wasTruncated(result)
+            ? `truncated after ${result.usage.outputTokens} output tokens `
+              + `(${result.usage.reasoningTokens} of them reasoning)`
+            : `response was not valid JSON`;
+          throw new ProviderError(`structured_output_missing: ${why}`,
+            "PROVIDER_ERROR", res.status, result.text.slice(0, 200));
+        }
+      }
       return result;
     },
   };

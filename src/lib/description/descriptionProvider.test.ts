@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   createProvider, buildOpenAIRequest, buildAnthropicRequest,
   normalizeOpenAIResponse, normalizeAnthropicResponse, parseStructured,
-  classifyStatus, ProviderError,
+  classifyStatus, ProviderError, outputTokenBudget, wasTruncated,
 } from "../../../supabase/functions/_shared/description-provider.ts";
 import { DESCRIPTION_OUTPUT_SCHEMA } from "../../../supabase/functions/_shared/description-evidence.ts";
 import { DRIVESIGNAL_V3_SYSTEM } from "../../../supabase/functions/_shared/prompts/drivesignal-v3-system.ts";
@@ -146,7 +146,13 @@ describe("credentials and failures", () => {
     let sent = "";
     const spy = (async (_u: string, init: any) => {
       sent = String(init.body);
-      return { ok: true, status: 200, json: async () => ({ output_text: "copy" }) };
+      // REQ requests a schema, so the response must be a conforming document
+      // or the provider now correctly refuses it.
+      return { ok: true, status: 200, json: async () => ({
+        status: "completed",
+        output_text: JSON.stringify({ headline: "h", master_description: "m",
+          used_fact_ids: [], hero_fact_ids: [], warranty_fact_ids: [], history_fact_ids: [] }),
+      }) };
     }) as unknown as typeof fetch;
     await createProvider("openai", envWith({ OPENAI_API_KEY: "sk-secret" }), spy).generate(REQ);
     expect(sent).not.toContain("sk-secret");
@@ -185,5 +191,70 @@ describe("the vendor stays behind the interface", () => {
   it("rejects an unknown provider rather than defaulting to one", () => {
     expect(() => createProvider("gemini" as never, envWith({}), fetch))
       .toThrow(ProviderError);
+  });
+});
+
+
+describe("the output budget covers the answer AND the thinking", () => {
+  it("is sent, rather than leaving the provider default in charge", () => {
+    // Sending nothing is what truncated a BMW X7 with 24 options and a new
+    // QX60 mid-JSON while thinner cars succeeded.
+    const body = buildOpenAIRequest({ ...REQ, maxOutputTokens: 2500 }) as Record<string, unknown>;
+    expect(body.max_output_tokens).toBe(2500);
+  });
+
+  it("scales with the target length", () => {
+    expect(outputTokenBudget(3800)).toBeGreaterThan(outputTokenBudget(2000));
+  });
+
+  it("leaves room for reasoning tokens, which share the budget", () => {
+    // On a reasoning model the thinking is billed as output and counts against
+    // the same ceiling, so a budget sized only for the prose truncates.
+    expect(outputTokenBudget(3800, "high")).toBeGreaterThan(outputTokenBudget(3800, "low"));
+    expect(outputTokenBudget(3800, "low")).toBeGreaterThan(outputTokenBudget(3800, "minimal"));
+  });
+
+  it("never returns a budget too small to hold one description", () => {
+    expect(outputTokenBudget(0)).toBeGreaterThanOrEqual(2048);
+    expect(outputTokenBudget(NaN)).toBeGreaterThanOrEqual(2048);
+  });
+});
+
+describe("a failed structured call says why", () => {
+  const respond = (body: unknown) => (async () => ({
+    ok: true, status: 200, json: async () => body, text: async () => "",
+  })) as unknown as typeof fetch;
+  const env = { get: (k: string) => ({ OPENAI_API_KEY: "k" } as Record<string, string>)[k] };
+
+  it("distinguishes truncation from a model ignoring the schema", () => {
+    // More budget versus a different model are different fixes, and
+    // "it wasn't JSON" cannot tell them apart.
+    expect(wasTruncated({ finishReason: "incomplete" } as never)).toBe(true);
+    expect(wasTruncated({ finishReason: "max_output_tokens" } as never)).toBe(true);
+    expect(wasTruncated({ finishReason: "completed" } as never)).toBe(false);
+  });
+
+  it("reports a truncated response with its token counts", async () => {
+    const p = createProvider("openai", env, respond({
+      status: "incomplete", output_text: '{"headline":"2023 Jeep Wran',
+      usage: { output_tokens: 1024, output_tokens_details: { reasoning_tokens: 900 } },
+    }));
+    await expect(p.generate(REQ)).rejects.toThrow(/truncated after 1024 output tokens \(900 of them reasoning\)/);
+  });
+
+  it("reports a non-JSON response differently", async () => {
+    const p = createProvider("openai", env, respond({
+      status: "completed", output_text: "Here is your description: the QX80...",
+    }));
+    await expect(p.generate(REQ)).rejects.toThrow(/not valid JSON/);
+  });
+
+  it("still returns a conforming response untouched", async () => {
+    const p = createProvider("openai", env, respond({
+      status: "completed",
+      output_text: JSON.stringify({ headline: "h", master_description: "m",
+        used_fact_ids: [], hero_fact_ids: [], warranty_fact_ids: [], history_fact_ids: [] }),
+    }));
+    expect((await p.generate(REQ)).parsed?.headline).toBe("h");
   });
 });
