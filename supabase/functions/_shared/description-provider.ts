@@ -29,6 +29,13 @@ export interface GenerationRequest {
   /** When set, the provider is asked to ENFORCE this schema, not hope for it. */
   schema?: Record<string, unknown>;
   schemaName?: string;
+  /** How much the model may think before answering. Reasoning tokens bill as
+   *  output, so on a nightly fleet-wide run this is a larger cost lever than
+   *  the choice of model. Omitted means the provider default. */
+  reasoningEffort?: "minimal" | "low" | "medium" | "high" | null;
+  /** How expansive the answer should be. Our prompt already specifies length,
+   *  so this is a nudge rather than the control. */
+  verbosity?: "low" | "medium" | "high" | null;
 }
 
 export interface GenerationUsage {
@@ -90,16 +97,23 @@ export function buildOpenAIRequest(req: GenerationRequest): Record<string, unkno
     input: req.userContent,
   };
   if (req.maxOutputTokens) body.max_output_tokens = req.maxOutputTokens;
+
+  // Both of these are nested rather than top-level, and both are omitted
+  // entirely when unset so an account default is never overwritten with a
+  // guess. If the wire names move, this function is the single place to fix
+  // and it is covered by fixtures.
+  if (req.reasoningEffort) body.reasoning = { effort: req.reasoningEffort };
+  const text: Record<string, unknown> = {};
   if (req.schema) {
-    body.text = {
-      format: {
-        type: "json_schema",
-        name: req.schemaName || "vehicle_description",
-        schema: req.schema,
-        strict: true,
-      },
+    text.format = {
+      type: "json_schema",
+      name: req.schemaName || "vehicle_description",
+      schema: req.schema,
+      strict: true,
     };
   }
+  if (req.verbosity) text.verbosity = req.verbosity;
+  if (Object.keys(text).length) body.text = text;
   return body;
 }
 

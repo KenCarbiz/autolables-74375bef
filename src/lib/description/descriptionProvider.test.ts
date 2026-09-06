@@ -36,6 +36,26 @@ describe("the request keeps the ruleset ahead of the vehicle", () => {
     expect((buildOpenAIRequest({ ...REQ, schema: undefined }) as any).text).toBeUndefined();
   });
 
+  it("sends the reasoning budget when a tenant sets one", () => {
+    // Reasoning tokens bill as output, so this is the cost lever on a nightly
+    // fleet-wide run — bigger than the choice of model.
+    const body = buildOpenAIRequest({ ...REQ, reasoningEffort: "low" }) as any;
+    expect(body.reasoning).toEqual({ effort: "low" });
+  });
+
+  it("leaves the account default alone when it is unset", () => {
+    // Writing a guess into every request is worse than sending nothing.
+    const body = buildOpenAIRequest({ ...REQ, reasoningEffort: null, verbosity: null }) as any;
+    expect(body.reasoning).toBeUndefined();
+    expect(body.text.verbosity).toBeUndefined();
+  });
+
+  it("carries verbosity beside the schema rather than replacing it", () => {
+    const body = buildOpenAIRequest({ ...REQ, verbosity: "medium" }) as any;
+    expect(body.text.verbosity).toBe("medium");
+    expect(body.text.format.strict).toBe(true);
+  });
+
   it("keeps the same separation on the other provider", () => {
     const body = buildAnthropicRequest(REQ) as Record<string, any>;
     expect(body.system).toBe(DRIVESIGNAL_V3_SYSTEM);

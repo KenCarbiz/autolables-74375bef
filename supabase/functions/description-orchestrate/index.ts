@@ -78,6 +78,7 @@ const DEFAULT_SETTINGS = {
   internal_publication_enabled: true, default_tone: "professional",
   min_length: 400, max_length: 2400, prohibited_phrases: [], class_rules: {},
   generation_provider: "anthropic", prompt_profile: "platform_v3", knowledge_revision: null,
+  reasoning_effort: "low", verbosity: "medium",
   warranty_language_allowed: false, cpo_language_allowed: false,
   accessory_language_allowed: false, market_context_allowed: false,
   price_in_description: false, quality_threshold: 70,
@@ -150,6 +151,8 @@ async function generateMaster(
     model: settings.generation_model,
     schema: DESCRIPTION_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
     schemaName: "drivesignal_vehicle_description",
+    reasoningEffort: settings.reasoning_effort || null,
+    verbosity: settings.verbosity || null,
   });
 
   // A structured call that came back as prose is a failed structured call, not
