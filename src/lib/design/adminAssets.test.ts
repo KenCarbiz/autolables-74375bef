@@ -12,7 +12,7 @@ const assets = Object.values(ADMIN_ASSETS);
 
 describe("every mapped asset is actually on disk", () => {
   it("installs the whole manifest", () => {
-    expect(assets.length).toBe(264);
+    expect(assets.length).toBe(290);
   });
 
   it("resolves every path", () => {
@@ -24,8 +24,17 @@ describe("every mapped asset is actually on disk", () => {
 
   it("keys each asset by its manifest id", () => {
     for (const [key, a] of Object.entries(ADMIN_ASSETS)) expect(a.id).toBe(key);
-    expect(adminAsset("010A")?.name).toBe("Home");
+    expect(adminAsset("010AC")?.name).toBe("Home");
     expect(adminAsset("999Z")).toBeUndefined();
+  });
+
+  it("carries the manifest's notes on every asset", () => {
+    // The V3 manifest is CRLF, so the final column parsed as "notes\r" and
+    // every asset silently lost its guidance. It typechecked and every path
+    // still resolved; only the content was gone.
+    const empty = assets.filter((a) => !a.notes || a.notes === "undefined");
+    expect(empty.map((a) => a.id)).toEqual([]);
+    expect(adminAsset("054AC")?.notes).toContain("verification");
   });
 
   it("carries the categories the placement map references", () => {
@@ -43,7 +52,7 @@ describe("icons are styleable rather than pre-coloured", () => {
   it("ships the currentColor variant, not the hardcoded blue", () => {
     // A file with stroke="#2563EB" cannot be dimmed when disabled, inverted on
     // the navy rail, or turned amber for an attention state.
-    expect(icons.length).toBe(118);
+    expect(icons.length).toBe(132);
     for (const a of icons) {
       const svg = read(a.path);
       expect(svg, a.id).toContain('stroke="currentColor"');
@@ -62,13 +71,15 @@ describe("icons are styleable rather than pre-coloured", () => {
   });
 
   it("records the semantic colour it was drawn in rather than baking it", () => {
-    // 31 icons shipped with a hardcoded semantic stroke. The file is now
-    // styleable and the intent is data, so a component can honour it for a
-    // real state and ignore it when the icon is merely a label.
+    // V3 ships a clean currentColor set, so the intent is recovered from the
+    // bare twin instead: the colour a concept was DRAWN in is design data,
+    // and discarding it would leave a failed inspection the same colour as a
+    // navigation item.
     const hinted = icons.filter((a) => a.semanticHint);
-    expect(hinted.length).toBe(31);
+    expect(hinted.length).toBe(42);
     for (const a of hinted) expect(a.semanticHint).toMatch(/^#[0-9A-F]{6}$/);
-    expect(adminAsset("054A")?.semanticHint).toBe("#16A34A");
+    expect(adminAsset("054AC")?.semanticHint).toBe("#16A34A");
+    expect(adminAsset("010AC")?.semanticHint).toBeNull();
   });
 
   it("keeps one consistent stroke weight", () => {
@@ -90,7 +101,7 @@ describe("the brand files are untouched", () => {
 describe("soft tiles stay the exception", () => {
   it("are a separate set, not the default icon", () => {
     const tiles = assets.filter((a) => a.path.includes("/tiles/"));
-    expect(tiles.length).toBe(118);
+    expect(tiles.length).toBe(132);
     // Tiles carry a background; that is what makes them tiles and why the
     // instructions restrict them to a few high-value entry points.
     expect(read(tiles[0].path)).toMatch(/<rect|<circle/);

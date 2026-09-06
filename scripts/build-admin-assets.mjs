@@ -25,21 +25,29 @@ const DEST  = "public/admin-assets";
 const MAP   = "src/lib/design/adminAssets.ts";
 const PATHS = "src/lib/design/adminIconPaths.ts";
 
-// manifest prefix -> [archive directory, filename suffix in the archive]
-const SOURCES = {
-  "01_BRAND":          ["01_BRAND/SVG", null],
-  "02_ICONS_BARE":     ["02_MASTER_SVG/D_CURRENTCOLOR_IMPLEMENTATION", "currentColor"],
-  "03_ICONS_SOFT":     ["02_MASTER_SVG/B_SOFT_BACKGROUND", "soft"],
-  "04_ICONS_REVERSE":  ["02_MASTER_SVG/C_REVERSE_WHITE", "reverse"],
-  "05_EMPTY_STATES":   ["06_EMPTY_STATES/SVG", null],
-};
-
-const OUT_DIR = { "01_BRAND": "brand", "02_ICONS_BARE": "icons", "03_ICONS_SOFT": "tiles",
-                  "04_ICONS_REVERSE": "reverse", "05_EMPTY_STATES": "empty-states" };
+// V3 fixed the manifest, so a path in it resolves directly against the pack
+// root. V2 addressed icons at directories that did not exist and needed a
+// translation table; keeping that table would now be a lie about the archive.
+//
+// The currentColor set remains the icon source: those files inherit colour, so
+// hover, disabled, the navy rail and semantic state are CSS rather than
+// separate files. V3 also dropped the reverse family entirely, which is only
+// coherent BECAUSE the icons inherit.
+const ICON_DIR    = "02_MASTER_SVG/C_CURRENTCOLOR_IMPLEMENTATION";
+const BARE_DIR    = "02_MASTER_SVG/A_BARE_NO_BACKGROUND";
+const OUT_DIR_FOR = (path) =>
+  path.startsWith("01_BRAND") ? "brand"
+  : path.startsWith("05_EMPTY_STATES") ? "empty-states"
+  : path.includes("B_SOFT_BACKGROUND") ? "tiles"
+  : "icons";
 
 function parseCsv(text) {
-  const [head, ...rows] = text.trim().split("\n");
-  const cols = head.split(",");
+  // The V3 manifest uses CRLF, which leaves a stray carriage return on the
+  // final column of every line. The header then reads "notes\r", so row.notes
+  // is undefined on all 290 assets — a silent data loss that typechecks only
+  // because the field is optional somewhere upstream.
+  const [head, ...rows] = text.replace(/\r\n?/g, "\n").trim().split("\n");
+  const cols = head.split(",").map((c) => c.trim());
   return rows.map((line) => {
     // Fields may contain quoted commas; a minimal split is enough for this file.
     const out = []; let cur = ""; let quoted = false;
@@ -67,8 +75,14 @@ function findFile(dir, id, suffix) {
 const pack = process.argv[2];
 if (!pack) { console.error("usage: build-admin-assets.mjs <pack dir>"); process.exit(1); }
 
-const rows = parseCsv(readFileSync(
-  join(pack, "08_MANIFESTS/000_MASTER_ASSET_INDEX_V2.csv"), "utf8"));
+// The manifest filename carries the pack version, so it is discovered rather
+// than hardcoded: a version bump should not silently read a stale index.
+const manifestDir = ["07_MANIFESTS", "08_MANIFESTS"].find((d) => existsSync(join(pack, d)));
+if (!manifestDir) { console.error("no manifest directory in pack"); process.exit(1); }
+const manifestFile = readdirSync(join(pack, manifestDir))
+  .find((f) => /MASTER_ASSET_INDEX/i.test(f) && f.endsWith(".csv"));
+if (!manifestFile) { console.error("no master asset index in pack"); process.exit(1); }
+const rows = parseCsv(readFileSync(join(pack, manifestDir, manifestFile), "utf8"));
 
 if (existsSync(DEST)) rmSync(DEST, { recursive: true });
 const entries = [];
@@ -76,48 +90,57 @@ const inline = [];
 const missing = [];
 
 for (const row of rows) {
-  const prefix = row.filename.split("/")[0];
-  const src = SOURCES[prefix];
-  if (!src) { missing.push(`${row.id}: unknown prefix ${prefix}`); continue; }
-  const dir = join(pack, src[0]);
-  if (!existsSync(dir)) { missing.push(`${row.id}: ${src[0]} not in archive`); continue; }
-  const file = findFile(dir, row.id, src[1]);
-  if (!file) { missing.push(`${row.id}: no file for ${row.filename}`); continue; }
+  // Soft tiles and bare icons share an id with the currentColor file; only one
+  // copy of each concept belongs in the app, and it is the styleable one.
+  const isBare = row.filename.includes(BARE_DIR);
+  if (isBare) continue;
 
-  const outDir = join(DEST, OUT_DIR[prefix]);
+  const source = row.filename.includes("C_CURRENTCOLOR_IMPLEMENTATION")
+    ? row.filename : row.filename;
+  const abs = join(pack, source);
+  if (!existsSync(abs)) { missing.push(`${row.id}: ${source}`); continue; }
+
+  const bucket = OUT_DIR_FOR(row.filename);
+  const outDir = join(DEST, bucket);
   mkdirSync(outDir, { recursive: true });
   const outName = basename(row.filename);
+  const svg = readFileSync(abs, "utf8");
 
-  // 31 files in the currentColor set still carry a hardcoded semantic stroke
-  // (#16A34A for verified, #D97706 for attention, and so on). A colour baked
-  // into the file cannot be dimmed when disabled, inverted on the navy rail,
-  // or driven by the state the component actually knows about — and a green
-  // icon that is always green is decoration rather than state, which the
-  // pack's own rules forbid. The stroke becomes currentColor and the intended
-  // semantic is recorded on the map so a component can opt into it in CSS.
+  // V3 reports zero hard-coded colours in the currentColor set. Verify rather
+  // than trust: a single fixed hex is invisible until an icon refuses to dim.
   let semanticHint = null;
-  if (prefix === "02_ICONS_BARE") {
-    const svg = readFileSync(join(dir, file), "utf8");
+  if (bucket === "icons") {
     const hex = svg.match(/stroke="(#[0-9A-Fa-f]{6})"/);
     if (hex) {
+      // V3 reports none of these; the check stays because a single fixed hex
+      // is invisible until an icon refuses to dim on a disabled control.
       semanticHint = hex[1].toUpperCase();
       writeFileSync(join(outDir, outName), svg.replace(hex[0], 'stroke="currentColor"'));
     } else {
-      copyFileSync(join(dir, file), join(outDir, outName));
+      copyFileSync(abs, join(outDir, outName));
     }
-  } else {
-    copyFileSync(join(dir, file), join(outDir, outName));
-  }
 
-  if (prefix === "02_ICONS_BARE") {
-    // currentColor only inherits when the SVG is IN the document. Referencing
-    // these through <img src> would silently defeat the whole reason for
-    // choosing the currentColor variant, so the geometry is emitted for inline
-    // rendering as well. All 118 come to roughly 37KB.
-    const svg = readFileSync(join(outDir, outName), "utf8");
-    const viewBox = svg.match(/viewBox="([^"]+)"/)?.[1] || "0 0 24 24";
-    const body = svg.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "").trim();
+    // The bare twin keeps the colour the concept was DRAWN in — green for
+    // verified, red for fail. Shipping the currentColor geometry without
+    // recording that intent would throw the designer's semantics away and
+    // leave a failed inspection the same colour as a nav item. Recorded as
+    // data so a component can honour it for a real state and ignore it for a
+    // label, which is also what keeps colour from being the only signal.
+    if (!semanticHint) {
+      const twin = join(pack, BARE_DIR, outName.replace(/_currentColor\.svg$/, "_bare.svg"));
+      if (existsSync(twin)) {
+        const bareHex = readFileSync(twin, "utf8").match(/stroke="(#[0-9A-Fa-f]{6})"/);
+        if (bareHex && bareHex[1].toUpperCase() !== "#2563EB") {
+          semanticHint = bareHex[1].toUpperCase();
+        }
+      }
+    }
+    const clean = readFileSync(join(outDir, outName), "utf8");
+    const viewBox = clean.match(/viewBox="([^"]+)"/)?.[1] || "0 0 24 24";
+    const body = clean.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "").trim();
     inline.push({ id: row.id, viewBox, body });
+  } else {
+    copyFileSync(abs, join(outDir, outName));
   }
 
   entries.push({
@@ -128,7 +151,7 @@ for (const row of rows) {
     variant: row.variant,
     surfaces: row.surfaces,
     notes: row.notes,
-    path: `/admin-assets/${OUT_DIR[prefix]}/${outName}`,
+    path: `/admin-assets/${bucket}/${outName}`,
   });
 }
 
