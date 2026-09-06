@@ -592,8 +592,8 @@ describe("truth snapshot still governs", () => {
   it("keeps a conflicted premium feature out of the packet", () => {
     const listing = {
       ...QX80,
-      features: ["Navigation System"],
-      mc_attributes: { ...QX80.mc_attributes, options: ["Navigation System", "Bose Premium Audio"] },
+      features: ["Navigation System", "Bose Premium Audio"],
+      mc_attributes: { ...QX80.mc_attributes, options: ["Navigation System"] },
     };
     const { packet } = packetFor(listing, { featureBudget: 20 });
     expect(packet.factoryFeatures.some((f) => f.canonical_id === "bose_audio")).toBe(false);
@@ -603,8 +603,8 @@ describe("truth snapshot still governs", () => {
   it("blocks copy that states the conflicted feature anyway", () => {
     const listing = {
       ...QX80,
-      features: ["Navigation System"],
-      mc_attributes: { ...QX80.mc_attributes, options: ["Navigation System", "Bose Premium Audio"] },
+      features: ["Navigation System", "Bose Premium Audio"],
+      mc_attributes: { ...QX80.mc_attributes, options: ["Navigation System"] },
     };
     const { snap, packet } = packetFor(listing, { featureBudget: 20 });
     const findings = validateContentV3(

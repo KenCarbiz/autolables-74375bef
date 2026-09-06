@@ -74,15 +74,29 @@ describe("fact snapshot", () => {
     expect(snap.conflicts.some((c) => c.field === "cpo_status" && c.material)).toBe(true);
   });
 
-  it("raises a material conflict when only one source lists premium equipment", () => {
+  it("withholds premium equipment only the feed claims", () => {
+    // No factory record stands behind it, so it stays out of copy — but as a
+    // review item, not a conflict a manager must adjudicate before the car can
+    // be described at all.
+    const snap = buildFactSnapshot({
+      ...LISTING,
+      features: ["Heated Seats", "Bose Performance Series Audio"],
+      mc_attributes: { ...LISTING.mc_attributes, options: ["Heated Seats"] },
+    }, SETTINGS, null);
+    expect(snap.excluded_claims.some((e) => /bose/i.test(String(e.claim)))).toBe(true);
+    expect(snap.conflicts.some((c) => c.field.includes("Bose"))).toBe(false);
+  });
+
+  it("states premium equipment the factory build sheet lists", () => {
+    // The feed enumerating fewer options than the factory installed is silence,
+    // not a denial. This was 592 standing conflicts in production.
     const snap = buildFactSnapshot({
       ...LISTING,
       features: ["Heated Seats"],
       mc_attributes: { ...LISTING.mc_attributes, options: ["Heated Seats", "Bose Performance Series Audio"] },
     }, SETTINGS, null);
-    const conflict = snap.conflicts.find((c) => c.field.includes("Bose"));
-    expect(conflict?.material).toBe(true);
-    expect(snap.excluded_claims.some((e) => /bose/i.test(String(e.claim)))).toBe(true);
+    expect(String(snap.facts.equipment?.value)).toContain("Bose");
+    expect(snap.excluded_claims.some((e) => /bose/i.test(String(e.claim)))).toBe(false);
   });
 
   it("never claims one owner without a history report", () => {
@@ -131,8 +145,8 @@ describe("validation engine", () => {
 
   it("blocks a claim excluded by an unresolved conflict", () => {
     const conflicted = buildFactSnapshot({
-      ...LISTING, features: ["Heated Seats"],
-      mc_attributes: { ...LISTING.mc_attributes, options: ["Bose Performance Series Audio"] },
+      ...LISTING, features: ["Heated Seats", "Bose Performance Series Audio"],
+      mc_attributes: { ...LISTING.mc_attributes, options: ["Heated Seats"] },
     }, SETTINGS, null);
     const f = validateContent("Features Bose Performance Series Audio for immersive sound. Contact us.", conflicted, SETTINGS);
     expect(f.some((x) => x.validator_code === "EXCLUDED_CLAIM_PRESENT" && x.blocking)).toBe(true);
@@ -239,13 +253,17 @@ describe("quality score", () => {
 });
 
 describe("resolved conflicts (the review loop must terminate)", () => {
+  // Premium equipment claimed by the FEED with no factory record behind it.
   const conflicted = {
-    ...LISTING, features: ["Heated Seats"],
-    mc_attributes: { ...LISTING.mc_attributes, options: ["Heated Seats", "Bose Performance Series Audio"] },
+    ...LISTING, features: ["Heated Seats", "Bose Performance Series Audio"],
+    mc_attributes: { ...LISTING.mc_attributes, options: ["Heated Seats"] },
   };
 
-  it("blocks while the conflict is unresolved", () => {
-    const snap = buildFactSnapshot(conflicted, SETTINGS, null, []);
+  it("blocks while a genuine source conflict is unresolved", () => {
+    // CPO is the remaining two-sided conflict: the feed asserts certification
+    // and no approved program source confirms it. Both sources speak, and they
+    // disagree — unlike a feed that simply lists fewer options than the factory.
+    const snap = buildFactSnapshot({ ...LISTING, condition: "cpo" }, SETTINGS, null, []);
     expect(snap.conflicts.some((c) => c.material)).toBe(true);
     const f = validateContent("Clean copy. Contact us to schedule a test drive.", snap, SETTINGS);
     expect(f.some((x) => x.validator_code === "SOURCE_CONFLICT_UNRESOLVED")).toBe(true);
