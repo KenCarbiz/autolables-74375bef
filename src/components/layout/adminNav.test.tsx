@@ -34,6 +34,9 @@ import {
   type AdminNavItem,
   type NavPermissionContext,
 } from "./adminNav";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { ADMIN_ICON_PATHS } from "@/lib/design/adminIconPaths";
 
 const ZERO_BADGES: NavBadgeValues = {
   workQueue: 0,
@@ -63,21 +66,32 @@ const byLabel = (label: string, badges: Partial<NavBadgeValues> = {}) =>
 describe("buildAdminNavSections — structure preserved", () => {
   it("keeps the section order, keys, and titles", () => {
     const sections = build();
+    // The information architecture the admin asset pack defines: Home,
+    // Inventory, My Work, Get Ready, Customers, Compliance, Reports, Settings.
+    // My Work and Customers did not exist -- Work Queue and Print Center sat
+    // under CREATE, Deals and Leads were split across two unrelated groups --
+    // and Reports was buried inside SETTINGS.
     expect(sections.map((s) => s.key)).toEqual([
       "main",
       "create",
+      "mywork",
+      "customers",
       "getready",
       "compliance",
       "office",
+      "reports",
       "settings",
       "platform",
     ]);
     expect(sections.map((s) => s.title)).toEqual([
       "",
       "CREATE",
+      "MY WORK",
+      "CUSTOMERS",
       "GET READY",
       "COMPLIANCE CENTER",
       "TITLES & INVOICES",
+      "REPORTS",
       "SETTINGS",
       "PLATFORM",
     ]);
@@ -86,18 +100,18 @@ describe("buildAdminNavSections — structure preserved", () => {
   it("preserves label order within each section", () => {
     const sections = build();
     const get = (key: string) => sections.find((s) => s.key === key)!.items.map((i) => i.label);
-    expect(get("main")).toEqual(["Home", "Inventory", "Deals"]);
-    // The comps lead each section with the surface the operator opens most:
-    // Work Queue in CREATE, Get Ready Command in GET READY.
+    expect(get("main")).toEqual(["Home", "Inventory"]);
+    // CREATE is now only the production surfaces -- the things that make a
+    // document. The queues moved to MY WORK and the people moved to CUSTOMERS.
     expect(get("create")).toEqual([
-      "Work Queue",
-      "Print Center",
-      "Leads",
       "Create",
       "OEM Window Sticker Studio",
       "Inventory Intelligence",
       "Description Operations",
     ]);
+    expect(get("mywork")).toEqual(["Work Queue", "Print Center"]);
+    expect(get("customers")).toEqual(["Leads", "Deals"]);
+    expect(get("reports")).toEqual(["Reports"]);
     expect(get("getready")).toEqual([
       "Get Ready Command",
       "Service Desk",
@@ -294,5 +308,49 @@ describe("permission filtering", () => {
     };
     const labels = filterNavSections(build(), ctx).flatMap((s) => s.items).map((i) => i.label);
     expect(labels).not.toContain("Leads");
+  });
+});
+
+// ── The asset pack has to actually render ────────────────────────────
+//
+// The 290-asset admin pack was installed, adminIconPaths.ts was generated and
+// <AdminIcon> was built and tested -- and nothing imported it. The whole
+// visual identity sat unused, which is exactly why the admin looked unchanged
+// after the design work landed. A component with no caller is not shipped.
+
+describe("navigation uses the admin asset pack", () => {
+  it("gives every row an icon from the pack", () => {
+    const missing = allItems()
+      .filter((i) => !i.assetIcon || !(i.assetIcon in ADMIN_ICON_PATHS))
+      .map((i) => i.label);
+    expect(missing).toEqual([]);
+  });
+
+  it("uses the pack's own navigation icons for the top-level surfaces", () => {
+    // The pack names exactly eight: Home, Inventory, My Work, Get Ready,
+    // Customers, Compliance, Reports, Settings.
+    const id = (label: string) => byLabel(label)?.assetIcon;
+    expect(id("Home")).toBe("010AC");
+    expect(id("Inventory")).toBe("011AC");
+    expect(id("Work Queue")).toBe("012AC");
+    expect(id("Get Ready Command")).toBe("013AC");
+    expect(id("Leads")).toBe("014AC");
+    expect(id("Compliance Center")).toBe("015AC");
+    expect(id("Reports")).toBe("016AC");
+    expect(id("Settings")).toBe("017AC");
+  });
+
+  it("keeps a lucide fallback on every row", () => {
+    // A wrong id or an uninstalled pack must cost the icon, never the row.
+    expect(allItems().every((i) => typeof i.icon === "function"
+      || typeof i.icon === "object")).toBe(true);
+  });
+
+  it("renders the pack inline, not as an <img>", () => {
+    // currentColor does not inherit through <img>, so a file reference would
+    // quietly turn every nav icon the same colour.
+    const shell = readFileSync(join(__dirname, "AppShell.tsx"), "utf8");
+    expect(shell).toMatch(/<AdminIcon id=\{item\.assetIcon\}/);
+    expect(shell).toMatch(/ADMIN_ICON_PATHS\[item\.assetIcon\]/);
   });
 });

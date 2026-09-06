@@ -54,6 +54,8 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { AdminIcon } from "@/components/design/AdminIcon";
+import { ADMIN_ICON_PATHS } from "@/lib/design/adminIconPaths";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -610,7 +612,17 @@ const AppShell = ({ children }: AppShellProps) => {
                               className={`group relative flex min-h-[42px] items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-sm transition-colors duration-[120ms] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1267e8] ${active ? "bg-[#eaf2ff] font-semibold text-[#0f2b5c]" : "text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a]"} ${collapsed ? "lg:min-h-[44px] lg:justify-center lg:px-0" : ""}`}
                             >
                               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[#dbeafe]" : ""}`}>
-                                <Icon size={19} strokeWidth={2} aria-hidden="true" className={active ? "text-[#1267e8]" : "text-[#64748b] group-hover:text-[#1267e8]"} />
+                                {item.assetIcon && ADMIN_ICON_PATHS[item.assetIcon]
+                                  // The pack is the product's icon language;
+                                  // lucide was the placeholder. `inherit`
+                                  // because navigation state decides this
+                                  // colour, not the colour it was drawn in.
+                                  ? <AdminIcon id={item.assetIcon} decorative inherit size={19}
+                                      className={active ? "text-[#1267e8]" : "text-[#64748b] group-hover:text-[#1267e8]"} />
+                                  // Falls back to lucide, so a wrong id or an
+                                  // uninstalled pack costs the new icon rather
+                                  // than the whole row.
+                                  : <Icon size={19} strokeWidth={2} aria-hidden="true" className={active ? "text-[#1267e8]" : "text-[#64748b] group-hover:text-[#1267e8]"} />}
                               </span>
                               {!collapsed && <span className="truncate">{item.label}</span>}
                               {!collapsed && badgeText && (
