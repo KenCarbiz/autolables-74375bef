@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  withRequiredDisclosure,
+  withRequiredDisclosure, featureBudgetForLength,
 } from "../../../supabase/functions/_shared/description-core.ts";
 import {
   evaluateBudget, collectTriggeredLimits, unpricedCallCeiling,
@@ -222,5 +222,46 @@ describe("the master band covers the vAuto floor", () => {
     const policy = readFileSync(join(fnDir,
       "_shared/description-channel-policy.ts"), "utf8");
     expect(policy).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
+  });
+});
+
+// ── 5. The writer has to be GIVEN enough to reach the floor ──────────
+//
+// The masters landed at ~2,600 characters against a 3,221 floor, which reads
+// as a model ignoring its length instruction. It was not. The master took its
+// feature budget from the vehicle_passport channel -- 10 features, sized for a
+// 900-2000 character display -- so the writer named everything it had been
+// given and stopped. Each of these vehicles carries 356-504 usable features;
+// the material was always there, and 10 of it reached the prompt.
+
+describe("the master is supplied enough material for its own band", () => {
+  it("sizes the budget from the length, not from a channel", () => {
+    expect(orch).toMatch(/featureBudget: featureBudgetForLength\(preferredLengthBand\(settings\)\.max\)/);
+    expect(orch).not.toMatch(/featureBudget: resolveChannelPolicy\("vehicle_passport"\)/);
+  });
+
+  it("gives a 3,879-character target enough features to fill it", () => {
+    expect(featureBudgetForLength(3879)).toBe(35);
+    // and a short channel still gets a short budget
+    expect(featureBudgetForLength(2000)).toBe(18);
+  });
+
+  it("clamps both ends", () => {
+    // Never so few that the floor is unreachable, never so many that the
+    // description becomes an enumeration.
+    expect(featureBudgetForLength(0)).toBe(8);
+    expect(featureBudgetForLength(50)).toBe(8);
+    expect(featureBudgetForLength(99999)).toBe(40);
+    expect(featureBudgetForLength(NaN)).toBe(8);
+  });
+
+  it("stops vAuto asking for a long variant with a short variant's material", () => {
+    const policy = readFileSync(join(fnDir,
+      "_shared/description-channel-policy.ts"), "utf8");
+    const vauto = policy.slice(policy.indexOf('key: "vauto"'),
+                               policy.indexOf('key: "vauto"') + 1400);
+    expect(vauto).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
+    expect(vauto).toMatch(/featureBudget: 35/);
+    expect(vauto).not.toMatch(/featureBudget: 10/);
   });
 });

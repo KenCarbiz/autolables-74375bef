@@ -1158,6 +1158,26 @@ export const LENGTH_POLICY = {
   absoluteMax: 4500,
 } as const;
 
+/**
+ * How many prioritized features a target length needs to be filled honestly.
+ *
+ * The master was taking its budget from the vehicle_passport channel -- 10
+ * features, sized for a 900-2000 character display -- while being asked for
+ * 3221-3879. Ten features cannot support 3,200 characters, so the writer said
+ * everything it had been given and stopped at ~2,600. That reads as a model
+ * that ignores its length instruction; it was a supply problem. The vehicles
+ * carry 356-504 usable features each, so the material was always there.
+ *
+ * ~110 characters per feature is the observed cost of naming one with enough
+ * context to be worth reading, once features are grouped rather than listed.
+ * Clamped at both ends: never so few that the floor is unreachable, never so
+ * many that the description becomes an enumeration.
+ */
+export function featureBudgetForLength(maxChars: number): number {
+  const n = Math.round((Number(maxChars) || 0) / 110);
+  return Math.max(8, Math.min(40, n));
+}
+
 /** The dealer's preferred band, falling back to the platform target. A tenant
  *  that configured an unreachably narrow window gets the platform band: the
  *  setting expresses a preference, not a contract the copy must satisfy. */

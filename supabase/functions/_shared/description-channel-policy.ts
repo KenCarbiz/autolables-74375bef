@@ -170,7 +170,11 @@ export const DEFAULT_CHANNEL_POLICIES: ChannelPolicy[] = [
     paragraphMin: 4, paragraphMax: 8, listsAllowed: false, htmlAllowed: false,
     markdownAllowed: false, emojiAllowed: false, linksAllowed: false, phoneAllowed: false,
     pricingPolicy: "never", keywordPolicy: "natural", ctaPolicy: "none",
-    seoFields: false, featureBudget: 10, prohibitedPhrases: [], requiredDisclosures: [],
+    seoFields: false,
+    // 3221-3879 characters cannot be written from 10 features. This policy
+    // asked for a long variant and supplied a short variant's material.
+    featureBudget: 35,
+    prohibitedPhrases: [], requiredDisclosures: [],
     // Export-only until a dealer actually configures a vAuto connector. This
     // is the honest state, not a placeholder: AutoLabels can produce a
     // vAuto-compatible export and nothing more.

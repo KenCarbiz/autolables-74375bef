@@ -24,7 +24,7 @@ import {
   resolveVoiceProfile, computeVoiceProfileVersion, featureChecksum, isToneKey,
   type DescriptionPacket, type ChannelPolicy, type ComparisonDoc, type SeoTargeting,
   type ToneKey, type VoiceProfile,
-  preferredLengthBand,
+  preferredLengthBand, featureBudgetForLength,
 } from "../_shared/description-core.ts";
 import { repairContent, hasRepairableFindings } from "../_shared/description-repair.ts";
 import { preflight, preflightSummary } from "../_shared/description-preflight.ts";
@@ -699,7 +699,12 @@ async function orchestrateVehicle(
     const packet: DescriptionPacket = buildDescriptionPacket(snap, settings, voice, {
       tone,
       targeting: opts.targeting,
-      featureBudget: resolveChannelPolicy("vehicle_passport")?.featureBudget ?? 10,
+      // Sized from the master's OWN length band, not borrowed from a channel.
+      // This took vehicle_passport's budget -- 10 features, for a 900-2000
+      // character display -- while the master is asked for 3221-3879, so the
+      // writer ran out of material at ~2,600 and stopped. The master carries
+      // the richest story; channels trim it with their own budgets.
+      featureBudget: featureBudgetForLength(preferredLengthBand(settings).max),
     });
     const featChecksum = await featureChecksum(packet.selectedFeatureIds);
     const masterPolicy = resolveChannelPolicy("vehicle_passport", channelOverrides.get("vehicle_passport"))!;
