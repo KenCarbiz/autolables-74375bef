@@ -151,7 +151,12 @@ export const PriceIntegrityPanel = () => {
         const vin = a.vin.toUpperCase();
         const lot = lotByVin.get(vin);
         if (lot == null) continue;
+        // A seed row carries advertised_price 0 as "no baseline captured yet".
+        // Treating it as a real website price paints a full-sticker mismatch on
+        // every unscraped car — the exact alarm dealers are meant to trust.
+        if (!a.advertised_price) continue;
         vinsWithAds.add(vin);
+
         // The lot price may carry the doc fee while the website advertised
         // price may not — accept an exact match OR an advertised+docFee match,
         // and report the smaller (true) gap.

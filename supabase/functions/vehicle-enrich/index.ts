@@ -516,7 +516,33 @@ async function fetchMds(ymm: string | null, condition: string, zip: string | nul
 // the client never displays make scope). Only the count and medians are kept —
 // market_meta ships to anonymous shoppers, so no listing rows, dealer names,
 // VINs, URLs, or min/max/mean ever leave this function.
-async function fetchSoldStats(ymm: string | null, condition: string, state: string | null) {
+// MarketCheck rejects anything longer than two characters for `state`, and the
+// dealer snapshot frequently carries the full name ("CONNECTICUT"), which is
+// why every sold-stats call 400'd and sold_stats was never populated.
+const USPS_BY_NAME: Record<string, string> = {
+  ALABAMA: "AL", ALASKA: "AK", ARIZONA: "AZ", ARKANSAS: "AR", CALIFORNIA: "CA",
+  COLORADO: "CO", CONNECTICUT: "CT", DELAWARE: "DE", "DISTRICT OF COLUMBIA": "DC",
+  FLORIDA: "FL", GEORGIA: "GA", HAWAII: "HI", IDAHO: "ID", ILLINOIS: "IL",
+  INDIANA: "IN", IOWA: "IA", KANSAS: "KS", KENTUCKY: "KY", LOUISIANA: "LA",
+  MAINE: "ME", MARYLAND: "MD", MASSACHUSETTS: "MA", MICHIGAN: "MI", MINNESOTA: "MN",
+  MISSISSIPPI: "MS", MISSOURI: "MO", MONTANA: "MT", NEBRASKA: "NE", NEVADA: "NV",
+  "NEW HAMPSHIRE": "NH", "NEW JERSEY": "NJ", "NEW MEXICO": "NM", "NEW YORK": "NY",
+  "NORTH CAROLINA": "NC", "NORTH DAKOTA": "ND", OHIO: "OH", OKLAHOMA: "OK",
+  OREGON: "OR", PENNSYLVANIA: "PA", "PUERTO RICO": "PR", "RHODE ISLAND": "RI",
+  "SOUTH CAROLINA": "SC", "SOUTH DAKOTA": "SD", TENNESSEE: "TN", TEXAS: "TX",
+  UTAH: "UT", VERMONT: "VT", VIRGINIA: "VA", WASHINGTON: "WA",
+  "WEST VIRGINIA": "WV", WISCONSIN: "WI", WYOMING: "WY",
+};
+function normalizeState(raw: string | null | undefined): string | null {
+  const s = String(raw ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+  if (!s) return null;
+  if (/^[A-Z]{2}$/.test(s)) return s;
+  return USPS_BY_NAME[s] ?? null;
+}
+
+async function fetchSoldStats(ymm: string | null, condition: string, stateRaw: string | null) {
+  const state = normalizeState(stateRaw);
+
   try {
     if (!ymm || !state) return null;
     const { year, make, model } = parseYmm(ymm);

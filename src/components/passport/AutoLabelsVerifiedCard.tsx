@@ -1,5 +1,7 @@
 import { ShieldCheck, ShieldAlert, TriangleAlert, Clock, CircleMinus, CircleCheck, ArrowRight, ChevronRight } from "lucide-react";
+import { isSettledCheck } from "@/lib/passport/verificationSummary";
 import type { VerificationReport, ReportCheck, VerificationStatus } from "@/lib/passport/verificationSummary";
+
 
 // ──────────────────────────────────────────────────────────────
 // AutoLabelsVerifiedCard — Option B "Balanced Status Dashboard".
@@ -78,16 +80,17 @@ const CARD = "bg-white border border-[#E6EAF0] rounded-2xl shadow-[0_1px_2px_rgb
 
 const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: Props) => {
   const total = report.totalChecks;
-  const verifiedCount = report.verifiedChecks;
+  const verified = report.checks.filter((c) => isSettledCheck(c.status));
+  const verifiedCount = verified.length;
   const reviewCount = total - verifiedCount;
   const allClear = reviewCount === 0;
 
-  const verified = report.checks.filter((c) => c.status === "verified");
   const attention = report.checks
-    .filter((c) => c.status !== "verified")
+    .filter((c) => !isSettledCheck(c.status))
     .sort((a, b) => rank(a.status) - rank(b.status));
 
   const review = onReview ?? (() => onOpenReport());
+
 
   return (
     <div className={`${CARD} p-5 ${className ?? ""}`} data-module="verification-card">

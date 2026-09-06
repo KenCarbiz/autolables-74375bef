@@ -1,0 +1,1 @@
+ALTER TABLE public.addendums ADD COLUMN IF NOT EXISTS getready_dispatched_at TIMESTAMPTZ;

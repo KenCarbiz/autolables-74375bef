@@ -152,23 +152,37 @@ export function normalizeOpenAIResponse(
 // ── Anthropic ────────────────────────────────────────────────────────
 
 export function buildAnthropicRequest(req: GenerationRequest): Record<string, unknown> {
-  return {
+  const body: Record<string, unknown> = {
     model: req.model,
     system: req.systemPrompt,
     max_tokens: req.maxOutputTokens || 4096,
     messages: [{ role: "user", content: req.userContent }],
   };
+  // Anthropic has no json_schema response format; a forced tool call is the
+  // only way it enforces a shape. Without this the vendor returns prose, the
+  // structured parse fails, and every vehicle throws — which is what made the
+  // documented one-line rollback to Anthropic a total outage.
+  if (req.schema) {
+    const name = req.schemaName || "vehicle_description";
+    body.tools = [{ name, description: "Return the vehicle description document.", input_schema: req.schema }];
+    body.tool_choice = { type: "tool", name };
+  }
+  return body;
 }
 
 export function normalizeAnthropicResponse(
   body: Record<string, any>, model: string, latencyMs: number,
 ): GenerationResult {
   const u = body?.usage || {};
+  const content: any[] = Array.isArray(body?.content) ? body.content : [];
+  const toolInput = content.find((c) => c?.type === "tool_use" && c?.input)?.input;
+  const text = toolInput
+    ? JSON.stringify(toolInput)
+    : content.filter((c: any) => c?.type === "text").map((c: any) => c.text).join("").trim();
   return {
     provider: "anthropic",
     model: String(body?.model || model),
-    text: (body?.content || [])
-      .filter((c: any) => c?.type === "text").map((c: any) => c.text).join("").trim(),
+    text,
     parsed: null,
     usage: {
       inputTokens: num(u.input_tokens),
@@ -180,6 +194,7 @@ export function normalizeAnthropicResponse(
     finishReason: body?.stop_reason ?? null,
   };
 }
+
 
 // ── Structured output ────────────────────────────────────────────────
 

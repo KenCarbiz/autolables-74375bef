@@ -14,6 +14,7 @@ import { derivePassport, type PassportData } from "@/lib/passportV2Data";
 import {
   deriveVerificationReport, PROVENANCE_LABEL, VERIFICATION_STATUS_LABEL,
   type VerificationReport, type ReportCheck, type VerificationStatus, type EvidenceProvenance,
+  isSettledCheck,
 } from "@/lib/passport/verificationSummary";
 import { resolvePassportBack } from "@/lib/passportReturn";
 import { subjectIcon, incompleteIcon, rankActionable, resolveFinding } from "@/lib/passport/verificationFindings";
@@ -85,7 +86,7 @@ const HERO_TONE: Record<string, { bg: string; border: string; icon: React.Elemen
 const dateLabel = (iso: string | null | undefined): string | null =>
   iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
 
-const ORDER: VerificationStatus[] = ["verified", "needs_attention", "needs_confirmation", "pending", "unavailable"];
+const ORDER: VerificationStatus[] = ["verified", "dealer_attested", "needs_attention", "needs_confirmation", "pending", "unavailable"];
 
 // The full status arithmetic, EVERY non-zero status included (unavailable too).
 // Presentation-only — reads the canonical counts, derives nothing.
@@ -468,7 +469,7 @@ const MobileVerification = ({
   const incompleteRows = report.checks
     .filter((c) => (c.status === "pending" || c.status === "unavailable") && c.key !== "recall")
     .sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1));
-  const completedRows = report.checks.filter((c) => c.status === "verified");
+  const completedRows = report.checks.filter((c) => isSettledCheck(c.status));
 
   // Highest-priority actionable finding drives the sticky CTA + finding order.
   const rankedActionable = rankActionable(report.checks);
@@ -825,9 +826,9 @@ const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationR
   const condition = conditionBadge(listing);
 
   const exceptions = report.checks
-    .filter((c) => c.status !== "verified")
+    .filter((c) => !isSettledCheck(c.status))
     .sort((a, b) => exceptionRank(a.status) - exceptionRank(b.status));
-  const verified = report.checks.filter((c) => c.status === "verified");
+  const verified = report.checks.filter((c) => isSettledCheck(c.status));
   const recallIsException = report.checks.some((c) => c.key === "recall" && c.status !== "verified");
   const unavailable = exceptions.filter((c) => c.status === "unavailable");
   const secondary = exceptions.filter((c) => c.status !== "unavailable" && c.key !== "recall");
@@ -1094,13 +1095,13 @@ const VehiclePassportVerification = () => {
   const recallNeedsConfirmation = recallCheck?.status === "needs_confirmation";
   const recallIsException = !!recallCheck && recallCheck.status !== "verified";
   const exceptions = report.checks
-    .filter((c) => c.status !== "verified")
+    .filter((c) => !isSettledCheck(c.status))
     .sort((a, b) => exceptionRank(a.status) - exceptionRank(b.status));
   // Recall lives in the decision hero; the remaining actionable exceptions render
   // as lighter secondary cards so nothing is stated twice.
   const secondary = exceptions.filter((c) => c.status !== "unavailable" && c.key !== "recall");
   const unavailable = exceptions.filter((c) => c.status === "unavailable");
-  const verified = report.checks.filter((c) => c.status === "verified");
+  const verified = report.checks.filter((c) => isSettledCheck(c.status));
   // The expanded verified card spans the full grid row (md:col-span-2); render it
   // first so it leads the grid and never orphans an empty cell beside a 1-col card.
   const orderedVerified = expandedKey && verified.some((c) => c.key === expandedKey)

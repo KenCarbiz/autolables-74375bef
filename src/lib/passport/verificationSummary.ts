@@ -647,7 +647,15 @@ function joinList(items: string[]): string {
 // status that ever reads as an INDEPENDENTLY sourced pass; "dealer_attested"
 // reads as a positive too, but it names the dealer so a shopper can tell who is
 // standing behind it.
+// A check that reads as SETTLED — nothing is asked of the shopper. Verified is
+// an independent source; dealer_attested is the dealer's own statement. Neither
+// belongs in a "needs review" bucket, so every surface asks this question here
+// rather than testing `status === "verified"` on its own.
+export const isSettledCheck = (s: VerificationStatus): boolean =>
+  s === "verified" || s === "dealer_attested";
+
 export const VERIFICATION_STATUS_LABEL: Record<VerificationStatus, string> = {
+
   verified: "Verified",
   dealer_attested: "Dealer attested",
   needs_attention: "Needs attention",

@@ -117,10 +117,18 @@ const ADAS_OVERCLAIM = [
 
 const norm = (s: string) => s.toLowerCase().replace(/[’]/g, "'");
 
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Whole-word matching. A substring test flags "perfectly sized" as the banned
+// word "perfect" and blocks an otherwise clean description outright.
 function phraseHits(text: string, phrases: string[]): string[] {
   const lc = norm(text);
-  return phrases.filter((p) => lc.includes(norm(p)));
+  return phrases.filter((p) => {
+    const n = norm(p);
+    return new RegExp(`(^|[^a-z0-9])${escapeRe(n)}($|[^a-z0-9])`, "i").test(lc);
+  });
 }
+
 
 /** Total characters including spaces — the unit every length limit uses. */
 export function countCharacters(text: string): number {

@@ -218,10 +218,16 @@ Deno.serve(async (req) => {
       // The count is over the WHOLE tenant, not the page. Without it a short
       // read is indistinguishable from a small lot, which is precisely how a
       // five-row cap passed for a complete answer.
+      // Only live rows, exactly as autofilm-feed scopes it. Without these two
+      // filters the partner site counts archived, sold and draft cars as lot
+      // inventory and the two "whole lot" endpoints disagree.
       const countRes = await (supabase as any)
         .from("vehicle_listings")
         .select("id", { count: "exact", head: true })
-        .or(tenantFilter);
+        .or(tenantFilter)
+        .is("archived_at", null)
+        .in("status", ["published", "active"]);
+
       if (countRes.error) {
         return json(200, { matches: [], total: null, error: countRes.error.message });
       }
@@ -234,8 +240,11 @@ Deno.serve(async (req) => {
         .from("vehicle_listings")
         .select("*")
         .or(tenantFilter)
+        .is("archived_at", null)
+        .in("status", ["published", "active"])
         .order("vin", { ascending: true })
         .range(from, from + limit - 1);
+
       if (rowsRes.error) {
         return json(200, { matches: [], total, error: rowsRes.error.message });
       }

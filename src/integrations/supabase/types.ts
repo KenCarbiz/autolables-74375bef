@@ -233,6 +233,7 @@ export type Database = {
           expected_total: number | null
           financing_input: Json | null
           frozen_snapshot: Json | null
+          getready_dispatched_at: string | null
           id: string
           initials: Json | null
           lifecycle_status: string
@@ -303,6 +304,7 @@ export type Database = {
           expected_total?: number | null
           financing_input?: Json | null
           frozen_snapshot?: Json | null
+          getready_dispatched_at?: string | null
           id?: string
           initials?: Json | null
           lifecycle_status?: string
@@ -373,6 +375,7 @@ export type Database = {
           expected_total?: number | null
           financing_input?: Json | null
           frozen_snapshot?: Json | null
+          getready_dispatched_at?: string | null
           id?: string
           initials?: Json | null
           lifecycle_status?: string
