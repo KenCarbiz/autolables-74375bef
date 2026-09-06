@@ -668,6 +668,15 @@ export function buildMasterPromptV3(packet: DescriptionPacket, settings: Record<
   // every vehicle failed REQUIRED_DISCLOSURE_MISSING on copy that had no way
   // to include it. It is appended after generation rather than written by the
   // model; this only stops the writer from producing a competing version.
+  // The disclosure is appended after the writer finishes, but it counts toward
+  // the stored character_count and toward every channel's floor. Asking for the
+  // full band and then adding 297 characters overshoots the ceiling; the
+  // writer's target is the band less what will be appended to it.
+  const legalLen = String(settings.required_legal_text || "").trim().length;
+  const reserve = legalLen ? legalLen + 2 : 0;
+  const band = preferredLengthBand(settings);
+  const writeFloor = Math.max(400, band.min - reserve);
+  const writeBand = { min: writeFloor, max: Math.max(writeFloor + 200, band.max - reserve) };
   const disclosureLine = String(settings.required_legal_text || "").trim()
     ? `\n- A required legal disclosure is appended verbatim after your text. Do not write it, do not restate it, and do not close with your own note about taxes, fees, financing terms or price exclusions.`
     : "";
@@ -715,7 +724,7 @@ ${toneInstruction(packet.tone)}
 ${voiceInstruction(packet.voice)}
 
 STRUCTURE
-- Length: aim for ${preferredLengthBand(settings).min}-${preferredLengthBand(settings).max} characters, and never exceed ${LENGTH_POLICY.absoluteMax}. This is a target, not a quota: write as much as the VERIFIED facts above genuinely support and no more. A vehicle with little verified data gets a shorter description. Never pad, repeat a feature, restate a fact in different words, or add generic dealership filler to reach a length.
+- Length: aim for ${writeBand.min}-${writeBand.max} characters, and never exceed ${LENGTH_POLICY.absoluteMax}. This is a target, not a quota: write as much as the VERIFIED facts above genuinely support and no more. A vehicle with little verified data gets a shorter description. Never pad, repeat a feature, restate a fact in different words, or add generic dealership filler to reach a length.
 - A strong opening that names the vehicle, then the qualities that matter most, then the prioritized equipment grouped sensibly, then practical ownership detail, then the close.
 ${kw}
 

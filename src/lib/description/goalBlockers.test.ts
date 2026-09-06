@@ -180,3 +180,47 @@ describe("the monthly budget binds even with no price on file", () => {
     expect(mig).toMatch(/\(SELECT auth\.uid\(\)\)/);
   });
 });
+
+// ── 4. The master must be able to feed its longest channel ───────────
+
+describe("the master band covers the vAuto floor", () => {
+  it("reserves the appended disclosure out of the writer's target", () => {
+    // The disclosure is appended after the writer finishes but counts toward
+    // character_count and every channel floor. Asking for the full band and
+    // then adding 297 characters overshoots the ceiling.
+    const v3 = core.slice(core.indexOf("export function buildMasterPromptV3("),
+                          core.indexOf("* V3 channel prompt."));
+    expect(v3).toMatch(/const reserve = legalLen \? legalLen \+ 2 : 0;/);
+    expect(v3).toMatch(/- Length: aim for \$\{writeBand\.min\}-\$\{writeBand\.max\} characters/);
+    // The legacy builder keeps the plain band: it appends nothing.
+    const legacy = core.slice(core.indexOf("export function buildMasterPrompt("),
+                              core.indexOf("export function buildMasterPromptV3("));
+    expect(legacy).toMatch(/preferredLengthBand\(settings\)\.min/);
+  });
+
+  it("never inverts the band on a very large disclosure", () => {
+    // A disclosure longer than the floor would otherwise produce a negative
+    // target, or a max below the min.
+    const huge = { min_length: 1000, max_length: 1500, required_legal_text: "x".repeat(2000) };
+    const v3 = core.slice(core.indexOf("export function buildMasterPromptV3("),
+                          core.indexOf("* V3 channel prompt."));
+    expect(v3).toMatch(/Math\.max\(400, band\.min - reserve\)/);
+    expect(v3).toMatch(/Math\.max\(writeFloor \+ 200, band\.max - reserve\)/);
+    expect(huge.max_length).toBeGreaterThan(0); // fixture is only illustrative
+  });
+
+  it("raises the master floor to the vAuto floor", () => {
+    const mig = readFileSync(join(fnDir,
+      "../migrations/20260906230000_master_band_covers_vauto.sql"), "utf8");
+    expect(mig).toMatch(/SET min_length = 3221/);
+    expect(mig).toMatch(/max_length = 3879/);
+    // Guarded on the old values so a later deliberate change is not reverted.
+    expect(mig).toMatch(/AND min_length = 1800/);
+  });
+
+  it("matches the vAuto channel policy it has to feed", () => {
+    const policy = readFileSync(join(fnDir,
+      "_shared/description-channel-policy.ts"), "utf8");
+    expect(policy).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
+  });
+});
