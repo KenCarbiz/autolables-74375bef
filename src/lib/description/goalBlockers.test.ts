@@ -146,6 +146,33 @@ describe("the monthly budget binds even with no price on file", () => {
     expect(orch).toMatch(/monthGenerationCount: Number\(\(spend as any\)\?\.month_generation_count/);
   });
 
+  it("uses the owner's $150 per-tenant budget", () => {
+    const mig = readFileSync(join(fnDir,
+      "../migrations/20260906221500_tenant_budget_150.sql"), "utf8");
+    // 135 production + 15 preview = the $150 decision, keeping the 90/10 ratio
+    // the previous $100 budget used.
+    expect(mig).toMatch(/monthly_generation_budget SET DEFAULT 135\.00/);
+    expect(mig).toMatch(/monthly_preview_budget    SET DEFAULT 15\.00/);
+    // The code fallback must not diverge from the column default, or a tenant
+    // with no row silently gets a different budget from every tenant with one.
+    expect(DEFAULT_BUDGET.monthlyGenerationBudget).toBe(135);
+    expect(DEFAULT_BUDGET.monthlyPreviewBudget).toBe(15);
+  });
+
+  it("leaves no tenant without a bound of any kind", () => {
+    const mig = readFileSync(join(fnDir,
+      "../migrations/20260906221500_tenant_budget_150.sql"), "utf8");
+    // Seeding every tenant with a budget row exposed this: the second tenant
+    // came out with a budget and a NULL max_cost_per_generation, which makes
+    // the unpriced ceiling inapplicable -- an unpriced model with no cap and
+    // no measurable spend is unbounded, the exact state the ceiling prevents.
+    expect(mig).toMatch(/max_cost_per_generation  SET DEFAULT 0\.50/);
+    expect(mig).toMatch(/WHERE max_cost_per_generation IS NULL/);
+    expect(mig).toMatch(/INSERT INTO public\.description_generation_budgets \(tenant_id\)/);
+    const noCap = { ...cfg, maxCostPerGeneration: null } as TenantBudgetConfig;
+    expect(unpricedCallCeiling(noCap, usage({ unpricedExecutions: 50 }), false)).toBeNull();
+  });
+
   it("has the count it divides against", () => {
     const mig = readFileSync(join(fnDir,
       "../migrations/20260906213000_description_spend_unpriced.sql"), "utf8");

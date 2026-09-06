@@ -23,9 +23,12 @@ export interface TenantBudgetConfig {
   hardStopPct: number;
 }
 
+// Mirrors the column defaults in 20260906221500_tenant_budget_150.sql. This is
+// the fallback for a tenant with no budget row, so a divergence here quietly
+// gives that tenant a different budget from every tenant that has a row.
 export const DEFAULT_BUDGET: TenantBudgetConfig = {
-  monthlyGenerationBudget: 200,
-  monthlyPreviewBudget: 25,
+  monthlyGenerationBudget: 135,
+  monthlyPreviewBudget: 15,
   maxCostPerGeneration: 0.5,
   maxRepairAttempts: 2,
   maxChannelsPerBatch: 8,
