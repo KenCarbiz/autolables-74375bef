@@ -630,9 +630,17 @@ export function buildMasterPromptV3(packet: DescriptionPacket, settings: Record<
   const marketLine = settings.market_context_allowed && Object.keys(packet.marketContext).length
     ? `\nMarket context (EMPHASIS ONLY — never state as a vehicle fact, never claim a price advantage):\n${JSON.stringify(packet.marketContext)}`
     : "";
+  // Local relevance is a real ranking signal and the dealership has an approved
+  // area list, so the instruction is "use a little, correctly" rather than a
+  // flat prohibition. The flat ban read as "no geography" while the validator
+  // simultaneously required any geography used to come from the approved list.
+  const areas = packet.voice.approvedAreas || [];
+  const geoLine = areas.length
+    ? `\n- Local relevance: you may name at most two of the approved localities listed in the dealership voice above, each at most once, only where it reads naturally. Never enumerate them and never write a "serving ..." list.`
+    : `\n- Do not name towns or regions; this dealership has no approved market area on file.`;
   const kw = packet.targeting.primaryKeyword
-    ? `\nSEARCH RELEVANCE\n- Shoppers reach this listing searching "${packet.targeting.primaryKeyword}". Use that phrasing ONCE, inside a sentence that would exist anyway. If it cannot be written naturally, leave it out.\n- Do not repeat the phrase, do not list nearby towns, do not add a keyword block.`
-    : "";
+    ? `\nSEARCH RELEVANCE\n- Shoppers reach this listing searching "${packet.targeting.primaryKeyword}". Use that phrasing ONCE, inside a sentence that would exist anyway. If it cannot be written naturally, leave it out.\n- Do not repeat the phrase and do not add a keyword block.\n- Name the year, make, model and trim naturally where they belong, and vary wording afterwards rather than repeating the full name.${geoLine}`
+    : `\nSEARCH RELEVANCE\n- Name the year, make, model and trim naturally where they belong, and vary wording afterwards rather than repeating the full name.${geoLine}`;
 
   return `You are writing the canonical vehicle merchandising description for a franchise dealership.
 

@@ -195,7 +195,12 @@ export function checkLocalityUse(content: string, v: VoiceProfile): VoiceFinding
 
   // Three or more comma-joined proper-noun place names in one sentence is a
   // city list regardless of which cities they are.
-  const listPattern = /\b(?:serving|near|around|proudly serving|shoppers? (?:from|in))\b[^.]*?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?(?:\s*,\s*[A-Z][a-z]+(?:\s[A-Z][a-z]+)?){2,})/;
+  // The keyword is matched case-insensitively but the place names are not: a
+  // city list most naturally BEGINS a sentence ("Serving Hartford, Manchester
+  // and New Britain..."), and a case-sensitive keyword missed exactly that.
+  // The /i flag cannot be applied to the whole pattern without [A-Z] matching
+  // lowercase words and turning any comma list into a locality finding.
+  const listPattern = /\b(?:[Ss]erving|[Nn]ear|[Aa]round|[Pp]roudly serving|[Ss]hoppers? (?:from|in))\b[^.]*?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?(?:\s*,\s*[A-Z][a-z]+(?:\s[A-Z][a-z]+)?){2,})/;
   const listed = text.match(listPattern);
   if (listed) {
     out.push({ code: "LOCALITY_STUFFING", severity: "blocking", claim: listed[1].slice(0, 120),
@@ -211,7 +216,7 @@ export function checkLocalityUse(content: string, v: VoiceProfile): VoiceFinding
   }
   // A place name the dealer never confirmed serving is an unverifiable
   // service-area claim, not merely awkward SEO.
-  const servingClause = text.match(/\b(?:serving|proudly serving)\s+([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)?)/);
+  const servingClause = text.match(/\b(?:[Ss]erving|[Pp]roudly serving)\s+([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)?)/);
   if (servingClause && approved.size && !approved.has(servingClause[1].toLowerCase().trim())) {
     out.push({ code: "UNAPPROVED_SERVICE_AREA", severity: "blocking", claim: servingClause[1],
       message: `"${servingClause[1]}" is not an approved market area for this store.` });
@@ -238,6 +243,16 @@ export function voiceInstruction(v: VoiceProfile, channel?: string): string {
     v.brandPositioning ? `- Positioning: ${v.brandPositioning}` : "",
     v.city || v.state ? `- Location: ${[v.city, v.state].filter(Boolean).join(", ")}` : "",
     v.marketArea ? `- Market area: ${v.marketArea}. Mention it at most twice, naturally.` : "",
+    // The approved areas were resolved once from the rooftop ZIP and are the
+    // allowlist checkLocalityUse validates against. Without naming them here
+    // the model could not use local relevance at all: any place it guessed was
+    // rejected as an unapproved service area, so geography was permitted,
+    // unstated and effectively forbidden at the same time.
+    v.approvedAreas.length
+      ? `- Approved localities (the ONLY places you may name): ${v.approvedAreas.slice(0, 12).join("; ")}.`
+        + ` Name AT MOST TWO, each once, inside a sentence that would exist anyway.`
+        + ` Never enumerate them, never write a "serving" list, never add a locality block.`
+      : "",
     approvedLabels.length
       ? `- APPROVED dealership claims (the ONLY store claims you may make): ${approvedLabels.join("; ")}.`
       : "- NO dealership benefit claims are approved. Do not state anything about the store beyond its name and location.",
