@@ -29,6 +29,11 @@ import { preflight, preflightSummary } from "../_shared/description-preflight.ts
 import { evaluateBudget, DEFAULT_BUDGET } from "../_shared/description-budget.ts";
 import { can } from "../_shared/description-permissions.ts";
 import { buyersGuideDisposition } from "../_shared/description-warranty-policy.ts";
+import { createProvider, type GenerationResult } from "../_shared/description-provider.ts";
+import { DRIVESIGNAL_V3_SYSTEM } from "../_shared/prompts/drivesignal-v3-system.ts";
+import { assembleKnowledge, vehicleSignals, KNOWLEDGE_REVISION } from "../_shared/description-knowledge.ts";
+import { DESCRIPTION_OUTPUT_SCHEMA, auditEvidence, factRoles } from "../_shared/description-evidence.ts";
+import { runGates, vehicleClassOf } from "../_shared/description-gates.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -72,6 +77,7 @@ const DEFAULT_SETTINGS = {
   enabled_channels: ["vehicle_passport", "dealer_website", "autotrader", "cars_com", "cargurus", "facebook", "google_seo"],
   internal_publication_enabled: true, default_tone: "professional",
   min_length: 400, max_length: 2400, prohibited_phrases: [], class_rules: {},
+  generation_provider: "anthropic", prompt_profile: "platform_v3", knowledge_revision: null,
   warranty_language_allowed: false, cpo_language_allowed: false,
   accessory_language_allowed: false, market_context_allowed: false,
   price_in_description: false, quality_threshold: 70,
@@ -97,6 +103,70 @@ async function callGenerator(prompt: string, modelKey?: string): Promise<string>
   const text = String(body?.description || "").trim();
   if (!text) throw Object.assign(new Error("generator_empty"), { code: "PROVIDER_ERROR" });
   return text;
+}
+
+export interface MasterGeneration {
+  text: string;
+  headline: string | null;
+  claimedFactIds: string[];
+  factRoles: Record<string, string[]>;
+  result: GenerationResult | null;
+}
+
+/**
+ * The DriveSignal path. The approved V3 instructions and the selected
+ * knowledge modules go in the provider's system slot, byte-identical on every
+ * vehicle so the prefix can be served from cache; only the fact packet varies.
+ *
+ * A tenant not configured for it keeps the platform prompt builder untouched.
+ */
+async function generateMaster(
+  packet: any, snap: any, settings: Record<string, any>, listing: Record<string, any>,
+): Promise<MasterGeneration> {
+  if (settings.prompt_profile !== "drivesignal-v3-system") {
+    const text = await callGenerator(buildMasterPromptV3(packet, settings), settings.generation_model);
+    return { text, headline: null, claimedFactIds: [], factRoles: {}, result: null };
+  }
+
+  const mc = (listing.mc_attributes || {}) as Record<string, any>;
+  const knowledge = assembleKnowledge(vehicleSignals({
+    condition: listing.condition,
+    bodyStyle: mc.body_type ?? mc.body_style,
+    fuelType: mc.fuel_type,
+    make: mc.make,
+    trim: listing.trim,
+    equipment: String(snap?.facts?.equipment?.value ?? ""),
+    hasBuildSheet: !!mc.build_sheet,
+    cpoVerified: !!snap?.facts?.cpo_status,
+    warrantyDisposition: snap?.facts?.warranty_eligible ? "FACTORY_PERMITTED" : null,
+    needsChannelDerivatives: false,
+  }));
+
+  const provider = createProvider(
+    settings.generation_provider === "openai" ? "openai" : "anthropic", Deno.env);
+  const result = await provider.generate({
+    systemPrompt: `${DRIVESIGNAL_V3_SYSTEM}\n\n${knowledge.text}`,
+    userContent: buildMasterPromptV3(packet, settings),
+    model: settings.generation_model,
+    schema: DESCRIPTION_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+    schemaName: "drivesignal_vehicle_description",
+  });
+
+  // A structured call that came back as prose is a failed structured call, not
+  // copy to publish: the evidence ledger would have nothing to audit.
+  if (!result.parsed) {
+    throw Object.assign(new Error("structured_output_missing"), { code: "PROVIDER_ERROR" });
+  }
+  return {
+    text: result.parsed.master_description,
+    headline: result.parsed.headline,
+    claimedFactIds: [...new Set([
+      ...result.parsed.used_fact_ids, ...result.parsed.hero_fact_ids,
+      ...result.parsed.warranty_fact_ids, ...result.parsed.history_fact_ids,
+    ])],
+    factRoles: factRoles(result.parsed),
+    result,
+  };
 }
 
 async function loadSettings(admin: any, tenantId: string) {
@@ -606,7 +676,8 @@ async function orchestrateVehicle(
     await setCase(admin, caseId, { status: "GENERATING" });
     await audit(admin, tenantId, "description_generation_started", caseId,
       { vin: listing.vin, tone, voice_profile_version: voice.version, input_checksum: inputChecksum });
-    const masterText = await callGenerator(buildMasterPromptV3(packet, settings), settings.generation_model);
+    const generation = await generateMaster(packet, snap, settings, listing);
+    const masterText = generation.text;
 
     const { data: lastVer } = await admin.from("description_versions")
       .select("id, version_number").eq("description_case_id", caseId)
@@ -620,6 +691,18 @@ async function orchestrateVehicle(
       content: masterText, word_count: masterText.split(/\s+/).filter(Boolean).length,
       character_count: masterText.length, generation_model: settings.generation_model,
       prompt_version: settings.prompt_version, configuration_version: configVersion,
+      prompt_profile: settings.prompt_profile,
+      knowledge_revision: settings.prompt_profile === "drivesignal-v3-system"
+        ? KNOWLEDGE_REVISION : null,
+      headline: generation.headline,
+      claimed_fact_ids: generation.claimedFactIds,
+      fact_roles_json: generation.factRoles,
+      evidence_audit_json: generation.result
+        ? auditEvidence({
+            used_fact_ids: generation.claimedFactIds, hero_fact_ids: [],
+            warranty_fact_ids: [], history_fact_ids: [],
+          }, snap)
+        : {},
       source_data_version: sdv, created_by_type: "automation",
       tone, seo_targeting_json: packet.targeting, voice_profile_version: voice.version,
       channel_policy_version: masterPolicyVersion, selected_feature_checksum: featChecksum,
