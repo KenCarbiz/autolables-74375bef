@@ -30,10 +30,27 @@ export const DESCRIPTION_OUTPUT_SCHEMA = {
   properties: {
     headline: { type: "string" },
     master_description: { type: "string" },
-    used_fact_ids: { type: "array", items: { type: "string" } },
-    hero_fact_ids: { type: "array", items: { type: "string" } },
-    warranty_fact_ids: { type: "array", items: { type: "string" } },
-    history_fact_ids: { type: "array", items: { type: "string" } },
+    // The descriptions are load-bearing, not documentation. Bare
+    // "array of strings" left the id vocabulary entirely to inference, and the
+    // writer inferred it from the fact list's layout -- gluing each field to
+    // its source ("vin_inventory_record") and inventing ids for features.
+    // Every one of those citations then failed the evidence audit.
+    used_fact_ids: {
+      type: "array", items: { type: "string" },
+      description: "Ids of facts actually used, copied exactly from the [id: ...] tags in the fact list. Never append the source or status to an id, and never invent an id for a feature.",
+    },
+    hero_fact_ids: {
+      type: "array", items: { type: "string" },
+      description: "The subset of used_fact_ids the description leads with. Same id vocabulary.",
+    },
+    warranty_fact_ids: {
+      type: "array", items: { type: "string" },
+      description: "Ids of warranty or coverage facts relied on. Empty when the description says nothing about coverage.",
+    },
+    history_fact_ids: {
+      type: "array", items: { type: "string" },
+      description: "Ids of ownership, accident or service-history facts relied on. Empty when the description says nothing about history.",
+    },
   },
 } as const;
 

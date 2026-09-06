@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   buildFactSnapshot, buildDescriptionPacket, validateContentV3, decideEligibility,
   type Finding,
@@ -155,5 +157,73 @@ describe("the Wrangler incident cannot publish again", () => {
     // citation audit is a separate net, and it catches this one.
     const { eligibility } = runChain(FABRICATED, CLEAN_COPY);
     expect(eligibility).toBe("blocked");
+  });
+});
+
+// ── The id vocabulary has to be stated, not inferred ─────────────────
+//
+// Production, 2026-09-06: 31 blocking FABRICATED_FACT_CITATION findings across
+// five vehicles. On one RAM 1500 all 25 citations were fabricated and 17 real
+// ids went unclaimed -- the writer had returned "vin_inventory_record",
+// "ymm_marketcheck_feed", "engine_vin_decode". It glued each field to its
+// provenance, which is a fair reading of a line that rendered as
+// "- vin: 1C6...  [source: inventory_record; status: verified]" and never said
+// which token was the id. The copy was grounded; only the citations were wrong,
+// and the audit blocked it. This was our defect, not the model's.
+
+const core = readFileSync(join(__dirname,
+  "../../../supabase/functions/_shared/description-core.ts"), "utf8");
+const evidence = readFileSync(join(__dirname,
+  "../../../supabase/functions/_shared/description-evidence.ts"), "utf8");
+
+describe("the writer is told what a fact id is", () => {
+  // Scoped to the V3 builder. buildMasterPrompt (the legacy, non-structured
+  // path) keeps the old line shape on purpose: it never asks for ids back, so
+  // there is nothing there to misread.
+  const v3 = core.slice(core.indexOf("export function buildMasterPromptV3("),
+                        core.indexOf("* V3 channel prompt."));
+
+  it("labels the id on every fact line", () => {
+    expect(v3.length).toBeGreaterThan(500);
+    expect(v3).toMatch(/- \[id: \$\{f\.field\}\]/);
+    // The old shape put the source in square brackets right after the value,
+    // which is what made "vin_inventory_record" look plausible.
+    expect(v3).not.toMatch(/- \$\{f\.field\}: \$\{f\.value\}  \[source:/);
+  });
+
+  it("names the exact valid ids in the prompt", () => {
+    expect(core).toMatch(/The valid ids, in full, are: \$\{packet\.verifiedFacts\.map/);
+    expect(core).toContain('"vin" is an id; "vin_inventory_record" is not.');
+  });
+
+  it("does not offer features as citable ids", () => {
+    // factory_wireless_apple_carplay, factory_hemi_v8 and friends were all
+    // invented because the feature lines looked like the fact lines.
+    const fb = core.slice(core.indexOf("function featureBlock("),
+                          core.indexOf("// ── Prompt construction"))
+      // Comments explain why the tag is absent and would match it.
+      .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    expect(fb).not.toMatch(/\[id:/);
+    expect(fb).toMatch(/\$\{f\.display_name\} \(\$\{f\.category\}/);
+    expect(core).toContain('Equipment is covered by the fact whose id is "equipment"');
+  });
+
+  it("stops telling a structured call to return only prose", () => {
+    // The V3 path is schema-enforced and must return a JSON object, while the
+    // prompt closed with "Return ONLY the description text" -- a direct
+    // contradiction the writer had to resolve on its own.
+    expect(core).toMatch(/Return the JSON object the schema requires/);
+    expect(core).toMatch(/const structured = settings\.prompt_profile === "drivesignal-v3-system"/);
+  });
+
+  it("carries the rule in the schema too, not only the prompt", () => {
+    expect(evidence).toMatch(/copied exactly from the \[id: \.\.\.\] tags/);
+    expect(evidence).toMatch(/never invent an id for a feature/i);
+    // Every id array is described, so a prompt change cannot silently drop it.
+    for (const f of ["used_fact_ids", "hero_fact_ids", "warranty_fact_ids", "history_fact_ids"]) {
+      const at = evidence.indexOf(`${f}: {`);
+      expect(at).toBeGreaterThan(-1);
+      expect(evidence.slice(at, at + 400)).toContain("description:");
+    }
   });
 });

@@ -554,8 +554,11 @@ export async function computeInputChecksum(parts: {
 }
 
 function featureBlock(packet: DescriptionPacket): string {
+  // Deliberately no [id: ...] tag. Features are not separately citable; the
+  // writer invented ids like "factory_wireless_apple_carplay" when the format
+  // implied they were.
   const fmt = (f: PrioritizedFeature) =>
-    `  - ${f.display_name} [${f.category}; source: ${f.source}; confidence ${f.confidence}%]`;
+    `  - ${f.display_name} (${f.category}; source: ${f.source}; confidence ${f.confidence}%)`;
   const parts: string[] = [];
   if (packet.factoryFeatures.length) {
     parts.push(`FACTORY EQUIPMENT (verified on this vehicle, listed in priority order):\n${packet.factoryFeatures.map(fmt).join("\n")}`);
@@ -621,8 +624,24 @@ Return ONLY the description text. No headings, no markdown, no preamble.`;
  * dealership voice, and tone as a wording-only instruction.
  */
 export function buildMasterPromptV3(packet: DescriptionPacket, settings: Record<string, any>): string {
+  // The id is written first and labelled, because the writer has to cite these
+  // back by id under the structured schema. When the line read
+  // "- vin: 1C6...  [source: inventory_record; ...]" the model produced
+  // "vin_inventory_record" -- it glued the field to its provenance, which is a
+  // reasonable reading of a format that never says which token is the id. On
+  // one RAM every single one of 25 citations was fabricated that way, and the
+  // evidence audit blocked copy that was actually grounded.
   const factLines = packet.verifiedFacts
-    .map((f) => `- ${f.field}: ${f.value}  [source: ${f.source}; status: ${f.status}]`).join("\n");
+    .map((f) => `- [id: ${f.field}] ${f.value}  (source: ${f.source}; status: ${f.status})`).join("\n");
+  const structured = settings.prompt_profile === "drivesignal-v3-system";
+  const evidenceBlock = structured
+    ? `\nEVIDENCE (how to cite)
+- Every id you return must be copied EXACTLY from an [id: ...] tag above. The valid ids, in full, are: ${packet.verifiedFacts.map((f) => f.field).join(", ")}.
+- Do not append the source, the status or anything else to an id. "vin" is an id; "vin_inventory_record" is not.
+- Do not invent an id for a feature. Equipment is covered by the fact whose id is "equipment"; cite that, not the feature's name.
+- used_fact_ids: every id whose value you actually used. hero_fact_ids: the few you led with. warranty_fact_ids and history_fact_ids: only ids about coverage and ownership/accident/service history, and leave them empty when you said nothing on those subjects.
+- If you cannot support a sentence with an id from that list, delete the sentence.`
+    : "";
   const banned = [
     ...packet.voice.prohibitedPhrases,
     ...packet.excludedClaims.map((e) => e.claim).filter(Boolean),
@@ -649,7 +668,7 @@ VERIFIED FACTS — the ONLY vehicle facts you may state:
 ${factLines}
 
 ${featureBlock(packet)}
-${marketLine}
+${marketLine}${evidenceBlock}
 
 ABSOLUTE RULES
 - Never state a fact that is not listed above. If something is missing, omit it entirely.
@@ -671,7 +690,9 @@ STRUCTURE
 - A strong opening that names the vehicle, then the qualities that matter most, then the prioritized equipment grouped sensibly, then practical ownership detail, then the close.
 ${kw}
 
-Return ONLY the description text. No headings, no markdown, no preamble.`;
+${structured
+  ? "Return the JSON object the schema requires. The description itself carries no headings, no markdown and no preamble."
+  : "Return ONLY the description text. No headings, no markdown, no preamble."}`;
 }
 
 /**
