@@ -331,16 +331,31 @@ describe("detail_version: cache the deep record, refetch only when it moves", ()
     // and caches nothing.
     expect(shared).toMatch(/export async function detailVersion/);
     expect(shared).toMatch(/crypto\.subtle\.digest\("SHA-256"/);
-    const block = shared.slice(shared.indexOf("const DETAIL_VERSION_FIELDS"), shared.indexOf("export async function detailVersion"));
+    const start = shared.indexOf("const DETAIL_VERSION_FIELDS");
+    const block = shared.slice(start, shared.indexOf("export async function detailVersion", start));
     expect(block).not.toContain('"updated_at"');
   });
 
   it("covers the equipment a walkaround describes", () => {
-    const block = shared.slice(shared.indexOf("const DETAIL_VERSION_FIELDS"), shared.indexOf("] as const;"));
+    // Search FORWARD from the start: indexOf finds the first "] as const;"
+    // in the file, which belongs to an earlier array, and a start after the
+    // end silently yields an empty string that contains nothing and passes.
+    const from = shared.indexOf("const DETAIL_VERSION_FIELDS");
+    const block = shared.slice(from, shared.indexOf("] as const;", from));
+    expect(block.length).toBeGreaterThan(40);
     for (const f of ["mc_attributes", "photos", "epa_economy", "warranty_info",
                      "recall_payload", "history_payload", "available_accessories"]) {
       expect(block, `${f} missing from detail_version`).toContain(`"${f}"`);
     }
+  });
+
+  it("moves when the manufacturing spec changes, without following scrape noise", () => {
+    // The spec is hashed through its derived form rather than by adding mc_raw
+    // to the field list: mc_raw also carries scraped_at, dom and last_seen_at,
+    // which change nightly for every car and would cache nothing.
+    expect(shared).toMatch(/JSON\.stringify\(specifications\(row\)\)/);
+    const from = shared.indexOf("const DETAIL_VERSION_FIELDS");
+    expect(shared.slice(from, shared.indexOf("] as const;", from))).not.toContain('"mc_raw"');
   });
 
   it("moves when the fact ledger moves, not only when the listing row does", () => {
@@ -352,7 +367,11 @@ describe("detail_version: cache the deep record, refetch only when it moves", ()
     // Both move often, are carried fresh in the list on every sync, and a
     // consumer re-reading a whole build sheet because a price dropped $200 is
     // the churn this exists to prevent.
-    const block = shared.slice(shared.indexOf("const DETAIL_VERSION_FIELDS"), shared.indexOf("] as const;"));
+    // Search FORWARD from the start: indexOf finds the first "] as const;"
+    // in the file, which belongs to an earlier array, and a start after the
+    // end silently yields an empty string that contains nothing and passes.
+    const from = shared.indexOf("const DETAIL_VERSION_FIELDS");
+    const block = shared.slice(from, shared.indexOf("] as const;", from));
     for (const f of ["price", "mileage", "market_value", "status"]) {
       expect(block, `${f} must not move detail_version`).not.toContain(`"${f}"`);
     }
@@ -469,5 +488,74 @@ describe("every field name AutoFilm reads is emitted", () => {
     // record constantly and showing a rep equipment that has gone stale.
     expect(feed).toMatch(/shaped\.detail_version = await detailVersion\(/);
     expect(shared).toMatch(/export async function detailVersion/);
+  });
+});
+
+// ── Manufacturing specification ──────────────────────────────────────
+
+describe("AutoFilm receives the full vehicle detail", () => {
+  const withBuild = {
+    vin: "1C6SRFFT2NN400176", ymm: "2022 RAM 1500", trim: "Big Horn",
+    mc_attributes: {
+      year: 2022, make: "RAM", model: "Ram 1500 Pickup", stock_no: "R4821",
+      build_sheet: { source: "neovin", options: ["Level 2 Equipment Group"],
+                     standard: { Interior: ["Cloth Seats"] }, packages: [], colors: {} },
+    },
+    mc_raw: {
+      vdp_url: "https://www.harteauto.com/inventory/ram-1500",
+      dealer: { name: "Harte", id: 12345 },
+      build: {
+        body_type: "Pickup", vehicle_type: "Truck", doors: 4, std_seating: 5,
+        engine: "5.7L V8", engine_size: 5.7, cylinders: 8, engine_block: "V",
+        fuel_type: "Unleaded", transmission: "Automatic", drivetrain: "4WD",
+        powertrain_type: "Combustion", city_mpg: 17, highway_mpg: 22,
+        overall_length: 232.9, overall_width: 82.1, overall_height: 77.5,
+        made_in: "United States", version: "Big Horn/Lone Star",
+        make: "RAM", model: "Ram 1500", year: 2022, trim: "Big Horn",
+      },
+    },
+  };
+
+  it("carries the NeoVIN decode, which is what a walkaround describes", () => {
+    const out = shapeLotRow(withBuild) as Record<string, any>;
+    expect(out.mc_attributes.build_sheet.source).toBe("neovin");
+    expect(out.mc_attributes.build_sheet.options).toContain("Level 2 Equipment Group");
+  });
+
+  it("carries the manufacturing spec that was locked inside the raw payload", () => {
+    // Fuel economy, cylinders, doors, seating and dimensions all live in
+    // mc_raw.build, and mc_raw is withheld wholesale — so none of it reached
+    // AutoFilm despite being ordinary vehicle detail.
+    const spec = (shapeLotRow(withBuild) as Record<string, any>).specifications;
+    expect(spec.city_mpg).toBe(17);
+    expect(spec.highway_mpg).toBe(22);
+    expect(spec.cylinders).toBe(8);
+    expect(spec.std_seating).toBe(5);
+    expect(spec.doors).toBe(4);
+    expect(spec.overall_length).toBe(232.9);
+    expect(spec.made_in).toBe("United States");
+    expect(spec.drivetrain).toBe("4WD");
+  });
+
+  it("still withholds the raw payload itself", () => {
+    // The rest of mc_raw is listing and marketplace metadata, including the
+    // dealer VDP URL that scrubHistory deliberately strips elsewhere. The
+    // contract is normalized resolved facts, not raw provider payloads.
+    const out = shapeLotRow(withBuild) as Record<string, any>;
+    expect(out.mc_raw).toBeUndefined();
+    expect(JSON.stringify(out)).not.toContain("harteauto.com");
+    expect(JSON.stringify(out.specifications)).not.toContain("dealer");
+  });
+
+  it("omits fields the decode did not produce rather than sending null", () => {
+    // A consumer must be able to tell "not decoded" from "decoded as empty".
+    const sparse = { ...withBuild, mc_raw: { build: { body_type: "Pickup", city_mpg: null, doors: "" } } };
+    const spec = (shapeLotRow(sparse) as Record<string, any>).specifications;
+    expect(spec).toEqual({ body_type: "Pickup" });
+  });
+
+  it("reports null when the vehicle was never decoded", () => {
+    const out = shapeLotRow({ ...withBuild, mc_raw: null }) as Record<string, any>;
+    expect(out.specifications).toBeNull();
   });
 });

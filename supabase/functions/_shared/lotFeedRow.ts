@@ -180,6 +180,31 @@ export const normalizePhotos = (photos: unknown): string[] =>
  * The listing row as it goes out: everything it has, minus the denylist, plus
  * the fields that are derived from a real source rather than invented.
  */
+const SPEC_FIELDS = [
+  "body_type", "vehicle_type", "doors", "std_seating",
+  "engine", "engine_block", "engine_size", "cylinders", "powertrain_type",
+  "fuel_type", "transmission", "drivetrain",
+  "city_mpg", "highway_mpg",
+  "overall_length", "overall_width", "overall_height",
+  "made_in", "version",
+] as const;
+
+/** The provider's normalized manufacturing spec, lifted out of the withheld
+ *  raw payload. Absent fields are omitted rather than sent as null, so a
+ *  consumer can tell "not decoded" from "decoded as empty". */
+export function specifications(row: any): Record<string, unknown> | null {
+  const build = ((row?.mc_raw as Record<string, unknown> | undefined)?.build
+    ?? null) as Record<string, unknown> | null;
+  if (!build) return null;
+  const out: Record<string, unknown> = {};
+  for (const f of SPEC_FIELDS) {
+    const v = build[f];
+    if (v === null || v === undefined || v === "") continue;
+    out[f] = v;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 export function shapeLotRow(
   row: any,
   file?: LotFeedFile | null,
@@ -221,6 +246,21 @@ export function shapeLotRow(
   out.passport_url = passportUrl(row?.slug);
   out.documents_url = documentsUrl(row?.slug);
   if (row?.history_payload) out.history_payload = scrubHistory(row.history_payload);
+
+  // Manufacturing specification.
+  //
+  // The NeoVIN decode already reaches AutoFilm inside mc_attributes.build_sheet
+  // — colours, packages, factory options, standard equipment. What did not was
+  // the provider's normalized spec block, because it lives inside mc_raw and
+  // mc_raw is withheld wholesale.
+  //
+  // That block is where fuel economy, cylinders, doors, seating, dimensions and
+  // country of manufacture live: ordinary vehicle detail a walkaround needs and
+  // nothing a licence covers. mc_raw itself stays denied — the rest of it is
+  // listing and marketplace metadata, including the dealer VDP URL that
+  // scrubHistory deliberately strips elsewhere, and the contract is normalized
+  // resolved facts rather than raw provider payloads.
+  out.specifications = specifications(row);
 
   const sticker = windowSticker(row, opts);
   out.window_sticker_url = sticker.url;
@@ -274,6 +314,10 @@ export async function detailVersion(
   // given stored value.
   const material = JSON.stringify([
     ...DETAIL_VERSION_FIELDS.map((k) => row?.[k] ?? null),
+    // Hashed through its derived form, not by adding mc_raw to the list above:
+    // mc_raw also carries scraped_at, dom and last_seen_at, which move nightly
+    // for every car and would make the version cache nothing.
+    JSON.stringify(specifications(row)),
     snapshot?.content_checksum ?? null,
     snapshot?.snapshot_version ?? null,
   ]);
