@@ -71,7 +71,7 @@ const VALIDATOR_GATE: Record<string, GateId> = {
 // ── Length band ──────────────────────────────────────────────────────
 //
 // Length is measured in TOTAL CHARACTERS INCLUDING SPACES, by owner decision,
-// and every vehicle targets the same band: 3,000 to 3,879. That is also the
+// and every vehicle targets the same band: 3,200 to 3,879. That is also the
 // unit every downstream limit uses — the tenant row's min_length and
 // max_length, LENGTH_POLICY, and the marketplace field caps — so counting
 // words here left two units able to disagree about one description.
@@ -90,7 +90,7 @@ const VALIDATOR_GATE: Record<string, GateId> = {
 
 export type VehicleClass = "economy" | "mainstream" | "luxury" | "performance" | "heavy_duty";
 
-export const TARGET_BAND = { min: 3000, max: 3879 } as const;
+export const TARGET_BAND = { min: 3200, max: 3879 } as const;
 
 export const CHAR_BANDS: Record<VehicleClass, { min: number; max: number }> = {
   economy: { ...TARGET_BAND },

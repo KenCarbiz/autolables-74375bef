@@ -159,9 +159,9 @@ export const DEFAULT_CHANNEL_POLICIES: ChannelPolicy[] = [
     // pricing is managed.
     key: "vauto", label: "vAuto", active: true,
     // Owner decision: vAuto carries the master essentially intact rather than
-    // a trimmed derivative, at the same 3,000-3,879 band every description
+    // a trimmed derivative, at the same 3,200-3,879 band every description
     // targets. It accepts the longest copy of any configured destination.
-    recommendedMin: 3000, recommendedMax: 3879, characterLimit: 3879, limitVerified: false,
+    recommendedMin: 3200, recommendedMax: 3879, characterLimit: 3879, limitVerified: false,
     paragraphMin: 4, paragraphMax: 8, listsAllowed: false, htmlAllowed: false,
     markdownAllowed: false, emojiAllowed: false, linksAllowed: false, phoneAllowed: false,
     pricingPolicy: "never", keywordPolicy: "natural", ctaPolicy: "none",

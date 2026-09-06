@@ -88,17 +88,17 @@ describe("gate 2 — completeness", () => {
   });
 
   it("targets one band for every vehicle, per the owner", () => {
-    // 3,000-3,879 across the lot, deliberately overriding the manual's
+    // 3,200-3,879 across the lot, deliberately overriding the manual's
     // per-class word guidance for marketplace parity. Class is still resolved
     // and recorded, so restoring a ladder later is a data change.
     for (const band of Object.values(CHAR_BANDS)) {
-      expect(band).toEqual({ min: 3000, max: 3879 });
+      expect(band).toEqual({ min: 3200, max: 3879 });
     }
     expect(TARGET_BAND.max - TARGET_BAND.min).toBeGreaterThanOrEqual(400);
   });
 
   it("treats the floor as a target rather than a gate", () => {
-    // A vehicle without enough verified data to reach 3,000 characters is
+    // A vehicle without enough verified data to reach 3,200 characters is
     // flagged, never padded: section 24 forbids padding outright.
     const short = runGates({ ...base, content: "Short but honest copy. Contact us." });
     expect(short.findings.find((f) => f.code === "BELOW_CLASS_CHAR_BAND")?.blocking).toBe(false);
