@@ -227,7 +227,10 @@ describe("generation spend is actually recorded", () => {
       orchestrator.indexOf("async function generateMaster("),
       orchestrator.indexOf("// ── The pipeline for a single vehicle"));
     expect(fn.length).toBeGreaterThan(400);
-    expect(fn.split("recordExecution(").length - 1).toBe(3); // transport, truncation, success
+    // transport failure, truncation, success, and the bounded length
+    // correction — every call that reaches the provider is billed, including
+    // the retry, or the ledger understates what a long draft costs.
+    expect(fn.split("recordExecution(").length - 1).toBe(4);
     // The record is written BEFORE the throw, or it is not written at all.
     expect(fn.indexOf('errorCode: "structured_output_missing"'))
       .toBeLessThan(fn.indexOf('throw Object.assign(new Error("structured_output_missing")'));

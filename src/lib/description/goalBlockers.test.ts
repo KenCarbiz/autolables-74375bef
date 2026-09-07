@@ -570,3 +570,60 @@ describe("the budget refuses the call instead of noting it", () => {
     expect(blk).not.toMatch(/opts\.force/);
   });
 });
+
+// ── 12. Missing the ceiling gets one measured correction ─────────────
+
+describe("an over-length draft is corrected, not truncated", () => {
+  const fn = orch.slice(orch.indexOf("async function generateMaster("),
+                        orch.indexOf("// ── The pipeline for a single vehicle"));
+
+  it("retries once with the measured miss", () => {
+    // Naming the ceiling moved four of six into band but does not bind -- a
+    // model treats "hard ceiling" as guidance. What it can act on is the
+    // actual character count and the actual amount to remove.
+    expect(fn).toMatch(/LENGTH CORRECTION/);
+    expect(fn).toMatch(/Your previous draft was \$\{firstDraft\.length\} characters/);
+    expect(fn).toMatch(/\$\{firstDraft\.length - ceiling\} fewer/);
+  });
+
+  it("does not shrink the token budget to force it", () => {
+    // An undersized budget truncates the JSON and fails the whole call, which
+    // is how the richest vehicles were lost before an output budget existed.
+    expect(fn).toMatch(/outputTokenBudget\(ceiling, settings\.reasoning_effort\)/);
+    expect(fn).not.toMatch(/slice\(0, ceiling\)/);
+  });
+
+  it("reserves the disclosure out of the ceiling it asks for", () => {
+    // The disclosure is appended after the writer finishes and counts toward
+    // the stored length, so the writer's ceiling is the band less that text.
+    expect(fn).toMatch(/const ceiling = preferredLengthBand\(settings\)\.max/);
+    expect(fn).toMatch(/required_legal_text/);
+  });
+
+  it("keeps the retry only when it is actually better", () => {
+    // A correction that overshoots the other way is not an improvement.
+    expect(fn).toMatch(/second\.length < firstDraft\.length/);
+    expect(fn).toMatch(/second\.length >= preferredLengthBand\(settings\)\.min - 299/);
+  });
+
+  it("keeps the long draft if the correction fails", () => {
+    // Publishable copy that is merely long beats losing it to a failed retry.
+    // Scoped to the retry's own catch: slicing to the end of the function ran
+    // past it and picked up an unrelated `throw error` in the next one.
+    const at = fn.indexOf("LENGTH CORRECTION");
+    const block = fn.slice(at, fn.indexOf("return {", at));
+    expect(block).toMatch(/\} catch \{/);
+    expect(block).not.toMatch(/throw/);
+    expect(block).toMatch(/The first draft is publishable copy that is merely long/);
+  });
+
+  it("bills the correction to the ledger as a repair", () => {
+    expect(fn).toMatch(/kind: "repair", outcome: "succeeded"/);
+  });
+
+  it("runs at most once", () => {
+    // A loop chasing a length would spend the budget on one vehicle.
+    expect((fn.match(/LENGTH CORRECTION/g) || []).length).toBe(1);
+    expect(fn).not.toMatch(/while \(/);
+  });
+});

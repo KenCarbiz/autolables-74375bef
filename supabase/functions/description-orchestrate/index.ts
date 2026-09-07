@@ -302,11 +302,66 @@ async function generateMaster(
     throw Object.assign(new Error("structured_output_missing"), { code: "PROVIDER_ERROR" });
   }
 
-  const executionId = await recordExecution(
+  let executionId = await recordExecution(
     ctx.admin, ctx.tenantId, ctx.vehicleId, ctx.caseId, {
       kind: "generation", outcome: "succeeded",
       provider: providerKey, model: settings.generation_model, result,
     });
+
+  // One bounded correction pass when the draft misses the ceiling.
+  //
+  // Naming the ceiling in the instruction moved four of six vehicles into
+  // band but does not bind: a model treats "hard ceiling" as guidance. The
+  // mechanical alternatives are both worse -- shrinking the output-token
+  // budget truncates the JSON and fails the whole call, and trimming the text
+  // afterwards is what cut the legal disclosure off the end and cost three
+  // investigations. What a model can act on is the MEASURED miss, so it is
+  // told the actual character count and how much to remove.
+  const ceiling = preferredLengthBand(settings).max
+    - (String(settings.required_legal_text || "").trim().length
+       ? String(settings.required_legal_text).trim().length + 2 : 0);
+  const firstDraft = String(result.parsed?.master_description ?? "");
+  if (firstDraft.length > ceiling) {
+    try {
+      const retry = await provider.generate({
+        systemPrompt: `${DRIVESIGNAL_V3_SYSTEM}\n\n${knowledge.text}`,
+        userContent: `${buildMasterPromptV3(packet, settings)}\n\n`
+          + `LENGTH CORRECTION\n`
+          + `Your previous draft was ${firstDraft.length} characters. The ceiling is `
+          + `${ceiling}. Rewrite it at no more than ${ceiling} characters — about `
+          + `${firstDraft.length - ceiling} fewer.\n`
+          + `Cut the least load-bearing equipment detail and any sentence that `
+          + `restates something already said. Keep the opening, the strongest `
+          + `equipment, the ownership and practical detail, and the close. Do not `
+          + `drop a verified fact to save room if a redundant clause would do.`,
+        model: settings.generation_model,
+        schema: DESCRIPTION_OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+        schemaName: "drivesignal_vehicle_description",
+        maxOutputTokens: outputTokenBudget(ceiling, settings.reasoning_effort),
+        reasoningEffort: settings.reasoning_effort || null,
+        verbosity: settings.verbosity || null,
+      });
+      const second = String(retry.parsed?.master_description ?? "");
+      const retryId = await recordExecution(
+        ctx.admin, ctx.tenantId, ctx.vehicleId, ctx.caseId, {
+          kind: "repair", outcome: "succeeded",
+          provider: providerKey, model: settings.generation_model, result: retry,
+        });
+      // Keep the retry only if it is genuinely shorter and still clears the
+      // floor. A correction that overshoots the other way is not an
+      // improvement, and a shorter draft that lost the disclosure or the
+      // facts would fail validation anyway.
+      if (retry.parsed && second.length < firstDraft.length
+          && second.length >= preferredLengthBand(settings).min - 299) {
+        result = retry;
+        executionId = retryId ?? executionId;
+      }
+    } catch {
+      // The first draft is publishable copy that is merely long. Losing it to
+      // a failed correction would be the worse outcome.
+    }
+  }
+
   return {
     executionId,
     text: result.parsed.master_description,
