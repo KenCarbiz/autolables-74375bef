@@ -509,3 +509,40 @@ describe("the disclosure check compares words, not whitespace", () => {
     expect(f?.source_reference).toMatch(/text=\d+c\/\d+n legal=\d+c\/\d+n exact=(true|false)/);
   });
 });
+
+// ── 11. The budget has to stop something ─────────────────────────────
+
+describe("the budget refuses the call instead of noting it", () => {
+  it("returns before the provider is reached", () => {
+    // The verdict was computed on every run and read only to log a warning.
+    // In production that let 434 calls run in a day against a 250/day limit
+    // and 453 in a month against a ceiling of 270 -- every check passed
+    // silently because nothing acted on the answer.
+    expect(orch).toMatch(/if \(!budgetDecision\.withinBudget\) \{/);
+    expect(orch).toMatch(/skipped: "budget_exhausted"/);
+    const gate = orch.indexOf('skipped: "budget_exhausted"');
+    const call = orch.indexOf("const generation = await generateMaster(");
+    expect(gate).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(call); // refused before anything is spent
+  });
+
+  it("says which limit stopped it", () => {
+    // "over budget" leaves the dealer guessing which knob to turn.
+    expect(orch).toMatch(/limits: budgetDecision\.triggeredLimits/);
+    expect(orch).toMatch(/generation_budget_blocked/);
+  });
+
+  it("reports that nothing was spent", () => {
+    const blk = orch.slice(orch.indexOf('if (!budgetDecision.withinBudget)'),
+                           orch.indexOf('const masterPolicyVersion'));
+    expect(blk).toMatch(/cost_incurred: false/);
+  });
+
+  it("is not overridden by force", () => {
+    // A manual regenerate spends the same money as an automatic one, so the
+    // refusal must not sit behind an opts.force check.
+    const blk = orch.slice(orch.indexOf('if (budgetDecision.verdict === "warning")'),
+                           orch.indexOf('const masterPolicyVersion'));
+    expect(blk).not.toMatch(/opts\.force/);
+  });
+});

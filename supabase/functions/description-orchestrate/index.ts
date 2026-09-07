@@ -850,6 +850,27 @@ async function orchestrateVehicle(
       await audit(admin, tenantId, "generation_budget_warning", caseId,
         { vin: listing.vin, consumed_pct: budgetDecision.consumedPct });
     }
+    // A budget that only writes a warning is a report, not a control. This
+    // verdict was computed on every run and never once stopped anything: the
+    // lot spent 434 calls in a day against a 250/day limit and 453 in a month
+    // against a ceiling of 270, and every check passed silently because
+    // nothing read the answer.
+    //
+    // Refused BEFORE the provider call, which is the only point at which the
+    // spend is still preventable. force does not override it -- a manual
+    // regenerate spends the same money as an automatic one.
+    if (!budgetDecision.withinBudget) {
+      await audit(admin, tenantId, "generation_budget_blocked", caseId, {
+        vin: listing.vin, limits: budgetDecision.triggeredLimits,
+        consumed_pct: budgetDecision.consumedPct, reason: budgetDecision.reason,
+      });
+      await setCase(admin, caseId, { last_error_message: budgetDecision.reason ?? "budget exhausted" });
+      return {
+        vehicle_id: vehicleId, case_id: caseId, skipped: "budget_exhausted",
+        limits: budgetDecision.triggeredLimits, reason: budgetDecision.reason,
+        cost_incurred: false,
+      };
+    }
     const masterPolicyVersion = await computeChannelPolicyVersion(masterPolicy);
     const inputChecksum = await computeInputChecksum({
       tenantId, vehicleId, snapshotChecksum: sdv, channel: "master",
