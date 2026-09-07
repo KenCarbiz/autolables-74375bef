@@ -890,10 +890,13 @@ const PrepSignOff = () => {
 // catalog) stays on Admin > Get-Ready Setup.
 const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: string }) => {
   const { settings } = useDealerSettings();
-  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory, createGetReady } = useGetReady(storeId);
+  const { user } = useAuth();
+  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory, createGetReady, completeItem } = useGetReady(storeId);
   const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(storeId);
   const [startGetReadyOpen, setStartGetReadyOpen] = useState(false);
   const [sheetRecord, setSheetRecord] = useState<GetReadyRecord | null>(null);
+  const [completingItem, setCompletingItem] = useState<string | null>(null);
+
 
   return (
     <div className="space-y-4">
@@ -990,6 +993,53 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
                         </div>
                         <span className="text-[10px] text-muted-foreground tabular-nums">{completedItems}/{totalItems}</span>
                       </div>
+
+                      {/* Work checklist. Completing the last item is what
+                          moves the record to "ready" — the step that unlocks
+                          "send to inventory". */}
+                      {totalItems > 0 && (
+                        <div className="mt-3 rounded-lg border border-border divide-y divide-border">
+                          {record.items.map(item => {
+                            const done = item.status === "complete";
+                            const busy = completingItem === `${record.id}:${item.id}`;
+                            return (
+                              <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                                <div className="min-w-0">
+                                  <p className={`text-xs font-medium truncate ${done ? "text-muted-foreground line-through" : "text-foreground"}`}>{item.label}</p>
+                                  {done && item.completedAt && (
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {format(new Date(item.completedAt), "M/d/yy")}{item.completedBy ? ` · ${item.completedBy}` : ""}
+                                    </p>
+                                  )}
+                                </div>
+                                {done ? (
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                ) : (
+                                  <button
+                                    disabled={busy}
+                                    onClick={async () => {
+                                      setCompletingItem(`${record.id}:${item.id}`);
+                                      try {
+                                        await completeItem(record.id, item.id, user?.email?.split("@")[0] || "staff");
+                                        toast.success(`${item.label} marked complete`);
+                                      } catch {
+                                        toast.error("Couldn't mark that step complete");
+                                      } finally {
+                                        setCompletingItem(null);
+                                      }
+                                    }}
+                                    className="h-7 px-2.5 rounded-md border border-border text-[10px] font-semibold text-foreground hover:bg-muted disabled:opacity-60 shrink-0"
+                                  >
+                                    {busy ? "Saving…" : "Mark done"}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+
 
                       {!timeline.valid && (
                         <div className="mt-2 space-y-1">
