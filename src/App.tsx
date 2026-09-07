@@ -45,6 +45,11 @@ const GmHome = lazy(() => import("./pages/GmHome"));
 const SalesManagerHome = lazy(() => import("./pages/SalesManagerHome"));
 const UsedCarManagerHome = lazy(() => import("./pages/UsedCarManagerHome"));
 const ServiceManagerHome = lazy(() => import("./pages/ServiceManagerHome"));
+const TechnicianHome = lazy(() => import("./pages/TechnicianHome"));
+const VendorHome = lazy(() => import("./pages/VendorHome"));
+const ServiceWriterDesk = lazy(() => import("./pages/ServiceWriterDesk"));
+const CustomerRecord = lazy(() => import("./pages/CustomerRecord"));
+const DealsPage = lazy(() => import("./pages/Deals"));
 const LotCaptureQueue = lazy(() => import("./pages/LotCaptureQueue"));
 const Index = lazy(() => import("./pages/Index"));
 const Landing = lazy(() => import("./pages/Landing"));
@@ -296,6 +301,14 @@ const App = () => (
                         <Route path="/home/sales" element={<SalesManagerHome />} />
                         <Route path="/home/used-cars" element={<UsedCarManagerHome />} />
                         <Route path="/home/service" element={<ServiceManagerHome />} />
+                        <Route path="/home/technician" element={<TechnicianHome />} />
+                        <Route path="/home/vendor" element={<VendorHome />} />
+                        <Route path="/service-desk" element={<ServiceWriterDesk />} />
+                        {/* Customers supersedes Leads. /leads still resolves so
+                            existing bookmarks and emailed links keep working. */}
+                        <Route path="/customers" element={<Leads />} />
+                        <Route path="/customers/:id" element={<CustomerRecord />} />
+                        <Route path="/deals" element={<DealsPage />} />
                         <Route path="/dashboard/classic" element={<ProcessDashboard />} />
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />
