@@ -88,14 +88,30 @@ export default {
         expand: "var(--al-motion-expand)",
         enter: "var(--al-motion-enter)",
         exit: "var(--al-motion-exit)",
+        "120": "120ms",
+        "200": "200ms",
+        "320": "320ms",
+        "480": "480ms",
       },
       transitionTimingFunction: {
+        // A duplicate key silently discards the block above it. These were two
+        // separate `transitionTimingFunction` entries in one object, so the
+        // whole al-ease ladder never reached Tailwind and `ease-standard`
+        // produced nothing. Merged; both sets are live.
         press: "var(--al-ease-press)",
         standard: "var(--al-ease-standard)",
         enter: "var(--al-ease-enter)",
         exit: "var(--al-ease-exit)",
+        // Wave 2 motion ladder — out-expo for enters, fast-in for exits
+        "out-expo": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "in-fast": "cubic-bezier(0.4, 0, 1, 1)",
+        "spring": "cubic-bezier(0.34, 1.56, 0.64, 1)",
       },
       fontSize: {
+        // Two `fontSize` keys existed in this object, so the al-* scale below
+        // was discarded outright and `text-al-page` produced no styles at all.
+        // That is why adding a type scale changed nothing on screen.
+        //
         // size, then line-height/weight/tracking, so a heading cannot be
         // used at the wrong weight by accident.
         "al-page": ["32px", { lineHeight: "38px", fontWeight: "700", letterSpacing: "-0.02em" }],
@@ -104,12 +120,6 @@ export default {
         "al-body": ["14px", { lineHeight: "20px", fontWeight: "400" }],
         "al-button": ["14px", { lineHeight: "20px", fontWeight: "600" }],
         "al-meta": ["12px", { lineHeight: "16px", fontWeight: "500" }],
-      },
-      fontFamily: {
-        "barlow": ["Barlow", "system-ui", "sans-serif"],
-        "barlow-condensed": ["'Barlow Condensed'", "Barlow", "system-ui", "sans-serif"],
-      },
-      fontSize: {
         // Wave 2 type scale — display-xl down to caption
         "display-xl":  ["4.5rem",   { lineHeight: "1.05", letterSpacing: "-0.03em", fontWeight: "600" }], // 72
         "display-lg":  ["3.5rem",   { lineHeight: "1.05", letterSpacing: "-0.03em", fontWeight: "600" }], // 56
@@ -121,23 +131,15 @@ export default {
         "body-sm":     ["0.875rem", { lineHeight: "1.45", letterSpacing: "0",       fontWeight: "400" }], // 14
         "caption":     ["0.75rem",  { lineHeight: "1.4",  letterSpacing: "0",       fontWeight: "400" }], // 12
       },
+      fontFamily: {
+        "barlow": ["Barlow", "system-ui", "sans-serif"],
+        "barlow-condensed": ["'Barlow Condensed'", "Barlow", "system-ui", "sans-serif"],
+      },
       letterSpacing: {
         // Wave 2 spacing tokens
         "ui":          "0",
         "label":       "0.14em",    // uppercase UI labels
         "label-wide":  "0.18em",    // section titles
-      },
-      transitionTimingFunction: {
-        // Wave 2 motion ladder — out-expo for enters, fast-in for exits
-        "out-expo":  "cubic-bezier(0.22, 1, 0.36, 1)",
-        "in-fast":   "cubic-bezier(0.4, 0, 1, 1)",
-        "spring":    "cubic-bezier(0.34, 1.56, 0.64, 1)",
-      },
-      transitionDuration: {
-        "120": "120ms",
-        "200": "200ms",
-        "320": "320ms",
-        "480": "480ms",
       },
       keyframes: {
         "accordion-down": {
