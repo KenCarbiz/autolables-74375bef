@@ -110,6 +110,56 @@ async function callGenerator(prompt: string, modelKey?: string): Promise<string>
   return text;
 }
 
+/**
+ * Channel variants, written by the SAME provider as the master.
+ *
+ * They went through callGenerator -> ai-description, which is hard-coded to
+ * Anthropic and whose MODEL_IDS map holds only Claude ids. A tenant configured
+ * for openai/gpt-5.6-luna fell through that map to Claude Haiku, so a channel
+ * variant would have been written by a different vendor and a different model
+ * than the master it derives from -- silently. With ANTHROPIC_API_KEY unset on
+ * an OpenAI tenant the call fails outright, which is why this lot has produced
+ * zero channel versions and vAuto has never been generated at all.
+ *
+ * No schema here: a channel variant is prose, and the master already carries
+ * the evidence ledger the audit reads.
+ */
+async function generateChannelText(
+  prompt: string, settings: Record<string, any>, maxChars: number,
+  ctx: { admin: any; tenantId: string; vehicleId: string; caseId: string; channel: string },
+): Promise<string> {
+  const providerKey = settings.generation_provider === "openai" ? "openai" : "anthropic";
+  const provider = createProvider(providerKey, Deno.env);
+  let result: GenerationResult;
+  try {
+    result = await provider.generate({
+      systemPrompt: "You rewrite an approved vehicle description for one destination. "
+        + "You may restructure, shorten and re-emphasise. You may not introduce a fact "
+        + "that is not already in the text you are given.",
+      userContent: prompt,
+      model: settings.generation_model,
+      maxOutputTokens: outputTokenBudget(maxChars, settings.reasoning_effort),
+      reasoningEffort: settings.reasoning_effort || null,
+      verbosity: settings.verbosity || null,
+    });
+  } catch (e) {
+    await recordExecution(ctx.admin, ctx.tenantId, ctx.vehicleId, ctx.caseId, {
+      kind: "generation", outcome: "failed", provider: providerKey,
+      model: settings.generation_model, result: null,
+      errorCode: (e as { code?: string }).code || "PROVIDER_ERROR",
+      errorCategory: "provider", channel: ctx.channel,
+    });
+    throw e;
+  }
+  await recordExecution(ctx.admin, ctx.tenantId, ctx.vehicleId, ctx.caseId, {
+    kind: "generation", outcome: "succeeded", provider: providerKey,
+    model: settings.generation_model, result, channel: ctx.channel,
+  });
+  const text = String(result.text || "").trim();
+  if (!text) throw Object.assign(new Error("generator_empty"), { code: "PROVIDER_ERROR" });
+  return text;
+}
+
 export interface MasterGeneration {
   text: string;
   headline: string | null;
@@ -144,6 +194,8 @@ async function recordExecution(
     provider: string; model: string;
     result: GenerationResult | null;
     errorCode?: string | null; errorCategory?: string | null;
+    /** Set for a channel derivative; null for the master. */
+    channel?: string | null;
   },
 ): Promise<string | null> {
   try {
@@ -156,7 +208,7 @@ async function recordExecution(
     });
     const { data } = await admin.from("description_model_executions").insert({
       tenant_id: tenantId, vehicle_id: vehicleId, description_case_id: caseId,
-      execution_kind: args.kind,
+      execution_kind: args.kind, channel: args.channel ?? null,
       provider: args.result?.provider ?? args.provider, model: args.model,
       input_tokens: usage?.inputTokens ?? null,
       output_tokens: usage?.outputTokens ?? null,
@@ -997,8 +1049,10 @@ async function orchestrateVehicle(
       });
 
       try {
-        const raw = await callGenerator(
-          buildChannelPromptV3(masterText2, policy, channelPacket), settings.generation_model);
+        const raw = await generateChannelText(
+          buildChannelPromptV3(masterText2, policy, channelPacket),
+          settings, policy.characterLimit,
+          { admin, tenantId, vehicleId, caseId, channel: key });
         let content = raw, seoTitle: string | null = null, metaDesc: string | null = null;
         if (policy.seoFields) {
           try {

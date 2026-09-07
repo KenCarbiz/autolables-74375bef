@@ -342,3 +342,61 @@ describe("the decode's own facts reach the writer", () => {
     expect(after).toBeGreaterThan(before + 5);
   });
 });
+
+// ── 7. The channel variants nothing ever produced ────────────────────
+//
+// Production holds ZERO description_channel_versions. All eight channels are
+// enabled, including vAuto -- the destination the 3,221 floor exists for --
+// and not one variant has ever been written. Channel generation went through
+// callGenerator -> ai-description, which calls Anthropic and whose MODEL_IDS
+// map holds only Claude ids. A tenant configured for openai/gpt-5.6-luna fell
+// through that map to Claude Haiku, so a variant would have been written by a
+// different vendor and model than the master it derives from -- silently. With
+// no ANTHROPIC_API_KEY on an OpenAI tenant the call simply fails.
+
+describe("channel variants use the configured provider", () => {
+  const aiDesc = readFileSync(join(fnDir, "ai-description/index.ts"), "utf8");
+
+  it("no longer routes channels through the Anthropic-only function", () => {
+    expect(orch).toMatch(/const raw = await generateChannelText\(/);
+    // callGenerator survives for tenants not on a provider profile, but the
+    // channel loop must not be one of its callers.
+    const loop = orch.slice(orch.indexOf("// 5 ── channel variants"),
+                            orch.indexOf("// A condition that no longer reproduces"));
+    expect(loop.length).toBeGreaterThan(500);
+    expect(loop).not.toMatch(/callGenerator\(/);
+  });
+
+  it("writes variants with the same provider and model as the master", () => {
+    const fn = orch.slice(orch.indexOf("async function generateChannelText("),
+                          orch.indexOf("export interface MasterGeneration"));
+    expect(fn).toMatch(/settings\.generation_provider === "openai" \? "openai" : "anthropic"/);
+    expect(fn).toMatch(/model: settings\.generation_model/);
+    expect(fn).toMatch(/outputTokenBudget\(maxChars/);
+  });
+
+  it("records channel calls in the spend ledger, tagged by channel", () => {
+    const fn = orch.slice(orch.indexOf("async function generateChannelText("),
+                          orch.indexOf("export interface MasterGeneration"));
+    expect(fn.split("recordExecution(").length - 1).toBe(2); // failure and success
+    expect(fn).toMatch(/channel: ctx\.channel/);
+    expect(orch).toMatch(/execution_kind: args\.kind, channel: args\.channel \?\? null/);
+  });
+
+  it("makes ai-description refuse a model it cannot serve", () => {
+    // The silent fall-through to Haiku is what hid this: the configuration
+    // said one vendor, the call used another, and nothing reported it.
+    expect(aiDesc).toMatch(/error: "unsupported_model"/);
+    expect(aiDesc).toMatch(/if \(requestedModel && !MODEL_IDS\[requestedModel\]\)/);
+  });
+
+  it("reads the request body before inspecting it", () => {
+    // The guard first landed above `const { vehicle } = await req.json()`,
+    // a temporal dead zone that throws before any request is served.
+    // TypeScript sees the binding in scope and says nothing.
+    expect(aiDesc.indexOf("const { vehicle } = await req.json();"))
+      .toBeLessThan(aiDesc.indexOf("const requestedModel ="));
+    expect(aiDesc.indexOf("const requestedModel ="))
+      .toBeLessThan(aiDesc.indexOf("model: resolvedModel,"));
+  });
+});

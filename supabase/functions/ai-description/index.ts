@@ -42,6 +42,7 @@ serve(async (req) => {
       }
     }
 
+
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
       return new Response(
@@ -65,6 +66,24 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // A model_key this function cannot serve must fail loudly. It used to fall
+    // through MODEL_IDS to Claude Haiku, so a tenant configured for
+    // openai/gpt-5.6-luna silently had its copy written by a different vendor
+    // and a different model than it asked for -- and the only visible symptom
+    // was channel variants that never appeared.
+    const requestedModel = String((vehicle as Record<string, unknown>)?.model_key || "");
+    if (requestedModel && !MODEL_IDS[requestedModel]) {
+      return new Response(
+        JSON.stringify({
+          error: "unsupported_model",
+          detail: `${requestedModel} is not served by ai-description, which calls Anthropic. `
+            + `Route this through description-orchestrate's provider abstraction instead.`,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const resolvedModel = MODEL_IDS[requestedModel] ?? "claude-haiku-4-5-20251001";
 
     // If the client sends a full prompt_override, use it (SEO Description Writer)
     // Otherwise use the default short description prompt
@@ -97,7 +116,7 @@ Write the description now:`;
       body: JSON.stringify({
         // The dealer's configured generation_model reaches us on the
         // description-orchestrate path; everything else keeps the default.
-        model: MODEL_IDS[String(vehicle.model_key || "")] ?? "claude-haiku-4-5-20251001",
+        model: resolvedModel,
         max_tokens: vehicle.prompt_override ? 1500 : 300,
         messages: [{ role: "user", content: prompt }],
       }),
