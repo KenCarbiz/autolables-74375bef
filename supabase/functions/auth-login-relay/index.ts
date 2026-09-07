@@ -37,7 +37,10 @@ serve(async (request) => {
   }
 
   try {
-    const body = await request.json() as { email?: unknown; password?: unknown };
+    const isNavigation = request.headers.get("content-type")?.includes("application/x-www-form-urlencoded") ?? false;
+    const body = isNavigation
+      ? Object.fromEntries((await request.formData()).entries())
+      : await request.json() as { email?: unknown; password?: unknown };
     if (typeof body.email !== "string" || typeof body.password !== "string") {
       return new Response(JSON.stringify({ error: "invalid request" }), {
         status: 400,
@@ -55,7 +58,25 @@ serve(async (request) => {
       body: JSON.stringify({ email: body.email, password: body.password }),
     });
 
-    return new Response(await response.text(), {
+    const responseText = await response.text();
+    if (isNavigation) {
+      const payload = responseText.replaceAll("<", "\\u003c");
+      const targetOrigin = JSON.stringify(origin);
+      return new Response(
+        `<!doctype html><meta charset="utf-8"><script>parent.postMessage({type:"autolabels-auth-relay",payload:${payload}},${targetOrigin})<\/script>`,
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+            "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline'; frame-ancestors https://autolabels.io https://www.autolabels.io https://autolables.lovable.app https://*.lovable.app https://*.lovableproject.com http://localhost:8080",
+          },
+        },
+      );
+    }
+
+    return new Response(responseText, {
       status: response.status,
       headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
