@@ -12,6 +12,51 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
+type SignInResult = { error: unknown };
+
+const isFetchFailure = (error: unknown): boolean => {
+  const candidate = error as { name?: string; message?: string } | null;
+  const message = candidate?.message?.toLowerCase() ?? "";
+  return candidate?.name === "AuthRetryableFetchError" || message.includes("failed to fetch") || message.includes("network error");
+};
+
+const signInWithXhr = (email: string, password: string): Promise<SignInResult> =>
+  new Promise((resolve) => {
+    const request = new XMLHttpRequest();
+    const baseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
+    const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "");
+
+    request.open("POST", `${baseUrl}/auth/v1/token?grant_type=password`);
+    request.timeout = 15_000;
+    request.setRequestHeader("apikey", publishableKey);
+    request.setRequestHeader("Content-Type", "application/json");
+
+    request.onload = async () => {
+      try {
+        const payload = JSON.parse(request.responseText || "{}") as {
+          access_token?: string;
+          refresh_token?: string;
+          error_description?: string;
+          msg?: string;
+        };
+        if (request.status < 200 || request.status >= 300 || !payload.access_token || !payload.refresh_token) {
+          resolve({ error: new Error(payload.error_description ?? payload.msg ?? "Invalid email or password.") });
+          return;
+        }
+        const { error } = await supabase.auth.setSession({
+          access_token: payload.access_token,
+          refresh_token: payload.refresh_token,
+        });
+        resolve({ error });
+      } catch (error) {
+        resolve({ error });
+      }
+    };
+    request.onerror = () => resolve({ error: new Error("Network error") });
+    request.ontimeout = () => resolve({ error: new Error("Network error") });
+    request.send(JSON.stringify({ email, password }));
+  });
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Last-known admin status per user. The role check must survive a
@@ -176,8 +221,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (!error || !isFetchFailure(error)) return { error };
+    } catch (error) {
+      if (!isFetchFailure(error)) return { error };
+    }
+    return signInWithXhr(email, password);
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
