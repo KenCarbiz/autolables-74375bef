@@ -223,6 +223,27 @@ const ONE_OWNER_RE = new RegExp(
 );
 const detectOneOwnerBadge = (html: string): boolean => ONE_OWNER_RE.test(html);
 
+// Manufacturer certification on the dealer's own VDP. The description engine
+// refuses CPO language on a feed flag alone, and rightly so: `condition` is
+// itself derived from MarketCheck's is_certified, so that single field cannot
+// corroborate itself. The dealer's published page IS an independent assertion,
+// and it is the one a shopper actually sees.
+//
+// A manufacturer word must appear next to the certification wording, so a
+// generic "certified technicians" or "certified dealer" footer cannot set it.
+// Positive-only, exactly like the one-owner badge: absence proves nothing.
+const CPO_RE = new RegExp(
+  [
+    String.raw`\bcertified\s+pre[-\s]?owned\b`,
+    String.raw`\b(?:manufacturer|factory)[\s-]?certified\b`,
+    String.raw`\bcpo\b[\s\S]{0,80}?\bwarrant`,
+  ].join("|"),
+  "i",
+);
+const GENERIC_CERT_RE = /certified\s+(?:technician|mechanic|dealer|service|collision|staff)/i;
+const detectCpoBadge = (html: string): boolean =>
+  CPO_RE.test(html) && !(GENERIC_CERT_RE.test(html) && !/certified\s+pre[-\s]?owned/i.test(html));
+
 // Generic selling-price labels appended after each dealer's configured labels.
 // These are advertised-price brands (never MSRP/retail), so running them in the
 // custom-label tier is safe and lets common sites resolve without per-dealer
@@ -1080,6 +1101,23 @@ serve(async (req) => {
           // passport already trusts (owner chip, Why Buy, buying score). Only
           // fills the gap — never overwrites a real MarketCheck owner_count or
           // an existing flag, and only ever asserts the positive.
+          // Certification confirmed on the page the dealer publishes. Recorded
+          // with its own source so the description engine can tell an
+          // independent confirmation from the feed flag that set `condition`.
+          // `program` stays unset: the page says certified, not which program,
+          // and naming one we did not read would be the fabrication this
+          // pipeline exists to prevent.
+          if (detectCpoBadge(html)) {
+            const { data: curCert } = await admin.from("vehicle_listings")
+              .select("certification").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
+            const cert = (curCert?.certification ?? {}) as Record<string, unknown>;
+            if (!cert.source) {
+              await admin.from("vehicle_listings")
+                .update({ certification: { ...cert, certified: true, source: "dealer_vdp", verified_at: new Date().toISOString() } })
+                .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+            }
+          }
+
           if (detectOneOwnerBadge(html)) {
             const { data: cur } = await admin.from("vehicle_listings")
               .select("mc_attributes").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
