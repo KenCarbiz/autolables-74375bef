@@ -169,7 +169,7 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
                     {doc.approved_at && <span>Approved {fmtDate(doc.approved_at)}</span>}
                     {doc.printed_at && <span>Printed {fmtDate(doc.printed_at)}{doc.print_count ? ` ·×${doc.print_count}` : ""}</span>}
                     {doc.published_at && <span>Published {fmtDate(doc.published_at)}</span>}
-                    {doc.reject_reason && <span className="text-rose-600">Rejected: {doc.reject_reason}</span>}
+                    {doc.rejection_reason && <span className="text-rose-600">Rejected: {doc.rejection_reason}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">

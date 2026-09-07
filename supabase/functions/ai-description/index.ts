@@ -43,10 +43,13 @@ serve(async (req) => {
     }
 
 
+    // Anthropic is the historical provider. When its key is absent, fall back
+    // to the Lovable AI Gateway rather than 500-ing every call.
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) {
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!apiKey && !lovableKey) {
       return new Response(
-        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
+        JSON.stringify({ error: "No AI provider configured (ANTHROPIC_API_KEY / LOVABLE_API_KEY)" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -106,32 +109,50 @@ Vehicle data:
 
 Write the description now:`;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        // The dealer's configured generation_model reaches us on the
-        // description-orchestrate path; everything else keeps the default.
-        model: resolvedModel,
-        max_tokens: vehicle.prompt_override ? 1500 : 300,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
+    const useAnthropic = Boolean(apiKey);
+    const response = useAnthropic
+      ? await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey as string,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            // The dealer's configured generation_model reaches us on the
+            // description-orchestrate path; everything else keeps the default.
+            model: resolvedModel,
+            max_tokens: vehicle.prompt_override ? 1500 : 300,
+            messages: [{ role: "user", content: prompt }],
+          }),
+        })
+      : await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${lovableKey}`,
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-5.6-sol",
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
 
     if (!response.ok) {
       const errorText = await response.text();
       return new Response(
-        JSON.stringify({ error: `Claude API error: ${response.status}`, details: errorText }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: useAnthropic ? `Claude API error: ${response.status}` : `AI gateway error: ${response.status}`,
+          details: errorText,
+        }),
+        { status: response.status === 429 || response.status === 402 ? response.status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const data = await response.json();
-    const description = data.content?.[0]?.text || "";
+    const description = useAnthropic
+      ? (data.content?.[0]?.text || "")
+      : (data.choices?.[0]?.message?.content || "");
 
     return new Response(
       JSON.stringify({ success: true, description }),

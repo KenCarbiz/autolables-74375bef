@@ -43,7 +43,7 @@ export function useVehicleEvidence(vehicleId?: string | null, vin?: string | nul
     const sb = supabase as any;
 
     const [docsRes, qrRes, addRes, listRes, auditRes] = await Promise.all([
-      sb.from("generated_documents").select("id, document_type, document_status, version, created_at, approved_at, printed_at, published_at, rejected_at, reject_reason, label_mode, template_id").eq("vehicle_id", vehicleId).then((r: any) => r).catch(() => ({ data: null })),
+      sb.from("generated_documents").select("id, document_type, document_status, version, created_at, approved_at, printed_at, published_at, rejected_at, rejection_reason, label_mode, template_id").eq("vehicle_id", vehicleId).then((r: any) => r).catch(() => ({ data: null })),
       sb.from("qr_scan_events").select("id, qr_code_id, user_agent, scanned_at").eq("vehicle_id", vehicleId).order("scanned_at", { ascending: false }).limit(25).then((r: any) => r).catch(() => ({ data: null })),
       vin ? sb.from("addendums").select("id, status, customer_signed_at, content_hash, customer_name, created_at, total_price").eq("vehicle_vin", vin).then((r: any) => r).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
       sb.from("vehicle_listings").select("created_at, ymm").eq("id", vehicleId).maybeSingle().then((r: any) => r).catch(() => ({ data: null })),
@@ -62,7 +62,7 @@ export function useVehicleEvidence(vehicleId?: string | null, vin?: string | nul
       if (d.approved_at) ev.push({ id: `${d.id}-app`, at: d.approved_at, category: "document", title: `${ty} v${d.version} approved`, raw: d });
       if (d.printed_at) ev.push({ id: `${d.id}-prt`, at: d.printed_at, category: "document", title: `${ty} v${d.version} printed`, raw: d });
       if (d.published_at) ev.push({ id: `${d.id}-pub`, at: d.published_at, category: "document", title: `${ty} v${d.version} published`, raw: d });
-      if (d.rejected_at) ev.push({ id: `${d.id}-rej`, at: d.rejected_at, category: "compliance", title: `${ty} v${d.version} rejected`, detail: d.reject_reason || undefined, raw: d });
+      if (d.rejected_at) ev.push({ id: `${d.id}-rej`, at: d.rejected_at, category: "compliance", title: `${ty} v${d.version} rejected`, detail: d.rejection_reason || undefined, raw: d });
     }
 
     // QR scans — derive device/browser from user_agent; sticker_type not stored here.
