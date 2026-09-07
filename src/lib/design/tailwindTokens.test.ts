@@ -80,3 +80,31 @@ describe("the design tokens survive into Tailwind", () => {
     expect(dupes).toEqual([]);
   });
 });
+
+// ── The chrome actually uses the scale ───────────────────────────────
+//
+// Tokens that resolve but that nothing references are the same as tokens that
+// do not resolve: the screen looks identical either way. This is what turns
+// the merge above into a visible change.
+
+describe("the shell chrome renders on the tokens", () => {
+  const shell = readFileSync(
+    join(__dirname, "../../components/layout/AppShell.tsx"), "utf8");
+
+  it("puts the page title and subtitle on the type scale", () => {
+    expect(shell).toMatch(/text-al-section/);
+    expect(shell).toMatch(/text-al-meta/);
+    // The scale carries weight and tracking, so the ad-hoc pair it replaced
+    // must not survive alongside it.
+    expect(shell).not.toMatch(/text-xl font-black tracking-tight text-foreground/);
+  });
+
+  it("puts navigation hover on the motion ladder", () => {
+    expect(shell).toMatch(/duration-hover ease-standard/);
+    expect(shell).not.toMatch(/duration-\[120ms\]/);
+  });
+
+  it("keeps the reduced-motion escape", () => {
+    expect(shell).toMatch(/motion-reduce:transition-none/);
+  });
+});

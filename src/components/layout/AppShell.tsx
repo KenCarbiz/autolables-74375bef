@@ -55,6 +55,7 @@ import {
   X,
 } from "lucide-react";
 import { AdminIcon } from "@/components/design/AdminIcon";
+import { AdminBrandLockup } from "@/components/design/AdminBrandLockup";
 import { ADMIN_ICON_PATHS } from "@/lib/design/adminIconPaths";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -66,7 +67,6 @@ import { useNavBadges } from "@/hooks/useNavBadges";
 import { useAudit } from "@/contexts/AuditContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import Logo from "@/components/brand/Logo";
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
 import { usePlatformEntitlements } from "@/hooks/usePlatformEntitlements";
 import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
@@ -559,7 +559,9 @@ const AppShell = ({ children }: AppShellProps) => {
         <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-card border-r border-border transition-all duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-64 flex flex-col`}>
           <div className="h-16 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
             <Link to="/dashboard" className={`flex items-center gap-3 min-w-0 ${collapsed ? "lg:justify-center lg:w-full" : ""}`}>
-              <Logo size={collapsed ? 24 : 32} variant={collapsed ? "mark" : "full"} />
+              {/* The official lockup, admin only. brand/Logo still renders every
+                  public surface, including the locked customer passport. */}
+              <AdminBrandLockup variant={collapsed ? "mark" : "lockup"} height={collapsed ? 24 : 28} />
             </Link>
             <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1 rounded-md hover:bg-muted">
               <X className="h-5 w-5" />
@@ -609,7 +611,7 @@ const AppShell = ({ children }: AppShellProps) => {
                               onClick={() => setMobileOpen(false)}
                               aria-current={active ? "page" : undefined}
                               aria-label={collapsed ? item.label : undefined}
-                              className={`group relative flex min-h-[42px] items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-sm transition-colors duration-[120ms] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1267e8] ${active ? "bg-[#eaf2ff] font-semibold text-[#0f2b5c]" : "text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a]"} ${collapsed ? "lg:min-h-[44px] lg:justify-center lg:px-0" : ""}`}
+                              className={`group relative flex min-h-[42px] items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-sm transition-colors duration-hover ease-standard motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1267e8] ${active ? "bg-[#eaf2ff] font-semibold text-[#0f2b5c]" : "text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a]"} ${collapsed ? "lg:min-h-[44px] lg:justify-center lg:px-0" : ""}`}
                             >
                               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[#dbeafe]" : ""}`}>
                                 {item.assetIcon && ADMIN_ICON_PATHS[item.assetIcon]
@@ -756,8 +758,10 @@ const AppShell = ({ children }: AppShellProps) => {
 
           <header className="hidden h-16 border-b border-border bg-card/95 backdrop-blur-sm lg:flex items-center gap-3 px-6 flex-shrink-0">
             <div className="min-w-0 shrink-0">
-              <h1 className="truncate text-xl font-black tracking-tight text-foreground">{pageMeta.title}</h1>
-              <p className="truncate text-xs font-medium text-muted-foreground">{pageMeta.subtitle}</p>
+              {/* The scale carries size, line-height, weight and tracking
+                  together, so a heading cannot drift to the wrong weight. */}
+              <h1 className="truncate text-al-section text-foreground">{pageMeta.title}</h1>
+              <p className="truncate text-al-meta text-muted-foreground">{pageMeta.subtitle}</p>
             </div>
 
 
