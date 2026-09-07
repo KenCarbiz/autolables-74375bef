@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { brokeredPreviewStorage } from "@/integrations/supabase/previewAuthStorage";
 import { markSessionActive, clearSessionActive } from "@/lib/auth/sessionExpiry";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
@@ -14,10 +15,28 @@ interface AuthContextType {
 
 type SignInResult = { error: unknown };
 
+type RelaySession = Session & {
+  error_description?: string;
+  msg?: string;
+};
+
 const isFetchFailure = (error: unknown): boolean => {
   const candidate = error as { name?: string; message?: string } | null;
   const message = candidate?.message?.toLowerCase() ?? "";
   return candidate?.name === "AuthRetryableFetchError" || message.includes("failed to fetch") || message.includes("network error");
+};
+
+const persistRelaySession = async (payload: RelaySession): Promise<SignInResult> => {
+  if (!payload.access_token || !payload.refresh_token || !payload.user) {
+    return { error: new Error(payload.error_description ?? payload.msg ?? "Invalid email or password.") };
+  }
+
+  const baseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const projectRef = new URL(baseUrl).hostname.split(".")[0];
+  const storage = brokeredPreviewStorage() ?? localStorage;
+  await storage.setItem(`sb-${projectRef}-auth-token`, JSON.stringify(payload));
+  window.location.reload();
+  return { error: null };
 };
 
 const signInWithRelay = (email: string, password: string): Promise<SignInResult> =>
@@ -32,21 +51,12 @@ const signInWithRelay = (email: string, password: string): Promise<SignInResult>
 
     request.onload = async () => {
       try {
-        const payload = JSON.parse(request.responseText || "{}") as {
-          access_token?: string;
-          refresh_token?: string;
-          error_description?: string;
-          msg?: string;
-        };
+        const payload = JSON.parse(request.responseText || "{}") as RelaySession;
         if (request.status < 200 || request.status >= 300 || !payload.access_token || !payload.refresh_token) {
           resolve({ error: new Error(payload.error_description ?? payload.msg ?? "Invalid email or password.") });
           return;
         }
-        const { error } = await supabase.auth.setSession({
-          access_token: payload.access_token,
-          refresh_token: payload.refresh_token,
-        });
-        resolve({ error });
+        resolve(await persistRelaySession(payload));
       } catch (error) {
         resolve({ error });
       }
@@ -78,21 +88,12 @@ const signInWithNavigationRelay = (email: string, password: string): Promise<Sig
 
     const onMessage = async (event: MessageEvent) => {
       if (event.origin !== relayOrigin || event.data?.type !== "autolabels-auth-relay") return;
-      const payload = event.data.payload as {
-        access_token?: string;
-        refresh_token?: string;
-        error_description?: string;
-        msg?: string;
-      };
+      const payload = event.data.payload as RelaySession;
       if (!payload.access_token || !payload.refresh_token) {
         finish({ error: new Error(payload.error_description ?? payload.msg ?? "Invalid email or password.") });
         return;
       }
-      const { error } = await supabase.auth.setSession({
-        access_token: payload.access_token,
-        refresh_token: payload.refresh_token,
-      });
-      finish({ error });
+      finish(await persistRelaySession(payload));
     };
 
     const timeoutId = window.setTimeout(
