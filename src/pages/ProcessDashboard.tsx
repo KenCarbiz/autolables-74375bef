@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
+import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import { useGetReady } from "@/hooks/useGetReady";
 import { useAdvertisedPrices, assessDrift } from "@/hooks/useAdvertisedPrices";
 import { hasDealerCapability, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
@@ -60,6 +61,7 @@ const ProcessDashboard = () => {
   //    TanStack Query, already realtime-synced in Wave 14.6).
   const { files: vehicleFiles } = useVehicleFiles(storeId);
   const { records: getReadyRecords } = useGetReady(storeId);
+  const { metrics } = useOperatingMetrics(storeId);
   const { byVin: advertisedByVin } = useAdvertisedPrices(storeId);
 
   // ── Direct queries for tiles whose data lives in tables not
@@ -163,9 +165,11 @@ const ProcessDashboard = () => {
   });
 
   // ── Derived counts off the cached hook data.
-  const getReadyInFlight = getReadyRecords.filter(
-    r => r.status === "pending" || r.status === "in_progress",
-  ).length;
+  // Canonical, off vehicle_lifecycle. The previous derivation counted
+  // get_ready_records rows still at "pending" -- which is every row ever
+  // created, because nothing advances them, so this read 196 against 134
+  // active vehicles.
+  const getReadyInFlight = metrics.inGetReady;
   const missingInstallPhotos = useMemo(
     () => getReadyRecords.filter(r =>
       (r.accessoriesToInstall || []).some(
@@ -196,15 +200,18 @@ const ProcessDashboard = () => {
   const firstName = user?.email?.split("@")[0].split(".")[0] || "there";
   const capitalized = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
-  const inFlight = vinQueueCount + getReadyInFlight + listings.draft + signings.open;
+  // Deliberately NOT vinQueue + getReady + drafts + signings: those are four
+  // overlapping populations, and their arithmetic sum is not a vehicle count.
+  // Each is now reported under its own name.
+  const activeInventory = metrics.activeInventory;
   const attentionCount = signings.returnsOpen + missingInstallPhotos + missingBenefit;
 
   // ── Outcome-centric health line. The dealer reads this as
   //    "where do I stand today" — compliant when nothing needs
   //    attention; otherwise a single number summarising the work.
   const health = attentionCount === 0
-    ? { tone: "ok" as const, headline: "Your dealership is compliant", sub: inFlight > 0 ? `${inFlight} ${inFlight === 1 ? "vehicle" : "vehicles"} moving through the pipeline` : "No vehicles in the pipeline right now" }
-    : { tone: "warn" as const, headline: `${attentionCount} item${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention`, sub: `${inFlight} ${inFlight === 1 ? "vehicle" : "vehicles"} in flight · review the action center below` };
+    ? { tone: "ok" as const, headline: "Your dealership is compliant", sub: activeInventory > 0 ? `${activeInventory} active ${activeInventory === 1 ? "vehicle" : "vehicles"} \u00b7 ${getReadyInFlight} in get-ready` : "No active inventory right now" }
+    : { tone: "warn" as const, headline: `${attentionCount} item${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention`, sub: `${activeInventory} active ${activeInventory === 1 ? "vehicle" : "vehicles"} · review the action center below` };
 
   // ── Role worklist. Each candidate is tied to a capability; only the
   //    ones the signed-in role holds appear, and items with work to do
@@ -296,9 +303,9 @@ const ProcessDashboard = () => {
           {/* KPI strip — outcome metrics, inventory-command-center style. */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
             <KpiCard
-              label="In flight"
-              value={inFlight}
-              caption={inFlight === 1 ? "vehicle" : "vehicles"}
+              label="Active inventory"
+              value={activeInventory}
+              caption={`${metrics.newInventory} new \u00b7 ${metrics.usedInventory} used`}
               icon={Activity}
               iconTone="sky"
             />

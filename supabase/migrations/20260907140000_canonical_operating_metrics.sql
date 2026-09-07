@@ -50,47 +50,48 @@ SET search_path = public
 AS $$
   WITH active AS (
     -- ACTIVE INVENTORY: still on the lot. Deliberately NOT published_at, which
-    -- is historical evidence a vehicle was once published and is non-null on
-    -- every archived row.
-    SELECT v.id, v.vin
+    -- is non-null on every archived row and so is historical evidence rather
+    -- than proof a vehicle is still here.
+    SELECT v.id, v.vin, lower(coalesce(v.condition,'')) AS cond
     FROM public.vehicle_listings v
     WHERE v.tenant_id = p_tenant_id
       AND coalesce(v.status,'') <> 'archived'
   ),
   lc AS (
-    SELECT a.id AS vehicle_id,
-           l.state,
+    SELECT a.id AS vehicle_id, a.cond, l.state,
            public.lifecycle_bucket(l.state) AS bucket
     FROM active a
     LEFT JOIN public.vehicle_lifecycle l
       ON l.vehicle_id = a.id AND l.tenant_id = p_tenant_id
   )
   SELECT jsonb_build_object(
-    'active_inventory',        (SELECT count(*) FROM active),
-    'published_inventory',     (SELECT count(*) FROM public.vehicle_listings
-                                 WHERE tenant_id = p_tenant_id AND status = 'published'),
-    -- Coverage, so a partially-populated lifecycle can never be mistaken for
-    -- an empty shop floor.
-    'lifecycle_tracked',       (SELECT count(*) FROM lc WHERE state IS NOT NULL),
-    'lifecycle_untracked',     (SELECT count(*) FROM lc WHERE state IS NULL),
-    'in_get_ready',            (SELECT count(*) FROM lc
-                                 WHERE bucket IN ('INTAKE','SERVICE','PREP','VERIFIED')),
-    'get_ready_intake',        (SELECT count(*) FROM lc WHERE bucket = 'INTAKE'),
-    'get_ready_service',       (SELECT count(*) FROM lc WHERE bucket = 'SERVICE'),
-    'get_ready_prep',          (SELECT count(*) FROM lc WHERE bucket = 'PREP'),
-    'get_ready_verified',      (SELECT count(*) FROM lc WHERE bucket = 'VERIFIED'),
-    'retail_ready',            (SELECT count(*) FROM lc WHERE bucket = 'READY'),
-    'gated',                   (SELECT count(*) FROM lc WHERE bucket = 'GATED'),
-    -- Recon is its own record type, counted as UNIQUE VEHICLES rather than
-    -- estimate rows.
-    -- Open recon work, as UNIQUE VEHICLES rather than estimate rows: one
-    -- vehicle can carry several estimates. 'voided' and 'approved' are settled.
-    'get_ready_recon',         (SELECT count(DISTINCT r.vehicle_listing_id)
-                                 FROM public.recon_estimates r
-                                 JOIN active a ON a.id = r.vehicle_listing_id
-                                 WHERE r.tenant_id = p_tenant_id
-                                   AND coalesce(r.status,'') = 'submitted'),
-    'tenant_id',               p_tenant_id
+    'active_inventory',       (SELECT count(*) FROM active),
+    'published_inventory',    (SELECT count(*) FROM public.vehicle_listings
+                                WHERE tenant_id = p_tenant_id AND status = 'published'),
+    'new_inventory',          (SELECT count(*) FROM active WHERE cond = 'new'),
+    'used_inventory',         (SELECT count(*) FROM active WHERE cond IN ('used','cpo','certified')),
+    'in_get_ready',           (SELECT count(*) FROM lc
+                                WHERE bucket IN ('INTAKE','SERVICE','PREP','VERIFIED')),
+    'get_ready_intake',       (SELECT count(*) FROM lc WHERE bucket = 'INTAKE'),
+    'get_ready_service',      (SELECT count(*) FROM lc WHERE bucket = 'SERVICE'),
+    'get_ready_prep',         (SELECT count(*) FROM lc WHERE bucket = 'PREP'),
+    'get_ready_verified',     (SELECT count(*) FROM lc WHERE bucket = 'VERIFIED'),
+    'awaiting_authorization', (SELECT count(*) FROM lc WHERE state = 'AWAITING_MANAGER_AUTHORIZATION'),
+    'retail_ready',           (SELECT count(*) FROM lc WHERE bucket = 'READY'),
+    'gated',                  (SELECT count(*) FROM lc WHERE bucket = 'GATED'),
+    -- Open recon work as UNIQUE VEHICLES, not estimate rows: one vehicle can
+    -- carry several. 'voided' and 'approved' are settled.
+    'get_ready_recon',        (SELECT count(DISTINCT r.vehicle_listing_id)
+                                FROM public.recon_estimates r
+                                JOIN active a ON a.id = r.vehicle_listing_id
+                                WHERE r.tenant_id = p_tenant_id
+                                  AND coalesce(r.status,'') = 'submitted'),
+    -- A used/CPO vehicle with no lifecycle row IS a defect. A new vehicle
+    -- without one is correct: recompute_vehicle_lifecycle returns early for
+    -- new stock, because new cars do not run used-vehicle Get Ready.
+    'used_missing_lifecycle', (SELECT count(*) FROM lc
+                                WHERE state IS NULL AND cond IN ('used','cpo','certified')),
+    'tenant_id',              p_tenant_id
   );
 $$;
 
