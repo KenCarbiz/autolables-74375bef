@@ -40,6 +40,11 @@ const AdminLayout = () => (
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ProcessDashboard = lazy(() => import("./pages/ProcessDashboard"));
+const RoleHome = lazy(() => import("./pages/RoleHome"));
+const GmHome = lazy(() => import("./pages/GmHome"));
+const SalesManagerHome = lazy(() => import("./pages/SalesManagerHome"));
+const UsedCarManagerHome = lazy(() => import("./pages/UsedCarManagerHome"));
+const ServiceManagerHome = lazy(() => import("./pages/ServiceManagerHome"));
 const LotCaptureQueue = lazy(() => import("./pages/LotCaptureQueue"));
 const Index = lazy(() => import("./pages/Index"));
 const Landing = lazy(() => import("./pages/Landing"));
@@ -283,7 +288,15 @@ const App = () => (
                       <Route element={<GatedLayout />}>
                         <Route path="/addendum" element={<Index />} />
                         <Route path="/create" element={<CreateHub />} />
-                        <Route path="/dashboard" element={<ProcessDashboard />} />
+                        {/* Home resolves per role. The named routes stay
+                            reachable so a GM can open the service board
+                            directly, and so a deep link keeps working. */}
+                        <Route path="/dashboard" element={<RoleHome />} />
+                        <Route path="/home/gm" element={<GmHome />} />
+                        <Route path="/home/sales" element={<SalesManagerHome />} />
+                        <Route path="/home/used-cars" element={<UsedCarManagerHome />} />
+                        <Route path="/home/service" element={<ServiceManagerHome />} />
+                        <Route path="/dashboard/classic" element={<ProcessDashboard />} />
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />
                         <Route path="/dashboard/document-review" element={<DocumentReview />} />
