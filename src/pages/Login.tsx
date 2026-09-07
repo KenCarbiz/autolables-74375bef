@@ -322,7 +322,6 @@ const Login = () => {
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 aria-pressed={showPassword}
-                tabIndex={-1}
                 className="login-input-action"
               >
                 {showPassword ? <IconEyeOff /> : <IconEye />}
@@ -371,6 +370,13 @@ const Login = () => {
                   <button type="button" onClick={retry} className="login-alert-action">
                     Retry
                   </button>
+                </div>
+              ) : banner.kind === "credentials" ? (
+                <div className="login-alert-text">
+                  <p className="login-alert-title">Sign-in unsuccessful</p>
+                  <p className="login-alert-body">
+                    The email or password doesn&apos;t match an AutoLabels account.
+                  </p>
                 </div>
               ) : (
                 <span>{banner.message}</span>
