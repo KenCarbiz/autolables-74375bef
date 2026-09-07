@@ -58,7 +58,7 @@ const Setup = () => {
               <button
                 key={s.id}
                 onClick={() => navigate(s.to)}
-                className={`group relative w-full text-left flex items-center gap-4 rounded-2xl border bg-card p-4 transition-all hover:shadow-premium ${isNext ? "border-slate-300 ring-1 ring-slate-900/10 shadow-sm" : "border-border hover:border-foreground/15"}`}
+                className={`group relative w-full text-left flex items-center gap-4 rounded-2xl border bg-card p-4 transition-all hover:shadow-premium ${isNext ? "border-border ring-1 ring-slate-900/10 shadow-sm" : "border-border hover:border-foreground/15"}`}
               >
                 <span className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold ${s.done ? "bg-emerald-100 text-emerald-600" : isNext ? "bg-slate-900 text-white" : "bg-muted text-muted-foreground"}`}>
                   {s.done ? <Check className="w-4 h-4" /> : i + 1}
@@ -67,7 +67,7 @@ const Setup = () => {
                   <p className="text-sm font-semibold text-foreground inline-flex items-center gap-2 flex-wrap">
                     {s.label}
                     {s.optional && <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Optional</span>}
-                    {isNext && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded"><Sparkles className="w-2.5 h-2.5" /> Next</span>}
+                    {isNext && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-foreground bg-muted px-1.5 py-0.5 rounded"><Sparkles className="w-2.5 h-2.5" /> Next</span>}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">{s.hint}</p>
                 </div>

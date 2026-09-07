@@ -40,12 +40,12 @@ interface ReturnRow {
 }
 
 const statusTone: Record<string, string> = {
-  eligible:  "border-slate-200 bg-slate-50 text-slate-700",
+  eligible:  "border-border bg-muted text-foreground",
   requested: "border-amber-300 bg-amber-50 text-amber-900",
   completed: "border-emerald-300 bg-emerald-50 text-emerald-900",
   denied:    "border-red-300 bg-red-50 text-red-900",
-  expired:   "border-slate-200 bg-white text-slate-500",
-  waived:    "border-slate-200 bg-white text-slate-500",
+  expired:   "border-border bg-white text-muted-foreground",
+  waived:    "border-border bg-white text-muted-foreground",
 };
 
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
@@ -111,9 +111,9 @@ const ReturnsQueue = () => {
   if (!loading && rows.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+    <section className="rounded-2xl border border-border bg-white p-5">
       <div className="flex items-center gap-2 mb-3">
-        <RotateCcw className="w-4 h-4 text-slate-700" />
+        <RotateCcw className="w-4 h-4 text-foreground" />
         <h3 className="text-base font-semibold text-foreground">SB 766 returns</h3>
         {requested.length > 0 && (
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5">
@@ -147,7 +147,7 @@ const ReturnsQueue = () => {
                   </button>
                   <button
                     onClick={() => setResolving({ row: r, outcome: "denied" })}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-slate-300 text-[11px] font-semibold hover:bg-slate-100"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-[11px] font-semibold hover:bg-muted"
                   >
                     <XCircle className="w-3 h-3" /> Deny
                   </button>
@@ -169,12 +169,12 @@ const ReturnsQueue = () => {
 
       {other.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1.5">History</p>
-          <div className="rounded-xl border border-slate-200 overflow-hidden">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground mb-1.5">History</p>
+          <div className="rounded-xl border border-border overflow-hidden">
             <table className="w-full text-[12px]">
               <tbody>
                 {other.map(r => (
-                  <tr key={r.id} className="border-t border-slate-100 first:border-t-0">
+                  <tr key={r.id} className="border-t border-border first:border-t-0">
                     <td className="px-3 py-2">
                       <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider rounded px-1.5 py-0.5 border ${statusTone[r.return_status] || statusTone.eligible}`}>
                         {r.return_status === "expired" && <Clock className="w-3 h-3" />}
@@ -183,7 +183,7 @@ const ReturnsQueue = () => {
                     </td>
                     <td className="px-3 py-2 font-mono text-[11px]">{(r.vin || "").slice(-8)}</td>
                     <td className="px-3 py-2">{r.signer_name || "Buyer"}</td>
-                    <td className="px-3 py-2 text-slate-500 text-right">{fmtDate(r.signed_at)}</td>
+                    <td className="px-3 py-2 text-muted-foreground text-right">{fmtDate(r.signed_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -282,10 +282,10 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
   return (
     <div className="mt-3 rounded-lg border border-amber-300 bg-white p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-700">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-foreground">
           {outcome === "completed" ? "Resolve return — §11713.21 caps applied live" : "Deny return — reason required"}
         </p>
-        <button onClick={onCancel} className="text-slate-400 hover:text-slate-700"><X className="w-3.5 h-3.5" /></button>
+        <button onClick={onCancel} className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
       </div>
 
       {outcome === "completed" && (
@@ -297,7 +297,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="22000"
-                className="w-full h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
+                className="w-full h-9 px-2 rounded-md border border-border bg-white text-sm"
               />
             </Field>
             <Field label={`Miles at return (cap: ${SB766_MILEAGE_CAP})`}>
@@ -306,7 +306,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
                 value={miles}
                 onChange={(e) => setMiles(e.target.value)}
                 placeholder="180"
-                className="w-full h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
+                className="w-full h-9 px-2 rounded-md border border-border bg-white text-sm"
               />
             </Field>
           </div>
@@ -321,7 +321,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
               <p className={`text-[11px] font-bold uppercase tracking-[0.14em] ${assessment.eligible ? "text-emerald-800" : "text-amber-900"}`}>
                 {assessment.eligible ? "Eligible" : "Ineligible"}
               </p>
-              <span className="text-[10px] text-slate-500">· day {days} of 3 · {milesNum} of {SB766_MILEAGE_CAP} mi</span>
+              <span className="text-[10px] text-muted-foreground">· day {days} of 3 · {milesNum} of {SB766_MILEAGE_CAP} mi</span>
             </div>
             {assessment.reason && (
               <p className="text-[11px] text-amber-900 mt-1">{assessment.reason}</p>
@@ -335,11 +335,11 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
                 value={restocking}
                 onChange={(e) => setRestocking(e.target.value)}
                 placeholder={String(suggestedRestocking.amount)}
-                className="w-full h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
+                className="w-full h-9 px-2 rounded-md border border-border bg-white text-sm"
               />
             </Field>
             <Field label={`Mileage charge (cap: $${SB766_PER_MILE_FEE_CAP})`}>
-              <div className="h-9 px-2 inline-flex items-center rounded-md border border-slate-200 bg-slate-50 text-sm font-mono w-full">
+              <div className="h-9 px-2 inline-flex items-center rounded-md border border-border bg-muted text-sm font-mono w-full">
                 {fmtMoney(mileageCharge.charge)}
                 {mileageCharge.charge_capped && <span className="ml-2 text-[10px] text-amber-700">capped</span>}
               </div>
@@ -356,7 +356,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. delivered to buyer's address per request"
-              className="w-full h-9 px-2 rounded-md border border-slate-300 bg-white text-sm"
+              className="w-full h-9 px-2 rounded-md border border-border bg-white text-sm"
             />
           </Field>
         </>
@@ -369,13 +369,13 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
             onChange={(e) => setReason(e.target.value)}
             placeholder="Vehicle returned outside the 3-day window with 500 miles — exceeds §11713.21 cap of 400 mi."
             rows={3}
-            className="w-full px-2 py-1.5 rounded-md border border-slate-300 bg-white text-sm"
+            className="w-full px-2 py-1.5 rounded-md border border-border bg-white text-sm"
           />
         </Field>
       )}
 
       <div className="flex items-center justify-end gap-2">
-        <button onClick={onCancel} className="h-8 px-3 rounded-md text-[11px] font-semibold text-slate-600 hover:bg-slate-100">
+        <button onClick={onCancel} className="h-8 px-3 rounded-md text-[11px] font-semibold text-muted-foreground hover:bg-muted">
           Cancel
         </button>
         <button
@@ -392,7 +392,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <label className="block">
-    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">{label}</span>
+    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</span>
     <div className="mt-1">{children}</div>
   </label>
 );

@@ -38,16 +38,16 @@ function Header({ qrUrl }: { qrUrl: string }) {
         <div className="flex h-14 w-14 items-center justify-center rounded-[16px] text-[34px] font-black text-white shadow-lg" style={{ background: `linear-gradient(145deg,${blue},#60a5fa)` }}>A</div>
         <div>
           <div className="text-[31px] font-black leading-none tracking-[-0.045em]" style={{ color: ink }}>autolabels<span style={{ color: blue }}>.io</span></div>
-          <div className="mt-1 text-[11px] text-slate-500">AI-Powered Vehicle Transparency</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">AI-Powered Vehicle Transparency</div>
         </div>
       </div>
       <div className="flex items-start gap-2 pt-1">
         <div className="flex h-8 w-8 items-center justify-center rounded-full border text-[15px] font-black" style={{ borderColor: blue, color: blue }}>✓</div>
-        <div><div className="text-[13px] font-black uppercase" style={{ color: ink }}>FTC-Aligned</div><div className="text-[10px] leading-tight text-slate-500">Disclosures delivered digitally and in print.</div></div>
+        <div><div className="text-[13px] font-black uppercase" style={{ color: ink }}>FTC-Aligned</div><div className="text-[10px] leading-tight text-muted-foreground">Disclosures delivered digitally and in print.</div></div>
       </div>
       <div className="flex items-center gap-3 rounded-[18px] border bg-white p-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.06)]" style={{ borderColor: "#cbd5e1" }}>
         <QRCodeSVG value={safeUrl} size={84} bgColor="#fff" fgColor="#111827" level="M" />
-        <div><div className="text-[12px] font-black uppercase leading-tight" style={{ color: ink }}>Scan to view full vehicle report</div><div className="mt-1 text-[9px] leading-tight text-slate-500">Photos, records, pricing analysis & disclosures.</div><div className="mt-1 text-[9px] font-bold" style={{ color: blue }}>Scan Anytime</div></div>
+        <div><div className="text-[12px] font-black uppercase leading-tight" style={{ color: ink }}>Scan to view full vehicle report</div><div className="mt-1 text-[9px] leading-tight text-muted-foreground">Photos, records, pricing analysis & disclosures.</div><div className="mt-1 text-[9px] font-bold" style={{ color: blue }}>Scan Anytime</div></div>
       </div>
     </header>
   );
@@ -84,20 +84,20 @@ function VehiclePhoto({ imageUrl }: { imageUrl?: string }) {
           <VehicleFallback />
         </>
       )}
-      <div className="absolute bottom-3 right-4 rounded-full bg-white/85 px-3 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-slate-500 shadow-sm">Vehicle Passport Ready</div>
+      <div className="absolute bottom-3 right-4 rounded-full bg-white/85 px-3 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-muted-foreground shadow-sm">Vehicle Passport Ready</div>
     </div>
   );
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
-  return <div><div className="text-[8.5px] font-black uppercase tracking-wide text-slate-500">{label}</div><div className="mt-0.5 text-[10.5px] font-black" style={{ color: ink }}>{value}</div></div>;
+  return <div><div className="text-[8.5px] font-black uppercase tracking-wide text-muted-foreground">{label}</div><div className="mt-0.5 text-[10.5px] font-black" style={{ color: ink }}>{value}</div></div>;
 }
 
 function Spec({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="flex items-center gap-3 border-r px-3 last:border-r-0" style={{ borderColor: line }}>
       <div className="flex h-10 w-10 items-center justify-center rounded-full border text-[18px] font-black" style={{ borderColor: "#bfdbfe", color: ink }}>{label[0]}</div>
-      <div><div className="text-[8px] font-black uppercase tracking-wide text-slate-500">{label}</div><div className="text-[17px] font-black leading-none" style={{ color: ink }}>{value}</div>{sub ? <div className="text-[8px] text-slate-500">{sub}</div> : null}</div>
+      <div><div className="text-[8px] font-black uppercase tracking-wide text-muted-foreground">{label}</div><div className="text-[17px] font-black leading-none" style={{ color: ink }}>{value}</div>{sub ? <div className="text-[8px] text-muted-foreground">{sub}</div> : null}</div>
     </div>
   );
 }
@@ -108,10 +108,10 @@ function ScoreGauge() {
       <div className="p-4 pt-3 text-center">
         <div className="relative mx-auto h-[1.42in] w-[1.62in]">
           <div className="absolute left-1/2 top-0 h-[1.42in] w-[1.42in] -translate-x-1/2 rounded-full border-[14px]" style={{ borderColor: green, borderBottomColor: "transparent", transform: "translateX(-50%) rotate(45deg)" }} />
-          <div className="absolute inset-x-0 top-[0.43in] text-center"><div className="text-[50px] font-black leading-none" style={{ color: ink }}>93</div><div className="text-[12px] font-bold text-slate-500">/100</div></div>
+          <div className="absolute inset-x-0 top-[0.43in] text-center"><div className="text-[50px] font-black leading-none" style={{ color: ink }}>93</div><div className="text-[12px] font-bold text-muted-foreground">/100</div></div>
         </div>
         <div className="mt-1 text-[14px] font-black uppercase" style={{ color: green }}>Excellent</div>
-        <div className="mx-auto mt-1 max-w-[1.75in] text-[9px] leading-tight text-slate-500">Analyzed across history, condition, market value, and ownership signals.</div>
+        <div className="mx-auto mt-1 max-w-[1.75in] text-[9px] leading-tight text-muted-foreground">Analyzed across history, condition, market value, and ownership signals.</div>
       </div>
     </Card>
   );
@@ -122,12 +122,12 @@ function PricePosition() {
     <Card title="Price Position">
       <div className="p-4 pt-3 text-center">
         <div className="text-[20px] font-black uppercase" style={{ color: green }}>Great Value</div>
-        <div className="mt-1 text-[10px] font-semibold text-slate-500">$1,240 below market average</div>
+        <div className="mt-1 text-[10px] font-semibold text-muted-foreground">$1,240 below market average</div>
         <div className="relative mx-auto mt-4 h-[1in] w-[1.9in] overflow-hidden">
           <div className="absolute bottom-0 left-1/2 h-[1.7in] w-[1.7in] -translate-x-1/2 rounded-full border-[18px]" style={{ borderColor: "#d8e1ee", borderBottomColor: green, borderLeftColor: green, borderRightColor: "#7aa2ff", transform: "translateX(-50%) rotate(-45deg)" }} />
           <div className="absolute bottom-0 left-1/2 h-[0.78in] w-[2px] origin-bottom bg-slate-900" style={{ transform: "rotate(-3deg)" }} />
         </div>
-        <div className="grid grid-cols-3 text-[8px] text-slate-500"><span>Below</span><span>Market</span><span>Above</span></div>
+        <div className="grid grid-cols-3 text-[8px] text-muted-foreground"><span>Below</span><span>Market</span><span>Above</span></div>
       </div>
     </Card>
   );
@@ -147,15 +147,15 @@ function PassportPanel() {
 }
 
 function BenefitIcon({ icon, title, sub }: { icon: string; title: string; sub: string }) {
-  return <div className="border-r px-3 text-center last:border-r-0" style={{ borderColor: line }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-[19px] font-black" style={{ color: blue, background: "#eff6ff" }}>{icon}</div><div className="mt-1 text-[9.5px] font-black leading-tight" style={{ color: ink }}>{title}</div><div className="mt-0.5 text-[8px] leading-tight text-slate-500">{sub}</div></div>;
+  return <div className="border-r px-3 text-center last:border-r-0" style={{ borderColor: line }}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-[19px] font-black" style={{ color: blue, background: "#eff6ff" }}>{icon}</div><div className="mt-1 text-[9.5px] font-black leading-tight" style={{ color: ink }}>{title}</div><div className="mt-0.5 text-[8px] leading-tight text-muted-foreground">{sub}</div></div>;
 }
 
 function TrustScore() {
-  return <Card title="Dealer Trust Score"><div className="grid grid-cols-[0.45fr_1fr] items-center gap-3 p-4 pt-2"><div className="flex h-16 w-16 items-center justify-center rounded-2xl text-[34px] font-black" style={{ color: blue, background: "#eff6ff" }}>★</div><div><div className="text-[38px] font-black leading-none" style={{ color: ink }}>4.9 <span className="text-[18px]" style={{ color: blue }}>★★★★★</span></div><div className="mt-1 text-[10px] text-slate-500">Based on 1,250+ verified reviews</div></div></div></Card>;
+  return <Card title="Dealer Trust Score"><div className="grid grid-cols-[0.45fr_1fr] items-center gap-3 p-4 pt-2"><div className="flex h-16 w-16 items-center justify-center rounded-2xl text-[34px] font-black" style={{ color: blue, background: "#eff6ff" }}>★</div><div><div className="text-[38px] font-black leading-none" style={{ color: ink }}>4.9 <span className="text-[18px]" style={{ color: blue }}>★★★★★</span></div><div className="mt-1 text-[10px] text-muted-foreground">Based on 1,250+ verified reviews</div></div></div></Card>;
 }
 
 function Timeline() {
-  return <Card title="Vehicle Journey Timeline"><div className="grid grid-cols-5 gap-1 p-4 pt-3 text-center">{['Acquired', 'Inspected', 'Reconditioned', 'Certified', 'Listed'].map((x, i) => <div key={x}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border-2 bg-white text-[11px] font-black" style={{ borderColor: i === 4 ? green : blue, color: i === 4 ? green : blue }}>{i + 1}</div><div className="mt-1 text-[8.5px] font-black uppercase" style={{ color: ink }}>{x}</div><div className="text-[7.5px] leading-tight text-slate-500">03/0{i + 2}/2024</div></div>)}</div></Card>;
+  return <Card title="Vehicle Journey Timeline"><div className="grid grid-cols-5 gap-1 p-4 pt-3 text-center">{['Acquired', 'Inspected', 'Reconditioned', 'Certified', 'Listed'].map((x, i) => <div key={x}><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border-2 bg-white text-[11px] font-black" style={{ borderColor: i === 4 ? green : blue, color: i === 4 ? green : blue }}>{i + 1}</div><div className="mt-1 text-[8.5px] font-black uppercase" style={{ color: ink }}>{x}</div><div className="text-[7.5px] leading-tight text-muted-foreground">03/0{i + 2}/2024</div></div>)}</div></Card>;
 }
 
 function Pill({ children }: { children: ReactNode }) {
@@ -201,10 +201,10 @@ export const SaturdayHeroWindow = ({ data }: Props) => {
 
         <section className="mt-3 grid grid-cols-[1.18fr_0.82fr] gap-3"><Timeline /><Card title="Vehicle Highlights"><div className="flex flex-wrap gap-1.5 p-3 pt-2">{featureList.map((h) => <Pill key={h}>{h}</Pill>)}</div></Card></section>
 
-        <section className="mt-3 grid grid-cols-[1.25fr_0.62fr_0.82fr] gap-3"><Card><div className="grid grid-cols-[0.82fr_1fr] items-center p-4"><div><div className="text-[10px] font-black uppercase text-slate-500">Market Price</div><div className="text-[36px] font-black leading-none" style={{ color: ink }}>{money(vehicle.price)}</div><div className="mt-2 text-[10px] font-bold text-emerald-600">✓ Within Market Range</div></div><svg viewBox="0 0 180 55" className="h-[0.62in] w-full"><polyline fill="none" stroke={blue} strokeWidth="3" points="5,40 30,36 52,27 78,29 103,18 130,21 160,10" /><circle cx="160" cy="10" r="5" fill={blue} /></svg></div></Card><Card><div className="p-4"><div className="text-[10px] font-black uppercase text-slate-500">Est. Monthly Payment</div><div className="mt-1 text-[26px] font-black" style={{ color: ink }}>$542 <span className="text-[10px]">/mo*</span></div><div className="text-[9px] text-slate-500">Get pre-qualified in minutes.</div></div></Card><Card><div className="p-4"><div className="text-[13px] font-black uppercase" style={{ color: blue }}>Secure. Private. Compliant.</div><div className="mt-2 text-[10px] leading-snug text-slate-500">Your data is protected with enterprise-grade security.</div></div></Card></section>
+        <section className="mt-3 grid grid-cols-[1.25fr_0.62fr_0.82fr] gap-3"><Card><div className="grid grid-cols-[0.82fr_1fr] items-center p-4"><div><div className="text-[10px] font-black uppercase text-muted-foreground">Market Price</div><div className="text-[36px] font-black leading-none" style={{ color: ink }}>{money(vehicle.price)}</div><div className="mt-2 text-[10px] font-bold text-emerald-600">✓ Within Market Range</div></div><svg viewBox="0 0 180 55" className="h-[0.62in] w-full"><polyline fill="none" stroke={blue} strokeWidth="3" points="5,40 30,36 52,27 78,29 103,18 130,21 160,10" /><circle cx="160" cy="10" r="5" fill={blue} /></svg></div></Card><Card><div className="p-4"><div className="text-[10px] font-black uppercase text-muted-foreground">Est. Monthly Payment</div><div className="mt-1 text-[26px] font-black" style={{ color: ink }}>$542 <span className="text-[10px]">/mo*</span></div><div className="text-[9px] text-muted-foreground">Get pre-qualified in minutes.</div></div></Card><Card><div className="p-4"><div className="text-[13px] font-black uppercase" style={{ color: blue }}>Secure. Private. Compliant.</div><div className="mt-2 text-[10px] leading-snug text-muted-foreground">Your data is protected with enterprise-grade security.</div></div></Card></section>
 
-        <footer className="mt-auto grid grid-cols-[1.05fr_repeat(4,0.72fr)_1fr] items-center rounded-[14px] border bg-slate-50 text-center" style={{ borderColor: line }}><div className="flex items-center gap-2 px-3 py-2 text-left"><div className="text-[28px] font-black" style={{ color: blue }}>A</div><div><div className="text-[14px] font-black" style={{ color: ink }}>autolabels.io</div><div className="text-[8px] text-slate-500">AI-Powered Vehicle Information Platform</div></div></div>{['AI-Powered', 'FTC-Aligned', 'Real-Time', 'Digital + Print'].map((x) => <div key={x} className="border-l px-2 text-[8.5px] font-semibold" style={{ borderColor: line, color: ink }}>{x}</div>)}<div className="border-l px-2 text-left text-[8.5px]" style={{ borderColor: line }}><div className="font-black" style={{ color: blue }}>Questions?</div><div>{dealer.phone}</div><div>{dealer.website}</div></div></footer>
-        <div className="mt-1 text-center text-[7px] leading-tight text-slate-500">{disclaimer}</div>
+        <footer className="mt-auto grid grid-cols-[1.05fr_repeat(4,0.72fr)_1fr] items-center rounded-[14px] border bg-muted text-center" style={{ borderColor: line }}><div className="flex items-center gap-2 px-3 py-2 text-left"><div className="text-[28px] font-black" style={{ color: blue }}>A</div><div><div className="text-[14px] font-black" style={{ color: ink }}>autolabels.io</div><div className="text-[8px] text-muted-foreground">AI-Powered Vehicle Information Platform</div></div></div>{['AI-Powered', 'FTC-Aligned', 'Real-Time', 'Digital + Print'].map((x) => <div key={x} className="border-l px-2 text-[8.5px] font-semibold" style={{ borderColor: line, color: ink }}>{x}</div>)}<div className="border-l px-2 text-left text-[8.5px]" style={{ borderColor: line }}><div className="font-black" style={{ color: blue }}>Questions?</div><div>{dealer.phone}</div><div>{dealer.website}</div></div></footer>
+        <div className="mt-1 text-center text-[7px] leading-tight text-muted-foreground">{disclaimer}</div>
       </div>
     </div>
   );

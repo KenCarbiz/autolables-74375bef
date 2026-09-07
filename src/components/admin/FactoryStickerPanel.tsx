@@ -68,15 +68,15 @@ const STATUS_TONE: Record<string, string> = {
   RUNNING_QA: "bg-blue-50 text-blue-700",
   FAILED_RETRYABLE: "bg-rose-50 text-rose-700",
   FAILED_PERMANENT: "bg-rose-50 text-rose-700",
-  SUPERSEDED: "bg-slate-100 text-slate-600",
-  ARCHIVED: "bg-slate-100 text-slate-600",
+  SUPERSEDED: "bg-muted text-muted-foreground",
+  ARCHIVED: "bg-muted text-muted-foreground",
 };
 
 const RECON_TONE: Record<string, string> = {
   MATCHED: "bg-emerald-50 text-emerald-700",
   MINOR_VARIANCE: "bg-amber-50 text-amber-700",
   REVIEW_REQUIRED: "bg-rose-50 text-rose-700",
-  INSUFFICIENT_DATA: "bg-slate-100 text-slate-600",
+  INSUFFICIENT_DATA: "bg-muted text-muted-foreground",
 };
 
 const Pill = ({ tone, children }: { tone: string; children: React.ReactNode }) => (
@@ -274,7 +274,7 @@ export default function FactoryStickerPanel() {
                         {doc && <p className="text-[10px] text-muted-foreground mt-0.5">v{doc.version} · {humanize(doc.document_status)}</p>}
                       </td>
                       <td className="px-2.5 py-2.5">
-                        <Pill tone={STATUS_TONE[r.generation_status] || "bg-slate-100 text-slate-600"}>{humanize(r.generation_status)}</Pill>
+                        <Pill tone={STATUS_TONE[r.generation_status] || "bg-muted text-muted-foreground"}>{humanize(r.generation_status)}</Pill>
                         {r.last_error && ["FAILED_RETRYABLE", "FAILED_PERMANENT"].includes(r.generation_status) && (
                           <p className="text-[10px] text-rose-600 mt-1 max-w-[220px]">{r.last_error}</p>
                         )}
@@ -282,7 +282,7 @@ export default function FactoryStickerPanel() {
                       <td className="px-2.5 py-2.5">
                         {r.reconciliation_status ? (
                           <>
-                            <Pill tone={RECON_TONE[r.reconciliation_status] || "bg-slate-100 text-slate-600"}>{humanize(r.reconciliation_status)}</Pill>
+                            <Pill tone={RECON_TONE[r.reconciliation_status] || "bg-muted text-muted-foreground"}>{humanize(r.reconciliation_status)}</Pill>
                             {r.reconciliation_difference != null && r.reconciliation_difference > 0 && (
                               <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">off by {fmtMoney(r.reconciliation_difference)}</p>
                             )}

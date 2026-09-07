@@ -386,8 +386,8 @@ export default function StickerTemplatesAdminPanel() {
       <div className="flex h-full w-full flex-col justify-between bg-white p-4 text-left">
         <div>
           <p className="text-[10px] font-black uppercase tracking-wider text-blue-600">{item.template.defaultBadge}</p>
-          <h4 className="mt-2 text-lg font-black leading-tight text-slate-950">{item.name}</h4>
-          <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-slate-500">{item.description}</p>
+          <h4 className="mt-2 text-lg font-black leading-tight text-foreground">{item.name}</h4>
+          <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{item.description}</p>
         </div>
         <div className="mt-4 rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white">{item.format === "window" ? "New Vehicle Sticker" : "New Vehicle Addendum"}</div>
       </div>
@@ -401,17 +401,17 @@ export default function StickerTemplatesAdminPanel() {
       return <UsedComponent data={SATURDAY_SAMPLE} />;
     }
     return (
-      <div className="mx-auto max-w-2xl rounded-[32px] border border-slate-200 bg-white p-8 shadow-xl">
+      <div className="mx-auto max-w-2xl rounded-[32px] border border-border bg-white p-8 shadow-xl">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">{item.template.defaultBadge}</p>
-        <h3 className="mt-3 text-3xl font-black tracking-tight text-slate-950">{item.name}</h3>
-        <p className="mt-3 text-sm leading-relaxed text-slate-600">{item.description}</p>
+        <h3 className="mt-3 text-3xl font-black tracking-tight text-foreground">{item.name}</h3>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
         <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-2xl bg-slate-50 p-4"><span className="text-xs font-bold uppercase text-slate-400">Renderer</span><p className="font-black text-slate-900">{item.template.rendererKey}</p></div>
-          <div className="rounded-2xl bg-slate-50 p-4"><span className="text-xs font-bold uppercase text-slate-400">Family</span><p className="font-black text-slate-900">{item.template.family}</p></div>
-          <div className="rounded-2xl bg-slate-50 p-4"><span className="text-xs font-bold uppercase text-slate-400">Placement</span><p className="font-black text-slate-900">{item.template.recommendedPlacement}</p></div>
-          <div className="rounded-2xl bg-slate-50 p-4"><span className="text-xs font-bold uppercase text-slate-400">Passport</span><p className="font-black text-slate-900">{item.template.supportsPassport ? "Supported" : "Disabled"}</p></div>
+          <div className="rounded-2xl bg-muted p-4"><span className="text-xs font-bold uppercase text-muted-foreground">Renderer</span><p className="font-black text-foreground">{item.template.rendererKey}</p></div>
+          <div className="rounded-2xl bg-muted p-4"><span className="text-xs font-bold uppercase text-muted-foreground">Family</span><p className="font-black text-foreground">{item.template.family}</p></div>
+          <div className="rounded-2xl bg-muted p-4"><span className="text-xs font-bold uppercase text-muted-foreground">Placement</span><p className="font-black text-foreground">{item.template.recommendedPlacement}</p></div>
+          <div className="rounded-2xl bg-muted p-4"><span className="text-xs font-bold uppercase text-muted-foreground">Passport</span><p className="font-black text-foreground">{item.template.supportsPassport ? "Supported" : "Disabled"}</p></div>
         </div>
-        {item.template.suggestedOEMs.length ? <p className="mt-5 text-xs font-semibold text-slate-500">OEM fit: {item.template.suggestedOEMs.join(", ")}</p> : null}
+        {item.template.suggestedOEMs.length ? <p className="mt-5 text-xs font-semibold text-muted-foreground">OEM fit: {item.template.suggestedOEMs.join(", ")}</p> : null}
       </div>
     );
   };
@@ -476,7 +476,7 @@ export default function StickerTemplatesAdminPanel() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredItems.map((item) => (
               <div key={`${item.source}-${item.id}`} className="rounded-2xl border border-border bg-card p-3">
-                <button type="button" onClick={() => openPreview(item)} className="group relative flex h-56 w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <button type="button" onClick={() => openPreview(item)} className="group relative flex h-56 w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-xl border border-border bg-muted focus:outline-none focus:ring-2 focus:ring-blue-400">
                   {renderMiniPreview(item)}
                   <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-slate-950/85 px-2.5 py-1 text-[10px] font-black text-white opacity-0 shadow-lg transition group-hover:opacity-100"><Search className="h-3 w-3" /> View larger</span>
                 </button>
@@ -515,7 +515,7 @@ export default function StickerTemplatesAdminPanel() {
               </div>
               <button onClick={() => setPreview(null)} className="rounded-full border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close preview"><X className="h-4 w-4" /></button>
             </div>
-            <div className="flex-1 overflow-auto bg-slate-100 p-6"><div className="mx-auto flex min-h-[70vh] items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 shadow-inner">{renderLargePreview(preview)}</div></div>
+            <div className="flex-1 overflow-auto bg-muted p-6"><div className="mx-auto flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-white p-6 shadow-inner">{renderLargePreview(preview)}</div></div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
               <div className="flex flex-wrap gap-1">{preview.tags.slice(0, 12).map((tag) => <span key={tag} className="rounded bg-muted px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tag}</span>)}</div>
               <div className="flex flex-wrap items-center gap-2">

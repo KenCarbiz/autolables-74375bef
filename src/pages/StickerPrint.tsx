@@ -69,8 +69,8 @@ const StickerPrint = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-8 text-center bg-white">
         <div>
-          <p className="text-sm font-semibold text-slate-900">Nothing to print</p>
-          <p className="text-xs text-slate-500 mt-1">Open Print-perfect PDF from the Sticker Studio generator. (Template {templateId})</p>
+          <p className="text-sm font-semibold text-foreground">Nothing to print</p>
+          <p className="text-xs text-muted-foreground mt-1">Open Print-perfect PDF from the Sticker Studio generator. (Template {templateId})</p>
         </div>
       </div>
     );

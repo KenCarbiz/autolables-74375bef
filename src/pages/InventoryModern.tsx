@@ -778,7 +778,7 @@ const Thumb = ({ r }: { r: VehicleRow }) => {
   const tint =
     r.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
     r.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
-    "from-slate-400/15 to-slate-500/5 text-slate-500";
+    "from-slate-400/15 to-slate-500/5 text-muted-foreground";
   return (
     <div className={`w-20 h-[60px] rounded-lg bg-gradient-to-br ${tint} flex items-center justify-center shrink-0 overflow-hidden`}>
       {r.hero_image_url && !err
@@ -789,7 +789,7 @@ const Thumb = ({ r }: { r: VehicleRow }) => {
 };
 
 const CondBadge = ({ condition }: { condition: "new" | "used" | "cpo" }) => {
-  const cls = condition === "new" ? "bg-blue-100 text-blue-700" : condition === "cpo" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-700";
+  const cls = condition === "new" ? "bg-blue-100 text-blue-700" : condition === "cpo" ? "bg-violet-100 text-violet-700" : "bg-muted text-foreground";
   return <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${cls}`}>{condition}</span>;
 };
 
@@ -921,7 +921,7 @@ const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label
     tone === "amber"   ? "bg-amber-50 text-amber-600" :
     tone === "red"     ? "bg-red-50 text-red-600" :
     tone === "violet"  ? "bg-violet-50 text-violet-600" :
-                         "bg-slate-100 text-slate-500";
+                         "bg-muted text-muted-foreground";
   return (
     <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 h-full text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all flex flex-col">
       <div className="flex items-start justify-between gap-2">
@@ -966,7 +966,7 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
               <p className="font-display text-2xl font-bold text-foreground leading-none tabular-nums">{counts.readyToPublish}</p>
               <p className="text-xs font-semibold text-muted-foreground">of {counts.total} ready to publish</p>
             </div>
-            <div className="mt-2.5 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+            <div className="mt-2.5 h-1.5 w-full rounded-full bg-muted overflow-hidden">
               <div className={`h-full rounded-full ${barTone} transition-all`} style={{ width: `${Math.max(2, pct)}%`, boxShadow: `0 0 8px ${ringTone}66` }} />
             </div>
           </div>
@@ -999,7 +999,7 @@ const Pill = ({ label, count, active, tone, onClick }: { label: string; count: n
 interface RowSignal { stickerDone: boolean; hasAddendum: boolean; priceVerified: boolean; needsPriceVerify: boolean; }
 
 const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }: { r: VehicleRow; signal: RowSignal; readiness: number; onOpen: () => void; onSticker: () => void; onView: () => void; items: KebabItem[] }) => {
-  const thumbTint = r.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" : r.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" : "from-slate-400/15 to-slate-500/5 text-slate-500";
+  const thumbTint = r.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" : r.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" : "from-slate-400/15 to-slate-500/5 text-muted-foreground";
   return (
     <div onClick={onOpen} className="group rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all cursor-pointer p-3">
       <div className="flex items-start gap-3">
@@ -1071,8 +1071,8 @@ const PortalChip = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published"
     ? { dot: "bg-emerald-500", text: "text-emerald-700", label: "Live" }
     : status === "archived"
-      ? { dot: "bg-slate-400", text: "text-slate-600", label: "Archived" }
-      : { dot: "bg-slate-300", text: "text-slate-600", label: "Not Live" };
+      ? { dot: "bg-slate-400", text: "text-muted-foreground", label: "Archived" }
+      : { dot: "bg-slate-300", text: "text-muted-foreground", label: "Not Live" };
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${cfg.text}`}>
       <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{cfg.label}
@@ -1085,7 +1085,7 @@ const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published"
     ? { dot: "bg-emerald-500", text: "text-emerald-700", label: "Published" }
     : status === "archived"
-      ? { dot: "bg-slate-400", text: "text-slate-600", label: "Archived" }
+      ? { dot: "bg-slate-400", text: "text-muted-foreground", label: "Archived" }
       : { dot: "bg-amber-500", text: "text-amber-700", label: "Draft" };
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${cfg.text}`}>
@@ -1168,11 +1168,11 @@ const PriceCell = ({ price, docFee, ap, position, value }: { price?: number | nu
 // pressing action the vehicle needs before it can publish.
 const StatusPill = ({ status, signal }: { status: VehicleRow["status"]; signal?: RowSignal }) => {
   const cfg = status === "published" ? { cls: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", label: "Published" }
-    : status === "archived" ? { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Archived" }
+    : status === "archived" ? { cls: "bg-muted text-muted-foreground", dot: "bg-slate-400", label: "Archived" }
     : signal && !signal.stickerDone ? { cls: "bg-amber-100 text-amber-700", dot: "bg-amber-500", label: "Needs Sticker" }
     : signal && !signal.hasAddendum ? { cls: "bg-orange-100 text-orange-700", dot: "bg-orange-500", label: "Needs Addendum" }
     : signal && signal.needsPriceVerify ? { cls: "bg-violet-100 text-violet-700", dot: "bg-violet-500", label: "Price Review" }
-    : { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Draft" };
+    : { cls: "bg-muted text-muted-foreground", dot: "bg-slate-400", label: "Draft" };
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}

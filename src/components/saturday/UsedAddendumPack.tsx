@@ -45,7 +45,7 @@ const safeUrl = (url: string) => (url.startsWith("http") ? url : `https://${url}
 
 function Shell({ data, theme, children, badge }: Props & { theme: Theme; children: React.ReactNode; badge: string }) {
   return (
-    <div className="bg-white text-slate-950 shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "4.5in", height: "11in", fontFamily: "Inter, system-ui, sans-serif" }}>
+    <div className="bg-white text-foreground shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "4.5in", height: "11in", fontFamily: "Inter, system-ui, sans-serif" }}>
       <div className="flex h-full flex-col p-[0.16in]">
         <header className="overflow-hidden rounded-[16px] text-white" style={{ background: `linear-gradient(135deg,${theme.navy},${theme.blue})` }}>
           <div className="grid grid-cols-[1fr_auto] gap-3 p-3.5">
@@ -63,7 +63,7 @@ function Shell({ data, theme, children, badge }: Props & { theme: Theme; childre
           <div className="h-1.5 bg-white/20" />
         </header>
         {children}
-        <footer className="mt-auto rounded-[10px] border px-3 py-2 text-[7.5px] leading-snug text-slate-500" style={{ borderColor: theme.border }}>{data.disclaimer}</footer>
+        <footer className="mt-auto rounded-[10px] border px-3 py-2 text-[7.5px] leading-snug text-muted-foreground" style={{ borderColor: theme.border }}>{data.disclaimer}</footer>
       </div>
     </div>
   );
@@ -72,11 +72,11 @@ function Shell({ data, theme, children, badge }: Props & { theme: Theme; childre
 function VehicleBlock({ data, theme }: Props & { theme: Theme }) {
   return (
     <section className="mt-3 rounded-[14px] border bg-white p-3" style={{ borderColor: theme.border }}>
-      <div className="text-[8.5px] font-black uppercase tracking-[0.18em] text-slate-500">Vehicle</div>
+      <div className="text-[8.5px] font-black uppercase tracking-[0.18em] text-muted-foreground">Vehicle</div>
       <h1 className="mt-1 text-[18px] font-black uppercase leading-tight tracking-[-0.03em]" style={{ color: theme.navy }}>{data.vehicle.title}</h1>
       <div className="mt-2 grid grid-cols-2 gap-2 text-[8.5px]">
-        <div><span className="font-black uppercase text-slate-500">VIN</span><br /><span className="font-mono font-semibold">{data.vehicle.vin}</span></div>
-        <div><span className="font-black uppercase text-slate-500">Stock</span><br /><span className="font-mono font-semibold">{data.vehicle.stock}</span></div>
+        <div><span className="font-black uppercase text-muted-foreground">VIN</span><br /><span className="font-mono font-semibold">{data.vehicle.vin}</span></div>
+        <div><span className="font-black uppercase text-muted-foreground">Stock</span><br /><span className="font-mono font-semibold">{data.vehicle.stock}</span></div>
       </div>
     </section>
   );
@@ -85,7 +85,7 @@ function VehicleBlock({ data, theme }: Props & { theme: Theme }) {
 function PriceLine({ label, value, theme, strong = false }: { label: string; value: string | number; theme: Theme; strong?: boolean }) {
   return (
     <div className={`flex items-center justify-between gap-3 border-b px-3 py-1.5 last:border-b-0 ${strong ? "font-black" : "font-semibold"}`} style={{ borderColor: theme.border }}>
-      <span className="text-[10px] leading-tight text-slate-800">{label}</span>
+      <span className="text-[10px] leading-tight text-foreground">{label}</span>
       <span className="shrink-0 text-[10px]" style={{ color: strong ? theme.navy : "#0f172a" }}>{fmtMoney(value)}</span>
     </div>
   );
@@ -107,7 +107,7 @@ function Benefits({ data, theme, compact = false }: Props & { theme: Theme; comp
     <section className="mt-3 rounded-[14px] border p-3" style={{ borderColor: theme.border, background: `linear-gradient(180deg,${theme.soft},#ffffff)` }}>
       <div className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: theme.blue }}>Ownership Benefits</div>
       <div className="mt-2 grid grid-cols-1 gap-1.5">
-        {items.map((b) => <div key={b} className="flex items-center gap-2 text-[10px] font-semibold text-slate-800"><span className="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black text-white" style={{ background: theme.blue }}>✓</span>{b}</div>)}
+        {items.map((b) => <div key={b} className="flex items-center gap-2 text-[10px] font-semibold text-foreground"><span className="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black text-white" style={{ background: theme.blue }}>✓</span>{b}</div>)}
       </div>
     </section>
   );
@@ -117,7 +117,7 @@ function QRPanel({ data, theme }: Props & { theme: Theme }) {
   return (
     <section className="mt-3 grid grid-cols-[0.95in_1fr] items-center gap-3 rounded-[14px] border bg-white p-3" style={{ borderColor: theme.border }}>
       <div className="rounded-lg bg-white p-1"><QRCodeSVG value={safeUrl(data.qrUrl)} size={82} bgColor="#fff" fgColor="#111827" level="M" /></div>
-      <div><div className="text-[10px] font-black uppercase leading-tight" style={{ color: theme.navy }}>Scan Full Vehicle Passport</div><div className="mt-1 text-[8.5px] leading-tight text-slate-600">Photos, disclosures, pricing support, market data, and digital signing.</div></div>
+      <div><div className="text-[10px] font-black uppercase leading-tight" style={{ color: theme.navy }}>Scan Full Vehicle Passport</div><div className="mt-1 text-[8.5px] leading-tight text-muted-foreground">Photos, disclosures, pricing support, market data, and digital signing.</div></div>
     </section>
   );
 }
@@ -138,10 +138,10 @@ function MarketMini({ data, theme }: Props & { theme: Theme }) {
     <section className="mt-3 rounded-[14px] border bg-white p-3" style={{ borderColor: theme.border }}>
       <div className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: theme.blue }}>Market Transparency</div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-[9px]">
-        <div><div className="font-black text-slate-500">Market Avg.</div><div className="text-[14px] font-black" style={{ color: theme.navy }}>{fmtMoney(market?.marketAverage)}</div></div>
-        <div><div className="font-black text-slate-500">Position</div><div className="text-[14px] font-black" style={{ color: theme.accent }}>{market?.delta ? `${fmtMoney(Math.abs(Number(String(market.delta).replace(/[^\d.-]/g, ""))))} Below` : "Verified"}</div></div>
-        <div><div className="font-black text-slate-500">Comps</div><div className="font-black">{market?.comparableCount || "--"}</div></div>
-        <div><div className="font-black text-slate-500">Source</div><div className="font-black">{market?.sourceLabel || "Market Data"}</div></div>
+        <div><div className="font-black text-muted-foreground">Market Avg.</div><div className="text-[14px] font-black" style={{ color: theme.navy }}>{fmtMoney(market?.marketAverage)}</div></div>
+        <div><div className="font-black text-muted-foreground">Position</div><div className="text-[14px] font-black" style={{ color: theme.accent }}>{market?.delta ? `${fmtMoney(Math.abs(Number(String(market.delta).replace(/[^\d.-]/g, ""))))} Below` : "Verified"}</div></div>
+        <div><div className="font-black text-muted-foreground">Comps</div><div className="font-black">{market?.comparableCount || "--"}</div></div>
+        <div><div className="font-black text-muted-foreground">Source</div><div className="font-black">{market?.sourceLabel || "Market Data"}</div></div>
       </div>
     </section>
   );
@@ -164,7 +164,7 @@ export function UsedAddendumLuxuryBlack({ data }: Props) {
 
 export function UsedAddendumCPOFocus({ data }: Props) {
   const theme = THEMES.cpo;
-  return <Shell data={data} theme={theme} badge="Certified Vehicle Addendum"><VehicleBlock data={data} theme={theme} /><section className="mt-3 rounded-[14px] border p-3" style={{ borderColor: theme.border, background: theme.soft }}><div className="text-[10px] font-black uppercase" style={{ color: theme.blue }}>Certification Coverage</div><div className="mt-1 text-[18px] font-black" style={{ color: theme.navy }}>{data.benefits[0] || "Dealer Certified Coverage"}</div><div className="mt-1 text-[9px] text-slate-600">Coverage details and eligibility are confirmed in the digital passport.</div></section><OptionsTable data={data} theme={theme} /><TotalBlock data={data} theme={theme} /><QRPanel data={data} theme={theme} /></Shell>;
+  return <Shell data={data} theme={theme} badge="Certified Vehicle Addendum"><VehicleBlock data={data} theme={theme} /><section className="mt-3 rounded-[14px] border p-3" style={{ borderColor: theme.border, background: theme.soft }}><div className="text-[10px] font-black uppercase" style={{ color: theme.blue }}>Certification Coverage</div><div className="mt-1 text-[18px] font-black" style={{ color: theme.navy }}>{data.benefits[0] || "Dealer Certified Coverage"}</div><div className="mt-1 text-[9px] text-muted-foreground">Coverage details and eligibility are confirmed in the digital passport.</div></section><OptionsTable data={data} theme={theme} /><TotalBlock data={data} theme={theme} /><QRPanel data={data} theme={theme} /></Shell>;
 }
 
 export function UsedAddendumOnePrice({ data }: Props) {

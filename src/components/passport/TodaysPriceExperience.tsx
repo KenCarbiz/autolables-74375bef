@@ -131,7 +131,7 @@ const VehicleSummaryCard = ({ listing, d }: { listing: VehicleListing; d: Passpo
   ];
   return (
     <div className={`${CARD} overflow-hidden`}>
-      <div className="relative aspect-[16/10] bg-slate-100 flex items-center justify-center">
+      <div className="relative aspect-[16/10] bg-muted flex items-center justify-center">
         {hero ? <img src={hero} alt={listing.ymm ?? "Vehicle"} className="w-full h-full object-cover" /> : <Car className="w-10 h-10 text-slate-300" />}
         {gallery.length > 1 && <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-black/55 rounded-lg px-2 py-1"><AutoLabelsSpecIcon name="camera" className="w-3.5 h-3.5" accent="#FFFFFF" /> {gallery.length} Photos</span>}
       </div>
@@ -405,7 +405,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                     <div>
                       <p className="text-[12px] text-[#64748B] mb-1.5">Term</p>
                       <div className="grid grid-cols-4 gap-2">{TERMS.map((t) => (
-                        <button key={t} onClick={() => { const prev = term; setTerm(t); markStarted(); emit("payment_term_selected", { term: t }); emit("payment_recalculated", { field: "term", from: prev, to: t, calc_version: PAYMENT_CALC_VERSION }); }} className={`h-10 rounded-xl text-[13px] font-semibold border transition-colors ${term === t ? "border-[#0B6FEA] bg-[#EAF4FF] text-[#0B6FEA]" : "border-[#DDE5EE] text-[#64748B] hover:border-slate-300"}`}>{t} mo</button>
+                        <button key={t} onClick={() => { const prev = term; setTerm(t); markStarted(); emit("payment_term_selected", { term: t }); emit("payment_recalculated", { field: "term", from: prev, to: t, calc_version: PAYMENT_CALC_VERSION }); }} className={`h-10 rounded-xl text-[13px] font-semibold border transition-colors ${term === t ? "border-[#0B6FEA] bg-[#EAF4FF] text-[#0B6FEA]" : "border-[#DDE5EE] text-[#64748B] hover:border-border"}`}>{t} mo</button>
                       ))}</div>
                     </div>
                   )}
@@ -419,7 +419,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                   <div>
                     <p className="text-[12px] text-[#64748B] mb-1.5 inline-flex items-center gap-1.5">Credit Profile (Optional) <Info className="w-3 h-3" /></p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{CREDIT_PROFILES.map((p) => (
-                      <button key={p.key} onClick={() => { const prev = apr; setProfile(p.label); setApr(p.apr); markStarted(); emit("credit_profile_selected", { profile: p.key }); emit("payment_recalculated", { field: "credit_profile", from: prev, to: p.apr, calc_version: PAYMENT_CALC_VERSION }); }} className={`h-12 rounded-xl border text-center transition-colors ${profile === p.label ? "border-[#0B6FEA] bg-[#EAF4FF]" : "border-[#DDE5EE] hover:border-slate-300"}`}>
+                      <button key={p.key} onClick={() => { const prev = apr; setProfile(p.label); setApr(p.apr); markStarted(); emit("credit_profile_selected", { profile: p.key }); emit("payment_recalculated", { field: "credit_profile", from: prev, to: p.apr, calc_version: PAYMENT_CALC_VERSION }); }} className={`h-12 rounded-xl border text-center transition-colors ${profile === p.label ? "border-[#0B6FEA] bg-[#EAF4FF]" : "border-[#DDE5EE] hover:border-border"}`}>
                         <span className={`block text-[12px] font-bold leading-tight ${profile === p.label ? "text-[#0B6FEA]" : "text-[#10202B]"}`}>{p.label}</span>
                         <span className="block text-[10px] text-[#94A3B8]">{p.range}</span>
                       </button>
@@ -483,7 +483,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
               <div>
                 <label htmlFor="tp-name" className="block text-[12px] font-semibold text-[#64748B] mb-1">Your Name *</label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <User className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input id="tp-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Full name" aria-invalid={!!errors.name} className={`${field} pl-10 ${errors.name ? "border-red-300" : "border-[#DDE5EE]"}`} />
                 </div>
                 {errors.name && <p className="text-[12px] text-red-600 mt-1">{errors.name}</p>}
@@ -492,7 +492,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                 <div>
                   <label htmlFor="tp-email" className="block text-[12px] font-semibold text-[#64748B] mb-1">Email</label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Mail className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input id="tp-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="email@example.com" aria-invalid={!!errors.email} className={`${field} pl-10 ${errors.email ? "border-red-300" : "border-[#DDE5EE]"}`} />
                   </div>
                   {errors.email && <p className="text-[12px] text-red-600 mt-1">{errors.email}</p>}
@@ -500,7 +500,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                 <div>
                   <label htmlFor="tp-phone" className="block text-[12px] font-semibold text-[#64748B] mb-1">Phone</label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Phone className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input id="tp-phone" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} type="tel" autoComplete="tel" inputMode="tel" placeholder="(555) 555-5555" aria-invalid={!!errors.contact} className={`${field} pl-10 ${errors.contact ? "border-red-300" : "border-[#DDE5EE]"}`} />
                   </div>
                   {errors.contact && <p className="text-[12px] text-red-600 mt-1">{errors.contact}</p>}
@@ -510,7 +510,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                 <p className="text-[12px] font-semibold text-[#64748B] mb-1.5">Preferred Contact Method</p>
                 <div className="grid grid-cols-3 gap-2">
                   {([["call", "Call", Phone], ["text", "Text", MessageSquare], ["email", "Email", Mail]] as ["call" | "text" | "email", string, React.ElementType][]).map(([key, label, Icon]) => (
-                    <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); emit("contact_method_selected", { method: key }); }} className={`h-11 rounded-xl text-[13px] inline-flex items-center justify-center gap-1.5 border transition-colors ${method === key ? "bg-[#0B6FEA] border-[#0B6FEA] text-white font-bold" : "border-[#DDE5EE] text-[#64748B] font-semibold hover:border-slate-300"}`}>
+                    <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); emit("contact_method_selected", { method: key }); }} className={`h-11 rounded-xl text-[13px] inline-flex items-center justify-center gap-1.5 border transition-colors ${method === key ? "bg-[#0B6FEA] border-[#0B6FEA] text-white font-bold" : "border-[#DDE5EE] text-[#64748B] font-semibold hover:border-border"}`}>
                       <Icon className="w-4 h-4" /> {label}
                     </button>
                   ))}
@@ -520,7 +520,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
               <div>
                 <label htmlFor="tp-msg" className="block text-[12px] font-semibold text-[#64748B] mb-1">Anything you'd like the dealer to know? <span className="font-normal text-[#94A3B8]">(Optional)</span></label>
                 <div className="relative">
-                  <PenLine className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                  <PenLine className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3.5 pointer-events-none" />
                   <textarea id="tp-msg" value={message} onChange={(e) => setMessage(e.target.value.slice(0, 500))} rows={2} maxLength={500} placeholder="Tell us about your trade-in, financing goals, or anything else…" className="w-full border rounded-xl px-4 py-3 pl-10 text-sm border-[#DDE5EE] resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>

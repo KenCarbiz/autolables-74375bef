@@ -28,7 +28,7 @@ const TONE_CLASS: Record<string, string> = {
   warn: "bg-amber-50 text-amber-700",
   bad: "bg-rose-50 text-rose-700",
   info: "bg-blue-50 text-blue-700",
-  muted: "bg-slate-100 text-slate-500",
+  muted: "bg-muted text-muted-foreground",
 };
 
 const Stage = ({ stage }: { stage: PipelineStage }) => (

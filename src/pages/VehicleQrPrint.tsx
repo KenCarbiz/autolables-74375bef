@@ -62,51 +62,51 @@ export default function VehicleQrPrint() {
 
       <div className="max-w-[800px] mx-auto bg-white p-8 shadow-premium print:shadow-none space-y-8 text-[#0F172A]">
         <div className="text-center">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">AutoLabels · Service Codes</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">AutoLabels · Service Codes</p>
           <p className="text-lg font-black">{meta?.ymm}</p>
-          <p className="text-xs text-slate-500">VIN {vin.toUpperCase()}{meta?.stock ? ` · Stock ${meta.stock}` : ""}</p>
+          <p className="text-xs text-muted-foreground">VIN {vin.toUpperCase()}{meta?.stock ? ` · Stock ${meta.stock}` : ""}</p>
         </div>
 
         {/* Windshield cling */}
-        <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 flex items-center gap-6">
-          <div className="shrink-0 border border-slate-200 rounded-xl p-3 bg-white">
+        <div className="border-2 border-dashed border-border rounded-2xl p-6 flex items-center gap-6">
+          <div className="shrink-0 border border-border rounded-xl p-3 bg-white">
             <QRCodeSVG value={readyUrl} size={200} level="M" />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-widest text-blue-700">Back windshield</p>
             <p className="text-2xl font-black leading-tight mt-1">Scan for Get-Ready</p>
-            <p className="text-sm text-slate-600 mt-1">Service &amp; detail scan to open this vehicle's work order, complete the inspection / installs, and sign off.</p>
-            <p className="text-xs text-slate-400 mt-3 font-mono break-all">{readyUrl}</p>
+            <p className="text-sm text-muted-foreground mt-1">Service &amp; detail scan to open this vehicle's work order, complete the inspection / installs, and sign off.</p>
+            <p className="text-xs text-muted-foreground mt-3 font-mono break-all">{readyUrl}</p>
           </div>
         </div>
 
         {/* Service · CT K-208 — deep-links straight to the safety inspection */}
         <div className="border-2 border-dashed border-blue-300 rounded-2xl p-6 flex items-center gap-6">
-          <div className="shrink-0 border border-slate-200 rounded-xl p-3 bg-white">
+          <div className="shrink-0 border border-border rounded-xl p-3 bg-white">
             <QRCodeSVG value={k208Url} size={200} level="M" />
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-widest text-blue-700">Service department</p>
             <p className="text-2xl font-black leading-tight mt-1">Scan for the CT K-208</p>
-            <p className="text-sm text-slate-600 mt-1">Opens the safety inspection directly — mark each item Pass or Fail, then sign. No login required.</p>
-            <p className="text-xs text-slate-400 mt-3 font-mono break-all">{k208Url}</p>
+            <p className="text-sm text-muted-foreground mt-1">Opens the safety inspection directly — mark each item Pass or Fail, then sign. No login required.</p>
+            <p className="text-xs text-muted-foreground mt-3 font-mono break-all">{k208Url}</p>
           </div>
         </div>
 
         {/* Key-fob tag */}
-        <div className="border-2 border-dashed border-slate-300 rounded-2xl p-4 flex items-center gap-4 max-w-sm">
-          <div className="shrink-0 border border-slate-200 rounded-lg p-2 bg-white">
+        <div className="border-2 border-dashed border-border rounded-2xl p-4 flex items-center gap-4 max-w-sm">
+          <div className="shrink-0 border border-border rounded-lg p-2 bg-white">
             <QRCodeSVG value={readyUrl} size={96} level="M" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Key fob tag</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Key fob tag</p>
             <p className="text-lg font-black leading-tight">{meta?.stock || tail}</p>
-            <p className="text-[11px] text-slate-500 font-mono">…{tail}</p>
-            <p className="text-[10px] text-slate-400 mt-1">Scan to open service workspace</p>
+            <p className="text-[11px] text-muted-foreground font-mono">…{tail}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Scan to open service workspace</p>
           </div>
         </div>
 
-        <p className="no-print text-center text-[11px] text-slate-400">Cut along the dashed lines. The windshield cling goes on the inside of the back glass; the tag clips to the key fob.</p>
+        <p className="no-print text-center text-[11px] text-muted-foreground">Cut along the dashed lines. The windshield cling goes on the inside of the back glass; the tag clips to the key fob.</p>
       </div>
     </div>
   );

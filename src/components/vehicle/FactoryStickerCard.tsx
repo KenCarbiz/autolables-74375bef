@@ -61,7 +61,7 @@ const PILL_TONE: Record<string, string> = {
   amber: "bg-amber-50 text-amber-700",
   blue: "bg-blue-50 text-blue-700",
   rose: "bg-rose-50 text-rose-700",
-  slate: "bg-slate-100 text-slate-600",
+  slate: "bg-muted text-muted-foreground",
 };
 
 const Pill = ({ tone, children }: { tone: keyof typeof PILL_TONE; children: React.ReactNode }) => (

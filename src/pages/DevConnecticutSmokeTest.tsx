@@ -144,7 +144,7 @@ export default function DevConnecticutSmokeTest() {
           <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">Launch Smoke Test</h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-300">One route to verify the first rollout: new addendum, used window sticker, FTC Buyers Guide, used addendum, and Connecticut K-208.</p>
           <div className="mt-4 grid gap-2 md:grid-cols-5">
-            {CONNECTICUT_FIRST_ROLLOUT_SCOPE.filter((item) => item.requiredForLaunch).map((item) => <div key={item.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"><div className="text-[10px] font-black uppercase tracking-wide text-slate-500">{item.status}</div><div className="mt-1 text-xs font-black text-white">{item.title}</div></div>)}
+            {CONNECTICUT_FIRST_ROLLOUT_SCOPE.filter((item) => item.requiredForLaunch).map((item) => <div key={item.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"><div className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">{item.status}</div><div className="mt-1 text-xs font-black text-white">{item.title}</div></div>)}
           </div>
         </header>
 
@@ -162,7 +162,7 @@ export default function DevConnecticutSmokeTest() {
               <Input label="VIN" value={String(vehicle.vin || "")} onChange={(value) => setVehicle((current) => ({ ...current, vin: value }))} />
               <Input label="Stock" value={String(vehicle.stock || "")} onChange={(value) => setVehicle((current) => ({ ...current, stock: value }))} />
               <Input label="Buyer Name" value={buyerName} onChange={setBuyerName} />
-              <button onClick={() => setVehicle((current) => ({ ...current, cpo: !current.cpo }))} className={`w-full rounded-xl px-4 py-2 text-xs font-black uppercase ${vehicle.cpo ? "bg-emerald-400 text-slate-950" : "bg-white/10 text-white"}`}>CPO: {vehicle.cpo ? "Yes" : "No"}</button>
+              <button onClick={() => setVehicle((current) => ({ ...current, cpo: !current.cpo }))} className={`w-full rounded-xl px-4 py-2 text-xs font-black uppercase ${vehicle.cpo ? "bg-emerald-400 text-foreground" : "bg-white/10 text-white"}`}>CPO: {vehicle.cpo ? "Yes" : "No"}</button>
             </div>
           </aside>
 
@@ -199,13 +199,13 @@ export default function DevConnecticutSmokeTest() {
 }
 
 function Input({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">{label}<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
-  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">{label}<select className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}<select className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
 
 function DecisionCard({ title, value, detail }: { title: string; value: string; detail?: string }) {
-  return <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl"><div className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">{title}</div><div className="mt-2 text-lg font-black text-white">{value}</div>{detail ? <p className="mt-2 text-xs leading-relaxed text-slate-400">{detail}</p> : null}</article>;
+  return <article className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-xl"><div className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">{title}</div><div className="mt-2 text-lg font-black text-white">{value}</div>{detail ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p> : null}</article>;
 }

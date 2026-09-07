@@ -78,14 +78,14 @@ export default function VerificationReportDock({
             {recallNeedsConfirmation && <TriangleAlert className="w-5 h-5 text-[#D97706] shrink-0 mt-0.5" aria-hidden="true" />}
             <p className="text-[15px] font-bold text-[#0F172A] leading-snug">{heading}</p>
           </div>
-          <button onClick={dismiss} aria-label="Dismiss report help" className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><X className="w-4 h-4 text-[#64748B]" /></button>
+          <button onClick={dismiss} aria-label="Dismiss report help" className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center shrink-0"><X className="w-4 h-4 text-[#64748B]" /></button>
         </div>
         <div className="mt-4 space-y-2">
           {recallNeedsConfirmation && (
             <button ref={firstActionRef} onClick={() => act("ask_recall", onAskRecall)} className="w-full min-h-[44px] rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13.5px] font-bold inline-flex items-center justify-center gap-2 px-4"><TriangleAlert className="w-4 h-4" /> Ask about the recall</button>
           )}
           <button ref={recallNeedsConfirmation ? undefined : firstActionRef} onClick={() => act("contact", onContact)} className="w-full min-h-[44px] rounded-xl border border-[#E6E8EC] bg-white hover:border-[#2563EB] text-[13.5px] font-semibold text-[#0F172A] inline-flex items-center justify-center gap-2 px-4"><MessageSquare className="w-4 h-4 text-[#2563EB]" /> Contact the dealer</button>
-          <button onClick={() => act("back", onBack)} className="w-full min-h-[44px] rounded-xl border border-transparent hover:bg-slate-50 text-[13.5px] font-semibold text-[#64748B] inline-flex items-center justify-center gap-2 px-4"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+          <button onClick={() => act("back", onBack)} className="w-full min-h-[44px] rounded-xl border border-transparent hover:bg-muted text-[13.5px] font-semibold text-[#64748B] inline-flex items-center justify-center gap-2 px-4"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
         </div>
       </div>
 

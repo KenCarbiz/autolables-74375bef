@@ -190,7 +190,7 @@ const TONE_CLASS: Record<Tone, string> = {
   fail: "bg-rose-50 text-rose-700 border-rose-200",
   warn: "bg-amber-50 text-amber-700 border-amber-200",
   info: "bg-blue-50 text-blue-700 border-blue-200",
-  off: "bg-slate-50 text-slate-500 border-slate-200",
+  off: "bg-muted text-muted-foreground border-border",
 };
 
 const Badge = ({ tone, children }: { tone: Tone; children: React.ReactNode }) => (
@@ -645,7 +645,7 @@ export default function FactoryStickerWorkspace({
   }
 
   return (
-    <div className={fixture ? "min-h-screen bg-slate-100 p-4 md:p-6" : embedded ? "" : "p-4 md:p-6"}>
+    <div className={fixture ? "min-h-screen bg-muted p-4 md:p-6" : embedded ? "" : "p-4 md:p-6"}>
       <div className={embedded ? "space-y-4" : "max-w-[1600px] mx-auto space-y-4"}>
         {fixture && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 space-y-2">

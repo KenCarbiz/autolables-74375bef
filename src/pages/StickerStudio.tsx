@@ -158,7 +158,7 @@ const StickerStudio = () => {
                 onClick={() => open(template.config.id)}
                 className="group flex items-center gap-3 rounded-xl border border-border bg-card p-2.5 text-left hover:border-primary hover:shadow-premium transition"
               >
-                <div className="rounded-md bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 64, height: 64 }}>
+                <div className="rounded-md bg-muted border border-border overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 64, height: 64 }}>
                   <TemplateRenderer template={template} data={SAMPLE} branding={branding} scale={slotDef.kind === "addendum" ? 0.12 : 0.072} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -201,7 +201,7 @@ const StickerStudio = () => {
               </div>
               <button type="button" onClick={() => open(t.config.id)} className="block w-full text-left">
                 {/* Thumbnail — a true-scale render shrunk to fit the card */}
-                <div className="rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center" style={{ height: 220 }}>
+                <div className="rounded-lg bg-muted border border-border overflow-hidden flex items-center justify-center" style={{ height: 220 }}>
                   <TemplateRenderer template={t} data={SAMPLE} branding={branding} scale={t.config.type === "addendum" ? 0.42 : 0.24} />
                 </div>
                 <div className="mt-2.5 flex items-start justify-between gap-2">

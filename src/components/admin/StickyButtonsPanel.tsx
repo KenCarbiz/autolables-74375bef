@@ -44,7 +44,7 @@ const StickyButtonsPanel = () => {
     <div className="space-y-5 max-w-2xl">
       <div>
         <h2 className="text-[22px] font-bold tracking-tight text-foreground">Passport Buttons</h2>
-        <p className="text-sm text-slate-500 mt-1">Choose up to {MAX_STICKY_BUTTONS} call-to-action buttons for the sticky bottom bar shown to shoppers on the Vehicle Passport. Changes save automatically.</p>
+        <p className="text-sm text-muted-foreground mt-1">Choose up to {MAX_STICKY_BUTTONS} call-to-action buttons for the sticky bottom bar shown to shoppers on the Vehicle Passport. Changes save automatically.</p>
       </div>
 
       {/* Enable */}
@@ -55,7 +55,7 @@ const StickyButtonsPanel = () => {
         </button>
         <div>
           <p className="text-sm font-semibold text-foreground">Show the sticky bottom bar</p>
-          <p className="text-[12px] text-slate-500">When off, no sticky CTA bar appears on the passport.</p>
+          <p className="text-[12px] text-muted-foreground">When off, no sticky CTA bar appears on the passport.</p>
         </div>
       </div>
 
@@ -66,16 +66,16 @@ const StickyButtonsPanel = () => {
           <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 font-semibold"><Star className="w-3 h-3" /> = primary</span>
         </div>
         {cfg.buttons.length === 0 ? (
-          <p className="text-[13px] text-slate-500 py-4 text-center">No buttons selected yet — add up to {MAX_STICKY_BUTTONS} below.</p>
+          <p className="text-[13px] text-muted-foreground py-4 text-center">No buttons selected yet — add up to {MAX_STICKY_BUTTONS} below.</p>
         ) : cfg.buttons.map((b, i) => (
           <div key={b.key} className="flex items-center gap-2 rounded-xl border border-border p-2.5">
             <div className="flex flex-col">
-              <button onClick={() => move(i, -1)} disabled={i === 0} className="text-slate-400 hover:text-foreground disabled:opacity-30"><ChevronUp className="w-4 h-4" /></button>
-              <button onClick={() => move(i, 1)} disabled={i === cfg.buttons.length - 1} className="text-slate-400 hover:text-foreground disabled:opacity-30"><ChevronDown className="w-4 h-4" /></button>
+              <button onClick={() => move(i, -1)} disabled={i === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronUp className="w-4 h-4" /></button>
+              <button onClick={() => move(i, 1)} disabled={i === cfg.buttons.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronDown className="w-4 h-4" /></button>
             </div>
             <input value={b.label} onChange={(e) => setLabel(b.key, e.target.value)} className="flex-1 h-9 px-2.5 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
             <button onClick={() => setCfg((c) => ({ ...c, primary_key: b.key }))} title="Make primary"
-              className={`h-9 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 ${cfg.primary_key === b.key ? "bg-amber-100 text-amber-700 border border-amber-200" : "border border-border text-slate-500 hover:bg-muted"}`}>
+              className={`h-9 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 ${cfg.primary_key === b.key ? "bg-amber-100 text-amber-700 border border-amber-200" : "border border-border text-muted-foreground hover:bg-muted"}`}>
               <Star className={`w-3.5 h-3.5 ${cfg.primary_key === b.key ? "fill-amber-500 text-amber-500" : ""}`} /> Primary
             </button>
             <button onClick={() => removeButton(b.key)} className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40"><X className="w-4 h-4" /></button>
@@ -87,17 +87,17 @@ const StickyButtonsPanel = () => {
               <option value="" disabled>Add a button…</option>
               {remaining.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
             </select>
-            <span className="text-[11px] text-slate-400 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> up to {MAX_STICKY_BUTTONS}</span>
+            <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1"><Plus className="w-3 h-3" /> up to {MAX_STICKY_BUTTONS}</span>
           </div>
         )}
-        {atMax && <p className="text-[11px] text-slate-400">Maximum of {MAX_STICKY_BUTTONS} reached — remove one to add another.</p>}
+        {atMax && <p className="text-[11px] text-muted-foreground">Maximum of {MAX_STICKY_BUTTONS} reached — remove one to add another.</p>}
       </div>
 
       {error && <p className="text-[12px] font-semibold text-red-600">{error}</p>}
 
       {/* Preview */}
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Preview</p>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Preview</p>
         <div className="rounded-2xl border border-border bg-[#f4f5f7] p-3">
           {cfg.enabled && cfg.buttons.length > 0 ? (
             <div className="bg-white rounded-xl border border-[#e8ebef] p-3" style={{ gridTemplateColumns: `repeat(${Math.min(cfg.buttons.length, MAX_STICKY_BUTTONS)}, minmax(0,1fr))`, display: "grid", gap: 8 }}>
@@ -105,7 +105,7 @@ const StickyButtonsPanel = () => {
                 <div key={b.key} className={`h-11 rounded-xl text-[11px] font-bold inline-flex items-center justify-center text-center px-1 ${b.key === cfg.primary_key ? "bg-[#1a6dff] text-white" : "border border-[#d8dce0] text-[#1a1d21]"}`}>{b.label}</div>
               ))}
             </div>
-          ) : <p className="text-[13px] text-slate-400 text-center py-4">Sticky bar is off.</p>}
+          ) : <p className="text-[13px] text-muted-foreground text-center py-4">Sticky bar is off.</p>}
         </div>
       </div>
     </div>

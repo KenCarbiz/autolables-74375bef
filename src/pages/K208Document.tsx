@@ -120,7 +120,7 @@ export default function K208Document() {
           <div className="font-bold text-[13px]">STATE OF CONNECTICUT &middot; DEPARTMENT OF MOTOR VEHICLES</div>
           <div className="text-[11px]">Commercial Vehicle Safety Division</div>
           <div className="font-bold text-[14px] mt-1">CT LICENSED DEALER VEHICLE INSPECTION FORM &mdash; K-208</div>
-          <div className="text-[9px] text-slate-500">NEW 10-2012 &middot; Required by CGS 14-62(g)</div>
+          <div className="text-[9px] text-muted-foreground">NEW 10-2012 &middot; Required by CGS 14-62(g)</div>
         </div>
 
         {/* Vehicle + Dealer */}
@@ -147,7 +147,7 @@ export default function K208Document() {
         {/* Inspection grid */}
         <table className="w-full border-collapse mt-3 border border-black">
           <thead>
-            <tr className="bg-slate-100">
+            <tr className="bg-muted">
               <th className="border border-black text-left px-2 py-1 w-[28%]">Inspection Item</th>
               <th className="border border-black px-2 py-1 w-[8%]">Pass</th>
               <th className="border border-black px-2 py-1 w-[8%]">Fail</th>
@@ -172,14 +172,14 @@ export default function K208Document() {
           {K208_INSPECTION_RESULTS.map((res) => (
             <div key={res.code} className="flex gap-2 items-start py-0.5">
               <button onClick={() => setResult(res.code as "A" | "B" | "C")} title={`Initial ${res.code}`}
-                className={`font-bold border border-black w-6 h-6 inline-grid place-items-center shrink-0 ${insp.result_initial === res.code ? "bg-slate-900 text-white print:bg-white print:text-black" : "hover:bg-slate-100 print:hover:bg-white"}`}>
+                className={`font-bold border border-black w-6 h-6 inline-grid place-items-center shrink-0 ${insp.result_initial === res.code ? "bg-slate-900 text-white print:bg-white print:text-black" : "hover:bg-muted print:hover:bg-white"}`}>
                 {insp.result_initial === res.code ? res.code : ""}
               </button>
               <span className="text-[11px]"><b>{res.code}.</b> {res.label}</span>
             </div>
           ))}
-          <p className="no-print text-[10px] text-slate-500 mt-1">Tap A, B, or C to record the dealer's warranty determination.</p>
-          <div className="text-[10px] text-slate-600 mt-1">Vehicle shall be emissions compliant per 14-164c(n).</div>
+          <p className="no-print text-[10px] text-muted-foreground mt-1">Tap A, B, or C to record the dealer's warranty determination.</p>
+          <div className="text-[10px] text-muted-foreground mt-1">Vehicle shall be emissions compliant per 14-164c(n).</div>
         </div>
 
         {/* Certification */}
@@ -249,7 +249,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function Field({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
     <div className="flex gap-2 py-0.5">
-      <span className="text-slate-600 w-[40%] shrink-0">{label}:</span>
+      <span className="text-muted-foreground w-[40%] shrink-0">{label}:</span>
       <span className={`flex-1 border-b border-dotted border-slate-400 min-h-[14px] ${bold ? "font-bold" : ""}`}>{value || " "}</span>
     </div>
   );
@@ -260,7 +260,7 @@ function SignatureLine({ label, sig, name, date, dateLabel }: { label: string; s
       <div className="h-12 border-b border-black flex items-end">
         {sig && sig.startsWith("data:image") ? <img src={sig} alt="" className="max-h-12" /> : <span className="text-[14px] italic pb-0.5">{sig || name || ""}</span>}
       </div>
-      <div className="text-[9px] text-slate-600 mt-0.5">{label}</div>
+      <div className="text-[9px] text-muted-foreground mt-0.5">{label}</div>
       {name && <div className="text-[11px] font-medium">{name}</div>}
       <div className="text-[10px] mt-1">{dateLabel}: <b>{date || "      "}</b></div>
     </div>

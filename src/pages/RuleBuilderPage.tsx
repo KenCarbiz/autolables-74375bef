@@ -114,7 +114,7 @@ export default function RuleBuilderPage() {
               <p className="text-xs font-black uppercase tracking-[0.25em] text-cyan-300">Dealer Admin</p>
               <h1 className="mt-2 text-2xl font-black tracking-[-0.04em]">Rule Builder</h1>
             </div>
-            <button onClick={addRule} className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-black text-slate-950 hover:bg-cyan-300">New</button>
+            <button onClick={addRule} className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-black text-foreground hover:bg-cyan-300">New</button>
           </div>
           <p className="mt-3 text-sm text-slate-300">Build IF/THEN rules so each vehicle automatically selects the right sticker, addendum, passport behavior, image strategy, and pricing mode.</p>
 
@@ -123,9 +123,9 @@ export default function RuleBuilderPage() {
               <button key={rule.id} onClick={() => setSelectedRuleId(rule.id)} className={`w-full rounded-2xl border p-3 text-left transition ${selectedRule?.id === rule.id ? "border-cyan-300 bg-cyan-400/15" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"}`}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm font-black text-white">{rule.name}</div>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${rule.enabled ? "bg-emerald-400 text-slate-950" : "bg-slate-700 text-slate-300"}`}>{rule.enabled ? "On" : "Off"}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${rule.enabled ? "bg-emerald-400 text-foreground" : "bg-slate-700 text-slate-300"}`}>{rule.enabled ? "On" : "Off"}</span>
                 </div>
-                <div className="mt-1 line-clamp-2 text-[11px] text-slate-400">{describeRule(rule)}</div>
+                <div className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{describeRule(rule)}</div>
               </button>
             ))}
           </div>
@@ -135,9 +135,9 @@ export default function RuleBuilderPage() {
           <section className="space-y-6">
             <header className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl">
               <div className="grid gap-4 lg:grid-cols-[1fr_120px_120px]">
-                <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">Rule Name<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={selectedRule.name} onChange={(event) => updateRule({ name: event.target.value })} /></label>
-                <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">Priority<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" type="number" value={selectedRule.priority} onChange={(event) => updateRule({ priority: Number(event.target.value) })} /></label>
-                <button onClick={() => updateRule({ enabled: !selectedRule.enabled })} className={`mt-5 rounded-xl px-4 py-2 text-xs font-black uppercase ${selectedRule.enabled ? "bg-emerald-400 text-slate-950" : "bg-white/10 text-white"}`}>{selectedRule.enabled ? "Enabled" : "Disabled"}</button>
+                <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Rule Name<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={selectedRule.name} onChange={(event) => updateRule({ name: event.target.value })} /></label>
+                <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Priority<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" type="number" value={selectedRule.priority} onChange={(event) => updateRule({ priority: Number(event.target.value) })} /></label>
+                <button onClick={() => updateRule({ enabled: !selectedRule.enabled })} className={`mt-5 rounded-xl px-4 py-2 text-xs font-black uppercase ${selectedRule.enabled ? "bg-emerald-400 text-foreground" : "bg-white/10 text-white"}`}>{selectedRule.enabled ? "Enabled" : "Disabled"}</button>
               </div>
               <div className="mt-4 rounded-2xl bg-slate-900 p-4 text-sm text-slate-300"><b className="text-white">Preview:</b> {describeRule(selectedRule)}</div>
             </header>
@@ -178,7 +178,7 @@ export default function RuleBuilderPage() {
 
             <Panel title="Quick Rule Templates">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {ruleTemplates.map((template) => <button key={template.id} onClick={() => applyTemplate(template)} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left hover:bg-white/[0.08]"><div className="font-black text-white">{template.name}</div><p className="mt-1 text-xs text-slate-400">{template.description}</p></button>)}
+                {ruleTemplates.map((template) => <button key={template.id} onClick={() => applyTemplate(template)} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left hover:bg-white/[0.08]"><div className="font-black text-white">{template.name}</div><p className="mt-1 text-xs text-muted-foreground">{template.description}</p></button>)}
               </div>
             </Panel>
 
@@ -197,18 +197,18 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 }
 
 function Select({ label, value, onChange, options, labels = {} }: { label: string; value: string; onChange: (value: string) => void; options: string[]; labels?: Record<string, string> }) {
-  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">{label}<select className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{labels[option] || option}</option>)}</select></label>;
+  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}<select className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{labels[option] || option}</option>)}</select></label>;
 }
 
 function TextInput({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
-  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">{label}<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /></label>;
+  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function NumberInput({ label, value, onChange }: { label: string; value?: number; onChange: (value?: number) => void }) {
-  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">{label}<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" type="number" value={value ?? ""} onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)} /></label>;
+  return <label className="block space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" type="number" value={value ?? ""} onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)} /></label>;
 }
 
 function BooleanToggle({ label, value, onChange }: { label: string; value?: boolean; onChange: (value?: boolean) => void }) {
   const text = value === true ? "Yes" : value === false ? "No" : "Any";
-  return <button onClick={() => onChange(value === undefined ? true : value === true ? false : undefined)} className={`rounded-xl px-3 py-2 text-xs font-black ${value === true ? "bg-emerald-400 text-slate-950" : value === false ? "bg-red-400 text-slate-950" : "bg-white/10 text-white"}`}>{label}: {text}</button>;
+  return <button onClick={() => onChange(value === undefined ? true : value === true ? false : undefined)} className={`rounded-xl px-3 py-2 text-xs font-black ${value === true ? "bg-emerald-400 text-foreground" : value === false ? "bg-red-400 text-foreground" : "bg-white/10 text-white"}`}>{label}: {text}</button>;
 }

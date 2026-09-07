@@ -83,7 +83,7 @@ const About = () => {
           <div className="mt-10 flex items-center justify-center gap-3 flex-wrap">
             <button
               onClick={() => navigate("/onboarding")}
-              className="inline-flex items-center gap-2 h-12 px-6 rounded-md bg-white text-slate-950 text-sm font-semibold hover:bg-white/90 transition-colors"
+              className="inline-flex items-center gap-2 h-12 px-6 rounded-md bg-white text-foreground text-sm font-semibold hover:bg-white/90 transition-colors"
             >
               Start free trial
               <ArrowRight className="w-4 h-4" />
@@ -249,7 +249,7 @@ const About = () => {
             <div className="mt-8 flex items-center justify-center gap-3 flex-wrap">
               <button
                 onClick={() => navigate("/onboarding")}
-                className="inline-flex items-center gap-2 h-12 px-6 rounded-md bg-white text-slate-950 text-sm font-semibold hover:bg-white/90 transition-colors"
+                className="inline-flex items-center gap-2 h-12 px-6 rounded-md bg-white text-foreground text-sm font-semibold hover:bg-white/90 transition-colors"
               >
                 Start free trial
                 <ArrowRight className="w-4 h-4" />

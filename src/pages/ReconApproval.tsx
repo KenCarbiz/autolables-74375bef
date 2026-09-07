@@ -29,14 +29,14 @@ const SEV: Record<string, { label: string; cls: string }> = {
   required: { label: "Required", cls: "bg-red-100 text-red-700" },
   recommended: { label: "Recommended", cls: "bg-amber-100 text-amber-700" },
   ok: { label: "OK", cls: "bg-emerald-100 text-emerald-700" },
-  na: { label: "N/A", cls: "bg-slate-100 text-slate-600" },
+  na: { label: "N/A", cls: "bg-muted text-muted-foreground" },
 };
 const STATUS: Record<string, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-amber-100 text-amber-700" },
   approved: { label: "Approved", cls: "bg-emerald-100 text-emerald-700" },
   auto_approved: { label: "Auto-approved", cls: "bg-emerald-50 text-emerald-600" },
   declined: { label: "Declined", cls: "bg-red-100 text-red-700" },
-  deferred: { label: "Deferred", cls: "bg-slate-100 text-slate-600" },
+  deferred: { label: "Deferred", cls: "bg-muted text-muted-foreground" },
 };
 
 export default function ReconApproval() {
@@ -138,7 +138,7 @@ export default function ReconApproval() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${sev.cls}`}>{sev.label}</span>
-                      {l.category && <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600">{l.category}</span>}
+                      {l.category && <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground">{l.category}</span>}
                       <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${st.cls}`}>{st.label}</span>
                     </div>
                     <p className="text-[15px] font-semibold text-foreground">{l.description}</p>

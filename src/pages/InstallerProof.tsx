@@ -104,57 +104,57 @@ const InstallerProof = () => {
           <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
             <Check className="w-7 h-7" strokeWidth={2.5} />
           </div>
-          <h1 className="mt-4 text-2xl font-black font-display tracking-tight text-slate-950">Installation recorded</h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <h1 className="mt-4 text-2xl font-black font-display tracking-tight text-foreground">Installation recorded</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
             Thank you. The dealer has a time-stamped record{photoFile ? " with your photo" : ""} that
             {" "}{productName || "this protection"} was installed.
           </p>
-          <p className="mt-6 text-[10px] font-mono uppercase tracking-wider text-slate-400">You can close this page.</p>
+          <p className="mt-6 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">You can close this page.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-muted">
       <div className="max-w-md mx-auto px-5 py-8 space-y-5">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500 font-semibold">Installer verification</p>
-          <h1 className="mt-1 text-3xl font-black font-display tracking-[-0.02em] text-slate-950">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">Installer verification</p>
+          <h1 className="mt-1 text-3xl font-black font-display tracking-[-0.02em] text-foreground">
             Confirm your installation
           </h1>
-          <p className="mt-2 text-[13px] text-slate-600">
+          <p className="mt-2 text-[13px] text-muted-foreground">
             Record what you installed on this vehicle, when, and a photo of the equipment in place.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+        <div className="rounded-2xl border border-border bg-white p-5 space-y-4">
           <Field label="Your name">
             <input value={installerName} onChange={(e) => setInstallerName(e.target.value)} placeholder="Full name"
-              className="w-full h-12 border-2 border-slate-300 rounded-xl px-4 text-base bg-white text-slate-900" />
+              className="w-full h-12 border-2 border-border rounded-xl px-4 text-base bg-white text-foreground" />
           </Field>
           <Field label="Company / shop">
             <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="e.g. ProShield Detail"
-              className="w-full h-12 border-2 border-slate-300 rounded-xl px-4 text-base bg-white text-slate-900" />
+              className="w-full h-12 border-2 border-border rounded-xl px-4 text-base bg-white text-foreground" />
           </Field>
           <Field label="What did you install?">
             <input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="As listed on the window sticker"
-              className="w-full h-12 border-2 border-slate-300 rounded-xl px-4 text-base bg-white text-slate-900" />
+              className="w-full h-12 border-2 border-border rounded-xl px-4 text-base bg-white text-foreground" />
           </Field>
           <Field label="Installed on">
             <input type="datetime-local" value={installedAt} onChange={(e) => setInstalledAt(e.target.value)}
-              className="w-full h-12 border-2 border-slate-300 rounded-xl px-4 text-base bg-white text-slate-900" />
+              className="w-full h-12 border-2 border-border rounded-xl px-4 text-base bg-white text-foreground" />
           </Field>
 
           <Field label="Photo of the equipment on the vehicle">
             <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onPickPhoto} className="hidden" />
             {photoPreview ? (
-              <button onClick={() => fileRef.current?.click()} className="block w-full rounded-xl overflow-hidden border-2 border-slate-300">
+              <button onClick={() => fileRef.current?.click()} className="block w-full rounded-xl overflow-hidden border-2 border-border">
                 <img src={photoPreview} alt="Install" className="w-full h-44 object-cover" />
               </button>
             ) : (
               <button onClick={() => fileRef.current?.click()}
-                className="w-full h-32 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-1.5 text-slate-500">
+                className="w-full h-32 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
                 <Camera className="w-6 h-6" />
                 <span className="text-sm font-semibold">Take or upload a photo</span>
               </button>
@@ -163,7 +163,7 @@ const InstallerProof = () => {
 
           <Field label="Notes (optional)">
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Anything worth recording"
-              className="w-full rounded-xl border-2 border-slate-300 px-4 py-2.5 text-sm bg-white text-slate-900" />
+              className="w-full rounded-xl border-2 border-border px-4 py-2.5 text-sm bg-white text-foreground" />
           </Field>
 
           <SignaturePad
@@ -179,7 +179,7 @@ const InstallerProof = () => {
           className="w-full h-14 rounded-2xl bg-slate-950 text-white font-display font-bold text-lg disabled:opacity-50 inline-flex items-center justify-center gap-2">
           {submitting ? <><Loader2 className="w-5 h-5 animate-spin" /> Recording…</> : "Record installation"}
         </button>
-        <p className="text-center text-[10px] font-mono uppercase tracking-wider text-slate-400">
+        <p className="text-center text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
           Time-stamped and stored as proof of installation
         </p>
       </div>
@@ -189,7 +189,7 @@ const InstallerProof = () => {
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div>
-    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">{label}</label>
+    <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">{label}</label>
     {children}
   </div>
 );

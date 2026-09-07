@@ -108,22 +108,22 @@ const TABS: { key: string; label: string }[] = [
 ];
 
 const GR_CHIP: Record<Row["grState"], { label: string; cls: string; Icon: typeof Circle }> = {
-  not_started: { label: "Not started", cls: "text-slate-500", Icon: Circle },
+  not_started: { label: "Not started", cls: "text-muted-foreground", Icon: Circle },
   in_progress: { label: "In progress", cls: "text-blue-600", Icon: CircleDot },
   complete: { label: "Work complete", cls: "text-emerald-600", Icon: CheckCircle2 },
   failed: { label: "Failed items", cls: "text-red-600", Icon: XCircle },
 };
 const K208_CHIP: Record<Row["k208State"], { label: string; cls: string; Icon: typeof Circle }> = {
-  waiting: { label: "Waiting", cls: "text-slate-500", Icon: Clock },
+  waiting: { label: "Waiting", cls: "text-muted-foreground", Icon: Clock },
   ready: { label: "Ready to certify", cls: "text-blue-600", Icon: Clock },
   blocked: { label: "Blocked", cls: "text-red-600", Icon: AlertTriangle },
   executed: { label: "Executed", cls: "text-emerald-600", Icon: CheckCircle2 },
   // "superseded" is deliberately unbuilt: nothing in this repo writes it yet.
-  voided: { label: "Voided", cls: "text-slate-500", Icon: XCircle },
+  voided: { label: "Voided", cls: "text-muted-foreground", Icon: XCircle },
 };
 
 const PRIORITY_ICON = { High: ArrowUp, Medium: Minus, Low: ArrowDown } as const;
-const PRIORITY_CLS = { High: "text-red-600", Medium: "text-amber-600", Low: "text-slate-400" } as const;
+const PRIORITY_CLS = { High: "text-red-600", Medium: "text-amber-600", Low: "text-muted-foreground" } as const;
 
 export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "desk" }) {
   const { tenant } = useTenant();

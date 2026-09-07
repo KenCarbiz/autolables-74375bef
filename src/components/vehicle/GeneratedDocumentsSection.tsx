@@ -23,7 +23,7 @@ import { toast } from "sonner";
 // document state only — it never touches the customer signing flow.
 
 const toneClass: Record<string, string> = {
-  slate: "bg-slate-100 text-slate-600",
+  slate: "bg-muted text-muted-foreground",
   amber: "bg-amber-50 text-amber-700",
   emerald: "bg-emerald-50 text-emerald-700",
   blue: "bg-blue-50 text-blue-700",

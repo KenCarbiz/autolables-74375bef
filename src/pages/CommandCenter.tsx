@@ -25,7 +25,7 @@ const STATUS_META: Record<ComplianceStatus, { label: string; cls: string; dot: s
   verification_needed: { label: "Verification needed", cls: "bg-amber-500/15 text-amber-700 border-amber-500/40",       dot: "bg-amber-500"  },
   action_required:     { label: "Action required",     cls: "bg-orange-500/15 text-orange-700 border-orange-500/40",    dot: "bg-orange-500" },
   critical:            { label: "Critical",            cls: "bg-red-500/15 text-red-700 border-red-500/40",             dot: "bg-red-500"    },
-  exempt:              { label: "Exempt",              cls: "bg-slate-500/15 text-slate-700 border-slate-400/40",       dot: "bg-slate-500"  },
+  exempt:              { label: "Exempt",              cls: "bg-slate-500/15 text-foreground border-slate-400/40",       dot: "bg-slate-500"  },
   sold:                { label: "Sold",                cls: "bg-gray-200 text-gray-600 border-gray-300",                dot: "bg-gray-400"   },
 };
 

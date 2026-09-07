@@ -116,10 +116,10 @@ const VehicleCtMvpStatusCard = ({ tenantId, vehicleId, vin, compact = false }: V
           {run.ready ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" /> : <XCircle className="mt-0.5 h-5 w-5 shrink-0" />}
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.18em]">CT MVP Status</p>
-            <h3 className="mt-1 text-base font-black text-slate-950">
+            <h3 className="mt-1 text-base font-black text-foreground">
               {run.ready ? "Certified" : "Needs attention"}
             </h3>
-            <p className="mt-1 text-xs text-slate-700">
+            <p className="mt-1 text-xs text-foreground">
               Last checked {new Date(run.certified_at).toLocaleString()}{run.source ? ` · ${run.source}` : ""}
             </p>
           </div>
@@ -127,7 +127,7 @@ const VehicleCtMvpStatusCard = ({ tenantId, vehicleId, vin, compact = false }: V
         <button
           type="button"
           onClick={() => void load()}
-          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-white/80 px-3 text-xs font-bold text-slate-800 hover:bg-white"
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-white/80 px-3 text-xs font-bold text-foreground hover:bg-white"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
         </button>
@@ -136,12 +136,12 @@ const VehicleCtMvpStatusCard = ({ tenantId, vehicleId, vin, compact = false }: V
       {!compact ? (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="rounded-xl bg-white/80 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Required documents</p>
-            <p className="mt-1 text-sm font-semibold text-slate-950">{(run.required_document_keys || []).join(", ") || "—"}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Required documents</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{(run.required_document_keys || []).join(", ") || "—"}</p>
           </div>
           <div className="rounded-xl bg-white/80 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Open checks</p>
-            <p className="mt-1 text-sm font-semibold text-slate-950">{failingChecks.length ? `${failingChecks.length} issue(s)` : "All checks passed"}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Open checks</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{failingChecks.length ? `${failingChecks.length} issue(s)` : "All checks passed"}</p>
           </div>
         </div>
       ) : null}
@@ -152,8 +152,8 @@ const VehicleCtMvpStatusCard = ({ tenantId, vehicleId, vin, compact = false }: V
             <div key={check.key} className="flex items-start gap-2 rounded-xl bg-white/80 p-3">
               <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
               <div>
-                <p className="text-sm font-bold text-slate-950">{check.label}</p>
-                <p className="text-xs text-slate-700">{check.detail}</p>
+                <p className="text-sm font-bold text-foreground">{check.label}</p>
+                <p className="text-xs text-foreground">{check.detail}</p>
               </div>
             </div>
           ))}

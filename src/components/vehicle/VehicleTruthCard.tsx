@@ -18,7 +18,7 @@ const TONE: Record<string, string> = {
   calculated: "bg-amber-50 text-amber-700",
   inferred: "bg-amber-50 text-amber-700",
   disputed: "bg-rose-50 text-rose-700",
-  pending: "bg-slate-100 text-slate-600",
+  pending: "bg-muted text-muted-foreground",
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -128,7 +128,7 @@ export default function VehicleTruthCard({
             <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
             <h4 className="text-sm font-bold text-foreground">Vehicle Truth</h4>
             {truth.snapshot && (
-              <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+              <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 v{truth.snapshot.snapshot_version}
               </span>
             )}

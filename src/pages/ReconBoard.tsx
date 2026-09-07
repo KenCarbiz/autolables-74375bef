@@ -10,13 +10,13 @@ import {
 const money = (n: number | null | undefined) => (n == null ? "—" : `$${Math.round(n).toLocaleString("en-US")}`);
 const photoUrls = (p: unknown[]): string[] => (Array.isArray(p) ? p : []).map((x) => typeof x === "string" ? x : (x as { url?: string })?.url || "").filter(Boolean);
 
-const SEV: Record<string, string> = { required: "bg-red-100 text-red-700", recommended: "bg-amber-100 text-amber-700", ok: "bg-emerald-100 text-emerald-700", na: "bg-slate-100 text-slate-600" };
+const SEV: Record<string, string> = { required: "bg-red-100 text-red-700", recommended: "bg-amber-100 text-amber-700", ok: "bg-emerald-100 text-emerald-700", na: "bg-muted text-muted-foreground" };
 const STATUS: Record<string, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-amber-100 text-amber-700" },
   approved: { label: "Approved", cls: "bg-emerald-100 text-emerald-700" },
   auto_approved: { label: "Auto-approved", cls: "bg-emerald-50 text-emerald-600" },
   declined: { label: "Declined", cls: "bg-red-100 text-red-700" },
-  deferred: { label: "Deferred", cls: "bg-slate-100 text-slate-600" },
+  deferred: { label: "Deferred", cls: "bg-muted text-muted-foreground" },
 };
 const CATEGORIES = ["mechanical", "safety", "tires", "glass", "cosmetic", "interior", "detail", "keys", "sublet"];
 
@@ -108,7 +108,7 @@ export default function ReconBoard() {
               {isManager && <Group title="Needs your approval" icon={<ShieldAlert className="w-4 h-4 text-amber-600" />} items={groups.needs} selId={selId} onSelect={setSelId} accent="amber" />}
               {!isManager && <Group title="Awaiting approval" icon={<Clock className="w-4 h-4 text-amber-600" />} items={groups.needs} selId={selId} onSelect={setSelId} accent="amber" />}
               <Group title="In recon" icon={<Wrench className="w-4 h-4 text-emerald-600" />} items={groups.inRecon} selId={selId} onSelect={setSelId} accent="emerald" />
-              <Group title="Closed" icon={<XCircle className="w-4 h-4 text-slate-400" />} items={groups.closed} selId={selId} onSelect={setSelId} accent="slate" />
+              <Group title="Closed" icon={<XCircle className="w-4 h-4 text-muted-foreground" />} items={groups.closed} selId={selId} onSelect={setSelId} accent="slate" />
               {estimates.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No recon estimates yet. Service submits the first one with “New estimate.”</p>}
             </>
           )}
@@ -158,7 +158,7 @@ export default function ReconBoard() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${SEV[l.severity] || SEV.recommended}`}>{l.severity}</span>
-                            {l.category && <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600">{l.category}</span>}
+                            {l.category && <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground">{l.category}</span>}
                             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${st.cls}`}>{st.label}</span>
                           </div>
                           <p className="text-[15px] font-semibold text-foreground">{l.description}</p>

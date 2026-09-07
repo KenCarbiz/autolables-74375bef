@@ -152,7 +152,7 @@ const CASES: { id: string; label: string; data: Record<string, unknown> }[] = [
 
 const Frame: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => (
   <div className="flex flex-col items-start gap-2">
-    <div className="font-mono text-xs text-slate-600">{label}</div>
+    <div className="font-mono text-xs text-muted-foreground">{label}</div>
     {children}
   </div>
 );
@@ -162,8 +162,8 @@ const DevSaturdayPreview = () => {
   if (fitCase) {
     const shown = fitCase === "all" ? CASES : CASES.filter((c) => c.id === fitCase.toUpperCase());
     return (
-      <div className="min-h-screen bg-slate-100 p-8">
-        <h1 className="text-2xl font-bold text-slate-900">Addendum content-fit cases</h1>
+      <div className="min-h-screen bg-muted p-8">
+        <h1 className="text-2xl font-bold text-foreground">Addendum content-fit cases</h1>
         <div className="mt-6 flex flex-wrap items-start gap-8">
           {shown.map((c) => (
             <Frame key={c.id} label={`${c.label} · used`}>
@@ -184,9 +184,9 @@ const DevSaturdayPreview = () => {
     );
   }
   return (
-    <div className="min-h-screen bg-slate-100 p-8">
-      <h1 className="text-2xl font-bold text-slate-900">Saturday Templates — Preview</h1>
-      <p className="mt-1 text-sm text-slate-700">
+    <div className="min-h-screen bg-muted p-8">
+      <h1 className="text-2xl font-bold text-foreground">Saturday Templates — Preview</h1>
+      <p className="mt-1 text-sm text-foreground">
         Three fresh Saturday-series layouts rendered through the tenant-safe dealer + vehicle + market adapter.
       </p>
 

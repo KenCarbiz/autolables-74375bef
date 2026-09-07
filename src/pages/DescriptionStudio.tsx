@@ -242,7 +242,7 @@ const DescriptionStudio = () => {
 
   return (
     <div className="min-h-screen bg-[#F7F9FC]">
-      <div className="border-b border-slate-200 bg-white">
+      <div className="border-b border-border bg-white">
         <div className="mx-auto flex max-w-[1600px] gap-8 overflow-x-auto px-5 py-5">
           {[
             { label: "Vehicle & Features", sub: "Canonical truth snapshot", done: !!snapshot },
@@ -251,12 +251,12 @@ const DescriptionStudio = () => {
             { label: "Review & Export", sub: "Approve and export", done: !!displayed },
           ].map((s, index) => (
             <div key={s.label} className="flex min-w-fit items-center gap-3">
-              <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black ${s.done ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"}`}>
+              <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black ${s.done ? "bg-blue-600 text-white" : "bg-muted text-foreground"}`}>
                 {s.done ? <CheckCircle2 className="h-5 w-5" /> : index + 1}
               </span>
               <div>
-                <div className="text-sm font-black text-slate-950">{s.label}</div>
-                <div className="text-xs font-semibold text-slate-500">{s.sub}</div>
+                <div className="text-sm font-black text-foreground">{s.label}</div>
+                <div className="text-xs font-semibold text-muted-foreground">{s.sub}</div>
               </div>
               {index < 3 && <ArrowRight className="h-4 w-4 text-slate-300" />}
             </div>
@@ -323,12 +323,12 @@ const DescriptionStudio = () => {
                 className="h-56 w-full rounded-2xl object-cover"
               />
             ) : (
-              <div className="flex h-56 w-full items-center justify-center rounded-2xl bg-slate-100 text-sm font-bold text-slate-400">
+              <div className="flex h-56 w-full items-center justify-center rounded-2xl bg-muted text-sm font-bold text-muted-foreground">
                 No photo on this listing
               </div>
             )}
-            <h2 className="mt-5 text-2xl font-black text-slate-950">{fact(snapshot, "ymm") || vehicle?.ymm || "—"}</h2>
-            <p className="text-lg font-semibold text-slate-600">{fact(snapshot, "trim") || vehicle?.trim || ""}</p>
+            <h2 className="mt-5 text-2xl font-black text-foreground">{fact(snapshot, "ymm") || vehicle?.ymm || "—"}</h2>
+            <p className="text-lg font-semibold text-muted-foreground">{fact(snapshot, "trim") || vehicle?.trim || ""}</p>
             <div className="mt-5 grid grid-cols-3 gap-4">
               <Spec label="Stock #" value={fact(snapshot, "stock_number")} icon={ImageIcon} />
               <Spec label="Mileage" value={num(fact(snapshot, "mileage"), " mi")} icon={Gauge} />
@@ -347,7 +347,7 @@ const DescriptionStudio = () => {
             badge={snapshot ? `Snapshot ${String(snapshot.source_data_version || "").slice(0, 10)}` : undefined}
           >
             {snapshot ? <FeatureList snapshot={snapshot} /> : (
-              <p className="text-sm font-semibold text-slate-500">
+              <p className="text-sm font-semibold text-muted-foreground">
                 No truth snapshot has been built for this vehicle yet.
               </p>
             )}
@@ -389,7 +389,7 @@ const DescriptionStudio = () => {
                   role="radio"
                   aria-checked={tone === item}
                   onClick={() => touchConfig(setTone)(item)}
-                  className={`h-12 min-w-[110px] rounded-xl border px-5 text-sm font-black capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${tone === item ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-700"}`}
+                  className={`h-12 min-w-[110px] rounded-xl border px-5 text-sm font-black capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${tone === item ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-white text-foreground"}`}
                 >
                   {item}
                 </button>
@@ -409,7 +409,7 @@ const DescriptionStudio = () => {
                 onChange={touchConfig(setPrimaryKeyword)}
                 placeholder="e.g. 2025 INFINITI QX80 for sale"
               />
-              <p className="mt-1 text-xs font-semibold text-slate-500">
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">
                 Used once, inside a sentence that would exist anyway. Repetition is scored down, not up.
               </p>
             </div>
@@ -433,20 +433,20 @@ const DescriptionStudio = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="text-xs font-black uppercase tracking-wide text-slate-400">
+                    <tr className="text-xs font-black uppercase tracking-wide text-muted-foreground">
                       <th className="pb-2">Channel</th><th className="pb-2">Words</th>
                       <th className="pb-2">Characters</th><th className="pb-2">Policy</th>
                     </tr>
                   </thead>
                   <tbody>
                     {channels.map((cv) => (
-                      <tr key={cv.id} className="border-t border-slate-100">
-                        <td className="py-2 font-bold text-slate-800">{channelMeta(cv.channel)?.label || cv.channel}</td>
-                        <td className="py-2 font-semibold text-slate-600">{cv.word_count ?? "—"}</td>
-                        <td className="py-2 font-semibold text-slate-600">
+                      <tr key={cv.id} className="border-t border-border">
+                        <td className="py-2 font-bold text-foreground">{channelMeta(cv.channel)?.label || cv.channel}</td>
+                        <td className="py-2 font-semibold text-muted-foreground">{cv.word_count ?? "—"}</td>
+                        <td className="py-2 font-semibold text-muted-foreground">
                           {cv.character_count ?? "—"}{cv.character_limit ? ` / ${cv.character_limit}` : ""}
                         </td>
-                        <td className="py-2 font-mono text-xs text-slate-500">{cv.channel_policy_version || "—"}</td>
+                        <td className="py-2 font-mono text-xs text-muted-foreground">{cv.channel_policy_version || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -460,9 +460,9 @@ const DescriptionStudio = () => {
         <section className="space-y-4">
           <Card title="Validation & Quality">
             {activeScore ? <ScorePanel score={activeScore} blocking={blocking.length} /> : (
-              <div className="rounded-xl bg-slate-50 px-4 py-6 text-center">
-                <div className="text-lg font-black text-slate-500">Not scored</div>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
+              <div className="rounded-xl bg-muted px-4 py-6 text-center">
+                <div className="text-lg font-black text-muted-foreground">Not scored</div>
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">
                   No score record exists for this version yet.
                 </p>
               </div>
@@ -475,7 +475,7 @@ const DescriptionStudio = () => {
               <button
                 onClick={() => regenerate(true)}
                 disabled={busy || !perms.canGenerate}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700 disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-border px-4 text-sm font-black text-foreground disabled:opacity-50"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />} Regenerate
               </button>
@@ -511,7 +511,7 @@ const DescriptionStudio = () => {
                 )}
 
                 {/* The exact stored text. Never reassembled client-side. */}
-                <div className="max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800">
+                <div className="max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-border bg-white p-4 text-sm font-medium leading-relaxed text-foreground">
                   {content}
                 </div>
 
@@ -536,7 +536,7 @@ const DescriptionStudio = () => {
                   )}
                 </div>
                 {!canPublish && (
-                  <p className="mt-3 text-xs font-semibold text-slate-500">
+                  <p className="mt-3 text-xs font-semibold text-muted-foreground">
                     Live publishing is unavailable for {channelMeta(channel)?.label || channel} until an inventory
                     connector is configured. This version can be approved and exported.
                   </p>
@@ -544,11 +544,11 @@ const DescriptionStudio = () => {
                 <DeliveryNote deliveries={deliveries} channel={channel} />
               </>
             ) : (
-              <div className="rounded-xl bg-slate-50 px-4 py-8 text-center">
-                <div className="text-base font-black text-slate-700">
+              <div className="rounded-xl bg-muted px-4 py-8 text-center">
+                <div className="text-base font-black text-foreground">
                   No description has been generated for this channel.
                 </div>
-                <p className="mx-auto mt-2 max-w-sm text-sm font-semibold text-slate-500">
+                <p className="mx-auto mt-2 max-w-sm text-sm font-semibold text-muted-foreground">
                   The master description is not shown here — it is a different piece of copy written under a
                   different policy, and displaying it would misrepresent what this channel would send.
                 </p>
@@ -566,7 +566,7 @@ const DescriptionStudio = () => {
 
           <Card title="Description Strength">
             {activeScore ? <StrengthPanel score={activeScore} /> : (
-              <p className="text-sm font-semibold text-slate-500">
+              <p className="text-sm font-semibold text-muted-foreground">
                 Strength is calculated when a version is scored. Nothing is shown until then.
               </p>
             )}
@@ -576,8 +576,8 @@ const DescriptionStudio = () => {
             <Card title="Version & Approval">
               <div className="space-y-2">
                 {versions.slice(0, 5).map((v) => (
-                  <div key={v.id} className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2">
-                    <span className="text-sm font-black text-slate-800">Draft v{v.version_number}</span>
+                  <div key={v.id} className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                    <span className="text-sm font-black text-foreground">Draft v{v.version_number}</span>
                     <span className={`rounded-full border px-2 py-0.5 text-xs font-black ${
                       v.id === caseRow.published_master_version_id ? TONE_CLASS.emerald
                       : v.id === caseRow.current_master_version_id ? TONE_CLASS.blue
@@ -589,7 +589,7 @@ const DescriptionStudio = () => {
                   </div>
                 ))}
               </div>
-              <div className="mt-3 flex items-center justify-between text-xs font-bold text-slate-500">
+              <div className="mt-3 flex items-center justify-between text-xs font-bold text-muted-foreground">
                 <span>Case status</span>
                 <span className={`rounded-full border px-2 py-0.5 ${TONE_CLASS[STATUS_META[caseRow.status as DescriptionStatus]?.tone ?? "slate"]}`}>
                   {STATUS_META[caseRow.status as DescriptionStatus]?.label ?? caseRow.status}
@@ -600,7 +600,7 @@ const DescriptionStudio = () => {
         </section>
       </main>
 
-      <div className="border-t border-slate-200 bg-white py-3 text-center text-sm font-semibold text-slate-500">
+      <div className="border-t border-border bg-white py-3 text-center text-sm font-semibold text-muted-foreground">
         AI-generated content. Always review for accuracy.
       </div>
     </div>
@@ -623,9 +623,9 @@ function ScorePanel({ score, blocking }: { score: Row; blocking: number }) {
     <div className="grid gap-5 md:grid-cols-[130px_1fr] md:items-start">
       <div className={`mx-auto flex h-28 w-28 items-center justify-center rounded-full border-[7px] bg-white ${ring}`}>
         <div className="text-center">
-          <div className="text-4xl font-black text-slate-950">{total}</div>
-          <div className="text-xs font-bold text-slate-500">/100</div>
-          <div className={`mt-1 rounded-full px-2 py-0.5 text-xs font-black ${blocked ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-700"}`}>
+          <div className="text-4xl font-black text-foreground">{total}</div>
+          <div className="text-xs font-bold text-muted-foreground">/100</div>
+          <div className={`mt-1 rounded-full px-2 py-0.5 text-xs font-black ${blocked ? "bg-red-50 text-red-700" : "bg-muted text-foreground"}`}>
             {blocked ? "Blocked" : band || "—"}
           </div>
         </div>
@@ -633,10 +633,10 @@ function ScorePanel({ score, blocking }: { score: Row; blocking: number }) {
       <div className="space-y-1.5">
         {cats.map((c) => (
           <div key={String(c.category)} className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-semibold text-slate-700">{humanize(String(c.category))}</span>
-            <span className="shrink-0 font-black text-slate-900" title={String(c.detail || "")}>
+            <span className="font-semibold text-foreground">{humanize(String(c.category))}</span>
+            <span className="shrink-0 font-black text-foreground" title={String(c.detail || "")}>
               {Math.round(Number(c.score ?? 0))}
-              <span className="ml-1 text-xs font-bold text-slate-400">×{c.weight}</span>
+              <span className="ml-1 text-xs font-bold text-muted-foreground">×{c.weight}</span>
             </span>
           </div>
         ))}
@@ -671,11 +671,11 @@ function StrengthPanel({ score }: { score: Row }) {
           sub={k.peakDensity != null ? `peak ${k.peakDensity}/100w` : ""} />
       </div>
       {Array.isArray(score.recommendations) && score.recommendations.length > 0 && (
-        <ul className="mt-4 space-y-1 text-xs font-semibold text-slate-600">
+        <ul className="mt-4 space-y-1 text-xs font-semibold text-muted-foreground">
           {score.recommendations.slice(0, 3).map((rec: string) => <li key={rec}>• {rec}</li>)}
         </ul>
       )}
-      <p className="mt-3 text-[11px] font-semibold text-slate-400">
+      <p className="mt-3 text-[11px] font-semibold text-muted-foreground">
         Calculated {score.calculatedAt ? new Date(String(score.calculatedAt)).toLocaleString() : "—"} · {String(score.version || "")}
       </p>
     </>
@@ -699,12 +699,12 @@ function FeatureList({ snapshot }: { snapshot: Row }) {
     <>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {items.slice(0, 12).map((label) => (
-          <div key={label} className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <div key={label} className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> {label}
           </div>
         ))}
         {items.length === 0 && (
-          <p className="text-sm font-semibold text-slate-500">No description-eligible equipment on this snapshot.</p>
+          <p className="text-sm font-semibold text-muted-foreground">No description-eligible equipment on this snapshot.</p>
         )}
       </div>
       {excluded.length > 0 && (
@@ -726,7 +726,7 @@ function DeliveryNote({ deliveries, channel }: { deliveries: Row[]; channel: str
   const delivered = rows.find((d) => d.status === "delivered");
   if (!rows.length) return null;
   return (
-    <p className="mt-3 text-xs font-semibold text-slate-500">
+    <p className="mt-3 text-xs font-semibold text-muted-foreground">
       {delivered
         ? `Delivered ${new Date(String(delivered.published_at || delivered.created_at)).toLocaleString()}.`
         : "Recorded for export. No automated delivery has been performed for this destination."}
@@ -739,9 +739,9 @@ function EmptyShell({ title, body, action }: {
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F7F9FC] p-6">
-      <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h1 className="text-xl font-black text-slate-950">{title}</h1>
-        <p className="mt-2 text-sm font-semibold text-slate-500">{body}</p>
+      <div className="max-w-md rounded-2xl border border-border bg-white p-8 text-center shadow-sm">
+        <h1 className="text-xl font-black text-foreground">{title}</h1>
+        <p className="mt-2 text-sm font-semibold text-muted-foreground">{body}</p>
         {action && (
           <button onClick={action.onClick} className="mt-5 inline-flex h-11 items-center rounded-xl bg-blue-600 px-5 text-sm font-black text-white">
             {action.label}
@@ -756,14 +756,14 @@ function Card({ title, subtitle, badge, action, children }: {
   title: string; subtitle?: string; badge?: string; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-border bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black text-slate-950">
+          <h2 className="text-lg font-black text-foreground">
             {title}
             {badge && <span className="ml-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{badge}</span>}
           </h2>
-          {subtitle && <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-sm font-semibold text-muted-foreground">{subtitle}</p>}
         </div>
         {action}
       </div>
@@ -775,8 +775,8 @@ function Card({ title, subtitle, badge, action, children }: {
 function Spec({ icon: Icon, label, value }: { icon: typeof Sparkles; label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Icon className="h-4 w-4" />{label}</div>
-      <div className="mt-1 truncate text-sm font-black text-slate-950">{value || "—"}</div>
+      <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><Icon className="h-4 w-4" />{label}</div>
+      <div className="mt-1 truncate text-sm font-black text-foreground">{value || "—"}</div>
     </div>
   );
 }
@@ -784,8 +784,8 @@ function Spec({ icon: Icon, label, value }: { icon: typeof Sparkles; label: stri
 function Meta({ label, value, tone = "slate" }: { label: string; value: string; tone?: "slate" | "amber" }) {
   return (
     <div>
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className={`mt-0.5 truncate text-sm font-black capitalize ${tone === "amber" ? "text-amber-700" : "text-slate-950"}`}>{value}</div>
+      <div className="text-xs font-semibold text-muted-foreground">{label}</div>
+      <div className={`mt-0.5 truncate text-sm font-black capitalize ${tone === "amber" ? "text-amber-700" : "text-foreground"}`}>{value}</div>
     </div>
   );
 }
@@ -793,9 +793,9 @@ function Meta({ label, value, tone = "slate" }: { label: string; value: string; 
 function Strength({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div>
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className="mt-1 font-black text-slate-900">{value}</div>
-      {sub && <div className="text-[11px] font-semibold text-slate-400">{sub}</div>}
+      <div className="text-xs font-semibold text-muted-foreground">{label}</div>
+      <div className="mt-1 font-black text-foreground">{value}</div>
+      {sub && <div className="text-[11px] font-semibold text-muted-foreground">{sub}</div>}
     </div>
   );
 }
@@ -805,12 +805,12 @@ function Field({ label, value, onChange, placeholder }: {
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-bold text-slate-600">{label}</span>
+      <span className="text-sm font-bold text-muted-foreground">{label}</span>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400"
+        className="mt-2 h-12 w-full rounded-xl border border-border bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400"
       />
     </label>
   );
@@ -818,8 +818,8 @@ function Field({ label, value, onChange, placeholder }: {
 
 function CheckOption({ checked, onClick, label }: { checked: boolean; onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick} role="checkbox" aria-checked={checked} className="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-      <span className={`flex h-5 w-5 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white"}`}>
+    <button onClick={onClick} role="checkbox" aria-checked={checked} className="inline-flex items-center gap-2 text-sm font-bold text-foreground">
+      <span className={`flex h-5 w-5 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-border bg-white"}`}>
         {checked && <CheckCircle2 className="h-3.5 w-3.5" />}
       </span>
       {label}
@@ -829,7 +829,7 @@ function CheckOption({ checked, onClick, label }: { checked: boolean; onClick: (
 
 function Button({ icon: Icon, label, onClick }: { icon: typeof Copy; label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700">
+    <button onClick={onClick} className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-black text-foreground">
       <Icon className="h-4 w-4" /> {label}
     </button>
   );

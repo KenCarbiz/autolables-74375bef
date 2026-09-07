@@ -33,7 +33,7 @@ const TONE_ACCENT: Record<Tone, string> = {
 // the same text shade TONE_CLASS already uses inside a pill, TONE_FILL is the
 // solid counterpart for a filled circle or dot.
 export const TONE_TEXT: Record<Tone, string> = {
-  slate: "text-slate-700",
+  slate: "text-foreground",
   blue: "text-blue-700",
   amber: "text-amber-800",
   red: "text-red-700",
@@ -979,7 +979,7 @@ export function TimelineRail({
                 className={cn(
                   "mt-1 w-2.5 h-2.5 rounded-full border-2",
                   entry.pending
-                    ? "border-slate-300 bg-card"
+                    ? "border-border bg-card"
                     : "border-blue-600 bg-blue-600",
                 )}
                 aria-hidden="true"

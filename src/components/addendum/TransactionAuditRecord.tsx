@@ -51,8 +51,8 @@ const fmt = (iso?: string | null) => {
 
 const Field = ({ label, value, mono }: { label: string; value: string; mono?: boolean }) => (
   <div className="min-w-0">
-    <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-400">{label}</p>
-    <p className={`text-[12px] text-slate-800 truncate ${mono ? "font-mono" : "font-semibold"}`}>{value}</p>
+    <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+    <p className={`text-[12px] text-foreground truncate ${mono ? "font-mono" : "font-semibold"}`}>{value}</p>
   </div>
 );
 
@@ -67,9 +67,9 @@ const TransactionAuditRecord = ({
       : "Not shared";
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">Transaction Audit Record</p>
+    <div className="rounded-2xl border border-border bg-white overflow-hidden">
+      <div className="px-5 py-3 border-b border-border bg-muted flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Transaction Audit Record</p>
         <span className="text-[9px] font-mono uppercase tracking-wider text-emerald-600">SHA-256 sealed</span>
       </div>
       <div className="p-5 grid grid-cols-2 gap-x-4 gap-y-3.5">
@@ -83,11 +83,11 @@ const TransactionAuditRecord = ({
         <Field label="IP address" value={ip || "—"} mono />
         <Field label="Location" value={geo} mono />
         <div className="col-span-2 min-w-0">
-          <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-400">Content hash</p>
-          <p className="text-[12px] text-slate-800 font-mono break-all">{hashShort}</p>
+          <p className="text-[9px] font-mono uppercase tracking-[0.16em] text-muted-foreground">Content hash</p>
+          <p className="text-[12px] text-foreground font-mono break-all">{hashShort}</p>
         </div>
       </div>
-      <p className="px-5 pb-4 text-[10px] text-slate-400 leading-relaxed">
+      <p className="px-5 pb-4 text-[10px] text-muted-foreground leading-relaxed">
         This record is captured at the moment of signature and hashed into the signed document. It is admissible
         evidence of the electronic signature under the federal E-SIGN Act and your state's UETA.
       </p>

@@ -12,7 +12,7 @@ export default function OemSticker({ listing }: { listing: VehicleListing }) {
     <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
+          <span className="w-7 h-7 rounded-lg bg-muted text-foreground flex items-center justify-center">
             <FileText className="w-4 h-4" />
           </span>
           <h2 className="text-sm font-semibold text-foreground">OEM window sticker</h2>
@@ -24,7 +24,7 @@ export default function OemSticker({ listing }: { listing: VehicleListing }) {
 
       {isPdf ? (
         <a href={url} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-border bg-muted/40 p-6 text-center hover:bg-muted/60 transition-colors">
-          <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+          <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
           <p className="text-sm font-semibold text-foreground">View the original factory Monroney label</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">Opens the OEM window sticker (PDF)</p>
         </a>

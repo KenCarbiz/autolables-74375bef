@@ -83,11 +83,11 @@ export default function PrintQrBatch() {
             const base = `${window.location.origin}/ready/${v.token}`;
             const url = mode === "k208" ? `${base}?station=service` : base;
             return (
-              <div key={v.vin} className="qr-card border border-slate-200 rounded-xl p-3 flex gap-3 items-center">
-                <div className="shrink-0 border border-slate-100 rounded-lg p-1.5 bg-white"><QRCodeSVG value={url} size={96} level="M" /></div>
+              <div key={v.vin} className="qr-card border border-border rounded-xl p-3 flex gap-3 items-center">
+                <div className="shrink-0 border border-border rounded-lg p-1.5 bg-white"><QRCodeSVG value={url} size={96} level="M" /></div>
                 <div className="min-w-0">
                   <p className="text-[13px] font-black leading-tight truncate">{v.ymm}</p>
-                  <p className="text-[10px] text-slate-500 font-mono">{v.stock ? `Stock ${v.stock} · ` : ""}…{v.vin.slice(-8)}</p>
+                  <p className="text-[10px] text-muted-foreground font-mono">{v.stock ? `Stock ${v.stock} · ` : ""}…{v.vin.slice(-8)}</p>
                   <p className="text-[9px] text-blue-700 font-bold uppercase tracking-wide mt-1">{mode === "k208" ? "Scan for CT K-208" : "Scan for Get-Ready"}</p>
                 </div>
               </div>

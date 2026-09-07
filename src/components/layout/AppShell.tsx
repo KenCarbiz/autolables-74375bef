@@ -689,10 +689,10 @@ const AppShell = ({ children }: AppShellProps) => {
 
         <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
           {!inventoryHasOwnMobileChrome && (
-            <header className="lg:hidden shrink-0 border-b border-slate-200 bg-white px-4 pb-4 pt-5">
+            <header className="lg:hidden shrink-0 border-b border-border bg-white px-4 pb-4 pt-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-4">
-                  <button onClick={() => setMobileOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Open menu">
+                  <button onClick={() => setMobileOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-foreground active:bg-muted" aria-label="Open menu">
                     <Menu className="h-7 w-7" />
                   </button>
                   <div className="h-12 w-px bg-slate-200" />
@@ -700,11 +700,11 @@ const AppShell = ({ children }: AppShellProps) => {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button className="min-w-0 text-left">
-                          <div className="flex items-center gap-2 text-[24px] font-black leading-none tracking-tight text-slate-950">
+                          <div className="flex items-center gap-2 text-[24px] font-black leading-none tracking-tight text-foreground">
                             <span className="truncate">{companyName}</span>
                             <ChevronDown className="h-5 w-5 shrink-0" />
                           </div>
-                          <div className="mt-1 text-lg font-medium text-slate-500">{dealerLocation}</div>
+                          <div className="mt-1 text-lg font-medium text-muted-foreground">{dealerLocation}</div>
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-72 bg-card">
@@ -723,14 +723,14 @@ const AppShell = ({ children }: AppShellProps) => {
                     </DropdownMenu>
                   ) : (
                     <div className="min-w-0">
-                      <div className="truncate text-[24px] font-black leading-none tracking-tight text-slate-950">{companyName}</div>
-                      <div className="mt-1 text-lg font-medium text-slate-500">{dealerLocation}</div>
+                      <div className="truncate text-[24px] font-black leading-none tracking-tight text-foreground">{companyName}</div>
+                      <div className="mt-1 text-lg font-medium text-muted-foreground">{dealerLocation}</div>
                     </div>
                   )}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Recent activity">
+                    <button className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-foreground active:bg-muted" aria-label="Recent activity">
                       <Bell className="h-7 w-7" />
                       {unreadBell > 0 && <span className="absolute -right-0.5 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{unreadBell}</span>}
                     </button>
@@ -750,7 +750,7 @@ const AppShell = ({ children }: AppShellProps) => {
                 </DropdownMenu>
               </div>
 
-              <div className="ml-[70px] mt-4 flex flex-wrap items-center gap-3 text-base font-medium text-slate-500">
+              <div className="ml-[70px] mt-4 flex flex-wrap items-center gap-3 text-base font-medium text-muted-foreground">
                 <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Last sync: {formatSyncTime(lastMarketCheckSync)}</span>
                 <span className="h-5 w-px bg-slate-300" />
                 <span className="flex items-center gap-2"><CheckCircle2 className={`h-5 w-5 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} /> {marketCheckLabel}</span>
@@ -786,7 +786,7 @@ const AppShell = ({ children }: AppShellProps) => {
                         onClick={() => navigate("/admin?tab=audit")}
                         className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-[13px] font-bold text-foreground hover:bg-muted"
                       >
-                        <History className="h-4 w-4 text-slate-500" /> History
+                        <History className="h-4 w-4 text-muted-foreground" /> History
                       </button>
                       {/* Tenant chip */}
                       <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
@@ -1020,14 +1020,14 @@ const AppShell = ({ children }: AppShellProps) => {
           </main>
 
           {!inventoryHasOwnMobileChrome && (
-            <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+            <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/95 px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
               <div className="mx-auto grid max-w-[520px] grid-cols-5 items-end gap-1">
                 {bottomNavItems.map((item) => {
                   const Icon = item.icon;
                   const active = item.path !== "scan" && location.pathname === item.path;
                   return (
-                    <button key={item.label} onClick={() => item.path === "scan" ? openScan() : navigate(item.path)} className={`flex flex-col items-center justify-end gap-1 text-[12px] font-bold ${active ? "text-blue-700" : "text-slate-500"}`}>
-                      <span className={`${item.raised ? "-mt-8 flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-white text-blue-700 shadow-lg" : "flex h-7 items-center justify-center"}`}>
+                    <button key={item.label} onClick={() => item.path === "scan" ? openScan() : navigate(item.path)} className={`flex flex-col items-center justify-end gap-1 text-[12px] font-bold ${active ? "text-blue-700" : "text-muted-foreground"}`}>
+                      <span className={`${item.raised ? "-mt-8 flex h-14 w-14 items-center justify-center rounded-full border border-border bg-white text-blue-700 shadow-lg" : "flex h-7 items-center justify-center"}`}>
                         <Icon className={item.raised ? "h-7 w-7" : "h-6 w-6"} />
                       </span>
                       <span>{item.label}</span>

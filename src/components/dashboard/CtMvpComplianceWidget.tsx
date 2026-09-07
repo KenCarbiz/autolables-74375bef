@@ -38,7 +38,7 @@ const Stat = ({ icon: Icon, label, value, tone = "slate", onClick }: { icon: typ
     amber: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100",
     rose: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
     blue: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",
-    slate: "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100",
+    slate: "border-border bg-muted text-foreground hover:bg-muted",
   } as const;
 
   return (

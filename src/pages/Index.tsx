@@ -1583,8 +1583,8 @@ const Index = () => {
           />
           {/* Per-state disclosure pack — collapsed by default so it isn't a
               wall of legal text above the dealer's work; one tap to review. */}
-          <details className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <summary className="cursor-pointer select-none px-4 py-3 text-body-sm font-semibold text-slate-700">
+          <details className="rounded-xl border border-border bg-white overflow-hidden">
+            <summary className="cursor-pointer select-none px-4 py-3 text-body-sm font-semibold text-foreground">
               State disclosures &amp; consumer-rights preview
             </summary>
             <div className="px-1 pb-1">

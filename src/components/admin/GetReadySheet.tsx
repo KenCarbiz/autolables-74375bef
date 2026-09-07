@@ -158,30 +158,30 @@ export const GetReadySheet = ({
         .gr-noprint { display: none !important; }
       }`}</style>
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-        <div id="gr-sheet" className="p-7 text-slate-900">
+        <div id="gr-sheet" className="p-7 text-foreground">
           {/* Header */}
           <div className="flex items-start justify-between gap-5 border-b-2 border-slate-900 pb-3">
             <div className="min-w-0 flex items-start gap-3">
               {logo && <img src={logo} alt={dealerName || settings.dealer_name} className="h-11 w-auto object-contain shrink-0" />}
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Get-Ready · Reconditioning Slip</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Get-Ready · Reconditioning Slip</p>
                 <h1 className="text-xl font-black leading-tight">{dealerName || settings.dealer_name || "Dealership"}</h1>
-                {(address || phone) && <p className="text-[10px] text-slate-500">{[address, phone].filter(Boolean).join(" · ")}</p>}
+                {(address || phone) && <p className="text-[10px] text-muted-foreground">{[address, phone].filter(Boolean).join(" · ")}</p>}
                 <p className="text-[13px] font-semibold mt-0.5">{record.ymm || "Vehicle"}</p>
               </div>
             </div>
             <div className="text-center flex-shrink-0">
               {loading ? (
-                <div className="w-[110px] h-[110px] rounded bg-slate-100 animate-pulse" />
+                <div className="w-[110px] h-[110px] rounded bg-muted animate-pulse" />
               ) : installUrl ? (
                 <>
-                  <div className="border border-slate-300 p-1.5 inline-block bg-white">
+                  <div className="border border-border p-1.5 inline-block bg-white">
                     <QRCodeSVG value={installUrl} size={100} />
                   </div>
-                  <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Installer: scan to verify</p>
+                  <p className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">Installer: scan to verify</p>
                 </>
               ) : (
-                <p className="text-[10px] text-slate-500 w-[110px]">Add vehicle to inventory to generate the installer QR.</p>
+                <p className="text-[10px] text-muted-foreground w-[110px]">Add vehicle to inventory to generate the installer QR.</p>
               )}
             </div>
           </div>
@@ -199,17 +199,17 @@ export const GetReadySheet = ({
 
           {/* Recon stage strip */}
           <div className="mt-4">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1">Recon stage</p>
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground mb-1">Recon stage</p>
             <div className="flex items-stretch gap-1">
               {STAGES.map((s, i) => (
                 <div
                   key={s}
                   className={`flex-1 text-center text-[9px] font-bold uppercase tracking-wide py-1.5 rounded border ${
                     i < reachedStage
-                      ? "bg-slate-100 border-slate-300 text-slate-500"
+                      ? "bg-muted border-border text-muted-foreground"
                       : i === reachedStage
                         ? "bg-slate-900 border-slate-900 text-white"
-                        : "bg-white border-slate-200 text-slate-400"
+                        : "bg-white border-border text-muted-foreground"
                   }`}
                 >
                   {s}
@@ -220,51 +220,51 @@ export const GetReadySheet = ({
 
           {/* Work / accessories table */}
           <div className="mt-4">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1">Equipment &amp; recon items</p>
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground mb-1">Equipment &amp; recon items</p>
             <table className="w-full border-collapse text-[11px]">
               <thead>
-                <tr className="bg-slate-100 text-left text-[9px] uppercase tracking-wider text-slate-600">
-                  <th className="border border-slate-300 px-2 py-1 w-6">✓</th>
-                  <th className="border border-slate-300 px-2 py-1">Item</th>
-                  <th className="border border-slate-300 px-2 py-1 w-28">Department</th>
-                  <th className="border border-slate-300 px-2 py-1 w-24">Vendor / Tech</th>
-                  <th className="border border-slate-300 px-2 py-1 w-14">Date</th>
-                  <th className="border border-slate-300 px-2 py-1 w-12">Init.</th>
+                <tr className="bg-muted text-left text-[9px] uppercase tracking-wider text-muted-foreground">
+                  <th className="border border-border px-2 py-1 w-6">✓</th>
+                  <th className="border border-border px-2 py-1">Item</th>
+                  <th className="border border-border px-2 py-1 w-28">Department</th>
+                  <th className="border border-border px-2 py-1 w-24">Vendor / Tech</th>
+                  <th className="border border-border px-2 py-1 w-14">Date</th>
+                  <th className="border border-border px-2 py-1 w-12">Init.</th>
                 </tr>
               </thead>
               <tbody>
                 {STANDARD_ITEMS.map((s) => (
                   <tr key={s.label}>
-                    <td className="border border-slate-300 px-2 py-1.5 text-center"><span className="inline-block w-3.5 h-3.5 border border-slate-500" /></td>
-                    <td className="border border-slate-300 px-2 py-1.5 font-semibold">{s.label}</td>
-                    <td className="border border-slate-300 px-2 py-1.5 text-slate-600">{s.dept}</td>
-                    <td className="border border-slate-300 px-2 py-1.5"></td>
-                    <td className="border border-slate-300 px-2 py-1.5"></td>
-                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                    <td className="border border-border px-2 py-1.5 text-center"><span className="inline-block w-3.5 h-3.5 border border-slate-500" /></td>
+                    <td className="border border-border px-2 py-1.5 font-semibold">{s.label}</td>
+                    <td className="border border-border px-2 py-1.5 text-muted-foreground">{s.dept}</td>
+                    <td className="border border-border px-2 py-1.5"></td>
+                    <td className="border border-border px-2 py-1.5"></td>
+                    <td className="border border-border px-2 py-1.5"></td>
                   </tr>
                 ))}
                 {accessories.map((a) => (
                   <tr key={a.productId}>
-                    <td className="border border-slate-300 px-2 py-1.5 text-center">
+                    <td className="border border-border px-2 py-1.5 text-center">
                       <span className={`inline-block w-3.5 h-3.5 border border-slate-500 ${a.installed ? "bg-slate-900" : ""}`} />
                     </td>
-                    <td className="border border-slate-300 px-2 py-1.5 font-semibold">{a.productName}</td>
-                    <td className="border border-slate-300 px-2 py-1.5 text-slate-600">Detail / Vendor</td>
-                    <td className="border border-slate-300 px-2 py-1.5">{a.installedBy || ""}</td>
-                    <td className="border border-slate-300 px-2 py-1.5">{fmtDate(a.installedDate)}</td>
-                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                    <td className="border border-border px-2 py-1.5 font-semibold">{a.productName}</td>
+                    <td className="border border-border px-2 py-1.5 text-muted-foreground">Detail / Vendor</td>
+                    <td className="border border-border px-2 py-1.5">{a.installedBy || ""}</td>
+                    <td className="border border-border px-2 py-1.5">{fmtDate(a.installedDate)}</td>
+                    <td className="border border-border px-2 py-1.5"></td>
                   </tr>
                 ))}
                 {Array.from({ length: blankRows }).map((_, i) => (
                   <tr key={`b${i}`}>
-                    <td className="border border-slate-300 px-2 py-1.5 text-center">
+                    <td className="border border-border px-2 py-1.5 text-center">
                       <span className="inline-block w-3.5 h-3.5 border border-slate-400" />
                     </td>
-                    <td className="border border-slate-300 px-2 py-1.5">&nbsp;</td>
-                    <td className="border border-slate-300 px-2 py-1.5"></td>
-                    <td className="border border-slate-300 px-2 py-1.5"></td>
-                    <td className="border border-slate-300 px-2 py-1.5"></td>
-                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                    <td className="border border-border px-2 py-1.5">&nbsp;</td>
+                    <td className="border border-border px-2 py-1.5"></td>
+                    <td className="border border-border px-2 py-1.5"></td>
+                    <td className="border border-border px-2 py-1.5"></td>
+                    <td className="border border-border px-2 py-1.5"></td>
                   </tr>
                 ))}
               </tbody>
@@ -273,14 +273,14 @@ export const GetReadySheet = ({
 
           {/* Notes */}
           <div className="mt-4">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1">Recon notes</p>
-            <div className="border border-slate-300 rounded h-16" />
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground mb-1">Recon notes</p>
+            <div className="border border-border rounded h-16" />
           </div>
 
           {/* Installer instructions */}
-          <div className="mt-3 rounded bg-slate-50 border border-slate-200 p-3">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-600 mb-0.5">For the installer</p>
-            <p className="text-[10px] text-slate-700 leading-snug">
+          <div className="mt-3 rounded bg-muted border border-border p-3">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">For the installer</p>
+            <p className="text-[10px] text-foreground leading-snug">
               Scan the QR above, enter your name and company, confirm what you installed and when, then take a photo of the
               equipment on the vehicle and submit. This creates the time-stamped proof of installation.
             </p>
@@ -290,11 +290,11 @@ export const GetReadySheet = ({
           <div className="mt-5 grid grid-cols-2 gap-6 text-[10px]">
             <div>
               <div className="border-b border-slate-500 h-5" />
-              <p className="mt-1 uppercase tracking-wider text-slate-500">Recon / Service Manager · Date</p>
+              <p className="mt-1 uppercase tracking-wider text-muted-foreground">Recon / Service Manager · Date</p>
             </div>
             <div>
               <div className="border-b border-slate-500 h-5" />
-              <p className="mt-1 uppercase tracking-wider text-slate-500">Used Car Manager · Date</p>
+              <p className="mt-1 uppercase tracking-wider text-muted-foreground">Used Car Manager · Date</p>
             </div>
           </div>
         </div>
@@ -304,10 +304,10 @@ export const GetReadySheet = ({
 
         {/* Actions */}
         <div className="gr-noprint flex items-center justify-end gap-2 px-7 pb-6">
-          <button onClick={onClose} className="h-10 px-4 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+          <button onClick={onClose} className="h-10 px-4 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted">
             Close
           </button>
-          <button onClick={printKeyTag} disabled={!installUrl} className="h-10 px-4 rounded-lg border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1.5 disabled:opacity-50">
+          <button onClick={printKeyTag} disabled={!installUrl} className="h-10 px-4 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted inline-flex items-center gap-1.5 disabled:opacity-50">
             <Printer className="w-4 h-4" /> Print key tag
           </button>
           <button onClick={() => window.print()} className="h-10 px-4 rounded-lg bg-slate-950 text-white text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-slate-900">
@@ -323,9 +323,9 @@ const Cell = ({
   label, value, mono, fill, span,
 }: { label: string; value: string; mono?: boolean; fill?: boolean; span?: number }) => (
   <div className={span === 2 ? "col-span-2" : ""}>
-    <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+    <p className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
     {value ? (
-      <p className={`text-[12px] font-semibold ${mono ? "font-mono" : ""} ${fill ? "border-b border-slate-300" : ""}`}>{value}</p>
+      <p className={`text-[12px] font-semibold ${mono ? "font-mono" : ""} ${fill ? "border-b border-border" : ""}`}>{value}</p>
     ) : (
       <p className="border-b border-slate-400 h-[15px]">&nbsp;</p>
     )}

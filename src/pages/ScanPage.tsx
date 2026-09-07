@@ -213,7 +213,7 @@ const ScanPage = () => {
               <List className="w-4 h-4" />
               Queue
               {queueCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500 text-[10px] font-bold text-slate-900 flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500 text-[10px] font-bold text-foreground flex items-center justify-center">
                   {queueCount}
                 </span>
               )}

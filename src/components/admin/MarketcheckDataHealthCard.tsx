@@ -383,7 +383,7 @@ function SyncStatusLine({ sync, running }: { sync: SyncState | null; running: bo
   if (!sync?.last_run_at) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
-        <MinusCircle className="w-4 h-4 text-slate-400" /> No inventory pull has run yet for this dealer.
+        <MinusCircle className="w-4 h-4 text-muted-foreground" /> No inventory pull has run yet for this dealer.
       </div>
     );
   }

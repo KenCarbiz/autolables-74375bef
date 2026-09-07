@@ -67,20 +67,20 @@ export function ChannelLogo({ channel, name }: { channel: string; name: string }
         style={{ width: LOGO_VIEWPORT.width, height: LOGO_VIEWPORT.height }}
         aria-hidden="true"
       >
-        <Globe className="h-8 w-8 text-slate-700" />
+        <Globe className="h-8 w-8 text-foreground" />
       </div>
     );
   }
 
   return (
     <div
-      className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 bg-slate-50"
+      className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-muted"
       style={{ width: LOGO_VIEWPORT.width, height: LOGO_VIEWPORT.height }}
       title={asset?.note || `No licensed ${name} brand asset has been supplied.`}
       data-testid={`logo-missing-${channel}`}
     >
-      <ImageOff className="h-4 w-4 text-slate-400" aria-hidden="true" />
-      <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Logo pending</span>
+      <ImageOff className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Logo pending</span>
     </div>
   );
 }
@@ -113,15 +113,15 @@ export function ChannelCard({
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
         "motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md",
         disabled
-          ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60"
+          ? "cursor-not-allowed border-border bg-muted opacity-60"
           : selected
             ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500"
-            : "cursor-pointer border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+            : "cursor-pointer border-border bg-white hover:border-border hover:bg-muted",
       ].join(" ")}
     >
       <ChannelLogo channel={meta.key} name={meta.name} />
-      <div className="mt-3 text-base font-black text-slate-950">{meta.name}</div>
-      <div className="mt-1 text-xs font-semibold text-slate-500">{meta.helper}</div>
+      <div className="mt-3 text-base font-black text-foreground">{meta.name}</div>
+      <div className="mt-1 text-xs font-semibold text-muted-foreground">{meta.helper}</div>
 
       <span id={`channel-note-${meta.key}`} className="sr-only">
         {disabled ? `Unavailable: ${status.disabledReason || "not enabled for this dealership"}.` : status.note || ""}
@@ -132,8 +132,8 @@ export function ChannelCard({
           className={[
             "mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black",
             status.state === "warning" ? "bg-amber-50 text-amber-800"
-              : status.state === "not_generated" ? "bg-slate-100 text-slate-600"
-              : "bg-slate-100 text-slate-600",
+              : status.state === "not_generated" ? "bg-muted text-muted-foreground"
+              : "bg-muted text-muted-foreground",
           ].join(" ")}
         >
           {status.state === "warning" && <AlertTriangle className="h-3 w-3" aria-hidden="true" />}
@@ -141,7 +141,7 @@ export function ChannelCard({
         </span>
       )}
       {disabled && status.disabledReason && (
-        <span className="mt-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
+        <span className="mt-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-black text-muted-foreground">
           {status.disabledReason}
         </span>
       )}

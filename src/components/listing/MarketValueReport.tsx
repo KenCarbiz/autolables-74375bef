@@ -49,9 +49,9 @@ export default function MarketValueReport({ listing }: { listing: VehicleListing
             <div className="w-3.5 h-3.5 rounded-full bg-emerald-600 ring-2 ring-white shadow" />
           </div>
         </div>
-        <div className="mt-2 flex items-center justify-between text-[10.5px] text-slate-500">
+        <div className="mt-2 flex items-center justify-between text-[10.5px] text-muted-foreground">
           <span>{usd(lo)}</span>
-          {mv != null && <span className="font-medium text-slate-600">Market avg {usd(mv)}</span>}
+          {mv != null && <span className="font-medium text-muted-foreground">Market avg {usd(mv)}</span>}
           <span>{usd(hi)}</span>
         </div>
       </div>
@@ -61,7 +61,7 @@ export default function MarketValueReport({ listing }: { listing: VehicleListing
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">This vehicle</p>
           <p className="text-lg font-bold text-emerald-600 tabular-nums leading-tight">{usd(price)}</p>
         </div>
-        <p className="text-[11px] text-slate-500 max-w-[60%] text-right">
+        <p className="text-[11px] text-muted-foreground max-w-[60%] text-right">
           {isDeal
             ? `Priced ${usd(below as number)} under the typical market value for similar vehicles.`
             : "Priced in line with comparable vehicles in this market."}

@@ -20,9 +20,9 @@ const REASON_LABEL = new Map(REGENERATION_REASONS.map((r) => [r.code as string, 
 const STATUS_TONE: Record<string, string> = {
   published: "bg-emerald-50 text-emerald-700",
   pending_approval: "bg-amber-50 text-amber-700",
-  draft: "bg-slate-100 text-slate-600",
-  superseded: "bg-slate-100 text-slate-500",
-  archived: "bg-slate-100 text-slate-500",
+  draft: "bg-muted text-muted-foreground",
+  superseded: "bg-muted text-muted-foreground",
+  archived: "bg-muted text-muted-foreground",
   rejected: "bg-rose-50 text-rose-700",
 };
 
@@ -113,7 +113,7 @@ export default function StickerVersionHistory({ tenantId, vehicleId, canRestore,
             <div key={v.id} className={`rounded-xl border p-3.5 space-y-2 ${v.id === currentId ? "border-blue-600" : "border-border"}`}>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[13px] font-bold text-foreground">Version {v.version}</span>
-                <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_TONE[v.status] || "bg-slate-100 text-slate-600"}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_TONE[v.status] || "bg-muted text-muted-foreground"}`}>
                   {humanize(v.status)}
                 </span>
                 {v.id === currentId && <span className="text-[10px] font-bold uppercase tracking-wide text-blue-700">Active</span>}

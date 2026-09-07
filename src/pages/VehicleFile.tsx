@@ -421,7 +421,7 @@ const VehicleFile = () => {
               <div className={`h-56 lg:h-[248px] rounded-2xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
                 vehicle.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
                 vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
-                "from-slate-400/15 to-slate-500/5 text-slate-500"
+                "from-slate-400/15 to-slate-500/5 text-muted-foreground"
               }`}>
                 {gallery.length ? (
                   <div className="relative w-full h-full rounded-2xl overflow-hidden">
@@ -456,18 +456,18 @@ const VehicleFile = () => {
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       vehicle.condition === "new" ? "bg-blue-100 text-blue-700" :
                       vehicle.condition === "cpo" ? "bg-emerald-100 text-emerald-700" :
-                      "bg-slate-100 text-slate-700"
+                      "bg-muted text-foreground"
                     }`}>{vehicle.condition || "unknown"}</span>
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       vehicle.status === "published" ? "bg-emerald-100 text-emerald-700" :
-                      vehicle.status === "archived" ? "bg-slate-100 text-slate-500" :
+                      vehicle.status === "archived" ? "bg-muted text-muted-foreground" :
                       "bg-amber-100 text-amber-700"
                     }`}>{vehicle.status}</span>
                   </div>
                   <h1 className="text-[32px] sm:text-[42px] lg:text-[48px] font-black tracking-[-0.02em] font-display text-foreground leading-[1]">
                     {vehicle.ymm || "(needs VIN decode)"}
                   </h1>
-                  {vehicle.trim ? <p className="text-2xl text-slate-600 font-normal leading-tight">{vehicle.trim}</p> : null}
+                  {vehicle.trim ? <p className="text-2xl text-muted-foreground font-normal leading-tight">{vehicle.trim}</p> : null}
                   {/* Stock + VIN, one row, with copy. The stock number is how
                       the lot, the DMS and the desk all refer to this car, so it
                       is always stated — an absent one says so rather than
@@ -806,7 +806,7 @@ const OverviewPanel = ({ vehicle, onTab, recall, onPublish, publishing }: { vehi
   const quick: { label: string; icon: typeof Car; tone: string; onClick: () => void }[] = [
     { label: "Generate Sticker", icon: Printer, tone: "bg-indigo-50 text-indigo-600", onClick: () => onTab("labels") },
     { label: "Create Addendum", icon: FileText, tone: "bg-violet-50 text-violet-600", onClick: () => onTab("addendum") },
-    { label: "Upload Documents", icon: Upload, tone: "bg-slate-100 text-slate-600", onClick: () => onTab("documents") },
+    { label: "Upload Documents", icon: Upload, tone: "bg-muted text-muted-foreground", onClick: () => onTab("documents") },
     { label: "Customer Sign-off", icon: Signature, tone: "bg-fuchsia-50 text-fuchsia-600", onClick: () => onTab("sign") },
     // Only open the public passport when it actually exists — an unpublished
     // vehicle's /v/{vin} renders "Vehicle unavailable", so route drafts to the
@@ -832,7 +832,7 @@ const OverviewPanel = ({ vehicle, onTab, recall, onPublish, publishing }: { vehi
     <div className="space-y-6">
       <div>
         <h2 className="text-[20px] font-bold tracking-tight text-foreground">Vehicle Health Snapshot</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Operational status, shopper readiness, pricing intelligence, and missing items for this vehicle.</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Operational status, shopper readiness, pricing intelligence, and missing items for this vehicle.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
@@ -1015,7 +1015,7 @@ const TabHeader = ({ title, description, action }: { title: string; description:
   <div className="flex items-start justify-between gap-4">
     <div className="min-w-0">
       <h2 className="text-[22px] font-bold tracking-tight text-foreground">{title}</h2>
-      <p className="text-sm text-slate-500 mt-1 max-w-xl">{description}</p>
+      <p className="text-sm text-muted-foreground mt-1 max-w-xl">{description}</p>
     </div>
     {action && <div className="shrink-0">{action}</div>}
   </div>
@@ -1167,7 +1167,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
 
       <div>
         <h3 className="text-[15px] font-bold text-foreground">Uploads &amp; Links</h3>
-        <p className="text-[13px] text-slate-500 mt-0.5 mb-3">Click Upload to attach a PDF or image, or Add link to paste a URL. Everything here appears in the shopper packet's Documents page.</p>
+        <p className="text-[13px] text-muted-foreground mt-0.5 mb-3">Click Upload to attach a PDF or image, or Add link to paste a URL. Everything here appears in the shopper packet's Documents page.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {slots.map((s) => (
         <div key={s.type} className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5 space-y-2">
@@ -1492,7 +1492,7 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
     <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5 flex items-center justify-between gap-4 flex-wrap">
       <div className="min-w-0">
         <h3 className="text-[15px] font-bold text-foreground">OEM Brochure</h3>
-        <p className="text-[13px] text-slate-500 mt-0.5">
+        <p className="text-[13px] text-muted-foreground mt-0.5">
           {found
             ? <>{fromIngest ? "Found automatically at intake" : "Linked"} to the manufacturer's official brochure{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a>{stored ? " — a copy is stored for this dealership, so the packet keeps working if the manufacturer moves the file." : ""}</>
             : <>No official {make || "model"} brochure has been found yet. Intake looks for one automatically; search now to try again.</>}
@@ -1547,7 +1547,7 @@ const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onR
     <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5 flex items-center justify-between gap-4 flex-wrap">
       <div className="min-w-0">
         <h3 className="text-[15px] font-bold text-foreground">Owner's Manual</h3>
-        <p className="text-[13px] text-slate-500 mt-0.5">
+        <p className="text-[13px] text-muted-foreground mt-0.5">
           {savedInDocs
             ? <>Saved to this vehicle's documents.</>
             : found
@@ -1658,7 +1658,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-[15px] font-bold text-foreground">Passport version</h3>
-            <p className="text-[13px] text-slate-500 mt-0.5">Which shopper experience this vehicle serves. Leave on “Inherit store default” unless this specific vehicle should be pinned.</p>
+            <p className="text-[13px] text-muted-foreground mt-0.5">Which shopper experience this vehicle serves. Leave on “Inherit store default” unless this specific vehicle should be pinned.</p>
           </div>
           <select
             value={passportVersion}
@@ -1676,7 +1676,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
       {/* Passport modules — module cards, same language as Documents */}
       <div>
         <h3 className="text-[15px] font-bold text-foreground">Passport Modules</h3>
-        <p className="text-[13px] text-slate-500 mt-0.5">Toggle the sections shoppers see. Recall, price, and verified installs always show.</p>
+        <p className="text-[13px] text-muted-foreground mt-0.5">Toggle the sections shoppers see. Recall, price, and verified installs always show.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
           {PACKET_MODULES.map((m) => {
             const override = packetModules[m.id];
@@ -1691,12 +1691,12 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
                 className={`text-left rounded-2xl border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5 flex flex-col gap-3 min-h-[150px] transition hover:shadow-md ${on ? "border-border" : "border-border opacity-75"}`}
               >
                 <h4 className="text-sm font-bold text-foreground">{m.label}</h4>
-                <p className="text-[13px] text-slate-500 leading-relaxed flex-1">{m.desc}</p>
+                <p className="text-[13px] text-muted-foreground leading-relaxed flex-1">{m.desc}</p>
                 <span className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-semibold ${on ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
+                  <span className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-semibold ${on ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-muted text-muted-foreground border border-border"}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-slate-400"}`} /> {on ? "Enabled" : "Disabled"}
                   </span>
-                  <span className={`inline-flex items-center h-7 px-2.5 rounded-full text-[11px] font-semibold ${inherited ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-slate-50 text-slate-600 border border-slate-200"}`}>
+                  <span className={`inline-flex items-center h-7 px-2.5 rounded-full text-[11px] font-semibold ${inherited ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-muted text-muted-foreground border border-border"}`}>
                     {inherited ? "Store default" : "This vehicle"}
                   </span>
                 </span>
@@ -1719,7 +1719,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
           <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6 space-y-3">
             <div>
               <h3 className="text-base font-bold text-foreground">Dealer Programs on This Vehicle</h3>
-              <p className="text-[13px] text-slate-500 mt-0.5">Store-wide programs that match this vehicle. Turn one off here if this exact unit doesn't qualify (mileage cap, branded title) — it disappears from this vehicle's sticker, packet, and warranty panel only.</p>
+              <p className="text-[13px] text-muted-foreground mt-0.5">Store-wide programs that match this vehicle. Turn one off here if this exact unit doesn't qualify (mileage cap, branded title) — it disappears from this vehicle's sticker, packet, and warranty panel only.</p>
             </div>
             <div className="space-y-2">
               {applicable.map((p) => {
@@ -1729,11 +1729,11 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
                   <div key={p.id} className={`flex items-center justify-between gap-3 rounded-xl border border-border px-3.5 py-2.5 ${off ? "opacity-60 bg-muted/30" : "bg-background"}`}>
                     <div className="min-w-0">
                       <p className="text-[13.5px] font-semibold text-foreground truncate">{p.title || p.offer}{term ? ` — ${term}` : ""}</p>
-                      <p className="text-[11.5px] text-slate-500">{programMode(p) === "included" ? "Included with the sale" : "Available upgrade"}{p.isWarranty ? " · Dealer warranty" : ""}</p>
+                      <p className="text-[11.5px] text-muted-foreground">{programMode(p) === "included" ? "Included with the sale" : "Available upgrade"}{p.isWarranty ? " · Dealer warranty" : ""}</p>
                     </div>
                     <button
                       onClick={() => toggle(p.id)}
-                      className={`shrink-0 h-8 px-3 rounded-lg border text-[12px] font-bold ${off ? "border-border text-slate-500 hover:bg-muted" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}
+                      className={`shrink-0 h-8 px-3 rounded-lg border text-[12px] font-bold ${off ? "border-border text-muted-foreground hover:bg-muted" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}
                     >
                       {off ? "Off for this vehicle" : "Showing"}
                     </button>
@@ -1750,7 +1750,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-bold text-foreground flex items-center gap-2"><Wrench className="w-4 h-4 text-muted-foreground" /> Service History</h3>
-            <p className="text-[13px] text-slate-500 mt-0.5">Add service visits, maintenance records, and repair history.</p>
+            <p className="text-[13px] text-muted-foreground mt-0.5">Add service visits, maintenance records, and repair history.</p>
           </div>
           <button onClick={() => setRecords((r) => [...r, { date: "", mileage: "", type: "", notes: "" }])} className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add Service Record</button>
         </div>
@@ -1758,7 +1758,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
           <div className="rounded-xl border border-dashed border-border bg-muted/20 py-8 text-center">
             <Wrench className="w-6 h-6 text-muted-foreground/50 mx-auto mb-2" />
             <p className="text-sm font-semibold text-foreground">No service records yet</p>
-            <p className="text-[12px] text-slate-500 mt-0.5">Log oil changes, inspections, and repairs to build buyer confidence.</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">Log oil changes, inspections, and repairs to build buyer confidence.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -1779,7 +1779,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
       <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6 space-y-4">
         <div>
           <h3 className="text-base font-bold text-foreground flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-muted-foreground" /> Remaining Factory Warranty</h3>
-          <p className="text-[13px] text-slate-500 mt-0.5">In-service date and coverage terms — shoppers see an estimated balance.</p>
+          <p className="text-[13px] text-muted-foreground mt-0.5">In-service date and coverage terms — shoppers see an estimated balance.</p>
         </div>
         {remainingCoverage && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 flex items-center gap-2.5">
@@ -1803,7 +1803,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-bold text-foreground flex items-center gap-2"><Sparkles className="w-4 h-4 text-muted-foreground" /> Available Accessories</h3>
-            <p className="text-[13px] text-slate-500 mt-0.5">Dealer-installed accessories and upgrades the shopper can add.</p>
+            <p className="text-[13px] text-muted-foreground mt-0.5">Dealer-installed accessories and upgrades the shopper can add.</p>
           </div>
           <button onClick={() => setAccessories((a) => [...a, { name: "", price: "", note: "" }])} className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add Accessory</button>
         </div>
@@ -1811,7 +1811,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
           <div className="rounded-xl border border-dashed border-border bg-muted/20 py-7 px-5 text-center">
             <Sparkles className="w-6 h-6 text-muted-foreground/50 mx-auto mb-2" />
             <p className="text-sm font-semibold text-foreground">No accessories added yet</p>
-            <p className="text-[12px] text-slate-500 mt-0.5">Examples: wheel packages · cargo systems · protection packages.</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">Examples: wheel packages · cargo systems · protection packages.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -2631,7 +2631,7 @@ const DealTokenCard = ({
   const cobuyerName = row.vehicle_payload?.coBuyer?.name;
   const statusCls =
     row.status === "signed" ? "bg-emerald-100 text-emerald-700" :
-    row.status === "expired" ? "bg-slate-100 text-slate-600" :
+    row.status === "expired" ? "bg-muted text-muted-foreground" :
     row.status === "revoked" ? "bg-red-100 text-red-700" :
     "bg-amber-100 text-amber-700";
   const statusIcon =
@@ -2820,7 +2820,7 @@ const eventVisual = (action: string): { icon: typeof CheckCircle2; cls: string }
   if (a.includes("publish")) return { icon: Globe, cls: "bg-emerald-50 text-emerald-600" };
   if (a.includes("addendum")) return { icon: FileText, cls: "bg-violet-50 text-violet-600" };
   if (a.includes("sign")) return { icon: Signature, cls: "bg-fuchsia-50 text-fuchsia-600" };
-  if (a.includes("upload") || a.includes("document")) return { icon: Upload, cls: "bg-slate-100 text-slate-600" };
+  if (a.includes("upload") || a.includes("document")) return { icon: Upload, cls: "bg-muted text-muted-foreground" };
   if (a.includes("recall")) return { icon: AlertTriangle, cls: "bg-amber-50 text-amber-600" };
   if (a.includes("prep") || a.includes("install")) return { icon: CheckCircle2, cls: "bg-teal-50 text-teal-600" };
   return { icon: CheckCircle2, cls: "bg-emerald-50 text-emerald-600" };

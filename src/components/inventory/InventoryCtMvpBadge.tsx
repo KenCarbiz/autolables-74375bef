@@ -13,7 +13,7 @@ const InventoryCtMvpBadge = ({ status, loading = false, compact = false }: Inven
   }
 
   if (!status) {
-    return <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-600"><ShieldCheck className="h-3 w-3" /> {compact ? "Not run" : "CT not run"}</span>;
+    return <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground"><ShieldCheck className="h-3 w-3" /> {compact ? "Not run" : "CT not run"}</span>;
   }
 
   if (status.ready) {

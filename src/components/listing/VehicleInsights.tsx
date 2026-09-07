@@ -5,7 +5,7 @@ import { vehicleInsights, type VehicleInsight, type InsightTone } from "@/lib/ve
 const TONE: Record<InsightTone, { chip: string; dot: string; text: string }> = {
   emerald: { chip: "border-emerald-200 bg-emerald-50", dot: "bg-emerald-500", text: "text-emerald-700" },
   blue: { chip: "border-blue-200 bg-blue-50", dot: "bg-blue-500", text: "text-blue-700" },
-  slate: { chip: "border-slate-200 bg-slate-50", dot: "bg-slate-400", text: "text-slate-700" },
+  slate: { chip: "border-border bg-muted", dot: "bg-slate-400", text: "text-foreground" },
   amber: { chip: "border-amber-200 bg-amber-50", dot: "bg-amber-500", text: "text-amber-700" },
 };
 
@@ -58,7 +58,7 @@ export default function VehicleInsights({ listing }: { listing: VehicleListing }
           return (
             <li key={i.id} className="flex items-start gap-2.5">
               <span className={`mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 ${t.dot}`} />
-              <p className="text-[12px] leading-relaxed text-slate-700">
+              <p className="text-[12px] leading-relaxed text-foreground">
                 <span className="font-semibold text-foreground">{i.label}.</span> {i.detail}
               </p>
             </li>

@@ -120,7 +120,7 @@ export default function PrintQueue() {
                     <p className="text-sm font-bold text-foreground truncate">{r.ymm || "Vehicle"}</p>
                     <p className="text-[11px] font-mono text-muted-foreground">{r.stock ? `Stock ${r.stock} · ` : ""}…{r.vin.slice(-8)}</p>
                   </div>
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">{r.condition || "used"}</span>
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-muted text-muted-foreground">{r.condition || "used"}</span>
                 </div>
                 <ol className="space-y-1">
                   {arts.map((a, i) => {
@@ -129,7 +129,7 @@ export default function PrintQueue() {
                       <li key={a.key}>
                         <button onClick={() => navigate(a.href(r))} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-muted/50 text-left">
                           <span className="w-5 text-[11px] font-bold text-muted-foreground tabular-nums">{i + 1}.</span>
-                          <Icon className="w-4 h-4 text-slate-500" />
+                          <Icon className="w-4 h-4 text-muted-foreground" />
                           <span className="text-[13px] text-foreground flex-1">{a.label}</span>
                           <ArrowUpRight className="w-3.5 h-3.5 text-blue-600" />
                         </button>

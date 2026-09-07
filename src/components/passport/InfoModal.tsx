@@ -69,7 +69,7 @@ export function InfoModal({
         tabIndex={-1}
         className={`relative w-full sm:w-[640px] sm:max-w-[92vw] max-h-[90vh] sm:max-h-[80vh] bg-white rounded-t-3xl sm:rounded-[20px] shadow-[0_30px_80px_rgba(0,0,0,0.30)] outline-none flex flex-col transition-all duration-200 ease-out ${enter ? "opacity-100 translate-y-0 sm:scale-100" : "opacity-0 translate-y-6 sm:translate-y-0 sm:scale-[0.96]"}`}
       >
-        <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors z-10"><X className="w-5 h-5" /></button>
+        <button onClick={onClose} aria-label="Close" className="absolute top-4 right-4 w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors z-10"><X className="w-5 h-5" /></button>
         <div className="overflow-y-auto px-6 sm:px-8 pt-7 sm:pt-8 pb-2">
           <div className="flex items-start gap-3.5 pr-8">
             {Icon && <span className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0"><Icon className="w-[22px] h-[22px] text-[#2563EB]" /></span>}

@@ -54,7 +54,7 @@ const Sheet = ({ id, mode }: { id: string; mode: LabelMode }) => {
   if (!t) return <div className="text-red-600">Missing template {id}</div>;
   return (
     <div className="flex flex-col items-start gap-2">
-      <div className="text-xs font-mono text-slate-600">
+      <div className="text-xs font-mono text-muted-foreground">
         {id} · {t.config.name} · {mode} label
       </div>
       <TemplateRenderer template={t} data={DATA} branding={BRAND} options={{ labelMode: mode }} />
@@ -64,9 +64,9 @@ const Sheet = ({ id, mode }: { id: string; mode: LabelMode }) => {
 
 const DevHeroPreview = () => {
   return (
-    <div className="min-h-screen bg-slate-100 p-8">
+    <div className="min-h-screen bg-muted p-8">
       <h1 className="text-2xl font-bold mb-6">Sticker Studio — Hero Template Preview</h1>
-      <p className="text-sm text-slate-700 mb-8">
+      <p className="text-sm text-foreground mb-8">
         Each sheet rendered at exact 8.5×11 with the Harte INFINITI / 2024 QX60 LUXE AWD sample data.
       </p>
       <div className="space-y-12">

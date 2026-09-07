@@ -72,7 +72,7 @@ export const AffordabilityStrip = ({
   return (
     <section
       aria-label="Estimated monthly payment"
-      className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+      className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden"
     >
       <header className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#0B2041] to-[#1E90FF] text-white">
         <div className="flex items-center gap-2">
@@ -87,21 +87,21 @@ export const AffordabilityStrip = ({
       <div className="grid grid-cols-1 sm:grid-cols-3 divide-x divide-slate-200 bg-white">
         {rows.map((r) => (
           <div key={r.term_months} className="p-4 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-label text-slate-500">
+            <p className="text-[10px] font-bold uppercase tracking-label text-muted-foreground">
               {r.term_months} months
             </p>
-            <p className="mt-1 text-2xl font-black tabular-nums text-slate-900">
+            <p className="mt-1 text-2xl font-black tabular-nums text-foreground">
               {formatCurrencyCents(r.monthly_payment)}
-              <span className="text-xs font-normal text-slate-500">/mo</span>
+              <span className="text-xs font-normal text-muted-foreground">/mo</span>
             </p>
-            <p className="text-[10px] text-slate-500 mt-1 tabular-nums">
+            <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">
               Lifetime cost {formatCurrency(r.lifetime_cost)}
             </p>
           </div>
         ))}
       </div>
 
-      <div className="px-4 py-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+      <div className="px-4 py-3 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
         <Field
           label="Down payment"
           value={down}
@@ -128,10 +128,10 @@ export const AffordabilityStrip = ({
         />
         {tax > 0 ? (
           <div>
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-label">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-label">
               Sales tax (est.)
             </p>
-            <p className="mt-1 h-9 flex items-center font-semibold text-slate-700 tabular-nums">
+            <p className="mt-1 h-9 flex items-center font-semibold text-foreground tabular-nums">
               {tax.toFixed(2)}%
             </p>
           </div>
@@ -142,13 +142,13 @@ export const AffordabilityStrip = ({
 
       <button
         onClick={() => setShowDetails((v) => !v)}
-        className="w-full px-4 py-2 text-[11px] text-slate-500 hover:text-slate-700 border-t border-slate-200 flex items-center justify-center gap-1.5"
+        className="w-full px-4 py-2 text-[11px] text-muted-foreground hover:text-foreground border-t border-border flex items-center justify-center gap-1.5"
       >
         <Info className="w-3 h-3" />
         {showDetails ? "Hide assumptions" : "How is this calculated?"}
       </button>
       {showDetails && (
-        <div className="px-4 pb-4 text-[11px] text-slate-600 leading-relaxed bg-slate-50">
+        <div className="px-4 pb-4 text-[11px] text-muted-foreground leading-relaxed bg-muted">
           Estimates use simple-interest amortization on price minus
           down + trade, plus an estimated sales-tax line for the
           state above. APR is editable; default reflects the Q1 2026
@@ -173,12 +173,12 @@ interface FieldProps {
 
 const Field = ({ label, value, onChange, step, min = 0, prefix, suffix }: FieldProps) => (
   <div>
-    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-label">
+    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-label">
       {label}
     </label>
     <div className="mt-1 relative">
       {prefix && (
-        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
           {prefix}
         </span>
       )}
@@ -191,12 +191,12 @@ const Field = ({ label, value, onChange, step, min = 0, prefix, suffix }: FieldP
           const v = parseFloat(e.target.value);
           onChange(isNaN(v) ? 0 : Math.max(min, v));
         }}
-        className={`w-full h-9 rounded-md border border-slate-200 bg-white text-right text-sm font-semibold text-slate-900 tabular-nums ${
+        className={`w-full h-9 rounded-md border border-border bg-white text-right text-sm font-semibold text-foreground tabular-nums ${
           prefix ? "pl-5 pr-2" : "px-2"
         } focus:outline-none focus:border-[#1E90FF]`}
       />
       {suffix && (
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
           {suffix}
         </span>
       )}

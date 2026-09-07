@@ -21,7 +21,7 @@ const statusColor = (s: EntitlementRow["status"]) =>
   s === "trial" ? "bg-blue-100 text-blue-700" :
   s === "past_due" ? "bg-amber-100 text-amber-700" :
   s === "canceled" ? "bg-rose-100 text-rose-700" :
-  "bg-slate-100 text-slate-700";
+  "bg-muted text-foreground";
 
 export const PlatformEntitlements = () => {
   const { tenants, entitlements, overrideEntitlement } = useAdminPlatform();

@@ -28,7 +28,7 @@ const PacketDefaultsPanel = () => {
         <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><PackageOpen className="w-[18px] h-[18px] text-blue-600" /></span>
         <div className="min-w-0">
           <h3 className="text-[15px] font-bold text-foreground">Customer Packet Defaults</h3>
-          <p className="text-[12.5px] text-slate-500 mt-0.5">
+          <p className="text-[12.5px] text-muted-foreground mt-0.5">
             The store-wide template for what shoppers see on every vehicle passport. Individual vehicles can
             override any module from their Vehicle File. Recall, price, and verified installs always show.
             Changes save automatically.
@@ -47,9 +47,9 @@ const PacketDefaultsPanel = () => {
             >
               <span className="min-w-0">
                 <span className="block text-[13px] font-semibold text-foreground truncate">{m.label}</span>
-                <span className="block text-[11.5px] text-slate-500 truncate">{m.desc}</span>
+                <span className="block text-[11.5px] text-muted-foreground truncate">{m.desc}</span>
               </span>
-              <span className={`shrink-0 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-[11px] font-bold ${on ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
+              <span className={`shrink-0 inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-[11px] font-bold ${on ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-muted text-muted-foreground border border-border"}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-slate-400"}`} /> {on ? "On" : "Off"}
               </span>
             </button>
@@ -65,7 +65,7 @@ const PacketDefaultsPanel = () => {
       <div className="flex items-center justify-between gap-3 border-t border-border pt-3.5 mt-4">
         <div className="min-w-0">
           <p className="text-[13px] font-bold text-foreground">CARFAX / AutoCheck report links</p>
-          <p className="text-[12px] text-slate-500 mt-0.5">
+          <p className="text-[12px] text-muted-foreground mt-0.5">
             Store-wide kill switch for your dealer-paid history report links (harvested nightly from your own
             website). Turn OFF if your subscription lapses so shoppers never land on a paywall. Overrides the
             module toggle above.

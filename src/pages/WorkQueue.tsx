@@ -41,8 +41,8 @@ const statusTone = (status: string) => {
   if (status === "completed") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (status === "needs_approval") return "border-amber-200 bg-amber-50 text-amber-800";
   if (status === "in_progress") return "border-blue-200 bg-blue-50 text-blue-800";
-  if (status === "cancelled") return "border-slate-200 bg-slate-50 text-slate-500";
-  return "border-slate-200 bg-white text-slate-800";
+  if (status === "cancelled") return "border-border bg-muted text-muted-foreground";
+  return "border-border bg-white text-foreground";
 };
 
 const departmentIcon = (department?: string | null) => {
@@ -193,7 +193,7 @@ const WorkQueue = () => {
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 p-4 lg:p-6">
-      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 text-white shadow-sm">
+      <section className="overflow-hidden rounded-[2rem] border border-border bg-slate-950 text-white shadow-sm">
         <div className="relative grid gap-6 p-5 lg:grid-cols-[1fr_auto] lg:items-end lg:p-7">
           <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
           <div className="relative">
@@ -209,7 +209,7 @@ const WorkQueue = () => {
             <button onClick={load} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-black text-white hover:bg-white/15 disabled:opacity-60">
               <RefreshCw className="h-4 w-4" /> Refresh
             </button>
-            <button onClick={generateFromInventory} disabled={creating} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-slate-950 shadow-lg shadow-black/20 disabled:opacity-60">
+            <button onClick={generateFromInventory} disabled={creating} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-foreground shadow-lg shadow-black/20 disabled:opacity-60">
               <PlayCircle className="h-4 w-4" /> {creating ? "Building queue..." : "Build from inventory"}
             </button>
           </div>
@@ -224,13 +224,13 @@ const WorkQueue = () => {
         <QueueMetric label="Compliance" value={counts.compliance} tone="red" onClick={() => setDepartment("compliance")} />
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="rounded-3xl border border-border bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[220px] flex-1">
-            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN, stock, task, department..." className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-400" />
+            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN, stock, task, department..." className="h-10 w-full rounded-xl border border-border bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-400" />
           </div>
-          <select value={status} onChange={(e) => setStatus(e.target.value as WorkStatus)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold">
+          <select value={status} onChange={(e) => setStatus(e.target.value as WorkStatus)} className="h-10 rounded-xl border border-border bg-white px-3 text-sm font-semibold">
             <option value="all">All statuses</option>
             <option value="open">Open</option>
             <option value="needs_approval">Needs approval</option>
@@ -238,7 +238,7 @@ const WorkQueue = () => {
             <option value="completed">Done</option>
             <option value="cancelled">Cancelled</option>
           </select>
-          <select value={department} onChange={(e) => setDepartment(e.target.value as Department)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold">
+          <select value={department} onChange={(e) => setDepartment(e.target.value as Department)} className="h-10 rounded-xl border border-border bg-white px-3 text-sm font-semibold">
             <option value="all">All departments</option>
             <option value="inventory">Inventory</option>
             <option value="print">Print</option>
@@ -257,18 +257,18 @@ const WorkQueue = () => {
 
       <section className="space-y-3">
         {loading ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm font-semibold text-slate-500">Loading work queue...</div>
+          <div className="rounded-3xl border border-border bg-white p-8 text-center text-sm font-semibold text-muted-foreground">Loading work queue...</div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
+          <div className="rounded-3xl border border-dashed border-border bg-white p-8 text-center">
             <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
-            <h2 className="mt-3 text-xl font-black text-slate-950">No matching work items</h2>
-            <p className="mt-1 text-sm text-slate-500">Build from inventory to let the system create sticker, compliance, get-ready, and Passport tasks.</p>
+            <h2 className="mt-3 text-xl font-black text-foreground">No matching work items</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Build from inventory to let the system create sticker, compliance, get-ready, and Passport tasks.</p>
           </div>
         ) : filtered.map((item) => {
           const Icon = departmentIcon(item.department);
           const previews = previewVehicleWork(item);
           return (
-            <article key={item.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+            <article key={item.id} className="rounded-3xl border border-border bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
               <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
                 <div className="flex gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white">
@@ -277,12 +277,12 @@ const WorkQueue = () => {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${statusTone(item.status)}`}>{statusLabels[item.status] || item.status}</span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-600">{item.department || "inventory"}</span>
+                      <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">{item.department || "inventory"}</span>
                       {item.priority === "urgent" || item.priority === "high" ? <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase text-red-700"><AlertTriangle className="h-3 w-3" /> {item.priority}</span> : null}
                     </div>
-                    <h2 className="mt-2 text-xl font-black tracking-tight text-slate-950">{item.title}</h2>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{item.description || "Self-aware task created from vehicle state."}</p>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+                    <h2 className="mt-2 text-xl font-black tracking-tight text-foreground">{item.title}</h2>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.description || "Self-aware task created from vehicle state."}</p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-muted-foreground">
                       {item.stock && <span>Stock {item.stock}</span>}
                       {item.vin && <span>VIN {item.vin}</span>}
                       {item.vehicle_title && <span>{item.vehicle_title}</span>}
@@ -303,7 +303,7 @@ const WorkQueue = () => {
                   </button>
                 )}
                 <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                  {item.vehicle_id && <button onClick={() => navigate(`/vehicle-file/${item.vehicle_id}`)} className="h-10 rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-700 hover:bg-slate-50">Open vehicle</button>}
+                  {item.vehicle_id && <button onClick={() => navigate(`/vehicle-file/${item.vehicle_id}`)} className="h-10 rounded-xl border border-border px-3 text-sm font-black text-foreground hover:bg-muted">Open vehicle</button>}
                   {/* A description exception is not a dealer_work_items row, so
                       Start / Mark done cannot act on it — rendering them enabled
                       made the primary button on the card a permanent no-op. */}

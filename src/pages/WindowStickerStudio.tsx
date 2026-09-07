@@ -61,7 +61,7 @@ const STATUS_TONE: Record<string, string> = {
   APPROVED: "bg-emerald-50 text-emerald-700",
   REVIEW_REQUIRED: "bg-amber-50 text-amber-700",
   READY_TO_GENERATE: "bg-blue-50 text-blue-700",
-  PENDING_DATA: "bg-slate-100 text-slate-600",
+  PENDING_DATA: "bg-muted text-muted-foreground",
   FAILED_RETRYABLE: "bg-rose-50 text-rose-700",
   FAILED_PERMANENT: "bg-rose-50 text-rose-700",
 };
@@ -483,7 +483,7 @@ export default function WindowStickerStudio() {
                         </span>
                       </td>
                       <td className="py-2.5 pr-3">
-                        <span className={`inline-flex text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_TONE[r.generation_status] || "bg-slate-100 text-slate-600"}`}>
+                        <span className={`inline-flex text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_TONE[r.generation_status] || "bg-muted text-muted-foreground"}`}>
                           {humanize(r.generation_status)}
                         </span>
                         {r.review_required && r.review_reason && (

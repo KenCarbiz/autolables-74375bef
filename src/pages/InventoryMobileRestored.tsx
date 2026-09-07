@@ -197,11 +197,11 @@ const InventoryMobileRestored = () => {
         </button>
       </div>
 
-      <section className="-mx-4 border-y border-slate-200 bg-white px-4 py-5">
-        <div className="grid grid-cols-3 rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+      <section className="-mx-4 border-y border-border bg-white px-4 py-5">
+        <div className="grid grid-cols-3 rounded-3xl border border-border bg-white p-2 shadow-sm">
           <button className="rounded-2xl bg-blue-50 px-2 py-4 text-lg font-black text-blue-700">All vehicles</button>
-          <button className="rounded-2xl px-2 py-4 text-lg font-black text-slate-600">Lot Queue</button>
-          <button className="rounded-2xl px-2 py-4 text-lg font-black text-slate-600">Get-Ready</button>
+          <button className="rounded-2xl px-2 py-4 text-lg font-black text-muted-foreground">Lot Queue</button>
+          <button className="rounded-2xl px-2 py-4 text-lg font-black text-muted-foreground">Get-Ready</button>
         </div>
       </section>
 
@@ -216,11 +216,11 @@ const InventoryMobileRestored = () => {
 
       <div className="mt-6 flex items-center gap-3">
         <div className="relative min-w-0 flex-1">
-          <Search className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-500" />
-          <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search VIN, stock #, make, model..." className="h-[58px] w-full rounded-2xl border border-slate-200 bg-white pl-13 pr-4 text-[20px] font-medium text-slate-800 shadow-sm outline-none placeholder:text-slate-500 focus:border-blue-400" />
+          <Search className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-muted-foreground" />
+          <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search VIN, stock #, make, model..." className="h-[58px] w-full rounded-2xl border border-border bg-white pl-13 pr-4 text-[20px] font-medium text-foreground shadow-sm outline-none placeholder:text-muted-foreground focus:border-blue-400" />
         </div>
-        <button className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Filters">
-          <SlidersHorizontal className="h-7 w-7 text-slate-950" />
+        <button className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-2xl border border-border bg-white shadow-sm" aria-label="Filters">
+          <SlidersHorizontal className="h-7 w-7 text-foreground" />
         </button>
       </div>
 
@@ -238,13 +238,13 @@ const InventoryMobileRestored = () => {
 
       <div className="mt-5 space-y-3">
         {filtered.slice(0, 8).map((vehicle) => (
-          <button key={vehicle.id} onClick={() => navigate(`/vehicle-file/${vehicle.id}`)} className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm">
+          <button key={vehicle.id} onClick={() => navigate(`/vehicle-file/${vehicle.id}`)} className="w-full rounded-2xl border border-border bg-white p-4 text-left shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate text-lg font-black text-slate-950">{vehicle.ymm || "Vehicle Pending Decode"}</div>
-                <div className="mt-1 truncate text-sm font-semibold text-slate-500">{vehicle.trim || vehicle.vin}</div>
+                <div className="truncate text-lg font-black text-foreground">{vehicle.ymm || "Vehicle Pending Decode"}</div>
+                <div className="mt-1 truncate text-sm font-semibold text-muted-foreground">{vehicle.trim || vehicle.vin}</div>
               </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black capitalize text-slate-600">{vehicle.status}</span>
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-black capitalize text-muted-foreground">{vehicle.status}</span>
             </div>
           </button>
         ))}
@@ -255,15 +255,15 @@ const InventoryMobileRestored = () => {
 
 function MobileReadinessCard({ percent, ready, total }: { percent: number; ready: number; total: number }) {
   return (
-    <button className="min-h-[245px] rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm">
-      <p className="text-[15px] font-black uppercase tracking-[0.18em] text-slate-500">Inventory Readiness</p>
+    <button className="min-h-[245px] rounded-2xl border border-border bg-white p-5 text-left shadow-sm">
+      <p className="text-[15px] font-black uppercase tracking-[0.18em] text-muted-foreground">Inventory Readiness</p>
       <div className="mt-5 flex items-center gap-5">
         <div className="relative flex h-[92px] w-[92px] shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#f5b93f ${percent * 3.6}deg, #edf1f7 0deg)` }}>
-          <div className="flex h-[66px] w-[66px] items-center justify-center rounded-full bg-white text-[21px] font-black text-slate-950">{percent}%</div>
+          <div className="flex h-[66px] w-[66px] items-center justify-center rounded-full bg-white text-[21px] font-black text-foreground">{percent}%</div>
         </div>
         <div>
-          <div className="text-[22px] font-black leading-tight text-slate-950">Ready to publish</div>
-          <div className="mt-1 text-[18px] font-semibold leading-snug text-slate-500">{ready} of {total}<br />vehicles</div>
+          <div className="text-[22px] font-black leading-tight text-foreground">Ready to publish</div>
+          <div className="mt-1 text-[18px] font-semibold leading-snug text-muted-foreground">{ready} of {total}<br />vehicles</div>
         </div>
       </div>
       <div className="mt-6 text-[17px] font-black text-blue-700">View readiness details {'->'}</div>
@@ -278,17 +278,17 @@ function MobileMetricCard({ title, value, subtitle, link, icon: Icon, tone, onCl
     red: { icon: "bg-orange-50 text-orange-500", value: "text-orange-600" },
     purple: { icon: "bg-purple-50 text-purple-600", value: "text-purple-700" },
     emerald: { icon: "bg-emerald-50 text-emerald-600", value: "text-emerald-600" },
-    slate: { icon: "bg-slate-50 text-slate-600", value: "text-slate-950" },
+    slate: { icon: "bg-muted text-muted-foreground", value: "text-foreground" },
   };
 
   return (
-    <button onClick={onClick} className="min-h-[245px] rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm">
+    <button onClick={onClick} className="min-h-[245px] rounded-2xl border border-border bg-white p-5 text-left shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[15px] font-black uppercase tracking-[0.18em] text-slate-500">{title}</p>
+        <p className="text-[15px] font-black uppercase tracking-[0.18em] text-muted-foreground">{title}</p>
         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneMap[tone].icon}`}><Icon className="h-5 w-5" /></span>
       </div>
       <div className={`mt-6 text-[48px] font-black leading-none tracking-tight ${toneMap[tone].value}`}>{value}</div>
-      <div className="mt-2 text-[18px] font-medium text-slate-500">{subtitle}</div>
+      <div className="mt-2 text-[18px] font-medium text-muted-foreground">{subtitle}</div>
       <div className="mt-8 text-[17px] font-black text-blue-700">{link} {'->'}</div>
     </button>
   );
@@ -301,11 +301,11 @@ function MobileFilterPill({ label, count, active, onClick, tone = "blue" }: { la
     red: "bg-rose-100 text-rose-700",
     purple: "bg-purple-100 text-purple-700",
     emerald: "bg-emerald-100 text-emerald-700",
-    slate: "bg-slate-100 text-slate-500",
+    slate: "bg-muted text-muted-foreground",
   };
 
   return (
-    <button onClick={onClick} className={`flex h-[52px] items-center gap-2 rounded-full border px-5 text-[17px] font-black shadow-sm transition ${active ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-950"}`}>
+    <button onClick={onClick} className={`flex h-[52px] items-center gap-2 rounded-full border px-5 text-[17px] font-black shadow-sm transition ${active ? "border-blue-600 bg-blue-600 text-white" : "border-border bg-white text-foreground"}`}>
       <span>{label}</span>
       <span className={`rounded-full px-2 py-1 text-[13px] font-black ${active ? "bg-white/20 text-white" : badgeMap[tone]}`}>{count}</span>
     </button>

@@ -25,7 +25,7 @@ const sourceBadge = (source: TenantSummary["source"]) => {
   const colors: Record<TenantSummary["source"], string> = {
     autocurb: "bg-violet-100 text-violet-700",
     autolabels: "bg-blue-100 text-blue-700",
-    manual: "bg-slate-100 text-slate-700",
+    manual: "bg-muted text-foreground",
   };
   return colors[source] || colors.manual;
 };

@@ -69,34 +69,34 @@ export const ShopperActivityDrawer = ({ open, onOpenChange, vin, tenantId, vehic
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="p-0 gap-0 w-full sm:w-[620px] sm:max-w-[94vw] flex flex-col bg-slate-50 [&>button]:hidden"
+        className="p-0 gap-0 w-full sm:w-[620px] sm:max-w-[94vw] flex flex-col bg-muted [&>button]:hidden"
       >
         <SheetTitle className="sr-only">Shopper Activity for {title}</SheetTitle>
         <SheetDescription className="sr-only">Internal engagement intelligence for this vehicle passport.</SheetDescription>
         {/* Sticky header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-4">
+        <div className="sticky top-0 z-10 bg-white border-b border-border px-5 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0">
-              <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100 shrink-0 flex items-center justify-center">
-                {thumbnailUrl ? <img src={thumbnailUrl} alt="" className="w-full h-full object-cover" /> : <Car className="w-6 h-6 text-slate-400" />}
+              <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                {thumbnailUrl ? <img src={thumbnailUrl} alt="" className="w-full h-full object-cover" /> : <Car className="w-6 h-6 text-muted-foreground" />}
               </div>
               <div className="min-w-0">
-                <h2 className="text-[15px] font-bold text-slate-900 leading-tight">Shopper Activity</h2>
-                <p className="text-[13px] text-slate-600 truncate">
+                <h2 className="text-[15px] font-bold text-foreground leading-tight">Shopper Activity</h2>
+                <p className="text-[13px] text-muted-foreground truncate">
                   {title}
                   {trim ? ` ${trim}` : ""}
                 </p>
-                <p className="text-[11px] text-slate-400 truncate">
+                <p className="text-[11px] text-muted-foreground truncate">
                   {stock ? `Stock ${stock} · ` : ""}
                   VIN {vin || "—"}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              <button onClick={refresh} title="Refresh" className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500">
+              <button onClick={refresh} title="Refresh" className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground">
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               </button>
-              <button onClick={() => onOpenChange(false)} aria-label="Close" className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 text-lg font-medium">
+              <button onClick={() => onOpenChange(false)} aria-label="Close" className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground text-lg font-medium">
                 ✕
               </button>
             </div>
@@ -104,17 +104,17 @@ export const ShopperActivityDrawer = ({ open, onOpenChange, vin, tenantId, vehic
 
           {/* Summary line + range filter */}
           <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-[12px] text-slate-500 inline-flex items-center gap-3">
+            <p className="text-[12px] text-muted-foreground inline-flex items-center gap-3">
               <span className="inline-flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {(summary.totals.views ?? 0).toLocaleString()} views</span>
               <span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {summary.totals.sessions} sessions</span>
               <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {mmss(summary.totals.totalSeconds)}</span>
             </p>
-            <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
+            <div className="inline-flex items-center rounded-lg border border-border bg-white p-0.5">
               {RANGES.map((r) => (
                 <button
                   key={r}
                   onClick={() => setRange(r)}
-                  className={`px-2.5 h-6 rounded-md text-[11px] font-semibold transition-colors ${range === r ? "bg-blue-600 text-white" : "text-slate-500 hover:text-slate-900"}`}
+                  className={`px-2.5 h-6 rounded-md text-[11px] font-semibold transition-colors ${range === r ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   {RANGE_LABEL[r]}
                 </button>
@@ -156,7 +156,7 @@ const Body = ({ summary, error }: { summary: ShopperActivitySummary; error: stri
     <SimilarVehiclesCard summary={summary} />
     <TriggersCard triggers={summary.behaviorTriggers} />
     <InsightCard insights={summary.insights} />
-    <p className="text-[11px] text-slate-400 text-center pt-1 pb-4">
+    <p className="text-[11px] text-muted-foreground text-center pt-1 pb-4">
       Aggregated, privacy-safe engagement signals. Shoppers are anonymous; location is estimated and coarse. Internal use only.
     </p>
   </>
@@ -165,10 +165,10 @@ const Body = ({ summary, error }: { summary: ShopperActivitySummary; error: stri
 // ── Section shell ────────────────────────────────────────────────────────
 
 const Card = ({ title, icon: Icon, action, children }: { title: string; icon: typeof Eye; action?: React.ReactNode; children: React.ReactNode }) => (
-  <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+  <section className="rounded-2xl border border-border bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
     <div className="flex items-center justify-between gap-2 mb-3">
-      <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500 inline-flex items-center gap-1.5">
-        <Icon className="w-3.5 h-3.5 text-slate-400" /> {title}
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground inline-flex items-center gap-1.5">
+        <Icon className="w-3.5 h-3.5 text-muted-foreground" /> {title}
       </h3>
       {action}
     </div>
@@ -179,7 +179,7 @@ const Card = ({ title, icon: Icon, action, children }: { title: string; icon: ty
 // ── b. Engagement score ──────────────────────────────────────────────────
 
 const LEVEL_STYLE: Record<string, { bar: string; chip: string; ring: string }> = {
-  Low: { bar: "bg-slate-300", chip: "bg-slate-100 text-slate-600", ring: "#94a3b8" },
+  Low: { bar: "bg-slate-300", chip: "bg-muted text-muted-foreground", ring: "#94a3b8" },
   Browsing: { bar: "bg-sky-400", chip: "bg-sky-50 text-sky-700", ring: "#38bdf8" },
   Moderate: { bar: "bg-blue-500", chip: "bg-blue-50 text-blue-700", ring: "#3b82f6" },
   High: { bar: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-700", ring: "#10b981" },
@@ -202,23 +202,23 @@ const ScoreCard = ({ summary }: { summary: ShopperActivitySummary }) => {
             <circle cx="60" cy="60" r="52" fill="none" stroke={st.ring} strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 52} strokeDashoffset={2 * Math.PI * 52 * (1 - score / 100)} className="transition-[stroke-dashoffset] duration-700" />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[24px] font-black tabular-nums text-slate-900 leading-none">{score}</span>
-            <span className="text-[9px] font-semibold text-slate-400">/ 100</span>
+            <span className="text-[24px] font-black tabular-nums text-foreground leading-none">{score}</span>
+            <span className="text-[9px] font-semibold text-muted-foreground">/ 100</span>
           </div>
         </div>
-        <p className="text-[12px] text-slate-500 flex-1">An internal 0–100 signal blending reach, dwell, return visits and CTA/lead events. Not a black box — the exact factors are below.</p>
+        <p className="text-[12px] text-muted-foreground flex-1">An internal 0–100 signal blending reach, dwell, return visits and CTA/lead events. Not a black box — the exact factors are below.</p>
       </div>
       <ul className="mt-3 space-y-2">
         {factors.map((f) => (
           <li key={f.key}>
             <div className="flex items-center justify-between text-[12px] mb-0.5">
-              <span className="text-slate-600">{f.label}</span>
-              <span className="tabular-nums text-slate-400">{f.points}/{f.max}</span>
+              <span className="text-muted-foreground">{f.label}</span>
+              <span className="tabular-nums text-muted-foreground">{f.points}/{f.max}</span>
             </div>
-            <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
               <div className={`h-full rounded-full ${st.bar}`} style={{ width: `${f.max ? Math.round((f.points / f.max) * 100) : 0}%` }} />
             </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">{f.detail}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{f.detail}</p>
           </li>
         ))}
       </ul>
@@ -231,9 +231,9 @@ const ScoreCard = ({ summary }: { summary: ShopperActivitySummary }) => {
 const MetricsGrid = ({ summary }: { summary: ShopperActivitySummary }) => (
   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
     {summary.metrics.map((m) => (
-      <div key={m.key} className={`rounded-xl border p-3 ${m.tracked ? "border-slate-200 bg-white" : "border-dashed border-slate-200 bg-slate-50"}`}>
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 truncate">{m.label}</p>
-        <p className={`text-[18px] font-bold tabular-nums mt-0.5 ${!m.tracked ? "text-slate-300 text-[12px] font-medium normal-case pt-1" : m.tone === "positive" ? "text-emerald-600" : m.tone === "watching" ? "text-amber-600" : "text-slate-900"}`}>
+      <div key={m.key} className={`rounded-xl border p-3 ${m.tracked ? "border-border bg-white" : "border-dashed border-border bg-muted"}`}>
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{m.label}</p>
+        <p className={`text-[18px] font-bold tabular-nums mt-0.5 ${!m.tracked ? "text-slate-300 text-[12px] font-medium normal-case pt-1" : m.tone === "positive" ? "text-emerald-600" : m.tone === "watching" ? "text-amber-600" : "text-foreground"}`}>
           {m.display}
         </p>
       </div>
@@ -244,19 +244,19 @@ const MetricsGrid = ({ summary }: { summary: ShopperActivitySummary }) => (
 // ── d. Section engagement (strongest signal) ─────────────────────────────
 
 const SectionEngagementCard = ({ sections }: { sections: SectionEngagement[] }) => (
-  <Card title="Attention by Section" icon={Eye} action={<span className="text-[10px] text-slate-400">from passport dwell time</span>}>
+  <Card title="Attention by Section" icon={Eye} action={<span className="text-[10px] text-muted-foreground">from passport dwell time</span>}>
     {sections.length === 0 ? (
-      <p className="text-[12px] text-slate-400 py-2">No section dwell recorded yet.</p>
+      <p className="text-[12px] text-muted-foreground py-2">No section dwell recorded yet.</p>
     ) : (
       <>
         <div className="space-y-2.5 mb-4">
           {sections.slice(0, 8).map((s) => (
             <div key={s.module}>
               <div className="flex items-center justify-between text-[12px] mb-1">
-                <span className="font-semibold text-slate-800 truncate pr-2">{s.label}</span>
-                <span className="text-slate-400 tabular-nums shrink-0">{mmss(s.seconds)} · {Math.round(s.pct)}%</span>
+                <span className="font-semibold text-foreground truncate pr-2">{s.label}</span>
+                <span className="text-muted-foreground tabular-nums shrink-0">{mmss(s.seconds)} · {Math.round(s.pct)}%</span>
               </div>
-              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
                 <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(3, Math.round(s.pct))}%` }} />
               </div>
             </div>
@@ -265,17 +265,17 @@ const SectionEngagementCard = ({ sections }: { sections: SectionEngagement[] }) 
         <div className="overflow-x-auto -mx-1">
           <table className="w-full text-[11px] min-w-[360px]">
             <thead>
-              <tr className="text-slate-400 text-left">
+              <tr className="text-muted-foreground text-left">
                 <th className="font-semibold pb-1.5 px-1">Section</th>
                 <th className="font-semibold pb-1.5 px-1 text-right">Time</th>
                 <th className="font-semibold pb-1.5 px-1 text-right">Sessions</th>
                 <th className="font-semibold pb-1.5 px-1 text-right">Last viewed</th>
               </tr>
             </thead>
-            <tbody className="text-slate-600">
+            <tbody className="text-muted-foreground">
               {sections.map((s) => (
-                <tr key={s.module} className="border-t border-slate-100">
-                  <td className="py-1.5 px-1 font-medium text-slate-800">{s.label}</td>
+                <tr key={s.module} className="border-t border-border">
+                  <td className="py-1.5 px-1 font-medium text-foreground">{s.label}</td>
                   <td className="py-1.5 px-1 text-right tabular-nums">{mmss(s.seconds)}</td>
                   <td className="py-1.5 px-1 text-right tabular-nums">{s.sessions}</td>
                   <td className="py-1.5 px-1 text-right whitespace-nowrap">{fmtWhen(s.lastViewedAt)}</td>
@@ -294,28 +294,28 @@ const SectionEngagementCard = ({ sections }: { sections: SectionEngagement[] }) 
 const SessionsCard = ({ sessions }: { sessions: SessionSummary[] }) => (
   <Card title="Session Timeline" icon={Users}>
     {sessions.length === 0 ? (
-      <p className="text-[12px] text-slate-400 py-2">No sessions recorded yet.</p>
+      <p className="text-[12px] text-muted-foreground py-2">No sessions recorded yet.</p>
     ) : (
       <div className="space-y-3">
         {sessions.slice(0, 10).map((s) => (
-          <div key={s.sessionId} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+          <div key={s.sessionId} className="rounded-xl border border-border bg-muted/60 p-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 flex-wrap">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap">
                 {s.returning && <span className="inline-flex items-center gap-1 text-blue-700 font-semibold"><Repeat className="w-3 h-3" /> Returning</span>}
                 {s.device && <span className="inline-flex items-center gap-1"><Smartphone className="w-3 h-3" /> {s.device}</span>}
                 {s.browser && <span>{s.browser}</span>}
                 {s.location && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" /> {s.location}</span>}
               </div>
-              <span className="text-[10px] text-slate-400 tabular-nums">{fmtWhen(s.firstAt)} · {mmss(s.totalSeconds)}</span>
+              <span className="text-[10px] text-muted-foreground tabular-nums">{fmtWhen(s.firstAt)} · {mmss(s.totalSeconds)}</span>
             </div>
             <div className="mt-2 flex items-center gap-1 flex-wrap">
               {s.entries.slice(0, 12).map((e, i) => (
-                <span key={i} className="inline-flex items-center text-[10px] text-slate-500">
+                <span key={i} className="inline-flex items-center text-[10px] text-muted-foreground">
                   {i > 0 && <span className="text-slate-300 mx-0.5">›</span>}
-                  <span className={`px-1.5 py-0.5 rounded ${e.kind === "section" ? "bg-white border border-slate-200" : "bg-blue-50 text-blue-700"}`}>{e.label}{e.seconds ? ` ${mmss(e.seconds)}` : ""}</span>
+                  <span className={`px-1.5 py-0.5 rounded ${e.kind === "section" ? "bg-white border border-border" : "bg-blue-50 text-blue-700"}`}>{e.label}{e.seconds ? ` ${mmss(e.seconds)}` : ""}</span>
                 </span>
               ))}
-              {s.entries.length === 0 && <span className="text-[10px] text-slate-400">No ordered events for this session.</span>}
+              {s.entries.length === 0 && <span className="text-[10px] text-muted-foreground">No ordered events for this session.</span>}
             </div>
             {!s.hasCta && (
               <p className="mt-2 text-[10px] font-semibold text-amber-600 inline-flex items-center gap-1">
@@ -324,7 +324,7 @@ const SessionsCard = ({ sessions }: { sessions: SessionSummary[] }) => (
             )}
           </div>
         ))}
-        {sessions.length > 10 && <p className="text-[11px] text-slate-400 text-center">+{sessions.length - 10} more session(s)</p>}
+        {sessions.length > 10 && <p className="text-[11px] text-muted-foreground text-center">+{sessions.length - 10} more session(s)</p>}
       </div>
     )}
   </Card>
@@ -335,20 +335,20 @@ const SessionsCard = ({ sessions }: { sessions: SessionSummary[] }) => (
 const ClickstreamCard = ({ summary }: { summary: ShopperActivitySummary }) => {
   const rows = summary.clickstream.slice(0, 40);
   return (
-    <Card title="Clickstream" icon={MousePointerClick} action={rows.length > 0 ? <span className="text-[10px] text-slate-400">latest {rows.length}</span> : undefined}>
+    <Card title="Clickstream" icon={MousePointerClick} action={rows.length > 0 ? <span className="text-[10px] text-muted-foreground">latest {rows.length}</span> : undefined}>
       {rows.length === 0 ? (
-        <p className="text-[12px] text-slate-400 py-2">No interaction events captured yet.</p>
+        <p className="text-[12px] text-muted-foreground py-2">No interaction events captured yet.</p>
       ) : (
         <ul className="space-y-1.5">
           {rows.map((c) => (
             <li key={c.id} className="grid grid-cols-[16px_1fr_auto] items-center gap-2 text-[12px]">
               <span className="w-2 h-2 rounded-full bg-blue-500 justify-self-center" />
-              <span className="text-slate-700 truncate">
+              <span className="text-foreground truncate">
                 {c.label}
-                {c.section && <span className="text-slate-400"> · {c.section}</span>}
+                {c.section && <span className="text-muted-foreground"> · {c.section}</span>}
                 {c.device && <span className="text-slate-300"> · {c.device}</span>}
               </span>
-              <span className="text-[10px] text-slate-400 tabular-nums whitespace-nowrap">{fmtWhen(c.at)}</span>
+              <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">{fmtWhen(c.at)}</span>
             </li>
           ))}
         </ul>
@@ -360,18 +360,18 @@ const ClickstreamCard = ({ summary }: { summary: ShopperActivitySummary }) => {
 // ── g. Shopper context ───────────────────────────────────────────────────
 
 const ContextRow = ({ label, values }: { label: string; values: string[] }) => (
-  <div className="flex items-start justify-between gap-3 text-[12px] py-1.5 border-b border-slate-100 last:border-0">
-    <span className="text-slate-400 shrink-0">{label}</span>
-    <span className="text-slate-700 text-right font-medium">{values.length ? values.slice(0, 4).join(", ") : "Not tracked yet"}</span>
+  <div className="flex items-start justify-between gap-3 text-[12px] py-1.5 border-b border-border last:border-0">
+    <span className="text-muted-foreground shrink-0">{label}</span>
+    <span className="text-foreground text-right font-medium">{values.length ? values.slice(0, 4).join(", ") : "Not tracked yet"}</span>
   </div>
 );
 
 const ShopperContextCard = ({ summary }: { summary: ShopperActivitySummary }) => {
   const c = summary.shopperContext;
   return (
-    <Card title="Shopper Context" icon={Shield} action={<span className="text-[10px] text-slate-400">estimated · anonymous</span>}>
+    <Card title="Shopper Context" icon={Shield} action={<span className="text-[10px] text-muted-foreground">estimated · anonymous</span>}>
       {!c.hasAny ? (
-        <p className="text-[12px] text-slate-400 py-2">No contextual signals captured yet.</p>
+        <p className="text-[12px] text-muted-foreground py-2">No contextual signals captured yet.</p>
       ) : (
         <div>
           <ContextRow label="Location" values={c.locations} />
@@ -380,13 +380,13 @@ const ShopperContextCard = ({ summary }: { summary: ShopperActivitySummary }) =>
           <ContextRow label="OS" values={c.oses} />
           <ContextRow label="Traffic source" values={c.sources} />
           <ContextRow label="Referrer" values={c.referrers} />
-          <div className="flex items-center justify-between gap-3 text-[12px] py-1.5 border-b border-slate-100">
-            <span className="text-slate-400">Returning / new</span>
-            <span className="text-slate-700 font-medium tabular-nums">{c.returningVisitors} returning · {c.newVisitors} new</span>
+          <div className="flex items-center justify-between gap-3 text-[12px] py-1.5 border-b border-border">
+            <span className="text-muted-foreground">Returning / new</span>
+            <span className="text-foreground font-medium tabular-nums">{c.returningVisitors} returning · {c.newVisitors} new</span>
           </div>
           <div className="flex items-center justify-between gap-3 text-[12px] py-1.5">
-            <span className="text-slate-400">First / last seen</span>
-            <span className="text-slate-700 font-medium text-right">{fmtWhen(c.firstSeen)} → {fmtWhen(c.lastSeen)}</span>
+            <span className="text-muted-foreground">First / last seen</span>
+            <span className="text-foreground font-medium text-right">{fmtWhen(c.firstSeen)} → {fmtWhen(c.lastSeen)}</span>
           </div>
         </div>
       )}
@@ -399,12 +399,12 @@ const ShopperContextCard = ({ summary }: { summary: ShopperActivitySummary }) =>
 const SimilarVehiclesCard = ({ summary }: { summary: ShopperActivitySummary }) => {
   if (!summary.similarVehicles.length) return null;
   return (
-    <Card title="Also Cross-Shopped" icon={Car} action={<span className="text-[10px] text-slate-400">same visitors, other vehicles</span>}>
+    <Card title="Also Cross-Shopped" icon={Car} action={<span className="text-[10px] text-muted-foreground">same visitors, other vehicles</span>}>
       <ul className="space-y-1.5">
         {summary.similarVehicles.slice(0, 8).map((v) => (
-          <li key={v.vin} className="flex items-center justify-between gap-2 text-[12px] py-1 border-b border-slate-100 last:border-0">
-            <span className="font-mono text-slate-700 truncate">{v.vin}</span>
-            <span className="text-slate-400 tabular-nums whitespace-nowrap">{v.visitors} shopper(s) · {v.events} event(s)</span>
+          <li key={v.vin} className="flex items-center justify-between gap-2 text-[12px] py-1 border-b border-border last:border-0">
+            <span className="font-mono text-foreground truncate">{v.vin}</span>
+            <span className="text-muted-foreground tabular-nums whitespace-nowrap">{v.visitors} shopper(s) · {v.events} event(s)</span>
           </li>
         ))}
       </ul>
@@ -417,7 +417,7 @@ const SimilarVehiclesCard = ({ summary }: { summary: ShopperActivitySummary }) =
 const TRIGGER_STYLE: Record<TriggerState, { chip: string; label: string; icon: typeof CheckCircle2 }> = {
   active: { chip: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Active", icon: CheckCircle2 },
   watching: { chip: "bg-amber-50 text-amber-700 border-amber-200", label: "Watching", icon: Eye },
-  inactive: { chip: "bg-slate-50 text-slate-400 border-slate-200", label: "Not triggered", icon: Info },
+  inactive: { chip: "bg-muted text-muted-foreground border-border", label: "Not triggered", icon: Info },
 };
 
 const TriggersCard = ({ triggers }: { triggers: BehaviorTrigger[] }) => (
@@ -429,8 +429,8 @@ const TriggersCard = ({ triggers }: { triggers: BehaviorTrigger[] }) => (
         return (
           <li key={t.key} className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-slate-800">{t.label}</p>
-              <p className="text-[11px] text-slate-400">{t.detail}</p>
+              <p className="text-[13px] font-semibold text-foreground">{t.label}</p>
+              <p className="text-[11px] text-muted-foreground">{t.detail}</p>
             </div>
             <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${st.chip}`}>
               <Icon className="w-3 h-3" /> {st.label}
@@ -451,7 +451,7 @@ const InsightCard = ({ insights }: { insights: string[] }) => (
     </h3>
     <ul className="space-y-1.5">
       {insights.map((t, i) => (
-        <li key={i} className="text-[13px] text-slate-700 leading-snug flex gap-2">
+        <li key={i} className="text-[13px] text-foreground leading-snug flex gap-2">
           <span className="text-blue-500 mt-0.5">•</span>
           <span>{t}</span>
         </li>
@@ -477,11 +477,11 @@ const LoadingSkeleton = () => (
 
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center text-center py-16 px-6">
-    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-      <Activity className="w-7 h-7 text-slate-400" />
+    <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+      <Activity className="w-7 h-7 text-muted-foreground" />
     </div>
-    <h3 className="text-[15px] font-bold text-slate-800">No shopper activity yet</h3>
-    <p className="text-[13px] text-slate-500 mt-1 max-w-xs">
+    <h3 className="text-[15px] font-bold text-foreground">No shopper activity yet</h3>
+    <p className="text-[13px] text-muted-foreground mt-1 max-w-xs">
       Once a shopper opens this vehicle's passport, section dwell time, sessions and interactions will appear here.
     </p>
   </div>
@@ -492,8 +492,8 @@ const ErrorState = ({ message, onRetry }: { message: string; onRetry: () => void
     <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
       <AlertTriangle className="w-7 h-7 text-red-500" />
     </div>
-    <h3 className="text-[15px] font-bold text-slate-800">Couldn't load activity</h3>
-    <p className="text-[13px] text-slate-500 mt-1 max-w-xs">{message}</p>
+    <h3 className="text-[15px] font-bold text-foreground">Couldn't load activity</h3>
+    <p className="text-[13px] text-muted-foreground mt-1 max-w-xs">{message}</p>
     <button onClick={onRetry} className="mt-4 h-9 px-4 rounded-lg bg-blue-600 text-white text-[13px] font-semibold inline-flex items-center gap-1.5">
       <RefreshCw className="w-3.5 h-3.5" /> Retry
     </button>

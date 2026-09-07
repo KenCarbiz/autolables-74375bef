@@ -163,9 +163,9 @@ const BillingHandshakeDiagnostic = () => {
         </button>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-start gap-2">
-        <Clock className="w-4 h-4 text-slate-600 mt-0.5 flex-shrink-0" />
-        <div className="text-[12px] text-slate-700 leading-relaxed">
+      <div className="rounded-xl border border-border bg-muted p-3 flex items-start gap-2">
+        <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+        <div className="text-[12px] text-foreground leading-relaxed">
           <span className="font-semibold">Abandoned-signing re-engagement: </span>
           {reengageSchedule === null ? (
             <span className="text-muted-foreground">checking\u2026</span>
@@ -182,9 +182,9 @@ const BillingHandshakeDiagnostic = () => {
       </div>
 
       {/* Wave 24 — advertised-price crawl status. Same shape. */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-start gap-2">
-        <Clock className="w-4 h-4 text-slate-600 mt-0.5 flex-shrink-0" />
-        <div className="text-[12px] text-slate-700 leading-relaxed">
+      <div className="rounded-xl border border-border bg-muted p-3 flex items-start gap-2">
+        <Clock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+        <div className="text-[12px] text-foreground leading-relaxed">
           <span className="font-semibold">Advertised-price crawl: </span>
           {crawlSchedule === null ? (
             <span className="text-muted-foreground">checking…</span>
@@ -363,7 +363,7 @@ const StatusPill = ({ status }: { status: string }) => {
   const tone = status === "active" ? "bg-emerald-100 text-emerald-800"
     : status === "past_due" || status === "paused" ? "bg-amber-100 text-amber-800"
       : status === "canceled" ? "bg-red-100 text-red-800"
-        : "bg-slate-100 text-slate-700";
+        : "bg-muted text-foreground";
   return (
     <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 ${tone}`}>
       {status}

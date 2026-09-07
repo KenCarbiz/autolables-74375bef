@@ -178,7 +178,7 @@ const STATUS_TONE: Record<string, string> = {
   approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   reviewed: "bg-blue-50 text-blue-700 border-blue-200",
   draft: "bg-amber-50 text-amber-700 border-amber-200",
-  fallback: "bg-slate-100 text-slate-600 border-slate-300",
+  fallback: "bg-muted text-muted-foreground border-border",
   retired: "bg-rose-50 text-rose-700 border-rose-200",
 };
 
@@ -210,13 +210,13 @@ export default function ThemeLab() {
   }, [result, pageIdx]);
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 md:p-6">
+    <div className="min-h-screen bg-muted p-4 md:p-6">
       <div className="max-w-[1500px] mx-auto space-y-4">
-        <div className="rounded-xl border border-slate-300 bg-white px-4 py-3 space-y-2">
+        <div className="rounded-xl border border-border bg-white px-4 py-3 space-y-2">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <h1 className="text-base font-bold text-slate-900">OEM Theme Laboratory</h1>
-              <p className="text-[11px] text-slate-500">
+              <h1 className="text-base font-bold text-foreground">OEM Theme Laboratory</h1>
+              <p className="text-[11px] text-muted-foreground">
                 Internal review of versioned OEM theme profiles against the shared document engine. Logos render as
                 approved text wordmarks until brand artwork is explicitly authorized. Production selection is
                 model-year-aware via the profile registry — never this screen.
@@ -226,28 +226,28 @@ export default function ThemeLab() {
               <select
                 value={oemId}
                 onChange={(e) => { setOemId(e.target.value as OemId); setPageIdx(0); }}
-                className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"
+                className="h-8 rounded-md border border-border bg-white px-2 text-xs font-semibold"
               >
                 {oemIds.map((id) => <option key={id} value={id}>{id.replace(/_/g, " ")}</option>)}
               </select>
               <select
                 value={fixtureKey}
                 onChange={(e) => { setFixtureKey(e.target.value as keyof typeof LAB_FIXTURES); setPageIdx(0); }}
-                className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"
+                className="h-8 rounded-md border border-border bg-white px-2 text-xs font-semibold"
               >
                 {Object.entries(LAB_FIXTURES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
               <button
                 type="button"
                 onClick={() => setGrayscale((g) => !g)}
-                className={`h-8 px-2.5 rounded-md border text-[11px] font-bold ${grayscale ? "bg-slate-800 text-white border-slate-800" : "border-slate-300 hover:bg-slate-50"}`}
+                className={`h-8 px-2.5 rounded-md border text-[11px] font-bold ${grayscale ? "bg-slate-800 text-white border-slate-800" : "border-border hover:bg-muted"}`}
               >
                 Grayscale
               </button>
               <button
                 type="button"
                 onClick={() => setActualSize((a) => !a)}
-                className={`h-8 px-2.5 rounded-md border text-[11px] font-bold ${actualSize ? "bg-blue-600 text-white border-blue-600" : "border-slate-300 hover:bg-slate-50"}`}
+                className={`h-8 px-2.5 rounded-md border text-[11px] font-bold ${actualSize ? "bg-blue-600 text-white border-blue-600" : "border-border hover:bg-muted"}`}
               >
                 Actual print size
               </button>
@@ -255,7 +255,7 @@ export default function ThemeLab() {
                 <button
                   type="button"
                   onClick={() => setPageIdx((i) => (i + 1) % result.model!.pages.length)}
-                  className="h-8 px-2.5 rounded-md border border-slate-300 text-[11px] font-bold hover:bg-slate-50"
+                  className="h-8 px-2.5 rounded-md border border-border text-[11px] font-bold hover:bg-muted"
                 >
                   Page {pageIdx + 1}/{result.model.pages.length}
                 </button>
@@ -267,9 +267,9 @@ export default function ThemeLab() {
               <span className={`px-1.5 py-0.5 rounded border font-bold uppercase tracking-wide text-[10px] ${STATUS_TONE[profile.status]}`}>
                 {profile.status}
               </span>
-              <span className="font-mono text-slate-600">{profile.themeVersion}</span>
-              <span className="text-slate-500">family: <b>{profile.layoutFamily}</b></span>
-              <span className="text-slate-500">
+              <span className="font-mono text-muted-foreground">{profile.themeVersion}</span>
+              <span className="text-muted-foreground">family: <b>{profile.layoutFamily}</b></span>
+              <span className="text-muted-foreground">
                 model years: <b>{profile.modelYearStart}–{profile.modelYearEnd ?? "present"}</b> ({profile.market})
               </span>
               <span className={`px-1.5 py-0.5 rounded border font-bold uppercase tracking-wide text-[10px] ${profile.logoAuthorized ? STATUS_TONE.approved : STATUS_TONE.draft}`}>

@@ -11,7 +11,7 @@ import { toast } from "sonner";
 const sevMeta: Record<StaleFlag["severity"], { tone: string; label: string }> = {
   compliance_block: { tone: "border-rose-200 bg-rose-50 text-rose-700", label: "Compliance block" },
   warning: { tone: "border-amber-200 bg-amber-50 text-amber-700", label: "Warning" },
-  info: { tone: "border-slate-200 bg-slate-50 text-slate-600", label: "Info" },
+  info: { tone: "border-border bg-muted text-muted-foreground", label: "Info" },
 };
 const fmtVal = (v: unknown) => (typeof v === "number" ? v.toLocaleString() : String(v ?? "—"));
 

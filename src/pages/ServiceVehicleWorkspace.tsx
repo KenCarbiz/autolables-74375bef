@@ -74,7 +74,7 @@ interface AuditRow { id: string; action: string; created_at: string; details: Re
 interface Clearance { state: string; reason_codes: string[]; computed_at?: string | null; }
 
 const TONE_BOX: Record<Tone, string> = {
-  slate: "border-slate-200 bg-slate-100",
+  slate: "border-border bg-muted",
   amber: "border-amber-200 bg-amber-50",
   red: "border-red-200 bg-red-50",
   blue: "border-blue-200 bg-blue-50",

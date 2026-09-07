@@ -67,7 +67,7 @@ const badgeCls = (b: ChipLabel) =>
   : b === "Compliance" ? "bg-[#EEF6FF] text-[#0F5E8C] border-[#cfe4f5]"
   : b === "AI Tool" ? "bg-violet-50 text-violet-700 border-violet-100"
   : b === "Sticker" ? "bg-[#EDF7FF] text-[#0077C8] border-[#cfe7f7]"
-  : "bg-slate-100 text-slate-600 border-slate-200";
+  : "bg-muted text-muted-foreground border-border";
 
 // Creation-shaped audit actions → recent list rows. The tool keeps its own
 // category-tinted icon; a separate status badge (never category color) is

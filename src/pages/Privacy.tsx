@@ -65,7 +65,7 @@ const Privacy = () => (
         purposes. Supported carriers include AT&amp;T, Verizon, T-Mobile, and most major U.S. carriers;
         carriers are not liable for delayed or undelivered messages.
       </p>
-      <p className="text-[13px] text-slate-500">
+      <p className="text-[13px] text-muted-foreground">
         <strong>Mobile opt-in data and consent are never shared with or sold to third parties or
         affiliates for their marketing or promotional purposes.</strong>
       </p>

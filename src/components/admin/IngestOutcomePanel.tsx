@@ -45,8 +45,8 @@ const STATUS_TONE: Record<IngestStepStatus, string> = {
   running: "bg-blue-50 text-blue-700",
   parked: "bg-amber-50 text-amber-700",
   failed: "bg-rose-50 text-rose-700",
-  skipped: "bg-slate-100 text-slate-600",
-  not_run: "bg-slate-100 text-slate-600",
+  skipped: "bg-muted text-muted-foreground",
+  not_run: "bg-muted text-muted-foreground",
 };
 
 const STATUS_LABEL: Record<IngestStepStatus, string> = {

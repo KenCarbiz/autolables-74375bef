@@ -177,8 +177,8 @@ const AdminSmokeTest = () => {
             {certification.ready ? <CheckCircle2 className="mt-0.5 h-6 w-6 text-emerald-700" /> : <XCircle className="mt-0.5 h-6 w-6 text-amber-700" />}
             <div>
               <p className={`text-sm font-bold uppercase tracking-[0.18em] ${certification.ready ? "text-emerald-800" : "text-amber-800"}`}>MVP Certification</p>
-              <h2 className="mt-1 text-xl font-black text-slate-950">{certification.ready ? "Ready for Connecticut MVP" : "Not ready yet"}</h2>
-              <p className="mt-1 text-sm text-slate-700">{certification.vehicleTitle} · Required docs: {certification.requiredDocumentKeys.join(", ")}</p>
+              <h2 className="mt-1 text-xl font-black text-foreground">{certification.ready ? "Ready for Connecticut MVP" : "Not ready yet"}</h2>
+              <p className="mt-1 text-sm text-foreground">{certification.vehicleTitle} · Required docs: {certification.requiredDocumentKeys.join(", ")}</p>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs font-semibold">

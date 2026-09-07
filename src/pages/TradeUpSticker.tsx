@@ -33,8 +33,8 @@ const THEMES: Record<Theme, { gradient: string; text: string; cta: string; ctaSu
   red:   { gradient: "from-red-600 to-red-800",           text: "text-white",     cta: "bg-yellow-400 text-red-900",      ctaSubhead: "text-yellow-300" },
   blue:  { gradient: "from-blue-600 to-blue-900",         text: "text-white",     cta: "bg-orange-400 text-blue-900",     ctaSubhead: "text-orange-300" },
   green: { gradient: "from-emerald-600 to-emerald-900",   text: "text-white",     cta: "bg-yellow-300 text-emerald-900",  ctaSubhead: "text-yellow-200" },
-  navy:  { gradient: "from-slate-800 to-slate-950",       text: "text-white",     cta: "bg-amber-400 text-slate-900",     ctaSubhead: "text-amber-300" },
-  gold:  { gradient: "from-amber-500 to-amber-700",       text: "text-slate-900", cta: "bg-slate-900 text-amber-400",     ctaSubhead: "text-slate-900" },
+  navy:  { gradient: "from-slate-800 to-slate-950",       text: "text-white",     cta: "bg-amber-400 text-foreground",     ctaSubhead: "text-amber-300" },
+  gold:  { gradient: "from-amber-500 to-amber-700",       text: "text-foreground", cta: "bg-slate-900 text-amber-400",     ctaSubhead: "text-foreground" },
 };
 
 const TradeUpSticker = () => {
@@ -474,13 +474,13 @@ const TradeUpSticker = () => {
                 {/* CTA with QR code */}
                 <div className="bg-white rounded-lg p-4 flex items-center gap-4">
                   <div className="flex-1">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <p className="text-xs font-bold uppercase tracking-wider text-foreground">
                       Scan to get your
                     </p>
-                    <p className="text-xl font-black tracking-tight text-slate-900">
+                    <p className="text-xl font-black tracking-tight text-foreground">
                       Instant Trade Value
                     </p>
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-[10px] text-muted-foreground mt-1">
                       {callText}
                     </p>
                   </div>

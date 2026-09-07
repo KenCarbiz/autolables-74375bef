@@ -32,13 +32,13 @@ const QrRedirect = () => {
       <div>
         {!failed ? (
           <>
-            <div className="w-8 h-8 mx-auto rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin" />
-            <p className="text-sm text-slate-600 mt-3">Opening this vehicle…</p>
+            <div className="w-8 h-8 mx-auto rounded-full border-2 border-border border-t-blue-600 animate-spin" />
+            <p className="text-sm text-muted-foreground mt-3">Opening this vehicle…</p>
           </>
         ) : (
           <>
-            <p className="text-sm font-semibold text-slate-900">Link unavailable</p>
-            <p className="text-xs text-slate-500 mt-1">This QR code could not be resolved.</p>
+            <p className="text-sm font-semibold text-foreground">Link unavailable</p>
+            <p className="text-xs text-muted-foreground mt-1">This QR code could not be resolved.</p>
             <a href="/" className="text-xs font-semibold text-blue-600 mt-3 inline-block">Go to AutoLabels</a>
           </>
         )}

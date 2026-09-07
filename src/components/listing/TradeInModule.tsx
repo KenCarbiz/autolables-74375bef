@@ -80,7 +80,7 @@ export default function TradeInModule({
             <div className="flex items-center gap-2 min-w-0">
               <span
                 className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
-                  sent || i === 0 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"
+                  sent || i === 0 ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"
                 }`}
               >
                 {sent ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.n}
@@ -148,12 +148,12 @@ function Field({
 }) {
   return (
     <div>
-      <label className="text-[10px] font-bold uppercase tracking-label text-slate-500">{label}</label>
+      <label className="text-[10px] font-bold uppercase tracking-label text-muted-foreground">{label}</label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1 w-full h-11 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+        className="mt-1 w-full h-11 px-3 rounded-lg border border-border text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
       />
     </div>
   );

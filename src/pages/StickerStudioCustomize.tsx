@@ -160,7 +160,7 @@ const StickerStudioCustomize = () => {
         {/* Live preview (customization applied) */}
         <div className="lg:col-span-3">
           <p className="text-[11px] font-semibold uppercase tracking-label text-muted-foreground mb-2">Preview — customization applied</p>
-          <div className={`flex justify-center rounded-2xl border border-border p-4 overflow-auto ${customization.preferredLabelMode === "black" ? "bg-slate-800" : "bg-slate-100"}`}>
+          <div className={`flex justify-center rounded-2xl border border-border p-4 overflow-auto ${customization.preferredLabelMode === "black" ? "bg-slate-800" : "bg-muted"}`}>
             <TemplateRenderer template={applied.template} data={{ ...SAMPLE, benefits: customization.defaultBenefits.length ? customization.defaultBenefits.map((n) => ({ name: n })) : SAMPLE.benefits }} branding={applied.branding} options={applied.options} scale={previewScale} />
           </div>
         </div>

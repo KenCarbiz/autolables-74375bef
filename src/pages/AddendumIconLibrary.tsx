@@ -16,7 +16,7 @@ const VARIANTS: AddendumIconColor[] = ["blue", "green", "purple", "orange"];
 
 const STATUS_STYLE: Record<AddendumIconStatus, string> = {
   ready: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  placeholder: "bg-slate-100 text-slate-500 border-slate-200",
+  placeholder: "bg-muted text-muted-foreground border-border",
   custom_required: "bg-amber-50 text-amber-700 border-amber-200",
 };
 

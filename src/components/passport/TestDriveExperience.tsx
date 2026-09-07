@@ -92,7 +92,7 @@ const VehicleContextCard = ({ listing, d }: { listing: VehicleListing; d: Passpo
   return (
     <div className={`${CARD} p-4 sm:p-5`}>
       <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-5">
-        <div className="relative w-full sm:w-72 lg:w-64 aspect-[16/10] rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center shrink-0">
+        <div className="relative w-full sm:w-72 lg:w-64 aspect-[16/10] rounded-xl overflow-hidden bg-muted flex items-center justify-center shrink-0">
           {hero ? <img src={hero} alt={listing.ymm ?? "Vehicle"} className="w-full h-full object-cover" /> : <Car className="w-8 h-8 text-slate-300" />}
           {photoCount > 1 && (
             <span className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-black/60 rounded-lg px-2 py-1">

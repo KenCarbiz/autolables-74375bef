@@ -12,7 +12,7 @@ const InventoryComplianceChips = ({ status, compact = false }: InventoryComplian
   if (!status) {
     return (
       <div className="flex flex-wrap gap-1">
-        <span className={`${chipBase} border-slate-200 bg-slate-50 text-slate-600`}><AlertTriangle className="h-3 w-3" /> Not checked</span>
+        <span className={`${chipBase} border-border bg-muted text-muted-foreground`}><AlertTriangle className="h-3 w-3" /> Not checked</span>
       </div>
     );
   }
@@ -40,7 +40,7 @@ const InventoryComplianceChips = ({ status, compact = false }: InventoryComplian
         );
       })}
       {labels.length > visible.length ? (
-        <span className={`${chipBase} border-slate-200 bg-slate-50 text-slate-600`}>+{labels.length - visible.length}</span>
+        <span className={`${chipBase} border-border bg-muted text-muted-foreground`}>+{labels.length - visible.length}</span>
       ) : null}
     </div>
   );

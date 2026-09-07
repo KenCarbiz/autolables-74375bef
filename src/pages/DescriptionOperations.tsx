@@ -223,8 +223,8 @@ export default function DescriptionOperations() {
           /* Every vehicle has a case row and none has produced anything. That
              is not a clean fleet — it is a fleet that has not been written
              yet, and the green band used to call it "processed". */
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 mb-3 flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-[13px] text-slate-800 inline-flex items-center gap-2 min-w-0">
+          <div className="rounded-2xl border border-border bg-muted p-3 mb-3 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-[13px] text-foreground inline-flex items-center gap-2 min-w-0">
               <Clock className="w-4 h-4 shrink-0" />
               <span>
                 <b>{summary.pending}</b> vehicle{summary.pending === 1 ? " is" : "s are"} queued and no description has been generated yet.

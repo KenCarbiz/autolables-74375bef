@@ -146,10 +146,10 @@ const AddendumLabelPrint = () => {
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
-  if (!data) return <div className="min-h-screen flex items-center justify-center text-sm text-slate-500">Vehicle not found.</div>;
+  if (!data) return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Vehicle not found.</div>;
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-muted">
       <style>{`
         @media print {
           @page { size: 4.5in 11in; margin: 0; }
@@ -159,12 +159,12 @@ const AddendumLabelPrint = () => {
           .addendum-label { page-break-after: always; }
         }
       `}</style>
-      <div className="no-print sticky top-0 z-10 bg-white border-b border-slate-200 px-4 h-14 flex items-center justify-between">
+      <div className="no-print sticky top-0 z-10 bg-white border-b border-border px-4 h-14 flex items-center justify-between">
         <button onClick={() => navigate(-1)} className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1"><ChevronLeft className="w-4 h-4" /> Back</button>
         <p className="text-[13px] font-bold">Addendum Label · 4.5" x 11"{isPreview ? " · SAMPLE" : ""}</p>
         <div className="flex items-center gap-2">
           <button onClick={doPrint} className="h-9 px-4 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center gap-1.5"><Printer className="w-4 h-4" /> Print</button>
-          <button onClick={doPrint} className="h-9 px-3 rounded-lg border border-slate-200 text-[13px] font-semibold inline-flex items-center gap-1.5" title="Use your browser's Save as PDF destination"><Download className="w-4 h-4" /> PDF</button>
+          <button onClick={doPrint} className="h-9 px-3 rounded-lg border border-border text-[13px] font-semibold inline-flex items-center gap-1.5" title="Use your browser's Save as PDF destination"><Download className="w-4 h-4" /> PDF</button>
         </div>
       </div>
       <div className="addendum-label-wrap mx-auto my-6 shadow-xl" style={{ width: "4.5in" }}>

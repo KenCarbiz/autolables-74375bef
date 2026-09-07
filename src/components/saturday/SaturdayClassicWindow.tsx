@@ -31,7 +31,7 @@ function CarSilhouette() {
         <circle cx="306" cy="135" r="25" fill="#475569" />
         <circle cx="306" cy="135" r="11" fill="#f8fafc" />
       </svg>
-      <div className="absolute bottom-7 text-[12px] font-black uppercase tracking-[0.14em] text-slate-500">Vehicle Photo</div>
+      <div className="absolute bottom-7 text-[12px] font-black uppercase tracking-[0.14em] text-muted-foreground">Vehicle Photo</div>
     </div>
   );
 }
@@ -47,16 +47,16 @@ export const SaturdayClassicWindow: React.FC<Props> = ({ data }) => {
   const interior = specs.find((s) => /interior/i.test(s.label))?.value || "Graphite Leather";
 
   return (
-    <div className="bg-white text-slate-950 shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "8.5in", height: "11in", fontFamily: "Arial, Helvetica, sans-serif" }}>
+    <div className="bg-white text-foreground shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "8.5in", height: "11in", fontFamily: "Arial, Helvetica, sans-serif" }}>
       <div className="flex h-full flex-col p-[0.18in]">
         <header className="grid grid-cols-[2fr_1.05fr] gap-3">
           <div className="rounded-[13px] border-[3px] p-3" style={{ borderColor: line }}>
             <div className="flex items-center gap-5">
-              <div className="flex h-[0.78in] w-[1.8in] items-center justify-center border-2 border-dashed border-slate-300 text-center text-[18px] font-black uppercase leading-tight text-slate-400">Dealership<br />Logo</div>
+              <div className="flex h-[0.78in] w-[1.8in] items-center justify-center border-2 border-dashed border-border text-center text-[18px] font-black uppercase leading-tight text-muted-foreground">Dealership<br />Logo</div>
               <div>
                 <div className="text-[30px] font-black uppercase tracking-wide" style={{ color: navy }}>{dealer.name}</div>
-                <div className="mt-1 text-[13px] font-semibold text-slate-800">● {dealer.address}</div>
-                <div className="mt-1 text-[13px] font-semibold text-slate-800">☎ {dealer.phone} &nbsp;&nbsp; | &nbsp;&nbsp; 🌐 {dealer.website}</div>
+                <div className="mt-1 text-[13px] font-semibold text-foreground">● {dealer.address}</div>
+                <div className="mt-1 text-[13px] font-semibold text-foreground">☎ {dealer.phone} &nbsp;&nbsp; | &nbsp;&nbsp; 🌐 {dealer.website}</div>
               </div>
             </div>
           </div>
@@ -101,7 +101,7 @@ export const SaturdayClassicWindow: React.FC<Props> = ({ data }) => {
             <section className="rounded-[12px] border-2 p-3" style={{ borderColor: line }}>
               <div className="flex items-center gap-3">
                 <QRCodeSVG value={safeUrl} size={82} bgColor="#fff" fgColor="#111827" level="M" />
-                <div><div className="text-[13px] font-black uppercase leading-tight">Scan QR code for more details!</div><div className="mt-1 text-[10px] leading-tight text-slate-600">View full details, photos, and more online.</div></div>
+                <div><div className="text-[13px] font-black uppercase leading-tight">Scan QR code for more details!</div><div className="mt-1 text-[10px] leading-tight text-muted-foreground">View full details, photos, and more online.</div></div>
               </div>
             </section>
           </aside>
@@ -122,7 +122,7 @@ export const SaturdayClassicWindow: React.FC<Props> = ({ data }) => {
                   <div className="text-[56px] font-black leading-none">{fuel.city}</div><div className="text-[16px] font-black">MPG CITY</div>
                   <div className="my-3 border-t" style={{ borderColor: line }} />
                   <div className="text-[56px] font-black leading-none">{fuel.highway}</div><div className="text-[16px] font-black">MPG HWY</div>
-                  <div className="mt-3 text-[11px] text-slate-600">Fuel economy estimates based on EPA ratings.</div>
+                  <div className="mt-3 text-[11px] text-muted-foreground">Fuel economy estimates based on EPA ratings.</div>
                 </div>
               </section>
             </div>
@@ -143,7 +143,7 @@ export const SaturdayClassicWindow: React.FC<Props> = ({ data }) => {
           </section>
         </main>
 
-        <footer className="mt-auto rounded-[10px] border-2 px-4 py-2 text-center text-[10px] leading-tight text-slate-700" style={{ borderColor: line }}>{disclaimer}</footer>
+        <footer className="mt-auto rounded-[10px] border-2 px-4 py-2 text-center text-[10px] leading-tight text-foreground" style={{ borderColor: line }}>{disclaimer}</footer>
       </div>
     </div>
   );

@@ -152,7 +152,7 @@ export default function TemplatePickerPage() {
         </header>
 
         <section className="grid gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-4 lg:grid-cols-[1.2fr_.8fr_.8fr_.8fr_auto_auto]">
-          <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">Search<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none ring-cyan-400/0 focus:ring-2" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="OEM, CPO, passport, market..." /></label>
+          <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Search<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none ring-cyan-400/0 focus:ring-2" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="OEM, CPO, passport, market..." /></label>
           <Select label="Type" value={kind} onChange={(value) => setKind(value as TemplateKindFilter)} options={["all", "used_window_sticker", "used_addendum", "new_monroney", "new_addendum"]} />
           <Select label="Category" value={category} onChange={setCategory} options={["all", ...categories]} />
           <Select label="OEM" value={oem} onChange={setOem} options={["all", ...oems]} />
@@ -175,17 +175,17 @@ export default function TemplatePickerPage() {
                       <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">{kindLabel(templateKind)} • {template.category}</div>
                       <h2 className="mt-2 text-lg font-black leading-tight tracking-[-0.02em]">{template.name}</h2>
                     </div>
-                    {isDefault ? <span className="rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black uppercase text-slate-950">Default</span> : null}
+                    {isDefault ? <span className="rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black uppercase text-foreground">Default</span> : null}
                   </div>
                   <p className="mt-3 line-clamp-3 text-sm text-slate-300">{template.description}</p>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {capabilityPills(template).slice(0, 6).map((cap) => <span key={cap} className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-1 text-[10px] font-bold text-slate-200">{cap}</span>)}
                   </div>
-                  <div className="mt-3 text-[11px] text-slate-400">Family: <b className="text-slate-200">{template.family}</b></div>
+                  <div className="mt-3 text-[11px] text-muted-foreground">Family: <b className="text-slate-200">{template.family}</b></div>
                   <div className="mt-4 grid grid-cols-3 gap-2">
-                    <button onClick={() => toggleEnabled(id)} className={`rounded-xl px-3 py-2 text-xs font-black ${enabled ? "bg-emerald-400 text-slate-950" : "bg-white/10 text-white hover:bg-white/15"}`}>{enabled ? "Enabled" : "Enable"}</button>
-                    <button onClick={() => toggleDisabled(id)} className={`rounded-xl px-3 py-2 text-xs font-black ${disabled ? "bg-red-400 text-slate-950" : "bg-white/10 text-white hover:bg-white/15"}`}>{disabled ? "Blocked" : "Block"}</button>
-                    <button onClick={() => setDefault(template)} className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-black text-slate-950 hover:bg-cyan-300">Default</button>
+                    <button onClick={() => toggleEnabled(id)} className={`rounded-xl px-3 py-2 text-xs font-black ${enabled ? "bg-emerald-400 text-foreground" : "bg-white/10 text-white hover:bg-white/15"}`}>{enabled ? "Enabled" : "Enable"}</button>
+                    <button onClick={() => toggleDisabled(id)} className={`rounded-xl px-3 py-2 text-xs font-black ${disabled ? "bg-red-400 text-foreground" : "bg-white/10 text-white hover:bg-white/15"}`}>{disabled ? "Blocked" : "Block"}</button>
+                    <button onClick={() => setDefault(template)} className="rounded-xl bg-cyan-400 px-3 py-2 text-xs font-black text-foreground hover:bg-cyan-300">Default</button>
                   </div>
                 </article>
               );
@@ -214,17 +214,17 @@ export default function TemplatePickerPage() {
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3"><div className="text-2xl font-black text-white">{value}</div><div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</div></div>;
+  return <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3"><div className="text-2xl font-black text-white">{value}</div><div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</div></div>;
 }
 
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
-  return <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">{label}<select className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option === "all" ? "All" : kindLabel(option)}</option>)}</select></label>;
+  return <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}<select className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option === "all" ? "All" : kindLabel(option)}</option>)}</select></label>;
 }
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <button onClick={() => onChange(!checked)} className={`mt-5 rounded-xl px-4 py-2 text-xs font-black uppercase ${checked ? "bg-cyan-400 text-slate-950" : "bg-white/10 text-white"}`}>{label}</button>;
+  return <button onClick={() => onChange(!checked)} className={`mt-5 rounded-xl px-4 py-2 text-xs font-black uppercase ${checked ? "bg-cyan-400 text-foreground" : "bg-white/10 text-white"}`}>{label}</button>;
 }
 
 function SummaryRow({ label, value }: { label: string; value: string | number }) {
-  return <div className="border-b border-white/10 pb-2"><div className="text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</div><div className="mt-1 break-words text-xs font-bold text-slate-200">{value}</div></div>;
+  return <div className="border-b border-white/10 pb-2"><div className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">{label}</div><div className="mt-1 break-words text-xs font-bold text-slate-200">{value}</div></div>;
 }

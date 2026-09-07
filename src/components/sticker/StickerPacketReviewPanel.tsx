@@ -10,7 +10,7 @@ import { ShieldCheck, AlertTriangle, XCircle, CheckCircle2 } from "lucide-react"
 const sevMeta: Record<MatchFinding["severity"], { tone: string; Icon: typeof AlertTriangle; label: string }> = {
   fail:    { tone: "text-rose-700 bg-rose-50 border-rose-200",     Icon: XCircle,       label: "Blocking" },
   warning: { tone: "text-amber-700 bg-amber-50 border-amber-200",  Icon: AlertTriangle, label: "Warning" },
-  info:    { tone: "text-slate-600 bg-slate-50 border-slate-200",  Icon: ShieldCheck,   label: "Info" },
+  info:    { tone: "text-muted-foreground bg-muted border-border",  Icon: ShieldCheck,   label: "Info" },
 };
 
 export default function StickerPacketReviewPanel({ sticker, ctx }: { sticker: StickerData; ctx: PacketContext }) {

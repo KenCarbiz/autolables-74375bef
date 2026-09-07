@@ -70,7 +70,7 @@ const OemDistributionPanel = () => {
         </span>
         <div className="min-w-0">
           <h3 className="text-[15px] font-bold text-foreground">Manufacturer Document Permissions</h3>
-          <p className="text-[12.5px] text-slate-500 mt-0.5">
+          <p className="text-[12.5px] text-muted-foreground mt-0.5">
             Owner's manuals and brochures are served directly for the brands this store is franchised
             for. Every other vehicle links to the manufacturer's own site instead. This is determined
             automatically from your new-vehicle inventory and is not a setting.
@@ -79,13 +79,13 @@ const OemDistributionPanel = () => {
       </div>
 
       {!loaded ? (
-        <p className="text-[12.5px] text-slate-500 mt-4">Checking…</p>
+        <p className="text-[12.5px] text-muted-foreground mt-4">Checking…</p>
       ) : franchises === null ? (
-        <p className="text-[12.5px] text-slate-500 mt-4">
+        <p className="text-[12.5px] text-muted-foreground mt-4">
           Could not confirm franchised brands. Every vehicle links out until this loads.
         </p>
       ) : hostable.length === 0 ? (
-        <p className="text-[12.5px] text-slate-500 mt-4">
+        <p className="text-[12.5px] text-muted-foreground mt-4">
           No franchised brand detected yet, so every vehicle links to the manufacturer. A brand appears
           here once this store carries new inventory of it.
         </p>
@@ -95,7 +95,7 @@ const OemDistributionPanel = () => {
             <li key={b} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3.5 py-2.5">
               <div className="min-w-0">
                 <p className="text-[13px] font-bold text-foreground">{label(b)}</p>
-                <p className="text-[11.5px] text-slate-500">
+                <p className="text-[11.5px] text-muted-foreground">
                   {unitsFor(b) != null ? `${unitsFor(b)} new units in inventory` : "Franchised"}
                 </p>
               </div>
@@ -108,7 +108,7 @@ const OemDistributionPanel = () => {
       )}
 
       {blockedHere.length > 0 && (
-        <p className="text-[11.5px] text-slate-500 mt-3">
+        <p className="text-[11.5px] text-muted-foreground mt-3">
           {blockedHere.map(label).join(", ")} {blockedHere.length === 1 ? "is" : "are"} link-only at the
           manufacturer&apos;s request.
         </p>

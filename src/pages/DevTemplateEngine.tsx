@@ -175,8 +175,8 @@ export default function DevTemplateEngine() {
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <Select label="Scenario" value={scenarioKey} onChange={setScenarioKey} options={Object.keys(scenarios)} />
-              <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">Buyer<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} /></label>
-              <button onClick={() => setServiceComplete((v) => !v)} className={`mt-5 rounded-xl px-4 py-2 text-xs font-black uppercase ${serviceComplete ? "bg-emerald-400 text-slate-950" : "bg-white/10 text-white"}`}>{serviceComplete ? "Service Complete" : "Complete Service"}</button>
+              <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Buyer<input className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={buyerName} onChange={(e) => setBuyerName(e.target.value)} /></label>
+              <button onClick={() => setServiceComplete((v) => !v)} className={`mt-5 rounded-xl px-4 py-2 text-xs font-black uppercase ${serviceComplete ? "bg-emerald-400 text-foreground" : "bg-white/10 text-white"}`}>{serviceComplete ? "Service Complete" : "Complete Service"}</button>
             </div>
           </div>
         </header>
@@ -189,7 +189,7 @@ export default function DevTemplateEngine() {
           <Panel title="Vehicle + Decisions">
             <div className="rounded-2xl bg-slate-900 p-4">
               <div className="text-2xl font-black text-white">{vehicleTitle(vehicle)}</div>
-              <div className="mt-1 text-sm text-slate-400">VIN {vehicle.vin} • Stock {vehicle.stock} • {vehicle.mileage.toLocaleString()} miles • {vehicle.saleState}</div>
+              <div className="mt-1 text-sm text-muted-foreground">VIN {vehicle.vin} • Stock {vehicle.stock} • {vehicle.mileage.toLocaleString()} miles • {vehicle.saleState}</div>
             </div>
             <DecisionRow label="Window Sticker" value={result.windowDecision.template.name} detail={result.windowDecision.reasons.join(" • ")} />
             <DecisionRow label="Used Addendum" value={result.addendumDecision.template.name} detail={result.addendumDecision.reasons.join(" • ")} />
@@ -199,7 +199,7 @@ export default function DevTemplateEngine() {
 
           <Panel title="Connecticut Launch Scope">
             <div className="space-y-2">
-              {CONNECTICUT_FIRST_ROLLOUT_SCOPE.filter((item) => item.requiredForLaunch).map((item) => <div key={item.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"><div className="flex items-center justify-between gap-3"><div className="font-black text-white">{item.title}</div><span className="rounded-full bg-cyan-400 px-2 py-1 text-[10px] font-black uppercase text-slate-950">{item.status}</span></div><p className="mt-1 text-xs text-slate-400">{item.description}</p></div>)}
+              {CONNECTICUT_FIRST_ROLLOUT_SCOPE.filter((item) => item.requiredForLaunch).map((item) => <div key={item.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"><div className="flex items-center justify-between gap-3"><div className="font-black text-white">{item.title}</div><span className="rounded-full bg-cyan-400 px-2 py-1 text-[10px] font-black uppercase text-foreground">{item.status}</span></div><p className="mt-1 text-xs text-muted-foreground">{item.description}</p></div>)}
             </div>
           </Panel>
         </section>
@@ -236,13 +236,13 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 }
 
 function StatusCard({ label, ok, detail }: { label: string; ok: boolean; detail?: string }) {
-  return <div className={`rounded-3xl border p-4 shadow-xl ${ok ? "border-emerald-400/40 bg-emerald-950/20" : "border-amber-400/40 bg-amber-950/20"}`}><div className="text-xs font-black uppercase tracking-wide text-slate-400">{ok ? "Pass" : "Pending"}</div><div className="mt-1 font-black text-white">{label}</div><div className="mt-1 text-xs text-slate-300">{detail}</div></div>;
+  return <div className={`rounded-3xl border p-4 shadow-xl ${ok ? "border-emerald-400/40 bg-emerald-950/20" : "border-amber-400/40 bg-amber-950/20"}`}><div className="text-xs font-black uppercase tracking-wide text-muted-foreground">{ok ? "Pass" : "Pending"}</div><div className="mt-1 font-black text-white">{label}</div><div className="mt-1 text-xs text-slate-300">{detail}</div></div>;
 }
 
 function DecisionRow({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"><div className="text-[10px] font-black uppercase tracking-wide text-cyan-300">{label}</div><div className="mt-1 font-black text-white">{value}</div>{detail ? <p className="mt-1 text-xs text-slate-400">{detail}</p> : null}</div>;
+  return <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3"><div className="text-[10px] font-black uppercase tracking-wide text-cyan-300">{label}</div><div className="mt-1 font-black text-white">{value}</div>{detail ? <p className="mt-1 text-xs text-muted-foreground">{detail}</p> : null}</div>;
 }
 
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
-  return <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-slate-400">{label}<select className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+  return <label className="space-y-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}<select className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 }
