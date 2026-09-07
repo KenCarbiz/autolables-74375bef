@@ -89,10 +89,10 @@
 
 .login-hero-car {
   position: absolute;
-  right: 1.4%;
+  right: 0;
   bottom: 0;
   z-index: 1;
-  width: 28.79%;
+  width: 30.19%;
   height: 65.25%;
   object-fit: contain;
   object-position: right bottom;
@@ -137,7 +137,7 @@
   margin: 0;
   font-size: clamp(9px, 0.69vw, 11.5px);
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.245em;
   text-transform: uppercase;
   color: #8FB4DC;
 }
@@ -178,19 +178,19 @@
 
 .login-hero-description {
   margin: 0;
-  max-width: clamp(320px, 29.9vw, 500px);
-  font-size: clamp(14.5px, 1.02vw, 17px);
-  line-height: 1.55;
+  max-width: clamp(330px, 31.7vw, 530px);
+  font-size: clamp(15px, 1.11vw, 18.6px);
+  line-height: 1.44;
   color: rgba(255, 255, 255, .88);
 }
 
 .login-hero-features {
   list-style: none;
-  margin: clamp(18px, 1.61vw, 27px) 0 0;
+  margin: clamp(15px, 1.32vw, 22px) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: clamp(6px, 0.54vw, 9px);
+  gap: clamp(7px, 0.66vw, 11px);
   max-width: 565px;
 }
 
