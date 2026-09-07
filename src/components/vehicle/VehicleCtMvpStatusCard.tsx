@@ -127,7 +127,7 @@ const VehicleCtMvpStatusCard = ({ tenantId, vehicleId, vin, compact = false }: V
         <button
           type="button"
           onClick={() => void load()}
-          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-white/80 px-3 text-xs font-bold text-foreground hover:bg-white"
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-card/80 px-3 text-xs font-bold text-foreground hover:bg-card"
         >
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
         </button>
@@ -135,11 +135,11 @@ const VehicleCtMvpStatusCard = ({ tenantId, vehicleId, vin, compact = false }: V
 
       {!compact ? (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl bg-white/80 p-3">
+          <div className="rounded-xl bg-card/80 p-3">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Required documents</p>
             <p className="mt-1 text-sm font-semibold text-foreground">{(run.required_document_keys || []).join(", ") || "—"}</p>
           </div>
-          <div className="rounded-xl bg-white/80 p-3">
+          <div className="rounded-xl bg-card/80 p-3">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Open checks</p>
             <p className="mt-1 text-sm font-semibold text-foreground">{failingChecks.length ? `${failingChecks.length} issue(s)` : "All checks passed"}</p>
           </div>
@@ -149,7 +149,7 @@ const VehicleCtMvpStatusCard = ({ tenantId, vehicleId, vin, compact = false }: V
       {!compact && failingChecks.length > 0 ? (
         <div className="mt-3 space-y-2">
           {failingChecks.slice(0, 4).map((check) => (
-            <div key={check.key} className="flex items-start gap-2 rounded-xl bg-white/80 p-3">
+            <div key={check.key} className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
               <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
               <div>
                 <p className="text-sm font-bold text-foreground">{check.label}</p>

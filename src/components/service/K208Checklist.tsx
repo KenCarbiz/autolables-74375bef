@@ -116,7 +116,7 @@ export default function K208Checklist({ marks, onMark, onPassAll, onClearAll, fa
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 space-y-2">
           <label className="text-xs font-bold text-red-800 uppercase tracking-wider">Explanation of defects or repairs needed</label>
           <textarea value={failureNotes} onChange={(e) => onFailureNotes(e.target.value)} rows={3}
-            className="w-full rounded-lg border border-red-200 bg-white p-3 text-sm" placeholder="Describe failures and corrective action taken before sale…" />
+            className="w-full rounded-lg border border-red-200 bg-card p-3 text-sm" placeholder="Describe failures and corrective action taken before sale…" />
         </div>
       )}
 

@@ -236,6 +236,8 @@ export default function StickerPrintTemplates() {
               <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-label mb-1">
                 Position the fill area
               </div>
+              {/* Literal white: this canvas stands in for printed paper, so it
+                  must not follow --card. */}
               <div ref={canvasRef} className="relative w-full rounded border border-border bg-white select-none"
                 style={{ aspectRatio: String(aspect), maxWidth: 480 }}>
                 {tpl.artwork_url ? (

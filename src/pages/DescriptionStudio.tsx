@@ -242,7 +242,7 @@ const DescriptionStudio = () => {
 
   return (
     <div className="min-h-screen bg-[#F7F9FC]">
-      <div className="border-b border-border bg-white">
+      <div className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-[1600px] gap-8 overflow-x-auto px-5 py-5">
           {[
             { label: "Vehicle & Features", sub: "Canonical truth snapshot", done: !!snapshot },
@@ -389,7 +389,7 @@ const DescriptionStudio = () => {
                   role="radio"
                   aria-checked={tone === item}
                   onClick={() => touchConfig(setTone)(item)}
-                  className={`h-12 min-w-[110px] rounded-xl border px-5 text-sm font-black capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${tone === item ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-white text-foreground"}`}
+                  className={`h-12 min-w-[110px] rounded-xl border px-5 text-sm font-black capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${tone === item ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-foreground"}`}
                 >
                   {item}
                 </button>
@@ -511,7 +511,7 @@ const DescriptionStudio = () => {
                 )}
 
                 {/* The exact stored text. Never reassembled client-side. */}
-                <div className="max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-border bg-white p-4 text-sm font-medium leading-relaxed text-foreground">
+                <div className="max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-border bg-card p-4 text-sm font-medium leading-relaxed text-foreground">
                   {content}
                 </div>
 
@@ -600,7 +600,7 @@ const DescriptionStudio = () => {
         </section>
       </main>
 
-      <div className="border-t border-border bg-white py-3 text-center text-sm font-semibold text-muted-foreground">
+      <div className="border-t border-border bg-card py-3 text-center text-sm font-semibold text-muted-foreground">
         AI-generated content. Always review for accuracy.
       </div>
     </div>
@@ -621,7 +621,7 @@ function ScorePanel({ score, blocking }: { score: Row; blocking: number }) {
 
   return (
     <div className="grid gap-5 md:grid-cols-[130px_1fr] md:items-start">
-      <div className={`mx-auto flex h-28 w-28 items-center justify-center rounded-full border-[7px] bg-white ${ring}`}>
+      <div className={`mx-auto flex h-28 w-28 items-center justify-center rounded-full border-[7px] bg-card ${ring}`}>
         <div className="text-center">
           <div className="text-4xl font-black text-foreground">{total}</div>
           <div className="text-xs font-bold text-muted-foreground">/100</div>
@@ -739,7 +739,7 @@ function EmptyShell({ title, body, action }: {
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F7F9FC] p-6">
-      <div className="max-w-md rounded-2xl border border-border bg-white p-8 text-center shadow-sm">
+      <div className="max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
         <h1 className="text-xl font-black text-foreground">{title}</h1>
         <p className="mt-2 text-sm font-semibold text-muted-foreground">{body}</p>
         {action && (
@@ -756,7 +756,7 @@ function Card({ title, subtitle, badge, action, children }: {
   title: string; subtitle?: string; badge?: string; action?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-black text-foreground">
@@ -810,7 +810,7 @@ function Field({ label, value, onChange, placeholder }: {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-2 h-12 w-full rounded-xl border border-border bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400"
+        className="mt-2 h-12 w-full rounded-xl border border-border bg-card px-4 text-sm font-semibold outline-none focus:border-blue-400"
       />
     </label>
   );
@@ -819,7 +819,7 @@ function Field({ label, value, onChange, placeholder }: {
 function CheckOption({ checked, onClick, label }: { checked: boolean; onClick: () => void; label: string }) {
   return (
     <button onClick={onClick} role="checkbox" aria-checked={checked} className="inline-flex items-center gap-2 text-sm font-bold text-foreground">
-      <span className={`flex h-5 w-5 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-border bg-white"}`}>
+      <span className={`flex h-5 w-5 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-border bg-card"}`}>
         {checked && <CheckCircle2 className="h-3.5 w-3.5" />}
       </span>
       {label}
@@ -829,7 +829,7 @@ function CheckOption({ checked, onClick, label }: { checked: boolean; onClick: (
 
 function Button({ icon: Icon, label, onClick }: { icon: typeof Copy; label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-black text-foreground">
+    <button onClick={onClick} className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-black text-foreground">
       <Icon className="h-4 w-4" /> {label}
     </button>
   );

@@ -61,7 +61,7 @@ export function VehicleFileConnectedHero({
         <ArrowLeft className="h-3.5 w-3.5" /> Back to Inventory
       </button>
 
-      <div className="overflow-hidden rounded-[1.7rem] border border-border bg-white shadow-sm">
+      <div className="overflow-hidden rounded-[1.7rem] border border-border bg-card shadow-sm">
         <div className="grid gap-0 lg:grid-cols-[330px_1fr_300px]">
           <div className="relative min-h-[210px] bg-muted lg:min-h-[250px]">
             {gallery.length ? (
@@ -120,7 +120,7 @@ export function VehicleFileConnectedHero({
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[10px] font-black uppercase text-amber-800">Missing:</span>
                     {ready.remaining.slice(0, 3).map((item) => (
-                      <span key={item.label} className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-amber-800 shadow-sm">
+                      <span key={item.label} className="inline-flex items-center gap-1 rounded-full bg-card px-2.5 py-1 text-[11px] font-black text-amber-800 shadow-sm">
                         <CircleAlert className="h-3 w-3" /> {item.label.replace(" generated & published", "")}
                       </span>
                     ))}
@@ -130,13 +130,13 @@ export function VehicleFileConnectedHero({
             </div>
           </div>
 
-          <div className="flex flex-col justify-center gap-3 border-t border-border bg-white p-5 lg:border-l lg:border-t-0">
+          <div className="flex flex-col justify-center gap-3 border-t border-border bg-card p-5 lg:border-l lg:border-t-0">
             {published ? (
               <>
                 <a href={publicUrl} target="_blank" rel="noreferrer" className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700">
                   <ExternalLink className="h-4 w-4" /> View Customer Packet
                 </a>
-                <button onClick={onCopyLink} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-black text-foreground hover:bg-muted">
+                <button onClick={onCopyLink} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-black text-foreground hover:bg-muted">
                   <Copy className="h-4 w-4" /> Copy Link
                 </button>
               </>
@@ -145,10 +145,10 @@ export function VehicleFileConnectedHero({
                 <button onClick={onLabels} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700">
                   <Printer className="h-4 w-4" /> Generate Sticker
                 </button>
-                <button onClick={onLabels} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-black text-foreground hover:bg-muted">
+                <button onClick={onLabels} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-black text-foreground hover:bg-muted">
                   <Globe className="h-4 w-4" /> Publish to Shopper Portal
                 </button>
-                <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-white px-4 text-sm font-black text-foreground hover:bg-muted">
+                <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-black text-foreground hover:bg-muted">
                   More actions
                 </button>
               </>
@@ -162,7 +162,7 @@ export function VehicleFileConnectedHero({
 
 function ReadinessBubble({ pct, published }: { pct: number; published: boolean }) {
   return (
-    <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 bg-white text-sm font-black ${published ? "border-emerald-500 text-emerald-900" : "border-amber-400 text-amber-900"}`}>
+    <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 bg-card text-sm font-black ${published ? "border-emerald-500 text-emerald-900" : "border-amber-400 text-amber-900"}`}>
       {pct}%
     </div>
   );

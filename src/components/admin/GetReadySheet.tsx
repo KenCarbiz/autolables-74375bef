@@ -157,7 +157,7 @@ export const GetReadySheet = ({
         #gr-sheet { position: fixed; inset: 0; margin: 0; box-shadow: none; border: 0; }
         .gr-noprint { display: none !important; }
       }`}</style>
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
         <div id="gr-sheet" className="p-7 text-foreground">
           {/* Header */}
           <div className="flex items-start justify-between gap-5 border-b-2 border-slate-900 pb-3">
@@ -175,7 +175,7 @@ export const GetReadySheet = ({
                 <div className="w-[110px] h-[110px] rounded bg-muted animate-pulse" />
               ) : installUrl ? (
                 <>
-                  <div className="border border-border p-1.5 inline-block bg-white">
+                  <div className="border border-border p-1.5 inline-block bg-card">
                     <QRCodeSVG value={installUrl} size={100} />
                   </div>
                   <p className="text-[8px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">Installer: scan to verify</p>
@@ -209,7 +209,7 @@ export const GetReadySheet = ({
                       ? "bg-muted border-border text-muted-foreground"
                       : i === reachedStage
                         ? "bg-slate-900 border-slate-900 text-white"
-                        : "bg-white border-border text-muted-foreground"
+                        : "bg-card border-border text-muted-foreground"
                   }`}
                 >
                   {s}

@@ -315,7 +315,7 @@ export default function FactoryStickerCard({
               href={fileUrl || thumbUrl}
               target="_blank"
               rel="noreferrer"
-              className="block rounded-lg border border-border overflow-hidden bg-white hover:border-blue-600 transition-colors"
+              className="block rounded-lg border border-border overflow-hidden bg-card hover:border-blue-600 transition-colors"
             >
               <img
                 src={thumbUrl}

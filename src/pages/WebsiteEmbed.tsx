@@ -83,7 +83,7 @@ const WebsiteEmbed = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Config */}
-        <section className="rounded-2xl border border-border bg-white p-5 space-y-5">
+        <section className="rounded-2xl border border-border bg-card p-5 space-y-5">
           <h2 className="text-sm font-semibold text-foreground">Configuration</h2>
 
           <div>
@@ -146,7 +146,7 @@ const WebsiteEmbed = () => {
       </div>
 
       {/* Snippet */}
-      <section className="rounded-2xl border border-border bg-white p-5 space-y-3">
+      <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Code className="w-4 h-4 text-muted-foreground" />
@@ -177,7 +177,7 @@ const EmbedPreview = ({ vin, tenant, label, position, accent }: { vin: string; t
   const [open, setOpen] = useState(false);
   const src = `${APP_ORIGIN}/v/${vin}?embed=1${tenant ? `&t=${tenant}` : ""}&preview=1`;
   return (
-    <div className="relative rounded-xl border border-border bg-white overflow-hidden" style={{ height: 420 }}>
+    <div className="relative rounded-xl border border-border bg-card overflow-hidden" style={{ height: 420 }}>
       {/* Mock VDP */}
       <div className="p-4 space-y-3">
         <div className="h-32 rounded-lg bg-gradient-to-br from-slate-200 to-slate-300" />
@@ -204,7 +204,7 @@ const EmbedPreview = ({ vin, tenant, label, position, accent }: { vin: string; t
           <div className={`absolute top-0 ${position === "right" ? "right-0" : "left-0"} bottom-0 z-20 w-[300px] bg-muted shadow-2xl flex flex-col`}>
             <div className="flex items-center justify-between px-3 py-2 bg-slate-900 text-white text-xs font-semibold">
               <span>Vehicle Passport · {vin.slice(-6)}</span>
-              <button onClick={() => setOpen(false)} className="w-6 h-6 rounded hover:bg-white/10">×</button>
+              <button onClick={() => setOpen(false)} className="w-6 h-6 rounded hover:bg-card/10">×</button>
             </div>
             <iframe title="Passport preview" src={src} className="flex-1 w-full border-0 bg-muted" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
           </div>

@@ -183,7 +183,7 @@ export default function DescriptionOperations() {
           <button onClick={() => setFilter("exceptions")}
             className="min-h-[44px] px-4 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold inline-flex items-center gap-1.5">
             <AlertTriangle className="w-4 h-4" /> Review Exceptions
-            {exceptionCount > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-[11px]">{exceptionCount}</span>}
+            {exceptionCount > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-card/20 text-[11px]">{exceptionCount}</span>}
           </button>
         </div>
       </div>

@@ -114,7 +114,7 @@ export const IncentivesSettingsPanel = () => {
           onClick={() => setEnabled((v) => !v)}
           className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? "bg-blue-600" : "bg-slate-300"}`}
         >
-          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${enabled ? "left-[22px]" : "left-0.5"}`} />
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow transition-all ${enabled ? "left-[22px]" : "left-0.5"}`} />
         </button>
       </div>
 

@@ -19,7 +19,7 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const Toggle = ({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) => (
   <label className="flex items-start gap-2.5 cursor-pointer select-none">
     <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 w-4 h-4 accent-blue-600" />
-    <span><span className="text-[13px] font-semibold text-foreground block leading-tight">{label}</span>{hint && <span className="text-[11px] text-slate-400">{hint}</span>}</span>
+    <span><span className="text-[13px] font-semibold text-foreground block leading-tight">{label}</span>{hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}</span>
   </label>
 );
 
@@ -118,7 +118,7 @@ const PassportContactRoutingPanel = () => {
     <div className="space-y-5 max-w-5xl">
       <div>
         <h2 className="text-[22px] font-bold tracking-tight text-foreground">Customer Passport Contact Routing</h2>
-        <p className="text-sm text-slate-500 mt-1">Control who shoppers reach when they reserve, value a trade, or ask for help. Shoppers only ever see Reserve · Trade · Talk to us — you decide who gets the lead. Changes save automatically.</p>
+        <p className="text-sm text-muted-foreground mt-1">Control who shoppers reach when they reserve, value a trade, or ask for help. Shoppers only ever see Reserve · Trade · Talk to us — you decide who gets the lead. Changes save automatically.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 items-start">
@@ -133,7 +133,7 @@ const PassportContactRoutingPanel = () => {
                 <option value="bdc">BDC Team</option>
                 <option value="dealership_default">Dealership Default</option>
               </select>
-              <p className="text-[11px] text-slate-400 mt-1">Smart Routing tries: CRM owner → assigned agent → rotation → BDC → manager → store.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Smart Routing tries: CRM owner → assigned agent → rotation → BDC → manager → store.</p>
             </div>
             <div className="space-y-3 pt-1">
               <Toggle checked={cfg.showAgentProfile} onChange={(v) => patch({ showAgentProfile: v })} label="Show agent profile to shoppers" hint="Off: leads still route to the person, but shoppers see neutral dealership language." />
@@ -161,7 +161,7 @@ const PassportContactRoutingPanel = () => {
           {/* Dealership default contact */}
           <div className="rounded-2xl border border-border bg-card p-4">
             <h3 className="text-[14px] font-bold text-foreground">Dealership default contact</h3>
-            <p className="text-[12px] text-slate-500 mt-0.5 mb-3">The guaranteed fallback — every routing path ends here if nothing else is available.</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">The guaranteed fallback — every routing path ends here if nothing else is available.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-[13px] font-semibold text-foreground">Main sales phone</label>
@@ -179,20 +179,20 @@ const PassportContactRoutingPanel = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-[14px] font-bold text-foreground">Sales team roster</h3>
-                <p className="text-[12px] text-slate-500 mt-0.5">Who can receive passport leads. Unavailable people are never shown or assigned.</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">Who can receive passport leads. Unavailable people are never shown or assigned.</p>
               </div>
               <button onClick={() => setAgents((a) => [...a, newAgent()])} className="inline-flex items-center gap-1 h-9 px-3 rounded-lg border border-border text-[13px] font-semibold hover:border-blue-500"><Plus className="w-4 h-4" /> Add</button>
             </div>
             <div className="mt-3 space-y-3">
-              {agents.length === 0 && <p className="text-[13px] text-slate-400">No agents yet — Smart Routing will use BDC / dealership fallbacks.</p>}
+              {agents.length === 0 && <p className="text-[13px] text-muted-foreground">No agents yet — Smart Routing will use BDC / dealership fallbacks.</p>}
               {agents.map((a, i) => (
                 <div key={a.id} className="rounded-xl border border-border p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
-                  <div className="col-span-2"><label className="text-[11px] font-semibold text-slate-500">Name</label><input value={a.name} onChange={(e) => patchAgent(i, { name: e.target.value })} placeholder="Sarah Miller" className={inputCls} /></div>
-                  <div className="col-span-2"><label className="text-[11px] font-semibold text-slate-500">Title</label><input value={a.title || ""} onChange={(e) => patchAgent(i, { title: e.target.value })} className={inputCls} /></div>
-                  <div><label className="text-[11px] font-semibold text-slate-500">Phone</label><input value={a.phone || ""} onChange={(e) => patchAgent(i, { phone: e.target.value })} className={inputCls} /></div>
-                  <div><label className="text-[11px] font-semibold text-slate-500">Text number</label><input value={a.smsNumber || ""} onChange={(e) => patchAgent(i, { smsNumber: e.target.value })} className={inputCls} /></div>
-                  <div className="col-span-2"><label className="text-[11px] font-semibold text-slate-500">Email</label><input value={a.email || ""} onChange={(e) => patchAgent(i, { email: e.target.value })} className={inputCls} /></div>
-                  <div><label className="text-[11px] font-semibold text-slate-500">Status</label>
+                  <div className="col-span-2"><label className="text-[11px] font-semibold text-muted-foreground">Name</label><input value={a.name} onChange={(e) => patchAgent(i, { name: e.target.value })} placeholder="Sarah Miller" className={inputCls} /></div>
+                  <div className="col-span-2"><label className="text-[11px] font-semibold text-muted-foreground">Title</label><input value={a.title || ""} onChange={(e) => patchAgent(i, { title: e.target.value })} className={inputCls} /></div>
+                  <div><label className="text-[11px] font-semibold text-muted-foreground">Phone</label><input value={a.phone || ""} onChange={(e) => patchAgent(i, { phone: e.target.value })} className={inputCls} /></div>
+                  <div><label className="text-[11px] font-semibold text-muted-foreground">Text number</label><input value={a.smsNumber || ""} onChange={(e) => patchAgent(i, { smsNumber: e.target.value })} className={inputCls} /></div>
+                  <div className="col-span-2"><label className="text-[11px] font-semibold text-muted-foreground">Email</label><input value={a.email || ""} onChange={(e) => patchAgent(i, { email: e.target.value })} className={inputCls} /></div>
+                  <div><label className="text-[11px] font-semibold text-muted-foreground">Status</label>
                     <select value={a.manualOverride === "unavailable" ? "unavailable" : a.status} onChange={(e) => {
                       const v = e.target.value;
                       if (v === "unavailable") patchAgent(i, { manualOverride: "unavailable" });
@@ -203,7 +203,7 @@ const PassportContactRoutingPanel = () => {
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <Toggle checked={a.acceptsPassportLeads} onChange={(v) => patchAgent(i, { acceptsPassportLeads: v })} label="Passport leads" />
-                    <button onClick={() => setAgents((arr) => arr.filter((_, j) => j !== i))} aria-label="Remove agent" className="w-9 h-9 rounded-lg border border-border text-slate-400 hover:text-red-500 hover:border-red-300 inline-flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => setAgents((arr) => arr.filter((_, j) => j !== i))} aria-label="Remove agent" className="w-9 h-9 rounded-lg border border-border text-muted-foreground hover:text-red-500 hover:border-red-300 inline-flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
               ))}
@@ -241,21 +241,21 @@ const PassportContactRoutingPanel = () => {
             <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
               <h3 className="text-[14px] font-bold text-foreground">BDC fallback</h3>
               <Toggle checked={!!cfg.bdcSettings?.enabled} onChange={(v) => patch({ bdcSettings: { showBdcAsTeam: true, ...(cfg.bdcSettings || {}), enabled: v } })} label="Enable BDC" />
-              <div><label className="text-[11px] font-semibold text-slate-500">BDC phone</label><input value={cfg.bdcSettings?.bdcPhone || ""} onChange={(e) => patch({ bdcSettings: { enabled: false, showBdcAsTeam: true, ...(cfg.bdcSettings || {}), bdcPhone: e.target.value } })} className={inputCls} /></div>
-              <div><label className="text-[11px] font-semibold text-slate-500">BDC email</label><input value={cfg.bdcSettings?.bdcEmail || ""} onChange={(e) => patch({ bdcSettings: { enabled: false, showBdcAsTeam: true, ...(cfg.bdcSettings || {}), bdcEmail: e.target.value } })} className={inputCls} /></div>
+              <div><label className="text-[11px] font-semibold text-muted-foreground">BDC phone</label><input value={cfg.bdcSettings?.bdcPhone || ""} onChange={(e) => patch({ bdcSettings: { enabled: false, showBdcAsTeam: true, ...(cfg.bdcSettings || {}), bdcPhone: e.target.value } })} className={inputCls} /></div>
+              <div><label className="text-[11px] font-semibold text-muted-foreground">BDC email</label><input value={cfg.bdcSettings?.bdcEmail || ""} onChange={(e) => patch({ bdcSettings: { enabled: false, showBdcAsTeam: true, ...(cfg.bdcSettings || {}), bdcEmail: e.target.value } })} className={inputCls} /></div>
             </div>
             <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
               <h3 className="text-[14px] font-bold text-foreground">Manager fallback</h3>
               <Toggle checked={!!cfg.managerFallback?.enabled} onChange={(v) => patch({ managerFallback: { ...(cfg.managerFallback || {}), enabled: v } })} label="Enable manager fallback" />
-              <div><label className="text-[11px] font-semibold text-slate-500">Manager phone</label><input value={cfg.managerFallback?.managerPhone || ""} onChange={(e) => patch({ managerFallback: { enabled: false, ...(cfg.managerFallback || {}), managerPhone: e.target.value } })} className={inputCls} /></div>
-              <div><label className="text-[11px] font-semibold text-slate-500">Manager email</label><input value={cfg.managerFallback?.managerEmail || ""} onChange={(e) => patch({ managerFallback: { enabled: false, ...(cfg.managerFallback || {}), managerEmail: e.target.value } })} className={inputCls} /></div>
+              <div><label className="text-[11px] font-semibold text-muted-foreground">Manager phone</label><input value={cfg.managerFallback?.managerPhone || ""} onChange={(e) => patch({ managerFallback: { enabled: false, ...(cfg.managerFallback || {}), managerPhone: e.target.value } })} className={inputCls} /></div>
+              <div><label className="text-[11px] font-semibold text-muted-foreground">Manager email</label><input value={cfg.managerFallback?.managerEmail || ""} onChange={(e) => patch({ managerFallback: { enabled: false, ...(cfg.managerFallback || {}), managerEmail: e.target.value } })} className={inputCls} /></div>
             </div>
           </div>
 
           {/* Business hours + after hours */}
           <div className="rounded-2xl border border-border bg-card p-4">
             <h3 className="text-[14px] font-bold text-foreground">Business hours & after-hours behavior</h3>
-            <p className="text-[12px] text-slate-500 mt-0.5 mb-3">Outside these hours no one is shown as "Available now" — shoppers get the capture flow instead. Leave every day off if you don't want after-hours behavior.</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">Outside these hours no one is shown as "Available now" — shoppers get the capture flow instead. Leave every day off if you don't want after-hours behavior.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
               {DAY_NAMES.map((dName, day) => {
                 const block = cfg.businessHours.find((b) => b.dayOfWeek === day);
@@ -263,7 +263,7 @@ const PassportContactRoutingPanel = () => {
                   <div key={day} className="flex items-center gap-2">
                     <label className="w-16 flex items-center gap-1.5 text-[13px] font-semibold cursor-pointer"><input type="checkbox" checked={!!block} onChange={(e) => setHours(day, "enabled", e.target.checked)} className="w-4 h-4 accent-blue-600" /> {dName}</label>
                     <input type="time" value={block?.startTime || "09:00"} disabled={!block} onChange={(e) => setHours(day, "startTime", e.target.value)} className="h-9 px-2 rounded-lg border border-border bg-background text-sm disabled:opacity-40" />
-                    <span className="text-slate-400 text-sm">–</span>
+                    <span className="text-muted-foreground text-sm">–</span>
                     <input type="time" value={block?.endTime || "19:00"} disabled={!block} onChange={(e) => setHours(day, "endTime", e.target.value)} className="h-9 px-2 rounded-lg border border-border bg-background text-sm disabled:opacity-40" />
                   </div>
                 );
@@ -290,12 +290,12 @@ const PassportContactRoutingPanel = () => {
           {/* Escalation */}
           <div className="rounded-2xl border border-border bg-card p-4">
             <h3 className="text-[14px] font-bold text-foreground">Response SLA & escalation</h3>
-            <p className="text-[12px] text-slate-500 mt-0.5 mb-3">Unanswered passport leads escalate automatically. Requires the passport-lead-escalation function on a schedule.</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">Unanswered passport leads escalate automatically. Requires the passport-lead-escalation function on a schedule.</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-3"><Toggle checked={cfg.escalationRules.enabled} onChange={(v) => patch({ escalationRules: { ...cfg.escalationRules, enabled: v } })} label="Enable escalation" /></div>
-              <div><label className="text-[11px] font-semibold text-slate-500">First response SLA (min)</label><input type="number" min={1} value={cfg.escalationRules.firstResponseSlaMinutes} onChange={(e) => patch({ escalationRules: { ...cfg.escalationRules, firstResponseSlaMinutes: Number(e.target.value) || 5 } })} className={inputCls} /></div>
-              <div><label className="text-[11px] font-semibold text-slate-500">Escalate to BDC after (min)</label><input type="number" min={0} value={cfg.escalationRules.escalateToBdcAfterMinutes ?? ""} onChange={(e) => patch({ escalationRules: { ...cfg.escalationRules, escalateToBdcAfterMinutes: e.target.value ? Number(e.target.value) : undefined } })} className={inputCls} /></div>
-              <div><label className="text-[11px] font-semibold text-slate-500">Escalate to manager after (min)</label><input type="number" min={0} value={cfg.escalationRules.escalateToManagerAfterMinutes ?? ""} onChange={(e) => patch({ escalationRules: { ...cfg.escalationRules, escalateToManagerAfterMinutes: e.target.value ? Number(e.target.value) : undefined } })} className={inputCls} /></div>
+              <div><label className="text-[11px] font-semibold text-muted-foreground">First response SLA (min)</label><input type="number" min={1} value={cfg.escalationRules.firstResponseSlaMinutes} onChange={(e) => patch({ escalationRules: { ...cfg.escalationRules, firstResponseSlaMinutes: Number(e.target.value) || 5 } })} className={inputCls} /></div>
+              <div><label className="text-[11px] font-semibold text-muted-foreground">Escalate to BDC after (min)</label><input type="number" min={0} value={cfg.escalationRules.escalateToBdcAfterMinutes ?? ""} onChange={(e) => patch({ escalationRules: { ...cfg.escalationRules, escalateToBdcAfterMinutes: e.target.value ? Number(e.target.value) : undefined } })} className={inputCls} /></div>
+              <div><label className="text-[11px] font-semibold text-muted-foreground">Escalate to manager after (min)</label><input type="number" min={0} value={cfg.escalationRules.escalateToManagerAfterMinutes ?? ""} onChange={(e) => patch({ escalationRules: { ...cfg.escalationRules, escalateToManagerAfterMinutes: e.target.value ? Number(e.target.value) : undefined } })} className={inputCls} /></div>
             </div>
           </div>
 
@@ -323,7 +323,7 @@ const PassportContactRoutingPanel = () => {
                 <option value="dealership_default">Dealership Default</option>
               </select>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">Exactly what the shopper sees. Routed to: {preview.routingTargetType.replace(/_/g, " ")}{preview.afterHours ? " · after hours" : ""}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Exactly what the shopper sees. Routed to: {preview.routingTargetType.replace(/_/g, " ")}{preview.afterHours ? " · after hours" : ""}</p>
             {previewSample && (
               <p className="text-[11px] font-medium text-amber-600 mt-1">
                 Sample preview — {previewMode === "bdc" ? "enable the BDC queue" : "add an agent"} above and save to make this mode live.
@@ -331,40 +331,40 @@ const PassportContactRoutingPanel = () => {
             )}
 
             {/* Closed pill */}
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mt-4 mb-1.5">Closed state</p>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mt-4 mb-1.5">Closed state</p>
             <div className="h-14 pl-4 pr-5 rounded-full text-white inline-flex items-center gap-2.5 shadow-lg" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
               {preview.displayMode === "agent" && preview.agentPhotoUrl && !preview.afterHours
                 ? <img src={preview.agentPhotoUrl} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-white/40" />
                 : preview.displayMode === "agent" && !preview.afterHours
-                  ? <span className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0"><Users className="w-4 h-4" /></span>
+                  ? <span className="w-8 h-8 rounded-full bg-card/15 flex items-center justify-center shrink-0"><Users className="w-4 h-4" /></span>
                   : <PillIcon className="w-5 h-5 shrink-0" />}
               <span className="text-left leading-tight"><span className="block text-[13px] font-extrabold">{pill.title}</span><span className="block text-[11px] opacity-85">{pill.sub}</span></span>
             </div>
 
             {/* Opened modal */}
             <div className="flex items-center justify-between mt-4 mb-1.5">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Opened state</p>
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Opened state</p>
               <button onClick={() => setPreviewOpen((o) => !o)} className="text-[11px] font-semibold text-[#2563EB]">{previewOpen ? "Hide" : "Show"}</button>
             </div>
             {previewOpen && (
               <div className="rounded-2xl p-4 text-white" style={{ background: preview.afterHours ? "linear-gradient(160deg,#1e3a8a 0%,#172d6e 100%)" : "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
                 <p className="text-[15px] font-extrabold leading-tight text-center">{preview.afterHours ? "We're closed right now." : "Ready to take the next step?"}</p>
                 <p className="text-[10px] opacity-90 text-center mt-0.5">{preview.afterHours ? "Send us a message and our team will follow up as soon as we open." : "Choose the option that works best for you."}</p>
-                <div className="mt-3 w-full rounded-xl bg-white text-[#2563EB] px-3 py-2.5 flex items-center gap-2"><ShieldCheck className="w-4 h-4" /><span className="text-[12px] font-extrabold">Request Vehicle Hold</span></div>
-                <div className="mt-2 w-full rounded-xl bg-white/10 border border-white/40 px-3 py-2.5 flex items-center gap-2"><RefreshCw className="w-4 h-4" /><span className="text-[12px] font-extrabold">Get a Trade Appraisal</span></div>
+                <div className="mt-3 w-full rounded-xl bg-card text-[#2563EB] px-3 py-2.5 flex items-center gap-2"><ShieldCheck className="w-4 h-4" /><span className="text-[12px] font-extrabold">Request Vehicle Hold</span></div>
+                <div className="mt-2 w-full rounded-xl bg-card/10 border border-white/40 px-3 py-2.5 flex items-center gap-2"><RefreshCw className="w-4 h-4" /><span className="text-[12px] font-extrabold">Get a Trade Appraisal</span></div>
                 <div className="mt-3 pt-3 border-t border-white/20">
                   <div className="flex items-center gap-2.5">
                     {preview.displayMode === "agent" && preview.agentPhotoUrl && !preview.afterHours
                       ? <img src={preview.agentPhotoUrl} alt="" className="w-9 h-9 rounded-full object-cover ring-2 ring-white/40" />
-                      : <span className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center"><PreviewHelpIcon className="w-4 h-4" /></span>}
+                      : <span className="w-9 h-9 rounded-full bg-card/15 flex items-center justify-center"><PreviewHelpIcon className="w-4 h-4" /></span>}
                     <div className="min-w-0">
                       <p className="text-[12px] font-bold leading-tight">{preview.afterHours ? "We'll follow up as soon as we open." : preview.displayName}</p>
                       <p className="text-[10px] opacity-80 leading-tight">{preview.afterHours ? preview.afterHoursMessage : preview.displaySubtitle}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-2.5">
-                    <span className="h-8 rounded-lg bg-white/15 border border-white/40 text-[11px] font-bold inline-flex items-center justify-center gap-1"><Phone className="w-3 h-3" /> {preview.callLabel}</span>
-                    <span className="h-8 rounded-lg bg-white/15 border border-white/40 text-[11px] font-bold inline-flex items-center justify-center gap-1"><MessageSquare className="w-3 h-3" /> {preview.contactLabel}</span>
+                    <span className="h-8 rounded-lg bg-card/15 border border-white/40 text-[11px] font-bold inline-flex items-center justify-center gap-1"><Phone className="w-3 h-3" /> {preview.callLabel}</span>
+                    <span className="h-8 rounded-lg bg-card/15 border border-white/40 text-[11px] font-bold inline-flex items-center justify-center gap-1"><MessageSquare className="w-3 h-3" /> {preview.contactLabel}</span>
                   </div>
                 </div>
               </div>

@@ -1164,7 +1164,7 @@ const Admin = () => {
                           title={`Click to switch to ${isInstalled ? "Optional" : "Installed"}`}
                         >
                           <div className={`relative w-10 h-5 rounded-full transition-colors ${isInstalled ? "bg-blue" : "bg-gold"}`}>
-                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isInstalled ? "translate-x-0.5" : "translate-x-[22px]"}`} />
+                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-card shadow transition-transform ${isInstalled ? "translate-x-0.5" : "translate-x-[22px]"}`} />
                           </div>
                           <span className={`text-[9px] font-bold uppercase tracking-wider ${isInstalled ? "text-blue" : "text-gold"}`}>
                             {isInstalled ? "Installed" : "Optional"}

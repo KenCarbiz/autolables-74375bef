@@ -116,7 +116,7 @@ export function ChannelCard({
           ? "cursor-not-allowed border-border bg-muted opacity-60"
           : selected
             ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500"
-            : "cursor-pointer border-border bg-white hover:border-border hover:bg-muted",
+            : "cursor-pointer border-border bg-card hover:border-border hover:bg-muted",
       ].join(" ")}
     >
       <ChannelLogo channel={meta.key} name={meta.name} />

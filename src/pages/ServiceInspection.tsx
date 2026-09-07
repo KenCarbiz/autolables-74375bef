@@ -26,8 +26,8 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </label>
 );
 
-const inputClass = "h-12 w-full rounded-xl border border-border bg-white px-3 text-sm font-semibold text-foreground outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
-const textareaClass = "min-h-24 w-full rounded-xl border border-border bg-white px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
+const inputClass = "h-12 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
+const textareaClass = "min-h-24 w-full rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
 const selectClass = inputClass;
 
 export default function ServiceInspection() {
@@ -148,7 +148,7 @@ export default function ServiceInspection() {
   if (submittedId) {
     return (
       <div className="min-h-screen bg-slate-950 px-4 py-6 text-white">
-        <div className="mx-auto max-w-xl rounded-[2rem] border border-white/10 bg-white/10 p-6 text-center shadow-2xl backdrop-blur">
+        <div className="mx-auto max-w-xl rounded-[2rem] border border-white/10 bg-card/10 p-6 text-center shadow-2xl backdrop-blur">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400 text-foreground"><CheckCircle2 className="h-9 w-9" /></div>
           <h1 className="mt-5 text-3xl font-black">Inspection submitted</h1>
           <p className="mt-2 text-sm leading-relaxed text-white/70">This used-car inspection is saved and ready for manager approval before anything appears on the customer Passport.</p>
@@ -156,7 +156,7 @@ export default function ServiceInspection() {
             <p><span className="font-black text-white">Inspection ID:</span> {submittedId}</p>
             <p><span className="font-black text-white">QR:</span> {qrToken || "Manual entry"}</p>
           </div>
-          <button onClick={() => setSubmittedId(null)} className="mt-5 h-11 rounded-xl bg-white px-5 text-sm font-black text-foreground">Start another inspection</button>
+          <button onClick={() => setSubmittedId(null)} className="mt-5 h-11 rounded-xl bg-card px-5 text-sm font-black text-foreground">Start another inspection</button>
         </div>
       </div>
     );
@@ -164,7 +164,7 @@ export default function ServiceInspection() {
 
   return (
     <div className="min-h-screen bg-muted text-foreground">
-      <header className="sticky top-0 z-20 border-b border-border bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-border bg-card/95 px-4 py-3 shadow-sm backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700"><ClipboardCheck className="h-3.5 w-3.5" /> Service QR Intake</div>
@@ -177,7 +177,7 @@ export default function ServiceInspection() {
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-5 pb-28">
         <section className="rounded-[2rem] bg-slate-950 p-5 text-white shadow-xl">
           <div className="flex items-start gap-3">
-            <div className="rounded-2xl bg-white p-3 text-foreground"><Car className="h-6 w-6" /></div>
+            <div className="rounded-2xl bg-card p-3 text-foreground"><Car className="h-6 w-6" /></div>
             <div>
               <h2 className="text-2xl font-black">Scan once. Use everywhere.</h2>
               <p className="mt-1 text-sm leading-relaxed text-white/70">Enter service and recon proof here. After manager approval, the same data can power the Passport, Vehicle Health Report, Dealer Investment Report, and story timeline.</p>
@@ -186,7 +186,7 @@ export default function ServiceInspection() {
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-border bg-white p-5 shadow-sm">
+        <section className="rounded-[2rem] border border-border bg-card p-5 shadow-sm">
           <h2 className="text-lg font-black">Vehicle</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Field label="VIN"><input className={inputClass} value={form.vin} onChange={(e) => update("vin", e.target.value)} placeholder="VIN" /></Field>
@@ -197,7 +197,7 @@ export default function ServiceInspection() {
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-border bg-white p-5 shadow-sm">
+        <section className="rounded-[2rem] border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div><h2 className="text-lg font-black">Vehicle Health</h2><p className="text-sm text-muted-foreground">{healthComplete}/5 major checks completed</p></div>
             <Gauge className="h-6 w-6 text-blue-600" />
@@ -217,7 +217,7 @@ export default function ServiceInspection() {
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-border bg-white p-5 shadow-sm">
+        <section className="rounded-[2rem] border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div><h2 className="text-lg font-black">Dealer Investment</h2><p className="text-sm text-muted-foreground">Visible only after approval if selected.</p></div>
             <Wrench className="h-6 w-6 text-emerald-600" />
@@ -238,7 +238,7 @@ export default function ServiceInspection() {
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-border bg-white p-5 shadow-sm">
+        <section className="rounded-[2rem] border border-border bg-card p-5 shadow-sm">
           <h2 className="text-lg font-black">Notes & Evidence</h2>
           <div className="mt-4 space-y-3">
             <Field label="Recon summary"><textarea className={textareaClass} value={form.reconSummary} onChange={(e) => update("reconSummary", e.target.value)} placeholder="Short recon summary for internal review" /></Field>
@@ -260,7 +260,7 @@ export default function ServiceInspection() {
         </section>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-white p-3 shadow-2xl sm:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card p-3 shadow-2xl sm:hidden">
         <button disabled={saving} onClick={save} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-black text-white disabled:opacity-60"><Save className="h-4 w-4" /> {saving ? "Saving inspection" : "Save inspection"}</button>
       </div>
     </div>

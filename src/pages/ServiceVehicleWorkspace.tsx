@@ -505,7 +505,7 @@ function StatusBannerCard({ ws, onAction }: { ws: WorkspaceStatus; onAction: (k:
       className={cn("rounded-2xl border p-4 flex items-center justify-between gap-3 flex-wrap", TONE_BOX[ws.tone])}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <span className={cn("w-11 h-11 rounded-xl bg-white/70 grid place-items-center shrink-0", TONE_TEXT[ws.tone])}>
+        <span className={cn("w-11 h-11 rounded-xl bg-card/70 grid place-items-center shrink-0", TONE_TEXT[ws.tone])}>
           <Icon className="w-5 h-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">
@@ -1595,7 +1595,7 @@ function ServiceQrCard({ tenantId, vin }: { tenantId: string; vin: string }) {
         </button>
       ) : (
         <div className="flex flex-col items-start gap-3">
-          <div className="bg-white p-3 rounded-xl border border-border"><QRCodeSVG value={url} size={140} /></div>
+          <div className="bg-card p-3 rounded-xl border border-border"><QRCodeSVG value={url} size={140} /></div>
           <a href={url} target="_blank" rel="noreferrer" className="block text-xs text-primary break-all underline">{url}</a>
           <button onClick={() => void copyWithToast(url, "Link")} className={BTN_SECONDARY}>
             <Copy className="w-4 h-4" aria-hidden="true" /> Copy link

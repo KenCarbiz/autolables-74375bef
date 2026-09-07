@@ -197,7 +197,7 @@ const AccessoryRow = ({ recordId, vin, accessory, onMarkInstalled }: RowProps) =
       </button>
 
       {expanded && (
-        <div className="border-t border-amber-200 px-3 py-3 space-y-3 bg-white">
+        <div className="border-t border-amber-200 px-3 py-3 space-y-3 bg-card">
           {/* Photos */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">

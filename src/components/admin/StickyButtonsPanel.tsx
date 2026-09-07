@@ -51,7 +51,7 @@ const StickyButtonsPanel = () => {
       <div className="rounded-2xl border border-border bg-card p-4 flex items-start gap-3">
         <button onClick={() => setCfg((c) => ({ ...c, enabled: !c.enabled }))} role="switch" aria-checked={cfg.enabled}
           className={`mt-0.5 w-10 h-6 rounded-full flex items-center px-0.5 shrink-0 transition-colors ${cfg.enabled ? "bg-blue-600 justify-end" : "bg-slate-300 justify-start"}`}>
-          <span className="w-5 h-5 rounded-full bg-white shadow" />
+          <span className="w-5 h-5 rounded-full bg-card shadow" />
         </button>
         <div>
           <p className="text-sm font-semibold text-foreground">Show the sticky bottom bar</p>
@@ -100,7 +100,7 @@ const StickyButtonsPanel = () => {
         <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Preview</p>
         <div className="rounded-2xl border border-border bg-[#f4f5f7] p-3">
           {cfg.enabled && cfg.buttons.length > 0 ? (
-            <div className="bg-white rounded-xl border border-[#e8ebef] p-3" style={{ gridTemplateColumns: `repeat(${Math.min(cfg.buttons.length, MAX_STICKY_BUTTONS)}, minmax(0,1fr))`, display: "grid", gap: 8 }}>
+            <div className="bg-card rounded-xl border border-[#e8ebef] p-3" style={{ gridTemplateColumns: `repeat(${Math.min(cfg.buttons.length, MAX_STICKY_BUTTONS)}, minmax(0,1fr))`, display: "grid", gap: 8 }}>
               {cfg.buttons.slice(0, MAX_STICKY_BUTTONS).map((b) => (
                 <div key={b.key} className={`h-11 rounded-xl text-[11px] font-bold inline-flex items-center justify-center text-center px-1 ${b.key === cfg.primary_key ? "bg-[#1a6dff] text-white" : "border border-[#d8dce0] text-[#1a1d21]"}`}>{b.label}</div>
               ))}

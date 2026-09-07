@@ -79,7 +79,7 @@ const Toggle = ({ label, v, on }: { label: string; v: boolean; on: (x: boolean) 
       onClick={() => on(!v)}
       className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${v ? "bg-blue-600" : "bg-muted"}`}
     >
-      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${v ? "translate-x-4" : ""}`} />
+      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-card shadow transition-transform ${v ? "translate-x-4" : ""}`} />
     </button>
   </label>
 );

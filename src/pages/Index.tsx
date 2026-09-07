@@ -102,7 +102,7 @@ const SaleModeControl = ({
         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[9px] font-bold uppercase tracking-wide ${meta.badge}`}
         title="Change sale method"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
+        <span className="w-1.5 h-1.5 rounded-full bg-card/90" />
         {meta.label}
         <ChevronDown className="w-2.5 h-2.5" />
       </button>
@@ -1583,7 +1583,7 @@ const Index = () => {
           />
           {/* Per-state disclosure pack — collapsed by default so it isn't a
               wall of legal text above the dealer's work; one tap to review. */}
-          <details className="rounded-xl border border-border bg-white overflow-hidden">
+          <details className="rounded-xl border border-border bg-card overflow-hidden">
             <summary className="cursor-pointer select-none px-4 py-3 text-body-sm font-semibold text-foreground">
               State disclosures &amp; consumer-rights preview
             </summary>
@@ -1728,7 +1728,7 @@ const Index = () => {
                             title={upgradeSelections[p.id] ? "Remove upgrade tier" : `Apply upgrade tier${up.name ? ` (${up.name})` : ""}`}
                           >
                             <span className={`relative inline-block w-8 h-4 shrink-0 rounded-full transition-colors ${upgradeSelections[p.id] ? "bg-violet-500" : "bg-muted"}`}>
-                              <span className={`absolute top-0.5 left-0 w-3 h-3 rounded-full bg-white shadow transition-transform ${upgradeSelections[p.id] ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+                              <span className={`absolute top-0.5 left-0 w-3 h-3 rounded-full bg-card shadow transition-transform ${upgradeSelections[p.id] ? "translate-x-[18px]" : "translate-x-0.5"}`} />
                             </span>
                             <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                               {upgradeSelections[p.id] ? "Upgrade" : "Base"}

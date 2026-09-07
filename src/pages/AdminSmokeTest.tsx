@@ -182,9 +182,9 @@ const AdminSmokeTest = () => {
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs font-semibold">
-            <div className="rounded-xl bg-white/80 p-3"><div className="text-lg font-black">{certification.lifecycleAudit.complete ? "Yes" : "No"}</div><div>Lifecycle</div></div>
-            <div className="rounded-xl bg-white/80 p-3"><div className="text-lg font-black">{certification.signatureValidation.packetReady ? "Yes" : "No"}</div><div>Packet</div></div>
-            <div className="rounded-xl bg-white/80 p-3"><div className="text-lg font-black">{certification.signatureValidation.archiveReady ? "Yes" : "No"}</div><div>Archive</div></div>
+            <div className="rounded-xl bg-card/80 p-3"><div className="text-lg font-black">{certification.lifecycleAudit.complete ? "Yes" : "No"}</div><div>Lifecycle</div></div>
+            <div className="rounded-xl bg-card/80 p-3"><div className="text-lg font-black">{certification.signatureValidation.packetReady ? "Yes" : "No"}</div><div>Packet</div></div>
+            <div className="rounded-xl bg-card/80 p-3"><div className="text-lg font-black">{certification.signatureValidation.archiveReady ? "Yes" : "No"}</div><div>Archive</div></div>
           </div>
         </div>
       </section>

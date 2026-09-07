@@ -164,7 +164,7 @@ const PrepSignOff = () => {
             </div>
             <div className="rounded-2xl bg-card border border-border p-6 shadow-premium">
               <p className="text-muted-foreground text-sm font-medium">Ready for listing</p>
-              <p className="text-3xl font-bold text-slate-900 mt-2">{ready.length}</p>
+              <p className="text-3xl font-bold text-foreground mt-2">{ready.length}</p>
             </div>
           </div>
 
@@ -799,14 +799,14 @@ const PrepSignOff = () => {
                     placeholder="Override manager name"
                     value={overrideForm.overriderName}
                     onChange={e => setOverrideForm(prev => ({ ...prev, overriderName: e.target.value }))}
-                    className="w-full h-10 px-4 border border-amber-300 rounded-md bg-white text-foreground"
+                    className="w-full h-10 px-4 border border-amber-300 rounded-md bg-card text-foreground"
                   />
                   <input
                     type="text"
                     placeholder="Reason for override"
                     value={overrideForm.reason}
                     onChange={e => setOverrideForm(prev => ({ ...prev, reason: e.target.value }))}
-                    className="w-full h-10 px-4 border border-amber-300 rounded-md bg-white text-foreground"
+                    className="w-full h-10 px-4 border border-amber-300 rounded-md bg-card text-foreground"
                   />
                   <button
                     onClick={async () => {
@@ -1116,27 +1116,27 @@ const RejectModal = ({
       onClick={onClose}
     >
       <div
-        className="bg-white w-full md:max-w-lg md:rounded-2xl rounded-t-[28px] overflow-hidden shadow-2xl"
+        className="bg-card w-full md:max-w-lg md:rounded-2xl rounded-t-[28px] overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="pt-2 md:hidden flex justify-center">
           <div className="w-10 h-1 rounded-full bg-slate-300" />
         </div>
-        <div className="px-5 py-4 border-b border-slate-200">
-          <h3 className="text-base font-black font-display tracking-tight text-slate-900">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="text-base font-black font-display tracking-tight text-foreground">
             Reject prep sign-off
           </h3>
-          <p className="text-[11px] text-slate-500 mt-0.5 font-mono">VIN {vin}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">VIN {vin}</p>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-label text-slate-500">
+            <label className="text-[10px] font-bold uppercase tracking-label text-muted-foreground">
               Reason *
             </label>
             <select
               value={category}
               onChange={(e) => onCategory(e.target.value)}
-              className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-3 text-sm bg-white"
+              className="mt-1 w-full h-11 rounded-lg border border-border px-3 text-sm bg-card"
             >
               {REJECT_CATEGORIES.map((c) => (
                 <option key={c.id} value={c.id}>{c.label}</option>
@@ -1144,7 +1144,7 @@ const RejectModal = ({
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-label text-slate-500">
+            <label className="text-[10px] font-bold uppercase tracking-label text-muted-foreground">
               Notes
             </label>
             <textarea
@@ -1152,7 +1152,7 @@ const RejectModal = ({
               onChange={(e) => onNotes(e.target.value)}
               rows={3}
               placeholder="Specifics the service/detail team needs to fix..."
-              className="mt-1 w-full rounded-lg border border-slate-200 p-3 text-sm focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+              className="mt-1 w-full rounded-lg border border-border p-3 text-sm focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
             />
           </div>
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-900">
@@ -1162,7 +1162,7 @@ const RejectModal = ({
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               onClick={onClose}
-              className="h-10 px-4 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100"
+              className="h-10 px-4 rounded-lg text-sm font-semibold text-muted-foreground hover:bg-muted"
             >
               Cancel
             </button>

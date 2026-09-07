@@ -1018,7 +1018,7 @@ export default function DescriptionIntelligence() {
               <li key={s} className="flex flex-col items-center gap-1 flex-1 min-w-0 relative">
                 {i > 0 && <span aria-hidden className={`absolute top-[13px] right-1/2 w-full h-0.5 ${i <= stepIdx ? "bg-emerald-500" : "bg-border"}`} />}
                 <span className={`w-7 h-7 rounded-full grid place-items-center text-[11px] font-bold relative z-10 ${
-                  i <= stepIdx ? "bg-emerald-500 text-white" : "bg-white/70 text-muted-foreground border border-border"}`}>
+                  i <= stepIdx ? "bg-emerald-500 text-white" : "bg-card/70 text-muted-foreground border border-border"}`}>
                   {i <= stepIdx ? "✓" : i + 1}
                 </span>
                 <span className="text-[9.5px] text-center leading-tight w-full">{s}</span>

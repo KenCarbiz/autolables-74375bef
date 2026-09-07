@@ -250,7 +250,7 @@ const SaveCarInventory = () => {
               <Check className="w-5 h-5" />
               <p className="text-sm font-semibold">Vehicle Saved</p>
             </div>
-            <button onClick={() => navigate("/admin?tab=files")} className="p-2 rounded-md hover:bg-white/10">
+            <button onClick={() => navigate("/admin?tab=files")} className="p-2 rounded-md hover:bg-card/10">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -303,7 +303,7 @@ const SaveCarInventory = () => {
               When this car is sold, scan this QR code to open the deal file.
               Customer, co-buyer, and dealer sign right from the phone or tablet.
             </p>
-            <div className="inline-block p-4 bg-white rounded-xl border-2 border-border">
+            <div className="inline-block p-4 bg-card rounded-xl border-2 border-border">
               <QRCodeSVG value={dealSigningUrl} size={200} level="H" />
             </div>
             <p className="text-[10px] text-muted-foreground break-all">{dealSigningUrl}</p>
@@ -349,7 +349,7 @@ const SaveCarInventory = () => {
               <p className="text-[10px] text-white/60">{currentStore?.name || "Your Dealership"}</p>
             </div>
           </div>
-          <button onClick={() => navigate("/admin?tab=files")} className="p-2 rounded-md hover:bg-white/10">
+          <button onClick={() => navigate("/admin?tab=files")} className="p-2 rounded-md hover:bg-card/10">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -516,7 +516,7 @@ const SaveCarInventory = () => {
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                         buyersGuideType === t ? "border-blue-500 bg-blue-500" : "border-border"
                       }`}>
-                        {buyersGuideType === t && <div className="w-2 h-2 rounded-full bg-white" />}
+                        {buyersGuideType === t && <div className="w-2 h-2 rounded-full bg-card" />}
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-foreground">

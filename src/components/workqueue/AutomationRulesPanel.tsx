@@ -106,12 +106,12 @@ export function AutomationRulesPanel() {
   const enabledCount = Object.values(settings).filter(Boolean).length;
 
   return (
-    <section className="overflow-hidden rounded-[2rem] border border-border bg-white shadow-sm">
+    <section className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-sm">
       <div className="grid gap-0 xl:grid-cols-[0.85fr_1.15fr]">
         <div className="relative bg-slate-950 p-5 text-white sm:p-6">
           <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-blue-500/25 blur-3xl" />
           <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-100">
+            <div className="inline-flex items-center gap-2 rounded-full bg-card/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-100">
               <Settings2 className="h-3.5 w-3.5" /> Automation Rules Center
             </div>
             <h2 className="mt-4 text-3xl font-black tracking-tight">Decide how autonomous the dealership becomes.</h2>
@@ -119,11 +119,11 @@ export function AutomationRulesPanel() {
               Full automation is the goal, but every store can choose where AutoLabels creates work automatically and where managers approve first.
             </p>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+              <div className="rounded-2xl border border-white/10 bg-card/10 p-4">
                 <div className="text-[10px] font-black uppercase tracking-wider text-white/45">Enabled rules</div>
                 <div className="mt-1 text-3xl font-black">{enabledCount}/10</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
+              <div className="rounded-2xl border border-white/10 bg-card/10 p-4">
                 <div className="text-[10px] font-black uppercase tracking-wider text-white/45">Status</div>
                 <div className="mt-1 flex items-center gap-2 text-sm font-black"><CheckCircle2 className="h-5 w-5 text-emerald-300" /> {loading ? "Loading" : saving ? "Saving" : "Ready"}</div>
               </div>
@@ -135,7 +135,7 @@ export function AutomationRulesPanel() {
           {ruleGroups.map((group) => (
             <div key={group.title} className="rounded-2xl border border-border bg-muted p-4">
               <div className="mb-3 flex items-start gap-3">
-                <div className="rounded-xl bg-white p-2 text-foreground shadow-sm"><Wrench className="h-5 w-5" /></div>
+                <div className="rounded-xl bg-card p-2 text-foreground shadow-sm"><Wrench className="h-5 w-5" /></div>
                 <div>
                   <h3 className="font-black text-foreground">{group.title}</h3>
                   <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{group.description}</p>
@@ -143,7 +143,7 @@ export function AutomationRulesPanel() {
               </div>
               <div className="grid gap-2">
                 {group.rules.map((rule) => (
-                  <button key={rule.key} onClick={() => toggle(rule.key)} className="rounded-2xl border border-border bg-white p-3 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md">
+                  <button key={rule.key} onClick={() => toggle(rule.key)} className="rounded-2xl border border-border bg-card p-3 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
@@ -153,7 +153,7 @@ export function AutomationRulesPanel() {
                         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{rule.help}</p>
                       </div>
                       <span className={`relative mt-1 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${settings[rule.key] ? "bg-blue-600" : "bg-slate-300"}`}>
-                        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${settings[rule.key] ? "translate-x-5" : "translate-x-1"}`} />
+                        <span className={`inline-block h-5 w-5 rounded-full bg-card shadow transition ${settings[rule.key] ? "translate-x-5" : "translate-x-1"}`} />
                       </span>
                     </div>
                   </button>

@@ -104,7 +104,7 @@ const DealershipTrustPanel = () => {
     <div className="space-y-5 max-w-2xl">
       <div>
         <h2 className="text-[22px] font-bold tracking-tight text-foreground">Why Buy From Us</h2>
-        <p className="text-sm text-slate-500 mt-1">Credibility badges and reviews shown to shoppers on the Vehicle Passport. Every field is optional — only what you fill in appears, so nothing is fabricated. Changes save automatically.</p>
+        <p className="text-sm text-muted-foreground mt-1">Credibility badges and reviews shown to shoppers on the Vehicle Passport. Every field is optional — only what you fill in appears, so nothing is fabricated. Changes save automatically.</p>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -113,12 +113,12 @@ const DealershipTrustPanel = () => {
             <label className="text-[13px] font-semibold text-foreground">{f.label}</label>
             <input value={cfg[f.key]} onChange={(e) => set(f.key, e.target.value)} placeholder={f.placeholder}
               className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
-            {f.hint && <p className="text-[11px] text-slate-400 mt-1">{f.hint}</p>}
+            {f.hint && <p className="text-[11px] text-muted-foreground mt-1">{f.hint}</p>}
           </div>
         ))}
         <div className="sm:col-span-2 flex items-center justify-between gap-3 border-t border-border pt-3">
           <div>
-            <p className="text-[12px] text-slate-500">Pull your live Google rating and review count instead of typing them.</p>
+            <p className="text-[12px] text-muted-foreground">Pull your live Google rating and review count instead of typing them.</p>
             {syncLabel && <p className="text-[11px] text-emerald-600 mt-0.5 inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {syncLabel}</p>}
           </div>
           <button onClick={refreshGoogle} disabled={googleSyncing}
@@ -130,7 +130,7 @@ const DealershipTrustPanel = () => {
 
       <div className="rounded-2xl border border-border bg-card p-4">
         <label className="text-[13px] font-semibold text-foreground">Review sources</label>
-        <p className="text-[12px] text-slate-500 mt-0.5">One per line, formatted <code className="text-[11px] bg-muted px-1 rounded">Source | rating | quote</code>. Example: <span className="text-slate-600">Google | 4.9 | Spacious, comfortable, and packed with technology.</span></p>
+        <p className="text-[12px] text-muted-foreground mt-0.5">One per line, formatted <code className="text-[11px] bg-muted px-1 rounded">Source | rating | quote</code>. Example: <span className="text-muted-foreground">Google | 4.9 | Spacious, comfortable, and packed with technology.</span></p>
         <textarea value={cfg.dealer_review_sources} onChange={(e) => set("dealer_review_sources", e.target.value)} rows={5}
           placeholder={"Google | 4.9 | Excellent family SUV. Very smooth ride.\nEdmunds | 4.7 | Quiet, comfortable, and packed with tech.\nCars.com | 4.8 | Luxury feel without the luxury price."}
           className="mt-2 w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary resize-none font-mono text-[12px]" />
@@ -138,7 +138,7 @@ const DealershipTrustPanel = () => {
 
       <div className="rounded-2xl border border-border bg-card p-4">
         <h3 className="text-[14px] font-bold text-foreground">Amenities & services</h3>
-        <p className="text-[12px] text-slate-500 mt-0.5 mb-3">Drives the "Why Buy From Us" section. Only what you set appears — nothing is assumed.</p>
+        <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">Drives the "Why Buy From Us" section. Only what you set appears — nothing is assumed.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-[13px] font-semibold text-foreground">Family owned</label>
@@ -171,12 +171,12 @@ const DealershipTrustPanel = () => {
           <div className="sm:col-span-2">
             <label className="text-[13px] font-semibold text-foreground">Services offered</label>
             <input value={cfg.dealer_services} onChange={(e) => set("dealer_services", e.target.value)} placeholder="OEM parts, Warranty repairs, Online scheduling, State inspection, Express service" className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
-            <p className="text-[11px] text-slate-400 mt-1">Comma-separated. Only listed services appear on the Passport.</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Comma-separated. Only listed services appear on the Passport.</p>
           </div>
           <div className="sm:col-span-2">
             <label className="text-[13px] font-semibold text-foreground">Amenities</label>
             <input value={cfg.dealer_amenities} onChange={(e) => set("dealer_amenities", e.target.value)} placeholder="Customer lounge, Café, Kids area, EV charging, Loaner vehicles" className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
-            <p className="text-[11px] text-slate-400 mt-1">Comma-separated.</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Comma-separated.</p>
           </div>
           <div className="sm:col-span-2">
             <label className="text-[13px] font-semibold text-foreground">Hours</label>
@@ -190,7 +190,7 @@ const DealershipTrustPanel = () => {
               <option value="two_button">Two Button Layout</option>
               <option value="progressive">Progressive CTA</option>
             </select>
-            <p className="text-[11px] text-slate-400 mt-1">How the bottom action area appears inside mobile Passport slide-outs.</p>
+            <p className="text-[11px] text-muted-foreground mt-1">How the bottom action area appears inside mobile Passport slide-outs.</p>
           </div>
         </div>
       </div>
@@ -199,7 +199,7 @@ const DealershipTrustPanel = () => {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-[14px] font-bold text-foreground">IIHS Top Safety Pick awards</h3>
-            <p className="text-[12px] text-slate-500 mt-0.5">IIHS ratings are copyrighted — display requires IIHS's written permission. Keep this OFF until permission is granted, then verify each model against iihs.org/ratings/top-safety-picks before adding it. Text statements only; no IIHS logos.</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">IIHS ratings are copyrighted — display requires IIHS's written permission. Keep this OFF until permission is granted, then verify each model against iihs.org/ratings/top-safety-picks before adding it. Text statements only; no IIHS logos.</p>
           </div>
           <label className="flex items-center gap-2 shrink-0 cursor-pointer select-none">
             <input type="checkbox" checked={iihsEnabled} onChange={(e) => setIihsEnabled(e.target.checked)} className="w-4 h-4 accent-blue-600" />
@@ -216,7 +216,7 @@ const DealershipTrustPanel = () => {
                 <option value="tsp">Top Safety Pick</option>
                 <option value="tsp_plus">Top Safety Pick+</option>
               </select>
-              <button onClick={() => setIihsAwards((arr) => arr.filter((_, j) => j !== i))} aria-label="Remove award" className="w-10 h-10 rounded-lg border border-border text-slate-400 hover:text-red-500 hover:border-red-300 inline-flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={() => setIihsAwards((arr) => arr.filter((_, j) => j !== i))} aria-label="Remove award" className="w-10 h-10 rounded-lg border border-border text-muted-foreground hover:text-red-500 hover:border-red-300 inline-flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
           <button onClick={() => setIihsAwards((a) => [...a, { year: "", make: "", model: "", award: "tsp_plus" }])} className="inline-flex items-center gap-1 h-9 px-3 rounded-lg border border-border text-[13px] font-semibold hover:border-blue-500"><Plus className="w-4 h-4" /> Add award</button>
@@ -225,7 +225,7 @@ const DealershipTrustPanel = () => {
 
       <div className="rounded-2xl border border-border bg-card p-4">
         <h3 className="text-[14px] font-bold text-foreground">Sales advisor</h3>
-        <p className="text-[12px] text-slate-500 mt-0.5 mb-3">Shown in the passport's conversion panel. Leave blank to show a generic specialist card instead.</p>
+        <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">Shown in the passport's conversion panel. Leave blank to show a generic specialist card instead.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {ADVISOR_FIELDS.map((f) => (
             <div key={f.key} className={f.key === "dealer_advisor_photo" || f.key === "dealer_advisor_response" ? "sm:col-span-2" : ""}>

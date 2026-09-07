@@ -80,7 +80,7 @@ const SigningFunnelWidget = () => {
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+    <section className="rounded-2xl border border-border bg-card p-5">
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
           <h3 className="text-base font-semibold text-foreground">Signing funnel</h3>
@@ -96,7 +96,7 @@ const SigningFunnelWidget = () => {
               className={`px-3 h-8 text-[11px] font-semibold transition-colors ${
                 windowDays === w.days
                   ? "bg-slate-950 text-white"
-                  : "bg-white text-slate-600 hover:bg-slate-50"
+                  : "bg-card text-muted-foreground hover:bg-muted"
               }`}
             >
               {w.label}
@@ -118,7 +118,7 @@ const SigningFunnelWidget = () => {
             <div key={s.key}>
               <div className="flex items-center justify-between gap-3 mb-1">
                 <div className="flex items-center gap-2">
-                  <Icon className="w-3.5 h-3.5 text-slate-600" />
+                  <Icon className="w-3.5 h-3.5 text-muted-foreground" />
                   <span className="text-[12px] font-semibold text-slate-700">{s.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -127,10 +127,10 @@ const SigningFunnelWidget = () => {
                       {drop}
                     </span>
                   )}
-                  <span className="text-sm font-bold tabular-nums text-slate-950">{s.value}</span>
+                  <span className="text-sm font-bold tabular-nums text-foreground">{s.value}</span>
                 </div>
               </div>
-              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full bg-slate-950 transition-all"
                   style={{ width: `${widthPct}%` }}

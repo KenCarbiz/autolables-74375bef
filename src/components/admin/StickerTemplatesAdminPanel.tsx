@@ -383,7 +383,7 @@ export default function StickerTemplatesAdminPanel() {
       return <div className="scale-[0.34]"><UsedComponent data={SATURDAY_SAMPLE} /></div>;
     }
     return (
-      <div className="flex h-full w-full flex-col justify-between bg-white p-4 text-left">
+      <div className="flex h-full w-full flex-col justify-between bg-card p-4 text-left">
         <div>
           <p className="text-[10px] font-black uppercase tracking-wider text-blue-600">{item.template.defaultBadge}</p>
           <h4 className="mt-2 text-lg font-black leading-tight text-foreground">{item.name}</h4>
@@ -401,7 +401,7 @@ export default function StickerTemplatesAdminPanel() {
       return <UsedComponent data={SATURDAY_SAMPLE} />;
     }
     return (
-      <div className="mx-auto max-w-2xl rounded-[32px] border border-border bg-white p-8 shadow-xl">
+      <div className="mx-auto max-w-2xl rounded-[32px] border border-border bg-card p-8 shadow-xl">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">{item.template.defaultBadge}</p>
         <h3 className="mt-3 text-3xl font-black tracking-tight text-foreground">{item.name}</h3>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
@@ -515,7 +515,7 @@ export default function StickerTemplatesAdminPanel() {
               </div>
               <button onClick={() => setPreview(null)} className="rounded-full border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close preview"><X className="h-4 w-4" /></button>
             </div>
-            <div className="flex-1 overflow-auto bg-muted p-6"><div className="mx-auto flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-white p-6 shadow-inner">{renderLargePreview(preview)}</div></div>
+            <div className="flex-1 overflow-auto bg-muted p-6"><div className="mx-auto flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card p-6 shadow-inner">{renderLargePreview(preview)}</div></div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
               <div className="flex flex-wrap gap-1">{preview.tags.slice(0, 12).map((tag) => <span key={tag} className="rounded bg-muted px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tag}</span>)}</div>
               <div className="flex flex-wrap items-center gap-2">

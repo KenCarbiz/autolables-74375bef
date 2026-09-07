@@ -66,7 +66,7 @@ const Ring = ({ pct, size = 76 }: { pct: number; size?: number }) => {
 };
 
 const Kpi = ({ label, value, sub, accent, cta, children }: { label: string; value?: React.ReactNode; sub?: React.ReactNode; accent?: string; cta?: { label: string; onClick: () => void }; children?: React.ReactNode }) => (
-  <div className="rounded-2xl border border-[#eef1f4] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-5 min-w-0 flex flex-col">
+  <div className="rounded-2xl border border-[#eef1f4] bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-5 min-w-0 flex flex-col">
     <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
     {children ?? (
       <>
@@ -258,13 +258,13 @@ const InventoryCommandCenterV2 = () => {
       <div className="flex items-center justify-between gap-3 mb-4">
         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">V2 Draft</span>
         <div className="relative shrink-0">
-          <button onClick={() => setShowSettings((v) => !v)} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg bg-white border border-[#e8ebef] text-sm font-semibold hover:bg-muted">
+          <button onClick={() => setShowSettings((v) => !v)} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg bg-card border border-[#e8ebef] text-sm font-semibold hover:bg-muted">
             <Settings className="w-4 h-4 text-muted-foreground" /> <span className="hidden sm:inline">Dashboard settings</span>
           </button>
           {showSettings && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowSettings(false)} />
-              <div className="absolute right-0 mt-2 w-[330px] rounded-2xl border border-[#e8ebef] bg-white shadow-lg z-20 p-4">
+              <div className="absolute right-0 mt-2 w-[330px] rounded-2xl border border-[#e8ebef] bg-card shadow-lg z-20 p-4">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Dashboard Layout</p>
                 <div className="flex items-start gap-3 mt-3">
                   <button
@@ -272,7 +272,7 @@ const InventoryCommandCenterV2 = () => {
                     role="switch" aria-checked={quickActionsOn} aria-label="Show Quick Actions Panel"
                     className={`mt-0.5 w-10 h-6 rounded-full flex items-center px-0.5 shrink-0 transition-colors ${quickActionsOn ? "bg-blue-600 justify-end" : "bg-slate-300 justify-start"}`}
                   >
-                    <span className="w-5 h-5 rounded-full bg-white shadow" />
+                    <span className="w-5 h-5 rounded-full bg-card shadow" />
                   </button>
                   <div>
                     <p className="text-[13px] font-semibold">Show Quick Actions Panel</p>
@@ -314,7 +314,7 @@ const InventoryCommandCenterV2 = () => {
               {priorities.map((p) => {
                 const s = SEV[p.sev];
                 return (
-                  <button key={p.label} onClick={p.onClick} className="text-left rounded-2xl border border-[#eef1f4] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-3.5 hover:shadow-md transition-shadow group">
+                  <button key={p.label} onClick={p.onClick} className="text-left rounded-2xl border border-[#eef1f4] bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-3.5 hover:shadow-md transition-shadow group">
                     <div className="flex items-center justify-between">
                       <span className={`w-8 h-8 rounded-xl flex items-center justify-center ${s.bg}`}><p.icon className={`w-4 h-4 ${s.text}`} /></span>
                       <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-muted-foreground" />
@@ -329,19 +329,19 @@ const InventoryCommandCenterV2 = () => {
           </div>
 
           {/* Toolbar */}
-          <div className="rounded-2xl border border-[#e8ebef] bg-white p-3 flex flex-col gap-3">
+          <div className="rounded-2xl border border-[#e8ebef] bg-card p-3 flex flex-col gap-3">
             <div className="flex flex-col md:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN, stock #, year, make, model, trim…" className="w-full h-10 pl-9 pr-3 rounded-xl border border-[#e8ebef] text-sm outline-none focus:border-blue-500" />
               </div>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 px-3 rounded-xl border border-[#e8ebef] text-sm bg-white">
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 px-3 rounded-xl border border-[#e8ebef] text-sm bg-card">
                 <option value="all">All statuses</option><option value="published">Published</option><option value="draft">Draft</option><option value="archived">Archived</option>
               </select>
-              <select value={condFilter} onChange={(e) => setCondFilter(e.target.value)} className="h-10 px-3 rounded-xl border border-[#e8ebef] text-sm bg-white">
+              <select value={condFilter} onChange={(e) => setCondFilter(e.target.value)} className="h-10 px-3 rounded-xl border border-[#e8ebef] text-sm bg-card">
                 <option value="all">New &amp; Used</option><option value="new">New</option><option value="used">Used</option><option value="cpo">CPO</option>
               </select>
-              <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="h-10 px-3 rounded-xl border border-[#e8ebef] text-sm bg-white">
+              <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="h-10 px-3 rounded-xl border border-[#e8ebef] text-sm bg-card">
                 <option value="updated">Sort: Last Updated</option><option value="price">Sort: Price</option><option value="ymm">Sort: Year/Make</option>
               </select>
             </div>
@@ -355,8 +355,8 @@ const InventoryCommandCenterV2 = () => {
           </div>
 
           {/* Table */}
-          <div className="rounded-2xl border border-[#eef1f4] bg-white overflow-hidden">
-            <div className="hidden lg:grid grid-cols-[1.8fr_0.9fr_1fr_1.3fr_1.1fr_0.7fr_1fr] gap-3 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-[#eef1f4] sticky top-0 z-10 bg-white/95 backdrop-blur">
+          <div className="rounded-2xl border border-[#eef1f4] bg-card overflow-hidden">
+            <div className="hidden lg:grid grid-cols-[1.8fr_0.9fr_1fr_1.3fr_1.1fr_0.7fr_1fr] gap-3 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-[#eef1f4] sticky top-0 z-10 bg-card/95 backdrop-blur">
               <span>Vehicle</span><span>Stock / VIN</span><span>Readiness</span><span>Compliance</span><span>Advertised Price</span><span>Publishing</span><span className="text-right">Actions</span>
             </div>
             {pageRows.length === 0 ? (
@@ -416,7 +416,7 @@ const InventoryCommandCenterV2 = () => {
               );
             })}
             {/* Pagination — sticky to the bottom of the viewport while scrolling */}
-            <div className="sticky bottom-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-2.5 border-t border-[#eef1f4] bg-white/95 backdrop-blur">
+            <div className="sticky bottom-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-2.5 border-t border-[#eef1f4] bg-card/95 backdrop-blur">
               <p className="text-[12px] text-muted-foreground">
                 {visible.length === 0 ? "No vehicles" : `Showing ${(page - 1) * perPage + 1} to ${Math.min(page * perPage, visible.length)} of ${visible.length} vehicles`}
               </p>
@@ -424,7 +424,7 @@ const InventoryCommandCenterV2 = () => {
                 <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="h-8 px-2.5 rounded-lg border border-[#e8ebef] text-[12px] font-semibold disabled:opacity-40 hover:bg-muted">Prev</button>
                 <span className="text-[12px] text-muted-foreground px-1">Page {page} of {totalPages}</span>
                 <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="h-8 px-2.5 rounded-lg border border-[#e8ebef] text-[12px] font-semibold disabled:opacity-40 hover:bg-muted">Next</button>
-                <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="h-8 px-2 rounded-lg border border-[#e8ebef] text-[12px] bg-white ml-1">
+                <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="h-8 px-2 rounded-lg border border-[#e8ebef] text-[12px] bg-card ml-1">
                   <option value={25}>25 / page</option><option value={50}>50 / page</option><option value={100}>100 / page</option>
                 </select>
               </div>
@@ -434,7 +434,7 @@ const InventoryCommandCenterV2 = () => {
 
         {/* Right sidebar — Today's Work Queue, then (admin opt-in) Quick Actions */}
         <aside className="space-y-3">
-          <div className="rounded-2xl border border-[#eef1f4] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
+          <div className="rounded-2xl border border-[#eef1f4] bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-[14px] font-bold">Today's Work Queue</h3>
               <RefreshCw className="w-3.5 h-3.5 text-slate-300" />
@@ -469,7 +469,7 @@ const InventoryCommandCenterV2 = () => {
 
           {/* Quick Actions — admin opt-in, below the work queue */}
           {quickActionsOn && (
-            <div className="rounded-2xl border border-[#eef1f4] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
+            <div className="rounded-2xl border border-[#eef1f4] bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
               <h3 className="text-[14px] font-bold mb-3">Quick Actions</h3>
               <div className="grid grid-cols-2 gap-2">
                 {quickActions.map((a) => (

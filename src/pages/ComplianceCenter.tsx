@@ -242,7 +242,7 @@ const CompliancePacketPanel = ({
     <div className="space-y-4">
       <div className="shimmer-hero relative overflow-hidden rounded-2xl px-6 py-6 text-white">
         <div className="relative z-10 space-y-3">
-          <div className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-label">
+          <div className="inline-flex items-center gap-1.5 bg-card/15 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-label">
             <ShieldCheck className="w-3 h-3" />
             Compliance Packet
           </div>
@@ -271,13 +271,13 @@ const CompliancePacketPanel = ({
                 maxLength={17}
                 autoComplete="off"
                 autoCapitalize="characters"
-                className="w-full h-11 pl-10 pr-3 rounded-lg bg-white/15 backdrop-blur border border-white/20 text-white placeholder:text-white/50 font-mono tracking-widest focus:outline-none focus:bg-white/25"
+                className="w-full h-11 pl-10 pr-3 rounded-lg bg-card/15 backdrop-blur border border-white/20 text-white placeholder:text-white/50 font-mono tracking-widest focus:outline-none focus:bg-card/25"
               />
             </div>
             <button
               type="submit"
               disabled={loading || vin.length < 11}
-              className="h-11 px-5 rounded-lg bg-white text-[#0B2041] font-display font-black text-sm inline-flex items-center gap-1.5 disabled:opacity-50 hover:brightness-95 transition-all whitespace-nowrap"
+              className="h-11 px-5 rounded-lg bg-card text-[#0B2041] font-display font-black text-sm inline-flex items-center gap-1.5 disabled:opacity-50 hover:brightness-95 transition-all whitespace-nowrap"
             >
               {loading ? "Searching…" : "Search"}
             </button>

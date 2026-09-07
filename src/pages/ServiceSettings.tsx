@@ -186,7 +186,7 @@ export default function ServiceSettings() {
                     onClick={() => void change("k208_authorized_users", on ? grantedUsers.filter((x) => x !== uid) : [...grantedUsers, uid], "Per-user signer grants")}
                     className={cn("shrink-0 h-7 w-12 rounded-full transition-colors relative", on ? "bg-emerald-600" : "bg-muted")}
                   >
-                    <span className={cn("absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all", on ? "left-[22px]" : "left-0.5")} />
+                    <span className={cn("absolute top-0.5 h-6 w-6 rounded-full bg-card shadow transition-all", on ? "left-[22px]" : "left-0.5")} />
                   </button>
                 </li>
               );
@@ -282,7 +282,7 @@ function ToggleRow({ title, detail, checked, onChange }: {
         onClick={() => onChange(!checked)}
         className={cn("shrink-0 h-7 w-12 rounded-full transition-colors relative mt-0.5", checked ? "bg-emerald-600" : "bg-muted")}
       >
-        <span className={cn("absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all", checked ? "left-[22px]" : "left-0.5")} />
+        <span className={cn("absolute top-0.5 h-6 w-6 rounded-full bg-card shadow transition-all", checked ? "left-[22px]" : "left-0.5")} />
       </button>
     </div>
   );

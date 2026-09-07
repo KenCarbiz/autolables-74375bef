@@ -44,8 +44,8 @@ const statusTone: Record<string, string> = {
   requested: "border-amber-300 bg-amber-50 text-amber-900",
   completed: "border-emerald-300 bg-emerald-50 text-emerald-900",
   denied:    "border-red-300 bg-red-50 text-red-900",
-  expired:   "border-border bg-white text-muted-foreground",
-  waived:    "border-border bg-white text-muted-foreground",
+  expired:   "border-border bg-card text-muted-foreground",
+  waived:    "border-border bg-card text-muted-foreground",
 };
 
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
@@ -111,7 +111,7 @@ const ReturnsQueue = () => {
   if (!loading && rows.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-border bg-white p-5">
+    <section className="rounded-2xl border border-border bg-card p-5">
       <div className="flex items-center gap-2 mb-3">
         <RotateCcw className="w-4 h-4 text-foreground" />
         <h3 className="text-base font-semibold text-foreground">SB 766 returns</h3>
@@ -280,7 +280,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
   };
 
   return (
-    <div className="mt-3 rounded-lg border border-amber-300 bg-white p-3 space-y-3">
+    <div className="mt-3 rounded-lg border border-amber-300 bg-card p-3 space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-foreground">
           {outcome === "completed" ? "Resolve return — §11713.21 caps applied live" : "Deny return — reason required"}
@@ -297,7 +297,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="22000"
-                className="w-full h-9 px-2 rounded-md border border-border bg-white text-sm"
+                className="w-full h-9 px-2 rounded-md border border-border bg-card text-sm"
               />
             </Field>
             <Field label={`Miles at return (cap: ${SB766_MILEAGE_CAP})`}>
@@ -306,7 +306,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
                 value={miles}
                 onChange={(e) => setMiles(e.target.value)}
                 placeholder="180"
-                className="w-full h-9 px-2 rounded-md border border-border bg-white text-sm"
+                className="w-full h-9 px-2 rounded-md border border-border bg-card text-sm"
               />
             </Field>
           </div>
@@ -335,7 +335,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
                 value={restocking}
                 onChange={(e) => setRestocking(e.target.value)}
                 placeholder={String(suggestedRestocking.amount)}
-                className="w-full h-9 px-2 rounded-md border border-border bg-white text-sm"
+                className="w-full h-9 px-2 rounded-md border border-border bg-card text-sm"
               />
             </Field>
             <Field label={`Mileage charge (cap: $${SB766_PER_MILE_FEE_CAP})`}>
@@ -356,7 +356,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. delivered to buyer's address per request"
-              className="w-full h-9 px-2 rounded-md border border-border bg-white text-sm"
+              className="w-full h-9 px-2 rounded-md border border-border bg-card text-sm"
             />
           </Field>
         </>
@@ -369,7 +369,7 @@ const ResolvePanel = ({ row, outcome, onCancel, onSubmit }: ResolvePanelProps) =
             onChange={(e) => setReason(e.target.value)}
             placeholder="Vehicle returned outside the 3-day window with 500 miles — exceeds §11713.21 cap of 400 mi."
             rows={3}
-            className="w-full px-2 py-1.5 rounded-md border border-border bg-white text-sm"
+            className="w-full px-2 py-1.5 rounded-md border border-border bg-card text-sm"
           />
         </Field>
       )}

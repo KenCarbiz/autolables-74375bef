@@ -74,7 +74,7 @@ export const ShopperActivityDrawer = ({ open, onOpenChange, vin, tenantId, vehic
         <SheetTitle className="sr-only">Shopper Activity for {title}</SheetTitle>
         <SheetDescription className="sr-only">Internal engagement intelligence for this vehicle passport.</SheetDescription>
         {/* Sticky header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-border px-5 py-4">
+        <div className="sticky top-0 z-10 bg-card border-b border-border px-5 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0">
               <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
@@ -109,7 +109,7 @@ export const ShopperActivityDrawer = ({ open, onOpenChange, vin, tenantId, vehic
               <span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {summary.totals.sessions} sessions</span>
               <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {mmss(summary.totals.totalSeconds)}</span>
             </p>
-            <div className="inline-flex items-center rounded-lg border border-border bg-white p-0.5">
+            <div className="inline-flex items-center rounded-lg border border-border bg-card p-0.5">
               {RANGES.map((r) => (
                 <button
                   key={r}
@@ -165,7 +165,7 @@ const Body = ({ summary, error }: { summary: ShopperActivitySummary; error: stri
 // ── Section shell ────────────────────────────────────────────────────────
 
 const Card = ({ title, icon: Icon, action, children }: { title: string; icon: typeof Eye; action?: React.ReactNode; children: React.ReactNode }) => (
-  <section className="rounded-2xl border border-border bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+  <section className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
     <div className="flex items-center justify-between gap-2 mb-3">
       <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground inline-flex items-center gap-1.5">
         <Icon className="w-3.5 h-3.5 text-muted-foreground" /> {title}
@@ -231,7 +231,7 @@ const ScoreCard = ({ summary }: { summary: ShopperActivitySummary }) => {
 const MetricsGrid = ({ summary }: { summary: ShopperActivitySummary }) => (
   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
     {summary.metrics.map((m) => (
-      <div key={m.key} className={`rounded-xl border p-3 ${m.tracked ? "border-border bg-white" : "border-dashed border-border bg-muted"}`}>
+      <div key={m.key} className={`rounded-xl border p-3 ${m.tracked ? "border-border bg-card" : "border-dashed border-border bg-muted"}`}>
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{m.label}</p>
         <p className={`text-[18px] font-bold tabular-nums mt-0.5 ${!m.tracked ? "text-slate-300 text-[12px] font-medium normal-case pt-1" : m.tone === "positive" ? "text-emerald-600" : m.tone === "watching" ? "text-amber-600" : "text-foreground"}`}>
           {m.display}
@@ -312,7 +312,7 @@ const SessionsCard = ({ sessions }: { sessions: SessionSummary[] }) => (
               {s.entries.slice(0, 12).map((e, i) => (
                 <span key={i} className="inline-flex items-center text-[10px] text-muted-foreground">
                   {i > 0 && <span className="text-slate-300 mx-0.5">›</span>}
-                  <span className={`px-1.5 py-0.5 rounded ${e.kind === "section" ? "bg-white border border-border" : "bg-blue-50 text-blue-700"}`}>{e.label}{e.seconds ? ` ${mmss(e.seconds)}` : ""}</span>
+                  <span className={`px-1.5 py-0.5 rounded ${e.kind === "section" ? "bg-card border border-border" : "bg-blue-50 text-blue-700"}`}>{e.label}{e.seconds ? ` ${mmss(e.seconds)}` : ""}</span>
                 </span>
               ))}
               {s.entries.length === 0 && <span className="text-[10px] text-muted-foreground">No ordered events for this session.</span>}

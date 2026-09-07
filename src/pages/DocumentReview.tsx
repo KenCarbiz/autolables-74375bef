@@ -100,10 +100,10 @@ const DocumentReview = () => {
                     <p className="text-[11px] opacity-80">Sticker: {fmtVal(f.old_value)} · Now: {fmtVal(f.new_value)}</p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button onClick={() => navigate(`/vehicle-file/${f.vehicle_id}?tab=labels`)} className="h-7 px-2.5 rounded-md bg-white/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Open vehicle</button>
-                    <button onClick={() => queueReprint(f)} disabled={queueing === f.id} className="h-7 px-2.5 rounded-md bg-white/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1 disabled:opacity-50"><Printer className="w-3 h-3" /> Queue reprint</button>
-                    <button onClick={() => act(f, "resolved")} className="h-7 px-2.5 rounded-md bg-white/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><Check className="w-3 h-3" /> Resolve</button>
-                    <button onClick={() => act(f, "ignored")} className="h-7 px-2.5 rounded-md bg-white/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><EyeOff className="w-3 h-3" /> Ignore</button>
+                    <button onClick={() => navigate(`/vehicle-file/${f.vehicle_id}?tab=labels`)} className="h-7 px-2.5 rounded-md bg-card/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Open vehicle</button>
+                    <button onClick={() => queueReprint(f)} disabled={queueing === f.id} className="h-7 px-2.5 rounded-md bg-card/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1 disabled:opacity-50"><Printer className="w-3 h-3" /> Queue reprint</button>
+                    <button onClick={() => act(f, "resolved")} className="h-7 px-2.5 rounded-md bg-card/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><Check className="w-3 h-3" /> Resolve</button>
+                    <button onClick={() => act(f, "ignored")} className="h-7 px-2.5 rounded-md bg-card/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><EyeOff className="w-3 h-3" /> Ignore</button>
                   </div>
                 </div>
               </div>

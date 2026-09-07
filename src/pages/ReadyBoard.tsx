@@ -413,7 +413,7 @@ export default function ReadyBoard() {
             <p className="text-xs text-muted-foreground font-mono">{qrVin}</p>
             {qrToken ? (
               <>
-                <div className="bg-white p-3 rounded-xl border border-border inline-block"><QRCodeSVG value={qrUrl} size={180} /></div>
+                <div className="bg-card p-3 rounded-xl border border-border inline-block"><QRCodeSVG value={qrUrl} size={180} /></div>
                 <a href={qrUrl} target="_blank" rel="noreferrer" className="block text-xs text-primary break-all underline">{qrUrl}</a>
                 <div className="flex items-center justify-center gap-2">
                   <button onClick={() => { navigator.clipboard.writeText(qrUrl); toast.success("Link copied"); }} className="h-9 px-3 rounded-md border border-border text-xs font-semibold">Copy link</button>
@@ -441,7 +441,7 @@ function BucketTab({ active, onClick, label, count, tone }: { active: boolean; o
   return (
     <button onClick={onClick} className={`h-9 px-3 rounded-md border text-xs font-semibold inline-flex items-center gap-1.5 ${active ? activeTone : "border-border text-foreground hover:bg-muted"}`}>
       {label}
-      <span className={`min-w-[18px] px-1 rounded text-[10px] tabular-nums ${active ? "bg-white/70" : "bg-muted text-muted-foreground"}`}>{count}</span>
+      <span className={`min-w-[18px] px-1 rounded text-[10px] tabular-nums ${active ? "bg-card/70" : "bg-muted text-muted-foreground"}`}>{count}</span>
     </button>
   );
 }

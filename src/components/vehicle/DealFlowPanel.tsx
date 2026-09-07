@@ -416,7 +416,7 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
                       ? "bg-emerald-100 text-emerald-700 ring-emerald-50"
                       : state === "active"
                         ? TONE_ACTIVE[st.tone]
-                        : "bg-slate-100 text-slate-400 ring-transparent"
+                        : "bg-muted text-muted-foreground ring-transparent"
                   }`}
                 >
                   <Icon className="w-6 h-6" strokeWidth={2} />
@@ -444,7 +444,7 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
                         ? "bg-emerald-100 text-emerald-700"
                         : state === "active"
                           ? TONE_ACTIVE[st.tone]
-                          : "bg-slate-100 text-slate-400"
+                          : "bg-muted text-muted-foreground"
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -499,13 +499,13 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
             return (
               <div key={c.key} className="rounded-2xl border border-border bg-card p-4 flex flex-col gap-3">
                 <div className="flex items-start gap-3">
-                  <div className={`w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 ${c.done ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                  <div className={`w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 ${c.done ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
                     <Icon className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <p className="text-body-sm font-semibold text-foreground">{c.label}</p>
-                      {c.official && <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Official form</span>}
+                      {c.official && <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Official form</span>}
                     </div>
                     <p className="text-caption text-muted-foreground mt-0.5">{c.meta}</p>
                   </div>
@@ -564,7 +564,7 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
                   <button
                     key={r.code}
                     onClick={() => setCertResult(r.code)}
-                    className={`w-full text-left rounded-xl border p-3 flex gap-3 transition-colors ${certResult === r.code ? "border-slate-800 bg-slate-50" : "border-border hover:bg-muted"}`}
+                    className={`w-full text-left rounded-xl border p-3 flex gap-3 transition-colors ${certResult === r.code ? "border-slate-800 bg-muted" : "border-border hover:bg-muted"}`}
                   >
                     <span className={`w-7 h-7 rounded-md flex items-center justify-center font-bold shrink-0 ${certResult === r.code ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-700"}`}>{r.code}</span>
                     <span className="text-caption text-foreground leading-snug">{r.label}</span>
