@@ -911,7 +911,18 @@ async function orchestrateVehicle(
 
     // 4 ── validate → repair → revalidate
     await setCase(admin, caseId, { status: "VALIDATING" });
-    let masterFinal = masterText;
+    // Validate the row we STORED, not a local copy of what we meant to store.
+    //
+    // Twice now the validator has disagreed with the stored text about the
+    // required disclosure: four vehicles blocked as REQUIRED_DISCLOSURE_MISSING
+    // whose stored copy ends with the exact 297-character disclosure, while
+    // the gates -- reading the same variable one block later -- measured the
+    // full appended length to the character. Whatever produced that divergence,
+    // reading the content back from the inserted row removes the class: the
+    // text that is checked is by construction the text that ships.
+    let masterFinal = typeof version.content === "string" && version.content.length
+      ? version.content
+      : masterText;
     let findings: Finding[] = validateContentV3(masterFinal, snap, settings, packet);
     let repairLog: Record<string, unknown> | null = null;
 

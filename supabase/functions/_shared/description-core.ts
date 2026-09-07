@@ -1077,10 +1077,23 @@ export function validateContentV3(
   // appears in the copy must be backed by a feature the packet actually
   // carries. Only catalogued equipment is checked, because those are the
   // names with agreed synonyms; free prose is not second-guessed.
+  // Support is judged against EVERY decoded feature on the vehicle, not the
+  // prioritized subset the writer was handed. Prioritization decides what to
+  // emphasise; it does not decide what is true. These vehicles carry 356-504
+  // decoded features and the packet surfaces ~35, so checking the packet alone
+  // blocked a BMW X7 and a QX60 for saying "Navigation System" when both
+  // decode it by that exact name -- a true sentence refused for being outside
+  // a display budget.
   const supported = new Set(
-    [...packet.factoryFeatures, ...packet.dealerAddedFeatures]
-      .flatMap((f) => [f.display_name, ...(f.aliases_seen || [])])
-      .map((n) => String(n).toLowerCase().trim()),
+    [
+      ...(snap.features || []),
+      ...packet.factoryFeatures,
+      ...packet.dealerAddedFeatures,
+    ]
+      .filter((f: any) => f && f.conflict !== true)
+      .flatMap((f: any) => [f.display_name, ...(f.aliases_seen || [])])
+      .map((n) => String(n ?? "").toLowerCase().trim())
+      .filter(Boolean),
   );
   // Support can come from ANY verified fact, not only the equipment list.
   // All-wheel drive is a drivetrain fact; a nine-speed is a transmission fact.

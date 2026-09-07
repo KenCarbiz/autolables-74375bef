@@ -400,3 +400,45 @@ describe("channel variants use the configured provider", () => {
       .toBeLessThan(aiDesc.indexOf("model: resolvedModel,"));
   });
 });
+
+// ── 8. What we validate must be what we ship ─────────────────────────
+
+describe("validation reads the stored row", () => {
+  it("takes the content back from the inserted version", () => {
+    // Twice the validator disagreed with the stored text about the required
+    // disclosure: four vehicles blocked REQUIRED_DISCLOSURE_MISSING whose
+    // stored copy ends with the exact 297-character disclosure, while the
+    // gates -- reading the same variable one block later -- measured the full
+    // appended length to the character on all six. Reading the content back
+    // from the row removes the class of bug rather than explaining it.
+    expect(orch).toMatch(/let masterFinal = typeof version\.content === "string"/);
+    const at = orch.indexOf("let masterFinal =");
+    const insert = orch.indexOf("content: masterText, word_count:");
+    expect(insert).toBeLessThan(at);
+  });
+
+  it("falls back to the local text if the row came back without content", () => {
+    expect(orch).toMatch(/\?\s*version\.content\s*\n?\s*: masterText;/);
+  });
+});
+
+// ── 9. A true sentence must not be refused ───────────────────────────
+
+describe("equipment claims are judged against the whole decode", () => {
+  it("credits every decoded feature, not the display budget", () => {
+    // A BMW X7 and a QX60 were blocked for saying "Navigation System" when
+    // both decode a feature by that exact name. The packet surfaces ~35 of
+    // 356-504 features, and the check only credited those: prioritization
+    // decides what to emphasise, it does not decide what is true.
+    const blk = core.slice(core.indexOf("const supported = new Set("),
+                           core.indexOf("const factBlob ="));
+    expect(blk).toMatch(/\.\.\.\(snap\.features \|\| \[\]\)/);
+    expect(blk).toMatch(/packet\.factoryFeatures/);
+  });
+
+  it("still refuses a feature the decode marks as conflicted", () => {
+    const blk = core.slice(core.indexOf("const supported = new Set("),
+                           core.indexOf("const factBlob ="));
+    expect(blk).toMatch(/f\.conflict !== true/);
+  });
+});
