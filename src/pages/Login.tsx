@@ -3,7 +3,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import Logo from "@/components/brand/Logo";
 import Seo from "@/components/Seo";
 import "@/styles/login.css";
 import LoginHero from "@/components/login/LoginHero";
@@ -13,6 +12,7 @@ import {
   IconEye,
   IconEyeOff,
   IconArrowRight,
+  IconInfo,
   IconWarning,
   IconCheck,
   IconSpinner,
@@ -214,10 +214,6 @@ const Login = () => {
           Nationwide
         </p>
 
-        <div className="login-mobile-brand">
-          <Logo variant="full" size={26} />
-        </div>
-
         <form ref={formRef} onSubmit={handleSubmit} noValidate className="login-card">
           <p className="login-eyebrow">{isAdminMode ? "Platform admin" : "Dealer portal"}</p>
           <h1 className="login-card-title">{isAdminMode ? "Admin sign-in" : "Welcome back"}</h1>
@@ -226,6 +222,17 @@ const Login = () => {
               ? "Platform operators — sign in to manage tenants and billing."
               : "Sign in to your AutoLabels workspace."}
           </p>
+
+          {!isAdminMode && (
+            <p className="login-info">
+              <IconInfo className="login-info-icon" />
+              <span>
+                Use the email associated with your dealership account. Need
+                access? Contact your dealership administrator or AutoLabels
+                Support.
+              </span>
+            </p>
+          )}
 
           {sessionExpired && (
             <div role="status" className="login-alert is-warning">
