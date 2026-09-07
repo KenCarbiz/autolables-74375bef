@@ -75,9 +75,11 @@ describe("ownership names the desk that must act next (L3)", () => {
     expect(STATE_OWNER.WAITING_FOR_MANAGER_DECISION).toBe("Used car manager");
   });
 
-  it("hands a finalized K-208 to detail", () => {
-    expect(STATE_OWNER.K208_FINALIZED).toBe("Detail");
-    expect(STATE_NEXT_ACTION.K208_FINALIZED).toContain("detail");
+  it("keeps a finalized K-208 with Service, whose evidence it is", () => {
+    // The K-208 is the Connecticut safety inspection. Finalized, it is the
+    // service department's attestation that they completed it -- so the record
+    // and the accountability stay with them even as the car moves on.
+    expect(STATE_OWNER.K208_FINALIZED).toBe("Service");
   });
 
   it("gives every state an owner, so no board can render a blank accountable desk", () => {

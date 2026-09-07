@@ -84,8 +84,9 @@ export const STATE_LABEL: Record<LifecycleState, string> = {
 // spend. So findings-recorded belongs to the writer, and the manager appears
 // one state later at WAITING_FOR_MANAGER_DECISION.
 //
-// K-208 finalized hands the car to detail; the certificate itself becomes part
-// of the vehicle's evidence record from that point.
+// K-208 finalized stays with Service: it is that department's evidence that
+// they completed the Connecticut safety inspection on the vehicle. Service
+// then hands the car on, but the record and the accountability are theirs.
 export const STATE_OWNER: Record<LifecycleState, string> = {
   INGESTED: "Inventory intake",
   PRELOAD_RUNNING: "Inventory intake",
@@ -101,7 +102,7 @@ export const STATE_OWNER: Record<LifecycleState, string> = {
   REPAIR_IN_PROGRESS: "Service",
   REPAIR_VERIFICATION_REQUIRED: "Service",
   K208_READY_TO_CERTIFY: "Service",
-  K208_FINALIZED: "Detail",
+  K208_FINALIZED: "Service",
   DETAIL_PENDING: "Detail",
   DETAIL_IN_PROGRESS: "Detail",
   FINAL_READY_VERIFICATION: "Used car manager",
