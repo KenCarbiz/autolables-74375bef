@@ -40,10 +40,10 @@ interface HeroProofPoint {
   label: string;
 }
 
-// Pack rule (005_LOGIN_TEXT_COPY.md): these are mockup figures, not
-// verified metrics — confirm with the owner before they ship live.
+// Pack rule (005_LOGIN_TEXT_COPY.md): numeric proof claims may not ship
+// unverified. The mockup's "10,000+ vehicles processed" is withheld on the
+// owner's instruction; keep any future figure out of here until it is verified.
 const PROOF_POINTS: HeroProofPoint[] = [
-  { value: "10,000+", label: "VEHICLES PROCESSED" },
   { value: "NATIONWIDE", label: "DEALERSHIPS" },
   { value: "ZERO COMPROMISE", label: "ON COMPLIANCE" },
 ];
