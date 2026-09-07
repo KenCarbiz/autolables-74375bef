@@ -249,6 +249,18 @@ describe("the master band covers the vAuto floor", () => {
     expect(v3).not.toMatch(/aim for \$\{writeBand\.min\}-/);
   });
 
+  it("makes the band ceiling the hard stop, not the platform guard", () => {
+    // The instruction ended "never exceed ${LENGTH_POLICY.absoluteMax}" --
+    // 4,500, a runaway guard, not a target. The writer read that as the real
+    // ceiling and four of six vehicles came back 4,172-4,377 characters,
+    // past the 3,879 the owner set. absoluteMax stays as the safety net in
+    // scoring; it is no longer quoted at the writer.
+    const v3 = core.slice(core.indexOf("export function buildMasterPromptV3("),
+                          core.indexOf("* V3 channel prompt."));
+    expect(v3).toMatch(/\$\{writeBand\.max\} is a hard ceiling: do not go past it/);
+    expect(v3).not.toMatch(/Never exceed \$\{LENGTH_POLICY\.absoluteMax\}/);
+  });
+
   it("says how to reach the target, and how not to", () => {
     const v3 = core.slice(core.indexOf("export function buildMasterPromptV3("),
                           core.indexOf("* V3 channel prompt."));

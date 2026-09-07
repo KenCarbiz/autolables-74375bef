@@ -746,7 +746,7 @@ ${toneInstruction(packet.tone)}
 ${voiceInstruction(packet.voice)}
 
 STRUCTURE
-- Length: write to about ${writeBand.max} characters. ${writeBand.min} is the floor, not the target — copy that stops just past the floor is short. Never exceed ${LENGTH_POLICY.absoluteMax}.
+- Length: write to about ${writeBand.max} characters. ${writeBand.min} is the floor, not the target — copy that stops just past the floor is short. ${writeBand.max} is a hard ceiling: do not go past it.
 - Reach the target by COVERING MORE of the verified material above: more of the prioritized equipment, grouped sensibly; the practical ownership detail; the specifications and fuel economy where they matter to a buyer. Never reach it by padding, repeating a feature under a second name, restating a fact in different words, or adding generic dealership filler.
 - If the verified facts genuinely run out before the floor, stop writing. Short copy is reviewed by a person; invented copy is not acceptable at any length.
 - A strong opening that names the vehicle, then the qualities that matter most, then the prioritized equipment grouped sensibly, then practical ownership detail, then the close.
