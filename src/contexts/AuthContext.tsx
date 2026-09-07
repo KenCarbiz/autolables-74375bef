@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { brokeredPreviewStorage } from "@/integrations/supabase/previewAuthStorage";
 import { markSessionActive, clearSessionActive } from "@/lib/auth/sessionExpiry";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
@@ -12,115 +11,6 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
-
-type SignInResult = { error: unknown };
-
-type RelaySession = Session & {
-  error_description?: string;
-  msg?: string;
-};
-
-const isFetchFailure = (error: unknown): boolean => {
-  const candidate = error as { name?: string; message?: string } | null;
-  const message = candidate?.message?.toLowerCase() ?? "";
-  return candidate?.name === "AuthRetryableFetchError" || message.includes("failed to fetch") || message.includes("network error");
-};
-
-const persistRelaySession = async (payload: RelaySession): Promise<SignInResult> => {
-  if (!payload.access_token || !payload.refresh_token || !payload.user) {
-    return { error: new Error(payload.error_description ?? payload.msg ?? "Invalid email or password.") };
-  }
-
-  const baseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
-  const projectRef = new URL(baseUrl).hostname.split(".")[0];
-  const storage = brokeredPreviewStorage() ?? localStorage;
-  await storage.setItem(`sb-${projectRef}-auth-token`, JSON.stringify(payload));
-  window.location.reload();
-  return { error: null };
-};
-
-const signInWithRelay = (email: string, password: string): Promise<SignInResult> =>
-  new Promise((resolve) => {
-    const request = new XMLHttpRequest();
-    const baseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
-    const projectRef = new URL(baseUrl).hostname.split(".")[0];
-
-    request.open("POST", `https://${projectRef}.functions.supabase.co/auth-login-relay`);
-    request.timeout = 15_000;
-    request.setRequestHeader("Content-Type", "application/json");
-
-    request.onload = async () => {
-      try {
-        const payload = JSON.parse(request.responseText || "{}") as RelaySession;
-        if (request.status < 200 || request.status >= 300 || !payload.access_token || !payload.refresh_token) {
-          resolve({ error: new Error(payload.error_description ?? payload.msg ?? "Invalid email or password.") });
-          return;
-        }
-        resolve(await persistRelaySession(payload));
-      } catch (error) {
-        resolve({ error });
-      }
-    };
-    request.onerror = () => resolve({ error: new Error("Network error") });
-    request.ontimeout = () => resolve({ error: new Error("Network error") });
-    request.send(JSON.stringify({ email, password }));
-  });
-
-const signInWithNavigationRelay = (email: string, password: string): Promise<SignInResult> =>
-  new Promise((resolve) => {
-    const baseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
-    const projectRef = new URL(baseUrl).hostname.split(".")[0];
-    const relayOrigin = `https://${projectRef}.functions.supabase.co`;
-    const frameName = `auth-relay-${crypto.randomUUID()}`;
-    const frame = document.createElement("iframe");
-    const form = document.createElement("form");
-    let settled = false;
-
-    const finish = (result: SignInResult) => {
-      if (settled) return;
-      settled = true;
-      window.removeEventListener("message", onMessage);
-      window.clearTimeout(timeoutId);
-      form.remove();
-      frame.remove();
-      resolve(result);
-    };
-
-    const onMessage = async (event: MessageEvent) => {
-      if (event.origin !== relayOrigin || event.data?.type !== "autolabels-auth-relay") return;
-      const payload = event.data.payload as RelaySession;
-      if (!payload.access_token || !payload.refresh_token) {
-        finish({ error: new Error(payload.error_description ?? payload.msg ?? "Invalid email or password.") });
-        return;
-      }
-      finish(await persistRelaySession(payload));
-    };
-
-    const timeoutId = window.setTimeout(
-      () => finish({ error: new Error("Network error") }),
-      15_000,
-    );
-    window.addEventListener("message", onMessage);
-
-    frame.name = frameName;
-    frame.hidden = true;
-    frame.setAttribute("aria-hidden", "true");
-    document.body.appendChild(frame);
-
-    form.method = "POST";
-    form.action = `${relayOrigin}/auth-login-relay`;
-    form.target = frameName;
-    form.hidden = true;
-    for (const [name, value] of [["email", email], ["password", password]]) {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = name;
-      input.value = value;
-      form.appendChild(input);
-    }
-    document.body.appendChild(form);
-    form.submit();
-  });
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -286,15 +176,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (!error || !isFetchFailure(error)) return { error };
-    } catch (error) {
-      if (!isFetchFailure(error)) return { error };
-    }
-    const relayResult = await signInWithRelay(email, password);
-    if (!relayResult.error || !isFetchFailure(relayResult.error)) return relayResult;
-    return signInWithNavigationRelay(email, password);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error };
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
