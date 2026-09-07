@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useTenant } from "@/contexts/TenantContext";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/brand/Logo";
 import Seo from "@/components/Seo";
@@ -64,7 +63,6 @@ const classifyAuthError = (
 
 const Login = () => {
   const { signIn, user, isAdmin } = useAuth();
-  const { tenant } = useTenant();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();

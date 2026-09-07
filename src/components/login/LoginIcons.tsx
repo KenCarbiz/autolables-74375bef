@@ -98,13 +98,6 @@ export const IconArrowRight = ({ className }: LoginIconProps) => (
   </Svg>
 );
 
-export const IconInfo = ({ className }: LoginIconProps) => (
-  <Svg className={className} strokeWidth={1.8}>
-    <circle cx={12} cy={12} r={9} />
-    <path d="M12 11v6M12 7h.01" />
-  </Svg>
-);
-
 export const IconWarning = ({ className }: LoginIconProps) => (
   <Svg className={className} strokeWidth={1.8}>
     <path d="M12 3 2.8 20h18.4L12 3Z" />
