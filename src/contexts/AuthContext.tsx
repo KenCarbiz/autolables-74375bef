@@ -20,15 +20,14 @@ const isFetchFailure = (error: unknown): boolean => {
   return candidate?.name === "AuthRetryableFetchError" || message.includes("failed to fetch") || message.includes("network error");
 };
 
-const signInWithXhr = (email: string, password: string): Promise<SignInResult> =>
+const signInWithRelay = (email: string, password: string): Promise<SignInResult> =>
   new Promise((resolve) => {
     const request = new XMLHttpRequest();
     const baseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
-    const publishableKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "");
+    const projectRef = new URL(baseUrl).hostname.split(".")[0];
 
-    request.open("POST", `${baseUrl}/auth/v1/token?grant_type=password`);
+    request.open("POST", `https://${projectRef}.functions.supabase.co/auth-login-relay`);
     request.timeout = 15_000;
-    request.setRequestHeader("apikey", publishableKey);
     request.setRequestHeader("Content-Type", "application/json");
 
     request.onload = async () => {
@@ -227,7 +226,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       if (!isFetchFailure(error)) return { error };
     }
-    return signInWithXhr(email, password);
+    return signInWithRelay(email, password);
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
