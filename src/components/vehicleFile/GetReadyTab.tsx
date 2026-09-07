@@ -6,9 +6,11 @@ import {
 } from "lucide-react";
 import { Card, DeepLink, EmptyNote, Pair, Section, TabHeader, btn, fmtWhen, sinceLabel } from "./primitives";
 import {
-  OFF_RAIL, RAIL, STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER,
-  stageStates, type LifecycleResult, type LifecycleState, type StageState,
+  OFF_RAIL, RAIL, stageStates, type LifecycleResult, type StageState,
 } from "./lifecycle";
+import {
+  STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER, type LifecycleState,
+} from "@/lib/lifecycle/states";
 import type { VehicleRow } from "./types";
 
 interface PrepRow {

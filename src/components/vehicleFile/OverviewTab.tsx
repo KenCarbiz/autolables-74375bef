@@ -5,7 +5,8 @@ import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight, ImageIcon, Ref
 import VehicleTruthCard from "@/components/vehicle/VehicleTruthCard";
 import { listingGallery } from "@/lib/photos";
 import { Card, DeepLink, EmptyNote, Pair, StatRow, TabHeader, btn, fmtWhen, sinceLabel } from "./primitives";
-import { STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER, type LifecycleResult } from "./lifecycle";
+import { type LifecycleResult } from "./lifecycle";
+import { STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER } from "@/lib/lifecycle/states";
 import DescriptionCard from "./DescriptionCard";
 import { readinessLabel, type ReadinessSummary, type TabId, type VehicleRow } from "./types";
 

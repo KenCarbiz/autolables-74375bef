@@ -77,6 +77,7 @@ import {
   isNavItemActive,
   formatBadgeCount,
   badgeAriaLabel,
+  navModeForRole,
 } from "@/components/layout/adminNav";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -145,6 +146,9 @@ const AppShell = ({ children }: AppShellProps) => {
   const can = useCallback((c: DealerCapability) => hasDealerCapability(role, c, isAdmin), [role, isAdmin]);
   // Any admin tab at all (not just can_manage_settings) opens the Settings door.
   const anyAdminTab = isAdmin || firstPermittedAdminTab(role, isAdmin) != null;
+  // Technicians and third-party vendors get their own shell: one worklist, and
+  // none of the dealer chrome that creates, prices or sells a vehicle.
+  const navMode = navModeForRole(role);
 
   const openScan = useCallback(() => {
     if (prefersLiveScanner()) navigate("/scan");
@@ -178,7 +182,7 @@ const AppShell = ({ children }: AppShellProps) => {
   // ./adminNav — the ~19 `?tab=` rows live behind the single "Settings" door,
   // the document creators behind one "Create" hub, recon/prep/service/ready
   // under "Get Ready". Expanded, collapsed, and mobile drawer all read this.
-  const navSections = buildAdminNavSections({ badges, anyAdminTab });
+  const navSections = buildAdminNavSections({ badges, anyAdminTab, role });
   const visibleSections = filterNavSections(navSections, {
     isAdmin,
     isManager,
@@ -191,9 +195,17 @@ const AppShell = ({ children }: AppShellProps) => {
 
   const pageTitles: Record<string, { title: string; subtitle: string }> = {
     "/dashboard": { title: "Home", subtitle: "Your dealership command center." },
+    "/home/technician": { title: "My Work", subtitle: "The vehicles assigned to you, one action each." },
+    "/home/vendor": { title: "My Assignments", subtitle: "The work this store has dispatched to your company." },
+    "/service-desk": { title: "Service Writer Desk", subtitle: "One row per vehicle in service, with its next action." },
+    "/customers": { title: "Customers", subtitle: "Every shopper, lead and deal against one customer record." },
+    "/leads": { title: "Customers", subtitle: "Every shopper, lead and deal against one customer record." },
+    "/deals": { title: "Deals", subtitle: "Every addendum as a deal, in the state the record says it is in." },
+    "/create": { title: "Create", subtitle: "Every document family, one door." },
+    "/queue": { title: "Work Queue", subtitle: "VIN decoding and the tasks waiting on a person." },
     "/inventory": { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
     "/inventory-v2": { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
-    "/saved": { title: "Deals", subtitle: "Review saved addendums, signatures, and delivery status." },
+    "/saved": { title: "Deals", subtitle: "Saved addendums, signatures, and delivery status." },
     "/addendum": { title: "New Addendum", subtitle: "Create compliant addendum labels and forms." },
     "/new-car-sticker-legacy": { title: "New Car Sticker (legacy builder)", subtitle: "Superseded by the OEM Window Sticker Studio." },
     "/inventory-intelligence": { title: "Inventory Intelligence", subtitle: "Pipeline state per vehicle, per document family." },
@@ -217,7 +229,12 @@ const AppShell = ({ children }: AppShellProps) => {
     || { title: activeItem?.label || "Dashboard", subtitle: "AutoLabels admin workspace." };
   const companyName = currentStore?.name || tenant?.name || (settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "Select store");
   const dealerLocation = [currentStore?.city || (settings as any)?.dealer_city, currentStore?.state || (settings as any)?.dealer_state].filter(Boolean).join(", ") || "Manchester, CT";
-  const unreadAudit = entries.filter((entry) => entry.action === "compliance_block" || entry.action === "price_integrity_block").length;
+  // The activity feed is the dealership's record, not the worker's. A
+  // technician's or vendor's bell carries only the notifications addressed to
+  // them (RLS-scoped, below); store-wide compliance and pricing events — and
+  // the "View all activity" door into /admin — are not theirs to see.
+  const auditEntries = navMode === "dealer" ? entries : [];
+  const unreadAudit = auditEntries.filter((entry) => entry.action === "compliance_block" || entry.action === "price_integrity_block").length;
 
   // Personal bell items (user_notifications, 20260726106000) — ADDITIVE to the
   // audit activity feed below: the same dropdown lists "For you" first, then
@@ -257,10 +274,10 @@ const AppShell = ({ children }: AppShellProps) => {
 
   const recentActivity = useMemo(
     () =>
-      [...entries]
+      [...auditEntries]
         .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
         .slice(0, 12),
-    [entries],
+    [auditEntries],
   );
   const formatActivityLabel = (a: string) =>
     a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -537,13 +554,22 @@ const AppShell = ({ children }: AppShellProps) => {
   // Role-aware mobile bottom nav: Scan stays the raised center; the four side
   // slots are filled from the role's capabilities (a service writer gets Get
   // Ready instead of Deals/Create, etc.).
-  const bottomCandidates: { label: string; path: string; icon: typeof Grid2X2; cap: DealerCapability }[] = [
+  const dealerBottomCandidates: { label: string; path: string; icon: typeof Grid2X2; cap: DealerCapability }[] = [
     { label: "Home", path: "/dashboard", icon: Grid2X2, cap: "can_view_dashboard" },
     { label: "Inventory", path: "/inventory", icon: Car, cap: "can_view_inventory" },
     { label: "Get Ready", path: "/ready-board", icon: Wrench, cap: "can_view_get_ready" },
-    { label: "Deals", path: "/saved", icon: Folder, cap: "can_view_deals" },
+    { label: "Deals", path: "/deals", icon: Folder, cap: "can_view_deals" },
     { label: "Create", path: "/create", icon: FilePlus2, cap: "can_create_documents" },
   ];
+  const bottomCandidates: { label: string; path: string; icon: typeof Grid2X2; cap: DealerCapability }[] =
+    navMode === "vendor"
+      ? [{ label: "My Work", path: "/home/vendor", icon: ClipboardList, cap: "can_complete_get_ready" }]
+      : navMode === "technician"
+        ? [
+            { label: "My Work", path: "/home/technician", icon: ClipboardList, cap: "can_view_work_queue" },
+            { label: "Ready", path: "/ready-board", icon: Wrench, cap: "can_view_get_ready" },
+          ]
+        : dealerBottomCandidates;
   const sideItems = bottomCandidates.filter((c) => can(c.cap)).slice(0, 4);
   const bottomNavItems: { label: string; path: string; icon: typeof Grid2X2; raised?: boolean }[] = [
     ...sideItems.slice(0, 2),
@@ -570,17 +596,33 @@ const AppShell = ({ children }: AppShellProps) => {
             </button>
           </div>
 
-          {/* Quick add — primary inventory entry point (full-width pill) */}
-          <div className="px-3 pt-3">
-            <button
-              onClick={() => navigate("/inventory?add=1")}
-              className="h-10 w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors"
-              title="Add a vehicle"
-            >
-              <Plus size={18} strokeWidth={2.25} aria-hidden="true" />
-              {!collapsed && <span>Add Vehicle</span>}
-            </button>
-          </div>
+          {/* Global controls: add a vehicle, and the one Create door for every
+              document family. Neither is a navigation destination, so neither
+              is a nav row — and a technician or vendor gets neither. */}
+          {navMode === "dealer" && (can("can_view_inventory") || can("can_create_documents")) && (
+            <div className={`px-3 pt-3 flex gap-2 ${collapsed ? "lg:flex-col" : ""}`}>
+              {can("can_view_inventory") && (
+                <button
+                  onClick={() => navigate("/inventory?add=1")}
+                  className="h-10 flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors"
+                  title="Add a vehicle"
+                >
+                  <Plus size={18} strokeWidth={2.25} aria-hidden="true" />
+                  {!collapsed && <span>Add Vehicle</span>}
+                </button>
+              )}
+              {can("can_create_documents") && (
+                <button
+                  onClick={() => navigate("/create")}
+                  aria-label="Create"
+                  className={`h-10 inline-flex items-center justify-center gap-2 rounded-full border border-shell-border text-shell-foreground text-sm font-semibold hover:bg-shell-hover transition-colors ${collapsed ? "w-full" : "w-10"}`}
+                  title="Create a document"
+                >
+                  <FilePlus2 size={18} strokeWidth={2.25} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          )}
 
           <TooltipProvider delayDuration={200}>
             <nav className="flex-1 overflow-y-auto p-3 space-y-1" aria-label="Primary">
@@ -742,10 +784,14 @@ const AppShell = ({ children }: AppShellProps) => {
                     </div>
                     {renderServiceNotifs()}
                     {renderNotificationsList()}
-                    <DropdownMenuSeparator className="my-0" />
-                    <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
-                      View all activity
-                    </DropdownMenuItem>
+                    {navMode === "dealer" && (
+                      <>
+                        <DropdownMenuSeparator className="my-0" />
+                        <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
+                          View all activity
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -904,10 +950,14 @@ const AppShell = ({ children }: AppShellProps) => {
                   </div>
                   {renderServiceNotifs()}
                   {renderNotificationsList()}
-                  <DropdownMenuSeparator className="my-0" />
-                  <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
-                    View all activity
-                  </DropdownMenuItem>
+                  {navMode === "dealer" && (
+                    <>
+                      <DropdownMenuSeparator className="my-0" />
+                      <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
+                        View all activity
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
 

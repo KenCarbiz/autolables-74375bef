@@ -6,7 +6,7 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { resolveOperatingState } from "@/lib/dealerState";
 import FactoryStickerCard from "@/components/vehicle/FactoryStickerCard";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
-import DealFlowPanel from "@/components/vehicle/DealFlowPanel";
+import DealDocumentsPanel from "@/components/vehicle/DealDocumentsPanel";
 import { Card, TabHeader, btnLarge } from "./primitives";
 import { BrochureFinderRow, OwnersManualFinderRow } from "./OemDocFinders";
 import StickerGenerators from "./StickerGenerators";
@@ -125,7 +125,7 @@ export const DocumentsTab = ({ vehicle, onReload }: { vehicle: VehicleRow; onRel
       </div>
 
       <div id={SECTION_IDS.forms} className="scroll-mt-24">
-        <DealFlowPanel vehicle={vehicle} />
+        <DealDocumentsPanel vehicle={vehicle} />
       </div>
 
       <div id={SECTION_IDS.stickers} className="scroll-mt-24">

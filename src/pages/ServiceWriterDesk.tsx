@@ -12,6 +12,7 @@ import {
 } from "@/components/command/CommandPrimitives";
 import { ChevronDown, ChevronRight, ClipboardList, Headset } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SERVICE_FLOOR_STATES, stateLabel, type ServiceFloorState } from "@/lib/lifecycle/states";
 
 // The service writer's desk: one row per vehicle in the service pipeline, and
 // exactly six columns. The column set is deliberately short so NEXT ACTION is
@@ -27,24 +28,7 @@ const sb = () => supabase as any;
 
 type StatusKey = "WAITING" | "IN_PROGRESS" | "AUTHORIZED" | "NEEDS_REVIEW" | "COMPLETED";
 
-const STATE_LABEL: Record<string, string> = {
-  AUTHORIZED_FOR_GET_READY: "Authorized for get ready",
-  SERVICE_UNASSIGNED: "Service unassigned",
-  K208_IN_PROGRESS: "Inspection in progress",
-  SERVICE_FINDINGS_RECORDED: "Service findings recorded",
-  WAITING_FOR_MANAGER_DECISION: "Waiting for manager decision",
-  RETURNED_FOR_CLARIFICATION: "Returned for clarification",
-  WORK_AUTHORIZED: "Work authorized",
-  REPAIR_IN_PROGRESS: "Repair in progress",
-  REPAIR_VERIFICATION_REQUIRED: "Ready for reinspection",
-  K208_READY_TO_CERTIFY: "Awaiting K-208 certification",
-  K208_FINALIZED: "K-208 finalized",
-  DETAIL_PENDING: "Detail pending",
-  DETAIL_IN_PROGRESS: "Detail in progress",
-  FINAL_READY_VERIFICATION: "Final ready verification",
-};
-
-const STATE_STATUS: Record<string, StatusKey> = {
+const STATE_STATUS: Record<ServiceFloorState, StatusKey> = {
   AUTHORIZED_FOR_GET_READY: "AUTHORIZED",
   SERVICE_UNASSIGNED: "WAITING",
   K208_IN_PROGRESS: "IN_PROGRESS",
@@ -69,7 +53,7 @@ const STATUS_TONE: Record<StatusKey, Tone> = {
   COMPLETED: "emerald",
 };
 
-const NEXT_ACTION: Record<string, string> = {
+const NEXT_ACTION: Record<ServiceFloorState, string> = {
   AUTHORIZED_FOR_GET_READY: "Start inspection",
   SERVICE_UNASSIGNED: "Assign technician",
   K208_IN_PROGRESS: "Continue inspection",
@@ -86,7 +70,7 @@ const NEXT_ACTION: Record<string, string> = {
   FINAL_READY_VERIFICATION: "Verify ready",
 };
 
-const DESK_STATES = new Set(Object.keys(STATE_LABEL));
+const DESK_STATES = new Set<string>(SERVICE_FLOOR_STATES);
 
 type TabKey =
   | "all" | "unassigned" | "inspection" | "waiting" | "authorized"
@@ -232,7 +216,7 @@ export default function ServiceWriterDesk() {
         ids.length
           ? sb().from("vehicle_listings")
             .select("id, ymm, status, deal_processed_at")
-            .eq("tenant_id", tenantId).in("id", ids)
+            .eq("tenant_id", tenantId).in("id", ids).neq("status", "archived")
           : none,
         vins.length
           ? sb().from("safety_inspections")
@@ -312,7 +296,14 @@ export default function ServiceWriterDesk() {
       }
 
       const now = Date.now();
-      const out: DeskRow[] = lcRows.map((r) => {
+      // A lifecycle row outlives its vehicle: production has 0 completed
+      // get_ready_records, so a car routinely sells while parked in a working
+      // state. Dropping rows whose vehicle is gone is what stops a board
+      // claiming more vehicles than the lot holds. Sold-but-present cars are
+      // deliberately kept: one still in the shop is urgent.
+      const out: DeskRow[] = lcRows
+        .filter((r) => vehicleById.has(r.vehicleId))
+        .map((r) => {
         const v = vehicleById.get(r.vehicleId);
         const inspection = inspectionByVin.get(r.vin) ?? null;
         const getReady = getReadyByVin.get(r.vin) ?? null;
@@ -485,10 +476,10 @@ export default function ServiceWriterDesk() {
                       </button>
                     </td>
                     <td className="py-2.5 pr-2 align-top">
-                      <span className="block text-foreground">{STATE_LABEL[r.state] || r.state}</span>
+                      <span className="block text-foreground">{stateLabel(r.state)}</span>
                       <span className="mt-1 inline-block">
-                        <StatusPill tone={STATUS_TONE[STATE_STATUS[r.state] || "WAITING"]}>
-                          {(STATE_STATUS[r.state] || "WAITING").replace("_", " ")}
+                        <StatusPill tone={STATUS_TONE[STATE_STATUS[r.state as ServiceFloorState] || "WAITING"]}>
+                          {(STATE_STATUS[r.state as ServiceFloorState] || "WAITING").replace("_", " ")}
                         </StatusPill>
                       </span>
                     </td>
@@ -506,7 +497,7 @@ export default function ServiceWriterDesk() {
                         to={`/service/vehicle/${encodeURIComponent(r.vin)}`}
                         className={cn(BTN_SECONDARY, "whitespace-nowrap")}
                       >
-                        {NEXT_ACTION[r.state] || "Open file"}
+                        {NEXT_ACTION[r.state as ServiceFloorState] || "Open file"}
                       </Link>
                     </td>
                   </tr>,

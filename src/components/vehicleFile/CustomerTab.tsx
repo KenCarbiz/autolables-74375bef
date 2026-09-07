@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Activity, CheckCircle2, Clock, Save, UserRound, Users } from "lucide-react";
+import { Activity, Save, UserRound, Users } from "lucide-react";
 import { useTenant } from "@/contexts/TenantContext";
 import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSection";
 import ShopperActivityDrawer from "@/components/vehicle/ShopperActivityDrawer";
+import DealProgressPanel from "@/components/vehicle/DealProgressPanel";
 import { useShopperActivity } from "@/hooks/useShopperActivity";
-import { useDealRecord, dealDocStatus } from "@/hooks/useDealRecord";
 import { mmss } from "@/lib/shopperActivity";
 import { listingHero } from "@/lib/photos";
 import { Card, EmptyNote, Pair, StatRow, TabHeader, btn, btnPrimary, fmtWhen } from "./primitives";
@@ -82,7 +82,6 @@ export const CustomerTab = ({ vehicle, stockNumber }: { vehicle: VehicleRow; sto
   const { summary, loading: activityLoading } = useShopperActivity({
     vin: vehicle.vin, tenantId: vehicle.tenant_id, vehicleId: vehicle.id, viewCount: vehicle.view_count,
   });
-  const { record: deal, loading: dealLoading } = useDealRecord(vehicle.vin, vehicle.id, vehicle.tenant_id);
   const signatures = useVehicleSignatures(vehicle.vin);
 
   useEffect(() => {
@@ -151,7 +150,6 @@ export const CustomerTab = ({ vehicle, stockNumber }: { vehicle: VehicleRow; sto
     toast.success("Customer record saved");
   };
 
-  const docs = deal ? dealDocStatus(deal) : null;
   const signedCount = signatures.signings.length;
   const pendingLinks = signatures.tokens.filter((t) => t.status === "pending").length;
 
@@ -259,36 +257,14 @@ export const CustomerTab = ({ vehicle, stockNumber }: { vehicle: VehicleRow; sto
         )}
       </Card>
 
-      <Card title="Deal & signature state">
-        {dealLoading || !deal || !docs ? (
-          <p className="text-al-body text-muted-foreground">Loading the deal record…</p>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-              <Pair label="Addendum" value={docs.addendum ? "Accepted" : "Not accepted"} />
-              <Pair label="Get-Ready" value={docs.getReady ? "Complete" : "Open"} />
-              {deal.isUsed && <Pair label="Safety inspection" value={docs.k208 ? "Executed" : "Not executed"} />}
-              {deal.isUsed && <Pair label="Buyers Guide" value={docs.buyersGuide ? "Filed" : "Not filed"} />}
-              <Pair label="Deal processed" value={deal.processedAt ? (fmtWhen(deal.processedAt) ?? "Yes") : "Not processed"} />
-              <Pair label="Customer signed" value={deal.addendum?.signed ? "Yes" : "No"} />
-            </div>
-            <div className="rounded-xl border border-border bg-muted/30 p-4 flex items-start gap-3">
-              {docs.complete
-                ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                : <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
-              <p className="text-al-body text-foreground">
-                {docs.complete
-                  ? "Every required document for this deal is on file."
-                  : "The deal package is not complete yet. The Documents tab produces and files the missing forms."}
-              </p>
-            </div>
-            <div className="space-y-2.5">
-              <StatRow label="Signatures captured" value={signatures.loading ? "…" : signedCount.toLocaleString()} tone={signedCount ? undefined : "muted"} />
-              <StatRow label="Active signing links" value={signatures.loading ? "…" : pendingLinks.toLocaleString()} tone={pendingLinks ? undefined : "muted"} />
-            </div>
-            <p className="text-al-meta text-muted-foreground">The full signature audit trail lives on the Compliance tab.</p>
-          </>
-        )}
+      <DealProgressPanel vehicle={vehicle} />
+
+      <Card title="Signatures">
+        <div className="space-y-2.5">
+          <StatRow label="Signatures captured" value={signatures.loading ? "…" : signedCount.toLocaleString()} tone={signedCount ? undefined : "muted"} />
+          <StatRow label="Active signing links" value={signatures.loading ? "…" : pendingLinks.toLocaleString()} tone={pendingLinks ? undefined : "muted"} />
+        </div>
+        <p className="text-al-meta text-muted-foreground">The full signature audit trail lives on the Compliance tab.</p>
       </Card>
 
       <Card title="Sold-to record" action={

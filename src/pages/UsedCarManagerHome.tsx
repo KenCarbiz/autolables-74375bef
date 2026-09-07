@@ -16,6 +16,7 @@ import {
   ChevronRight, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { stateLabel } from "@/lib/lifecycle/states";
 
 // /used-car-manager — the used-car manager's home: the PHYSICAL path of used
 // inventory, in the order this role has to act on it. Counts that exist in
@@ -61,31 +62,6 @@ const Status = ({ status, suffix }: { status: StatusKey; suffix?: string }) => (
     {suffix ? `${STATUS_LABEL[status]} - ${suffix}` : STATUS_LABEL[status]}
   </StatusPill>
 );
-
-const STATE_LABEL: Record<string, string> = {
-  INGESTED: "Ingested",
-  PRELOAD_RUNNING: "Preload running",
-  PRELOAD_EXCEPTION: "Preload exception",
-  AWAITING_MANAGER_AUTHORIZATION: "Awaiting manager authorization",
-  AUTHORIZED_FOR_GET_READY: "Authorized for get ready",
-  SERVICE_UNASSIGNED: "Service unassigned",
-  K208_IN_PROGRESS: "Inspection in progress",
-  SERVICE_FINDINGS_RECORDED: "Service findings recorded",
-  WAITING_FOR_MANAGER_DECISION: "Waiting for manager decision",
-  RETURNED_FOR_CLARIFICATION: "Returned for clarification",
-  WORK_AUTHORIZED: "Work authorized",
-  REPAIR_IN_PROGRESS: "Repair in progress",
-  REPAIR_VERIFICATION_REQUIRED: "Ready for reinspection",
-  K208_READY_TO_CERTIFY: "Awaiting K-208 certification",
-  K208_FINALIZED: "K-208 finalized",
-  DETAIL_PENDING: "Detail pending",
-  DETAIL_IN_PROGRESS: "Detail in progress",
-  FINAL_READY_VERIFICATION: "Final ready verification",
-  RETAIL_READY: "Retail ready",
-  ON_HOLD: "On hold",
-  WHOLESALE: "Wholesale",
-  REMOVED: "Removed",
-};
 
 const STATE_STATUS: Record<string, StatusKey> = {
   INGESTED: "WAITING",
@@ -334,14 +310,18 @@ export default function UsedCarManagerHome() {
 
   const now = useMemo(() => Date.now(), [lifecycle, vehicles]);
 
+  // A lifecycle row outlives its vehicle: production has 0 completed
+  // get_ready_records, so a car routinely sells while still parked in a
+  // working state. Counting those rows is how a board comes to claim more
+  // vehicles than the lot holds, and it renders them as nameless "Vehicle".
   const awaiting = useMemo(
-    () => lifecycle.filter((l) => l.state === "AWAITING_MANAGER_AUTHORIZATION"),
-    [lifecycle],
+    () => lifecycle.filter((l) => vehicleById.has(l.vehicleId) && l.state === "AWAITING_MANAGER_AUTHORIZATION"),
+    [lifecycle, vehicleById],
   );
 
   const stuck = useMemo<StuckRow[]>(() => {
     return lifecycle
-      .filter((l) => !RESTING_STATES.has(l.state))
+      .filter((l) => vehicleById.has(l.vehicleId) && !RESTING_STATES.has(l.state))
       .map((l) => {
         const v = vehicleById.get(l.vehicleId);
         const changed = l.stateChangedAt ? new Date(l.stateChangedAt).getTime() : NaN;
@@ -674,7 +654,7 @@ export default function UsedCarManagerHome() {
                     </td>
                     <td className="py-2.5 pr-3 align-top">
                       <div className="flex flex-col gap-1 items-start">
-                        <span className="text-foreground">{STATE_LABEL[r.state] || r.state}</span>
+                        <span className="text-foreground">{stateLabel(r.state)}</span>
                         <Status status={STATE_STATUS[r.state] || "WAITING"} />
                       </div>
                     </td>

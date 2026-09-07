@@ -191,7 +191,7 @@ export default function TechnicianHome() {
         ids.length
           ? sb().from("vehicle_listings")
             .select("id, vin, ymm, status, deal_processed_at, hero_image_url, photos")
-            .eq("tenant_id", tenantId).in("id", ids)
+            .eq("tenant_id", tenantId).in("id", ids).neq("status", "archived")
           : none,
         vins.length
           ? sb().from("safety_inspections")
@@ -252,7 +252,14 @@ export default function TechnicianHome() {
       }
 
       const now = Date.now();
-      const out: BenchRow[] = lcRows.map((r) => {
+      // A lifecycle row outlives its vehicle: production has 0 completed
+      // get_ready_records, so a car routinely sells while parked in a working
+      // state. Dropping rows whose vehicle is gone is what stops a board
+      // claiming more vehicles than the lot holds. Sold-but-present cars are
+      // deliberately kept: one still in the shop is urgent.
+      const out: BenchRow[] = lcRows
+        .filter((r) => vehicleById.has(r.vehicleId))
+        .map((r) => {
         const v = vehicleById.get(r.vehicleId);
         const inspection = inspectionByVin.get(r.vin) ?? null;
         const getReady = getReadyByVin.get(r.vin) ?? null;

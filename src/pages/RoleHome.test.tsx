@@ -37,7 +37,11 @@ describe("role-resolved home (R1)", () => {
 
 describe("routing (R2)", () => {
   it("points /dashboard at the resolver", () => {
-    expect(APP).toContain('<Route path="/dashboard" element={<RoleHome />} />');
+    // HomeRoute is the resolver at the route: it answers the two roles RoleHome
+    // does not map (technician, third-party vendor) and delegates every desk
+    // role to RoleHome unchanged.
+    expect(APP).toContain('<Route path="/dashboard" element={<HomeRoute />} />');
+    expect(APP).toContain("return <RoleHome />;");
   });
 
   it("keeps every board directly reachable", () => {

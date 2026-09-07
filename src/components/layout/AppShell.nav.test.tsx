@@ -19,7 +19,8 @@ vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { email: "ken
 vi.mock("@/contexts/TenantContext", () => ({ useTenant: () => ({ tenant: { id: "t1", name: "Test Motors" }, currentStore: null, stores: [], setCurrentStore: () => {} }) }));
 vi.mock("@/contexts/DealerSettingsContext", () => ({ useDealerSettings: () => ({ settings: { feature_lead_capture: true, dealer_name: "Test Motors" } }) }));
 vi.mock("@/contexts/AuditContext", () => ({ useAudit: () => ({ entries: [] }) }));
-vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ member: { role: "admin" } }) }));
+const shellRole = vi.hoisted(() => ({ value: "admin" }));
+vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ member: { role: shellRole.value } }) }));
 vi.mock("@/hooks/usePlatformEntitlements", () => ({ usePlatformEntitlements: () => ({ productIds: [], load: () => {} }) }));
 vi.mock("@/hooks/useNavBadges", () => ({
   useNavBadges: () => ({ workQueue: 0, leads: 0, reconApprovals: 150, priceChangeReview: 0, complianceTasks: 0, returns: 0 }),
@@ -55,7 +56,10 @@ const renderShell = (route: string, collapsed = false) => {
 const primaryNav = () => screen.getByRole("navigation", { name: "Primary" });
 
 describe("AppShell sidebar rendering", () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    shellRole.value = "admin";
+  });
 
   it("marks exactly one leaf as aria-current for the active route", () => {
     const { container } = renderShell("/inventory");
@@ -93,19 +97,41 @@ describe("AppShell sidebar rendering", () => {
   it("uses a collapsible section heading button (aria-expanded toggles)", () => {
     renderShell("/dashboard");
     const nav = primaryNav();
-    const heading = within(nav).getByRole("button", { name: "COMPLIANCE CENTER" });
+    const heading = within(nav).getByRole("button", { name: "COMPLIANCE" });
     expect(heading).toHaveAttribute("aria-expanded", "true");
-    expect(within(nav).getByRole("link", { name: "Compliance Center" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Compliance" })).toBeInTheDocument();
     fireEvent.click(heading);
     expect(heading).toHaveAttribute("aria-expanded", "false");
-    expect(within(nav).queryByRole("link", { name: "Compliance Center" })).toBeNull();
+    expect(within(nav).queryByRole("link", { name: "Compliance" })).toBeNull();
   });
 
-  it("keeps the Add Vehicle and Search controls intact", () => {
+  it("keeps the global Add Vehicle, Create and Search controls out of the nav", () => {
     renderShell("/dashboard");
     expect(screen.getByRole("button", { name: "Add Vehicle" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create" })).toBeInTheDocument();
     expect(within(primaryNav()).queryByRole("link", { name: "Add Vehicle" })).toBeNull();
+    expect(within(primaryNav()).queryByRole("link", { name: "Create" })).toBeNull();
     expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
+  });
+
+  it("gives a third-party vendor their assignments and no dealer surface", () => {
+    // Capabilities are mocked wide open here on purpose: vendor containment
+    // must not depend on a capability being set correctly.
+    shellRole.value = "third_party_vendor";
+    renderShell("/dashboard");
+    const nav = primaryNav();
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/home/vendor"]);
+    expect(screen.queryByRole("button", { name: "Add Vehicle" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Create" })).toBeNull();
+  });
+
+  it("gives a technician a bench and a board, and no administration", () => {
+    shellRole.value = "detail";
+    renderShell("/dashboard");
+    const links = within(primaryNav()).getAllByRole("link");
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/home/technician", "/ready-board"]);
+    expect(screen.queryByRole("button", { name: "Add Vehicle" })).toBeNull();
   });
 
   it("keeps an accessible name via aria-label when collapsed", () => {

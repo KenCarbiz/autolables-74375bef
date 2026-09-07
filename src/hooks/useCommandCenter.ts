@@ -2122,7 +2122,7 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
   }, [tenantId, vehicleId, actorId, dataRef, reload]);
 
   // Rebuild a missing form file — the same generate-vehicle-forms invoke the
-  // Vehicle File's DealFlowPanel uses, scoped to this one document's kind.
+  // Vehicle File's DealDocumentsPanel uses, scoped to this one document's kind.
   const generating = useRef(false);
   const generateDocument = useCallback(async (docId: string): Promise<MutationResult> => {
     if (!tenantId || !vehicleId) return { ok: false, error: "No dealership or vehicle in context." };

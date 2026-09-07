@@ -15,6 +15,8 @@ import ThemeInjector from "@/components/layout/ThemeInjector";
 import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import EntitlementGate from "@/components/layout/EntitlementGate";
 import AdminGate from "@/components/layout/AdminGate";
+import { navModeForRole } from "@/components/layout/adminNav";
+import { useEntitlements } from "@/hooks/useEntitlements";
 
 const GatedLayout = () => (
   <EntitlementGate app="autolabels">
@@ -100,7 +102,6 @@ const Trust = lazy(() => import("./pages/Trust"));
 const BrandGuide = lazy(() => import("./pages/BrandGuide"));
 const ScanPage = lazy(() => import("./pages/ScanPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
-const ComplianceActionCenter = lazy(() => import("./pages/ComplianceActionCenter"));
 // Legacy per-VIN portal is retired — /vehicle/:vin redirects to the single
 // canonical Passport at /v/:vin so there is only one shopper page.
 const VehicleVinRedirect = () => {
@@ -148,8 +149,6 @@ const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Leads = lazy(() => import("./pages/Leads"));
-const Titles = lazy(() => import("./pages/Titles"));
-const DocumentReview = lazy(() => import("./pages/DocumentReview"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
 const DescriptionStudio = lazy(() => import("./pages/DescriptionStudio"));
@@ -180,6 +179,38 @@ const PrepMobile = lazy(() => import("./pages/PrepMobile"));
 const ReconBoard = lazy(() => import("./pages/ReconBoard"));
 const ServiceInspection = lazy(() => import("./pages/ServiceInspection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Home and the work queue resolve to the screen that belongs to the person.
+// RoleHome maps the desk roles; technician and vendor are resolved here because
+// they are route-level containment as much as preference — a third-party vendor
+// must land on their own assignments from ANY entry point (login, a guard
+// redirect, an old bookmark), never on a dealer board.
+const HomeRoute = () => {
+  const { member, loading } = useEntitlements();
+  if (loading) return null;
+  const mode = navModeForRole(member?.role);
+  if (mode === "vendor") return <VendorHome />;
+  if (mode === "technician") return <TechnicianHome />;
+  return <RoleHome />;
+};
+
+const QueueRoute = () => {
+  const { member, loading } = useEntitlements();
+  if (loading) return null;
+  if (navModeForRole(member?.role) === "vendor") return <VendorHome />;
+  return <LotCaptureQueue />;
+};
+
+// Compliance Center, Compliance Tasks, Price Change Review and Titles were four
+// pages; they are four sections of one surface now. The old URLs keep working
+// and open on the section they used to be, carrying any ?vin= or ?filter= with
+// them so an emailed deep link still lands on the same vehicle.
+const ComplianceTabRedirect = ({ tab }: { tab: string }) => {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  params.set("tab", tab);
+  return <Navigate to={`/compliance?${params.toString()}`} replace />;
+};
 
 const queryClient = new QueryClient();
 
@@ -296,7 +327,7 @@ const App = () => (
                         {/* Home resolves per role. The named routes stay
                             reachable so a GM can open the service board
                             directly, and so a deep link keeps working. */}
-                        <Route path="/dashboard" element={<RoleHome />} />
+                        <Route path="/dashboard" element={<HomeRoute />} />
                         <Route path="/home/gm" element={<GmHome />} />
                         <Route path="/home/sales" element={<SalesManagerHome />} />
                         <Route path="/home/used-cars" element={<UsedCarManagerHome />} />
@@ -312,12 +343,12 @@ const App = () => (
                         <Route path="/dashboard/classic" element={<ProcessDashboard />} />
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />
-                        <Route path="/dashboard/document-review" element={<DocumentReview />} />
+                        <Route path="/dashboard/document-review" element={<ComplianceTabRedirect tab="price" />} />
                         {/* Setup folded into Admin Home; the route stays so old links don't 404. */}
                         <Route path="/setup" element={<Navigate to="/admin?tab=home" replace />} />
-                        <Route path="/queue" element={<LotCaptureQueue />} />
+                        <Route path="/queue" element={<QueueRoute />} />
                         <Route path="/leads" element={<Leads />} />
-                        <Route path="/titles" element={<Titles />} />
+                        <Route path="/titles" element={<ComplianceTabRedirect tab="titles" />} />
                         <Route path="/inventory" element={<Inventory />} />
                         <Route path="/inventory-v2" element={<InventoryCommandCenterV2 />} />
                         <Route path="/dashboard-legacy" element={<Navigate to="/dashboard" replace />} />
@@ -358,7 +389,7 @@ const App = () => (
                         <Route path="/new-car-sticker-legacy" element={<NewCarSticker />} />
                         <Route path="/cpo-sheet" element={<CpoSheet />} />
                         <Route path="/compliance" element={<ComplianceCenter />} />
-                        <Route path="/compliance-center" element={<ComplianceActionCenter />} />
+                        <Route path="/compliance-center" element={<ComplianceTabRedirect tab="issues" />} />
                         {/* Fleet operations is the primary description surface; the
                             manual studio stays available as an authorized override. */}
                         <Route path="/description-operations" element={<DescriptionOperations />} />

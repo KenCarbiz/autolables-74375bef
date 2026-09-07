@@ -9,7 +9,8 @@ import {
 import { useRecallTask } from "@/hooks/useRecallTask";
 import { listingGallery } from "@/lib/photos";
 import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
-import { STATE_LABEL, useVehicleLifecycle } from "@/components/vehicleFile/lifecycle";
+import { useVehicleLifecycle } from "@/components/vehicleFile/lifecycle";
+import { STATE_LABEL } from "@/lib/lifecycle/states";
 import OverviewTab from "@/components/vehicleFile/OverviewTab";
 import DocumentsTab from "@/components/vehicleFile/DocumentsTab";
 import GetReadyTab from "@/components/vehicleFile/GetReadyTab";
@@ -375,10 +376,10 @@ const VehicleFile = () => {
       </div>
 
       <div className="pt-2">
-        {tab === "overview" && <OverviewTab vehicle={vehicle} ready={ready} lifecycle={lifecycle} stockNumber={vehicleStockNumber(vehicle)} onTab={setTab} onReload={load} />}
+        {tab === "overview" && <OverviewTab vehicle={vehicle} ready={ready} lifecycle={lifecycle} stockNumber={stockNo} onTab={setTab} onReload={load} />}
         {tab === "documents" && <DocumentsTab vehicle={vehicle} onReload={load} />}
         {tab === "getready" && <GetReadyTab vehicle={vehicle} lifecycle={lifecycle} />}
-        {tab === "customer" && <CustomerTab vehicle={vehicle} stockNumber={vehicleStockNumber(vehicle)} />}
+        {tab === "customer" && <CustomerTab vehicle={vehicle} stockNumber={stockNo} />}
         {tab === "compliance" && <ComplianceTab vehicle={vehicle} ready={ready} recall={recall} onReload={load} />}
       </div>
 

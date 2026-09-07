@@ -8,18 +8,14 @@ import {
   Radar,
   Tag,
   BadgeCheck,
-  BadgeDollarSign,
   BarChart3,
   CarFront,
+  ClipboardCheck,
   ClipboardList,
   Columns3,
-  FilePlus2,
-  FileText,
   Handshake,
   Headset,
-  History,
   LayoutDashboard,
-  ListChecks,
   Printer,
   Rocket,
   ScrollText,
@@ -30,7 +26,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import type { DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import type { DealerCapability, DealerRole } from "@/lib/permissions/dealerRoleCapabilities";
 
 export interface AdminNavItem {
   label: string;
@@ -77,19 +73,111 @@ const underSegment = (base: string) => (pathname: string) =>
 
 const badgeOrUndefined = (n: number) => (n > 0 ? n : undefined);
 
+/**
+ * Which navigation a role gets. Technicians and third-party vendors work one
+ * assignment list and nothing else; the vendor case is a containment
+ * requirement, not a preference, so it is decided by role rather than left to
+ * capability filtering alone — a mis-set capability must never hand an outside
+ * company a door into dealer inventory, pricing or customer data.
+ */
+export type NavMode = "dealer" | "technician" | "vendor";
+
+const TECHNICIAN_ROLES = new Set(["technician", "detail"]);
+const VENDOR_ROLES = new Set(["third_party_vendor", "vendor"]);
+
+export const navModeForRole = (role: DealerRole): NavMode => {
+  const normalized = `${role || ""}`.trim().toLowerCase();
+  if (VENDOR_ROLES.has(normalized)) return "vendor";
+  if (TECHNICIAN_ROLES.has(normalized)) return "technician";
+  return "dealer";
+};
+
 export interface BuildNavOptions {
   badges: NavBadgeValues;
   anyAdminTab: boolean;
+  role?: DealerRole;
 }
 
-export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions): AdminNavSection[] {
+// The vendor's whole application: the work addressed to their company. Every
+// path here resolves to VendorHome for this role, including /dashboard and
+// /queue, so the row stays lit wherever the vendor lands.
+const vendorSections = (): AdminNavSection[] => [
+  {
+    key: "main",
+    title: "",
+    defaultOpen: true,
+    items: [
+      {
+        label: "My Assignments",
+        assetIcon: "093AC",
+        path: "/home/vendor",
+        icon: ClipboardList,
+        capability: "can_complete_get_ready",
+        match: (p) => p === "/home/vendor" || p === "/dashboard" || p === "/queue",
+      },
+    ],
+  },
+];
+
+// The technician's bench plus the board that tells them where a vehicle went.
+// No administration, no pricing, no customers.
+const technicianSections = (): AdminNavSection[] => [
+  {
+    key: "main",
+    title: "",
+    defaultOpen: true,
+    items: [
+      {
+        label: "My Work",
+        assetIcon: "061AC",
+        path: "/home/technician",
+        icon: ClipboardList,
+        capability: "can_view_work_queue",
+        match: (p) =>
+          p === "/home/technician" ||
+          p === "/dashboard" ||
+          underSegment("/service/vehicle")(p) ||
+          underSegment("/service-inspection")(p),
+      },
+      {
+        label: "Ready Board",
+        assetIcon: "055AC",
+        path: "/ready-board",
+        icon: Columns3,
+        capability: "can_view_get_ready",
+        match: underSegment("/ready-board"),
+      },
+    ],
+  },
+];
+
+export function buildAdminNavSections({ badges, anyAdminTab, role }: BuildNavOptions): AdminNavSection[] {
+  const mode = navModeForRole(role);
+  if (mode === "vendor") return vendorSections();
+  if (mode === "technician") return technicianSections();
+
   return [
     {
       key: "main",
       title: "",
       defaultOpen: true,
       items: [
-        { label: "Home", assetIcon: "010AC", path: "/dashboard", icon: LayoutDashboard, capability: "can_view_dashboard" },
+        {
+          label: "Home",
+          assetIcon: "010AC",
+          path: "/dashboard",
+          icon: LayoutDashboard,
+          capability: "can_view_dashboard",
+          // Home resolves per role, so every named role board is still Home.
+          match: (p) => p === "/dashboard" || p === "/dashboard/classic" || underSegment("/home")(p),
+        },
+      ],
+    },
+    {
+      key: "inventory",
+      title: "INVENTORY",
+      defaultOpen: true,
+      items: [
         {
           label: "Inventory",
           assetIcon: "011AC",
@@ -103,29 +191,47 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
           match: (p) =>
             underSegment("/inventory")(p) ||
             p === "/inventory-v2" ||
+            p === "/add-inventory" ||
             p.startsWith("/vehicle-file/") ||
             underSegment("/vin-command")(p),
         },
-      ],
-    },
-    {
-      key: "create",
-      title: "CREATE",
-      defaultOpen: true,
-      items: [
-        { label: "Create", assetIcon: "021AC", path: "/create", icon: FilePlus2, capability: "can_create_documents", match: underSegment("/create") },
+        {
+          label: "Inventory Intelligence",
+          assetIcon: "141AC",
+          path: "/inventory-intelligence",
+          icon: Radar,
+          capability: "can_view_inventory",
+          match: underSegment("/inventory-intelligence"),
+        },
         // The document families are not interchangeable, so each production
         // destination is named for exactly what it produces. "New Car
         // Sticker" is deliberately absent: it read as either a manufacturer
         // reproduction or a dealer addendum, which are different documents.
-        { label: "OEM Window Sticker Studio", assetIcon: "041AC", path: "/window-sticker-studio", icon: Tag, capability: "can_create_documents",
-          match: (p: string) => p.startsWith("/window-sticker-studio") || p.startsWith("/factory-sticker") || p.startsWith("/new-car-sticker") },
-        { label: "Inventory Intelligence", assetIcon: "141AC", path: "/inventory-intelligence", icon: Radar, capability: "can_view_inventory",
-          match: underSegment("/inventory-intelligence") },
+        {
+          label: "OEM Window Sticker Studio",
+          assetIcon: "041AC",
+          path: "/window-sticker-studio",
+          icon: Tag,
+          capability: "can_create_documents",
+          match: (p) =>
+            p.startsWith("/window-sticker-studio") ||
+            p.startsWith("/factory-sticker") ||
+            p.startsWith("/new-car-sticker"),
+        },
         // Description work is exception-driven and visited daily, so it earns a
-        // row of its own rather than living only behind the Create hub.
-        { label: "Description Operations", assetIcon: "037AC", path: "/description-operations", icon: Sparkles, capability: "can_create_documents",
-          match: (p: string) => p.startsWith("/description-operations") || p.startsWith("/description-intelligence") || p.startsWith("/description-writer") || p.startsWith("/description-studio") },
+        // row of its own rather than living only behind the Create control.
+        {
+          label: "Description Operations",
+          assetIcon: "037AC",
+          path: "/description-operations",
+          icon: Sparkles,
+          capability: "can_create_documents",
+          match: (p) =>
+            p.startsWith("/description-operations") ||
+            p.startsWith("/description-intelligence") ||
+            p.startsWith("/description-writer") ||
+            p.startsWith("/description-studio"),
+        },
       ],
     },
     {
@@ -137,16 +243,10 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
         // Gate on the same capability the page itself checks. Every role that
         // holds can_print also holds can_view_print_queue, so this only widens
         // the row to the read-only roles the page already admits.
-        { label: "Print Center", assetIcon: "045AC", path: "/print-center", icon: Printer, capability: "can_view_print_queue", match: underSegment("/print-center") },
-      ],
-    },
-    {
-      key: "customers",
-      title: "CUSTOMERS",
-      defaultOpen: true,
-      items: [
-        { label: "Leads", assetIcon: "014AC", path: "/leads", icon: Users, capability: "can_view_leads", featureKey: "feature_lead_capture", badge: badgeOrUndefined(badges.leads), match: underSegment("/leads") },
-        { label: "Deals", assetIcon: "105AC", path: "/saved", icon: Handshake, capability: "can_view_deals", badge: badgeOrUndefined(badges.returns), match: underSegment("/saved") },
+        { label: "Print Center", assetIcon: "045AC", path: "/print-center", icon: Printer, capability: "can_view_print_queue", match: (p) => underSegment("/print-center")(p) || underSegment("/print-queue")(p) },
+        // Billing paperwork is a daily job for the office, not a setting, so it
+        // sits with the other worklists — and only for the roles that hold it.
+        { label: "Invoices", assetIcon: "106AC", path: "/admin?tab=invoices", icon: ScrollText, capability: "can_manage_invoices" },
       ],
     },
     {
@@ -155,30 +255,55 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
       defaultOpen: true,
       items: [
         { label: "Get Ready Command", assetIcon: "013AC", path: "/get-ready-command", icon: Rocket, capability: "can_view_get_ready", match: underSegment("/get-ready-command") },
-        { label: "Service Desk", assetIcon: "060AC", path: "/service", icon: Headset, capability: "can_view_get_ready", match: underSegment("/service") },
+        // The writer's own desk. Narrowly gated so it appears for the people who
+        // dispatch service work and for nobody else.
+        { label: "Service Writer Desk", assetIcon: "062AC", path: "/service-desk", icon: ClipboardCheck, capability: "can_assign_service_work", match: underSegment("/service-desk") },
+        { label: "Service Desk", assetIcon: "060AC", path: "/service", icon: Headset, capability: "can_view_get_ready", match: (p) => underSegment("/service")(p) || underSegment("/service-inspection")(p) },
         { label: "Prep & Vendors", assetIcon: "053AC", path: "/prep", icon: Wrench, capability: "can_view_get_ready", match: underSegment("/prep") },
         { label: "Ready Board", assetIcon: "055AC", path: "/ready-board", icon: Columns3, capability: "can_view_get_ready", match: underSegment("/ready-board") },
         { label: "Recon Approvals", assetIcon: "052AC", path: "/recon", icon: BadgeCheck, capability: "can_view_get_ready", badge: badgeOrUndefined(badges.reconApprovals), match: underSegment("/recon") },
       ],
     },
     {
-      key: "compliance",
-      title: "COMPLIANCE CENTER",
+      key: "customers",
+      title: "CUSTOMERS",
       defaultOpen: true,
       items: [
-        { label: "Compliance Center", assetIcon: "015AC", path: "/compliance", icon: ShieldCheck, capability: "can_view_compliance", match: underSegment("/compliance") },
-        { label: "Compliance Tasks", assetIcon: "120AC", path: "/compliance-center", icon: ListChecks, capability: "can_manage_compliance", badge: badgeOrUndefined(badges.complianceTasks), match: underSegment("/compliance-center") },
-        { label: "Price Change Review", assetIcon: "121AC", path: "/dashboard/document-review", icon: BadgeDollarSign, capability: "can_view_compliance", badge: badgeOrUndefined(badges.priceChangeReview), match: underSegment("/dashboard/document-review") },
-        { label: "Audit Log", assetIcon: "124AC", path: "/admin?tab=audit", icon: History, capability: "can_view_compliance" },
+        // One customer book. /leads is the same workspace and keeps working, so
+        // the row has to light on both. Deliberately NOT gated on
+        // feature_lead_capture: the records exist whether or not the dealer
+        // runs lead-capture forms, and a customer file no one can navigate
+        // back to is a dead end.
+        { label: "Customers", assetIcon: "014AC", path: "/customers", icon: Users, capability: "can_view_leads", badge: badgeOrUndefined(badges.leads), match: (p) => underSegment("/customers")(p) || underSegment("/leads")(p) },
+        // An addendum IS the deal. The saved/signed/delivered/returns stages are
+        // the same record set under their older URLs.
+        { label: "Deals", assetIcon: "105AC", path: "/deals", icon: Handshake, capability: "can_view_deals", badge: badgeOrUndefined(badges.returns), match: (p) => underSegment("/deals")(p) || underSegment("/saved")(p) || underSegment("/signed")(p) || underSegment("/delivered")(p) || underSegment("/returns")(p) || underSegment("/signatures")(p) },
       ],
     },
     {
-      key: "office",
-      title: "TITLES & INVOICES",
+      key: "compliance",
+      title: "COMPLIANCE",
       defaultOpen: true,
       items: [
-        { label: "Titles", assetIcon: "123AC", path: "/titles", icon: FileText, capability: "can_view_compliance", match: underSegment("/titles") },
-        { label: "Invoices", assetIcon: "106AC", path: "/admin?tab=invoices", icon: ScrollText, capability: "can_manage_invoices" },
+        // ONE row for one surface. Compliance Center, Compliance Tasks, Price
+        // Change Review, Audit Log and Titles were five rows onto the same
+        // ComplianceShell, which made the dealer choose a module before they
+        // could look at a problem. The shell's own tabs are the navigation
+        // inside it, and the legacy URLs still open on their old section.
+        // The count is both open queues; each tab carries its own exact number.
+        {
+          label: "Compliance",
+          assetIcon: "015AC",
+          path: "/compliance",
+          icon: ShieldCheck,
+          capability: "can_view_compliance",
+          badge: badgeOrUndefined(badges.complianceTasks + badges.priceChangeReview),
+          match: (p) =>
+            underSegment("/compliance")(p) ||
+            underSegment("/compliance-center")(p) ||
+            underSegment("/titles")(p) ||
+            underSegment("/dashboard/document-review")(p),
+        },
       ],
     },
     {
@@ -186,7 +311,14 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
       title: "REPORTS",
       defaultOpen: true,
       items: [
-        { label: "Reports", assetIcon: "016AC", path: "/dashboard/reports", icon: BarChart3, capability: "can_view_reports" },
+        {
+          label: "Reports",
+          assetIcon: "016AC",
+          path: "/dashboard/reports",
+          icon: BarChart3,
+          capability: "can_view_reports",
+          match: (p) => underSegment("/dashboard/reports")(p) || underSegment("/dashboard/qr-analytics")(p),
+        },
       ],
     },
     {
@@ -194,10 +326,10 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
       title: "SETTINGS",
       defaultOpen: true,
       items: [
-        // Settings is the /admin hub for every tab except the two broken out
-        // into their own rows (Audit Log, Invoices), which win those tabs.
+        // Settings is the /admin hub for every tab except Invoices, which has
+        // its own row in MY WORK and wins that tab.
         ...(anyAdminTab
-          ? [{ label: "Settings", assetIcon: "017AC", path: "/admin", icon: Settings, match: (p: string, s: string) => p === "/admin" && s !== "?tab=audit" && s !== "?tab=invoices" }]
+          ? [{ label: "Settings", assetIcon: "017AC", path: "/admin", icon: Settings, match: (p: string, s: string) => underSegment("/admin")(p) && s !== "?tab=invoices" }]
           : []),
       ],
     },

@@ -15,6 +15,7 @@ import {
   FileText, ShieldAlert, Clock, ArrowUp, ArrowDown, Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SERVICE_FLOOR_STATES, stateLabel, type ServiceFloorState } from "@/lib/lifecycle/states";
 
 // /service-manager — the service manager's home. Physical work only: what is
 // unassigned, what is open on the floor, what is waiting on someone else, and
@@ -66,24 +67,7 @@ const Status = ({ status, suffix }: { status: StatusKey; suffix?: string }) => (
   </StatusPill>
 );
 
-const STATE_LABEL: Record<string, string> = {
-  AUTHORIZED_FOR_GET_READY: "Authorized for get ready",
-  SERVICE_UNASSIGNED: "Service unassigned",
-  K208_IN_PROGRESS: "Inspection in progress",
-  SERVICE_FINDINGS_RECORDED: "Service findings recorded",
-  WAITING_FOR_MANAGER_DECISION: "Waiting for manager decision",
-  RETURNED_FOR_CLARIFICATION: "Returned for clarification",
-  WORK_AUTHORIZED: "Work authorized",
-  REPAIR_IN_PROGRESS: "Repair in progress",
-  REPAIR_VERIFICATION_REQUIRED: "Ready for reinspection",
-  K208_READY_TO_CERTIFY: "Awaiting K-208 certification",
-  K208_FINALIZED: "K-208 finalized",
-  DETAIL_PENDING: "Detail pending",
-  DETAIL_IN_PROGRESS: "Detail in progress",
-  FINAL_READY_VERIFICATION: "Final ready verification",
-};
-
-const STATE_STATUS: Record<string, StatusKey> = {
+const STATE_STATUS: Record<ServiceFloorState, StatusKey> = {
   AUTHORIZED_FOR_GET_READY: "AUTHORIZED",
   SERVICE_UNASSIGNED: "WAITING",
   K208_IN_PROGRESS: "IN_PROGRESS",
@@ -100,7 +84,10 @@ const STATE_STATUS: Record<string, StatusKey> = {
   FINAL_READY_VERIFICATION: "NEEDS_REVIEW",
 };
 
-const NEXT_ACTION: Record<string, string> = {
+// Desk-specific CTA copy: what THIS screen's button says. The state
+// vocabulary it is keyed on is shared; the wording is not, because the service
+// writer and the technician are told to do different things in the same state.
+const NEXT_ACTION: Record<ServiceFloorState, string> = {
   AUTHORIZED_FOR_GET_READY: "Start inspection",
   SERVICE_UNASSIGNED: "Assign technician",
   K208_IN_PROGRESS: "Continue inspection",
@@ -119,7 +106,7 @@ const NEXT_ACTION: Record<string, string> = {
 
 // The states this desk works. Gate states (AWAITING_MANAGER_AUTHORIZATION,
 // ON_HOLD, WHOLESALE, REMOVED) and the resting states belong elsewhere.
-const QUEUE_STATES = new Set(Object.keys(STATE_LABEL));
+const QUEUE_STATES = new Set<string>(SERVICE_FLOOR_STATES);
 
 const PRIORITY_ICON = { High: ArrowUp, Medium: Minus, Low: ArrowDown } as const;
 const PRIORITY_TONE: Record<ServicePriority["level"], Tone> = {
@@ -214,7 +201,7 @@ export default function ServiceManagerHome() {
         ids.length
           ? sb().from("vehicle_listings")
             .select("id, vin, ymm, status, deal_processed_at")
-            .eq("tenant_id", tenantId).in("id", ids)
+            .eq("tenant_id", tenantId).in("id", ids).neq("status", "archived")
           : none,
         vins.length
           ? sb().from("safety_inspections")
@@ -275,7 +262,14 @@ export default function ServiceManagerHome() {
       }
 
       const now = Date.now();
-      const out: QueueRow[] = lcRows.map((r) => {
+      // A lifecycle row outlives its vehicle: production has 0 completed
+      // get_ready_records, so a car routinely sells while parked in a working
+      // state. Dropping rows whose vehicle is gone is what stops a board
+      // claiming more vehicles than the lot holds. Sold-but-present cars are
+      // deliberately kept: one still in the shop is urgent.
+      const out: QueueRow[] = lcRows
+        .filter((r) => vehicleById.has(r.vehicleId))
+        .map((r) => {
         const v = vehicleById.get(r.vehicleId);
         const changed = r.stateChangedAt ? new Date(r.stateChangedAt).getTime() : NaN;
         const ageHours = Number.isNaN(changed) ? 0 : Math.max(0, (now - changed) / 36e5);
@@ -464,8 +458,8 @@ export default function ServiceManagerHome() {
                       </td>
                       <td className="py-2.5 pr-3 align-top">
                         <div className="flex flex-col gap-1 items-start">
-                          <span className="text-foreground">{STATE_LABEL[r.state] || r.state}</span>
-                          <Status status={STATE_STATUS[r.state] || "WAITING"} />
+                          <span className="text-foreground">{stateLabel(r.state)}</span>
+                          <Status status={STATE_STATUS[r.state as ServiceFloorState] || "WAITING"} />
                           {r.blocked && (
                             <Status
                               status="NOT_READY"
@@ -498,7 +492,7 @@ export default function ServiceManagerHome() {
                           to={`/service/vehicle/${encodeURIComponent(r.vin)}`}
                           className={cn(BTN_SECONDARY, "whitespace-nowrap")}
                         >
-                          {NEXT_ACTION[r.state] || "Open file"}
+                          {NEXT_ACTION[r.state as ServiceFloorState] || "Open file"}
                         </Link>
                       </td>
                     </tr>

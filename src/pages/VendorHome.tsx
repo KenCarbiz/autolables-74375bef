@@ -138,29 +138,20 @@ export default function VendorHome() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const patchItem = useCallback(async (task: VendorTask, patch: Partial<VendorItem>, closing: boolean) => {
+  const patchItem = useCallback(async (task: VendorTask, patch: Partial<VendorItem>) => {
     setBusyKey(task.key);
     try {
-      const { data: row, error } = await sb().from("get_ready_records")
-        .select("items, get_ready_complete_date")
-        .eq("id", task.recordId)
-        .single();
-      if (error || !row) throw new Error(error?.message || "This assignment is no longer available.");
-      const items = ((row.items as VendorItem[]) || []).map((i) => (i.id === task.itemId ? { ...i, ...patch } : i));
-      const allComplete = items.every((i) => i.status === "complete");
-      const now = new Date().toISOString();
-      const { error: upErr } = await sb().from("get_ready_records")
-        .update(
-          closing
-            ? {
-              items,
-              status: allComplete ? "ready" : "in_progress",
-              get_ready_complete_date: allComplete ? now : row.get_ready_complete_date,
-            }
-            : { items },
-        )
-        .eq("id", task.recordId);
-      if (upErr) throw new Error(upErr.message);
+      // Server-side, for the same reason the read is. Pulling the items array
+      // into a vendor's browser to change one line leaked every other vendor's
+      // assignment on that car, dropped any edit the shop made in between, and
+      // let a third party stamp the dealership's completion. The RPC patches
+      // only the caller's own line, under a row lock.
+      const { error } = await sb().rpc("vendor_update_assigned_line", {
+        p_record_id: task.recordId,
+        p_item_id: task.itemId,
+        p_patch: patch,
+      });
+      if (error) throw new Error(error.message);
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "We could not save that.");
@@ -169,11 +160,11 @@ export default function VendorHome() {
   }, [load]);
 
   const startTask = useCallback((task: VendorTask) => {
-    void patchItem(task, { startedAt: new Date().toISOString(), startedBy: vendorEmail }, false);
+    void patchItem(task, { startedAt: new Date().toISOString(), startedBy: vendorEmail });
   }, [patchItem, vendorEmail]);
 
   const completeTask = useCallback((task: VendorTask) => {
-    void patchItem(task, { status: "complete", completedAt: new Date().toISOString(), completedBy: vendorEmail }, true);
+    void patchItem(task, { status: "complete", completedAt: new Date().toISOString(), completedBy: vendorEmail });
   }, [patchItem, vendorEmail]);
 
   const inTab = useCallback((t: VendorTask, key: TabKey): boolean => {

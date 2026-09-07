@@ -47,13 +47,25 @@ describe("the stock number is found wherever ingest filed it", () => {
   });
 });
 
-describe("the Vehicle File reads it from one place", () => {
+describe("the Vehicle File never hand-rolls the stock number", () => {
   const page = readFileSync(join(__dirname, "../pages/VehicleFile.tsx"), "utf8");
 
-  it("has no second derivation left in the page", () => {
-    expect(page).toMatch(/import \{ vehicleStockNumber \}/);
-    expect(page).not.toMatch(/stock_no as string/);
-    expect((page.match(/vehicleStockNumber\(vehicle\)/g) || []).length).toBeGreaterThanOrEqual(3);
+  // The intent, not a call count: the page may read the stock number however
+  // often it needs to, but it must get the answer from this module. Asserting
+  // the number of calls only pinned the shape the page happened to have, and
+  // punished deriving it once and passing it down.
+  it("derives it through the shared helper", () => {
+    expect(page).toMatch(/import \{ vehicleStockNumber \} from "@\/lib\/vehicleStockNumber"/);
+    expect(page).toMatch(/vehicleStockNumber\(/);
+  });
+
+  it("reads none of the raw fields the helper exists to reconcile", () => {
+    // Any of these appearing in the page is a second derivation: it is exactly
+    // how the header came to show no stock number for a car the Command
+    // Palette could find by one.
+    for (const field of ["mc_attributes", "sticker_snapshot", "stock_no", "decoded"]) {
+      expect(page, `VehicleFile.tsx reads ${field} directly`).not.toMatch(new RegExp(`\\b${field}\\b`));
+    }
   });
 
   it("always states the stock number, including when there isn't one", () => {

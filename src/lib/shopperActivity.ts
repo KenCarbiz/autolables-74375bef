@@ -209,8 +209,7 @@ export interface ShopperActivitySummary {
 
 // ── Label maps ─────────────────────────────────────────────────────────
 
-// Kept in sync with ShopperFocus.tsx's module map so the drawer and the card
-// name sections identically.
+// The passport section names, as the dealer-facing drawer reports them.
 export const MODULE_LABEL: Record<string, string> = {
   "vehicle-details": "Vehicle Details",
   market: "Market Intelligence",
