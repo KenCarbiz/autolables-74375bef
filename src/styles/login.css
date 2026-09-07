@@ -8,10 +8,12 @@
   --al-mid-blue: #0653A6;
   --al-electric: #0A84FF;
   --al-electric-deep: #1257D6;
+  --al-submit-from: #0184FE;
+  --al-submit-to: #0052BE;
   --al-cyan: #01B4F5;
   --al-cyan-deep: #0170E7;
   --al-link: #0A7CF0;
-  --al-wordmark-auto: #608DF0;
+  --al-wordmark-auto: #0180FC;
   --al-ink: #0B1B33;
   --al-muted: #64748B;
   --al-paper-wash-1: #E7F4FE;
@@ -139,7 +141,7 @@
   font-weight: 700;
   letter-spacing: 0.245em;
   text-transform: uppercase;
-  color: #8FB4DC;
+  color: #B5D1EB;
 }
 
 .login-hero-main {
@@ -197,7 +199,7 @@
 .login-hero-feature {
   display: flex;
   align-items: center;
-  gap: clamp(14px, 1.2vw, 20px);
+  gap: clamp(16px, 1.44vw, 24px);
 }
 
 .login-hero-feature-icon {
@@ -233,7 +235,7 @@
   margin: 3px 0 0;
   font-size: clamp(12px, 0.81vw, 13.5px);
   line-height: 1.35;
-  color: rgba(255, 255, 255, .78);
+  color: #D2E9F7;
 }
 
 .login-hero-proof {
@@ -356,7 +358,7 @@
   font-size: clamp(28px, 2.27vw, 38px);
   line-height: 1.06;
   letter-spacing: -0.015em;
-  color: var(--al-ink);
+  color: #050D22;
 }
 
 .login-card-subtitle {
@@ -589,7 +591,7 @@
   gap: 16px;
   border: 0;
   border-radius: var(--al-radius-control);
-  background: linear-gradient(90deg, var(--al-electric), var(--al-electric-deep));
+  background: linear-gradient(90deg, var(--al-submit-from), var(--al-submit-to));
   box-shadow: var(--al-shadow-submit);
   font: 700 17px/1 var(--al-font);
   color: #fff;
