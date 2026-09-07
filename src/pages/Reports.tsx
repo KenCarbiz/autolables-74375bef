@@ -53,7 +53,7 @@ const Reports = () => {
     <div className="p-4 lg:p-6 max-w-[1100px] mx-auto space-y-5">
       <div>
         <button onClick={() => navigate("/dashboard")} className="text-[11px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Dashboard</button>
-        <h1 className="text-xl font-semibold tracking-tight font-display text-foreground inline-flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" /> Reports</h1>
+        <h1 className="text-al-page font-display text-foreground inline-flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" /> Reports</h1>
         <p className="text-xs text-muted-foreground mt-1">Operational and sales value from your stickers, documents, and customer packets.</p>
       </div>
 
@@ -107,7 +107,7 @@ const Reports = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground text-left border-b border-border">
+                      <tr className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground text-left border-b border-border">
                         <th className="py-1.5 pr-3">Add-on</th><th className="py-1.5 px-2 text-right">Shown</th><th className="py-1.5 px-2 text-right">Accepted</th>
                         <th className="py-1.5 px-2 text-right">Rate</th><th className="py-1.5 px-2 text-right">Revenue</th><th className="py-1.5 pl-2 text-right">Avg</th>
                       </tr>
@@ -202,7 +202,7 @@ const StatMini = ({ icon: Icon, label, value, color }: { icon: typeof FileText; 
 
 const Kpi = ({ icon: Icon, label, value, money: isMoney }: { icon: typeof FileText; label: string; value: number; money?: boolean }) => (
   <div className="rounded-2xl border border-border bg-card p-4">
-    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1"><Icon className="w-3 h-3" /> {label}</p>
+    <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1"><Icon className="w-3 h-3" /> {label}</p>
     <p className="text-2xl font-black text-foreground mt-1 tabular-nums">{isMoney ? money(value) : value.toLocaleString()}</p>
   </div>
 );

@@ -71,7 +71,7 @@ export default function MerchandisingContentSection({ vehicleId }: { vehicleId: 
 
           {published ? (
             <>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1">
+              <p className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground mb-1">
                 Published version v{published.version_number}
               </p>
               <p className="text-[12.5px] text-foreground leading-relaxed line-clamp-4 whitespace-pre-wrap">{published.content}</p>

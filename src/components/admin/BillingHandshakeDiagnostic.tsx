@@ -350,7 +350,7 @@ const StatCard = ({
   note: string;
 }) => (
   <div className={`rounded-xl border p-4 ${tone === "ok" ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
-    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+    <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
     <div className="flex items-baseline gap-2 mt-1">
       <span className="text-3xl font-black tabular-nums text-foreground">{value}</span>
       {tone === "stale" && <AlertTriangle className="w-4 h-4 text-amber-600" />}
@@ -365,7 +365,7 @@ const StatusPill = ({ status }: { status: string }) => {
       : status === "canceled" ? "bg-red-100 text-red-800"
         : "bg-muted text-foreground";
   return (
-    <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 ${tone}`}>
+    <span className={`inline-flex items-center text-al-meta font-bold uppercase tracking-wider rounded px-1.5 py-0.5 ${tone}`}>
       {status}
     </span>
   );

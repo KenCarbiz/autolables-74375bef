@@ -192,7 +192,7 @@ export const PublishPriceGate = ({
               <AlertTriangle className="w-5 h-5" strokeWidth={2.25} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Publish-time check · FTC §5 + SB 766 §11713.21
               </p>
               <h2 className="text-base font-display font-bold text-foreground mt-0.5">
@@ -215,7 +215,7 @@ export const PublishPriceGate = ({
           {/* Comparison */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Sticker</p>
+              <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">Sticker</p>
               <p className="text-2xl font-display font-black tabular-nums text-foreground mt-0.5">
                 ${stickerPrice.toLocaleString()}
               </p>
@@ -224,7 +224,7 @@ export const PublishPriceGate = ({
             <div className={`rounded-lg border px-3 py-2.5 ${
               drift.status === "drift" ? "border-rose-200 bg-rose-50/70" : "border-amber-200 bg-amber-50/70"
             }`}>
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Advertised {drift.source ? `· ${SOURCE_LABELS[drift.source]}` : ""}
               </p>
               <p className="text-2xl font-display font-black tabular-nums text-foreground mt-0.5">
@@ -264,7 +264,7 @@ export const PublishPriceGate = ({
           {/* Branch — choose mode */}
           {mode === "choose" && drift.status === "drift" && (
             <div className="space-y-2">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Choose a resolution to publish
               </p>
               <button
@@ -295,7 +295,7 @@ export const PublishPriceGate = ({
 
           {mode === "choose" && drift.status === "untracked" && (
             <div className="space-y-2">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Capture now or proceed without
               </p>
               <button
@@ -332,7 +332,7 @@ export const PublishPriceGate = ({
               onSubmit={(e) => { e.preventDefault(); handleRecaptureSubmit(); }}
               className="space-y-3"
             >
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 New advertised-price snapshot
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -401,7 +401,7 @@ export const PublishPriceGate = ({
               onSubmit={(e) => { e.preventDefault(); handleJustifySubmit(); }}
               className="space-y-3"
             >
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Written justification · permanent log entry
               </p>
               <textarea

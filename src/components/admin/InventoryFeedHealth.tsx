@@ -166,12 +166,12 @@ export const InventoryFeedHealth = () => {
       {/* Recent events table */}
       {data?.rows && data.rows.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
+          <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
             Recent events · last 20
           </p>
           <div className="rounded-lg border border-border overflow-hidden max-h-80 overflow-y-auto">
             <table className="w-full text-xs">
-              <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.12em] text-muted-foreground sticky top-0">
+              <thead className="bg-muted/40 text-al-meta uppercase tracking-[0.12em] text-muted-foreground sticky top-0">
                 <tr>
                   <th className="text-left px-3 py-1.5 font-bold">When</th>
                   <th className="text-left px-3 py-1.5 font-bold">Action</th>
@@ -214,10 +214,10 @@ const FeedBadge = ({ icon: Icon, label, tone, relative, detail }: FeedBadgeProps
       <Icon className={`w-4 h-4 ${tone.iconColor}`} strokeWidth={2} />
     </div>
     <div className="min-w-0 flex-1">
-      <p className={`text-[10px] font-bold uppercase tracking-[0.12em] ${tone.text}`}>{label}</p>
+      <p className={`text-al-meta font-bold uppercase tracking-[0.12em] ${tone.text}`}>{label}</p>
       <p className={`text-base font-display font-bold mt-0.5 ${tone.text}`}>
         {relative}
-        <span className={`ml-2 text-[10px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded ${tone.border} bg-card`}>
+        <span className={`ml-2 text-al-meta font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded ${tone.border} bg-card`}>
           {tone.label === "Live" && <CheckCircle2 className="w-2.5 h-2.5 inline mr-0.5" />}
           {tone.label === "Stale" && <AlertTriangle className="w-2.5 h-2.5 inline mr-0.5" />}
           {tone.label === "Broken" && <AlertTriangle className="w-2.5 h-2.5 inline mr-0.5" />}

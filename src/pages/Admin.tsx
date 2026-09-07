@@ -647,11 +647,11 @@ const Admin = () => {
         {/* Page header — clean light surface, no gradient. */}
         <div className="px-6 lg:px-10 pt-8 pb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-border">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-label text-muted-foreground">
+            <div className="inline-flex items-center gap-1.5 text-al-meta font-bold uppercase tracking-label text-muted-foreground">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Control Center
             </div>
-            <h1 className="mt-2 text-2xl lg:text-3xl font-black tracking-tight font-display leading-tight text-foreground">
+            <h1 className="text-al-page mt-2 lg: font-display leading-tight text-foreground">
               Administration
             </h1>
             <p className="text-xs lg:text-sm text-muted-foreground mt-1 max-w-xl">
@@ -662,7 +662,7 @@ const Admin = () => {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="px-3 py-1.5 rounded-lg bg-muted border border-border text-[10px] font-semibold uppercase tracking-label text-muted-foreground">
+            <div className="px-3 py-1.5 rounded-lg bg-muted border border-border text-al-meta font-semibold uppercase tracking-label text-muted-foreground">
               FTC-aligned · 50-state engine
             </div>
           </div>
@@ -912,7 +912,7 @@ const Admin = () => {
                   onClick={() => setTab("files")}
                   className="text-left bg-card rounded-xl border border-border shadow-premium p-4 hover:shadow-md transition-shadow"
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-label" style={{ color: "#3BB4FF" }}>
+                  <p className="text-al-meta font-semibold uppercase tracking-label" style={{ color: "#3BB4FF" }}>
                     This month's addendums
                   </p>
                   <div className="flex items-baseline gap-2 mt-2">
@@ -935,7 +935,7 @@ const Admin = () => {
                   onClick={() => navigate("/prep?view=installs")}
                   className="text-left bg-card rounded-xl border border-border shadow-premium p-4 hover:shadow-md transition-shadow"
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-label" style={{ color: "#F59E0B" }}>
+                  <p className="text-al-meta font-semibold uppercase tracking-label" style={{ color: "#F59E0B" }}>
                     Pending get-ready
                   </p>
                   <div className="flex items-baseline gap-2 mt-2">
@@ -949,7 +949,7 @@ const Admin = () => {
                   onClick={() => navigate("/leads")}
                   className="text-left bg-card rounded-xl border border-border shadow-premium p-4 hover:shadow-md transition-shadow"
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-label" style={{ color: "#10B981" }}>
+                  <p className="text-al-meta font-semibold uppercase tracking-label" style={{ color: "#10B981" }}>
                     Leads (30 days)
                   </p>
                   <div className="flex items-baseline gap-2 mt-2">
@@ -963,7 +963,7 @@ const Admin = () => {
                   onClick={() => setTab("warranty")}
                   className="text-left bg-card rounded-xl border border-border shadow-premium p-4 hover:shadow-md transition-shadow"
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-label" style={{ color: "#DC2626" }}>
+                  <p className="text-al-meta font-semibold uppercase tracking-label" style={{ color: "#DC2626" }}>
                     Warranty alerts
                   </p>
                   <div className="flex items-baseline gap-2 mt-2">
@@ -2234,7 +2234,7 @@ const Admin = () => {
               </div>
             )}
             <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
-              <div className="px-5 py-2.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{warrantyRecords.length} warranties</div>
+              <div className="px-5 py-2.5 bg-muted/30 text-al-meta font-semibold uppercase tracking-wider text-muted-foreground">{warrantyRecords.length} warranties</div>
               {warrantyRecords.length === 0 ? (
                 <p className="px-5 py-8 text-center text-xs text-muted-foreground">No warranty records yet. Warranties are registered when products with warranty info are installed.</p>
               ) : warrantyRecords.slice(0, 20).map(w => (
@@ -2323,7 +2323,7 @@ const Admin = () => {
                   });
                   return (
                     <div>
-                      <div className="px-5 py-2.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <div className="px-5 py-2.5 bg-muted/30 text-al-meta font-semibold uppercase tracking-wider text-muted-foreground">
                         {filtered.length} vehicle{filtered.length !== 1 ? "s" : ""}
                       </div>
                       {filtered.map(f => {
@@ -2703,7 +2703,7 @@ const Admin = () => {
               ) : (
                 <table className="w-full text-sm">
                   <thead className="bg-muted/30">
-                    <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <tr className="text-al-meta font-semibold uppercase tracking-wider text-muted-foreground">
                       <th className="text-left px-4 py-2.5">Timestamp</th>
                       <th className="text-left py-2.5">Action</th>
                       <th className="text-left py-2.5">Entity</th>
@@ -3183,7 +3183,7 @@ const ProductEditPreview = ({ editing }: { editing: Partial<Product> }) => {
     <div className="hidden lg:flex w-80 flex-shrink-0 flex-col border-l border-border bg-muted/20 overflow-y-auto">
       <div className="p-5 space-y-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Customer view</p>
+          <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Customer view</p>
           <p className="text-[11px] text-muted-foreground">This is exactly how this item appears on the addendum.</p>
         </div>
 
@@ -3208,7 +3208,7 @@ const ProductEditPreview = ({ editing }: { editing: Partial<Product> }) => {
           )}
           {benefit && (
             <div className="mt-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Why this benefits you</p>
+              <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Why this benefits you</p>
               <p className="text-[11px] text-foreground mt-1 whitespace-pre-wrap leading-snug">{benefit}</p>
             </div>
           )}

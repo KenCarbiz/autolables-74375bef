@@ -153,7 +153,7 @@ export const PlatformEntitlements = () => {
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <thead className="bg-muted/50 text-al-meta uppercase tracking-wide text-muted-foreground">
               <tr>
                 <SortHeader label="Tenant"     sortKey="tenant"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
                 <SortHeader label="App"        sortKey="app_slug"      activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
@@ -244,7 +244,7 @@ const EntRow = ({ row, tenantName, editing, rowClass, onEdit, onClose, onSubmit 
         <td className={`${rowClass} uppercase text-xs tracking-wider`}>{row.app_slug}</td>
         <td className={`${rowClass} capitalize`}>{row.plan_tier}</td>
         <td className={rowClass}>
-          <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusColor(row.status)}`}>
+          <span className={`text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusColor(row.status)}`}>
             {row.status}
           </span>
         </td>

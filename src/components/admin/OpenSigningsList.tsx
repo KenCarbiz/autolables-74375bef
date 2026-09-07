@@ -159,7 +159,7 @@ export const OpenSigningsList = () => {
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <thead className="bg-muted/40 text-al-meta uppercase tracking-[0.14em] text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-2 font-bold">Sent</th>
                 <th className="text-left px-3 py-2 font-bold">Vehicle</th>
@@ -173,7 +173,7 @@ export const OpenSigningsList = () => {
                 return (
                   <tr key={r.id} className="hover:bg-muted/30">
                     <td className="px-3 py-2.5">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded border ${tone.chip} ${tone.text}`}>
+                      <span className={`inline-flex items-center gap-1 text-al-meta font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded border ${tone.chip} ${tone.text}`}>
                         <Clock className="w-2.5 h-2.5" />
                         {fmtRelative(r.created_at)}
                       </span>

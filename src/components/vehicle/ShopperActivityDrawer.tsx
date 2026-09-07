@@ -167,7 +167,7 @@ const Body = ({ summary, error }: { summary: ShopperActivitySummary; error: stri
 const Card = ({ title, icon: Icon, action, children }: { title: string; icon: typeof Eye; action?: React.ReactNode; children: React.ReactNode }) => (
   <section className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
     <div className="flex items-center justify-between gap-2 mb-3">
-      <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground inline-flex items-center gap-1.5">
+      <h3 className="text-al-meta font-bold uppercase tracking-[0.08em] text-muted-foreground inline-flex items-center gap-1.5">
         <Icon className="w-3.5 h-3.5 text-muted-foreground" /> {title}
       </h3>
       {action}
@@ -232,7 +232,7 @@ const MetricsGrid = ({ summary }: { summary: ShopperActivitySummary }) => (
   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
     {summary.metrics.map((m) => (
       <div key={m.key} className={`rounded-xl border p-3 ${m.tracked ? "border-border bg-card" : "border-dashed border-border bg-muted"}`}>
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{m.label}</p>
+        <p className="text-al-meta font-semibold uppercase tracking-wide text-muted-foreground truncate">{m.label}</p>
         <p className={`text-[18px] font-bold tabular-nums mt-0.5 ${!m.tracked ? "text-slate-300 text-[12px] font-medium normal-case pt-1" : m.tone === "positive" ? "text-emerald-600" : m.tone === "watching" ? "text-amber-600" : "text-foreground"}`}>
           {m.display}
         </p>
@@ -446,7 +446,7 @@ const TriggersCard = ({ triggers }: { triggers: BehaviorTrigger[] }) => (
 
 const InsightCard = ({ insights }: { insights: string[] }) => (
   <section className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
-    <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-blue-700 inline-flex items-center gap-1.5 mb-2">
+    <h3 className="text-al-meta font-bold uppercase tracking-[0.08em] text-blue-700 inline-flex items-center gap-1.5 mb-2">
       <Sparkles className="w-3.5 h-3.5" /> What this tells us
     </h3>
     <ul className="space-y-1.5">

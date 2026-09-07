@@ -95,7 +95,7 @@ export function VehicleFileConnectedHero({
               {vehicle.prep_status?.foreman_signed_at ? <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase text-emerald-700"><CheckCircle2 className="h-3 w-3" /> Prep signed</span> : null}
             </div>
 
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground lg:text-4xl">
+            <h1 className="text-al-page mt-3 text-foreground lg:">
               {vehicle.ymm || "Vehicle needs VIN decode"}
               {vehicle.trim ? <span className="block text-2xl font-semibold text-muted-foreground lg:inline lg:pl-2 lg:text-3xl">{vehicle.trim}</span> : null}
             </h1>

@@ -185,7 +185,7 @@ export function ManagerMessagesRail({ tenantId, vehicles }: {
       <div className="space-y-3">
         <MessageList rows={visible} showVin={filter === "all"} />
         <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1" htmlFor="rail-msg-vin">
+          <label className="block text-al-meta font-bold uppercase tracking-wide text-muted-foreground mb-1" htmlFor="rail-msg-vin">
             About vehicle
           </label>
           <select

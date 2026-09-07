@@ -89,7 +89,7 @@ const CommandCenter = () => {
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Compliance Command Center</h1>
+          <h1 className="text-al-page text-foreground">Compliance Command Center</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Live per-VIN compliance derived from ingestion, exceptions, documents, prep, and price signals.
           </p>
@@ -250,7 +250,7 @@ const CommandCenter = () => {
 };
 
 const Th = ({ children, className = "" }: { children?: React.ReactNode; className?: string }) => (
-  <th className={`px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground ${className}`}>{children}</th>
+  <th className={`px-4 py-2 text-al-meta font-semibold uppercase tracking-wide text-muted-foreground ${className}`}>{children}</th>
 );
 
 const FilterSelect = ({ label, value, onChange, options }: {
@@ -285,7 +285,7 @@ const SummaryCard = ({ label, value, tone, hint, active, onClick }: {
       disabled={!onClick}
       className={`text-left rounded-xl border p-3 transition-colors ${active ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-muted/40"} ${!onClick ? "cursor-default" : ""}`}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-al-meta font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${toneCls}`}>
         {value === null || value === undefined ? <span className="text-muted-foreground/70">—</span> : value}
       </div>
@@ -341,7 +341,7 @@ const Drawer = ({ row, canResolve, onClose }: {
 
           {/* Signals */}
           <div className="rounded-lg border border-border">
-            <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">Signals</div>
+            <div className="px-3 py-2 text-al-meta font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">Signals</div>
             <ul className="divide-y divide-border">
               <SignalRow icon={AlertTriangle} label="Open exceptions" value={row.open_exceptions}
                 tone={row.open_by_severity.critical > 0 ? "red" : row.open_by_severity.high + row.open_by_severity.medium > 0 ? "orange" : "muted"}>
@@ -362,7 +362,7 @@ const Drawer = ({ row, canResolve, onClose }: {
 
           {nextActions.length > 0 && (
             <div className="rounded-lg border border-border">
-              <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">Recommended next actions</div>
+              <div className="px-3 py-2 text-al-meta font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">Recommended next actions</div>
               <ul className="divide-y divide-border">
                 {nextActions.map((a, i) => {
                   const Icon = a.icon;
@@ -407,7 +407,7 @@ const Drawer = ({ row, canResolve, onClose }: {
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div>
-    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+    <div className="text-al-meta font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
     <div className="text-foreground mt-0.5">{children}</div>
   </div>
 );

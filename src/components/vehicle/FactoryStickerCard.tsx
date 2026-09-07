@@ -65,7 +65,7 @@ const PILL_TONE: Record<string, string> = {
 };
 
 const Pill = ({ tone, children }: { tone: keyof typeof PILL_TONE; children: React.ReactNode }) => (
-  <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${PILL_TONE[tone]}`}>{children}</span>
+  <span className={`text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${PILL_TONE[tone]}`}>{children}</span>
 );
 
 const GEN_STATUS: Record<string, { label: string; tone: keyof typeof PILL_TONE }> = {

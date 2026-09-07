@@ -16,7 +16,7 @@ const Leads = () => {
         <div>
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-blue-600" />
-            <h1 className="text-xl font-semibold tracking-tight font-display text-foreground">Leads</h1>
+            <h1 className="text-al-page font-display text-foreground">Leads</h1>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">Leads captured from QR scans and signing links.</p>
         </div>
@@ -51,7 +51,7 @@ const Leads = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/30">
-                <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <tr className="text-al-meta font-semibold uppercase tracking-wider text-muted-foreground">
                   <th className="text-left px-4 py-2.5">Date</th>
                   <th className="text-left py-2.5">Name</th>
                   <th className="text-left py-2.5">Phone</th>

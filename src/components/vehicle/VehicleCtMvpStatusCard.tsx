@@ -136,11 +136,11 @@ const VehicleCtMvpStatusCard = ({ tenantId, vehicleId, vin, compact = false }: V
       {!compact ? (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="rounded-xl bg-card/80 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Required documents</p>
+            <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Required documents</p>
             <p className="mt-1 text-sm font-semibold text-foreground">{(run.required_document_keys || []).join(", ") || "—"}</p>
           </div>
           <div className="rounded-xl bg-card/80 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Open checks</p>
+            <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Open checks</p>
             <p className="mt-1 text-sm font-semibold text-foreground">{failingChecks.length ? `${failingChecks.length} issue(s)` : "All checks passed"}</p>
           </div>
         </div>

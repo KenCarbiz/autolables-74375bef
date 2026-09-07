@@ -43,7 +43,7 @@ export default function AdminSpecsBackfillOne() {
   return (
     <div className="mx-auto max-w-2xl p-6 space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold">Specs Backfill — Single VIN</h1>
+        <h1 className="text-al-page ">Specs Backfill — Single VIN</h1>
         <p className="text-sm text-muted-foreground">
           Admin-only trigger. Invokes the selected function with your session token.
         </p>

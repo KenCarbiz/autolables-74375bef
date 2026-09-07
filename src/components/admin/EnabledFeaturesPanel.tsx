@@ -33,7 +33,7 @@ export default function EnabledFeaturesPanel() {
           <div key={group.plan} className={`rounded-2xl border p-4 ${included ? "border-border bg-card" : "border-dashed border-border bg-muted/20"}`}>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-foreground">{group.label}</h3>
-              <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${included ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
+              <span className={`text-al-meta font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${included ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
                 {included ? "Included" : `Requires ${planLabel(group.plan)}`}
               </span>
             </div>

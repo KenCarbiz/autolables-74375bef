@@ -740,7 +740,7 @@ function EmptyShell({ title, body, action }: {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F7F9FC] p-6">
       <div className="max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
-        <h1 className="text-xl font-black text-foreground">{title}</h1>
+        <h1 className="text-al-page text-foreground">{title}</h1>
         <p className="mt-2 text-sm font-semibold text-muted-foreground">{body}</p>
         {action && (
           <button onClick={action.onClick} className="mt-5 inline-flex h-11 items-center rounded-xl bg-blue-600 px-5 text-sm font-black text-white">

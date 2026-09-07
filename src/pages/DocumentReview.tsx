@@ -66,7 +66,7 @@ const DocumentReview = () => {
     <div className="p-4 lg:p-6 max-w-[1000px] mx-auto space-y-4">
       <div>
         <button onClick={() => navigate("/dashboard")} className="text-[11px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Dashboard</button>
-        <h1 className="text-xl font-semibold tracking-tight font-display text-foreground inline-flex items-center gap-2"><FileWarning className="w-5 h-5 text-primary" /> Document review queue</h1>
+        <h1 className="text-al-page font-display text-foreground inline-flex items-center gap-2"><FileWarning className="w-5 h-5 text-primary" /> Document review queue</h1>
         <p className="text-xs text-muted-foreground mt-1">Stickers and addendums that may be stale because the vehicle's price, MSRP, or details changed after they were generated.</p>
       </div>
 
@@ -93,7 +93,7 @@ const DocumentReview = () => {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="text-[10px] font-bold uppercase tracking-wide">{m.label}</span>
+                      <span className="text-al-meta font-bold uppercase tracking-wide">{m.label}</span>
                       {f.changed_field && <span className="text-[10px] font-mono opacity-70">{f.changed_field}</span>}
                     </div>
                     <p className="text-sm font-semibold mt-1">{f.reason}</p>

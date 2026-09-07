@@ -26,7 +26,7 @@ export default function ServiceApprovals() {
           </Link>
           <div className="flex items-center gap-2 mt-2">
             <ClipboardCheck className="w-5 h-5 text-primary" aria-hidden="true" />
-            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Work Authorization</h1>
+            <h1 className="text-al-page font-display text-foreground">Work Authorization</h1>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             Additional-work requests from the shop, waiting on a manager decision.

@@ -114,11 +114,11 @@ export default function MarketcheckApiUsagePanel() {
           <div className="flex items-center gap-2">
             <div className="rounded-2xl bg-muted p-3 text-center">
               <p className="text-xl font-black text-foreground">{usd(runTotal)}</p>
-              <p className="text-[10px] font-bold uppercase text-muted-foreground">Last run, all tenants</p>
+              <p className="text-al-meta font-bold uppercase text-muted-foreground">Last run, all tenants</p>
             </div>
             <div className="rounded-2xl bg-muted p-3 text-center">
               <p className="text-xl font-black text-foreground">{usd(monthTotal)}</p>
-              <p className="text-[10px] font-bold uppercase text-muted-foreground">Projected / month</p>
+              <p className="text-al-meta font-bold uppercase text-muted-foreground">Projected / month</p>
             </div>
             <button onClick={load} className="h-10 rounded-lg border border-border px-3 text-xs font-bold inline-flex items-center gap-1.5">
               <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -151,11 +151,11 @@ export default function MarketcheckApiUsagePanel() {
               <div className="flex items-center gap-4 text-right">
                 <div>
                   <p className="text-lg font-black text-foreground">{usd(u.estimatedUsd)}</p>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">{u.totalCalls ?? 0} calls</p>
+                  <p className="text-al-meta font-bold uppercase text-muted-foreground">{u.totalCalls ?? 0} calls</p>
                 </div>
                 <div>
                   <p className="text-lg font-black text-foreground">{usd(u.projectedMonthlyUsd)}</p>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Per month</p>
+                  <p className="text-al-meta font-bold uppercase text-muted-foreground">Per month</p>
                 </div>
               </div>
             </div>

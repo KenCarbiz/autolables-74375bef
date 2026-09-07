@@ -180,7 +180,7 @@ export const AddonElectionsPanel = ({ storeId }: { storeId: string }) => {
               <ArrowUpRight className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-amber-700">Charged above the advertised price</p>
+              <p className="text-al-meta font-bold uppercase tracking-[0.12em] text-amber-700">Charged above the advertised price</p>
               <p className="mt-0.5 font-display text-2xl font-black tracking-tight text-foreground">
                 {aboveElected.length}/{aboveItems.length} elected · {fmtMoney(aboveElectedRevenue)}
               </p>
@@ -196,7 +196,7 @@ export const AddonElectionsPanel = ({ storeId }: { storeId: string }) => {
 
       {products.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-5">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">
+          <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">
             Election rate by product
           </p>
           <div className="space-y-2.5">
@@ -216,7 +216,7 @@ export const AddonElectionsPanel = ({ storeId }: { storeId: string }) => {
       )}
 
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground px-5 pt-4">
+        <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground px-5 pt-4">
           Recent signed deals
         </p>
         {deals.length === 0 ? (
@@ -258,7 +258,7 @@ const Kpi = ({
     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#2563EB]">
       <Icon className="h-4 w-4" />
     </div>
-    <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+    <p className="mt-3 text-al-meta font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
     <p className="mt-0.5 font-display text-2xl font-black tracking-tight text-foreground">{value}</p>
     {note && <p className="text-[11px] text-muted-foreground mt-0.5">{note}</p>}
   </div>

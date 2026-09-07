@@ -67,7 +67,7 @@ const EVIDENCE_LABEL: Record<IngestStepOutcome["evidence"], string> = {
 const NEEDS_ATTENTION = new Set<IngestStepStatus>(["failed", "parked", "not_run"]);
 
 const Pill = ({ tone, children }: { tone: string; children: React.ReactNode }) => (
-  <span className={`inline-flex text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${tone}`}>
+  <span className={`inline-flex text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${tone}`}>
     {children}
   </span>
 );

@@ -274,7 +274,7 @@ export default function ReadyBoard() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-5 h-5 text-primary" />
-          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Ready Board</h1>
+          <h1 className="text-al-page font-display text-foreground">Ready Board</h1>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setTodayOnly((v) => !v)} className={`h-9 px-3 rounded-md border text-xs font-semibold ${todayOnly ? "border-primary bg-primary/10 text-primary" : "border-border text-foreground hover:bg-muted"}`}>

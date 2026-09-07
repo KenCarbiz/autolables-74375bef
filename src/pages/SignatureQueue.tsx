@@ -165,12 +165,12 @@ const SignatureQueue = () => {
             {a.customer_name ? `  ·  ${a.customer_name}` : ""}
           </p>
           {drift && drift.status === "drift" && (
-            <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+            <span className="inline-flex items-center gap-1 mt-1 text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
               Advertised price moved · now ${drift.advertised?.toLocaleString()} vs locked ${drift.sticker.toLocaleString()} — re-verify
             </span>
           )}
           {drift && drift.status === "match" && (
-            <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+            <span className="inline-flex items-center gap-1 mt-1 text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
               Price verified vs advertised
             </span>
           )}
@@ -222,7 +222,7 @@ const SignatureQueue = () => {
       <div className="max-w-4xl mx-auto p-4 md:p-8">
         <PageTabs tabs={DEALS_TABS} className="mb-5" />
         <div className="mb-6">
-          <h1 className="text-xl font-bold font-barlow-condensed text-foreground">Out for Signature</h1>
+          <h1 className="text-al-page font-barlow-condensed text-foreground">Out for Signature</h1>
           <p className="text-[12px] text-muted-foreground">Locked deals, confirmed and queued for the customer to sign.</p>
         </div>
 
@@ -237,7 +237,7 @@ const SignatureQueue = () => {
         ) : (
           <div className="space-y-6">
             <div className="space-y-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="text-al-meta font-bold uppercase tracking-[0.16em] text-muted-foreground">
                 Awaiting customer · {waiting.length}
               </p>
               {waiting.length === 0 ? (
@@ -249,7 +249,7 @@ const SignatureQueue = () => {
 
             {executed.length > 0 && (
               <div className="space-y-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                <p className="text-al-meta font-bold uppercase tracking-[0.16em] text-muted-foreground">
                   Customer signed · counter-sign to finalize · {executed.length}
                 </p>
                 {executed.map((a) => <Card key={a.id} a={a} done />)}

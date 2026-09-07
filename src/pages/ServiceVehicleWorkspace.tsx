@@ -807,7 +807,7 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFail
         )}
         <Link to={`/k208/${vin}`} className={BTN_SECONDARY}><FileText className="w-4 h-4" aria-hidden="true" /> Preview the K-208 document</Link>
         <fieldset className="space-y-1.5">
-          <legend className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Signer confirmations</legend>
+          <legend className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Signer confirmations</legend>
           {CONFIRMS.map((c, i) => (
             <label key={c} className="flex items-start gap-2 text-[12.5px] text-foreground min-h-[44px] items-center">
               <input type="checkbox" checked={confirms[i]} onChange={(e) => setConfirms((s) => s.map((v, j) => (j === i ? e.target.checked : v)))} />
@@ -816,7 +816,7 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFail
           ))}
         </fieldset>
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Warranty result</span>
+          <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Warranty result</span>
           <div className={cn(ACTION_GROUP, "mt-1")}>
             {(["A", "B", "C"] as const).map((code) => (
               <button
@@ -1102,7 +1102,7 @@ function InspectionChecklistPanel({ tenantId, veh, newestActive, canConduct, pas
         />
 
         <div className="space-y-2">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Documents (inspection sheet, defect photos)</span>
+          <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Documents (inspection sheet, defect photos)</span>
           <input type="file" accept="image/*,application/pdf" multiple onChange={(e) => onFiles(e.target.files)} className="hidden" id="k208-files" />
           <div className={ACTION_GROUP}>
             <label htmlFor="k208-files" className={cn(BTN_SECONDARY, "cursor-pointer")}>
@@ -1304,7 +1304,7 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
               {!resolved && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <label className="block">
-                    <span className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">Repair state</span>
+                    <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Repair state</span>
                     <select
                       value={f.repair_state}
                       disabled={busyId === f.id || !canConduct}
@@ -1317,7 +1317,7 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">Assignee</span>
+                    <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Assignee</span>
                     <select
                       value={f.assignee || ""}
                       disabled={busyId === f.id || !canConduct}
@@ -1329,7 +1329,7 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">RO number</span>
+                    <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">RO number</span>
                     <input
                       defaultValue={f.ro_number || ""}
                       disabled={!canConduct}
@@ -1339,7 +1339,7 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
                     />
                   </label>
                   <div className="block">
-                    <span className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">Evidence</span>
+                    <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Evidence</span>
                     <div className="mt-1">
                       <input type="file" accept="image/*" multiple className="hidden" id={`fail-photo-${f.id}`} onChange={(e) => void addFailurePhoto(f, e.target.files)} />
                       <label htmlFor={`fail-photo-${f.id}`} className={cn(BTN_SECONDARY, "cursor-pointer")}>
@@ -1663,7 +1663,7 @@ function VoidInspectionCard({ tenantId, vin, inspection, canVoid, onChanged }: {
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-2">
             <label className="block">
-              <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Reason (required, recorded in the audit trail)</span>
+              <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Reason (required, recorded in the audit trail)</span>
               <textarea
                 autoFocus
                 value={reason}

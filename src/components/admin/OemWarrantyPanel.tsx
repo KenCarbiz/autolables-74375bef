@@ -100,7 +100,7 @@ export default function OemWarrantyPanel() {
 
   const input = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
   const num = `${input} tabular-nums`;
-  const label = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+  const label = "text-al-meta font-bold uppercase tracking-wider text-muted-foreground";
   const area = "w-full px-2.5 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary resize-y";
 
   return (

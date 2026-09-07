@@ -30,7 +30,7 @@ const fmtDate = (d?: string | null) =>
 
 const Field = ({ label, value }: { label: string; value: string }) => (
   <div className="min-w-0">
-    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+    <p className="text-al-meta font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
     <p className="text-[13px] font-semibold text-foreground truncate">{value}</p>
   </div>
 );
@@ -145,7 +145,7 @@ export default function RegenerateStickerDrawer({
                 <input type="radio" name="regen-source" checked={dataSource === "reuse"} onChange={() => setDataSource("reuse")} className="mt-0.5" />
                 <span>
                   <span className="text-[13px] font-semibold text-foreground">Reuse saved NeoVIN data</span>
-                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Recommended</span>
+                  <span className="ml-2 text-al-meta font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Recommended</span>
                   <span className="block text-[11.5px] text-muted-foreground mt-0.5">
                     No provider charge. Replays the stored response through the current template and renderer.
                   </span>

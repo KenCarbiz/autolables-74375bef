@@ -589,7 +589,7 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
         <div className="mt-3 overflow-auto max-h-[600px]">
           <table className="w-full text-sm min-w-[1020px]">
             <thead>
-              <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border">
+              <tr className="text-al-meta uppercase tracking-wide text-muted-foreground border-b border-border">
                 {["Priority", "Vehicle", "Stock / VIN", "Age (since intake)", "Assigned to", "Get Ready", "K-208", "Delivery"].map((h) => (
                   <th key={h} className="text-left font-semibold px-4 py-2.5 sticky top-0 bg-card z-10">{h}</th>
                 ))}
@@ -819,12 +819,12 @@ function RowDrawer({ r, members, canAssign, onAssigned, onClose, onOpenWorkspace
 
           <div className="rounded-xl border border-border bg-muted/30 p-3.5 space-y-2.5">
             <div>
-              <p className="text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">Next required task</p>
+              <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Next required task</p>
               <p className="text-sm font-bold text-foreground mt-0.5">{r.nextTask}</p>
             </div>
             {r.nextWhy && (
               <div>
-                <p className="text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">Why it is waiting</p>
+                <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Why it is waiting</p>
                 <p className="text-[12.5px] text-foreground mt-0.5">{r.nextWhy}</p>
               </div>
             )}
@@ -858,7 +858,7 @@ function RowDrawer({ r, members, canAssign, onAssigned, onClose, onOpenWorkspace
             )}
             {canReassign && assigning && (
               <div className="rounded-xl border border-border p-3 space-y-2">
-                <label className="block text-[11px] font-bold uppercase tracking-wide text-muted-foreground" htmlFor="drawer-assign">
+                <label className="block text-al-meta font-bold uppercase tracking-wide text-muted-foreground" htmlFor="drawer-assign">
                   Assign to
                 </label>
                 <select

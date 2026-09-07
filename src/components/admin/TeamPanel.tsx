@@ -122,7 +122,7 @@ export default function TeamPanel() {
                   <p className="text-[11px] text-muted-foreground">{m.accepted_at ? "Active" : "Invited — pending sign-up"}</p>
                 </div>
                 {m.role === "owner" ? (
-                  <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-amber-50 text-amber-700">Owner</span>
+                  <span className="text-al-meta font-bold uppercase tracking-wide px-2 py-1 rounded bg-amber-50 text-amber-700">Owner</span>
                 ) : (
                   <select
                     value={m.role}

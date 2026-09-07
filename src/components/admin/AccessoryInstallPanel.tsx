@@ -191,7 +191,7 @@ const AccessoryRow = ({ recordId, vin, accessory, onMarkInstalled }: RowProps) =
           <span className="w-4 h-4 rounded-full border-2 border-amber-400 flex-shrink-0" />
           <p className="text-sm font-semibold text-foreground truncate">{accessory.productName}</p>
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
+        <span className="text-al-meta font-bold uppercase tracking-wider text-amber-800">
           {expanded ? "cancel" : "Mark installed"}
         </span>
       </button>
@@ -200,7 +200,7 @@ const AccessoryRow = ({ recordId, vin, accessory, onMarkInstalled }: RowProps) =
         <div className="border-t border-amber-200 px-3 py-3 space-y-3 bg-card">
           {/* Photos */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
+            <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
               Install photos ({photoUrls.length} ready)
             </p>
             <div className="flex items-center gap-2 flex-wrap">
@@ -238,7 +238,7 @@ const AccessoryRow = ({ recordId, vin, accessory, onMarkInstalled }: RowProps) =
 
           {/* Installer name */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1">
+            <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground mb-1">
               Installer name
             </p>
             <input

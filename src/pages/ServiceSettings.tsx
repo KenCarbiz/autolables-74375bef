@@ -98,7 +98,7 @@ export default function ServiceSettings() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">K-208 Policy</h1>
+          <h1 className="text-al-page font-display text-foreground">K-208 Policy</h1>
         </div>
         <Link to="/service" className={BTN_SECONDARY}>
           <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Service Desk

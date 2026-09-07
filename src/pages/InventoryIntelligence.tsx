@@ -32,7 +32,7 @@ const TONE_CLASS: Record<string, string> = {
 };
 
 const Stage = ({ stage }: { stage: PipelineStage }) => (
-  <span className={`inline-flex text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${TONE_CLASS[STAGE_TONE[stage]]}`}>
+  <span className={`inline-flex text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${TONE_CLASS[STAGE_TONE[stage]]}`}>
     {stage}
   </span>
 );
@@ -182,7 +182,7 @@ export default function InventoryIntelligence() {
       <div className="max-w-[1600px] mx-auto space-y-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-lg font-bold text-foreground inline-flex items-center gap-2">
+            <h1 className="text-al-page text-foreground inline-flex items-center gap-2">
               <Radar className="w-5 h-5 text-blue-600" /> Inventory Intelligence
             </h1>
             <p className="text-[12.5px] text-muted-foreground mt-0.5">
@@ -226,7 +226,7 @@ export default function InventoryIntelligence() {
           <div className="overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <thead>
-                <tr className="text-left text-[10.5px] uppercase tracking-wide text-muted-foreground border-b border-border">
+                <tr className="text-left text-al-meta uppercase tracking-wide text-muted-foreground border-b border-border">
                   <th className="py-2 pr-3 font-semibold">Vehicle</th>
                   <th className="py-2 pr-3 font-semibold">Source data</th>
                   {DOCUMENT_FAMILY_IDS.map((id) => (

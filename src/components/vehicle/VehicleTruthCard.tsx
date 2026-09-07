@@ -128,7 +128,7 @@ export default function VehicleTruthCard({
             <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
             <h4 className="text-sm font-bold text-foreground">Vehicle Truth</h4>
             {truth.snapshot && (
-              <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+              <span className="text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 v{truth.snapshot.snapshot_version}
               </span>
             )}
@@ -187,7 +187,7 @@ export default function VehicleTruthCard({
               if (!rows.length) return null;
               return (
                 <div key={group.title}>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">{group.title}</p>
+                  <p className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground mb-1">{group.title}</p>
                   <div className="space-y-1">
                     {rows.map(([key, fact]) => {
                       const status = factStatus(fact!);
@@ -233,7 +233,7 @@ export default function VehicleTruthCard({
               ))}
               {truth.snapshot.material_changes.length > 0 && (
                 <div className="pt-2 border-t border-border">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">
+                  <p className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground mb-1">
                     What changed in v{truth.snapshot.snapshot_version}
                   </p>
                   {truth.snapshot.material_changes.map((change) => (

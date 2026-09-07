@@ -67,7 +67,7 @@ const Ring = ({ pct, size = 76 }: { pct: number; size?: number }) => {
 
 const Kpi = ({ label, value, sub, accent, cta, children }: { label: string; value?: React.ReactNode; sub?: React.ReactNode; accent?: string; cta?: { label: string; onClick: () => void }; children?: React.ReactNode }) => (
   <div className="rounded-2xl border border-[#eef1f4] bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-5 min-w-0 flex flex-col">
-    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+    <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
     {children ?? (
       <>
         <p className={`text-[34px] font-extrabold leading-none mt-2 ${accent || "text-foreground"}`}>{value}</p>
@@ -256,7 +256,7 @@ const InventoryCommandCenterV2 = () => {
       {/* The page title now lives in the global AppShell header (pageTitles).
           This thin row only carries the draft marker + admin settings. */}
       <div className="flex items-center justify-between gap-3 mb-4">
-        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">V2 Draft</span>
+        <span className="text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">V2 Draft</span>
         <div className="relative shrink-0">
           <button onClick={() => setShowSettings((v) => !v)} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg bg-card border border-[#e8ebef] text-sm font-semibold hover:bg-muted">
             <Settings className="w-4 h-4 text-muted-foreground" /> <span className="hidden sm:inline">Dashboard settings</span>
@@ -265,7 +265,7 @@ const InventoryCommandCenterV2 = () => {
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowSettings(false)} />
               <div className="absolute right-0 mt-2 w-[330px] rounded-2xl border border-[#e8ebef] bg-card shadow-lg z-20 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Dashboard Layout</p>
+                <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Dashboard Layout</p>
                 <div className="flex items-start gap-3 mt-3">
                   <button
                     onClick={() => updateSettings({ inventory_show_quick_actions: !quickActionsOn })}
@@ -321,7 +321,7 @@ const InventoryCommandCenterV2 = () => {
                     </div>
                     <p className={`text-[26px] font-extrabold leading-none mt-2 ${p.n ? s.text : "text-foreground"}`}>{p.n}</p>
                     <p className="text-[12px] text-muted-foreground font-medium mt-1">{p.label}</p>
-                    <p className={`text-[10px] font-bold uppercase tracking-wide mt-0.5 ${s.text}`}>{PRIO[p.sev]}</p>
+                    <p className={`text-al-meta font-bold uppercase tracking-wide mt-0.5 ${s.text}`}>{PRIO[p.sev]}</p>
                   </button>
                 );
               })}
@@ -356,7 +356,7 @@ const InventoryCommandCenterV2 = () => {
 
           {/* Table */}
           <div className="rounded-2xl border border-[#eef1f4] bg-card overflow-hidden">
-            <div className="hidden lg:grid grid-cols-[1.8fr_0.9fr_1fr_1.3fr_1.1fr_0.7fr_1fr] gap-3 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-[#eef1f4] sticky top-0 z-10 bg-card/95 backdrop-blur">
+            <div className="hidden lg:grid grid-cols-[1.8fr_0.9fr_1fr_1.3fr_1.1fr_0.7fr_1fr] gap-3 px-4 py-2.5 text-al-meta font-bold uppercase tracking-wider text-muted-foreground border-b border-[#eef1f4] sticky top-0 z-10 bg-card/95 backdrop-blur">
               <span>Vehicle</span><span>Stock / VIN</span><span>Readiness</span><span>Compliance</span><span>Advertised Price</span><span>Publishing</span><span className="text-right">Actions</span>
             </div>
             {pageRows.length === 0 ? (

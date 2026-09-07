@@ -228,7 +228,7 @@ function K208History({ inspectionId }: { inspectionId: string }) {
       <ul className="space-y-2">
         {revs.map((r) => (
           <li key={r.id} className="flex items-start gap-3 text-sm border-t border-border/60 pt-2 first:border-0 first:pt-0">
-            <span className={`mt-0.5 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${failed(r) ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>{r.result || r.status || "—"}</span>
+            <span className={`mt-0.5 text-al-meta font-bold uppercase px-1.5 py-0.5 rounded ${failed(r) ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>{r.result || r.status || "—"}</span>
             <div className="min-w-0 flex-1">
               <p className="text-foreground">
                 {r.result_initial ? `Result ${r.result_initial} · ` : ""}{r.status || ""}{r.inspector_name ? ` · ${r.inspector_name}` : ""}
@@ -244,7 +244,7 @@ function K208History({ inspectionId }: { inspectionId: string }) {
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div className="font-bold text-[11px] uppercase tracking-wide border-b border-black mb-1">{children}</div>;
+  return <div className="font-bold text-al-meta uppercase tracking-wide border-b border-black mb-1">{children}</div>;
 }
 function Field({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (

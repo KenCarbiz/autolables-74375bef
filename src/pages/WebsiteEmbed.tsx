@@ -65,7 +65,7 @@ const WebsiteEmbed = () => {
     return (
       <div className="max-w-3xl mx-auto px-6 py-16 text-center">
         <ShieldX className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-        <h1 className="text-lg font-bold">Admin access required</h1>
+        <h1 className="text-al-page ">Admin access required</h1>
         <p className="text-sm text-muted-foreground mt-1">Only settings managers can configure the website widget.</p>
       </div>
     );
@@ -75,7 +75,7 @@ const WebsiteEmbed = () => {
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Website Integration</h1>
+          <h1 className="text-al-page text-foreground">Website Integration</h1>
           <p className="text-sm text-muted-foreground mt-1">Add a "Vehicle Passport" slide-out to your VDP with one script tag.</p>
         </div>
         <Link to="/admin" className="text-sm text-muted-foreground hover:text-foreground">← Admin</Link>

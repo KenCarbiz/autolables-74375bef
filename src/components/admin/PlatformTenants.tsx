@@ -220,7 +220,7 @@ export const PlatformTenants = () => {
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-x-auto">
           <table className="w-full min-w-[920px] text-sm">
-            <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <thead className="bg-muted/50 text-al-meta uppercase tracking-wide text-muted-foreground">
               <tr>
                 <SortHeader label="Dealer"        sortKey="name"          activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
                 <SortHeader label="Source"        sortKey="source"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
@@ -243,7 +243,7 @@ export const PlatformTenants = () => {
                     </div>
                   </td>
                   <td className={rowClass}>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${sourceBadge(t.source)}`}>
+                    <span className={`text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${sourceBadge(t.source)}`}>
                       {t.source}
                     </span>
                   </td>
@@ -443,7 +443,7 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
       </p>
       {/* Look up & import from Autocurb */}
       <div className="rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/30 dark:border-blue-900 p-3">
-        <label className="text-[10px] font-bold uppercase tracking-label text-blue-700 dark:text-blue-300">Look up &amp; import from Autocurb</label>
+        <label className="text-al-meta font-bold uppercase tracking-label text-blue-700 dark:text-blue-300">Look up &amp; import from Autocurb</label>
         <div className="relative mt-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input value={acQuery} onChange={(e) => searchAutocurb(e.target.value)} placeholder="Search Autocurb by name, domain, or owner email…" className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-background text-sm outline-none" />
@@ -687,7 +687,7 @@ const TenantDetailsDrawer = ({
         <div className="mx-4 mt-4 rounded-lg border border-border p-3">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-foreground">Plan tier</p>
+              <p className="text-al-meta font-bold uppercase tracking-wider text-foreground">Plan tier</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 Compliance Pro grants price verification + the website scrape.
                 {marketcheck?.enabled ? " Scrape is on." : ""}
@@ -711,21 +711,21 @@ const TenantDetailsDrawer = ({
         {marketcheck?.allowed && (
           <div className="mx-4 mt-4 rounded-lg border border-border p-3 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-foreground">MarketCheck inventory scrape</p>
+              <p className="text-al-meta font-bold uppercase tracking-wider text-foreground">MarketCheck inventory scrape</p>
               <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
                 <input type="checkbox" checked={mcEnabled} onChange={(e) => setMcEnabled(e.target.checked)} className="h-4 w-4 rounded border-border" />
                 Nightly sync on
               </label>
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Dealer website domain</label>
+              <label className="block text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1">Dealer website domain</label>
               <input value={mcSource} onChange={(e) => setMcSource(e.target.value)} placeholder="harteinfiniti.com"
                 className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm font-mono" />
               <p className="text-[10px] text-muted-foreground mt-1">The sync scopes to this dealership's own website listings only — no dealer ID needed.</p>
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Frequency</label>
+                <label className="block text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1">Frequency</label>
                 <select value={mcFreq} onChange={(e) => setMcFreq(e.target.value)} className="w-full h-9 rounded-md border border-border bg-background px-1.5 text-xs">
                   <option value="nightly">Nightly</option>
                   <option value="weekly">Weekly</option>
@@ -734,13 +734,13 @@ const TenantDetailsDrawer = ({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Hour (UTC)</label>
+                <label className="block text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1">Hour (UTC)</label>
                 <select value={mcHour} onChange={(e) => setMcHour(parseInt(e.target.value, 10))} className="w-full h-9 rounded-md border border-border bg-background px-1.5 text-xs">
                   {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Max / run</label>
+                <label className="block text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1">Max / run</label>
                 <input type="number" min={1} max={10000} value={mcMax} onChange={(e) => setMcMax(Math.max(1, Math.min(10000, parseInt(e.target.value, 10) || 1)))}
                   className="w-full h-9 rounded-md border border-border bg-background px-2 text-xs tabular-nums" />
               </div>
@@ -778,7 +778,7 @@ const TenantDetailsDrawer = ({
 
         <div className={`mx-4 mt-4 rounded-lg border-2 p-3 ${pct === 100 ? "border-emerald-500 bg-emerald-50" : "border-amber-300 bg-amber-50/60"}`}>
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-foreground">Compliance profile</p>
+            <p className="text-al-meta font-bold uppercase tracking-wider text-foreground">Compliance profile</p>
             <span className={`text-lg font-bold tabular-nums ${pct === 100 ? "text-emerald-600" : "text-amber-600"}`}>{pct}%</span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">Legal name, address, operating state, and DMV license are required for compliant documents.</p>
@@ -804,7 +804,7 @@ const TenantDetailsDrawer = ({
           return (
             <div className="mx-4 mt-3 rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/30 dark:border-blue-900 p-3">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Managed in Autocurb</p>
+                <p className="text-al-meta font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Managed in Autocurb</p>
                 <button onClick={resync} disabled={resyncing} className="h-7 px-2.5 rounded-md bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 disabled:opacity-50">
                   {resyncing ? "Syncing…" : "Re-sync"}
                 </button>

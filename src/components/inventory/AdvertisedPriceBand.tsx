@@ -81,7 +81,7 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", docFee = 
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setExpanded(e2 => !e2); }}
-          className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded border ${toneClass}`}
+          className={`inline-flex items-center gap-1 text-al-meta font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded border ${toneClass}`}
           title={feedAdvertised ? docNote : drift.reason}
         >
           {icon}
@@ -128,7 +128,7 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", docFee = 
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {icon}
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em]">{label}</p>
+            <p className="text-al-meta font-bold uppercase tracking-[0.14em]">{label}</p>
             <p className="text-[11px] opacity-80 leading-tight mt-0.5">
               {feedAdvertised ? (
                 <>
@@ -236,7 +236,7 @@ const CaptureForm = ({ vin, existing, onCancel, onSubmit, saving }: CaptureFormP
       className="bg-card rounded-md p-3 border border-border text-foreground"
     >
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-foreground">
+        <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-foreground">
           Capture advertised price · VIN …{vin.slice(-8)}
         </p>
         <button

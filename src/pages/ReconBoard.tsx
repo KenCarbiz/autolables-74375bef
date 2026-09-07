@@ -92,7 +92,7 @@ export default function ReconBoard() {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-2xl font-bold text-foreground inline-flex items-center gap-2"><Wrench className="w-6 h-6 text-primary" /> Recon Approvals</h1>
+          <h1 className="text-al-page text-foreground inline-flex items-center gap-2"><Wrench className="w-6 h-6 text-primary" /> Recon Approvals</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{isManager ? "Approve or decline recon work, ask service questions." : "Submit recon work and track approvals."}</p>
         </div>
         <button onClick={() => setShowNew(true)} className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5"><Plus className="w-4 h-4" /> New estimate</button>
@@ -128,8 +128,8 @@ export default function ReconBoard() {
                   <div>
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                       <h2 className="text-lg font-bold text-foreground">{sel.ymm || "Vehicle"}</h2>
-                      {sel.origin === "ingest" && <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">From intake</span>}
-                      {sel.sent_to_service_at && <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">Sent to service</span>}
+                      {sel.origin === "ingest" && <span className="text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">From intake</span>}
+                      {sel.sent_to_service_at && <span className="text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">Sent to service</span>}
                     </div>
                     <p className="text-xs text-muted-foreground">VIN {sel.vin}{sel.submitted_by ? ` · submitted by ${sel.submitted_by}` : ""}</p>
                   </div>
@@ -157,9 +157,9 @@ export default function ReconBoard() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${SEV[l.severity] || SEV.recommended}`}>{l.severity}</span>
-                            {l.category && <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground">{l.category}</span>}
-                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${st.cls}`}>{st.label}</span>
+                            <span className={`text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded ${SEV[l.severity] || SEV.recommended}`}>{l.severity}</span>
+                            {l.category && <span className="text-al-meta font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-muted text-muted-foreground">{l.category}</span>}
+                            <span className={`text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded ${st.cls}`}>{st.label}</span>
                           </div>
                           <p className="text-[15px] font-semibold text-foreground">{l.description}</p>
                           <p className="text-[12px] text-muted-foreground mt-0.5">{l.labor_cost > 0 && `Labor ${money(l.labor_cost)}`}{l.parts_cost > 0 && ` · Parts ${money(l.parts_cost)}`}{l.sublet_cost > 0 && ` · Sublet ${money(l.sublet_cost)}`}{l.vendor ? ` · ${l.vendor}` : ""}</p>
@@ -264,7 +264,7 @@ function NewEstimateModal({ canned, onClose, onSubmit }: { canned: ReconCannedSe
         <h2 className="text-lg font-bold text-foreground mb-3">New recon estimate</h2>
         {cannedSorted.length > 0 && (
           <div className="mb-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Quick add</p>
+            <p className="text-al-meta font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Quick add</p>
             <div className="flex flex-wrap gap-1.5">
               {cannedSorted.map((c, i) => (
                 <button key={i} onClick={() => addCanned(c)} className="h-8 px-2.5 rounded-full border border-border text-xs font-medium hover:border-primary hover:bg-primary/5">

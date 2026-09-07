@@ -34,7 +34,7 @@ export default function PrintSettingsPanel() {
     } catch { toast.error("Couldn't open test sheet"); }
   };
 
-  const label = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+  const label = "text-al-meta font-bold uppercase tracking-wider text-muted-foreground";
   const input = "w-full h-9 px-2.5 rounded-md border border-border bg-background text-sm outline-none focus:border-primary";
   const num = (v: number) => (Number.isFinite(v) ? v : 0);
 

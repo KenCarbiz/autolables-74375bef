@@ -159,7 +159,7 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
   };
 
   const input = "w-full h-10 px-3 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
-  const label = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+  const label = "text-al-meta font-bold uppercase tracking-wider text-muted-foreground";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
@@ -236,7 +236,7 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
           {/* Route each selected install to a department / vendor */}
           {products.some((p) => selected[p.id]) && (
             <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3 space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Route installs</p>
+              <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Route installs</p>
               {products.filter((p) => selected[p.id]).map((p) => {
                 const r = accRoute[p.id] || { department: "detail" as const, vendorName: "", vendorEmail: "" };
                 return (

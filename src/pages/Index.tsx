@@ -1394,7 +1394,7 @@ const Index = () => {
       {/* Page header + action bar */}
       <div style={{ maxWidth: previewMaxWidth }} className="mx-auto mb-4 flex items-center justify-between flex-wrap gap-3 no-print">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight font-display text-foreground">
+          <h1 className="text-al-page font-display text-foreground">
             {viewMode ? "View Addendum" : "New Addendum"}
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">

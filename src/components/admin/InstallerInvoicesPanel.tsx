@@ -237,7 +237,7 @@ export default function InstallerInvoicesPanel() {
                     </div>
                   ))}
                   <div className="px-5 py-2.5 flex items-center justify-between bg-muted/30">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total</p>
+                    <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Total</p>
                     <p className="text-sm font-extrabold tabular-nums">{money(total)}</p>
                   </div>
                 </div>
@@ -255,7 +255,7 @@ function StatMini({ icon: Icon, label, value, color }: { icon: typeof FileText; 
     <div className="bg-card rounded-xl border border-border p-3.5">
       <Icon className={`w-4 h-4 ${color}`} />
       <p className={`text-lg font-bold tabular-nums mt-1 ${color}`}>{value}</p>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-al-meta font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
     </div>
   );
 }

@@ -139,7 +139,7 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
 
       {staleFlags.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 inline-flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> {staleFlags.length} document {staleFlags.length === 1 ? "issue" : "issues"} need review</p>
+          <p className="text-al-meta font-bold uppercase tracking-wide text-amber-700 inline-flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> {staleFlags.length} document {staleFlags.length === 1 ? "issue" : "issues"} need review</p>
           <ul className="mt-1 space-y-0.5">
             {staleFlags.slice(0, 4).map((f) => (
               <li key={f.id} className="text-[11px] text-amber-800">· {f.reason} <span className="opacity-70">(was {String(f.old_value)}, now {String(f.new_value)})</span></li>
@@ -160,7 +160,7 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-foreground">{TYPE_LABEL[doc.document_type] || doc.document_type}</span>
                     <span className="text-[11px] text-muted-foreground">v{doc.version}</span>
-                    <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${toneClass[meta.tone]}`}>{meta.label}</span>
+                    <span className={`text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${toneClass[meta.tone]}`}>{meta.label}</span>
                     {doc.label_mode === "black" && <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-900 text-white">Black</span>}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5 font-mono truncate">{doc.template_id}</p>

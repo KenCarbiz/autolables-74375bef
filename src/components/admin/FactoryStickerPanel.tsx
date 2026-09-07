@@ -80,7 +80,7 @@ const RECON_TONE: Record<string, string> = {
 };
 
 const Pill = ({ tone, children }: { tone: string; children: React.ReactNode }) => (
-  <span className={`inline-flex text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${tone}`}>{children}</span>
+  <span className={`inline-flex text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${tone}`}>{children}</span>
 );
 
 type RowAction = "approve_publish" | "unpublish" | "regenerate";

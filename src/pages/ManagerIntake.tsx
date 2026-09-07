@@ -181,7 +181,7 @@ export default function ManagerIntake() {
       <div>
         <div className="flex items-center gap-2">
           <ClipboardCheck className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Manager Intake & Authorization</h1>
+          <h1 className="text-al-page font-display text-foreground">Manager Intake & Authorization</h1>
         </div>
         <p className="text-sm text-muted-foreground mt-0.5">
           Fleet-level release queue after automatic nightly ingest. Authorization is the gate that releases service and detail work.
@@ -270,7 +270,7 @@ export default function ManagerIntake() {
                 <div className="flex justify-between"><dt className="text-muted-foreground">Current state</dt><dd className="text-foreground">{(STATE_PILL[drawer.state] ?? { label: drawer.state }).label}</dd></div>
               </dl>
               <div>
-                <label htmlFor="intake-reason" className="block text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1">
+                <label htmlFor="intake-reason" className="block text-al-meta font-bold uppercase tracking-wide text-muted-foreground mb-1">
                   Note / reason
                 </label>
                 <textarea id="intake-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2}

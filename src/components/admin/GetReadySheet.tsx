@@ -164,8 +164,8 @@ export const GetReadySheet = ({
             <div className="min-w-0 flex items-start gap-3">
               {logo && <img src={logo} alt={dealerName || settings.dealer_name} className="h-11 w-auto object-contain shrink-0" />}
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Get-Ready · Reconditioning Slip</p>
-                <h1 className="text-xl font-black leading-tight">{dealerName || settings.dealer_name || "Dealership"}</h1>
+                <p className="text-al-meta font-bold uppercase tracking-[0.2em] text-muted-foreground">Get-Ready · Reconditioning Slip</p>
+                <h1 className="text-al-page leading-tight">{dealerName || settings.dealer_name || "Dealership"}</h1>
                 {(address || phone) && <p className="text-[10px] text-muted-foreground">{[address, phone].filter(Boolean).join(" · ")}</p>}
                 <p className="text-[13px] font-semibold mt-0.5">{record.ymm || "Vehicle"}</p>
               </div>

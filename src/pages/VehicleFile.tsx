@@ -453,12 +453,12 @@ const VehicleFile = () => {
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
                 <div className="space-y-1.5 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                    <span className={`text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       vehicle.condition === "new" ? "bg-blue-100 text-blue-700" :
                       vehicle.condition === "cpo" ? "bg-emerald-100 text-emerald-700" :
                       "bg-muted text-foreground"
                     }`}>{vehicle.condition || "unknown"}</span>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                    <span className={`text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       vehicle.status === "published" ? "bg-emerald-100 text-emerald-700" :
                       vehicle.status === "archived" ? "bg-muted text-muted-foreground" :
                       "bg-amber-100 text-amber-700"
@@ -475,7 +475,7 @@ const VehicleFile = () => {
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm pt-0.5">
                     {stockNo ? (
                       <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2 py-1 ring-1 ring-blue-100">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Stock #</span>
+                        <span className="text-al-meta font-bold uppercase tracking-wider text-blue-700">Stock #</span>
                         <span className="font-mono text-base font-black tracking-tight text-blue-900">{stockNo}</span>
                         <button
                           onClick={() => { navigator.clipboard?.writeText(stockNo); toast.success("Stock number copied"); }}
@@ -911,7 +911,7 @@ const OverviewPanel = ({ vehicle, onTab, recall, onPublish, publishing }: { vehi
           <div className="grid grid-cols-2 gap-x-5 gap-y-3 flex-1">
             {infoPairs.map((p) => (
               <div key={p.label} className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{p.label}</p>
+                <p className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">{p.label}</p>
                 <p className="text-[13px] font-semibold text-foreground truncate mt-0.5">{p.value}</p>
               </div>
             ))}
@@ -1619,7 +1619,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
   };
 
   const inputCls = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
-  const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+  const labelCls = "text-al-meta font-bold uppercase tracking-wider text-muted-foreground";
 
   const remainingCoverage = (() => {
     if (!warranty.in_service_date || !warranty.factory_months) return null;
@@ -1836,7 +1836,7 @@ const SUFFIXES = ["", "Jr.", "Sr.", "II", "III", "IV", "V"];
 // CustomerPanel made it a new component type each keystroke, remounting the
 // inputs and dropping focus after every character.
 const CP_INPUT = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
-const CP_LABEL = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+const CP_LABEL = "text-al-meta font-bold uppercase tracking-wider text-muted-foreground";
 const CustomerPersonFields = ({ info, set }: { info: PersonInfo; set: (u: PersonInfo) => void }) => (
   <div className="space-y-3">
     <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
@@ -1919,7 +1919,7 @@ const CustomerPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   };
 
   const inputCls = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
-  const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+  const labelCls = "text-al-meta font-bold uppercase tracking-wider text-muted-foreground";
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading customer record…</p>;
 
@@ -1954,7 +1954,7 @@ const CustomerPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
               <button
                 type="button"
                 onClick={() => setCobuyer({ ...cobuyer, address: buyer.address, city: buyer.city, state: buyer.state, zip: buyer.zip })}
-                className="text-[10px] font-bold uppercase tracking-wide text-primary hover:underline"
+                className="text-al-meta font-bold uppercase tracking-wide text-primary hover:underline"
               >
                 Same address as buyer
               </button>
@@ -2430,11 +2430,11 @@ const PrepCard = ({ row, onOpen }: { row: PrepRow; onOpen: () => void }) => {
           <p className="text-body-sm font-semibold text-foreground truncate">
             {row.foreman_name || "Unassigned foreman"}
           </p>
-          <span className={`text-[10px] font-bold uppercase tracking-label px-1.5 py-0.5 rounded ${statusCls}`}>
+          <span className={`text-al-meta font-bold uppercase tracking-label px-1.5 py-0.5 rounded ${statusCls}`}>
             {row.status}
           </span>
           {row.listing_unlocked && (
-            <span className="text-[10px] font-bold uppercase tracking-label px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
+            <span className="text-al-meta font-bold uppercase tracking-label px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
               <Unlock className="w-2.5 h-2.5" />
               unlocked
             </span>
@@ -2650,7 +2650,7 @@ const DealTokenCard = ({
           {cobuyerName ? <span className="text-muted-foreground"> + {cobuyerName}</span> : null}
         </p>
         <div className="flex items-center gap-3 text-caption text-muted-foreground mt-0.5 flex-wrap">
-          <span className={`text-[10px] font-bold uppercase tracking-label px-1.5 py-0.5 rounded ${statusCls}`}>
+          <span className={`text-al-meta font-bold uppercase tracking-label px-1.5 py-0.5 rounded ${statusCls}`}>
             {row.status}
           </span>
           <span>{new Date(row.created_at).toLocaleDateString()}</span>
@@ -2711,7 +2711,7 @@ const SigningCard = ({ row, onOpen }: { row: SigningRow; onOpen: () => void }) =
       <div className="flex-1 min-w-0">
         <p className="text-body-sm font-semibold text-foreground truncate">
           {row.signer_name || "Unnamed signer"}
-          <span className="ml-2 text-[10px] font-bold uppercase tracking-label px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+          <span className="ml-2 text-al-meta font-bold uppercase tracking-label px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
             {row.signer_type.replace(/_/g, " ")}
           </span>
         </p>
@@ -2757,7 +2757,7 @@ const JumpTo = ({ path, reason }: { path: string; reason: string }) => {
 const Card = ({ title, children, action, className = "" }: { title: string; children: React.ReactNode; action?: React.ReactNode; className?: string }) => (
   <div className={`rounded-2xl border border-border/70 bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04),0_12px_28px_-16px_rgba(16,24,40,0.12)] hover:shadow-[0_2px_4px_rgba(16,24,40,0.05),0_16px_36px_-18px_rgba(16,24,40,0.16)] transition-shadow p-6 lg:p-7 space-y-4 ${className}`}>
     <div className="flex items-center justify-between gap-2">
-      <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">{title}</h3>
+      <h3 className="text-al-meta font-bold uppercase tracking-[0.1em] text-muted-foreground">{title}</h3>
       {action}
     </div>
     {children}
@@ -2987,7 +2987,7 @@ const RecallCard = ({ vehicle, recall, reviewOpen, onReviewOpenChange }: { vehic
               {recalls.map((r, i) => (
                 <div key={i} className="rounded-xl border border-red-200 bg-red-50/40 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700">{r.component || "Safety Recall"}</p>
+                    <p className="text-al-meta font-bold uppercase tracking-wide text-red-700">{r.component || "Safety Recall"}</p>
                     {r.nhtsaCampaignNumber ? <span className="text-[10px] font-mono text-muted-foreground">{r.nhtsaCampaignNumber}</span> : null}
                   </div>
                   <p className="text-[12px] text-foreground mt-1 leading-relaxed">{r.summary || r.description || r.title}</p>
@@ -3122,11 +3122,11 @@ const MarketPricingCard = ({ vehicle }: { vehicle: VehicleRow }) => {
             </div>
             <div className="grid grid-cols-2 gap-x-5 pt-1">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{valueLabel}</p>
+                <p className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">{valueLabel}</p>
                 <p className="text-[15px] font-bold tabular-nums text-foreground mt-0.5">${market.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Market difference</p>
+                <p className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Market difference</p>
                 <p className={`text-[15px] font-bold tabular-nums mt-0.5 ${below > 0 ? "text-emerald-600" : below < 0 ? "text-amber-600" : "text-foreground"}`}>
                   {below === 0 ? "At market" : `$${Math.abs(below).toLocaleString()} ${below > 0 ? "below" : "above"}`}
                 </p>

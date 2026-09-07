@@ -150,7 +150,7 @@ export default function ServiceInspection() {
       <div className="min-h-screen bg-slate-950 px-4 py-6 text-white">
         <div className="mx-auto max-w-xl rounded-[2rem] border border-white/10 bg-card/10 p-6 text-center shadow-2xl backdrop-blur">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400 text-foreground"><CheckCircle2 className="h-9 w-9" /></div>
-          <h1 className="mt-5 text-3xl font-black">Inspection submitted</h1>
+          <h1 className="text-al-page mt-5">Inspection submitted</h1>
           <p className="mt-2 text-sm leading-relaxed text-white/70">This used-car inspection is saved and ready for manager approval before anything appears on the customer Passport.</p>
           <div className="mt-5 rounded-2xl bg-slate-950/50 p-4 text-left text-xs text-white/70">
             <p><span className="font-black text-white">Inspection ID:</span> {submittedId}</p>
@@ -168,7 +168,7 @@ export default function ServiceInspection() {
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700"><ClipboardCheck className="h-3.5 w-3.5" /> Service QR Intake</div>
-            <h1 className="mt-1 text-xl font-black tracking-tight">Used Vehicle Inspection</h1>
+            <h1 className="text-al-page mt-1">Used Vehicle Inspection</h1>
           </div>
           <button disabled={saving} onClick={save} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-lg shadow-blue-600/20 disabled:opacity-60"><Save className="h-4 w-4" /> {saving ? "Saving" : "Save"}</button>
         </div>

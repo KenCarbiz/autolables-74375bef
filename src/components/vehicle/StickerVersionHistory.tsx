@@ -113,10 +113,10 @@ export default function StickerVersionHistory({ tenantId, vehicleId, canRestore,
             <div key={v.id} className={`rounded-xl border p-3.5 space-y-2 ${v.id === currentId ? "border-blue-600" : "border-border"}`}>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[13px] font-bold text-foreground">Version {v.version}</span>
-                <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_TONE[v.status] || "bg-muted text-muted-foreground"}`}>
+                <span className={`text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_TONE[v.status] || "bg-muted text-muted-foreground"}`}>
                   {humanize(v.status)}
                 </span>
-                {v.id === currentId && <span className="text-[10px] font-bold uppercase tracking-wide text-blue-700">Active</span>}
+                {v.id === currentId && <span className="text-al-meta font-bold uppercase tracking-wide text-blue-700">Active</span>}
               </div>
               <div className="text-[11.5px] text-muted-foreground space-y-0.5">
                 {fmtWhen(v.published_at || v.created_at) && (

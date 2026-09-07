@@ -31,7 +31,7 @@ export default function DealerProgramsPanel() {
 
   const inputCls = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
   const areaCls = "w-full px-2.5 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary resize-y";
-  const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+  const labelCls = "text-al-meta font-bold uppercase tracking-wider text-muted-foreground";
 
   return (
     <div className="space-y-4 max-w-3xl">
@@ -49,7 +49,7 @@ export default function DealerProgramsPanel() {
 
       {/* One-click starters for the items dealers most commonly include. */}
       <div className="rounded-2xl border border-border bg-card p-3.5">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Quick add — common items</p>
+        <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-2">Quick add — common items</p>
         <div className="flex flex-wrap gap-1.5">
           {PROGRAM_PRESETS.map((preset) => {
             const added = programs.some((p) => p.title.trim().toLowerCase() === preset.fields.title.toLowerCase());
@@ -226,7 +226,7 @@ export default function DealerProgramsPanel() {
             )}
 
             <div className="pt-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Where it appears</p>
+              <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Where it appears</p>
               <div className="flex flex-wrap items-center gap-4">
               <label className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground cursor-pointer">
                 <input type="checkbox" checked={p.showOnSticker} onChange={(e) => set(p.id, { showOnSticker: e.target.checked })} />

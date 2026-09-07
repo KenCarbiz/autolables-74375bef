@@ -136,7 +136,7 @@ const ComplianceActionCenter = () => {
         <div>
           <button onClick={() => navigate(-1)} className="mb-2 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Back</button>
           <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"><ShieldCheck className="h-3.5 w-3.5" /> Manager Action Center</div>
-          <h1 className="mt-3 text-2xl font-black tracking-tight text-foreground">Compliance Action Center</h1>
+          <h1 className="text-al-page mt-3 text-foreground">Compliance Action Center</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Find vehicles missing FTC Buyers Guides, K208 warranty worksheets, signatures, or other CT MVP evidence.</p>
         </div>
         <button onClick={load} disabled={loading} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-bold hover:bg-muted disabled:opacity-60"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh</button>
@@ -168,7 +168,7 @@ const ComplianceActionCenter = () => {
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <table className="w-full min-w-[920px] text-sm">
-          <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <thead className="bg-muted/40 text-al-meta uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3 text-left font-semibold">Vehicle</th>
               <th className="px-3 py-3 text-left font-semibold">Stock / VIN</th>

@@ -156,7 +156,7 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
           </p>
         </div>
         {enabled && (
-          <span className="text-[10px] font-bold uppercase tracking-wide text-blue-700 bg-blue-50 ring-1 ring-blue-100 rounded-full px-2 py-1 shrink-0">Compliance Pro</span>
+          <span className="text-al-meta font-bold uppercase tracking-wide text-blue-700 bg-blue-50 ring-1 ring-blue-100 rounded-full px-2 py-1 shrink-0">Compliance Pro</span>
         )}
       </div>
 

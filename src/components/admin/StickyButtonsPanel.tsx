@@ -97,7 +97,7 @@ const StickyButtonsPanel = () => {
 
       {/* Preview */}
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Preview</p>
+        <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-2">Preview</p>
         <div className="rounded-2xl border border-border bg-[#f4f5f7] p-3">
           {cfg.enabled && cfg.buttons.length > 0 ? (
             <div className="bg-card rounded-xl border border-[#e8ebef] p-3" style={{ gridTemplateColumns: `repeat(${Math.min(cfg.buttons.length, MAX_STICKY_BUTTONS)}, minmax(0,1fr))`, display: "grid", gap: 8 }}>

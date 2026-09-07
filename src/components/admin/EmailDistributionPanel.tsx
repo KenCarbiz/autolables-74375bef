@@ -123,7 +123,7 @@ export const EmailDistributionPanel = ({ storeId }: Props) => {
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <thead className="bg-muted/40 text-al-meta uppercase tracking-[0.14em] text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-2 font-bold">Role</th>
                 <th className="text-left px-3 py-2 font-bold">Name</th>
@@ -140,7 +140,7 @@ export const EmailDistributionPanel = ({ storeId }: Props) => {
             <tbody className="divide-y divide-border">
               {recipients.map(rec => (
                 <tr key={rec.id}>
-                  <td className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-foreground">
+                  <td className="px-3 py-2 text-al-meta font-bold uppercase tracking-wider text-foreground">
                     {ROLE_LABELS[rec.role]}
                   </td>
                   <td className="px-3 py-2 text-sm">{rec.name || "—"}</td>

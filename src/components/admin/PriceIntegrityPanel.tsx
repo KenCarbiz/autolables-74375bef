@@ -233,21 +233,21 @@ export const PriceIntegrityPanel = () => {
 
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">VINs monitored</p>
+          <p className="text-al-meta font-bold uppercase tracking-[0.12em] text-muted-foreground">VINs monitored</p>
           <p className="mt-0.5 font-display text-2xl font-black tracking-tight text-foreground">{monitored}</p>
         </div>
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700">Matched</p>
+          <p className="text-al-meta font-bold uppercase tracking-[0.12em] text-emerald-700">Matched</p>
           <p className="mt-0.5 font-display text-2xl font-black tracking-tight text-emerald-700">{matched}</p>
         </div>
         <div className={`rounded-2xl border p-4 ${mismatches.length > 0 ? "border-red-200 bg-red-50/50" : "border-border bg-card"}`}>
-          <p className={`text-[11px] font-bold uppercase tracking-[0.12em] ${mismatches.length > 0 ? "text-red-700" : "text-muted-foreground"}`}>Mismatches</p>
+          <p className={`text-al-meta font-bold uppercase tracking-[0.12em] ${mismatches.length > 0 ? "text-red-700" : "text-muted-foreground"}`}>Mismatches</p>
           <p className={`mt-0.5 font-display text-2xl font-black tracking-tight ${mismatches.length > 0 ? "text-red-700" : "text-foreground"}`}>{mismatches.length}</p>
         </div>
       </div>
 
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground px-5 pt-4">Flagged price mismatches</p>
+        <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground px-5 pt-4">Flagged price mismatches</p>
         {mismatches.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-muted-foreground inline-flex items-center justify-center gap-2 w-full">
             <ShieldCheck className="w-4 h-4 text-emerald-600" /> Every advertised price matches its sticker. No drift.

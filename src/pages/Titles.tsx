@@ -94,7 +94,7 @@ const Titles = () => {
         <div>
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-blue-600" />
-            <h1 className="text-xl font-semibold tracking-tight font-display text-foreground">Titles &amp; MCOs</h1>
+            <h1 className="text-al-page font-display text-foreground">Titles &amp; MCOs</h1>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             In-stock vehicles missing the title (used) or MCO (new) upload. Documents are dealer-only and never appear on the public Passport.
@@ -152,11 +152,11 @@ const Titles = () => {
                     </div>
                   </div>
                   {v.missing.length === 0 ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 flex-shrink-0">
+                    <span className="inline-flex items-center gap-1 text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 flex-shrink-0">
                       <CheckCircle2 className="w-3 h-3" /> On file
                     </span>
                   ) : (
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 flex-shrink-0">
+                    <span className="text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 flex-shrink-0">
                       {isNew ? "MCO" : "Title"} missing {v.missing.join(" + ")}
                     </span>
                   )}

@@ -47,7 +47,7 @@ const Stat = ({ icon: Icon, label, value, tone = "slate", onClick }: { icon: typ
         <Icon className="h-4 w-4" />
         <span className="text-xl font-black tabular-nums">{value}</span>
       </div>
-      <p className="mt-2 text-[11px] font-bold uppercase tracking-wide">{label}</p>
+      <p className="mt-2 text-al-meta font-bold uppercase tracking-wide">{label}</p>
     </button>
   );
 };

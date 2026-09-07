@@ -446,11 +446,11 @@ export default function StickerTemplatesAdminPanel() {
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Browse the restored 100+ catalog by purpose, OEM fit, pricing strategy, and customer Passport flow. Click any card for a larger preview, or Duplicate to get an editable copy that renders exactly like its source.</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center sm:grid-cols-5">
-            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{items.length}</p><p className="text-[10px] font-bold uppercase text-muted-foreground">Total</p></div>
-            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{USED_ADDENDUM_CATALOG_50.length}</p><p className="text-[10px] font-bold uppercase text-muted-foreground">Used</p></div>
-            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{NEW_MONRONEY_CATALOG_50.length}</p><p className="text-[10px] font-bold uppercase text-muted-foreground">New Stickers</p></div>
-            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{NEW_ADDENDUM_CATALOG_50.length}</p><p className="text-[10px] font-bold uppercase text-muted-foreground">New Add.</p></div>
-            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{rows.length}</p><p className="text-[10px] font-bold uppercase text-muted-foreground">DB</p></div>
+            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{items.length}</p><p className="text-al-meta font-bold uppercase text-muted-foreground">Total</p></div>
+            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{USED_ADDENDUM_CATALOG_50.length}</p><p className="text-al-meta font-bold uppercase text-muted-foreground">Used</p></div>
+            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{NEW_MONRONEY_CATALOG_50.length}</p><p className="text-al-meta font-bold uppercase text-muted-foreground">New Stickers</p></div>
+            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{NEW_ADDENDUM_CATALOG_50.length}</p><p className="text-al-meta font-bold uppercase text-muted-foreground">New Add.</p></div>
+            <div className="rounded-2xl bg-muted p-3"><p className="text-xl font-black text-foreground">{rows.length}</p><p className="text-al-meta font-bold uppercase text-muted-foreground">DB</p></div>
           </div>
         </div>
         <div className="relative mt-5">
@@ -488,7 +488,7 @@ export default function StickerTemplatesAdminPanel() {
                   {item.source === "database" ? <button onClick={() => patch(item.row.id, { is_featured: !item.row.is_featured })} className={`rounded p-1 ${item.row.is_featured ? "text-amber-500" : "text-muted-foreground hover:text-foreground"}`}><Star className="h-4 w-4" fill={item.row.is_featured ? "currentColor" : "none"} /></button> : null}
                 </div>
                 <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
-                {item.source === "database" && copySourceId(item.row) ? <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wide text-blue-600">Copy of {copySourceId(item.row)} · key {item.row.template_key}</p> : null}
+                {item.source === "database" && copySourceId(item.row) ? <p className="mt-1 truncate text-al-meta font-bold uppercase tracking-wide text-blue-600">Copy of {copySourceId(item.row)} · key {item.row.template_key}</p> : null}
                 <div className="mt-2 flex flex-wrap gap-1">{item.tags.slice(0, 5).map((tag) => <span key={tag} className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{tag}</span>)}</div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button onClick={() => duplicate(item)} disabled={copyingId === item.id} className="h-8 flex-1 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 disabled:opacity-60"><Copy className="inline h-3.5 w-3.5" /> {copyingId === item.id ? "Copying…" : "Duplicate"}</button>
@@ -517,7 +517,7 @@ export default function StickerTemplatesAdminPanel() {
             </div>
             <div className="flex-1 overflow-auto bg-muted p-6"><div className="mx-auto flex min-h-[70vh] items-center justify-center rounded-2xl border border-border bg-card p-6 shadow-inner">{renderLargePreview(preview)}</div></div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
-              <div className="flex flex-wrap gap-1">{preview.tags.slice(0, 12).map((tag) => <span key={tag} className="rounded bg-muted px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{tag}</span>)}</div>
+              <div className="flex flex-wrap gap-1">{preview.tags.slice(0, 12).map((tag) => <span key={tag} className="rounded bg-muted px-2 py-1 text-al-meta font-bold uppercase tracking-wide text-muted-foreground">{tag}</span>)}</div>
               <div className="flex flex-wrap items-center gap-2">
                 {previewCopySource && previewRow ? (
                   <>

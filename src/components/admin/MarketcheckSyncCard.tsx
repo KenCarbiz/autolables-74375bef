@@ -235,7 +235,7 @@ export default function MarketcheckSyncCard() {
           </label>
 
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+            <label className="block text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1">
               Dealer website domain
             </label>
             <input value={cfg.source} onChange={(e) => set({ source: e.target.value })}
@@ -246,7 +246,7 @@ export default function MarketcheckSyncCard() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Frequency</label>
+              <label className="block text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1">Frequency</label>
               <select value={cfg.frequency} onChange={(e) => set({ frequency: e.target.value as Config["frequency"] })}
                 className="w-full h-10 rounded-md border border-border bg-background px-2 text-sm">
                 <option value="nightly">Nightly</option>
@@ -256,7 +256,7 @@ export default function MarketcheckSyncCard() {
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Run hour (UTC)</label>
+              <label className="block text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1">Run hour (UTC)</label>
               <select value={cfg.run_hour} onChange={(e) => set({ run_hour: parseInt(e.target.value, 10) })}
                 className="w-full h-10 rounded-md border border-border bg-background px-2 text-sm">
                 {Array.from({ length: 24 }, (_, h) => (
@@ -266,7 +266,7 @@ export default function MarketcheckSyncCard() {
             </div>
             {periodic && (
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Day of week</label>
+                <label className="block text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1">Day of week</label>
                 <select value={cfg.day_of_week} onChange={(e) => set({ day_of_week: parseInt(e.target.value, 10) })}
                   className="w-full h-10 rounded-md border border-border bg-background px-2 text-sm">
                   {DOW.map((d, i) => <option key={i} value={i}>{d}</option>)}
@@ -274,7 +274,7 @@ export default function MarketcheckSyncCard() {
               </div>
             )}
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Max vehicles / run</label>
+              <label className="block text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-1">Max vehicles / run</label>
               <input type="number" min={1} max={10000} value={cfg.max_vehicles}
                 onChange={(e) => set({ max_vehicles: Math.max(1, Math.min(10000, parseInt(e.target.value, 10) || 1)) })}
                 className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm tabular-nums" />

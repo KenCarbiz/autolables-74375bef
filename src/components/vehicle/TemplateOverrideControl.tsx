@@ -101,12 +101,12 @@ export default function TemplateOverrideControl({ tenantId, vehicleId, canEdit, 
               <span className="block text-[12.5px] font-semibold text-foreground">
                 {o.label}
                 {o.isAutomatic && (
-                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                  <span className="ml-2 text-al-meta font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
                     Automatic
                   </span>
                 )}
                 {o.templateKey === current && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                  <span className="ml-2 inline-flex items-center gap-1 text-al-meta font-bold uppercase tracking-wide text-blue-700">
                     <Check className="w-3 h-3" /> In use
                   </span>
                 )}

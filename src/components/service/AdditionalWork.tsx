@@ -141,7 +141,7 @@ export function RequestAdditionalWorkButton({ tenantId, veh, inspectionItemId, o
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
   );
@@ -325,7 +325,7 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
                 {clarifyForId === r.id ? (
                   <form onSubmit={(e) => { e.preventDefault(); respond(r.id); }} className="flex items-end gap-2 flex-wrap">
                     <label className="flex-1 min-w-[180px]">
-                      <span className="text-[10.5px] font-bold uppercase tracking-wide text-amber-900">Your answer</span>
+                      <span className="text-al-meta font-bold uppercase tracking-wide text-amber-900">Your answer</span>
                       <input
                         autoFocus
                         value={clarifyValue}
@@ -360,7 +360,7 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
                   const approvedTotal = lines.reduce((s, l) => s + (unchecked[l.id] ? 0 : Number(l.amount)), 0);
                   return (
                     <div className="rounded-lg border border-border bg-muted/30 p-2.5 space-y-1.5">
-                      <p className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">
+                      <p className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">
                         Approval selection — unchecked items will not be approved
                       </p>
                       {lines.map((l) => (
@@ -405,7 +405,7 @@ export function ServiceApprovalsPanel({ tenantId, vin, onDecided }: { tenantId: 
                       className="flex items-end gap-2 flex-wrap rounded-lg border border-border bg-muted/40 p-2.5"
                     >
                       <label className="flex-1 min-w-[180px]">
-                        <span className="text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">{meta.label}</span>
+                        <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">{meta.label}</span>
                         <input
                           autoFocus
                           value={decisionValue}

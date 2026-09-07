@@ -17,7 +17,7 @@ const QrAnalytics = () => {
     <div className="p-4 lg:p-6 max-w-[1100px] mx-auto space-y-5">
       <div>
         <button onClick={() => navigate("/dashboard")} className="text-[11px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Dashboard</button>
-        <h1 className="text-xl font-semibold tracking-tight font-display text-foreground inline-flex items-center gap-2"><QrCode className="w-5 h-5 text-primary" /> QR scan analytics</h1>
+        <h1 className="text-al-page font-display text-foreground inline-flex items-center gap-2"><QrCode className="w-5 h-5 text-primary" /> QR scan analytics</h1>
         <p className="text-xs text-muted-foreground mt-1">How shoppers are engaging with the QR codes on your printed stickers — last 30 days.</p>
       </div>
 
@@ -95,7 +95,7 @@ const QrAnalytics = () => {
 
 const Kpi = ({ label, value }: { label: string; value: number }) => (
   <div className="rounded-2xl border border-border bg-card p-4">
-    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+    <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
     <p className="text-2xl font-black text-foreground mt-1 tabular-nums">{value.toLocaleString()}</p>
   </div>
 );

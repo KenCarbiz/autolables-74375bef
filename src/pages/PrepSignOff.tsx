@@ -138,7 +138,7 @@ const PrepSignOff = () => {
           <div className="mb-6"><NextStepBanner stage="prep" /></div>
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Prep & Install Sign-Off</h1>
+              <h1 className="text-al-page text-foreground">Prep & Install Sign-Off</h1>
               <p className="text-muted-foreground mt-2">Shop foreman approves every vehicle before it hits the lot.</p>
             </div>
             <button
@@ -505,7 +505,7 @@ const PrepSignOff = () => {
                           } bg-muted`}
                         >
                           <img src={ph.url} alt="" className="w-full h-full object-cover" />
-                          <div className="absolute inset-x-0 bottom-0 px-1.5 py-1 text-[10px] font-bold uppercase tracking-label bg-black/50 text-white flex items-center justify-between">
+                          <div className="absolute inset-x-0 bottom-0 px-1.5 py-1 text-al-meta font-bold uppercase tracking-label bg-black/50 text-white flex items-center justify-between">
                             {isUploading ? (
                               <span className="inline-flex items-center gap-1">
                                 <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse" />
@@ -934,7 +934,7 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
           </div>
         ) : (
           <div>
-            <div className="px-5 py-2.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+            <div className="px-5 py-2.5 bg-muted/30 text-al-meta font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
               <span>{getReadyRecords.length} vehicle{getReadyRecords.length !== 1 ? "s" : ""}</span>
               <span>{getPendingGetReady().length} pending</span>
             </div>
@@ -1130,7 +1130,7 @@ const RejectModal = ({
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-label text-muted-foreground">
+            <label className="text-al-meta font-bold uppercase tracking-label text-muted-foreground">
               Reason *
             </label>
             <select
@@ -1144,7 +1144,7 @@ const RejectModal = ({
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-label text-muted-foreground">
+            <label className="text-al-meta font-bold uppercase tracking-label text-muted-foreground">
               Notes
             </label>
             <textarea

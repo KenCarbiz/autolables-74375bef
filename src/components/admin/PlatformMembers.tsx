@@ -138,7 +138,7 @@ export const PlatformMembers = () => {
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <thead className="bg-muted/50 text-al-meta uppercase tracking-wide text-muted-foreground">
               <tr>
                 <SortHeader label="Tenant"   sortKey="tenant"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
                 <SortHeader label="Email"    sortKey="invited_email" activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />

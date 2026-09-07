@@ -23,7 +23,7 @@ const fmtWhen = (d?: string | null) =>
 
 const Field = ({ label, value }: { label: string; value: string }) => (
   <div className="min-w-0">
-    <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+    <dt className="text-al-meta font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
     <dd className="text-[12px] text-foreground break-words">{value}</dd>
   </div>
 );
@@ -34,7 +34,7 @@ export default function StickerBlockersPanel({
   if (!blockers.length) {
     return (
       <div className="rounded-2xl border border-border bg-card p-4">
-        <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Blockers</h2>
+        <h2 className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Blockers</h2>
         <p className="text-[12.5px] text-emerald-700 inline-flex items-center gap-1.5">
           <CheckCircle2 className="w-4 h-4" /> Nothing is blocking this document.
         </p>
@@ -44,7 +44,7 @@ export default function StickerBlockersPanel({
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-      <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+      <h2 className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">
         Blockers ({blockers.length})
       </h2>
 
@@ -68,7 +68,7 @@ export default function StickerBlockersPanel({
                 <p className="text-[13px] font-bold text-foreground">{b.title}</p>
                 <p className="text-[10px] font-mono text-muted-foreground mt-0.5">{b.code}</p>
               </div>
-              <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${blocking ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+              <span className={`text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${blocking ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
                 {blocking ? "Blocks publishing" : "Review"}
               </span>
             </div>
@@ -86,7 +86,7 @@ export default function StickerBlockersPanel({
             </dl>
 
             <div className="rounded-lg bg-background/70 border border-border/60 p-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Recommended resolution</p>
+              <p className="text-al-meta font-semibold uppercase tracking-wide text-muted-foreground">Recommended resolution</p>
               <p className="text-[12px] text-foreground mt-0.5">{b.recommendedResolution}</p>
             </div>
 
