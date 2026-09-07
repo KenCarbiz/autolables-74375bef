@@ -191,7 +191,8 @@ describe("the master band covers the vAuto floor", () => {
     const v3 = core.slice(core.indexOf("export function buildMasterPromptV3("),
                           core.indexOf("* V3 channel prompt."));
     expect(v3).toMatch(/const reserve = legalLen \? legalLen \+ 2 : 0;/);
-    expect(v3).toMatch(/- Length: aim for \$\{writeBand\.min\}-\$\{writeBand\.max\} characters/);
+    expect(v3).toMatch(/write to about \$\{writeBand\.max\} characters/);
+    expect(v3).toMatch(/\$\{writeBand\.min\} is the floor/);
     // The legacy builder keeps the plain band: it appends nothing.
     const legacy = core.slice(core.indexOf("export function buildMasterPrompt("),
                               core.indexOf("export function buildMasterPromptV3("));
@@ -209,19 +210,40 @@ describe("the master band covers the vAuto floor", () => {
     expect(huge.max_length).toBeGreaterThan(0); // fixture is only illustrative
   });
 
-  it("raises the master floor to the vAuto floor", () => {
+  it("uses the owner's floor of 3,200 and goal of 3,879", () => {
     const mig = readFileSync(join(fnDir,
-      "../migrations/20260906230000_master_band_covers_vauto.sql"), "utf8");
-    expect(mig).toMatch(/SET min_length = 3221/);
+      "../migrations/20260907014500_master_band_3200_goal_3879.sql"), "utf8");
+    expect(mig).toMatch(/SET min_length = 3200/);
     expect(mig).toMatch(/max_length = 3879/);
-    // Guarded on the old values so a later deliberate change is not reverted.
-    expect(mig).toMatch(/AND min_length = 1800/);
+    // Guarded on the previous values so a later deliberate change is not
+    // silently reverted by re-running the migration.
+    expect(mig).toMatch(/WHERE min_length = 3221/);
   });
 
   it("matches the vAuto channel policy it has to feed", () => {
     const policy = readFileSync(join(fnDir,
       "_shared/description-channel-policy.ts"), "utf8");
-    expect(policy).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
+    expect(policy).toMatch(/recommendedMin: 3200, recommendedMax: 3879/);
+    expect(policy).not.toMatch(/recommendedMin: 3221/);
+  });
+
+  it("treats the ceiling as the target and the floor as a floor", () => {
+    // "aim for 3200-3879" invites stopping at the bottom of the range, which
+    // is what produced copy landing a few characters past the floor.
+    const v3 = core.slice(core.indexOf("export function buildMasterPromptV3("),
+                          core.indexOf("* V3 channel prompt."));
+    expect(v3).toMatch(/write to about \$\{writeBand\.max\} characters/);
+    expect(v3).toMatch(/is the floor, not the target/);
+    expect(v3).not.toMatch(/aim for \$\{writeBand\.min\}-/);
+  });
+
+  it("says how to reach the target, and how not to", () => {
+    const v3 = core.slice(core.indexOf("export function buildMasterPromptV3("),
+                          core.indexOf("* V3 channel prompt."));
+    // A goal with no route to it is an invitation to pad.
+    expect(v3).toMatch(/Reach the target by COVERING MORE of the verified material/);
+    expect(v3).toMatch(/Never reach it by padding/);
+    expect(v3).toMatch(/If the verified facts genuinely run out before the floor, stop writing/);
   });
 });
 
@@ -260,7 +282,7 @@ describe("the master is supplied enough material for its own band", () => {
       "_shared/description-channel-policy.ts"), "utf8");
     const vauto = policy.slice(policy.indexOf('key: "vauto"'),
                                policy.indexOf('key: "vauto"') + 1400);
-    expect(vauto).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
+    expect(vauto).toMatch(/recommendedMin: 3200, recommendedMax: 3879/);
     expect(vauto).toMatch(/featureBudget: 35/);
     expect(vauto).not.toMatch(/featureBudget: 10/);
   });

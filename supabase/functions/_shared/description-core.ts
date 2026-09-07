@@ -746,7 +746,9 @@ ${toneInstruction(packet.tone)}
 ${voiceInstruction(packet.voice)}
 
 STRUCTURE
-- Length: aim for ${writeBand.min}-${writeBand.max} characters, and never exceed ${LENGTH_POLICY.absoluteMax}. This is a target, not a quota: write as much as the VERIFIED facts above genuinely support and no more. A vehicle with little verified data gets a shorter description. Never pad, repeat a feature, restate a fact in different words, or add generic dealership filler to reach a length.
+- Length: write to about ${writeBand.max} characters. ${writeBand.min} is the floor, not the target — copy that stops just past the floor is short. Never exceed ${LENGTH_POLICY.absoluteMax}.
+- Reach the target by COVERING MORE of the verified material above: more of the prioritized equipment, grouped sensibly; the practical ownership detail; the specifications and fuel economy where they matter to a buyer. Never reach it by padding, repeating a feature under a second name, restating a fact in different words, or adding generic dealership filler.
+- If the verified facts genuinely run out before the floor, stop writing. Short copy is reviewed by a person; invented copy is not acceptable at any length.
 - A strong opening that names the vehicle, then the qualities that matter most, then the prioritized equipment grouped sensibly, then practical ownership detail, then the close.
 ${kw}
 
