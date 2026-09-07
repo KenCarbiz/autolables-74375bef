@@ -10564,6 +10564,7 @@ export type Database = {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: boolean
       }
+      lifecycle_bucket: { Args: { p_state: string }; Returns: string }
       listings_with_stale_recalls: {
         Args: { p_limit?: number }
         Returns: {
@@ -10684,6 +10685,7 @@ export type Database = {
       }
       oem_franchise_min_new_units: { Args: never; Returns: number }
       oem_make_from_ymm: { Args: { _ymm: string }; Returns: string }
+      operating_metrics: { Args: { p_tenant_id: string }; Returns: Json }
       publish_description_internal: {
         Args: {
           p_case_id: string
