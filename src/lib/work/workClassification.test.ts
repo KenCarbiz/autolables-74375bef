@@ -69,6 +69,14 @@ describe("engineering wording never reaches a screen (W4)", () => {
     expect(exceptionCopy("exception_removed_from_feed").nextAction).toBeNull();
   });
 
+  it("gives description review a real next action, not the de-slugged fallback", () => {
+    // 470 of these exist; "Description review" with no action would strand
+    // every one of them on a screen that offers nothing to do.
+    const c = exceptionCopy("exception_description_review");
+    expect(c.label).toBe("Description needs review");
+    expect(c.nextAction).toBe("Review facts");
+  });
+
   it("de-slugs an unknown type rather than leaking the raw identifier", () => {
     const c = exceptionCopy("exception_some_new_backend_thing");
     expect(c.label).toBe("Some new backend thing");

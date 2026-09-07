@@ -111,6 +111,11 @@ const COPY: Record<string, ExceptionCopy> = {
     why: "Reported odometer moved since the last sync.",
     nextAction: "Review mileage",
   },
+  exception_description_review: {
+    label: "Description needs review",
+    why: "A validator flagged a claim in this vehicle's description.",
+    nextAction: "Review facts",
+  },
   exception_stock_number_change: {
     label: "Stock number changed",
     why: "The dealer feed reassigned this vehicle's stock number.",

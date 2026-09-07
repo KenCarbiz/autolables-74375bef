@@ -1,12 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVinQueue } from "@/hooks/useVinQueue";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { buildSelfAwareWorkItems, createSelfAwareWorkItems, type DealerAutomationSettings, type SelfAwareVehicle } from "@/lib/automation/selfAwareWorkEngine";
-import { AlertTriangle, Car, CheckCircle2, ClipboardList, FileText, Filter, PlayCircle, Printer, RefreshCw, RotateCcw, ScanLine, ShieldCheck, Sparkles, Trash2, Wrench } from "lucide-react";
+import {
+  classifyWorkItem,
+  exceptionCopy,
+  isLiveException,
+  isSystemException,
+  WORK_LANES,
+  type WorkLane,
+} from "@/lib/work/workClassification";
+import { AlertTriangle, Car, CheckCircle2, ClipboardList, Filter, Inbox, PlayCircle, Printer, RefreshCw, RotateCcw, ScanLine, ShieldCheck, Sparkles, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
 type WorkStatus = "all" | "open" | "needs_approval" | "in_progress" | "completed" | "cancelled";
@@ -25,8 +34,12 @@ type WorkItem = {
   status: string;
   priority?: string | null;
   department?: string | null;
+  source?: string | null;
+  assigned_to?: string | null;
+  due_at?: string | null;
   created_at?: string | null;
   metadata?: Record<string, unknown> | null;
+  vehicleActive?: boolean;
 };
 
 const statusLabels: Record<string, string> = {
@@ -37,12 +50,12 @@ const statusLabels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
-const statusTone = (status: string) => {
-  if (status === "completed") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (status === "needs_approval") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (status === "in_progress") return "border-blue-200 bg-blue-50 text-blue-800";
-  if (status === "cancelled") return "border-border bg-muted text-muted-foreground";
-  return "border-border bg-white text-foreground";
+const laneCopy: Record<WorkLane, string> = {
+  needs_me: "New work lands here the moment it carries your name.",
+  team: "Tasks owned by someone else on the team show up here.",
+  waiting: "Human work with no owner yet waits here for someone to take it.",
+  system_exception: "Records the sync wrote about vehicles still on the lot.",
+  completed: "Finished and cancelled work stays here for the audit trail.",
 };
 
 const departmentIcon = (department?: string | null) => {
@@ -53,14 +66,41 @@ const departmentIcon = (department?: string | null) => {
   return ClipboardList;
 };
 
+const deepLinkOf = (item: WorkItem) => {
+  const link = item.metadata?.deep_link;
+  if (typeof link === "string" && link) return link;
+  if (item.vehicle_id) return `/vehicle-file/${item.vehicle_id}`;
+  return null;
+};
+
+const vehicleLabel = (item: WorkItem) => {
+  const customer = item.metadata?.customer_name;
+  if (typeof customer === "string" && customer.trim()) return customer.trim();
+  if (item.vehicle_title) return item.vehicle_title;
+  if (item.stock) return `Stock ${item.stock}`;
+  if (item.vin) return item.vin;
+  return "No vehicle on file";
+};
+
+const dueLabel = (item: WorkItem) => {
+  if (!item.due_at) return { text: "No due date", overdue: false };
+  const due = new Date(item.due_at);
+  if (Number.isNaN(due.getTime())) return { text: "No due date", overdue: false };
+  const overdue = due.getTime() < Date.now() && item.status !== "completed" && item.status !== "cancelled";
+  return { text: `${overdue ? "Overdue " : ""}${format(due, "MMM d, yyyy")}`, overdue };
+};
+
 const WorkQueue = () => {
   const { tenant } = useTenant();
+  const { user } = useAuth();
   const navigate = useViewTransitionNavigate();
   const [items, setItems] = useState<WorkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [lane, setLane] = useState<WorkLane>("needs_me");
   const [status, setStatus] = useState<WorkStatus>("all");
   const [department, setDepartment] = useState<Department>("all");
+  const [includeDeparted, setIncludeDeparted] = useState(false);
   const [q, setQ] = useState("");
 
   const load = async () => {
@@ -73,8 +113,8 @@ const WorkQueue = () => {
       .order("created_at", { ascending: false })
       .limit(250);
 
-    // Open description exceptions are real work: surface them here alongside
-    // the vehicle tasks rather than hiding them inside the description tool.
+    // Open description exceptions are system records too, not owned tasks, so
+    // they carry an exception_ work_type and land in the exceptions lane.
     const { data: descExc } = await (supabase as any)
       .from("description_exceptions")
       .select("id, vehicle_id, exception_type, severity, blocking, title, summary, created_at, description_case_id")
@@ -83,21 +123,45 @@ const WorkQueue = () => {
     const descItems: WorkItem[] = ((descExc || []) as any[]).map((e) => ({
       id: `desc-exc-${e.id}`,
       vehicle_id: e.vehicle_id,
-      work_type: "description_exception",
+      work_type: "exception_description_review",
       title: e.title || "Description exception",
       description: e.summary || "A vehicle description needs review before it can publish.",
       status: "open",
       priority: e.blocking ? "high" : e.severity === "critical" ? "urgent" : "normal",
       department: "passport",
+      source: "description_exception",
       created_at: e.created_at,
       metadata: { deep_link: `/description-intelligence/${e.vehicle_id}`, exception_type: e.exception_type },
     }));
 
+    // Active inventory drives `vehicleActive`. When this read fails we mark
+    // everything active: a silent miss would hide every live exception behind
+    // the departed-vehicle filter, which is worse than showing a few extras.
+    const { data: activeRows, error: activeErr } = await (supabase as any)
+      .from("vehicle_listings")
+      .select("id, vin")
+      .or(`tenant_id.eq.${tenant.id},tenant_id.is.null`)
+      .neq("status", "archived")
+      .limit(2000);
+    const activeIds = new Set<string>();
+    const activeVins = new Set<string>();
+    for (const row of ((activeRows || []) as { id?: string | null; vin?: string | null }[])) {
+      if (row.id) activeIds.add(row.id);
+      if (row.vin) activeVins.add(row.vin.toUpperCase());
+    }
+    const inventoryKnown = !activeErr && (activeRows || []).length > 0;
+    const withActivity = (rows: WorkItem[]) => rows.map((row) => ({
+      ...row,
+      vehicleActive: inventoryKnown
+        ? Boolean((row.vehicle_id && activeIds.has(row.vehicle_id)) || (row.vin && activeVins.has(row.vin.toUpperCase())))
+        : true,
+    }));
+
     if (error) {
       toast.error("Could not load Work Queue. The newest migration may still be deploying.");
-      setItems(descItems);
+      setItems(withActivity(descItems));
     } else {
-      setItems([...(data || []), ...descItems] as WorkItem[]);
+      setItems(withActivity([...((data || []) as WorkItem[]), ...descItems]));
     }
     setLoading(false);
   };
@@ -116,19 +180,32 @@ const WorkQueue = () => {
     });
   }, [items, status, department, q]);
 
-  const counts = useMemo(() => ({
-    total: items.length,
-    open: items.filter((i) => i.status === "open").length,
-    approval: items.filter((i) => i.status === "needs_approval").length,
-    print: items.filter((i) => i.department === "print" && i.status !== "completed" && i.status !== "cancelled").length,
-    service: items.filter((i) => ["service", "detail", "third_party"].includes(i.department || "") && i.status !== "completed" && i.status !== "cancelled").length,
-    compliance: items.filter((i) => ["compliance", "manager"].includes(i.department || "") && i.status !== "completed" && i.status !== "cancelled").length,
-  }), [items]);
+  const byLane = useMemo(() => {
+    const buckets: Record<WorkLane, WorkItem[]> = {
+      needs_me: [], team: [], waiting: [], system_exception: [], completed: [],
+    };
+    for (const item of filtered) buckets[classifyWorkItem(item, user?.id)].push(item);
+    return buckets;
+  }, [filtered, user?.id]);
+
+  // isLiveException gates on open/needs_approval; an exception someone already
+  // started must not vanish from the lane while it is being worked.
+  const liveExceptions = useMemo(
+    () => byLane.system_exception.filter(
+      (item) => isLiveException(item) || (item.vehicleActive === true && item.status === "in_progress"),
+    ),
+    [byLane.system_exception],
+  );
+  const departedCount = byLane.system_exception.length - liveExceptions.length;
+  const visibleExceptions = includeDeparted ? byLane.system_exception : liveExceptions;
+
+  const laneCount = (key: WorkLane) => key === "system_exception" ? visibleExceptions.length : byLane[key].length;
+  const laneItems = lane === "system_exception" ? visibleExceptions : byLane[lane];
 
   const updateStatus = async (item: WorkItem, nextStatus: string) => {
     // Description exceptions are not dealer_work_items rows — they can only be
     // resolved on the description record, where the decision is audited.
-    if (item.work_type === "description_exception") {
+    if (item.source === "description_exception") {
       toast.info("Open the description record to resolve this exception.");
       return;
     }
@@ -191,46 +268,58 @@ const WorkQueue = () => {
     return buildSelfAwareWorkItems({ id: item.vehicle_id, vin: item.vin, stock: item.stock, ymm: item.vehicle_title, condition: item.condition }, {});
   };
 
+  const filtersActive = status !== "all" || department !== "all" || q.trim().length > 0;
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-5 p-4 lg:p-6">
-      <section className="overflow-hidden rounded-[2rem] border border-border bg-slate-950 text-white shadow-sm">
-        <div className="relative grid gap-6 p-5 lg:grid-cols-[1fr_auto] lg:items-end lg:p-7">
-          <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
-          <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-100">
-              <Sparkles className="h-3.5 w-3.5" /> Self-Aware Work Queue
-            </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">Today&apos;s dealership work, created from inventory.</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/70">
-              Scraper and inventory changes should create the work automatically: stickers, Buyers Guides, get-ready, CPO/demo/EV reviews, Passport approval, and price truth checks.
+      <section className="rounded-2xl border border-border bg-card px-5 py-5 shadow-sm lg:px-6 lg:py-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">Work</p>
+            <h1 className="font-display text-al-page text-foreground mt-1">What needs a person today.</h1>
+            <p className="text-al-body text-muted-foreground mt-2 max-w-2xl">
+              Tasks people own come first. Everything the sync recorded about a vehicle sits in its own lane, so a feed
+              event never counts as somebody&apos;s job.
             </p>
           </div>
-          <div className="relative flex flex-wrap gap-2">
-            <button onClick={load} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-black text-white hover:bg-white/15 disabled:opacity-60">
+          <div className="flex flex-wrap gap-2">
+            <button onClick={load} disabled={loading} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-al-button text-foreground transition-colors hover:bg-muted disabled:opacity-60">
               <RefreshCw className="h-4 w-4" /> Refresh
             </button>
-            <button onClick={generateFromInventory} disabled={creating} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-foreground shadow-lg shadow-black/20 disabled:opacity-60">
+            <button onClick={generateFromInventory} disabled={creating} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-al-button text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
               <PlayCircle className="h-4 w-4" /> {creating ? "Building queue..." : "Build from inventory"}
             </button>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <QueueMetric label="Open" value={counts.open} onClick={() => setStatus("open")} />
-        <QueueMetric label="Needs Approval" value={counts.approval} tone="amber" onClick={() => setStatus("needs_approval")} />
-        <QueueMetric label="Print Queue" value={counts.print} onClick={() => setDepartment("print")} />
-        <QueueMetric label="Get-Ready" value={counts.service} onClick={() => setDepartment("service")} />
-        <QueueMetric label="Compliance" value={counts.compliance} tone="red" onClick={() => setDepartment("compliance")} />
+      <section className="rounded-2xl border border-border bg-card p-2 shadow-sm">
+        <div className="flex gap-1 overflow-x-auto">
+          {WORK_LANES.map((l) => {
+            const active = l.key === lane;
+            const count = laneCount(l.key);
+            return (
+              <button
+                key={l.key}
+                onClick={() => setLane(l.key)}
+                aria-current={active ? "page" : undefined}
+                className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-al-button transition-colors ${active ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60"}`}
+              >
+                {l.label}
+                <span className={`rounded-full px-2 py-0.5 text-al-meta ${active ? "bg-card text-foreground" : "bg-muted text-muted-foreground"}`}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
-      <section className="rounded-3xl border border-border bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[220px] flex-1">
             <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN, stock, task, department..." className="h-10 w-full rounded-xl border border-border bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-400" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN, stock, task, department..." className="h-10 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-al-body text-foreground outline-none focus:border-primary" />
           </div>
-          <select value={status} onChange={(e) => setStatus(e.target.value as WorkStatus)} className="h-10 rounded-xl border border-border bg-white px-3 text-sm font-semibold">
+          <select value={status} onChange={(e) => setStatus(e.target.value as WorkStatus)} className="h-10 rounded-xl border border-border bg-card px-3 text-al-button text-foreground">
             <option value="all">All statuses</option>
             <option value="open">Open</option>
             <option value="needs_approval">Needs approval</option>
@@ -238,7 +327,7 @@ const WorkQueue = () => {
             <option value="completed">Done</option>
             <option value="cancelled">Cancelled</option>
           </select>
-          <select value={department} onChange={(e) => setDepartment(e.target.value as Department)} className="h-10 rounded-xl border border-border bg-white px-3 text-sm font-semibold">
+          <select value={department} onChange={(e) => setDepartment(e.target.value as Department)} className="h-10 rounded-xl border border-border bg-card px-3 text-al-button text-foreground">
             <option value="all">All departments</option>
             <option value="inventory">Inventory</option>
             <option value="print">Print</option>
@@ -251,78 +340,252 @@ const WorkQueue = () => {
             <option value="finance">Finance</option>
           </select>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <QuickFilter label="Needs approval" onClick={() => { setStatus("needs_approval"); setDepartment("all"); }} />
+          <QuickFilter label="Print queue" onClick={() => { setDepartment("print"); setStatus("all"); }} />
+          <QuickFilter label="Get-ready" onClick={() => { setDepartment("service"); setStatus("all"); }} />
+          <QuickFilter label="Compliance" onClick={() => { setDepartment("compliance"); setStatus("all"); }} />
+          {filtersActive && (
+            <button onClick={() => { setStatus("all"); setDepartment("all"); setQ(""); }} className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3 text-al-meta text-muted-foreground transition-colors hover:bg-muted">
+              Clear filters
+            </button>
+          )}
+        </div>
       </section>
+
+      {lane === "system_exception" && (
+        <section className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
+          <label className="flex flex-wrap items-center gap-2 text-al-body text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={includeDeparted}
+              onChange={(e) => setIncludeDeparted(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-current"
+            />
+            Include exceptions about vehicles that have left the lot
+            {departedCount > 0 ? ` (${departedCount} hidden)` : ""}
+          </label>
+          <p className="text-al-meta text-muted-foreground mt-1">
+            Off by default: a sold car&apos;s exception is a record of what happened, not work anybody can do.
+          </p>
+        </section>
+      )}
 
       {(department === "all" || department === "print") && <VinPrintQueue />}
 
       <section className="space-y-3">
         {loading ? (
-          <div className="rounded-3xl border border-border bg-white p-8 text-center text-sm font-semibold text-muted-foreground">Loading work queue...</div>
-        ) : filtered.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-border bg-white p-8 text-center">
-            <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
-            <h2 className="mt-3 text-xl font-black text-foreground">No matching work items</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Build from inventory to let the system create sticker, compliance, get-ready, and Passport tasks.</p>
-          </div>
-        ) : filtered.map((item) => {
-          const Icon = departmentIcon(item.department);
-          const previews = previewVehicleWork(item);
-          return (
-            <article key={item.id} className="rounded-3xl border border-border bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
-              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
-                <div className="flex gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white">
-                    <Icon className="h-6 w-6" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${statusTone(item.status)}`}>{statusLabels[item.status] || item.status}</span>
-                      <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">{item.department || "inventory"}</span>
-                      {item.priority === "urgent" || item.priority === "high" ? <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase text-red-700"><AlertTriangle className="h-3 w-3" /> {item.priority}</span> : null}
-                    </div>
-                    <h2 className="mt-2 text-xl font-black tracking-tight text-foreground">{item.title}</h2>
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.description || "Self-aware task created from vehicle state."}</p>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-muted-foreground">
-                      {item.stock && <span>Stock {item.stock}</span>}
-                      {item.vin && <span>VIN {item.vin}</span>}
-                      {item.vehicle_title && <span>{item.vehicle_title}</span>}
-                    </div>
-                    {previews.length > 0 && item.status !== "completed" && (
-                      <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 p-3 text-xs font-semibold text-blue-900">
-                        Next-best-action engine sees {previews.length} possible requirement{previews.length === 1 ? "" : "s"} for this vehicle.
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {/* Description exceptions deep-link straight to the record that
-                    can actually resolve them. */}
-                {typeof item.metadata?.deep_link === "string" && (
-                  <button onClick={() => navigate(item.metadata!.deep_link as string)}
-                    className="inline-flex h-9 items-center gap-1 self-start rounded-xl border border-blue-200 bg-blue-50 px-3 text-[12px] font-bold text-blue-700 hover:bg-blue-100 lg:order-2">
-                    Open record
-                  </button>
-                )}
-                <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                  {item.vehicle_id && <button onClick={() => navigate(`/vehicle-file/${item.vehicle_id}`)} className="h-10 rounded-xl border border-border px-3 text-sm font-black text-foreground hover:bg-muted">Open vehicle</button>}
-                  {/* A description exception is not a dealer_work_items row, so
-                      Start / Mark done cannot act on it — rendering them enabled
-                      made the primary button on the card a permanent no-op. */}
-                  {item.work_type !== "description_exception" && (
-                    <>
-                      {item.status !== "in_progress" && item.status !== "completed" && <button onClick={() => updateStatus(item, "in_progress")} className="h-10 rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-black text-blue-800">Start</button>}
-                      {item.department === "print" && <button onClick={() => updateStatus(item, "completed")} className="h-10 rounded-xl bg-slate-950 px-3 text-sm font-black text-white"><Printer className="mr-1 inline h-4 w-4" /> Approve done</button>}
-                      {item.status !== "completed" && item.department !== "print" && <button onClick={() => updateStatus(item, "completed")} className="h-10 rounded-xl bg-emerald-600 px-3 text-sm font-black text-white">Mark done</button>}
-                    </>
-                  )}
-                </div>
-              </div>
-            </article>
-          );
-        })}
+          <div className="rounded-2xl border border-border bg-card p-8 text-center text-al-body text-muted-foreground">Loading work...</div>
+        ) : laneItems.length === 0 ? (
+          filtersActive ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+              <Filter className="mx-auto h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
+              <h2 className="text-al-section text-foreground mt-3">Nothing matches these filters</h2>
+              <p className="text-al-body text-muted-foreground mt-1">Clear the search, status, or department filter to see this lane again.</p>
+            </div>
+          ) : (
+            <LaneEmpty lane={lane} departedCount={lane === "system_exception" ? departedCount : 0} onShowDeparted={() => setIncludeDeparted(true)} />
+          )
+        ) : laneItems.map((item) => isSystemException(item) ? (
+          <ExceptionRow key={item.id} item={item} onOpen={navigate} onDismiss={updateStatus} />
+        ) : (
+          <HumanTaskRow
+            key={item.id}
+            item={item}
+            currentUserId={user?.id}
+            previews={previewVehicleWork(item).length}
+            onOpen={navigate}
+            onUpdate={updateStatus}
+          />
+        ))}
       </section>
     </div>
   );
 };
+
+function QuickFilter({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3 text-al-meta text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+      {label}
+    </button>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-al-meta uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <div className="text-al-body text-foreground mt-0.5 truncate">{children}</div>
+    </div>
+  );
+}
+
+function LaneEmpty({ lane, departedCount, onShowDeparted }: { lane: WorkLane; departedCount: number; onShowDeparted: () => void }) {
+  const copy = WORK_LANES.find((l) => l.key === lane);
+  const Icon = lane === "completed" ? ClipboardList : lane === "system_exception" ? Inbox : CheckCircle2;
+  return (
+    <div className="rounded-2xl border border-border bg-card p-10 text-center shadow-sm">
+      <Icon className="mx-auto h-10 w-10 text-muted-foreground" strokeWidth={1.5} />
+      <h2 className="text-al-section text-foreground mt-4">{copy?.empty || "You're caught up."}</h2>
+      <p className="text-al-body text-muted-foreground mt-2 mx-auto max-w-md">{laneCopy[lane]}</p>
+      {lane === "system_exception" && departedCount > 0 && (
+        <button onClick={onShowDeparted} className="mt-4 inline-flex h-9 items-center rounded-xl border border-border bg-card px-4 text-al-button text-foreground transition-colors hover:bg-muted">
+          Show {departedCount} about vehicles that left
+        </button>
+      )}
+    </div>
+  );
+}
+
+function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate }: {
+  item: WorkItem;
+  currentUserId?: string | null;
+  previews: number;
+  onOpen: (to: string) => void;
+  onUpdate: (item: WorkItem, nextStatus: string) => void;
+}) {
+  const Icon = departmentIcon(item.department);
+  const urgent = item.priority === "urgent" || item.priority === "high";
+  const due = dueLabel(item);
+  const owner = item.assigned_to
+    ? (currentUserId && item.assigned_to === currentUserId ? "You" : "A teammate")
+    : "Unassigned";
+  const link = deepLinkOf(item);
+  const external = item.source === "description_exception";
+
+  return (
+    <article className="rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/30">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
+            <Icon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-al-meta uppercase tracking-[0.14em] ${urgent ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border bg-muted text-muted-foreground"}`}>
+                {urgent && <AlertTriangle className="h-3 w-3" />}
+                {item.priority || "normal"}
+              </span>
+              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-al-meta uppercase tracking-[0.14em] text-muted-foreground">
+                {statusLabels[item.status] || item.status}
+              </span>
+              <span className="rounded-full border border-border bg-card px-2.5 py-0.5 text-al-meta uppercase tracking-[0.14em] text-muted-foreground">
+                {item.department || "inventory"}
+              </span>
+            </div>
+            <h2 className="text-al-card text-foreground mt-2">{item.title}</h2>
+            <p className="text-al-meta uppercase tracking-[0.14em] text-muted-foreground mt-2">Why</p>
+            <p className="text-al-body text-muted-foreground mt-0.5">
+              {item.description || "Created from this vehicle's state during the last inventory sync."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {link && (
+            <button onClick={() => onOpen(link)} className="h-9 rounded-xl border border-border bg-card px-3 text-al-button text-foreground transition-colors hover:bg-muted">
+              Open record
+            </button>
+          )}
+          {/* A description exception is not a dealer_work_items row, so Start /
+              Mark done cannot act on it — rendering them made the primary
+              button on the card a permanent no-op. */}
+          {!external && (
+            <>
+              {item.status !== "in_progress" && item.status !== "completed" && (
+                <button onClick={() => onUpdate(item, "in_progress")} className="h-9 rounded-xl border border-border bg-muted px-3 text-al-button text-foreground transition-colors hover:bg-card">
+                  Start
+                </button>
+              )}
+              {item.department === "print" && (
+                <button onClick={() => onUpdate(item, "completed")} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-al-button text-primary-foreground transition-opacity hover:opacity-90">
+                  <Printer className="h-4 w-4" /> Approve done
+                </button>
+              )}
+              {item.status !== "completed" && item.department !== "print" && (
+                <button onClick={() => onUpdate(item, "completed")} className="h-9 rounded-xl bg-primary px-3 text-al-button text-primary-foreground transition-opacity hover:opacity-90">
+                  Mark done
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="Vehicle or customer">{vehicleLabel(item)}</Field>
+        <Field label="Owner">{owner}</Field>
+        <Field label="Due">
+          <span className={due.overdue ? "text-destructive" : undefined}>{due.text}</span>
+        </Field>
+        <Field label="Next action">
+          {external ? "Open the description record" : item.status === "in_progress" ? "Finish and mark done" : "Start this task"}
+        </Field>
+      </div>
+
+      {previews > 0 && item.status !== "completed" && (
+        <p className="text-al-meta text-muted-foreground mt-3">
+          Next-best-action engine sees {previews} possible requirement{previews === 1 ? "" : "s"} for this vehicle.
+        </p>
+      )}
+    </article>
+  );
+}
+
+function ExceptionRow({ item, onOpen, onDismiss }: {
+  item: WorkItem;
+  onOpen: (to: string) => void;
+  onDismiss: (item: WorkItem, nextStatus: string) => void;
+}) {
+  const copy = exceptionCopy(item.work_type);
+  const link = deepLinkOf(item);
+  const detail = (item.description || "").trim();
+  const showDetail = detail && detail.toLowerCase() !== copy.why.toLowerCase();
+  const external = item.source === "description_exception";
+  const departed = item.vehicleActive === false;
+
+  return (
+    <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <Inbox className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-al-card text-foreground">{copy.label}</h2>
+            <p className="text-al-body text-muted-foreground mt-1">{copy.why}</p>
+            {showDetail && <p className="text-al-body text-muted-foreground mt-1">{detail}</p>}
+            <div className="text-al-meta text-muted-foreground mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              <span>{vehicleLabel(item)}</span>
+              {item.vin && <span>VIN {item.vin}</span>}
+              {item.created_at && <span>Recorded {format(new Date(item.created_at), "MMM d, yyyy")}</span>}
+              {departed && <span>Vehicle no longer in inventory</span>}
+            </div>
+            <details className="mt-2">
+              <summary className="text-al-meta cursor-pointer text-muted-foreground">Diagnostics</summary>
+              <p className="text-al-meta text-muted-foreground mt-1 break-all font-mono">
+                {item.work_type} · {item.source || "unknown source"} · {item.status} · {item.id}
+              </p>
+            </details>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {copy.nextAction && link && (
+            <button onClick={() => onOpen(link)} className="h-9 rounded-xl bg-primary px-3 text-al-button text-primary-foreground transition-opacity hover:opacity-90">
+              {copy.nextAction}
+            </button>
+          )}
+          {!external && item.status !== "completed" && (
+            <button onClick={() => onDismiss(item, "completed")} className="h-9 rounded-xl border border-border bg-card px-3 text-al-button text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              Dismiss
+            </button>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
 
 // Scanned-VIN print queue (moved from /admin?tab=queue) — the print
 // department's worklist of lot-scanned vehicles awaiting stickers.
@@ -336,10 +599,10 @@ function VinPrintQueue() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
-            <ScanLine className="w-4 h-4 text-blue-600" />
-            <h2 className="text-sm font-semibold text-foreground">Inventory Print Queue</h2>
+            <ScanLine className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-al-card text-foreground">Inventory Print Queue</h2>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-al-meta text-muted-foreground mt-0.5">
             Vehicles scanned from the lot. Review, customize, and print stickers.
           </p>
         </div>
@@ -349,14 +612,14 @@ function VinPrintQueue() {
               clearCompleted();
               toast.success("Cleared completed items");
             }}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-xs font-medium hover:bg-muted transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-al-meta font-medium hover:bg-muted transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Clear Completed
           </button>
           <button
             onClick={openScan}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-al-meta font-medium hover:opacity-90"
           >
             <ScanLine className="w-3.5 h-3.5" />
             Scan More
@@ -368,11 +631,11 @@ function VinPrintQueue() {
         {vinQueue.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <ScanLine className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium text-foreground">No vehicles in queue</p>
-            <p className="text-xs text-muted-foreground mt-1">Go to the lot, open the scanner on your phone, and scan VINs to populate this queue.</p>
+            <p className="text-al-card text-foreground">No vehicles in queue</p>
+            <p className="text-al-meta text-muted-foreground mt-1">Go to the lot, open the scanner on your phone, and scan VINs to populate this queue.</p>
             <button
               onClick={openScan}
-              className="mt-4 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
+              className="mt-4 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-al-meta font-medium hover:opacity-90"
             >
               <ScanLine className="w-3.5 h-3.5" />
               Open Scanner
@@ -380,7 +643,7 @@ function VinPrintQueue() {
           </div>
         ) : (
           <div>
-            <div className="px-5 py-3 bg-muted/30 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="px-5 py-3 bg-muted/30 flex items-center justify-between text-al-meta font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               <span>{vinQueue.length} vehicle{vinQueue.length !== 1 ? "s" : ""} in queue</span>
               <span>{vinQueue.filter(q => q.status === "queued").length} awaiting print</span>
             </div>
@@ -398,25 +661,23 @@ function VinPrintQueue() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        isCompleted ? "bg-emerald-50" : "bg-muted"
-                      }`}>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
                         {isCompleted ? (
-                          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                          <CheckCircle2 className="w-5 h-5 text-muted-foreground" />
                         ) : (
                           <Car className="w-5 h-5 text-muted-foreground" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{ymm}</p>
-                        <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                        <p className="text-al-card text-foreground truncate">{ymm}</p>
+                        <div className="flex items-center gap-3 mt-0.5 text-al-meta text-muted-foreground">
                           {item.stock_number && <span>Stock: {item.stock_number}</span>}
                           {item.mileage && <span>{parseInt(item.mileage).toLocaleString()} mi</span>}
                           {item.condition && <span className="capitalize">{item.condition}</span>}
                         </div>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{item.vin}</p>
-                        {item.notes && <p className="text-[10px] text-muted-foreground mt-0.5 italic">{item.notes}</p>}
-                        <p className="text-[10px] text-muted-foreground mt-1">
+                        <p className="text-al-meta text-muted-foreground mt-0.5 font-mono">{item.vin}</p>
+                        {item.notes && <p className="text-al-meta text-muted-foreground mt-0.5 italic">{item.notes}</p>}
+                        <p className="text-al-meta text-muted-foreground mt-1">
                           Scanned {format(new Date(item.scanned_at), "M/d/yy h:mm a")}
                         </p>
                       </div>
@@ -434,7 +695,7 @@ function VinPrintQueue() {
                               navigate(`/?${params.toString()}`);
                               updateQueueItem(item.id, { status: "processing" });
                             }}
-                            className="inline-flex items-center gap-1 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
+                            className="inline-flex items-center gap-1 h-8 px-3 rounded-md bg-primary text-primary-foreground text-al-meta font-medium hover:opacity-90"
                           >
                             <Printer className="w-3 h-3" />
                             Print
@@ -446,7 +707,7 @@ function VinPrintQueue() {
                             }}
                             className="h-8 w-8 rounded-md border border-border flex items-center justify-center hover:bg-muted"
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-muted-foreground" />
                           </button>
                         </>
                       )}
@@ -468,17 +729,6 @@ function VinPrintQueue() {
         )}
       </div>
     </section>
-  );
-}
-
-function QueueMetric({ label, value, tone = "blue", onClick }: { label: string; value: number; tone?: "blue" | "amber" | "red"; onClick: () => void }) {
-  const toneClass = tone === "amber" ? "border-amber-200 bg-amber-50 text-amber-900" : tone === "red" ? "border-red-200 bg-red-50 text-red-900" : "border-blue-200 bg-blue-50 text-blue-900";
-  return (
-    <button onClick={onClick} className={`rounded-3xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClass}`}>
-      <div className="text-[10px] font-black uppercase tracking-wider opacity-70">{label}</div>
-      <div className="mt-1 text-3xl font-black">{value}</div>
-      <div className="mt-1 text-xs font-bold opacity-70">Click to filter</div>
-    </button>
   );
 }
 
