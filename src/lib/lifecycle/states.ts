@@ -75,6 +75,17 @@ export const STATE_LABEL: Record<LifecycleState, string> = {
 // signing authority: K-208 certification comes from the store's K-208 policy
 // (k208_authority_roles / k208_authorized_users, enforced server-side), never
 // from a job title shown on a page.
+// Owner is the desk that must act NEXT, not the desk that produced the state.
+// That is what makes the column useful on a "vehicles stuck" board: it names
+// who is holding the car up.
+//
+// The service chain, per the dealership: the technician records the findings,
+// the service writer prices them out, and the used car manager authorises the
+// spend. So findings-recorded belongs to the writer, and the manager appears
+// one state later at WAITING_FOR_MANAGER_DECISION.
+//
+// K-208 finalized hands the car to detail; the certificate itself becomes part
+// of the vehicle's evidence record from that point.
 export const STATE_OWNER: Record<LifecycleState, string> = {
   INGESTED: "Inventory intake",
   PRELOAD_RUNNING: "Inventory intake",
@@ -83,14 +94,14 @@ export const STATE_OWNER: Record<LifecycleState, string> = {
   AUTHORIZED_FOR_GET_READY: "Service",
   SERVICE_UNASSIGNED: "Service",
   K208_IN_PROGRESS: "Service",
-  SERVICE_FINDINGS_RECORDED: "Service",
+  SERVICE_FINDINGS_RECORDED: "Service writer",
   WAITING_FOR_MANAGER_DECISION: "Used car manager",
   RETURNED_FOR_CLARIFICATION: "Service",
   WORK_AUTHORIZED: "Service",
   REPAIR_IN_PROGRESS: "Service",
   REPAIR_VERIFICATION_REQUIRED: "Service",
   K208_READY_TO_CERTIFY: "Service",
-  K208_FINALIZED: "Service",
+  K208_FINALIZED: "Detail",
   DETAIL_PENDING: "Detail",
   DETAIL_IN_PROGRESS: "Detail",
   FINAL_READY_VERIFICATION: "Used car manager",
@@ -108,7 +119,7 @@ export const STATE_NEXT_ACTION: Record<LifecycleState, string> = {
   AUTHORIZED_FOR_GET_READY: "Start the safety inspection",
   SERVICE_UNASSIGNED: "Assign a technician",
   K208_IN_PROGRESS: "Continue the inspection",
-  SERVICE_FINDINGS_RECORDED: "Review the findings and decide on the work",
+  SERVICE_FINDINGS_RECORDED: "Price the findings and send for authorization",
   WAITING_FOR_MANAGER_DECISION: "Approve, limit, or decline the requested work",
   RETURNED_FOR_CLARIFICATION: "Answer the manager's question",
   WORK_AUTHORIZED: "Start the authorized work",

@@ -66,3 +66,23 @@ describe("no screen keeps a second copy of the vocabulary", () => {
     }
   });
 });
+
+describe("ownership names the desk that must act next (L3)", () => {
+  it("hands priced findings to the service writer, not back to the bench", () => {
+    // The technician records findings; the writer prices them; the used car
+    // manager authorises. The manager appears one state later, deliberately.
+    expect(STATE_OWNER.SERVICE_FINDINGS_RECORDED).toBe("Service writer");
+    expect(STATE_OWNER.WAITING_FOR_MANAGER_DECISION).toBe("Used car manager");
+  });
+
+  it("hands a finalized K-208 to detail", () => {
+    expect(STATE_OWNER.K208_FINALIZED).toBe("Detail");
+    expect(STATE_NEXT_ACTION.K208_FINALIZED).toContain("detail");
+  });
+
+  it("gives every state an owner, so no board can render a blank accountable desk", () => {
+    for (const state of LIFECYCLE_STATES) {
+      expect(STATE_OWNER[state], `no owner for ${state}`).toBeTruthy();
+    }
+  });
+});
