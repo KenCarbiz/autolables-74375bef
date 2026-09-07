@@ -133,11 +133,11 @@ describe("the vAuto band", () => {
 
   it("targets the owner's vAuto band", () => {
     const vauto = policyForChannel("vauto")!;
-    expect(vauto.recommendedMin).toBe(3200);
+    expect(vauto.recommendedMin).toBe(3221);
     expect(vauto.recommendedMax).toBe(3879);
     expect(vauto.characterLimit).toBe(3879);
     expect(buildChannelPromptV3(master, vauto, packet))
-      .toMatch(/Length: 3200-3879 characters/);
+      .toMatch(/Length: 3221-3879 characters/);
   });
 
   it("still forbids padding to reach that floor", () => {

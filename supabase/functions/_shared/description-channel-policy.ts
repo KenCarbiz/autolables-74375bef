@@ -158,8 +158,8 @@ export const DEFAULT_CHANNEL_POLICIES: ChannelPolicy[] = [
     // destination-specific formatting and no pricing, because vAuto is where
     // pricing is managed.
     key: "vauto", label: "vAuto", active: true,
-    // Owner decision: vAuto targets 3,200-3,879 characters, where 3,879 is the
-    // goal to write toward and 3,200 is a floor.
+    // Owner decision: vAuto targets 3,221-3,879 characters, where 3,879 is the
+    // goal to write toward and 3,221 is a floor.
     //
     // The floor is a TARGET, not a quota. Channel variants are derived by
     // trimming an approved master, and nothing in this system expands one, so
@@ -167,7 +167,7 @@ export const DEFAULT_CHANNEL_POLICIES: ChannelPolicy[] = [
     // produces a short vAuto version that is FLAGGED for review rather than
     // padded to reach the number. The writing standard forbids padding
     // outright, and a floor enforced by inventing content would breach it.
-    recommendedMin: 3200, recommendedMax: 3879, characterLimit: 3879, limitVerified: false,
+    recommendedMin: 3221, recommendedMax: 3879, characterLimit: 3879, limitVerified: false,
     paragraphMin: 4, paragraphMax: 8, listsAllowed: false, htmlAllowed: false,
     markdownAllowed: false, emojiAllowed: false, linksAllowed: false, phoneAllowed: false,
     pricingPolicy: "never", keywordPolicy: "natural", ctaPolicy: "none",

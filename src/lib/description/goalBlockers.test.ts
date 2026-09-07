@@ -210,21 +210,21 @@ describe("the master band covers the vAuto floor", () => {
     expect(huge.max_length).toBeGreaterThan(0); // fixture is only illustrative
   });
 
-  it("uses the owner's floor of 3,200 and goal of 3,879", () => {
+  it("uses the owner's floor of 3,221 and goal of 3,879", () => {
     const mig = readFileSync(join(fnDir,
-      "../migrations/20260907014500_master_band_3200_goal_3879.sql"), "utf8");
-    expect(mig).toMatch(/SET min_length = 3200/);
-    expect(mig).toMatch(/max_length = 3879/);
+      "../migrations/20260907015500_master_floor_back_to_3221.sql"), "utf8");
+    expect(mig).toMatch(/SET min_length = 3221/);
+    expect(mig).toMatch(/AND max_length = 3879/);
     // Guarded on the previous values so a later deliberate change is not
     // silently reverted by re-running the migration.
-    expect(mig).toMatch(/WHERE min_length = 3221/);
+    expect(mig).toMatch(/WHERE min_length = 3200/);
   });
 
   it("matches the vAuto channel policy it has to feed", () => {
     const policy = readFileSync(join(fnDir,
       "_shared/description-channel-policy.ts"), "utf8");
-    expect(policy).toMatch(/recommendedMin: 3200, recommendedMax: 3879/);
-    expect(policy).not.toMatch(/recommendedMin: 3221/);
+    expect(policy).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
+    expect(policy).not.toMatch(/recommendedMin: 3200/);
   });
 
   it("treats the ceiling as the target and the floor as a floor", () => {
@@ -282,7 +282,7 @@ describe("the master is supplied enough material for its own band", () => {
       "_shared/description-channel-policy.ts"), "utf8");
     const vauto = policy.slice(policy.indexOf('key: "vauto"'),
                                policy.indexOf('key: "vauto"') + 1400);
-    expect(vauto).toMatch(/recommendedMin: 3200, recommendedMax: 3879/);
+    expect(vauto).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
     expect(vauto).toMatch(/featureBudget: 35/);
     expect(vauto).not.toMatch(/featureBudget: 10/);
   });
