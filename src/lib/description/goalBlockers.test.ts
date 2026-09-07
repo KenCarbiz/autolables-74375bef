@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  withRequiredDisclosure, featureBudgetForLength, buildFactSnapshot,
+  withRequiredDisclosure, featureBudgetForLength, buildFactSnapshot, validateContent,
 } from "../../../supabase/functions/_shared/description-core.ts";
 import {
   evaluateBudget, collectTriggeredLimits, unpricedCallCeiling,
@@ -440,5 +440,50 @@ describe("equipment claims are judged against the whole decode", () => {
     const blk = core.slice(core.indexOf("const supported = new Set("),
                            core.indexOf("const factBlob ="));
     expect(blk).toMatch(/f\.conflict !== true/);
+  });
+});
+
+// ── 10. A line wrap is not a missing disclosure ──────────────────────
+
+describe("the disclosure check compares words, not whitespace", () => {
+  const LEGAL = "Prices do not include tax, title, registration, and Negotiable Dealer Conveyance Fee.";
+  const settings = { required_legal_text: LEGAL };
+  const snap = { facts: {}, conflicts: [], excluded_claims: [], fact_confidence: 100 } as never;
+  const codes = (text: string) =>
+    validateContent(text, snap, settings as never).map((f) => f.validator_code);
+
+  it("accepts the disclosure however it is wrapped", () => {
+    const wrapped = LEGAL.replace(/ /g, "\n");
+    expect(codes(`Great truck.\n\n${wrapped}`)).not.toContain("REQUIRED_DISCLOSURE_MISSING");
+    const doubled = LEGAL.replace(/ /g, "  ");
+    expect(codes(`Great truck.\n\n${doubled}`)).not.toContain("REQUIRED_DISCLOSURE_MISSING");
+  });
+
+  it("accepts a non-breaking space", () => {
+    //   collapses under \s in JS, which is the point.
+    expect(codes(`Great truck.\n\n${LEGAL.replace(/ /g, " ")}`))
+      .not.toContain("REQUIRED_DISCLOSURE_MISSING");
+  });
+
+  it("still blocks when the words are actually absent", () => {
+    expect(codes("Great truck. No disclosure here."))
+      .toContain("REQUIRED_DISCLOSURE_MISSING");
+  });
+
+  it("still blocks a paraphrase", () => {
+    // Whitespace is cosmetic; wording is not. An $895 fee stated differently
+    // is a different disclosure.
+    expect(codes("Prices exclude tax, title and a negotiable conveyance fee."))
+      .toContain("REQUIRED_DISCLOSURE_MISSING");
+  });
+
+  it("records what the validator held when it fires", () => {
+    // Three separate runs blocked vehicles whose stored copy demonstrably ends
+    // with the exact disclosure, verified in the database with position().
+    // The next occurrence has to explain itself rather than need a fourth
+    // investigation.
+    const f = validateContent("no disclosure", snap, settings as never)
+      .find((x) => x.validator_code === "REQUIRED_DISCLOSURE_MISSING");
+    expect(f?.source_reference).toMatch(/text=\d+c\/\d+n legal=\d+c\/\d+n exact=(true|false)/);
   });
 });

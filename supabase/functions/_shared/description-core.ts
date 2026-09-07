@@ -935,9 +935,30 @@ export function validateContent(
   }
 
   // 5. Required legal wording.
-  if (settings.required_legal_text && !text.includes(settings.required_legal_text)) {
-    out.push({ validator_code: "REQUIRED_DISCLOSURE_MISSING", severity: "blocking", blocking: true,
-      message: "Required disclosure text is missing." });
+  //
+  // Compared with whitespace collapsed on both sides. A line wrap, a double
+  // space or a non-breaking space is not a missing disclosure -- the words and
+  // their order are what the dealership must publish, and an exact includes()
+  // treats a cosmetic difference as a compliance failure.
+  //
+  // This check has now blocked four vehicles three separate times whose stored
+  // copy demonstrably ends with the exact 297-character disclosure, verified
+  // in the database with position(). The diagnostic below is deliberate: if it
+  // fires again, source_reference records what the validator actually held, so
+  // the next run explains itself instead of needing another investigation.
+  if (settings.required_legal_text) {
+    const collapse = (t: string) => String(t ?? "").replace(/\s+/g, " ").trim();
+    const needle = collapse(settings.required_legal_text);
+    const hay = collapse(text);
+    if (needle && !hay.includes(needle)) {
+      out.push({
+        validator_code: "REQUIRED_DISCLOSURE_MISSING", severity: "blocking", blocking: true,
+        message: "Required disclosure text is missing.",
+        source_reference:
+          `text=${text.length}c/${hay.length}n legal=${String(settings.required_legal_text).length}c/${needle.length}n `
+          + `exact=${text.includes(settings.required_legal_text)} tail=${JSON.stringify(hay.slice(-60))}`,
+      });
+    }
   }
 
   // 6. Length / channel format.
