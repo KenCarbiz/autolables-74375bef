@@ -155,6 +155,14 @@ const EntitlementGate = ({ app, children }: Props) => {
     })();
   }, [tenant, app, hasApp, activateApp]);
 
+  // Platform admins never need a tenant or entitlement, so they must not
+  // wait on the entitlement load at all — a slow tenant/inventory query
+  // used to strand them on the spinner and then the "couldn't confirm
+  // your access" screen.
+  if (!authLoading && user && isAdmin) {
+    return <>{children}</>;
+  }
+
   if (stillResolving) {
     if (deadlineReached) {
       return <AccessUnconfirmed onRetry={handleRetry} onSignOut={handleSignOut} />;
@@ -165,6 +173,7 @@ const EntitlementGate = ({ app, children }: Props) => {
                    "Checking your subscription…"
     } />;
   }
+
 
   if (!user) {
     // A lapsed (vs never-signed-in) session surfaces the "session expired" banner.

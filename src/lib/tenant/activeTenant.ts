@@ -25,22 +25,32 @@ export async function pickActiveTenantId(tenantIds: string[]): Promise<string | 
 
   const ordered = [...ids].sort();
   try {
-    const counts = await Promise.all(
-      ordered.map((id) =>
-        (supabase as any)
-          .from("vehicle_listings")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", id)
-          .then((r: { count: number | null }) => ({ id, n: r.count || 0 })),
+    // Bounded: exact counts over a large, RLS-filtered inventory can stall.
+    // A slow count must never freeze the access gate — fall back to the
+    // stable first id instead.
+    const counts = await Promise.race([
+      Promise.all(
+        ordered.map((id) =>
+          (supabase as any)
+            .from("vehicle_listings")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", id)
+            .then((r: { count: number | null }) => ({ id, n: r.count || 0 })),
+        ),
       ),
-    );
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ]);
+    if (!counts) return ordered[0];
     let best = ordered[0];
     let bestN = -1;
-    for (const c of counts) if (c.n > bestN) { bestN = c.n; best = c.id; }
+    for (const c of counts as Array<{ id: string; n: number }>) {
+      if (c.n > bestN) { bestN = c.n; best = c.id; }
+    }
     return best;
   } catch {
     return ordered[0];
   }
+
 }
 
 export function saveActiveTenantId(id: string) {
