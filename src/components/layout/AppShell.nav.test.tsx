@@ -78,7 +78,9 @@ describe("AppShell sidebar rendering", () => {
     expect(link).toHaveAttribute("href", "/inventory");
     link.focus();
     expect(document.activeElement).toBe(link);
-    expect(link.className).toContain("focus-visible:outline-[#1267e8]");
+    // The ring is asserted through its token, not a literal hex: the colour
+    // is the shell palette's to change, a visible focus ring is not.
+    expect(link.className).toContain("focus-visible:outline-shell-accent");
   });
 
   it("shows a 99+ recon badge with an accessible count label", () => {

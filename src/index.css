@@ -115,7 +115,10 @@
    * cards lift off it, a lighter border that stops every panel reading as a
    * box, and slightly deeper body text for contrast on dense screens. */
   .al-admin {
-    --background: 220 20% 96.5%;
+    /* The ground is a real grey, not a tinted white. At 96.5% it was within
+     * half a percent of the white cards sitting on it, so nothing read as
+     * elevated and every screen looked like one flat field. */
+    --background: 220 22% 93.5%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --foreground: 222 47% 11%;
@@ -123,16 +126,32 @@
     /* 4.9:1 on --background, so secondary text stays readable rather than
      * decorative. The old 46% sat just under 4.5:1 on white cards. */
     --muted-foreground: 220 12% 42%;
-    --muted: 220 16% 95%;
-    --secondary: 220 16% 95%;
-    --accent: 220 16% 95%;
+    --muted: 220 18% 95.5%;
+    --secondary: 220 18% 95.5%;
+    --accent: 220 18% 95.5%;
 
-    /* One step lighter. At 91% every card, row and input drew a hard line and
-     * dense screens read as a grid of boxes. */
-    --border: 220 14% 93%;
-    --input: 220 14% 93%;
+    /* Cards separate from the ground now, so the border only has to hint at
+     * an edge instead of drawing every panel as a box. */
+    --border: 220 15% 89%;
+    --input: 220 15% 89%;
 
-    --radius: 0.875rem;
+    --radius: 1rem;
+
+    /* ── Shell chrome ──────────────────────────────────────────────
+     * The sidebar and top bar, which are navigation rather than content.
+     * They get their own ramp so chrome reads as chrome and the white
+     * content field is unambiguously the work surface.
+     *
+     * These are NOT the shadcn --sidebar-* tokens. Those are consumed only
+     * by src/components/ui/sidebar.tsx, which this shell does not use --
+     * setting them would have changed nothing on screen. */
+    --al-shell: 220 44% 13%;
+    --al-shell-foreground: 213 32% 92%;
+    --al-shell-muted: 215 22% 62%;
+    --al-shell-border: 220 32% 20%;
+    --al-shell-hover: 220 36% 18%;
+    --al-shell-active: 221 70% 24%;
+    --al-shell-accent: 213 94% 62%;
   }
 
   .dark {

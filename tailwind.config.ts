@@ -62,6 +62,18 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // The admin shell chrome (sidebar + top bar). Separate from the
+        // shadcn `sidebar` group below, which only src/components/ui/sidebar.tsx
+        // reads; AppShell hand-rolls its own rail and consumes these.
+        shell: {
+          DEFAULT: "hsl(var(--al-shell))",
+          foreground: "hsl(var(--al-shell-foreground))",
+          muted: "hsl(var(--al-shell-muted))",
+          border: "hsl(var(--al-shell-border))",
+          hover: "hsl(var(--al-shell-hover))",
+          active: "hsl(var(--al-shell-active))",
+          accent: "hsl(var(--al-shell-accent))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

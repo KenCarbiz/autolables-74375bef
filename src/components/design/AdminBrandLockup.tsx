@@ -29,10 +29,17 @@ export interface AdminBrandLockupProps {
   /** Rendered height in px. Width follows the artwork's own ratio. */
   height?: number;
   className?: string;
+  /**
+   * "auto" swaps cuts on the .dark theme class. "dark" pins the reverse cut
+   * for a surface that is dark in BOTH themes -- the shell rail. Without it
+   * the light cut's dark ink lands on dark chrome and the lockup disappears,
+   * because these are <img> files that cannot inherit currentColor.
+   */
+  surface?: "auto" | "dark";
 }
 
 export function AdminBrandLockup({
-  variant = "lockup", height = 28, className,
+  variant = "lockup", height = 28, className, surface = "auto",
 }: AdminBrandLockupProps) {
   const [lightId, darkId] = PAIRS[variant];
   const light = ADMIN_ASSETS[lightId];
@@ -42,6 +49,25 @@ export function AdminBrandLockup({
   // Both cuts are rendered and swapped in CSS rather than chosen in JS. The
   // theme can change without a re-render, and a server-rendered or
   // pre-hydration paint would otherwise show the wrong cut on a dark shell.
+  if (surface === "dark") {
+    return (
+      <span
+        className={cn("inline-flex items-center", className)}
+        role="img"
+        aria-label="AutoLabels"
+      >
+        <img
+          src={dark.path}
+          alt=""
+          aria-hidden="true"
+          style={{ height }}
+          className="w-auto"
+          draggable={false}
+        />
+      </span>
+    );
+  }
+
   return (
     <span
       className={cn("inline-flex items-center", className)}

@@ -558,14 +558,14 @@ const AppShell = ({ children }: AppShellProps) => {
       <div className="al-admin min-h-screen bg-background flex w-full overflow-hidden">
         {mobileOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />}
 
-        <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-card border-r border-border transition-all duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-64 flex flex-col`}>
-          <div className="h-16 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
+        <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-shell border-r border-shell-border transition-all duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-64 flex flex-col`}>
+          <div className="h-16 flex items-center justify-between px-4 border-b border-shell-border flex-shrink-0">
             <Link to="/dashboard" className={`flex items-center gap-3 min-w-0 ${collapsed ? "lg:justify-center lg:w-full" : ""}`}>
               {/* The official lockup, admin only. brand/Logo still renders every
                   public surface, including the locked customer passport. */}
-              <AdminBrandLockup variant={collapsed ? "mark" : "lockup"} height={collapsed ? 24 : 28} />
+              <AdminBrandLockup variant={collapsed ? "mark" : "lockup"} height={collapsed ? 24 : 28} surface="dark" />
             </Link>
-            <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1 rounded-md hover:bg-muted">
+            <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1 rounded-md text-shell-foreground hover:bg-shell-hover">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -595,7 +595,7 @@ const AppShell = ({ children }: AppShellProps) => {
                         onClick={() => toggleSection(section.key, open)}
                         aria-expanded={open}
                         aria-controls={panelId}
-                        className="w-full flex items-center justify-between rounded-md px-2.5 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b] transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1267e8]"
+                        className="w-full flex items-center justify-between rounded-md px-2.5 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-shell-muted transition-colors hover:text-shell-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shell-accent"
                       >
                         {section.title}
                         <ChevronDown size={14} strokeWidth={2} aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${open ? "" : "-rotate-90"}`} />
@@ -613,26 +613,26 @@ const AppShell = ({ children }: AppShellProps) => {
                               onClick={() => setMobileOpen(false)}
                               aria-current={active ? "page" : undefined}
                               aria-label={collapsed ? item.label : undefined}
-                              className={`group relative flex min-h-[42px] items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-sm transition-colors duration-hover ease-standard motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1267e8] ${active ? "bg-[#eaf2ff] font-semibold text-[#0f2b5c]" : "text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a]"} ${collapsed ? "lg:min-h-[44px] lg:justify-center lg:px-0" : ""}`}
+                              className={`group relative flex min-h-[42px] items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-sm transition-colors duration-hover ease-standard motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shell-accent ${active ? "bg-shell-active font-semibold text-white" : "text-shell-foreground/75 hover:bg-shell-hover hover:text-shell-foreground"} ${collapsed ? "lg:min-h-[44px] lg:justify-center lg:px-0" : ""}`}
                             >
-                              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[#dbeafe]" : ""}`}>
+                              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? "bg-shell-accent/15" : ""}`}>
                                 {item.assetIcon && ADMIN_ICON_PATHS[item.assetIcon]
                                   // The pack is the product's icon language;
                                   // lucide was the placeholder. `inherit`
                                   // because navigation state decides this
                                   // colour, not the colour it was drawn in.
                                   ? <AdminIcon id={item.assetIcon} decorative inherit size={19}
-                                      className={active ? "text-[#1267e8]" : "text-[#64748b] group-hover:text-[#1267e8]"} />
+                                      className={active ? "text-shell-accent" : "text-shell-muted group-hover:text-shell-accent"} />
                                   // Falls back to lucide, so a wrong id or an
                                   // uninstalled pack costs the new icon rather
                                   // than the whole row.
-                                  : <Icon size={19} strokeWidth={2} aria-hidden="true" className={active ? "text-[#1267e8]" : "text-[#64748b] group-hover:text-[#1267e8]"} />}
+                                  : <Icon size={19} strokeWidth={2} aria-hidden="true" className={active ? "text-shell-accent" : "text-shell-muted group-hover:text-shell-accent"} />}
                               </span>
                               {!collapsed && <span className="truncate">{item.label}</span>}
                               {!collapsed && badgeText && (
                                 <span
                                   aria-label={badgeAriaLabel(item.label, item.badge ?? 0)}
-                                  className={`ml-auto inline-flex h-5 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ${active ? "bg-[#1267e8] text-white" : "bg-[#eef2f7] text-[#475569]"}`}
+                                  className={`ml-auto inline-flex h-5 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ${active ? "bg-shell-accent text-slate-950" : "bg-shell-hover text-shell-muted"}`}
                                 >
                                   {badgeText}
                                 </span>
@@ -640,7 +640,7 @@ const AppShell = ({ children }: AppShellProps) => {
                               {collapsed && badgeText && (
                                 <span
                                   aria-label={badgeAriaLabel(item.label, item.badge ?? 0)}
-                                  className={`absolute right-1 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums ${active ? "bg-[#1267e8] text-white" : "bg-[#eef2f7] text-[#475569]"}`}
+                                  className={`absolute right-1 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums ${active ? "bg-shell-accent text-slate-950" : "bg-shell-hover text-shell-muted"}`}
                                 >
                                   {badgeText}
                                 </span>
@@ -663,12 +663,12 @@ const AppShell = ({ children }: AppShellProps) => {
             </nav>
           </TooltipProvider>
 
-          <div className="p-3 border-t border-border flex-shrink-0 space-y-2">
-            <button onClick={() => setPaletteOpen(true)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted ${collapsed ? "lg:justify-center" : ""}`} title={collapsed ? "Search" : undefined}>
+          <div className="p-3 border-t border-shell-border flex-shrink-0 space-y-2">
+            <button onClick={() => setPaletteOpen(true)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-shell-muted hover:text-shell-foreground hover:bg-shell-hover ${collapsed ? "lg:justify-center" : ""}`} title={collapsed ? "Search" : undefined}>
               <Search className="h-4 w-4" />
               {!collapsed && <span>Search</span>}
             </button>
-            <button onClick={toggleCollapsed} className={`hidden lg:flex w-full items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted ${collapsed ? "lg:justify-center" : ""}`} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            <button onClick={toggleCollapsed} className={`hidden lg:flex w-full items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-shell-muted hover:text-shell-foreground hover:bg-shell-hover ${collapsed ? "lg:justify-center" : ""}`} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
               {!collapsed && <span>Collapse sidebar</span>}
             </button>
@@ -677,10 +677,10 @@ const AppShell = ({ children }: AppShellProps) => {
             {!collapsed && (dealerGroupName || tenantTagline) && (
               <div className="pt-2 text-center">
                 {dealerGroupName && (
-                  <p className="text-[11px] font-bold tracking-wide text-foreground/70 uppercase">{dealerGroupName}</p>
+                  <p className="text-[11px] font-bold tracking-wide text-shell-foreground/70 uppercase">{dealerGroupName}</p>
                 )}
                 {tenantTagline && (
-                  <p className="text-[9.5px] tracking-[0.14em] text-muted-foreground uppercase mt-0.5">{tenantTagline}</p>
+                  <p className="text-[9.5px] tracking-[0.14em] text-shell-muted uppercase mt-0.5">{tenantTagline}</p>
                 )}
               </div>
             )}
