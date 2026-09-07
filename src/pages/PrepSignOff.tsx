@@ -890,10 +890,13 @@ const PrepSignOff = () => {
 // catalog) stays on Admin > Get-Ready Setup.
 const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: string }) => {
   const { settings } = useDealerSettings();
-  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory, createGetReady } = useGetReady(storeId);
+  const { user } = useAuth();
+  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory, createGetReady, completeItem } = useGetReady(storeId);
   const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(storeId);
   const [startGetReadyOpen, setStartGetReadyOpen] = useState(false);
   const [sheetRecord, setSheetRecord] = useState<GetReadyRecord | null>(null);
+  const [completingItem, setCompletingItem] = useState<string | null>(null);
+
 
   return (
     <div className="space-y-4">
