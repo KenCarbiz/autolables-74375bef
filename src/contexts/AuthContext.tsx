@@ -56,6 +56,71 @@ const signInWithRelay = (email: string, password: string): Promise<SignInResult>
     request.send(JSON.stringify({ email, password }));
   });
 
+const signInWithNavigationRelay = (email: string, password: string): Promise<SignInResult> =>
+  new Promise((resolve) => {
+    const baseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
+    const projectRef = new URL(baseUrl).hostname.split(".")[0];
+    const relayOrigin = `https://${projectRef}.functions.supabase.co`;
+    const frameName = `auth-relay-${crypto.randomUUID()}`;
+    const frame = document.createElement("iframe");
+    const form = document.createElement("form");
+    let settled = false;
+
+    const finish = (result: SignInResult) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("message", onMessage);
+      window.clearTimeout(timeoutId);
+      form.remove();
+      frame.remove();
+      resolve(result);
+    };
+
+    const onMessage = async (event: MessageEvent) => {
+      if (event.origin !== relayOrigin || event.data?.type !== "autolabels-auth-relay") return;
+      const payload = event.data.payload as {
+        access_token?: string;
+        refresh_token?: string;
+        error_description?: string;
+        msg?: string;
+      };
+      if (!payload.access_token || !payload.refresh_token) {
+        finish({ error: new Error(payload.error_description ?? payload.msg ?? "Invalid email or password.") });
+        return;
+      }
+      const { error } = await supabase.auth.setSession({
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token,
+      });
+      finish({ error });
+    };
+
+    const timeoutId = window.setTimeout(
+      () => finish({ error: new Error("Network error") }),
+      15_000,
+    );
+    window.addEventListener("message", onMessage);
+
+    frame.name = frameName;
+    frame.hidden = true;
+    frame.setAttribute("aria-hidden", "true");
+    document.body.appendChild(frame);
+
+    form.method = "POST";
+    form.action = `${relayOrigin}/auth-login-relay`;
+    form.target = frameName;
+    form.hidden = true;
+    for (const [name, value] of [["email", email], ["password", password]]) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.submit();
+  });
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Last-known admin status per user. The role check must survive a
@@ -226,7 +291,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       if (!isFetchFailure(error)) return { error };
     }
-    return signInWithRelay(email, password);
+    const relayResult = await signInWithRelay(email, password);
+    if (!relayResult.error || !isFetchFailure(relayResult.error)) return relayResult;
+    return signInWithNavigationRelay(email, password);
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
