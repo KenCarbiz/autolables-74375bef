@@ -101,8 +101,8 @@ describe("a source conflict blocks only what the copy can assert", () => {
 describe("the monthly budget binds even with no price on file", () => {
   const cfg: TenantBudgetConfig = {
     ...DEFAULT_BUDGET,
-    monthlyGenerationBudget: 90, monthlyPreviewBudget: 10,
-    maxCostPerGeneration: 0.5,
+    monthlyGenerationBudget: 135, monthlyPreviewBudget: 15,
+    maxCostPerGeneration: 0.1,
   };
   const usage = (over: Partial<BudgetUsage> = {}): BudgetUsage => ({
     monthProductionSpend: 0, monthPreviewSpend: 0,
@@ -110,8 +110,10 @@ describe("the monthly budget binds even with no price on file", () => {
   });
 
   it("derives the ceiling from the budget and the per-call cap", () => {
-    // $90 at a $0.50 worst case per call is 180 calls the budget can afford.
-    expect(unpricedCallCeiling(cfg, usage({ unpricedExecutions: 6 }), false)).toBe(180);
+    // $135 at a $0.10 worst case per call is 1,350 calls the budget affords.
+    // A cap set TOO HIGH silently shrinks how much of the budget may be used:
+    // the placeholder $0.50 put this at 270, below the 453 calls already made.
+    expect(unpricedCallCeiling(cfg, usage({ unpricedExecutions: 6 }), false)).toBe(1350);
   });
 
   it("does not apply when every call this month is priced", () => {
@@ -119,7 +121,7 @@ describe("the monthly budget binds even with no price on file", () => {
   });
 
   it("blocks once the derived ceiling is reached", () => {
-    const d = evaluateBudget(cfg, usage({ unpricedExecutions: 180, monthGenerationCount: 180 }),
+    const d = evaluateBudget(cfg, usage({ unpricedExecutions: 1350, monthGenerationCount: 1350 }),
       { isPreview: false, estimatedCost: null });
     expect(d.triggeredLimits).toContain("unpriced_call_ceiling");
     expect(d.withinBudget).toBe(false);
@@ -144,6 +146,16 @@ describe("the monthly budget binds even with no price on file", () => {
   it("is actually consulted by the orchestrator", () => {
     expect(orch).toMatch(/unpricedExecutions: Number\(\(spend as any\)\?\.pending_cost_executions/);
     expect(orch).toMatch(/monthGenerationCount: Number\(\(spend as any\)\?\.month_generation_count/);
+  });
+
+  it("keeps the code fallback and the column default in step", () => {
+    const mig = readFileSync(join(fnDir,
+      "../migrations/20260907065000_budget_per_call_cap_010.sql"), "utf8");
+    expect(mig).toMatch(/max_cost_per_generation SET DEFAULT 0\.10/);
+    expect(mig).toMatch(/daily_generation_limit  SET DEFAULT 500/);
+    // A tenant with no row must not get a different budget from one with a row.
+    expect(DEFAULT_BUDGET.maxCostPerGeneration).toBe(0.1);
+    expect(DEFAULT_BUDGET.dailyGenerationLimit).toBe(500);
   });
 
   it("uses the owner's $150 per-tenant budget", () => {

@@ -29,10 +29,14 @@ export interface TenantBudgetConfig {
 export const DEFAULT_BUDGET: TenantBudgetConfig = {
   monthlyGenerationBudget: 135,
   monthlyPreviewBudget: 15,
-  maxCostPerGeneration: 0.5,
+  // Owner-set. This is a worst-case CAP, not a price: while the model has no
+  // pricing row the ceiling is budget / cap, so a cap set too high silently
+  // shrinks how much of the budget the system may use. $0.50 was a
+  // placeholder and put the ceiling at 270 against 453 calls already made.
+  maxCostPerGeneration: 0.1,
   maxRepairAttempts: 2,
   maxChannelsPerBatch: 8,
-  dailyGenerationLimit: 250,
+  dailyGenerationLimit: 500,
   perUserDailyLimit: 100,
   warningThresholdPct: 80,
   hardStopPct: 100,
