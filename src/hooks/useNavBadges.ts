@@ -52,12 +52,21 @@ export const useNavBadges = (): NavBadgeCounts => {
     const [vinQueue, workItems, leads, reconApprovals, priceChangeReview, returns, complianceTasks] = await Promise.all([
       // RLS scopes vin_queue to the tenant.
       safeCount(() => sb().from("vin_queue").select("id", { count: "exact", head: true }).in("status", ["queued", "processing"])),
+      // Human work only. Every open dealer_work_items row in production is
+      // source='vehicle_exception' and assigned to nobody -- 883 of them, 467
+      // about vehicles already gone -- so counting the table gave a permanent
+      // 99+ that no one could ever clear. A badge is open work a person can
+      // pick up; system exceptions are records, and live on their own tab.
       safeCount(() =>
         sb()
           .from("dealer_work_items")
           .select("id", { count: "exact", head: true })
           .or(`tenant_id.eq.${tenantId},store_id.eq.${tenantId}`)
           .in("status", ["open", "needs_approval"])
+          // `is.null` is spelled out because a bare .neq() drops NULLs, which
+          // would hide a genuine task that arrived without a source rather
+          // than merely under-counting exceptions.
+          .or("source.is.null,source.neq.vehicle_exception")
       ),
       storeId
         ? safeCount(() => sb().from("leads").select("id", { count: "exact", head: true }).eq("store_id", storeId).eq("status", "new"))
