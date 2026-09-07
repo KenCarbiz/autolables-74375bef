@@ -30,6 +30,8 @@ export interface OperatingMetrics {
   awaitingAuthorization: number;
   retailReady: number;
   gated: number;
+  /** Vehicles needing a price review. Counts vehicles, never flag rows. */
+  priceReviewRequired: number;
   /** Non-zero means a used vehicle is missing its lifecycle row — a real defect. */
   usedMissingLifecycle: number;
 }
@@ -38,7 +40,7 @@ const EMPTY: OperatingMetrics = {
   activeInventory: 0, publishedInventory: 0, newInventory: 0, usedInventory: 0,
   inGetReady: 0, getReadyIntake: 0, getReadyService: 0, getReadyPrep: 0,
   getReadyVerified: 0, getReadyRecon: 0, awaitingAuthorization: 0,
-  retailReady: 0, gated: 0, usedMissingLifecycle: 0,
+  retailReady: 0, gated: 0, priceReviewRequired: 0, usedMissingLifecycle: 0,
 };
 
 const n = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
@@ -77,6 +79,7 @@ export function useOperatingMetrics(tenantId?: string | null) {
       awaitingAuthorization: n(d.awaiting_authorization),
       retailReady: n(d.retail_ready),
       gated: n(d.gated),
+      priceReviewRequired: n(d.price_review_required),
       usedMissingLifecycle: n(d.used_missing_lifecycle),
     });
     setLoading(false);

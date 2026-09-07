@@ -57,6 +57,16 @@ describe("operating_metrics — canonical definitions (M1)", () => {
     expect(body).not.toContain("security definer");
   });
 
+  it("counts vehicles needing a price review, never flag rows", () => {
+    // 7,080 open flags on one tenant resolve to 2 vehicles, neither still on
+    // the lot. Counting rows is what made the badge read 99+ forever.
+    expect(body).toContain("'price_review_required'");
+    expect(body).toContain("count(distinct f.vehicle_id)");
+    // Joined to active inventory, so a flag on a sold car cannot count.
+    const block = body.slice(body.indexOf("'price_review_required'"), body.indexOf("'used_missing_lifecycle'"));
+    expect(block).toContain("join active a on a.id = f.vehicle_id");
+  });
+
   it("reports used vehicles missing a lifecycle row as the real defect", () => {
     // New stock legitimately has no lifecycle row; used/CPO without one does not.
     expect(body).toContain("'used_missing_lifecycle'");

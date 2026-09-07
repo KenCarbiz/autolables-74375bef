@@ -7,7 +7,7 @@ import {
 import { Card, DeepLink, EmptyNote, Pair, Section, TabHeader, btn, fmtWhen, sinceLabel } from "./primitives";
 import {
   OFF_RAIL, RAIL, STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER,
-  stageStates, useVehicleLifecycle, type LifecycleState, type StageState,
+  stageStates, type LifecycleResult, type LifecycleState, type StageState,
 } from "./lifecycle";
 import type { VehicleRow } from "./types";
 
@@ -113,9 +113,9 @@ const PrepCard = ({ row, onOpen }: { row: PrepRow; onOpen: () => void }) => {
   );
 };
 
-export const GetReadyTab = ({ vehicle }: { vehicle: VehicleRow }) => {
+export const GetReadyTab = ({ vehicle, lifecycle }: { vehicle: VehicleRow; lifecycle: LifecycleResult }) => {
   const navigate = useNavigate();
-  const { row, loading, error, tracked } = useVehicleLifecycle(vehicle.tenant_id, vehicle.id, vehicle.condition);
+  const { row, loading, error, tracked } = lifecycle;
   const [prep, setPrep] = useState<PrepRow[]>([]);
   const [gates, setGates] = useState<GateEvent[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);

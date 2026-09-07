@@ -9,7 +9,6 @@ import { useShopperActivity } from "@/hooks/useShopperActivity";
 import { useDealRecord, dealDocStatus } from "@/hooks/useDealRecord";
 import { mmss } from "@/lib/shopperActivity";
 import { listingHero } from "@/lib/photos";
-import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
 import { Card, EmptyNote, Pair, StatRow, TabHeader, btn, btnPrimary, fmtWhen } from "./primitives";
 import { useVehicleSignatures } from "./SignaturesSection";
 import type { CustomerInfoBag, PersonInfo, VehicleRow } from "./types";
@@ -69,7 +68,7 @@ const ACTIVITY_GROUPS: Array<{ key: string; label: string; events: string[] }> =
   { key: "contact", label: "Call / text / contact tapped", events: ["call_clicked", "text_clicked", "customer_passport_call_clicked", "customer_passport_contact_clicked"] },
 ];
 
-export const CustomerTab = ({ vehicle }: { vehicle: VehicleRow }) => {
+export const CustomerTab = ({ vehicle, stockNumber }: { vehicle: VehicleRow; stockNumber: string | null }) => {
   const { tenant } = useTenant();
   const [buyer, setBuyer] = useState<PersonInfo>({});
   const [cobuyer, setCobuyer] = useState<PersonInfo>({});
@@ -344,7 +343,7 @@ export const CustomerTab = ({ vehicle }: { vehicle: VehicleRow }) => {
         viewCount={vehicle.view_count}
         title={vehicle.ymm || vehicle.vin}
         trim={vehicle.trim}
-        stock={vehicleStockNumber(vehicle)}
+        stock={stockNumber}
         thumbnailUrl={listingHero(vehicle) || null}
       />
     </div>

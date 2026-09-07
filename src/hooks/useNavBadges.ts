@@ -82,7 +82,19 @@ export const useNavBadges = (): NavBadgeCounts => {
           .eq("status", "submitted")
           .or(`origin.neq.ingest,created_at.gte.${new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()}`)
       ),
-      safeCount(() => sb().from("stale_document_flags").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "open")),
+      // Vehicles needing a price review, not flag rows. One tenant carries
+      // 7,080 open flags that resolve to 2 vehicles, neither still on the lot:
+      // counting rows made this badge read 99+ for work nobody could clear.
+      // operating_metrics dedupes to active inventory server-side.
+      (async () => {
+        try {
+          const { data } = await sb().rpc("operating_metrics", { p_tenant_id: tenantId });
+          const v = (data as Record<string, unknown> | null)?.price_review_required;
+          return typeof v === "number" ? v : Number(v) || 0;
+        } catch {
+          return 0;
+        }
+      })(),
       safeCount(() => sb().from("addendum_signings").select("id", { count: "exact", head: true }).eq("return_status", "requested")),
       // Latest certification run per vehicle, counted not-ready. Bounded read
       // (3 columns, recent rows) rather than the action center's full 750-row

@@ -89,6 +89,13 @@ AS $$
     -- A used/CPO vehicle with no lifecycle row IS a defect. A new vehicle
     -- without one is correct: recompute_vehicle_lifecycle returns early for
     -- new stock, because new cars do not run used-vehicle Get Ready.
+    -- Vehicles needing a price review, NOT flag rows. 7,080 open flags on one
+    -- tenant resolve to 2 vehicles, neither still on the lot; counting rows
+    -- made the navigation badge read 99+ for work that does not exist.
+    'price_review_required', (SELECT count(DISTINCT f.vehicle_id)
+                               FROM public.stale_document_flags f
+                               JOIN active a ON a.id = f.vehicle_id
+                               WHERE f.tenant_id = p_tenant_id AND f.status = 'open'),
     'used_missing_lifecycle', (SELECT count(*) FROM lc
                                 WHERE state IS NULL AND cond IN ('used','cpo','certified')),
     'tenant_id',              p_tenant_id

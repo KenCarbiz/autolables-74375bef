@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -68,6 +68,17 @@ const VehicleFile = () => {
       setSearchParams(next, { replace: true });
     }
   }, [tab, searchParams, setSearchParams]);
+
+  // …and the other direction, so a link pressed while the page is already open
+  // still moves the tab. Guarded on the raw value actually changing, because
+  // the effect above rewrites the same parameter.
+  const lastRawTab = useRef<string | null>(searchParams.get("tab"));
+  useEffect(() => {
+    const raw = searchParams.get("tab");
+    if (raw === lastRawTab.current) return;
+    lastRawTab.current = raw;
+    if (raw) setTab(resolveTab(raw));
+  }, [searchParams]);
 
   const load = async () => {
     if (!id) return;
@@ -271,10 +282,18 @@ const VehicleFile = () => {
                 {vehicle.trim ? <p className="text-al-section text-muted-foreground font-normal">{vehicle.trim}</p> : null}
 
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-al-body">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Stock</span>
-                    <span className="font-mono font-semibold text-foreground">{stockNo || "Not on the feed"}</span>
-                  </span>
+                  {/* The stock number is how the lot, the DMS and the desk all
+                      refer to this car, so it is always stated — an absent one
+                      says so rather than leaving a gap that reads as "this
+                      screen has no stock number field". */}
+                  {stockNo ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Stock</span>
+                      <span className="font-mono font-semibold text-foreground">{stockNo}</span>
+                    </span>
+                  ) : (
+                    <span className="text-al-meta font-semibold text-amber-700">Stock # not on the feed</span>
+                  )}
                   <span className="inline-flex items-center gap-1.5 min-w-0">
                     <span className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">VIN</span>
                     <span className="font-mono text-foreground truncate">{vehicle.vin}</span>
@@ -356,10 +375,10 @@ const VehicleFile = () => {
       </div>
 
       <div className="pt-2">
-        {tab === "overview" && <OverviewTab vehicle={vehicle} ready={ready} lifecycle={lifecycle} onTab={setTab} onReload={load} />}
+        {tab === "overview" && <OverviewTab vehicle={vehicle} ready={ready} lifecycle={lifecycle} stockNumber={vehicleStockNumber(vehicle)} onTab={setTab} onReload={load} />}
         {tab === "documents" && <DocumentsTab vehicle={vehicle} onReload={load} />}
         {tab === "getready" && <GetReadyTab vehicle={vehicle} lifecycle={lifecycle} />}
-        {tab === "customer" && <CustomerTab vehicle={vehicle} />}
+        {tab === "customer" && <CustomerTab vehicle={vehicle} stockNumber={vehicleStockNumber(vehicle)} />}
         {tab === "compliance" && <ComplianceTab vehicle={vehicle} ready={ready} recall={recall} onReload={load} />}
       </div>
 

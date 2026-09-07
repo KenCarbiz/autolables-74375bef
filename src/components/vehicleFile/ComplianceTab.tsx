@@ -8,7 +8,7 @@ import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
 import TitleVerificationPanel from "@/components/vehicle/TitleVerificationPanel";
 import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { useVehicleTruth } from "@/hooks/useVehicleTruth";
+import { useVehicleTruth, type VehicleTruth } from "@/hooks/useVehicleTruth";
 import { useDealRecord, dealDocStatus } from "@/hooks/useDealRecord";
 import { useVehicleEvidence } from "@/lib/stickerStudio/useVehicleEvidence";
 import { useRecallTask } from "@/hooks/useRecallTask";
@@ -18,8 +18,7 @@ import PriceIntegrityCards from "./PriceIntegrityCard";
 import SignaturesSection, { useVehicleSignatures } from "./SignaturesSection";
 import { readinessLabel, type ReadinessSummary, type VehicleRow } from "./types";
 
-const TruthConflictsCard = ({ vehicle }: { vehicle: VehicleRow }) => {
-  const { truth, loading } = useVehicleTruth(vehicle.tenant_id, vehicle.id);
+const TruthConflictsCard = ({ truth, loading }: { truth: VehicleTruth; loading: boolean }) => {
   const blocking = truth.conflicts.filter((c) => c.blocks_generation);
   const other = truth.conflicts.filter((c) => !c.blocks_generation);
 
@@ -104,7 +103,7 @@ export const ComplianceTab = ({ vehicle, ready, recall, onReload }: {
   const titleVerifyEnabled = tier("autolabels") === "compliance_pro";
   const signatures = useVehicleSignatures(vehicle.vin);
   const { events } = useVehicleEvidence(vehicle.id, vehicle.vin, vehicle.tenant_id);
-  const { truth } = useVehicleTruth(vehicle.tenant_id, vehicle.id);
+  const { truth, loading: truthLoading } = useVehicleTruth(vehicle.tenant_id, vehicle.id);
   const [building, setBuilding] = useState(false);
   const readiness = readinessLabel(ready);
 
@@ -236,7 +235,7 @@ export const ComplianceTab = ({ vehicle, ready, recall, onReload }: {
         onUpdated={onReload}
       />
 
-      <TruthConflictsCard vehicle={vehicle} />
+      <TruthConflictsCard truth={truth} loading={truthLoading} />
 
       <Card title="Audit evidence">
         {events.length === 0 ? (

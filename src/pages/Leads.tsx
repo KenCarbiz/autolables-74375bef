@@ -240,9 +240,7 @@ const Customers = () => {
           <div className="lg:hidden space-y-3">
             {rows.map((c) => (
               <article key={c.id} className="bg-card rounded-2xl border border-border shadow-premium p-4 space-y-3">
-                <Link to={`/customers/${encodeURIComponent(c.id)}`} className="block">
-                  <CustomerIdentity customer={c} />
-                </Link>
+                <CustomerIdentity customer={c} />
                 {c.vehicles[0] && <VehicleCell label={c.vehicles[0].label} stock={c.vehicles[0].stock} vin={c.vehicles[0].vin} slug={c.vehicles[0].slug} />}
                 <EngagementCell engagement={c.engagement} />
                 <dl className="grid grid-cols-2 gap-2">
@@ -276,9 +274,13 @@ const CustomerIdentity = ({ customer }: { customer: CustomerEntry }) => (
   <div className="min-w-0">
     <div className="flex items-center gap-2 min-w-0">
       <UserRound className={`w-4 h-4 shrink-0 ${customer.identified ? "text-foreground" : "text-muted-foreground"}`} />
-      <p className="text-al-body font-semibold text-foreground truncate">
+      <Link
+        to={`/customers/${encodeURIComponent(customer.id)}`}
+        onClick={(e) => e.stopPropagation()}
+        className="text-al-body font-semibold text-foreground truncate hover:underline underline-offset-2"
+      >
         {customer.identified ? customer.name || customer.email || "Unnamed customer" : "Unidentified shopper"}
-      </p>
+      </Link>
     </div>
     <p className="text-al-meta text-muted-foreground mt-0.5 truncate">
       {customer.identified

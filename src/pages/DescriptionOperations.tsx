@@ -7,6 +7,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
 import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import {
   useDescriptionOperations, useDescriptionPermissions, type DescriptionCaseRow,
@@ -313,8 +314,7 @@ export default function DescriptionOperations() {
       if (channelFilter === "partial" && !(present > 0 && present < configured)) return false;
       if (channelFilter === "none" && present !== 0) return false;
       if (!q) return true;
-      const stock = String((r.vehicle.mc_attributes || {}).stock_no ?? "");
-      return [r.vehicle.vin, r.vehicle.ymm, r.vehicle.trim, stock]
+      return [r.vehicle.vin, r.vehicle.ymm, r.vehicle.trim, vehicleStockNumber(r.vehicle)]
         .filter(Boolean).some((s) => String(s).toLowerCase().includes(q));
     });
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -612,7 +612,7 @@ export default function DescriptionOperations() {
                   {paged.map((r) => {
                     const conf = confidenceBand(r.caseRow?.fact_confidence as number | null | undefined);
                     const state = STATE_META[r.state];
-                    const stock = String((r.vehicle.mc_attributes || {}).stock_no ?? "");
+                    const stock = vehicleStockNumber(r.vehicle);
                     const isOpen = expanded === r.vehicleId;
                     const published = r.caseRow?.status === "PUBLISHED" || r.caseRow?.status === "PARTIALLY_PUBLISHED";
                     return (
@@ -644,7 +644,7 @@ export default function DescriptionOperations() {
                               <span className="min-w-0">
                                 <span className="block text-al-body font-semibold text-foreground truncate">{r.vehicle.ymm || "Vehicle"}</span>
                                 <span className="block text-al-meta text-muted-foreground truncate">
-                                  {[r.vehicle.trim, stock ? `Stock ${stock}` : ""].filter(Boolean).join(" - ") || "—"}
+                                  {[r.vehicle.trim, stock ? `Stock ${stock}` : "No stock number"].filter(Boolean).join(" - ")}
                                 </span>
                               </span>
                             </div>
