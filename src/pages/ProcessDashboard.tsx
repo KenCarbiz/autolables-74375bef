@@ -229,10 +229,10 @@ const ProcessDashboard = () => {
       <section className="rounded-2xl bg-card border border-border px-5 lg:px-6 py-5 lg:py-6 shadow-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
               {currentStore?.name || tenant?.name || "Your dealership"}
             </p>
-            <h1 className="font-display text-[28px] lg:text-[32px] font-bold tracking-tight text-foreground mt-1">
+            <h1 className="font-display text-al-page text-foreground mt-1">
               {greeting}, {capitalized}.
             </h1>
             <div className="mt-3 inline-flex items-center gap-2">
@@ -271,7 +271,7 @@ const ProcessDashboard = () => {
       {priorities.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
               Your work today{openPriorities.length > 0 ? ` · ${openPriorities.length} need${openPriorities.length === 1 ? "s" : ""} action` : ""}
             </p>
           </div>
@@ -330,7 +330,7 @@ const ProcessDashboard = () => {
           this vehicle in my pipeline." */}
       <section>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
             Today's flow · 1 → 5
           </p>
         </div>
@@ -351,10 +351,10 @@ const ProcessDashboard = () => {
           /saved row actions (Wave 15.5). */}
       <section>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
             Recent signings · last 7 days
           </p>
-          <Link to="/saved" className="text-[11px] font-semibold text-[#2563EB] hover:underline">
+          <Link to="/saved" className="text-[11px] font-semibold text-primary hover:underline">
             View all →
           </Link>
         </div>
@@ -396,7 +396,7 @@ const ProcessDashboard = () => {
             {/* Desktop: full audit table including the chain hash. */}
             <div className="hidden md:block rounded-xl border border-border bg-card overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                <thead className="bg-muted/40 text-al-meta uppercase tracking-[0.14em] text-muted-foreground">
                   <tr>
                     <th className="text-left px-4 py-2 font-bold">Signed</th>
                     <th className="text-left px-4 py-2 font-bold">VIN</th>
@@ -493,10 +493,10 @@ const ShopperInterest = () => {
   return (
     <section>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
           Shopper interest · most-viewed vehicles
         </p>
-        <Link to="/inventory" className="text-[11px] font-semibold text-[#2563EB] hover:underline">All inventory →</Link>
+        <Link to="/inventory" className="text-[11px] font-semibold text-primary hover:underline">All inventory →</Link>
       </div>
       <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
         {data.map((v, i) => (
@@ -515,7 +515,7 @@ const ShopperInterest = () => {
               <p className="text-sm font-bold text-foreground tabular-nums">{v.view_count.toLocaleString()}</p>
               <p className="text-[10px] text-muted-foreground">views</p>
             </div>
-            <a href={`/v/${v.slug}`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#2563EB] hover:underline shrink-0">Open</a>
+            <a href={`/v/${v.slug}`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-primary hover:underline shrink-0">Open</a>
           </div>
         ))}
       </div>
@@ -548,7 +548,7 @@ const PriorityCard = ({ item }: { item: PriorityItem }) => {
         {active ? <Icon className="w-5 h-5" strokeWidth={2} /> : <CheckCircle2 className="w-5 h-5" strokeWidth={2} />}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+        <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
         {active ? (
           <p className="text-sm font-semibold text-foreground mt-0.5">
             <span className="font-display text-lg tabular-nums mr-1">{count}</span>{unit}
@@ -589,7 +589,7 @@ const KpiCard = ({ label, value, caption, icon: Icon, iconTone }: KpiCardProps) 
   return (
     <div className="rounded-[14px] border border-border bg-card p-5 flex flex-col gap-2 hover:shadow-sm transition-shadow">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+        <p className="text-al-meta font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
         <span className={`w-8 h-8 rounded-lg ${chip} inline-flex items-center justify-center`}>
           <Icon className="w-4 h-4" strokeWidth={2.25} />
         </span>
@@ -637,7 +637,7 @@ const FlowTile = ({ num, icon: Icon, label, count, unit, empty, href, tone, blur
         </span>
         <Icon className="w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
       </div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
       <p className={`mt-0.5 font-display text-2xl font-semibold tabular-nums leading-none ${isZero ? "text-muted-foreground" : "text-foreground"}`}>
         {count}
       </p>
@@ -647,7 +647,7 @@ const FlowTile = ({ num, icon: Icon, label, count, unit, empty, href, tone, blur
       <p className="text-[10px] text-muted-foreground mt-2 leading-snug line-clamp-2 group-hover:text-foreground/70 transition-colors">
         {blurb}
       </p>
-      <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-[#2563EB] opacity-0 group-hover:opacity-100 transition-opacity">
+      <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
         Open <ArrowRight className="w-3 h-3" />
       </span>
     </Link>
@@ -685,7 +685,7 @@ const DefenseTile = ({ icon: Icon, label, count, empty, href, cite, tone, countS
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">{label}</p>
-        <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-[0.12em] font-bold">
+        <p className="text-al-meta text-muted-foreground mt-0.5 uppercase tracking-[0.12em] font-bold">
           {cite}
         </p>
         {count > 0 ? (
