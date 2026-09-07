@@ -51,12 +51,21 @@ const PROOF_POINTS: HeroProofPoint[] = [
 export default function LoginHero({ year }: LoginHeroProps): JSX.Element {
   return (
     <section className="login-hero">
-      <img
-        className="login-hero-car"
-        src="/login-assets/hero-car.png"
-        alt=""
-        aria-hidden="true"
-      />
+      {/* The phone hero is a portrait crop, not the desktop one scaled down, so
+          each breakpoint loads its own art rather than one compromised file. */}
+      <picture>
+        <source
+          media="(max-width: 767px)"
+          srcSet="/login-assets/mobile-hero-car.webp"
+        />
+        <img
+          className="login-hero-car"
+          src="/login-assets/hero-car.png"
+          alt=""
+          aria-hidden="true"
+        />
+      </picture>
+      <div className="login-hero-fade" aria-hidden="true" />
       <div className="login-hero-content">
         <div className="login-hero-brand" aria-label="AutoLabels.io" role="img">
           <span className="login-hero-wordmark">

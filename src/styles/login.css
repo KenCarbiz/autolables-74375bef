@@ -32,6 +32,7 @@
   --al-inset-panel: clamp(24px, 3.71vw, 62px);
   --al-hero-pad-x: clamp(40px, 3.83vw, 64px);
   --al-hero-pad-top: clamp(28px, 2.81vw, 47px);
+  --al-hero-pad-x-mobile: clamp(22px, 6.5vw, 28px);
 
   min-height: 100vh;
   min-height: 100dvh;
@@ -65,6 +66,12 @@
     linear-gradient(160deg, var(--al-navy-700) 0%, var(--al-navy-800) 28%, #00193d 55%, var(--al-navy-900) 100%);
 }
 
+/* Phone-only elements; the desktop composition has neither. */
+.login-hero-fade,
+.login-info {
+  display: none;
+}
+
 .login-hero::before {
   content: "";
   position: absolute;
@@ -81,6 +88,12 @@
   0% { transform: translate3d(-2%, -1%, 0) scale(1.07); opacity: .18; }
   45% { transform: translate3d(4%, 2%, 0) scale(1.10); opacity: .29; }
   100% { transform: translate3d(-2%, -1%, 0) scale(1.07); opacity: .18; }
+}
+
+/* The <picture> wrapper must not generate a box of its own: as an inline
+   element it added a line box to the hero and pushed the layout down 9px. */
+.login-hero picture {
+  display: contents;
 }
 
 .login-hero-car {
@@ -366,7 +379,8 @@
   margin-top: clamp(15px, 1.44vw, 24px);
 }
 
-.login-card-subtitle + .login-field {
+.login-card-subtitle + .login-field,
+.login-card-subtitle + .login-info + .login-field {
   margin-top: clamp(18px, 1.73vw, 29px);
 }
 
@@ -758,43 +772,301 @@
   }
 }
 
-@media (max-width: 860px) {
+
+/* ── Phone and small tablet ────────────────────────────────────────
+   The hero is not dropped here. It becomes a portrait composition the
+   auth card overlaps, per the approved mobile design: the same DOM,
+   re-ordered and re-proportioned, so the two breakpoints cannot drift
+   apart in copy or behaviour. */
+@media (max-width: 767px) {
   .login-page {
     grid-template-columns: 1fr;
-    min-height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: var(--al-paper);
+    overflow-x: clip;
   }
 
   .login-hero {
+    display: block;
+    min-height: clamp(600px, 72svh, 760px);
+    padding:
+      calc(env(safe-area-inset-top) + 30px)
+      var(--al-hero-pad-x-mobile)
+      96px;
+    isolation: isolate;
+    background:
+      url('/login-assets/mobile-hero-base.webp') center / cover no-repeat,
+      var(--al-navy-900);
+  }
+
+  .login-hero::before {
+    inset: -10%;
+    background-image: url('/login-assets/mobile-hero-light.webp');
+    mix-blend-mode: normal;
+    opacity: .6;
+    animation-name: al-login-light-drift-mobile;
+  }
+
+  .login-hero-car {
+    right: -15%;
+    bottom: auto;
+    top: 6%;
+    width: 56vw;
+    max-width: 300px;
+    height: auto;
+    object-fit: contain;
+  }
+
+  /* Blends the hero into the paper the card sits on, so the overlap does
+     not read as a hard seam. */
+  .login-hero-fade {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 190px;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(7, 28, 62, 0) 0%, rgba(9, 42, 92, .35) 45%, rgba(150, 200, 245, .55) 82%, var(--al-paper) 100%);
+  }
+
+  .login-hero-content {
+    display: block;
+    padding: 0;
+    min-height: 0;
+  }
+
+  .login-hero-wordmark {
+    font-size: clamp(30px, 8.4vw, 38px);
+  }
+
+  .login-hero-tagline {
+    margin-top: 9px;
+    font-size: clamp(9px, 2.5vw, 11px);
+    letter-spacing: 0.2em;
+  }
+
+  .login-hero-main {
+    display: flex;
+    flex-direction: column;
+    margin-top: clamp(30px, 8vw, 46px);
+    max-width: 100%;
+  }
+
+  /* The phone design puts the rule between the headline and the statement;
+     the desktop puts it after the statement. Same nodes, different order. */
+  .login-hero-title { order: 1; }
+  .login-hero-accent { order: 2; }
+  .login-hero-kicker { order: 3; }
+  .login-hero-features { order: 4; }
+  .login-hero-description { display: none; }
+
+  .login-hero-title {
+    font-size: clamp(41px, 11.8vw, 57px);
+    line-height: .99;
+    letter-spacing: -.035em;
+  }
+
+  .login-hero-accent {
+    width: 64px;
+    height: 5px;
+    margin: clamp(18px, 5.6vw, 26px) 0 clamp(16px, 5vw, 23px);
+  }
+
+  .login-hero-kicker {
+    margin: 0;
+    max-width: 78%;
+    font-size: clamp(21px, 6.1vw, 27px);
+    line-height: 1.27;
+  }
+
+  .login-hero-features {
+    margin: clamp(24px, 7vw, 32px) 0 0;
+    max-width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .login-hero-feature {
+    gap: 8px;
+    padding-right: 9px;
+    border-right: 1px solid rgba(255, 255, 255, .26);
+  }
+
+  .login-hero-feature:last-child {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  .login-hero-feature + .login-hero-feature {
+    padding-left: 9px;
+  }
+
+  .login-hero-feature-body {
+    min-width: 0;
+  }
+
+  .login-hero-feature {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 9px;
+  }
+
+  .login-hero-feature-icon {
+    width: clamp(38px, 10.5vw, 46px);
+    height: clamp(38px, 10.5vw, 46px);
+    border-radius: 12px;
+  }
+
+  .login-hero-feature-icon svg {
+    width: clamp(19px, 5.3vw, 23px);
+    height: clamp(19px, 5.3vw, 23px);
+  }
+
+  .login-hero-feature-title {
+    font-size: clamp(11.5px, 3.1vw, 13px);
+    line-height: 1.18;
+  }
+
+  /* The phone pillars carry the name only; the detail line is desktop-only. */
+  .login-hero-feature-sub {
+    display: none;
+  }
+
+  .login-hero-proof {
+    margin: clamp(24px, 7vw, 32px) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .login-hero-proof-item {
+    padding-right: 14px;
+    border-right: 1px solid rgba(255, 255, 255, .32);
+  }
+
+  .login-hero-proof-item + .login-hero-proof-item {
+    padding-left: 14px;
+  }
+
+  .login-hero-proof-item:last-child {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  .login-hero-proof-value {
+    font-size: 13px;
+    letter-spacing: .05em;
+  }
+
+  .login-hero-proof-label {
+    margin-top: 5px;
+    font-size: 9px;
+    letter-spacing: .13em;
+  }
+
+  .login-hero-footer {
     display: none;
   }
 
   .login-auth {
-    min-height: 100vh;
-    min-height: 100dvh;
-    padding: 28px 20px 40px;
-    justify-content: flex-start;
+    position: relative;
+    z-index: 2;
+    display: block;
+    min-height: 0;
+    margin-top: -74px;
+    padding: 0 16px calc(env(safe-area-inset-bottom) + 28px);
+    background: none;
+  }
+
+  .login-auth::before,
+  .login-auth::after {
+    display: none;
   }
 
   .login-auth-eyebrow {
-    position: static;
-    text-align: center;
-    margin: 0 0 16px;
-  }
-
-  .login-mobile-brand {
-    display: flex;
-    justify-content: center;
-    margin: 8px 0 24px;
+    display: none;
   }
 
   .login-card {
-    width: 100%;
-    max-width: 480px;
-    padding: 30px 24px 34px;
+    width: min(100%, 460px);
+    margin: 0 auto;
+    border-radius: 30px;
+    border-color: rgba(15, 23, 42, .08);
+    box-shadow: 0 22px 60px rgba(11, 32, 65, .15), 0 2px 8px rgba(11, 32, 65, .06);
+    padding: 32px 26px 26px;
+  }
+
+  .login-eyebrow {
+    margin-bottom: 10px;
+    font-size: 13px;
+    letter-spacing: .13em;
+  }
+
+  .login-card-title {
+    margin-bottom: 4px;
+    font-size: clamp(32px, 9vw, 40px);
+    line-height: 1.06;
+    letter-spacing: -.025em;
+  }
+
+  .login-card-subtitle {
+    margin-bottom: 22px;
+    font-size: 17px;
+    line-height: 1.4;
+  }
+
+  .login-info {
+    display: flex;
+    gap: 12px;
+    margin: 0 0 22px;
+    padding: 16px;
+    border: 1px solid rgba(37, 99, 235, .18);
+    border-radius: 14px;
+    background: #EFF6FF;
+    color: #31598F;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .login-info-icon {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    margin-top: 1px;
+    color: var(--al-link);
+  }
+
+  .login-card-subtitle + .login-field,
+  .login-card-subtitle + .login-info + .login-field,
+  .login-field {
+    margin-top: 18px;
+  }
+
+  .login-field-label {
+    font-size: 15px;
+  }
+
+  .login-field-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 14px;
   }
 
   .login-input-shell {
-    height: 52px;
+    height: 56px;
+    gap: 12px;
+    padding: 0 8px 0 14px;
+  }
+
+  /* 16px keeps iOS from zooming the viewport when a field takes focus. */
+  .login-input {
+    font-size: 16px;
   }
 
   .login-input-action {
@@ -804,6 +1076,248 @@
 
   .login-submit {
     height: 56px;
+    margin-top: 26px;
+    border-radius: 12px;
+    font-size: 18px;
+  }
+
+  .login-secure {
+    margin-top: 24px;
+  }
+
+  .login-access {
+    margin-top: 14px;
+    font-size: 14px;
+  }
+
+  .login-auth-footer {
+    position: static;
+    margin-top: 26px;
+    padding: 0;
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .login-legal,
+  .login-tagline {
+    margin: 0;
+    justify-content: center;
+  }
+}
+
+@keyframes al-login-light-drift-mobile {
+  0% { transform: translate3d(-2%, -1%, 0) scale(1.06); opacity: .5; }
+  45% { transform: translate3d(4%, 2%, 0) scale(1.10); opacity: .68; }
+  100% { transform: translate3d(-2%, -1%, 0) scale(1.06); opacity: .5; }
+}
+
+@media (max-width: 389px) {
+  .login-hero {
+    min-height: 600px;
+    padding-bottom: 88px;
+  }
+
+  .login-hero-car {
+    right: -19%;
+    top: 7%;
+    width: 59vw;
+  }
+
+  .login-hero-feature {
+    gap: 7px;
+    padding-right: 7px;
+  }
+
+  .login-hero-feature + .login-hero-feature {
+    padding-left: 7px;
+  }
+
+  .login-hero-feature-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .login-card {
+    padding: 28px 20px 24px;
+  }
+
+  .login-legal {
+    flex-wrap: wrap;
+  }
+}
+
+/* Stacked tablet: the same portrait composition with more room, one step
+   before the desktop split returns. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .login-page {
+    grid-template-columns: 1fr;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: var(--al-paper);
+    overflow-x: clip;
+  }
+
+  .login-hero {
+    display: block;
+    min-height: clamp(560px, 64svh, 720px);
+    padding: calc(env(safe-area-inset-top) + 42px) 32px 120px;
+    isolation: isolate;
+    background:
+      url('/login-assets/mobile-hero-base.webp') center / cover no-repeat,
+      var(--al-navy-900);
+  }
+
+  .login-hero::before {
+    inset: -10%;
+    background-image: url('/login-assets/mobile-hero-light.webp');
+    mix-blend-mode: normal;
+    opacity: .55;
+    animation-name: al-login-light-drift-mobile;
+  }
+
+  .login-hero-car {
+    right: -5%;
+    top: 4%;
+    bottom: auto;
+    width: 33vw;
+    max-width: 300px;
+    height: auto;
+    object-fit: contain;
+  }
+
+  .login-hero-fade {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 210px;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(7, 28, 62, 0) 0%, rgba(9, 42, 92, .35) 45%, rgba(150, 200, 245, .55) 82%, var(--al-paper) 100%);
+  }
+
+  .login-hero-content {
+    display: block;
+    padding: 0;
+    min-height: 0;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+
+  .login-hero-main {
+    display: flex;
+    flex-direction: column;
+    margin-top: 42px;
+  }
+
+  .login-hero-title { order: 1; font-size: 58px; }
+  .login-hero-accent { order: 2; margin: 26px 0 22px; }
+  .login-hero-kicker { order: 3; margin: 0; font-size: 26px; max-width: 62%; }
+  .login-hero-features { order: 4; margin-top: 34px; }
+  .login-hero-description { display: none; }
+
+  /* Keep the pillar and proof rows clear of the vehicle, which reaches
+     furthest into the copy at the narrow end of this range. */
+  .login-hero-features {
+    max-width: 72%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .login-hero-feature {
+    gap: 12px;
+    padding-right: 18px;
+    border-right: 1px solid rgba(255, 255, 255, .26);
+  }
+
+  .login-hero-feature + .login-hero-feature {
+    padding-left: 18px;
+  }
+
+  .login-hero-feature:last-child {
+    border-right: 0;
+  }
+
+  .login-hero-feature-sub {
+    display: none;
+  }
+
+  .login-hero-proof {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 0;
+    margin-top: 34px;
+    padding: 0;
+    max-width: 72%;
+  }
+
+  .login-hero-proof-item {
+    padding-right: 18px;
+    border-right: 1px solid rgba(255, 255, 255, .32);
+  }
+
+  .login-hero-proof-item + .login-hero-proof-item {
+    padding-left: 18px;
+  }
+
+  .login-hero-proof-item:last-child {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  .login-hero-footer {
+    display: none;
+  }
+
+  .login-auth {
+    position: relative;
+    z-index: 2;
+    display: block;
+    min-height: 0;
+    margin-top: -90px;
+    padding: 0 24px calc(env(safe-area-inset-bottom) + 48px);
+    background: none;
+  }
+
+  .login-auth::before,
+  .login-auth::after,
+  .login-auth-eyebrow {
+    display: none;
+  }
+
+  .login-card {
+    width: min(100%, 620px);
+    margin: 0 auto;
+    border-radius: 30px;
+    padding: 36px 32px 30px;
+  }
+
+  .login-info {
+    display: flex;
+    gap: 12px;
+    margin: 0 0 24px;
+    padding: 16px;
+    border: 1px solid rgba(37, 99, 235, .18);
+    border-radius: 14px;
+    background: #EFF6FF;
+    color: #31598F;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .login-info-icon {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    margin-top: 1px;
+    color: var(--al-link);
+  }
+
+  .login-input {
+    font-size: 16px;
   }
 
   .login-auth-footer {
@@ -812,33 +1326,57 @@
     padding: 0;
     flex-direction: column;
     gap: 14px;
+    text-align: center;
   }
 
-  .login-legal {
-    justify-content: center;
-  }
-
+  .login-legal,
   .login-tagline {
     margin: 0;
     justify-content: center;
   }
 }
 
-@media (max-width: 430px) {
-  .login-card {
-    padding: 26px 18px 30px;
+/* A phone held sideways has no vertical room for the portrait hero. */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  .login-hero {
+    min-height: 390px;
+    padding-top: calc(env(safe-area-inset-top) + 18px);
+    padding-bottom: 74px;
+    background-image: url('/login-assets/mobile-hero-landscape.webp');
   }
 
-  .login-card-title {
-    font-size: 30px;
+  .login-hero-main {
+    margin-top: 20px;
   }
 
-  .login-auth-footer {
-    text-align: center;
+  .login-hero-title {
+    font-size: clamp(32px, 7.5vw, 46px);
   }
 
-  .login-legal {
-    flex-wrap: wrap;
-    justify-content: center;
+  .login-hero-kicker {
+    font-size: 18px;
+    max-width: 62%;
+  }
+
+  .login-hero-features,
+  .login-hero-proof {
+    margin-top: 16px;
+    max-width: 74%;
+  }
+
+  .login-hero-car {
+    width: 38vw;
+    right: -3%;
+    top: 2%;
+  }
+
+  .login-auth {
+    margin-top: -48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-hero::before {
+    animation: none !important;
   }
 }
