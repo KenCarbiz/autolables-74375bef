@@ -24,7 +24,7 @@ import {
   resolveVoiceProfile, computeVoiceProfileVersion, featureChecksum, isToneKey,
   type DescriptionPacket, type ChannelPolicy, type ComparisonDoc, type SeoTargeting,
   type ToneKey, type VoiceProfile,
-  preferredLengthBand, featureBudgetForLength,
+  preferredLengthBand, featureBudgetForLength, LENGTH_POLICY,
 } from "../_shared/description-core.ts";
 import { repairContent, hasRepairableFindings } from "../_shared/description-repair.ts";
 import { preflight, preflightSummary } from "../_shared/description-preflight.ts";
@@ -759,7 +759,24 @@ async function orchestrateVehicle(
       featureBudget: featureBudgetForLength(preferredLengthBand(settings).max),
     });
     const featChecksum = await featureChecksum(packet.selectedFeatureIds);
-    const masterPolicy = resolveChannelPolicy("vehicle_passport", channelOverrides.get("vehicle_passport"))!;
+    // The master is NOT a channel. It borrowed vehicle_passport's policy, whose
+    // characterLimit is 2400 -- so the repair pass trimmed a master targeted at
+    // 3221-3879 down to 2400, cutting the legal disclosure off the end and
+    // slicing mid-sentence. That is the whole of the REQUIRED_DISCLOSURE_MISSING
+    // mystery: the stored copy ended with the disclosure, and the text the
+    // validator judged after repair was a thousand characters shorter.
+    //
+    // Same mistake as the feature budget: the master taking a channel's limits.
+    // It keeps the passport policy's formatting and CTA rules and gets its own
+    // length, with the platform safety ceiling as the only hard cap.
+    const passportPolicy = resolveChannelPolicy("vehicle_passport", channelOverrides.get("vehicle_passport"))!;
+    const masterBand = preferredLengthBand(settings);
+    const masterPolicy = {
+      ...passportPolicy,
+      recommendedMin: masterBand.min,
+      recommendedMax: masterBand.max,
+      characterLimit: Math.max(masterBand.max, LENGTH_POLICY.absoluteMax),
+    };
 
     // ── Preflight: refuse a doomed request BEFORE any provider call ──
     // Everything above this point is free. Everything below spends money, so
