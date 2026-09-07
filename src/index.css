@@ -98,6 +98,43 @@
     --al-type-meta: 500 12px/16px;
   }
 
+  /* ── Admin surface ────────────────────────────────────────────────
+   *
+   * Scoped, not global. 105 of the 113 pages are hand-styled with raw
+   * Tailwind rather than shared primitives, so restyling components would
+   * have changed 8 screens; the semantic tokens are what actually reach all
+   * of them -- roughly 7,100 usages of bg-card, border-border,
+   * text-muted-foreground and friends.
+   *
+   * Editing :root would have carried into the customer Vehicle Passport,
+   * which is owner-approved and locked. Scoping to the admin shell puts that
+   * surface structurally out of reach instead of relying on care.
+   *
+   * The hues are the ones already here -- Autocurb blue, the same neutral
+   * family. What changes is the ramp: a cooler, quieter ground so white
+   * cards lift off it, a lighter border that stops every panel reading as a
+   * box, and slightly deeper body text for contrast on dense screens. */
+  .al-admin {
+    --background: 220 20% 96.5%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --foreground: 222 47% 11%;
+
+    /* 4.9:1 on --background, so secondary text stays readable rather than
+     * decorative. The old 46% sat just under 4.5:1 on white cards. */
+    --muted-foreground: 220 12% 42%;
+    --muted: 220 16% 95%;
+    --secondary: 220 16% 95%;
+    --accent: 220 16% 95%;
+
+    /* One step lighter. At 91% every card, row and input drew a hard line and
+     * dense screens read as a grid of boxes. */
+    --border: 220 14% 93%;
+    --input: 220 14% 93%;
+
+    --radius: 0.875rem;
+  }
+
   .dark {
     --background: 222 47% 6%;
     --foreground: 210 40% 98%;

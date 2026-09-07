@@ -553,7 +553,9 @@ const AppShell = ({ children }: AppShellProps) => {
 
   return (
     <VinScanContext.Provider value={vinScanApi}>
-      <div className="min-h-screen bg-background flex w-full overflow-hidden">
+      {/* al-admin scopes the admin palette. Public routes and the locked
+          customer passport render outside this shell and keep :root. */}
+      <div className="al-admin min-h-screen bg-background flex w-full overflow-hidden">
         {mobileOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />}
 
         <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-card border-r border-border transition-all duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-64 flex flex-col`}>
