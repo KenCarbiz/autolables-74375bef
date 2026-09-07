@@ -5,7 +5,9 @@ const allowedOrigin = (origin: string): boolean => {
   try {
     const { hostname, protocol } = new URL(origin);
     if (protocol !== "https:" && hostname !== "localhost") return false;
-    return hostname === "autolabels.io"
+    return hostname === "localhost"
+      || hostname === "127.0.0.1"
+      || hostname === "autolabels.io"
       || hostname === "www.autolabels.io"
       || hostname === "autolables.lovable.app"
       || hostname.endsWith(".lovableproject.com")
