@@ -27,12 +27,6 @@ verify_jwt = false
 [functions.public-document-asset]
 verify_jwt = false
 
-# Browser fallback for networks that block the project's auth host while still
-# allowing the Edge Functions host. The function forwards credentials directly
-# to GoTrue and never stores or logs them.
-[functions.auth-login-relay]
-verify_jwt = false
-
 # oem-brochure and oem-owners-manual reach a metered search provider and write
 # to a GLOBAL link cache, so an anonymous caller would be spending our money.
 # JWT verification stays ON — pinned here rather than left to the default so a
