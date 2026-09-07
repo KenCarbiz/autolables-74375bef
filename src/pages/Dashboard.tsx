@@ -103,6 +103,13 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-5">
+      <div>
+        <h1 className="text-al-page text-foreground">Dashboard</h1>
+        <p className="text-al-body text-muted-foreground mt-1">
+          Addendum activity and store performance
+        </p>
+      </div>
+
       {/* Status pills bar (HarteCash style) */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 text-xs flex-wrap">
@@ -118,7 +125,7 @@ const Dashboard = () => {
 
       {/* Analytics section header */}
       <div className="flex items-center justify-between mt-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-label text-muted-foreground">
+        <h2 className="text-al-meta uppercase tracking-label text-muted-foreground">
           Analytics
         </h2>
         <button className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-card border border-border text-xs font-medium hover:bg-muted transition-colors">
@@ -164,11 +171,11 @@ const Dashboard = () => {
       </div>
 
       {/* Pipeline overview — HarteCash-style segmented bar */}
-      <div className="bg-card rounded-xl border border-border shadow-premium p-5">
+      <div className="bg-card rounded-2xl border border-border shadow-premium p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-label text-muted-foreground">Pipeline Overview</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Addendum workflow by status</p>
+            <h3 className="text-al-meta uppercase tracking-label text-muted-foreground">Pipeline Overview</h3>
+            <p className="text-al-meta text-muted-foreground mt-1">Addendum workflow by status</p>
           </div>
         </div>
         <div className="flex rounded-lg overflow-hidden h-8 bg-muted">
@@ -218,11 +225,11 @@ const Dashboard = () => {
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Recent addendums table */}
-        <div className="lg:col-span-2 bg-card rounded-xl border border-border shadow-premium overflow-hidden">
+        <div className="lg:col-span-2 bg-card rounded-2xl border border-border shadow-premium overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Recent Addendums</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Latest activity across your store</p>
+              <h3 className="text-al-card text-foreground">Recent Addendums</h3>
+              <p className="text-al-meta text-muted-foreground mt-1">Latest activity across your store</p>
             </div>
             <button
               onClick={() => navigate("/saved")}
@@ -297,10 +304,10 @@ const Dashboard = () => {
         {/* Right column: top products + activity */}
         <div className="space-y-5">
           {/* Top products */}
-          <div className="bg-card rounded-xl border border-border shadow-premium">
+          <div className="bg-card rounded-2xl border border-border shadow-premium">
             <div className="px-5 py-4 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground">Top Products</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">By acceptance rate</p>
+              <h3 className="text-al-card text-foreground">Top Products</h3>
+              <p className="text-al-meta text-muted-foreground mt-1">By acceptance rate</p>
             </div>
             <div className="px-5 py-3">
               {topProducts.length === 0 ? (
@@ -329,10 +336,10 @@ const Dashboard = () => {
           </div>
 
           {/* Activity feed */}
-          <div className="bg-card rounded-xl border border-border shadow-premium">
+          <div className="bg-card rounded-2xl border border-border shadow-premium">
             <div className="px-5 py-4 border-b border-border">
-              <h3 className="text-sm font-semibold text-foreground">Recent Activity</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Compliance log</p>
+              <h3 className="text-al-card text-foreground">Recent Activity</h3>
+              <p className="text-al-meta text-muted-foreground mt-1">Compliance log</p>
             </div>
             <div>
               {recentActivity.length === 0 ? (
@@ -404,7 +411,7 @@ const QuickStat = ({
   prefix?: string;
   suffix?: string;
 }) => (
-  <div className="bg-card rounded-xl border border-border p-4 shadow-premium hover:shadow-premium-md transition-shadow">
+  <div className="bg-card rounded-2xl border border-border p-4 shadow-premium hover:shadow-premium-md transition-shadow">
     <Icon className={`w-4 h-4 ${iconColor} mb-2`} />
     <div className="text-2xl font-semibold tracking-tight text-foreground font-display tabular-nums">
       {prefix}{value.toLocaleString()}{suffix}
