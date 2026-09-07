@@ -4313,6 +4313,9 @@ export type Database = {
           inventory_date: string | null
           items: Json
           priority: string | null
+          reconciled_at: string | null
+          reconciliation_note: string | null
+          reconciliation_state: string | null
           ro_number: string
           service_advisor: string
           status: string
@@ -4345,6 +4348,9 @@ export type Database = {
           inventory_date?: string | null
           items?: Json
           priority?: string | null
+          reconciled_at?: string | null
+          reconciliation_note?: string | null
+          reconciliation_state?: string | null
           ro_number?: string
           service_advisor?: string
           status?: string
@@ -4377,6 +4383,9 @@ export type Database = {
           inventory_date?: string | null
           items?: Json
           priority?: string | null
+          reconciled_at?: string | null
+          reconciliation_note?: string | null
+          reconciliation_state?: string | null
           ro_number?: string
           service_advisor?: string
           status?: string
