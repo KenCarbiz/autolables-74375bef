@@ -43,10 +43,13 @@ serve(async (req) => {
     }
 
 
+    // Anthropic is the historical provider. When its key is absent, fall back
+    // to the Lovable AI Gateway rather than 500-ing every call.
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) {
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!apiKey && !lovableKey) {
       return new Response(
-        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
+        JSON.stringify({ error: "No AI provider configured (ANTHROPIC_API_KEY / LOVABLE_API_KEY)" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
