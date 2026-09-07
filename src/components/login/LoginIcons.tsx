@@ -25,25 +25,41 @@ const Svg = ({ className, strokeWidth, children }: SvgProps) => (
   </svg>
 );
 
+// The three hero capability icons are solid in the approved mockup, so they are
+// filled here rather than copied as strokes from the pack's SVGs. The form-field
+// glyphs below are strokes in the mockup and do match the pack verbatim.
+const SolidSvg = ({ className, children }: LoginIconProps & { children: ReactNode }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false" className={className}>
+    {children}
+  </svg>
+);
+
 export const IconVehicleTruth = ({ className }: LoginIconProps) => (
-  <Svg className={className} strokeWidth={1.9}>
-    <path d="M5 11l1.5-4.2A2.5 2.5 0 0 1 8.85 5h6.3a2.5 2.5 0 0 1 2.35 1.8L19 11" />
-    <path d="M4 11h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Z" />
-    <path d="M6 19v2M18 19v2M6 15h.01M18 15h.01M8.5 15h7" />
-  </Svg>
+  <SolidSvg className={className}>
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M6.55 6.3A2.6 2.6 0 0 1 9 4.6h6a2.6 2.6 0 0 1 2.45 1.7l1.4 3.85A2.6 2.6 0 0 1 21 12.7v3.9a1.5 1.5 0 0 1-1.5 1.5H19v.9a1.5 1.5 0 0 1-3 0v-.9H8v.9a1.5 1.5 0 0 1-3 0v-.9h-.5A1.5 1.5 0 0 1 3 16.6v-3.9a2.6 2.6 0 0 1 2.15-2.55L6.55 6.3Zm1.9.7-1.1 3h9.3l-1.1-3a.6.6 0 0 0-.55-.4H9a.6.6 0 0 0-.55.4ZM6.3 13a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3Zm11.4 0a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3Z"
+    />
+  </SolidSvg>
 );
 
 export const IconComplianceShield = ({ className }: LoginIconProps) => (
-  <Svg className={className} strokeWidth={1.9}>
-    <path d="M12 3 5 6v5c0 4.7 2.9 8.2 7 10 4.1-1.8 7-5.3 7-10V6l-7-3Z" />
-    <path d="m8.7 12.2 2.1 2.1 4.5-4.6" />
-  </Svg>
+  <SolidSvg className={className}>
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M12 2.5 4.3 5.8v5.5c0 5.1 3.2 8.9 7.7 10.8 4.5-1.9 7.7-5.7 7.7-10.8V5.8L12 2.5Zm4.05 6.35-5.2 5.3-2.9-2.95 1.4-1.4 1.5 1.55 3.8-3.9 1.4 1.4Z"
+    />
+  </SolidSvg>
 );
 
 export const IconRetailOperations = ({ className }: LoginIconProps) => (
-  <Svg className={className} strokeWidth={1.9}>
-    <path d="M4 20V13h4v7M10 20V8h4v12M16 20V4h4v16" />
-  </Svg>
+  <SolidSvg className={className}>
+    <rect x={4} y={12.6} width={4} height={7.4} rx={1} />
+    <rect x={10} y={7.6} width={4} height={12.4} rx={1} />
+    <rect x={16} y={3.6} width={4} height={16.4} rx={1} />
+  </SolidSvg>
 );
 
 export const IconEmail = ({ className }: LoginIconProps) => (
