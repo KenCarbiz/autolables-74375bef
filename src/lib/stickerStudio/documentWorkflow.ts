@@ -41,7 +41,7 @@ export interface GeneratedDocument {
   printed_at?: string | null;
   published_at?: string | null;
   rejected_at?: string | null;
-  reject_reason?: string | null;
+  rejection_reason?: string | null;
   created_at?: string;
 }
 
@@ -118,7 +118,7 @@ export async function transitionDocument({ doc, action, actorId, reason, expecte
   // deno-lint-ignore no-explicit-any
   const patch: Record<string, any> = { document_status: to };
   if (action === "approve") { patch.approved_by = actorId || null; patch.approved_at = now; patch.reviewed_by = actorId || null; }
-  if (action === "reject") { patch.rejected_at = now; patch.reviewed_by = actorId || null; patch.reject_reason = reason || null; }
+  if (action === "reject") { patch.rejected_at = now; patch.reviewed_by = actorId || null; patch.rejected_by = actorId || null; patch.rejection_reason = reason || null; }
   if (action === "mark_printed") { patch.printed_at = now; patch.print_count = (doc.print_count || 0) + 1; }
   if (action === "publish") patch.published_at = now;
   if (action === "unpublish") patch.published_at = null;
