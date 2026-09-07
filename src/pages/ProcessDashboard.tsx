@@ -61,7 +61,11 @@ const ProcessDashboard = () => {
   //    TanStack Query, already realtime-synced in Wave 14.6).
   const { files: vehicleFiles } = useVehicleFiles(storeId);
   const { records: getReadyRecords } = useGetReady(storeId);
-  const { metrics } = useOperatingMetrics(storeId);
+  // Tenant id, not storeId: operating_metrics takes p_tenant_id. These are the
+  // same value only for single-store dealers, where TenantContext synthesizes a
+  // store whose id IS the tenant id. A dealer with configured stores gets a
+  // slug-shaped store id, the RPC errors, and the page reads as an empty lot.
+  const { metrics, error: metricsError } = useOperatingMetrics(tenant?.id);
   const { byVin: advertisedByVin } = useAdvertisedPrices(storeId);
 
   // ── Direct queries for tiles whose data lives in tables not
@@ -295,6 +299,21 @@ const ProcessDashboard = () => {
             </div>
           )}
         </section>
+      )}
+
+      {/* A failed metrics read must not render as zeros: "0 active inventory"
+          is indistinguishable from an empty lot, and that is how an outage
+          reads as good news. */}
+      {metricsError && (
+        <div
+          role="status"
+          className="rounded-2xl border border-border bg-card px-4 py-3 text-al-body text-foreground"
+        >
+          <span className="font-semibold">Counts unavailable.</span>{" "}
+          <span className="text-muted-foreground">
+            The operating figures below could not be loaded, so they are not shown as zero.
+          </span>
+        </div>
       )}
 
       <div className="flex flex-col xl:flex-row gap-5">
