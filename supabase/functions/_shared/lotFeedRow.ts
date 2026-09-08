@@ -37,6 +37,45 @@ export const LOT_FEED_DENY = new Set([
   "blackbook", "mc_raw", "market_payload", "comparables",
 ]);
 
+// ── The anonymous shopper's view of the same denylist ─────────────────
+//
+// public-listing-view answers /v/:slug for anyone on the internet off the same
+// `SELECT *` row, and until now it deleted about fifteen fields it happened to
+// think of. install_token was not one of them — the sole credential for the
+// anon `install_proofs_upload` storage policy and for record_install_proof() —
+// so every published and archived listing handed a working capability to
+// whoever loaded the page. The same allow-by-default hazard the comment at the
+// top of this file describes, pointed the other way: a column nobody
+// remembered is indistinguishable from a column nobody needed to hide.
+//
+// So the public view derives its denylist from LOT_FEED_DENY rather than
+// keeping a second one. A field added above is denied to the shopper too,
+// with nothing to remember.
+
+/**
+ * The LOT_FEED_DENY members public-listing-view SANITIZES instead of dropping.
+ *
+ * These three are withheld from a sister app because redistributing a paid
+ * valuation feed and a bulk provider payload is a licensing question — not
+ * because they are secret. The customer passport is the surface they were
+ * bought for: Market Intelligence and Market Comparison render the market
+ * position, the price band and the comparable set, and those modules are part
+ * of the locked /v/:slug spec. public-listing-view already reduces each one to
+ * a shopper-safe projection before it ships (competitor identity, wholesale
+ * numbers and cheaper-car counts stripped), so dropping them outright here
+ * would blank approved modules to fix a leak that is not in them.
+ *
+ * Anything NOT named here is denied. Exempting a field is the deliberate act.
+ */
+const PUBLIC_VIEW_SANITIZED = new Set([
+  "blackbook", "market_payload", "comparables",
+]);
+
+/** What must never reach an anonymous shopper. Derived, never hand-listed. */
+export const PUBLIC_VIEW_DENY = new Set(
+  [...LOT_FEED_DENY].filter((k) => !PUBLIC_VIEW_SANITIZED.has(k)),
+);
+
 /**
  * Listing history, minus other dealers' addresses.
  *

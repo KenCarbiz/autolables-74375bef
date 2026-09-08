@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
+import { PUBLIC_VIEW_DENY } from "../_shared/lotFeedRow.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
@@ -875,11 +876,37 @@ serve(async (req) => {
       delete row.blackbook; delete row.history_payload;
     }
 
-    // The raw MarketCheck listing object (verbatim, incl. the competitor-facing
-    // `dealer` block, full comp/history data, and market valuation) must never
-    // reach a shopper. The passport reads the curated `mc_attributes`, never
-    // `mc_raw`, so dropping the raw dump is safe.
-    delete (row as Record<string, unknown>).mc_raw;
+    // ── Final deny sweep. The last thing that touches the payload. ─────────
+    //
+    // get_vehicle_listing_by_slug is `SELECT * FROM vehicle_listings`, so every
+    // column that table has ever grown arrives here and ships unless something
+    // names it. The named deletes above could not hold that line: install_token
+    // was never among them, and it is not merchandising data — it is the sole
+    // credential for the anon `install_proofs_upload` storage policy and for
+    // record_install_proof(), both of which are EXECUTE/INSERT-granted to anon
+    // and keyed on the token alone. Every published and archived listing was
+    // therefore handing a working capability to anyone who opened its passport,
+    // and install_proofs rows written with it come back out through the recon
+    // block above as verified installed equipment.
+    //
+    // The denylist is shared with the sister-app feeds (autofilm-feed,
+    // vehicle-lookup) so there is one place to add a field and no second list
+    // to remember. What it drops here: the credential (install_token), the
+    // internal actors (created_by, assigned_agent_id), the recall-override
+    // audit trail incl. free-text notes (recall_override_by / _at / _notes),
+    // the price-scraper diagnostics (price_parse_notes), and the raw
+    // MarketCheck dump (mc_raw — verbatim, incl. the competitor-facing `dealer`
+    // block; the passport reads the curated mc_attributes and never this).
+    //
+    // What it deliberately does NOT drop: blackbook, market_payload and
+    // comparables. They are on the feed denylist as a licensing question, not
+    // as a secret, and the locked passport's Market Intelligence and Market
+    // Comparison modules render all three. They ship as the shopper-safe
+    // projections built directly above — competitor identity, wholesale values
+    // and cheaper-car counts already stripped. See PUBLIC_VIEW_SANITIZED in
+    // _shared/lotFeedRow.ts, which is where that exemption is spelled out and
+    // the only reason a denied field can fall out of scope.
+    for (const k of PUBLIC_VIEW_DENY) delete (row as Record<string, unknown>)[k];
 
     return json(200, { listing: row });
   } catch (err) {
