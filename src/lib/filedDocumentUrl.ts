@@ -24,6 +24,20 @@
 
 import { isSignedUrlUsable } from "./factorySticker/assets";
 
+/**
+ * Is this stored value a signed storage credential at all?
+ *
+ * Not every filed document is one. A window sticker and an addendum are stored
+ * as `data:` URLs with no storage object behind them, so there is nothing to
+ * re-sign and the stored value IS the document — a caller that cannot re-mint
+ * must hand those back rather than report the document unopenable.
+ */
+export function isSignedStorageUrl(url: string | null | undefined): boolean {
+  const v = (url || "").trim();
+  if (!/^https?:/i.test(v)) return false;
+  return v.includes("/object/sign/") || /[?&]token=/.test(v);
+}
+
 /** What the caller needs from `useWindowSticker().documentAssets`. */
 export interface FiledDocumentAssets {
   pdf_url: string | null;

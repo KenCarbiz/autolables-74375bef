@@ -9,6 +9,8 @@ import TemplateOverrideControl from "@/components/vehicle/TemplateOverrideContro
 import StickerBlockersPanel from "@/components/vehicle/StickerBlockersPanel";
 import { buildStickerBlockers } from "@/lib/factorySticker/blockers";
 import { promptRegenerationReason } from "@/lib/factorySticker/regenerationReason";
+import { fetchFiledDocumentAssets } from "@/hooks/useWindowSticker";
+import { freshFiledDocumentUrl } from "@/lib/filedDocumentUrl";
 import { listingHero } from "@/lib/photos";
 import { buildRenderLayout } from "@/lib/factorySticker/render/contract.ts";
 import type { FactoryStickerRenderData, FactoryStickerTheme } from "@/lib/factorySticker/render/contract.ts";
@@ -431,6 +433,8 @@ export default function FactoryStickerWorkspace({
   const [scenario, setScenario] = useState<keyof typeof FIXTURE_SCENARIOS>("used");
   const [zoom, setZoom] = useState<"fit" | number>("fit");
   const [fullscreen, setFullscreen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [openingDoc, setOpeningDoc] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (fixture || !vehicleId) return;
@@ -590,7 +594,45 @@ export default function FactoryStickerWorkspace({
     || null;
   const hero = fixture ? null : vehicle ? listingHero(vehicle as unknown as Parameters<typeof listingHero>[0]) : null;
   const currentDoc = docs.find((d) => d.id === record?.current_document_id) || docs[0] || null;
-  const pdfUrl = currentDoc?.pdf_url || null;
+
+  // The PDF button opens a credential minted now, never generated_documents.pdf_url:
+  // that column holds a seven-day signed URL, so an untouched sticker's Download /
+  // Print buttons started answering InvalidJWT a week after generation while the
+  // record still read PUBLISHED and the file had never moved.
+  const docTenantId = vehicle?.tenant_id || null;
+  useEffect(() => {
+    let cancelled = false;
+    setPdfUrl(null);
+    if (fixture || !docTenantId || !vehicleId || !currentDoc?.id) return;
+    (async () => {
+      const url = await freshFiledDocumentUrl(
+        (documentId) => fetchFiledDocumentAssets(docTenantId, vehicleId, documentId),
+        currentDoc.id,
+        currentDoc.pdf_url || currentDoc.online_url || null,
+      );
+      if (!cancelled) setPdfUrl(url);
+    })();
+    return () => { cancelled = true; };
+  }, [fixture, docTenantId, vehicleId, currentDoc?.id, currentDoc?.pdf_url, currentDoc?.online_url]);
+
+  // Version history opens the same way: one round trip on click rather than a
+  // stored link that may have aged out since the page loaded.
+  const openFiledVersion = async (doc: DocRow) => {
+    if (!docTenantId || !vehicleId) return;
+    setOpeningDoc(doc.id);
+    try {
+      const url = await freshFiledDocumentUrl(
+        (documentId) => fetchFiledDocumentAssets(docTenantId, vehicleId, documentId),
+        doc.id,
+        doc.pdf_url || doc.online_url || null,
+      );
+      if (!url) { toast.error("That version's file could not be opened. Try regenerating it."); return; }
+      window.open(url, "_blank", "noreferrer");
+    } finally {
+      setOpeningDoc(null);
+    }
+  };
+
   const oemOriginalUrl = fixture ? null
     : (record?.qa_metadata?.oem_original_url as string | undefined) || vehicle?.oem_sticker_url || null;
 
@@ -1085,7 +1127,7 @@ export default function FactoryStickerWorkspace({
                     </a>
                   ) : (
                     <span className="inline-flex items-center justify-center h-8 rounded-md border border-dashed border-border text-[11px] text-muted-foreground">
-                      No PDF yet
+                      {currentDoc ? "Preparing PDF…" : "No PDF yet"}
                     </span>
                   )}
                   {pdfUrl && (
@@ -1125,8 +1167,15 @@ export default function FactoryStickerWorkspace({
                       <span className="font-semibold text-foreground">v{d.version}</span>
                       <span className="text-muted-foreground">{humanize(d.document_status)}</span>
                       <span className="text-muted-foreground">{fmtDate(d.created_at)}</span>
-                      {d.pdf_url ? (
-                        <a href={d.pdf_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">PDF</a>
+                      {d.pdf_url || d.online_url ? (
+                        <button
+                          type="button"
+                          onClick={() => openFiledVersion(d)}
+                          disabled={openingDoc === d.id}
+                          className="text-blue-600 hover:underline disabled:opacity-50"
+                        >
+                          {openingDoc === d.id ? "Opening…" : "PDF"}
+                        </button>
                       ) : <span className="text-muted-foreground">—</span>}
                     </div>
                   ))}

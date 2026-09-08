@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListing";
+import { freshPublishedAssetUrl } from "@/hooks/usePublishedWindowSticker";
+import { isSignedStorageUrl } from "@/lib/filedDocumentUrl";
 import Logo from "@/components/brand/Logo";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 
@@ -75,6 +77,11 @@ const fmtDate = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "";
 
 const pickUrl = (d?: PublicDoc | null) => d?.online_url || d?.pdf_url || d?.png_url || null;
+
+// The document types that file a durable document_assets row, so a fresh
+// signed URL can be minted for them. `window` and `addendum` are stored as
+// data URLs with no storage object behind them and are left alone.
+const REMINTABLE_DOCUMENT_TYPES = ["factory_sticker", "buyers_guide", "k208"] as const;
 
 const findDoc = (listing: VehicleListing, kw: RegExp) =>
   (listing.documents || []).find((d) => kw.test(d.type || "") || kw.test(d.name || "")) || null;
@@ -627,6 +634,23 @@ const PublicDocuments = () => {
       setListing(row);
       const map: Record<string, PublicDoc> = {};
       for (const d of pubArr) if (!map[d.document_type]) map[d.document_type] = d;
+      // The stored *_url on a published document is a signed credential that
+      // expires, so a car published longer than its lifetime served this page a
+      // set of dead links. Every type that files a durable asset row is re-minted
+      // through public-document-asset before it reaches a card.
+      await Promise.all(REMINTABLE_DOCUMENT_TYPES.map(async (type) => {
+        const doc = map[type];
+        if (!doc) return;
+        const cached = doc.pdf_url || doc.online_url || null;
+        const fresh = await freshPublishedAssetUrl(slug, type, "pdf", cached);
+        // Null means the credential is dead and could not be re-minted; the card
+        // then falls back to whatever else its resolver knows about rather than
+        // to a link that answers InvalidJWT. A stored value that was never a
+        // credential is kept as-is — there is nothing to re-sign.
+        const url = fresh || (isSignedStorageUrl(cached) ? null : cached);
+        map[type] = { ...doc, pdf_url: url, online_url: url, png_url: url ? doc.png_url : null };
+      }));
+      if (!mounted) return;
       setPub(map);
       setLoading(false);
     })();

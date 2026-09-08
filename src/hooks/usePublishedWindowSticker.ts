@@ -33,8 +33,16 @@ interface Row {
   published_at?: string | null;
 }
 
-async function freshAssetUrl(
+/**
+ * A shopper-side URL for one published document asset that is valid right now.
+ *
+ * Exported because every anonymous surface that shows a filed document — this
+ * hook, the classic document center — has to mint rather than read the stored
+ * *_url, which is a signed credential with a lifetime.
+ */
+export async function freshPublishedAssetUrl(
   slug: string,
+  documentType: string,
   assetType: "pdf" | "thumbnail",
   cached: string | null,
 ): Promise<string | null> {
@@ -43,7 +51,7 @@ async function freshAssetUrl(
   if (isSignedUrlUsable(cached, Date.now())) return cached;
   try {
     const { data, error } = await supabase.functions.invoke("public-document-asset", {
-      body: { slug, document_type: "factory_sticker", asset_type: assetType },
+      body: { slug, document_type: documentType, asset_type: assetType },
     });
     const payload = (data || {}) as { success?: boolean; url?: string };
     if (error || payload.success !== true || !payload.url) return null;
@@ -76,8 +84,8 @@ export function usePublishedWindowSticker(slug: string | null | undefined, enabl
         if (!doc) { setSticker(null); return; }
 
         const [pdfUrl, thumbnailUrl] = await Promise.all([
-          freshAssetUrl(s, "pdf", doc.pdf_url || doc.online_url || null),
-          freshAssetUrl(s, "thumbnail", doc.png_url || null),
+          freshPublishedAssetUrl(s, "factory_sticker", "pdf", doc.pdf_url || doc.online_url || null),
+          freshPublishedAssetUrl(s, "factory_sticker", "thumbnail", doc.png_url || null),
         ]);
         if (cancelled) return;
         // A published document with no reachable file is not shown at all

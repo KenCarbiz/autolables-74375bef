@@ -80,6 +80,8 @@ import {
   createLoadSequencer,
 } from "@/lib/commandCenter/writeSequencing";
 import { openPacketPrintSheet, type PacketPrintHandle } from "@/lib/commandCenter/packetPrintSheet";
+import { fetchFiledDocumentAssets } from "@/hooks/useWindowSticker";
+import { freshFiledDocumentUrl } from "@/lib/filedDocumentUrl";
 import type { Tone } from "@/components/command/CommandPrimitives";
 
 // Data layer for the three command surfaces (VIN Command Center, Get Ready
@@ -90,6 +92,28 @@ import type { Tone } from "@/components/command/CommandPrimitives";
 // write or returns { ok: false, error } naming the reason it could not.
 
 type Row = Record<string, any>;
+
+// A link a printer can actually open, minted now.
+//
+// generated_documents.pdf_url / png_url are seven-day signed credentials, so a
+// packet released for a car filed the week before printed a row of links that
+// answer InvalidJWT — and the stamp says the paper went up. The durable
+// (bucket, path) is re-signed through the orchestrator instead.
+//
+// The stored value stays the fallback rather than the answer: a document filed
+// as a data URL has no asset row to re-sign, and re-minting must never be able
+// to drop a document off the paper that would have printed before.
+async function printableDocumentUrl(tenantId: string, doc: Row): Promise<string> {
+  const cached = String(doc.pdf_url || doc.png_url || "");
+  const vehicleId = String(doc.vehicle_id || "");
+  if (!tenantId || !vehicleId || !doc.id) return cached;
+  const fresh = await freshFiledDocumentUrl(
+    (documentId) => fetchFiledDocumentAssets(tenantId, vehicleId, documentId),
+    String(doc.id),
+    cached,
+  );
+  return fresh || cached;
+}
 
 // Re-exported so consumers can name the tone of a value this module returns
 // without also importing the primitives module. It is the same type.
@@ -615,6 +639,18 @@ export async function loadVinCommand(r: SourceReader, tenantId: string, vehicleI
     getReady: { record: grRecord, items: grItems },
     description: { row: descCase, channelCount: descChannelCount },
   });
+
+  // The builder reports what is FILED; the link to open it is minted here.
+  // buildVinPackageItems can only carry generated_documents.pdf_url, which is a
+  // seven-day credential — so the Buyers Guide and the window sticker rows on
+  // this screen opened as an InvalidJWT page for every car filed before then.
+  await Promise.all(items.map(async (item) => {
+    if (!item.docId || !item.href || !/^https?:/i.test(item.href)) return;
+    const doc = docs.find((d) => String(d.id) === item.docId);
+    if (!doc) return;
+    const fresh = await printableDocumentUrl(tenantId, doc);
+    if (fresh) item.href = fresh;
+  }));
 
   // "Automation Complete" counts artifacts that are FINISHED. A draft sticker
   // and a prefilled K-208 exist, but neither is work anyone can stop doing.
@@ -1715,6 +1751,16 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
   // rather than re-matched against the display strings.
   const rows: { row: DocRow; visibility: PassportVisibilityState; onPaper: boolean; blocked: boolean }[] = [];
 
+  // Open links are minted here rather than copied off the row: the stored
+  // credential is signed for seven days, so this screen handed out an
+  // InvalidJWT page for every document filed longer ago than that. Only the
+  // rows whose cached URL has actually aged out cost a round trip.
+  const openHrefs = new Map<string, string>();
+  await Promise.all(docs.map(async (d) => {
+    const url = await printableDocumentUrl(tenantId, d);
+    if (url) openHrefs.set(String(d.id), url);
+  }));
+
   for (const d of docs) {
     const status = String(d.document_status) as DocumentStatus;
     const meta = STATUS_META[status] || { label: humanize(String(d.document_status)), tone: "slate" as const };
@@ -1748,7 +1794,7 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
         internalStatus: { label: meta.label, tone: toneFromMeta(meta.tone) },
         passportVisibility: PASSPORT_VISIBILITY_PILL[visibility],
         printStatus: PRINT_STATE_PILL[printState],
-        href: d.pdf_url || d.online_url || undefined,
+        href: openHrefs.get(String(d.id)) || d.online_url || undefined,
         reprintCopy: reprintable(d) ? reprintCopyNumber(d) : undefined,
         generateKind: canGenerate ? (docType as "buyers_guide" | "k208" | "factory_sticker") : undefined,
         generateBlockedReason: printState === "no_file" && !canGenerate
@@ -1893,6 +1939,15 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
       if (onSheet.length === 0) return abandon({ ok: false, error: printBlockedReason(docs) });
 
       const current = dataRef.current;
+      const sheetDocuments = await Promise.all(onSheet.map(async (d) => ({
+        id: String(d.id),
+        label: documentLabel(d.document_type as string | null),
+        version: `v${d.version ?? 1}`,
+        url: await printableDocumentUrl(tenantId, d),
+        // The unexecuted K-208 goes on the paper only as a labelled working
+        // copy — the label travels with the sheet, not just the screen.
+        note: printSheetNoteFor(d),
+      })));
       const opened = openPacketPrintSheet(
         sheet,
         {
@@ -1900,15 +1955,7 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
           vin: current?.vehicle.vin || "",
           stockNumber: current?.vehicle.stockNumber ?? null,
         },
-        onSheet.map((d) => ({
-          id: String(d.id),
-          label: documentLabel(d.document_type as string | null),
-          version: `v${d.version ?? 1}`,
-          url: String(d.pdf_url || d.png_url || ""),
-          // The unexecuted K-208 goes on the paper only as a labelled working
-          // copy — the label travels with the sheet, not just the screen.
-          note: printSheetNoteFor(d),
-        })),
+        sheetDocuments,
       );
       // Three causes, three things for the employee to do. They used to share
       // one sentence about pop-ups, which is advice for exactly one of them.
@@ -2055,7 +2102,7 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
           id: String(doc.id),
           label: documentLabel(doc.document_type as string | null),
           version: `v${doc.version ?? 1}`,
-          url: String(doc.pdf_url || doc.png_url || ""),
+          url: await printableDocumentUrl(tenantId, doc),
           note: `Copy ${copy}`,
         }],
       );

@@ -15,6 +15,8 @@ import {
   type GeneratedDocument, type DocumentAction, type DocumentStatus,
 } from "@/lib/stickerStudio/documentWorkflow";
 import { FileText, ExternalLink, Printer, Send, Check, X, Globe, Archive, Layers, RefreshCw, QrCode } from "lucide-react";
+import { fetchFiledDocumentAssets } from "@/hooks/useWindowSticker";
+import { freshFiledDocumentUrl, isSignedStorageUrl } from "@/lib/filedDocumentUrl";
 import { toast } from "sonner";
 
 // Generated-documents manager for the Vehicle File. Lists every sticker /
@@ -101,21 +103,40 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
     else toast.error(r.error || "Action failed");
   };
 
-  const openDoc = (doc: GeneratedDocument) => {
-    const url = doc.online_url || doc.pdf_url || doc.png_url;
-    if (!url) {
+  // The stored *_url columns are seven-day signed credentials, not addresses:
+  // a document filed last week opens as an InvalidJWT error page while the file
+  // itself has never moved. The link is minted from the filed asset at click
+  // time, and only a URL with real time left on it is reused as-is.
+  const openDoc = async (doc: GeneratedDocument) => {
+    // What the button has always opened. For a published used-car sticker that
+    // is the passport link, which is an address and not a credential — only the
+    // filed PDF below is re-signed.
+    const stored = doc.online_url || doc.pdf_url || doc.png_url || null;
+    const cached = doc.pdf_url || doc.online_url || null;
+    if (!stored) {
       // An auto-drafted compliance form (Buyers Guide / K-208) has no filled PDF
       // yet — send the manager to Deal Flow, the one place it's filled + filed.
       if (["buyers_guide", "k208"].includes(doc.document_type as string)) { navigate(`/vehicle-file/${vehicleId}?tab=deal`); return; }
       toast.error("No file URL on this document"); return;
     }
+    const fresh = tenant?.id
+      ? await freshFiledDocumentUrl(
+        (documentId) => fetchFiledDocumentAssets(tenant.id, vehicleId, documentId),
+        doc.id,
+        cached,
+      )
+      : null;
+    // Nothing to re-sign for a document filed as a data URL: the stored value is
+    // the document itself, and only a dead credential is withheld.
+    const url = fresh || (isSignedStorageUrl(stored) ? null : stored);
+    if (!url) { toast.error("This document's file could not be opened. Regenerate it and try again."); return; }
     window.open(url, "_blank", "noopener");
   };
   // Reprint from the frozen snapshot via the vector print route.
   const printDoc = (doc: GeneratedDocument) => {
     // deno-lint-ignore no-explicit-any
     const snap = (doc as any).data_snapshot;
-    if (!snap?.config) { openDoc(doc); return; }
+    if (!snap?.config) { void openDoc(doc); return; }
     try {
       const key = `sticker-print-${crypto.randomUUID()}`;
       localStorage.setItem(key, JSON.stringify(snap));
@@ -173,7 +194,7 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => openDoc(doc)} title="Open" className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"><ExternalLink className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => void openDoc(doc)} title="Open" className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"><ExternalLink className="w-3.5 h-3.5" /></button>
                   <button onClick={() => printDoc(doc)} title="Print" className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"><Printer className="w-3.5 h-3.5" /></button>
                 </div>
               </div>

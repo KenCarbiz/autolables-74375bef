@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { freshFiledDocumentUrl, freshFiledDocumentAssets } from "./filedDocumentUrl";
+import { freshFiledDocumentUrl, freshFiledDocumentAssets, isSignedStorageUrl } from "./filedDocumentUrl";
 
 // A factory sticker generated on Monday opened fine and, the following week,
 // answered {"statusCode":"400","error":"InvalidJWT"} from the same button — the
@@ -83,6 +83,28 @@ describe("the thumbnail and the PDF come from one fetch", () => {
   });
 });
 
+describe("only a credential is treated as a credential", () => {
+  it("recognizes a signed storage URL", () => {
+    expect(isSignedStorageUrl(signed(3600))).toBe(true);
+    expect(isSignedStorageUrl(signed(-60))).toBe(true);
+  });
+
+  it("does not claim a data URL or a plain address is one", () => {
+    // A window sticker and an addendum are filed as data URLs: there is no
+    // storage object to re-sign, and withholding them would report a document
+    // that opens today as unopenable.
+    expect(isSignedStorageUrl("data:application/pdf;base64,JVBER")).toBe(false);
+    expect(isSignedStorageUrl("https://files.test/monroney.pdf")).toBe(false);
+    expect(isSignedStorageUrl(null)).toBe(false);
+    expect(isSignedStorageUrl("")).toBe(false);
+  });
+
+  it("the Vehicle File list still opens a document that was never signed", () => {
+    const section = readFileSync(join(__dirname, "../components/vehicle/GeneratedDocumentsSection.tsx"), "utf8");
+    expect(section).toMatch(/isSignedStorageUrl\(stored\) \? null : stored/);
+  });
+});
+
 describe("no admin surface links straight at the stored URL", () => {
   const read = (p: string) => readFileSync(join(__dirname, "../", p), "utf8");
 
@@ -97,5 +119,56 @@ describe("no admin surface links straight at the stored URL", () => {
     const panel = read("components/admin/FactoryStickerPanel.tsx");
     expect(panel).toMatch(/freshFiledDocumentUrl\(/);
     expect(panel).not.toMatch(/<a href=\{previewUrl\}/);
+  });
+
+  it("the sticker workspace signs its Download / Print buttons and its version list", () => {
+    const page = read("pages/FactoryStickerWorkspace.tsx");
+    expect(page).toMatch(/freshFiledDocumentUrl\(/);
+    // The old shapes: a URL derived straight off the row at render time, and a
+    // version-history link pointing at the stored credential.
+    expect(page).not.toMatch(/const pdfUrl = currentDoc\?\.pdf_url/);
+    expect(page).not.toMatch(/href=\{d\.pdf_url\}/);
+  });
+
+  it("the Vehicle File document list signs on open", () => {
+    const section = read("components/vehicle/GeneratedDocumentsSection.tsx");
+    expect(section).toMatch(/freshFiledDocumentUrl\(/);
+    expect(section).not.toMatch(/const url = doc\.online_url \|\| doc\.pdf_url/);
+  });
+
+  it("the packet print sheet prints links minted at release time", () => {
+    const hook = read("hooks/useCommandCenter.ts");
+    expect(hook).toMatch(/printableDocumentUrl\(/);
+    // The old shape: the stored credential copied straight onto the paper.
+    expect(hook).not.toMatch(/url: String\(d\.pdf_url \|\| d\.png_url \|\| ""\)/);
+    expect(hook).not.toMatch(/url: String\(doc\.pdf_url \|\| doc\.png_url \|\| ""\)/);
+  });
+});
+
+describe("no shopper surface links straight at the stored URL", () => {
+  const read = (p: string) => readFileSync(join(__dirname, "../", p), "utf8");
+
+  it("the classic document center re-mints every type that files an asset", () => {
+    const page = read("pages/PublicDocuments.tsx");
+    expect(page).toMatch(/freshPublishedAssetUrl\(/);
+    expect(page).toMatch(/REMINTABLE_DOCUMENT_TYPES/);
+  });
+});
+
+describe("the orchestrator can re-sign every filed document, not only stickers", () => {
+  it("its document_assets action does not narrow to factory_sticker", () => {
+    const fn = readFileSync(
+      join(__dirname, "../../supabase/functions/factory-sticker-orchestrate/index.ts"),
+      "utf8",
+    );
+    const action = fn.slice(fn.indexOf('if (action === "document_assets")'), fn.indexOf('if (action === "vehicle_truth")'));
+    expect(action).toBeTruthy();
+    // The Buyers Guide and the K-208 are filed in a bucket no browser client may
+    // sign against, so this action is the only seam a dealer surface has for
+    // re-minting them.
+    expect(action).not.toMatch(/\.eq\("document_type", "factory_sticker"\)/);
+    // Each asset is signed against its own row's bucket: the compliance PDFs live
+    // in signed-archives while stickers live in vehicle-docs.
+    expect(action).toMatch(/sign\(pdfRow\?\.storage_path \?\? snap\.storage_path, pdfRow\?\.storage_bucket\)/);
   });
 });

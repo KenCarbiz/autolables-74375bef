@@ -1301,12 +1301,20 @@ serve(async (req) => {
       // Fresh signed URLs for a filed version. The thumbnail is the vector
       // first page of the SAME immutable snapshot the PDF was realized
       // from — never a stock graphic and never another vehicle's document.
+      //
+      // Any document type this vehicle has filed, not just the factory
+      // sticker: generated_documents.*_url is a seven-day credential for
+      // every writer, and the Buyers Guide and K-208 live in a bucket no
+      // browser client may sign against, so this is the only seam a dealer
+      // surface has for re-minting them. Authority is unchanged — the caller
+      // is already an accepted member of this tenant and the row is still
+      // pinned to (tenant_id, vehicle_id, document_id).
       const documentId = String(body.document_id || "");
       if (!documentId) return json({ error: "document_id required" }, 400);
       const { data: doc } = await admin.from("generated_documents")
-        .select("id, version, document_status, data_snapshot")
+        .select("id, version, document_type, document_status, data_snapshot")
         .eq("id", documentId).eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
-        .eq("document_type", "factory_sticker").maybeSingle();
+        .maybeSingle();
       if (!doc) return json({ error: "document_not_found" }, 404);
       const snap = ((doc as { data_snapshot?: Record<string, unknown> }).data_snapshot || {}) as Record<string, unknown>;
       // Prefer the durable asset rows; fall back to the snapshot for
@@ -1316,17 +1324,24 @@ serve(async (req) => {
         .eq("tenant_id", tenantId).eq("document_id", documentId);
       const byType = new Map(((assetRows || []) as Array<{ asset_type: string; storage_bucket: string; storage_path: string }>)
         .map((r) => [r.asset_type, r]));
-      const bucket = String(byType.get("pdf")?.storage_bucket || snap.storage_bucket || BUCKET);
-      const sign = async (path: unknown): Promise<string | null> => {
+      const fallbackBucket = String(byType.get("pdf")?.storage_bucket || snap.storage_bucket || BUCKET);
+      // Each asset is signed against ITS OWN bucket: a compliance PDF is filed
+      // in signed-archives while its sticker sibling is in vehicle-docs, and
+      // signing one against the other's bucket yields a URL that resolves to
+      // nothing.
+      const sign = async (path: unknown, bucket?: string): Promise<string | null> => {
         if (typeof path !== "string" || !path) return null;
-        const { data } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 60);
+        const { data } = await admin.storage.from(String(bucket || fallbackBucket)).createSignedUrl(path, 60 * 60);
         return (data as { signedUrl?: string } | null)?.signedUrl ?? null;
       };
-      const pdfUrl = await sign(byType.get("pdf")?.storage_path ?? snap.storage_path);
-      const previewUrl = await sign(byType.get("thumbnail")?.storage_path ?? snap.preview_path);
+      const pdfRow = byType.get("pdf");
+      const thumbRow = byType.get("thumbnail");
+      const pdfUrl = await sign(pdfRow?.storage_path ?? snap.storage_path, pdfRow?.storage_bucket);
+      const previewUrl = await sign(thumbRow?.storage_path ?? snap.preview_path, thumbRow?.storage_bucket);
       return json({
         success: true, document_id: documentId,
         version: (doc as { version?: number }).version ?? null,
+        document_type: (doc as { document_type?: string }).document_type ?? null,
         status: (doc as { document_status?: string }).document_status ?? null,
         pdf_url: pdfUrl, preview_url: previewUrl,
         content_hash: snap.content_hash ?? null,

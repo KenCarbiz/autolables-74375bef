@@ -61,6 +61,7 @@ export interface TemplateOptions {
 export interface DocumentAssets {
   document_id: string;
   version: number | null;
+  document_type?: string | null;
   status: string | null;
   pdf_url: string | null;
   preview_url: string | null;
@@ -91,6 +92,24 @@ async function invokeOrchestrator<T>({ action, tenantId, vehicleId, vin, extra }
     throw new Error(String(error?.message || payload.error || "request failed"));
   }
   return payload as T;
+}
+
+/**
+ * Freshly signed URLs for one filed document of one vehicle.
+ *
+ * Exported outside the hook because the surfaces that open a filed document —
+ * the packet print sheet, the Vehicle File document list — are not all React
+ * components, and every one of them must mint rather than read
+ * generated_documents.pdf_url, which is a seven-day credential.
+ */
+export async function fetchFiledDocumentAssets(
+  tenantId: string,
+  vehicleId: string,
+  documentId: string,
+): Promise<DocumentAssets> {
+  return await invokeOrchestrator<DocumentAssets>({
+    action: "document_assets", tenantId, vehicleId, extra: { document_id: documentId },
+  });
 }
 
 export interface RegenerateArgs {
@@ -134,9 +153,7 @@ export function useWindowSticker() {
   }, []);
 
   const documentAssets = useCallback(async (tenantId: string, vehicleId: string, documentId: string) => {
-    return await invokeOrchestrator<DocumentAssets>({
-      action: "document_assets", tenantId, vehicleId, extra: { document_id: documentId },
-    });
+    return await fetchFiledDocumentAssets(tenantId, vehicleId, documentId);
   }, []);
 
   const restoreVersion = useCallback(async (tenantId: string, vehicleId: string, documentId: string) => {
