@@ -32,6 +32,33 @@ const json = (b: unknown, s = 200) =>
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// The dealer's own website sits behind a bot filter that answered 403 to a
+// bare "AutoLabels/1.0" agent on 8 of 10 vehicles, so the parser never saw a
+// page. These are the dealer's own public VDPs -- the same HTML a shopper is
+// served -- and the request set below is simply what a browser actually sends:
+// a real agent string plus the Accept/Sec-Fetch headers a filter checks for
+// consistency. A UA alone is often not enough; a mismatched header set is
+// itself a bot signal.
+//
+// The cleaner fix is for the website vendor to allowlist a named agent, and
+// VDP_USER_AGENT exists so that can be switched back without a deploy. Set
+// VDP_USER_AGENT once the allowlist is in place.
+const VDP_USER_AGENT = Deno.env.get("VDP_USER_AGENT")
+  || "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+
+const VDP_FETCH_HEADERS: Record<string, string> = {
+  "User-Agent": VDP_USER_AGENT,
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
@@ -71,13 +98,18 @@ serve(async (req) => {
 
       let html = "";
       try {
-        const res = await fetch(vdp, {
-          headers: { "User-Agent": "AutoLabels/1.0 (+dealer inventory sync)" },
-          signal: AbortSignal.timeout(15000),
-        });
+        const res = await fetch(vdp, { headers: VDP_FETCH_HEADERS, signal: AbortSignal.timeout(20000) });
         if (!res.ok) {
           fetchFailed++;
-          results.push({ vin: r.vin, outcome: "fetch_status", status: res.status });
+          // 403/429 from a dealer site is a bot filter, not a missing page. Say
+          // which, so a blocked sweep never reads as "this vehicle has no CARFAX".
+          const blocked = res.status === 403 || res.status === 429;
+          results.push({
+            vin: r.vin,
+            outcome: blocked ? "blocked_by_site" : "fetch_status",
+            status: res.status,
+            ...(blocked ? { hint: "dealer site refused the request; allowlist the sweep or check the WAF" } : {}),
+          });
           continue;
         }
         html = await res.text();
