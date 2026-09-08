@@ -66,9 +66,8 @@
     linear-gradient(160deg, var(--al-navy-700) 0%, var(--al-navy-800) 28%, #00193d 55%, var(--al-navy-900) 100%);
 }
 
-/* Phone-only elements; the desktop composition has neither. */
-.login-hero-fade,
-.login-info {
+/* Phone-only element; the desktop composition has no equivalent. */
+.login-hero-fade {
   display: none;
 }
 
@@ -379,8 +378,7 @@
   margin-top: clamp(15px, 1.44vw, 24px);
 }
 
-.login-card-subtitle + .login-field,
-.login-card-subtitle + .login-info + .login-field {
+.login-card-subtitle + .login-field {
   margin-top: clamp(18px, 1.73vw, 29px);
 }
 
@@ -1015,34 +1013,14 @@
   }
 
   .login-card-subtitle {
-    margin-bottom: 22px;
+    margin-bottom: 32px;
     font-size: 17px;
     line-height: 1.4;
   }
 
-  .login-info {
-    display: flex;
-    gap: 12px;
-    margin: 0 0 22px;
-    padding: 16px;
-    border: 1px solid rgba(37, 99, 235, .18);
-    border-radius: 14px;
-    background: #EFF6FF;
-    color: #31598F;
-    font-size: 14px;
-    line-height: 1.45;
-  }
 
-  .login-info-icon {
-    width: 22px;
-    height: 22px;
-    flex: 0 0 auto;
-    margin-top: 1px;
-    color: var(--al-link);
-  }
 
   .login-card-subtitle + .login-field,
-  .login-card-subtitle + .login-info + .login-field,
   .login-field {
     margin-top: 18px;
   }
@@ -1295,26 +1273,11 @@
     padding: 36px 32px 30px;
   }
 
-  .login-info {
-    display: flex;
-    gap: 12px;
-    margin: 0 0 24px;
-    padding: 16px;
-    border: 1px solid rgba(37, 99, 235, .18);
-    border-radius: 14px;
-    background: #EFF6FF;
-    color: #31598F;
-    font-size: 14px;
-    line-height: 1.45;
+  .login-card-subtitle {
+    margin-bottom: 32px;
   }
 
-  .login-info-icon {
-    width: 22px;
-    height: 22px;
-    flex: 0 0 auto;
-    margin-top: 1px;
-    color: var(--al-link);
-  }
+
 
   .login-input {
     font-size: 16px;
