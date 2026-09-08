@@ -7,7 +7,6 @@ import {
   SOURCE_LABELS,
   type AdvertisedSource,
 } from "@/hooks/useAdvertisedPrices";
-import { useAuth } from "@/contexts/AuthContext";
 
 // ──────────────────────────────────────────────────────────────
 // AdvertisedPriceBand — Wave 20.
@@ -42,7 +41,6 @@ const fmtMoney = (n: number) =>
 
 export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", docFee = 0, compact = false }: Props) => {
   const { byVin, captureSnapshot, capturing } = useAdvertisedPrices(storeId);
-  const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
 
   const sticker = stickerPrice ?? 0;
@@ -107,7 +105,6 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", docFee = 
                   advertised_price: payload.price,
                   source_label: payload.source,
                   source_url: payload.url,
-                  captured_by: user?.email || "",
                 });
                 toast.success("Advertised price captured");
                 setExpanded(false);
@@ -195,7 +192,6 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", docFee = 
                   advertised_price: payload.price,
                   source_label: payload.source,
                   source_url: payload.url,
-                  captured_by: user?.email || "",
                 });
                 toast.success("Advertised price captured");
                 setExpanded(false);

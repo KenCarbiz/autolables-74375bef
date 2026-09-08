@@ -560,7 +560,7 @@ const Index = () => {
     () => advertisedForVin ?? (vehiclePriceNum > 0 ? {
       id: "", vin: (vehicle.vin || "").toUpperCase(), source_url: "",
       source_label: "website" as AdvertisedSource, advertised_price: vehiclePriceNum,
-      snapshot_at: new Date().toISOString(), captured_by: "marketcheck", notes: "",
+      snapshot_at: new Date().toISOString(), captured_by: null, notes: "MarketCheck feed price",
     } : undefined),
     [advertisedForVin, vehiclePriceNum, vehicle.vin],
   );
@@ -608,8 +608,7 @@ const Index = () => {
         vin: vehicle.vin,
         advertised_price: price,
         source_label: source,
-        captured_by: user?.email || "dealer",
-        notes: "Captured at addendum build for price-integrity verification",
+          notes: "Captured at addendum build for price-integrity verification",
       });
       toast.success("Advertised price captured.");
     } catch (e) {
@@ -637,7 +636,6 @@ const Index = () => {
       source_channel: "website",
       source_url: "",
       advertised_price: adv,
-      captured_by: "dealer_manual",
       screenshot_url: path,
       notes: "Dealer-uploaded website evidence (VIN defense)",
     };

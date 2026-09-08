@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   assessDrift,
+  buildCaptureRow,
+  captureErrorMessage,
   assessSiteSpread,
   assessPriceIntegrity,
   includedInAdvertised,
@@ -301,5 +303,53 @@ describe("assessPriceIntegrity — mismatch branch", () => {
     expect(r.status).toBe("mismatch");
     expect(r.delta).toBe(-2_406);
     expect(r.reason).toMatch(/UNDER/);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// buildCaptureRow is the single row every manual capture writes
+// (price band, publish gate, addendum builder). advertised_prices
+// .captured_by is a uuid stamped by the table's BEFORE INSERT
+// trigger from auth.uid(); a client-side display string raised
+// 22P02 and the snapshot was silently lost.
+// ──────────────────────────────────────────────────────────────
+
+describe("buildCaptureRow — the row a manual capture inserts", () => {
+  it("never sends captured_by, so the uuid column is stamped by the trigger", () => {
+    const row = buildCaptureRow(
+      { vin: "1hgcm82633a123456", advertised_price: 22_000, source_label: "website" },
+      "store-1",
+    );
+    expect(row).not.toHaveProperty("captured_by");
+  });
+
+  it("keeps provenance on the columns that are text: source_channel and notes", () => {
+    const row = buildCaptureRow(
+      { vin: "1HGCM82633A123456", advertised_price: 22_000, source_label: "cars_com", notes: "Captured at publish time" },
+      "store-1",
+    );
+    expect(row.source_channel).toBe("cars_com");
+    expect(row.notes).toBe("Captured at publish time");
+  });
+
+  it("normalizes the VIN and defaults the optional text columns", () => {
+    const row = buildCaptureRow({ vin: " 1hgcm82633a123456 ", advertised_price: 100 }, "");
+    expect(row.vin).toBe("1HGCM82633A123456");
+    expect(row.source_url).toBe("");
+    expect(row.notes).toBe("");
+    expect(row.store_id).toBe("");
+  });
+});
+
+describe("captureErrorMessage — a failed capture cannot read as a success", () => {
+  it("carries the Postgres code alongside the driver message", () => {
+    expect(captureErrorMessage({ message: 'invalid input syntax for type uuid: "seed"', code: "22P02" }))
+      .toBe('invalid input syntax for type uuid: "seed" (22P02)');
+  });
+
+  it("falls back to details, then to a named failure, never to silence", () => {
+    expect(captureErrorMessage({ details: "row rejected" })).toBe("row rejected");
+    expect(captureErrorMessage({})).toMatch(/failed/i);
+    expect(captureErrorMessage(null)).toMatch(/failed/i);
   });
 });

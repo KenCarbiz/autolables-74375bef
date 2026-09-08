@@ -123,7 +123,6 @@ export const PublishPriceGate = ({
         advertised_price: priceNum,
         source_label: reCaptureSource,
         source_url: reCaptureUrl,
-        captured_by: user?.email || "",
         notes: "Captured at publish time to resolve drift",
       });
       await logResolution("publish_price_match_recaptured", {

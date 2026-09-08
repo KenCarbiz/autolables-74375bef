@@ -49,9 +49,41 @@ export interface AdvertisedPrice {
   source_label: AdvertisedSource;
   advertised_price: number;
   snapshot_at: string;
-  captured_by: string;
+  // uuid of the human who captured the row, or null for machine-written rows
+  // (the crawler). Never a display string — the column is a uuid.
+  captured_by: string | null;
   notes: string;
 }
+
+export interface CaptureArgs {
+  vin: string;
+  advertised_price: number;
+  source_label?: AdvertisedSource;
+  source_url?: string;
+  notes?: string;
+}
+
+// advertised_prices.captured_by is a uuid, and the table's BEFORE INSERT
+// trigger stamps it with auth.uid() when the client leaves it null. Sending a
+// display string ("dealer_manual", an email) raises 22P02 and the snapshot is
+// never written, so the row must omit the column entirely; provenance lives in
+// source_channel + notes.
+export const buildCaptureRow = (args: CaptureArgs, storeId: string) => ({
+  store_id: storeId,
+  vin: args.vin.toUpperCase().trim(),
+  source_channel: args.source_label || "manual",
+  source_url: args.source_url || "",
+  advertised_price: args.advertised_price,
+  notes: args.notes || "",
+});
+
+// A capture that does not reach the table must never read as a success, so the
+// Postgres code travels with the message the dealer is shown.
+export const captureErrorMessage = (error: { message?: string; code?: string; details?: string } | null): string => {
+  if (!error) return "Advertised price capture failed";
+  const base = error.message || error.details || "Advertised price capture failed";
+  return error.code ? `${base} (${error.code})` : base;
+};
 
 const cacheKey = (tenantId: string | null) => ["advertised_prices", tenantId] as const;
 
@@ -130,26 +162,11 @@ export const useAdvertisedPrices = (storeId: string = "") => {
   }, [q.data]);
 
   const captureMutation = useMutation({
-    mutationFn: async (args: {
-      vin: string;
-      advertised_price: number;
-      source_label?: AdvertisedSource;
-      source_url?: string;
-      captured_by?: string;
-      notes?: string;
-    }) => {
+    mutationFn: async (args: CaptureArgs) => {
       const { error } = await (supabase as any)
         .from("advertised_prices")
-        .insert({
-          store_id: storeId,
-          vin: args.vin.toUpperCase().trim(),
-          source_channel: args.source_label || "manual",
-          source_url: args.source_url || "",
-          advertised_price: args.advertised_price,
-          captured_by: args.captured_by || "",
-          notes: args.notes || "",
-        });
-      if (error) throw new Error(error.message);
+        .insert(buildCaptureRow(args, storeId));
+      if (error) throw new Error(captureErrorMessage(error));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: cacheKey(tenantId) }),
   });

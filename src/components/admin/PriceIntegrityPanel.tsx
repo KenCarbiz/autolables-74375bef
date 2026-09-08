@@ -105,7 +105,6 @@ export const PriceIntegrityPanel = () => {
         .replace(/\{vin\}/g, l.vin.toLowerCase())
         .replace(/\{STOCK\}/gi, stockFor(l) || ""),
       advertised_price: l.price ?? 0,
-      captured_by: "seed",
       notes: "Seeded website URL for nightly crawl",
     }));
     if (rows.length === 0) {

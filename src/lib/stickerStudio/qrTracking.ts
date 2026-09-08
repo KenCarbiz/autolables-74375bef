@@ -11,6 +11,16 @@ export type StickerKind = "window" | "addendum" | "passport";
 // deno-lint-ignore no-explicit-any
 const sb = () => supabase as any;
 
+// qr_codes.code is NOT NULL with no database default, so the tracking token is
+// minted here (16 hex chars, same shape the crawler-era rows used).
+export const newQrCode = (): string => {
+  const bytes = new Uint8Array(8);
+  const c = (globalThis as { crypto?: Crypto }).crypto;
+  if (c?.getRandomValues) c.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+};
+
 // Create or reuse the stable QR code for this vehicle + type; returns the
 // tracking URL (/q/:token) or null if tracking isn't available.
 export async function ensureQrCode(args: {
@@ -22,29 +32,51 @@ export async function ensureQrCode(args: {
 }): Promise<string | null> {
   if (!args.tenantId || !args.vehicleId || !args.destinationUrl) return null;
   try {
-    // Reuse an existing token; keep the destination fresh.
-    const { data: existing } = await sb()
+    // Reuse an existing code; keep the destination fresh.
+    const { data: existing, error: readError } = await sb()
       .from("qr_codes")
-      .select("token")
+      .select("code")
       .eq("tenant_id", args.tenantId)
       .eq("vehicle_id", args.vehicleId)
-      .eq("sticker_type", args.stickerType)
-      .maybeSingle();
-    let token: string | undefined = existing?.token;
-    if (token) {
-      await sb().from("qr_codes").update({ destination_url: args.destinationUrl, generated_document_id: args.generatedDocumentId || null }).eq("token", token);
+      .eq("surface", args.stickerType)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (readError) {
+      console.warn("[qr] could not read qr_codes:", readError.message);
+      return null;
+    }
+    let code: string | undefined = existing?.[0]?.code;
+    if (code) {
+      const { error } = await sb()
+        .from("qr_codes")
+        .update({ target_url: args.destinationUrl, document_id: args.generatedDocumentId || null })
+        .eq("code", code);
+      if (error) console.warn("[qr] could not refresh qr_codes.target_url:", error.message);
     } else {
       const { data: created, error } = await sb()
         .from("qr_codes")
-        .insert({ tenant_id: args.tenantId, vehicle_id: args.vehicleId, sticker_type: args.stickerType, destination_url: args.destinationUrl, generated_document_id: args.generatedDocumentId || null })
-        .select("token")
+        .insert({
+          tenant_id: args.tenantId,
+          vehicle_id: args.vehicleId,
+          surface: args.stickerType,
+          code: newQrCode(),
+          target_url: args.destinationUrl,
+          document_id: args.generatedDocumentId || null,
+        })
+        .select("code")
         .maybeSingle();
-      if (error || !created?.token) return null;
-      token = created.token;
+      if (error || !created?.code) {
+        console.warn("[qr] could not create the tracking code:", error?.message || "no row returned");
+        return null;
+      }
+      code = created.code;
     }
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    return `${origin}/q/${token}`;
-  } catch { return null; }
+    return `${origin}/q/${code}`;
+  } catch (e) {
+    console.warn("[qr] tracking unavailable:", e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
 // Coarse device category from a user-agent string.
@@ -82,16 +114,16 @@ export async function logScan(token: string): Promise<string | null> {
     try {
       const { data: qr } = await sb()
         .from("qr_codes")
-        .select("tenant_id, vehicle_id, sticker_type, destination_url")
-        .eq("token", token)
+        .select("tenant_id, vehicle_id, surface, target_url")
+        .eq("code", token)
         .maybeSingle();
       await recordPassportViewed(buildPersistenceContext({
         tenantId: qr?.tenant_id,
         vehicleId: qr?.vehicle_id,
       }), {
         token,
-        stickerType: qr?.sticker_type,
-        destinationUrl: qr?.destination_url,
+        stickerType: qr?.surface,
+        destinationUrl: qr?.target_url,
         device: deviceCategory(ua),
         browser: browserName(ua),
         referrer: typeof document !== "undefined" ? document.referrer || null : null,

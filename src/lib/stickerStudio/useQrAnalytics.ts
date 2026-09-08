@@ -65,13 +65,13 @@ export function useQrAnalytics(days = 30): QrAnalytics {
         if (cancelled) return;
         if (error) { setState((s) => ({ ...s, available: false, loading: false })); return; }
         const rows: any[] = data || [];
-        // Resolve sticker_type from parent qr_codes rows (column doesn't exist on qr_scan_events).
+        // Resolve the sticker surface from parent qr_codes rows (qr_scan_events has no such column).
         const qrIds = Array.from(new Set(rows.map((r) => r.qr_code_id).filter(Boolean)));
         let typeById: Record<string, string> = {};
         if (qrIds.length) {
           const { data: qrRows } = await (supabase as any)
-            .from("qr_codes").select("id, sticker_type").in("id", qrIds);
-          for (const q of (qrRows || [])) typeById[q.id] = q.sticker_type || "unknown";
+            .from("qr_codes").select("id, surface").in("id", qrIds);
+          for (const q of (qrRows || [])) typeById[q.id] = q.surface || "unknown";
         }
         const events: ScanEvent[] = rows.map((r) => ({
           id: r.id,
@@ -128,8 +128,8 @@ export function useVehicleQrScans(vehicleId?: string | null) {
         let typeById: Record<string, string> = {};
         if (qrIds.length) {
           const { data: qrRows } = await (supabase as any)
-            .from("qr_codes").select("id, sticker_type").in("id", qrIds);
-          for (const q of (qrRows || [])) typeById[q.id] = q.sticker_type || "unknown";
+            .from("qr_codes").select("id, surface").in("id", qrIds);
+          for (const q of (qrRows || [])) typeById[q.id] = q.surface || "unknown";
         }
         const t: Record<string, number> = {};
         for (const e of data) {
