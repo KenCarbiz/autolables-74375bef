@@ -32,14 +32,14 @@ const CRON_ENV_READ = /Deno\.env\.get\(\s*["'`]([A-Z0-9_]*CRON[A-Z0-9_]*)["'`]\s
 const cronEnvNamesIn = (src: string): string[] =>
   [...src.matchAll(CRON_ENV_READ)].map((m) => m[1]);
 
-// Functions that still read a cron secret name of their own instead of calling
-// isServiceOrCron. Neither currently has a pg_cron schedule pointed at it, so
-// neither is burning runs — but both are the same latent defect. This list may
-// only ever SHRINK: migrating one to the shared gate without deleting its entry
-// here fails the "no stale entries" test below.
-const NOT_YET_ON_SHARED_GATE = new Set([
-  "send-ct-mvp-compliance-digests",
-]);
+// Escape hatch for a function that still reads a cron secret name of its own
+// instead of calling isServiceOrCron. Currently EMPTY: carfax-link-sweep and
+// send-ct-mvp-compliance-digests were the last two, and both were migrated when
+// they were finally scheduled — being unreachable is exactly why neither had a
+// schedule. The list may only ever SHRINK: migrating a function to the shared
+// gate without deleting its entry here fails the "no stale entries" test below,
+// so an exemption cannot outlive the defect it covers.
+const NOT_YET_ON_SHARED_GATE = new Set<string>([]);
 
 // Functions whose auth gate must be the shared one, no local env lookup.
 const MUST_USE_SHARED_GATE = [

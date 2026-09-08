@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { isServiceOrCron } from "../_shared/supabase.ts";
 
 type DigestOutboxRow = {
   id: string;
@@ -105,12 +106,13 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceKey) throw new Error("Supabase service credentials are not configured");
 
-    // Cron-only: require service-role bearer or a matching cron secret so
+    // Cron-only: require a service-role bearer or a matching cron secret so
     // anonymous callers cannot drain the digest outbox and burn email credits.
-    const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-    const cronSecret = Deno.env.get("CRON_SECRET") || "";
-    const headerSecret = req.headers.get("x-cron-secret") || "";
-    if (auth !== serviceKey && !(cronSecret && headerSecret === cronSecret)) {
+    // This previously compared against a private third name for the shared
+    // secret, which nothing sets, so only the literal service key would pass --
+    // and no cron job can supply one, since the bearer every schedule carries
+    // is the ANON key. That is why this sender was never scheduled.
+    if (!isServiceOrCron(req)) {
       return new Response(JSON.stringify({ ok: false, error: "not authorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
