@@ -209,6 +209,24 @@ const extractHistoryReportLink = (html: string, targetVin: string): string | nul
   return CFX_LINK_RE.exec(html)?.[0] ?? null;
 };
 
+// Site chrome asserts nothing about the car in front of you. Every dealer
+// platform puts "Certified Pre-Owned Vehicles" in its inventory nav, and
+// Harte's real VDP for a non-certified 2022 Ram carries that footer link, so a
+// detector reading the whole document certifies the entire lot. An anchor
+// pointing at a listing or search page is navigation by construction, so its
+// label is dropped before any badge is read.
+//
+// Applied to all three badge detectors rather than only the CPO one: the same
+// nav can advertise "One-Owner Specials" or "Clean Title Guarantee", and a
+// missed badge is the right way for a compliance claim to fail.
+const LISTING_HREF_RE =
+  /(?:\/|[?&])(?:inventory|showroom|search|vehicles?|cpo|certified|certified-pre-owned|pre-owned|preowned|used|new|specials)(?:[/?#&=]|$)/i;
+const stripNavigationLinks = (html: string): string =>
+  html.replace(/<a\b([^>]*)>([\s\S]{0,400}?)<\/a>/gi, (whole, attrs: string) => {
+    const href = /href=["']([^"']*)["']/i.exec(attrs)?.[1] ?? "";
+    return href && LISTING_HREF_RE.test(href) ? " " : whole;
+  });
+
 // One-owner badge on the dealer's own VDP. Provider context (CARFAX/
 // AutoCheck within range, or badge image alt/title) is REQUIRED so loose
 // marketing copy can't set the flag; absence of the badge means nothing —
@@ -221,7 +239,8 @@ const ONE_OWNER_RE = new RegExp(
   ].join("|"),
   "i",
 );
-const detectOneOwnerBadge = (html: string): boolean => ONE_OWNER_RE.test(html);
+const detectOneOwnerBadge = (html: string): boolean =>
+  ONE_OWNER_RE.test(stripNavigationLinks(html));
 
 // Manufacturer certification on the dealer's own VDP. The description engine
 // refuses CPO language on a feed flag alone, and rightly so: `condition` is
@@ -241,8 +260,10 @@ const CPO_RE = new RegExp(
   "i",
 );
 const GENERIC_CERT_RE = /certified\s+(?:technician|mechanic|dealer|service|collision|staff)/i;
-const detectCpoBadge = (html: string): boolean =>
-  CPO_RE.test(html) && !(GENERIC_CERT_RE.test(html) && !/certified\s+pre[-\s]?owned/i.test(html));
+const detectCpoBadge = (rawHtml: string): boolean => {
+  const html = stripNavigationLinks(rawHtml);
+  return CPO_RE.test(html) && !(GENERIC_CERT_RE.test(html) && !/certified\s+pre[-\s]?owned/i.test(html));
+};
 
 // Clean-title confirmation on the dealer's own VDP. MarketCheck's feed never
 // supplies carfax_clean_title — it is null on every active vehicle — yet the
@@ -278,10 +299,11 @@ const CLEAN_TITLE_CONDITION_RE =
 const CLEAN_TITLE_PROCESS_RE =
   /^\W{0,3}(?:paperwork|transfers?|processing|services?|fees?|loans?|liens?|department|clerk|required|only|necessary|guaranteed|unless|except)\b/i;
 
-const detectCleanTitleBadge = (html: string): boolean => {
+const detectCleanTitleBadge = (rawHtml: string): boolean => {
   // Badge art carries the claim in alt/title text, so those values are searched
   // alongside the rendered text; the pipe keeps one attribute's words from
   // forming a phrase with the next one's.
+  const html = stripNavigationLinks(rawHtml);
   const attrs = [...html.matchAll(/(?:alt|title)=["']([^"']{0,120})["']/gi)].map((m) => m[1]);
   const text = `${html.replace(/<[^>]+>/g, " ")} | ${attrs.join(" | ")}`
     .replace(/&nbsp;?/gi, " ").replace(/\s+/g, " ");

@@ -30,8 +30,22 @@ function buildDetector() {
   );
   const CONDITION = literal("CLEAN_TITLE_CONDITION_RE");
   const PROCESS = literal("CLEAN_TITLE_PROCESS_RE");
+  // Mirrors stripNavigationLinks: an anchor pointing at a listing page is
+  // navigation, and its label is not a claim about this car.
+  const listingHref = /const LISTING_HREF_RE =\s*\n?\s*(\/.*?\/[a-z]*);/s.exec(SRC);
+  if (!listingHref) throw new Error("LISTING_HREF_RE not found in the crawl source");
+  const LISTING_HREF_RE = new RegExp(
+    listingHref[1].slice(1, listingHref[1].lastIndexOf("/")),
+    listingHref[1].slice(listingHref[1].lastIndexOf("/") + 1),
+  );
+  const strip = (html: string): string =>
+    html.replace(/<a\b([^>]*)>([\s\S]{0,400}?)<\/a>/gi, (whole, attrs: string) => {
+      const href = /href=["']([^"']*)["']/i.exec(attrs)?.[1] ?? "";
+      return href && LISTING_HREF_RE.test(href) ? " " : whole;
+    });
   // Mirrors detectCleanTitleBadge.
-  return (html: string): boolean => {
+  return (raw: string): boolean => {
+    const html = strip(raw);
     const attrs = [...html.matchAll(/(?:alt|title)=["']([^"']{0,120})["']/gi)].map((m) => m[1]);
     const text = `${html.replace(/<[^>]+>/g, " ")} | ${attrs.join(" | ")}`
       .replace(/&nbsp;?/gi, " ").replace(/\s+/g, " ");

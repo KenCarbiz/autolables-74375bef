@@ -22,9 +22,24 @@ function buildDetector() {
   const CPO_RE = new RegExp(parts.join("|"), "i");
   // eslint-disable-next-line no-eval
   const GENERIC_CERT_RE = eval(generic[1]) as RegExp;
-  return (html: string) =>
-    CPO_RE.test(html) &&
-    !(GENERIC_CERT_RE.test(html) && !/certified\s+pre[-\s]?owned/i.test(html));
+  // Mirrors stripNavigationLinks: an anchor pointing at a listing page is
+  // navigation, and its label is not a claim about this car.
+  const listingHref = /const LISTING_HREF_RE =\s*\n?\s*(\/.*?\/[a-z]*);/s.exec(SRC);
+  if (!listingHref) throw new Error("LISTING_HREF_RE not found in the crawl source");
+  const LISTING_HREF_RE = new RegExp(
+    listingHref[1].slice(1, listingHref[1].lastIndexOf("/")),
+    listingHref[1].slice(listingHref[1].lastIndexOf("/") + 1),
+  );
+  const strip = (html: string): string =>
+    html.replace(/<a\b([^>]*)>([\s\S]{0,400}?)<\/a>/gi, (whole, attrs: string) => {
+      const href = /href=["']([^"']*)["']/i.exec(attrs)?.[1] ?? "";
+      return href && LISTING_HREF_RE.test(href) ? " " : whole;
+    });
+  return (raw: string) => {
+    const html = strip(raw);
+    return CPO_RE.test(html) &&
+      !(GENERIC_CERT_RE.test(html) && !/certified\s+pre[-\s]?owned/i.test(html));
+  };
 }
 
 describe("dealer VDP certification detector (C1)", () => {
@@ -48,6 +63,13 @@ describe("dealer VDP certification detector (C1)", () => {
       <h2>INFINITI Certified Pre-Owned</h2>
       <footer>Our certified technicians service every make</footer>
     `)).toBe(true);
+  });
+
+  it("does NOT fire on the inventory nav every dealer site carries", () => {
+    // Found on Harte's real VDP for a non-certified 2022 Ram: the footer links
+    // to /inventory/cpo with the label "Certified Pre-Owned Vehicles". Matching
+    // it certified all 132 used vehicles. See dealerVdpBadges.test.ts.
+    expect(detect('<a href="/inventory/cpo">Certified Pre-Owned Vehicles</a>')).toBe(false);
   });
 
   it("is positive-only: an ordinary used page certifies nothing", () => {
