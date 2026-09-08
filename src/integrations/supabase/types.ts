@@ -10694,6 +10694,7 @@ export type Database = {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      is_used_condition: { Args: { p_condition: string }; Returns: boolean }
       issue_dept_signoff_token: {
         Args: {
           p_department: string
