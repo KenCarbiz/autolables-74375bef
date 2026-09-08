@@ -3035,6 +3035,11 @@ export type Database = {
           prompt_version: string
           quality_threshold: number
           reasoning_effort: string | null
+          refresh_abundant_days_supply: number
+          refresh_abundant_supply_count: number
+          refresh_age_days: number
+          refresh_require_abundant_supply: boolean
+          refresh_supply_evidence_max_age_days: number
           required_legal_text: string | null
           review_mode: string
           review_mode_by_class: Json
@@ -3071,6 +3076,11 @@ export type Database = {
           prompt_version?: string
           quality_threshold?: number
           reasoning_effort?: string | null
+          refresh_abundant_days_supply?: number
+          refresh_abundant_supply_count?: number
+          refresh_age_days?: number
+          refresh_require_abundant_supply?: boolean
+          refresh_supply_evidence_max_age_days?: number
           required_legal_text?: string | null
           review_mode?: string
           review_mode_by_class?: Json
@@ -3107,6 +3117,11 @@ export type Database = {
           prompt_version?: string
           quality_threshold?: number
           reasoning_effort?: string | null
+          refresh_abundant_days_supply?: number
+          refresh_abundant_supply_count?: number
+          refresh_age_days?: number
+          refresh_require_abundant_supply?: boolean
+          refresh_supply_evidence_max_age_days?: number
           required_legal_text?: string | null
           review_mode?: string
           review_mode_by_class?: Json
@@ -5113,78 +5128,6 @@ export type Database = {
           },
           {
             foreignKeyName: "oem_distribution_events_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      oem_document_copy_attempts: {
-        Row: {
-          attempts: number
-          brand: string
-          brand_key: string
-          created_at: string
-          detail: string | null
-          document_kind: string
-          id: string
-          last_attempt_at: string
-          model: string
-          model_key: string
-          model_year: number | null
-          outcome: string
-          resolved_at: string | null
-          source_url: string | null
-          tenant_id: string
-          year_key: number
-        }
-        Insert: {
-          attempts?: number
-          brand: string
-          brand_key: string
-          created_at?: string
-          detail?: string | null
-          document_kind: string
-          id?: string
-          last_attempt_at?: string
-          model: string
-          model_key: string
-          model_year?: number | null
-          outcome: string
-          resolved_at?: string | null
-          source_url?: string | null
-          tenant_id: string
-          year_key?: number
-        }
-        Update: {
-          attempts?: number
-          brand?: string
-          brand_key?: string
-          created_at?: string
-          detail?: string | null
-          document_kind?: string
-          id?: string
-          last_attempt_at?: string
-          model?: string
-          model_key?: string
-          model_year?: number | null
-          outcome?: string
-          resolved_at?: string | null
-          source_url?: string | null
-          tenant_id?: string
-          year_key?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "oem_document_copy_attempts_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenant_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "oem_document_copy_attempts_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -11351,6 +11294,22 @@ export type Database = {
       unschedule_marketcheck_sync: { Args: never; Returns: undefined }
       unschedule_reengage_abandoned_signings: {
         Args: never
+        Returns: undefined
+      }
+      vendor_assigned_lines: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          accessory: Json
+          delivery_target: string
+          item: Json
+          record_id: string
+          stock_number: string
+          vin: string
+          ymm: string
+        }[]
+      }
+      vendor_update_assigned_line: {
+        Args: { p_item_id: string; p_patch: Json; p_record_id: string }
         Returns: undefined
       }
       verify_addendum_price: {
