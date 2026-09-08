@@ -11223,6 +11223,14 @@ export type Database = {
         }
         Returns: number
       }
+      schedule_oem_document_copy_sweep: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
       schedule_packet_backfill: {
         Args: {
           _cron_expr?: string
