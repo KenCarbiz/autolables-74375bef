@@ -66,7 +66,8 @@ export type BudgetLimitCode =
   | "per_user_daily_limit"
   | "monthly_generation_budget"
   | "monthly_preview_budget"
-  | "unpriced_call_ceiling";
+  | "unpriced_call_ceiling"
+  | "budget_unavailable";
 
 export interface BudgetDecision {
   verdict: BudgetVerdict;
@@ -88,6 +89,7 @@ const LIMIT_LABELS: Record<BudgetLimitCode, string> = {
   per_user_daily_limit: "This user has reached their daily generation limit.",
   monthly_generation_budget: "The monthly generation budget is exhausted.",
   monthly_preview_budget: "The monthly preview budget is exhausted.",
+  budget_unavailable: "Spend controls could not be read, so no paid call was made.",
   unpriced_call_ceiling: "The configured model has no price on file, so spend cannot be measured. Generation is capped at the most calls the monthly budget could possibly afford.",
 };
 
@@ -206,6 +208,106 @@ export function evaluateBudget(
   }
 
   return { verdict: "allowed", withinBudget: true, consumedPct, remaining, triggeredLimits: [] };
+}
+
+/**
+ * The decision to return when the budget could not be evaluated at all — the
+ * config row would not load, or the spend RPC failed.
+ *
+ * Fail CLOSED. An unreadable budget is indistinguishable from an exhausted one
+ * from the only angle that matters: nobody can say what the next call costs or
+ * whether it is affordable. Treating the unknown as "allowed" is how a control
+ * that exists on paper spends real money for a month.
+ */
+export function budgetUnavailable(detail: string): BudgetDecision {
+  return {
+    verdict: "blocked",
+    withinBudget: false,
+    reason: `Spend controls could not be evaluated, so generation is refused: ${detail}`,
+    consumedPct: null,
+    remaining: null,
+    triggeredLimits: ["budget_unavailable"],
+  };
+}
+
+/** Null / empty / non-numeric means "not configured"; a numeric string is a
+ *  configured value. Postgres numerics can arrive as strings depending on the
+ *  client and serializer in between, and a "135.00" that fails a
+ *  `typeof === "number"` test silently disables the dollar budget. */
+const asNumber = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const asNumberOr = (v: unknown, fallback: number): number => asNumber(v) ?? fallback;
+
+/**
+ * Builds the config from a `description_generation_budgets` row.
+ *
+ * A missing row means DEFAULT_BUDGET, not "no limits": a tenant that never
+ * opened the budget screen is exactly the tenant most likely to run away.
+ */
+export function coerceBudgetConfig(
+  row: Record<string, unknown> | null | undefined,
+): TenantBudgetConfig {
+  if (!row) return { ...DEFAULT_BUDGET };
+  return {
+    monthlyGenerationBudget: asNumber(row.monthly_generation_budget),
+    monthlyPreviewBudget: asNumber(row.monthly_preview_budget),
+    maxCostPerGeneration: asNumber(row.max_cost_per_generation),
+    maxRepairAttempts: asNumberOr(row.max_repair_attempts, DEFAULT_BUDGET.maxRepairAttempts),
+    maxChannelsPerBatch: asNumberOr(row.max_channels_per_batch, DEFAULT_BUDGET.maxChannelsPerBatch),
+    dailyGenerationLimit: asNumber(row.daily_generation_limit),
+    perUserDailyLimit: asNumber(row.per_user_daily_limit),
+    warningThresholdPct: asNumberOr(row.warning_threshold_pct, DEFAULT_BUDGET.warningThresholdPct),
+    hardStopPct: asNumberOr(row.hard_stop_pct, DEFAULT_BUDGET.hardStopPct),
+  };
+}
+
+/**
+ * Reads the `description_generation_spend` RPC payload.
+ *
+ * Returns null when the payload cannot be trusted — the RPC refused, or the
+ * counts are not numbers. The caller must then refuse the call rather than
+ * evaluate a budget against zeros, which is a guaranteed "allowed".
+ */
+export function parseSpendUsage(raw: unknown): BudgetUsage | null {
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  if (row.ok === false) return null;
+
+  const today = asNumber(row.today_generation_count);
+  const month = asNumber(row.month_generation_count);
+  if (today === null || today < 0) return null;
+
+  return {
+    monthProductionSpend: asNumberOr(row.month_production_spend, 0),
+    monthPreviewSpend: asNumberOr(row.month_preview_spend, 0),
+    todayGenerationCount: today,
+    userTodayGenerationCount: asNumberOr(row.user_today_generation_count, 0),
+    unpricedExecutions: asNumberOr(row.pending_cost_executions, 0),
+    monthGenerationCount: month ?? today,
+  };
+}
+
+/**
+ * Raises a usage snapshot to a floor the caller already knows to be true.
+ *
+ * The counts come from rows that are written AFTER each provider call, so a
+ * caller mid-run has always spent more than the table can yet show. Without
+ * this, one vehicle's ten calls are all authorized against the count as it
+ * stood before the first of them — which is how a 500/day cap let 506 through.
+ */
+export function withUsageFloor(usage: BudgetUsage, floor: {
+  todayGenerationCount: number; monthGenerationCount: number;
+}): BudgetUsage {
+  return {
+    ...usage,
+    todayGenerationCount: Math.max(usage.todayGenerationCount, floor.todayGenerationCount),
+    monthGenerationCount: Math.max(
+      Number(usage.monthGenerationCount ?? 0), floor.monthGenerationCount),
+  };
 }
 
 export interface BudgetOverride {

@@ -22,6 +22,10 @@ export interface ModelPricing {
   cachedInputPerMillion?: number;
   currency: "USD";
   effectiveFrom: string;
+  /** Set only on operator-supplied entries, so a stored record says which
+   *  price list produced it and a later table change cannot be mistaken for
+   *  the price that was actually applied. */
+  version?: string;
 }
 
 // The model keys this repo actually sends: the settings-level keys in
@@ -68,8 +72,104 @@ export const PRICING_TABLE: ModelPricing[] = [
 
 const BY_MODEL = new Map(PRICING_TABLE.map((p) => [p.model, p]));
 
+// ── Operator-supplied prices ─────────────────────────────────────────
+//
+// The table above is a code constant, so a model it does not list can only be
+// priced by a deploy. That is how a whole month of production ran unmeasured:
+// the tenant was configured for a model with no entry, every record landed
+// `unavailable` with a null amount, SUM(cost_amount) stayed 0, and the dollar
+// budget reported 0% consumed no matter how much was spent.
+//
+// An operator can now supply the missing rate as configuration
+// (DESCRIPTION_MODEL_PRICING, read by the edge function at boot). Overrides win
+// over the table for the same key -- a published rate that has changed is
+// exactly what this is for -- and every entry is validated before it is
+// accepted, because a malformed price is worse than a missing one: it would
+// make the number look measured.
+export const PRICING_OVERRIDE_VERSION = `${PRICING_TABLE_VERSION}+operator`;
+
+const OVERRIDES = new Map<string, ModelPricing>();
+
+export interface PricingOverrideParse {
+  entries: ModelPricing[];
+  errors: string[];
+}
+
+/**
+ * Reads an operator price list. Never throws: a bad configuration string must
+ * leave the system unpriced-but-honest, not crash the generator.
+ */
+export function parsePricingOverrides(raw: string | null | undefined): PricingOverrideParse {
+  const text = String(raw ?? "").trim();
+  if (!text) return { entries: [], errors: [] };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    return { entries: [], errors: [`not valid JSON: ${(e as Error).message}`] };
+  }
+  const list = Array.isArray(parsed) ? parsed : [parsed];
+
+  const entries: ModelPricing[] = [];
+  const errors: string[] = [];
+  for (const item of list) {
+    const row = (item ?? {}) as Record<string, unknown>;
+    const model = String(row.model ?? "").trim();
+    const input = Number(row.inputPerMillion);
+    const output = Number(row.outputPerMillion);
+    const cachedRaw = row.cachedInputPerMillion;
+    const cached = cachedRaw === undefined || cachedRaw === null ? undefined : Number(cachedRaw);
+    const currency = String(row.currency ?? "USD").toUpperCase();
+
+    if (!model) { errors.push("an entry has no model key"); continue; }
+    // Rejecting a zero rate is the whole point. A zero is a claim that the
+    // call was free, and that claim is what an operator acts on.
+    if (!(Number.isFinite(input) && input > 0) || !(Number.isFinite(output) && output > 0)) {
+      errors.push(`"${model}" needs positive inputPerMillion and outputPerMillion`);
+      continue;
+    }
+    if (cached !== undefined && !(Number.isFinite(cached) && cached >= 0)) {
+      errors.push(`"${model}" has a non-numeric cachedInputPerMillion`);
+      continue;
+    }
+    if (currency !== "USD") {
+      errors.push(`"${model}" is priced in ${currency}; only USD is supported`);
+      continue;
+    }
+    entries.push({
+      model,
+      provider: String(row.provider ?? "operator"),
+      inputPerMillion: input,
+      outputPerMillion: output,
+      ...(cached === undefined ? {} : { cachedInputPerMillion: cached }),
+      currency: "USD",
+      effectiveFrom: String(row.effectiveFrom ?? "").trim() || new Date().toISOString().slice(0, 10),
+      version: String(row.version ?? "").trim() || PRICING_OVERRIDE_VERSION,
+    });
+  }
+  return { entries, errors };
+}
+
+/** Installs operator prices. Returns the model keys now priced by override. */
+export function registerPricing(entries: ModelPricing[]): string[] {
+  for (const e of entries) OVERRIDES.set(e.model, e);
+  return entries.map((e) => e.model);
+}
+
+/** Test seam. Production never needs to drop a price it has been given. */
+export function clearPricingOverrides(): void {
+  OVERRIDES.clear();
+}
+
 export function pricingFor(model: string): ModelPricing | undefined {
-  return BY_MODEL.get(String(model || "").trim());
+  const key = String(model || "").trim();
+  return OVERRIDES.get(key) ?? BY_MODEL.get(key);
+}
+
+/** Whether spend on this model can be measured at all. */
+export function isPriced(model: string): boolean {
+  return pricingFor(model) !== undefined;
 }
 
 export type CostState =
@@ -110,7 +210,7 @@ export function computeCost(
     model,
     usage,
     currency: pricing?.currency ?? DEFAULT_CURRENCY,
-    pricingVersion: PRICING_TABLE_VERSION,
+    pricingVersion: pricing?.version ?? PRICING_TABLE_VERSION,
   };
 
   // A number the provider billed outranks anything we can derive, even when
@@ -124,7 +224,8 @@ export function computeCost(
       ...base,
       state: "unavailable",
       amount: null,
-      note: `no pricing entry for "${model}" in ${PRICING_TABLE_VERSION}`,
+      note: `no pricing entry for "${model}" in ${PRICING_TABLE_VERSION}`
+        + ` — set DESCRIPTION_MODEL_PRICING to record what this model costs`,
     };
   }
 

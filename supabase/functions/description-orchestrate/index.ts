@@ -28,7 +28,10 @@ import {
 } from "../_shared/description-core.ts";
 import { repairContent, hasRepairableFindings } from "../_shared/description-repair.ts";
 import { preflight, preflightSummary } from "../_shared/description-preflight.ts";
-import { evaluateBudget, DEFAULT_BUDGET } from "../_shared/description-budget.ts";
+import {
+  evaluateBudget, coerceBudgetConfig, parseSpendUsage, withUsageFloor, budgetUnavailable,
+  type BudgetDecision, type TenantBudgetConfig,
+} from "../_shared/description-budget.ts";
 import { can } from "../_shared/description-permissions.ts";
 import { buyersGuideDisposition } from "../_shared/description-warranty-policy.ts";
 import { createProvider, outputTokenBudget, type GenerationResult } from "../_shared/description-provider.ts";
@@ -38,6 +41,10 @@ import { DESCRIPTION_OUTPUT_SCHEMA, auditEvidence, factRoles } from "../_shared/
 import { runGates, vehicleClassOf } from "../_shared/description-gates.ts";
 import { refreshDecision } from "../_shared/description-refresh.ts";
 import { computeCost, type CostRecord } from "../_shared/description-cost.ts";
+// Split from the line above, which a wiring test matches literally.
+import {
+  estimateRequestCost, parsePricingOverrides, registerPricing,
+} from "../_shared/description-cost.ts";
 
 // The disclosures repair is allowed to append verbatim. The dealer's own
 // required_legal_text has to be in this list: validateContentV3 raises
@@ -64,6 +71,18 @@ const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
 const RECONCILE_BUDGET_MS = 100_000;
 const RECONCILE_MAX_DEPTH = 80; // backstop against runaway chaining
 
+// Prices the built-in table does not carry, supplied as configuration so a
+// model this project has never shipped a rate for can still be measured
+// without a deploy. Read once at boot; a malformed list is logged and ignored,
+// which leaves cost honestly unknown rather than wrongly zero.
+const PRICING_OVERRIDES = parsePricingOverrides(Deno.env.get("DESCRIPTION_MODEL_PRICING"));
+for (const err of PRICING_OVERRIDES.errors) {
+  console.error("DESCRIPTION_MODEL_PRICING ignored an entry:", err);
+}
+if (PRICING_OVERRIDES.entries.length) {
+  console.log("operator pricing registered for", registerPricing(PRICING_OVERRIDES.entries).join(", "));
+}
+
 // A dropped/renamed RPC signature returns { data: null, error } — destructuring
 // only `data` turns that into an indistinguishable "nothing to do" and the
 // pipeline stalls silently. Every RPC goes through one of these two.
@@ -87,6 +106,93 @@ async function rpcSoft(admin: any, fn: string, args: Record<string, unknown>): P
 }
 
 
+
+// ── Spend guard ──────────────────────────────────────────────────────
+//
+// One authorization per PAID CALL, not one per vehicle.
+//
+// The budget used to be evaluated once, at the top of a vehicle, and the ten
+// provider calls that vehicle then made (master, the length correction, and
+// one derivative per enabled channel) were never checked again. The daily cap
+// could therefore only ever be approximately enforced: on 2026-09-08 the last
+// case was authorized at 496 of a 500/day limit and finished the day at 506.
+// Yesterday it ended at 562. Every one of those calls was billable.
+//
+// So: re-read the tenant's spend before every call, and count what this run
+// has already authorized on top of it — the execution rows are written AFTER
+// the call returns, so the table always lags a run in flight. The counts come
+// from description_generation_spend, which sums the whole tenant, so the
+// nightly ingest sweep and the reconcile sweep spend against one shared
+// number instead of each seeing only its own traffic.
+//
+// If any of that cannot be read, the answer is "no". A budget that cannot be
+// evaluated is not a budget.
+interface SpendGuard {
+  authorize(
+    purpose: string,
+    req?: { isPreview?: boolean; estimatedCost?: number | null },
+  ): Promise<BudgetDecision>;
+}
+
+function createSpendGuard(admin: any, tenantId: string): SpendGuard {
+  let cfg: TenantBudgetConfig | null = null;
+  let authorizedFloor = { todayGenerationCount: 0, monthGenerationCount: 0 };
+
+  return {
+    async authorize(purpose, req = {}) {
+      let config = cfg;
+      if (!config) {
+        const { data, error } = await admin.from("description_generation_budgets")
+          .select("*").eq("tenant_id", tenantId).maybeSingle();
+        // Destructuring only `data` here would turn an unreadable budget into
+        // an unlimited one, which is the failure this whole module exists to
+        // prevent.
+        if (error) return budgetUnavailable(`the budget row could not be read (${error.message})`);
+        config = coerceBudgetConfig(data as Record<string, unknown> | null);
+        cfg = config;
+      }
+
+      // One tenant-wide counter. Both nightly jobs — the ingest sweep and the
+      // reconcile sweep — spend against this same number, so neither can be
+      // under its own limit while the tenant is over.
+      let spend: unknown;
+      try {
+        spend = await rpc(admin, "description_generation_spend", { p_tenant_id: tenantId });
+      } catch (e) {
+        return budgetUnavailable(`spend could not be read (${(e as Error).message})`);
+      }
+      // Rejects a payload that cannot be trusted — a refusal, or counts that
+      // are not numbers — so an unreadable answer is never mistaken for a
+      // quiet day.
+      const observed = parseSpendUsage(spend);
+      if (!observed) return budgetUnavailable("the spend function returned no usable counts");
+
+      const usage = withUsageFloor({
+        ...observed,
+        // Without these the dollar budget cannot bind: the configured model has
+        // no price on file, so every cost_amount is NULL, spend sums to 0, and
+        // the budget reports 0% consumed however many vehicles are generated.
+        unpricedExecutions: Number((spend as any)?.pending_cost_executions ?? 0),
+        monthGenerationCount: Number((spend as any)?.month_generation_count ?? 0),
+      }, authorizedFloor);
+      const decision = evaluateBudget(config, usage, {
+        isPreview: !!req.isPreview,
+        estimatedCost: req.estimatedCost ?? null,
+      });
+
+      if (decision.withinBudget) {
+        authorizedFloor = {
+          todayGenerationCount: usage.todayGenerationCount + 1,
+          monthGenerationCount: Number(usage.monthGenerationCount ?? 0) + 1,
+        };
+      } else {
+        console.error("spend guard refused", purpose, decision.triggeredLimits.join(","),
+          `today=${usage.todayGenerationCount}`, `month=${usage.monthGenerationCount}`);
+      }
+      return decision;
+    },
+  };
+}
 
 const DEFAULT_SETTINGS = {
   review_mode: "EXCEPTION_REVIEW", review_mode_by_class: {},
@@ -237,10 +343,46 @@ async function recordExecution(
       cost_may_have_occurred: true,
       completed_at: new Date().toISOString(),
     }).select("id").single();
+
+    // A null amount is the honest answer, and it is also invisible: it sums to
+    // zero, so a dollar budget reads 0% consumed however much was spent. Say
+    // so where an operator will see it instead of leaving it in a column.
+    if (cost.amount === null) {
+      await signalUnmeasuredCost(admin, tenantId, vehicleId, caseId, cost).catch(() => undefined);
+    }
     return (data?.id as string) ?? null;
   } catch {
     return null;
   }
+}
+
+// Bounded so a warm isolate does not re-raise the same exception on every one
+// of a vehicle's ten calls; the RPC de-dupes per case as well.
+const unmeasuredSignalled = new Set<string>();
+
+async function signalUnmeasuredCost(
+  admin: any, tenantId: string, vehicleId: string | null, caseId: string | null,
+  cost: CostRecord,
+): Promise<void> {
+  if (!caseId || !vehicleId) return;
+  const key = `${caseId}:${cost.model}:${cost.state}`;
+  if (unmeasuredSignalled.has(key)) return;
+  if (unmeasuredSignalled.size > 2_000) unmeasuredSignalled.clear();
+  unmeasuredSignalled.add(key);
+
+  await audit(admin, tenantId, "description_model_cost_unmeasured", caseId, {
+    model: cost.model, provider: cost.provider, cost_state: cost.state,
+    pricing_version: cost.pricingVersion, note: cost.note ?? null,
+  });
+  await raiseException(
+    admin, { tenant_id: tenantId, vehicle_id: vehicleId, case_id: caseId },
+    "COST_UNMEASURED", "high", false,
+    `Spend on ${cost.model} cannot be measured`,
+    cost.note ?? `No price is on file for ${cost.model}, so this call's cost is unknown. `
+      + `The dollar budget cannot bind until one is supplied.`,
+    { model: cost.model, provider: cost.provider, cost_state: cost.state,
+      pricing_version: cost.pricingVersion },
+  );
 }
 
 /**
@@ -252,7 +394,7 @@ async function recordExecution(
  */
 async function generateMaster(
   packet: any, snap: any, settings: Record<string, any>, listing: Record<string, any>,
-  ctx: { admin: any; tenantId: string; vehicleId: string; caseId: string },
+  ctx: { admin: any; tenantId: string; vehicleId: string; caseId: string; guard: SpendGuard },
 ): Promise<MasterGeneration> {
   if (settings.prompt_profile !== "drivesignal-v3-system") {
     const text = await callGenerator(buildMasterPromptV3(packet, settings), settings.generation_model);
@@ -333,7 +475,24 @@ async function generateMaster(
     - (String(settings.required_legal_text || "").trim().length
        ? String(settings.required_legal_text).trim().length + 2 : 0);
   const firstDraft = String(result.parsed?.master_description ?? "");
-  if (firstDraft.length > ceiling) {
+  // The correction is a SECOND provider call on the same vehicle. It was never
+  // put to the budget, so a vehicle could cost twice what one authorization
+  // allowed. A long draft is publishable copy; the cap outranks the polish.
+  const needsCorrection = firstDraft.length > ceiling;
+  const retryBudget = needsCorrection
+    ? await ctx.guard.authorize("master_length_correction", {
+        estimatedCost: estimateRequestCost(
+          settings.generation_model,
+          `${DRIVESIGNAL_V3_SYSTEM}\n\n${knowledge.text}\n\n${buildMasterPromptV3(packet, settings)}`,
+          ceiling,
+        ).amount,
+      })
+    : null;
+  if (retryBudget && !retryBudget.withinBudget) {
+    await recordBudgetRefusal(ctx.admin, ctx.tenantId, ctx.vehicleId, ctx.caseId,
+      "master_length_correction", retryBudget, { draft_characters: firstDraft.length });
+  }
+  if (needsCorrection && retryBudget?.withinBudget) {
     try {
       const retry = await provider.generate({
         systemPrompt: `${DRIVESIGNAL_V3_SYSTEM}\n\n${knowledge.text}`,
@@ -618,6 +777,30 @@ async function audit(admin: any, tenantId: string, action: string, caseId: strin
   } catch { /* audit must never break the pipeline */ }
 }
 
+/**
+ * A refused call has to leave a trace an operator can find. The whole class of
+ * bug this fixes is the silent skip: the budget verdict was computed on every
+ * run for a month and never once produced a row anyone could read, so "the cap
+ * is on" and "the cap fired" were indistinguishable from outside.
+ */
+async function recordBudgetRefusal(
+  admin: any, tenantId: string, vehicleId: string, caseId: string,
+  stage: string, decision: BudgetDecision, extra: Record<string, unknown> = {},
+): Promise<void> {
+  await audit(admin, tenantId, "generation_budget_blocked", caseId, {
+    stage, limits: decision.triggeredLimits, consumed_pct: decision.consumedPct,
+    remaining: decision.remaining, reason: decision.reason, ...extra,
+  });
+  await raiseException(
+    admin, { tenant_id: tenantId, vehicle_id: vehicleId, case_id: caseId },
+    "GENERATION_BUDGET_EXHAUSTED", "critical", true,
+    "Generation refused: spending limit reached",
+    `${decision.reason ?? "A spending limit was reached."} No provider call was made (${stage}).`,
+    { stage, limits: decision.triggeredLimits, consumed_pct: decision.consumedPct,
+      remaining: decision.remaining, ...extra },
+  );
+}
+
 async function setCase(admin: any, caseId: string, patch: Record<string, unknown>, bump = false) {
   // bump=true advances the optimistic-concurrency counter, so an approval
   // issued against copy that has since been regenerated is rejected. Writing
@@ -751,6 +934,8 @@ async function orchestrateVehicle(
 
   const raisedTypes = new Set<string>();
   const ctx = { tenant_id: tenantId, vehicle_id: vehicleId, case_id: caseId, raised: raisedTypes };
+  // One guard per vehicle, consulted before every paid call this run makes.
+  const guard = createSpendGuard(admin, tenantId);
   const failJob = async (code: string, msg: string, retryable: boolean) => {
     await admin.from("description_jobs").update({
       status: retryable ? "failed_retryable" : "failed_blocked",
@@ -849,33 +1034,57 @@ async function orchestrateVehicle(
     // Everything above this point is free. Everything below spends money, so
     // a request that was always going to fail must be rejected here rather
     // than discovered by the model.
-    const { data: budgetRow } = await admin.from("description_generation_budgets")
-      .select("*").eq("tenant_id", tenantId).maybeSingle();
-    const spend = await rpc(admin, "description_generation_spend", { p_tenant_id: tenantId });
-    const budgetCfg = budgetRow ? {
-      ...DEFAULT_BUDGET,
-      monthlyGenerationBudget: budgetRow.monthly_generation_budget,
-      monthlyPreviewBudget: budgetRow.monthly_preview_budget,
-      maxCostPerGeneration: budgetRow.max_cost_per_generation,
-      maxRepairAttempts: budgetRow.max_repair_attempts ?? DEFAULT_BUDGET.maxRepairAttempts,
-      maxChannelsPerBatch: budgetRow.max_channels_per_batch ?? DEFAULT_BUDGET.maxChannelsPerBatch,
-      dailyGenerationLimit: budgetRow.daily_generation_limit,
-      perUserDailyLimit: budgetRow.per_user_daily_limit,
-      warningThresholdPct: budgetRow.warning_threshold_pct ?? DEFAULT_BUDGET.warningThresholdPct,
-      hardStopPct: budgetRow.hard_stop_pct ?? DEFAULT_BUDGET.hardStopPct,
-    } : DEFAULT_BUDGET;
-    const budgetDecision = evaluateBudget(budgetCfg, {
-      monthProductionSpend: Number((spend as any)?.month_production_spend ?? 0),
-      monthPreviewSpend: Number((spend as any)?.month_preview_spend ?? 0),
-      todayGenerationCount: Number((spend as any)?.today_generation_count ?? 0),
-      userTodayGenerationCount: 0,
-      // Without these the dollar budget cannot bind: the configured model has
-      // no price on file, so every cost_amount is NULL, spend sums to 0, and
-      // the budget reports 0% consumed however many vehicles are generated.
-      unpricedExecutions: Number((spend as any)?.pending_cost_executions ?? 0),
-      monthGenerationCount: Number((spend as any)?.month_generation_count ?? 0),
-    }, { isPreview: false, estimatedCost: null });
+    // What this call is about to cost, as a number the per-generation cap can
+    // actually compare against. Passing null here meant `estimatedCost` fell
+    // back to 0 inside collectTriggeredLimits, so max_cost_per_generation
+    // could never trigger no matter what the cap was set to. When the model
+    // has no price the estimate is null again — deliberately — and the
+    // unpriced-call ceiling is what binds instead.
+    const masterCostEstimate = estimateRequestCost(
+      settings.generation_model,
+      `${DRIVESIGNAL_V3_SYSTEM}\n\n${buildMasterPromptV3(packet, settings)}`,
+      masterBand.max,
+    );
+    const budgetDecision = await guard.authorize("master_generation", {
+      isPreview: false, estimatedCost: masterCostEstimate.amount,
+    });
 
+    if (budgetDecision.verdict === "warning") {
+      await audit(admin, tenantId, "generation_budget_warning", caseId,
+        { vin: listing.vin, consumed_pct: budgetDecision.consumedPct });
+    }
+    // A budget that only writes a warning is a report, not a control. This
+    // verdict was computed on every run and never once stopped anything: the
+    // lot spent 434 calls in a day against a 250/day limit and 453 in a month
+    // against a ceiling of 270, and every check passed silently because
+    // nothing read the answer.
+    //
+    // Refused BEFORE the provider call, which is the only point at which the
+    // spend is still preventable. force does not override it -- a manual
+    // regenerate spends the same money as an automatic one.
+    if (!budgetDecision.withinBudget) {
+      await recordBudgetRefusal(admin, tenantId, vehicleId, caseId,
+        "master_generation", budgetDecision, { vin: listing.vin });
+      await admin.from("description_jobs").update({
+        status: "failed_blocked", last_error_code: budgetDecision.triggeredLimits[0] || "BUDGET_EXHAUSTED",
+        last_error_message: (budgetDecision.reason ?? "budget exhausted").slice(0, 500),
+        failed_at: new Date().toISOString(),
+      }).eq("id", jobId);
+      await setCase(admin, caseId, {
+        status: "FAILED_BLOCKED", publication_eligibility: "blocked",
+        last_error_message: budgetDecision.reason ?? "budget exhausted",
+      });
+      return {
+        vehicle_id: vehicleId, case_id: caseId, skipped: "budget_exhausted",
+        limits: budgetDecision.triggeredLimits, reason: budgetDecision.reason,
+        cost_incurred: false,
+      };
+    }
+
+    // Checked ahead of preflight on purpose. preflight() also folds the budget
+    // into its blocking codes, and letting it answer first would record the
+    // refusal as a generic PREFLIGHT_FAILED — the operator would see that
+    // generation stopped but not that it stopped over money.
     const pf = preflight({
       authenticated: true,
       canGenerate: true,
@@ -913,31 +1122,6 @@ async function orchestrateVehicle(
       return { vehicle_id: vehicleId, case_id: caseId, skipped: "preflight_rejected",
                blocking_codes: pf.blockingCodes, reason: preflightSummary(pf), cost_incurred: false };
     }
-    if (budgetDecision.verdict === "warning") {
-      await audit(admin, tenantId, "generation_budget_warning", caseId,
-        { vin: listing.vin, consumed_pct: budgetDecision.consumedPct });
-    }
-    // A budget that only writes a warning is a report, not a control. This
-    // verdict was computed on every run and never once stopped anything: the
-    // lot spent 434 calls in a day against a 250/day limit and 453 in a month
-    // against a ceiling of 270, and every check passed silently because
-    // nothing read the answer.
-    //
-    // Refused BEFORE the provider call, which is the only point at which the
-    // spend is still preventable. force does not override it -- a manual
-    // regenerate spends the same money as an automatic one.
-    if (!budgetDecision.withinBudget) {
-      await audit(admin, tenantId, "generation_budget_blocked", caseId, {
-        vin: listing.vin, limits: budgetDecision.triggeredLimits,
-        consumed_pct: budgetDecision.consumedPct, reason: budgetDecision.reason,
-      });
-      await setCase(admin, caseId, { last_error_message: budgetDecision.reason ?? "budget exhausted" });
-      return {
-        vehicle_id: vehicleId, case_id: caseId, skipped: "budget_exhausted",
-        limits: budgetDecision.triggeredLimits, reason: budgetDecision.reason,
-        cost_incurred: false,
-      };
-    }
     const masterPolicyVersion = await computeChannelPolicyVersion(masterPolicy);
     const inputChecksum = await computeInputChecksum({
       tenantId, vehicleId, snapshotChecksum: sdv, channel: "master",
@@ -969,7 +1153,7 @@ async function orchestrateVehicle(
     await audit(admin, tenantId, "description_generation_started", caseId,
       { vin: listing.vin, tone, voice_profile_version: voice.version, input_checksum: inputChecksum });
     const generation = await generateMaster(packet, snap, settings, listing,
-      { admin, tenantId, vehicleId, caseId });
+      { admin, tenantId, vehicleId, caseId, guard });
     // Appended here, not at render time, so ONE string flows through the
     // version row, validation, the gates, scoring and the channel derivations.
     // Appending later would have stored copy that differed from the copy we
@@ -1146,6 +1330,10 @@ async function orchestrateVehicle(
     // Cross-channel comparison corpus, grown as each variant lands.
     const channelTexts: Array<{ channel: string; label: string; content: string }> = [];
     const channelBlocking: Finding[] = [];
+    // Channels the spending limit stopped before they were attempted. Reported
+    // rather than dropped: a variant that is missing because the money ran out
+    // must not look like a variant that was never enabled.
+    let budgetStoppedChannels: string[] = [];
     for (const key of enabled) {
       const policy: ChannelPolicy | undefined = resolveChannelPolicy(key, channelOverrides.get(key));
       if (!policy || !policy.active) continue;
@@ -1169,9 +1357,26 @@ async function orchestrateVehicle(
         tone, targeting: packet.targeting, featureBudget: policy.featureBudget,
       });
 
+      // Every channel variant is its own provider call. Authorizing the
+      // vehicle once and then making nine more calls is precisely how a
+      // 500/day cap let 506 through: the count was read before the first of
+      // ten calls and never read again.
+      const channelPrompt = buildChannelPromptV3(masterText2, policy, channelPacket);
+      const channelBudget = await guard.authorize(`channel_generation:${key}`, {
+        estimatedCost: estimateRequestCost(
+          settings.generation_model, channelPrompt, policy.characterLimit).amount,
+      });
+      if (!channelBudget.withinBudget) {
+        budgetStoppedChannels = enabled.slice(enabled.indexOf(key));
+        await recordBudgetRefusal(admin, tenantId, vehicleId, caseId,
+          `channel_generation:${key}`, channelBudget,
+          { vin: listing.vin, channels_not_generated: budgetStoppedChannels });
+        break;
+      }
+
       try {
         const raw = await generateChannelText(
-          buildChannelPromptV3(masterText2, policy, channelPacket),
+          channelPrompt,
           settings, policy.characterLimit,
           { admin, tenantId, vehicleId, caseId, channel: key });
         let content = raw, seoTitle: string | null = null, metaDesc: string | null = null;
@@ -1405,6 +1610,8 @@ async function orchestrateVehicle(
       fact_confidence: snap.fact_confidence, channels: channelRows.length,
       conflicts: snap.conflicts.length, published,
       ...(refusedChannels.length ? { refused_channels: refusedChannels } : {}),
+      ...(budgetStoppedChannels.length
+        ? { budget_stopped_channels: budgetStoppedChannels } : {}),
     };
   } catch (e) {
     const err = e as Error & { code?: string };
