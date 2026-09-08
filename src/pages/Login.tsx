@@ -12,7 +12,6 @@ import {
   IconEye,
   IconEyeOff,
   IconArrowRight,
-  IconInfo,
   IconWarning,
   IconCheck,
   IconSpinner,
