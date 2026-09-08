@@ -87,7 +87,7 @@ export const useComplianceCenterData = (): ComplianceCenterData => {
     try {
       const [listingRes, runRes, exceptionRes, flagRes, snapshotRes, docRes, recallRes] = await Promise.all([
         sb().from("vehicle_listings")
-          .select("id, vin, ymm, trim, condition, status, price, doc_fee, price_parse_status, price_last_verified_at, price_source_url, source_url, open_recall_count, recall_status, created_at, mc_attributes, sticker_snapshot")
+          .select("id, vin, ymm, trim, condition, status, price, doc_fee, website_sale_price, advertised_price_before_doc, price_parse_status, price_last_verified_at, price_source_url, source_url, open_recall_count, recall_status, created_at, mc_attributes, sticker_snapshot")
           .eq("tenant_id", tenantId)
           .neq("status", "archived")
           .order("created_at", { ascending: false })

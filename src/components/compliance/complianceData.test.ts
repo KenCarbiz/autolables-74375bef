@@ -8,6 +8,7 @@ import {
   isActiveListing,
   latestRunByVehicle,
   reconcileGap,
+  feeExclusiveEquivalent,
   type CertificationRunRow,
   type DocumentFlagRow,
   type ListingRow,
@@ -26,6 +27,8 @@ const listing = (over: Partial<ListingRow> = {}): ListingRow => ({
   condition: "used",
   status: "published",
   price: 48_000,
+  website_sale_price: null,
+  advertised_price_before_doc: null,
   doc_fee: null,
   price_parse_status: null,
   price_last_verified_at: null,
@@ -78,6 +81,46 @@ describe("active inventory", () => {
       defaultDocFee: 0,
     });
     expect(rows.map((r) => r.vin)).toEqual([VIN]);
+  });
+});
+
+describe("fee-inclusive website prices (Harte VDP ladder)", () => {
+  // The real page: Market Value $36,925, less an $11,944 discount, plus an $895
+  // conveyance fee, displayed as Sale Price $25,876. The feed says $24,981.
+  const HARTE = { website_sale_price: 25_876, advertised_price_before_doc: 24_981 };
+
+  it("reports no gap when the only difference is the fee the page added", () => {
+    // Before the fix this returned +895 -- on all 132 vehicles at once, because
+    // the only adjustment available was to ADD the fee, which moves the website
+    // price further from the feed rather than closer.
+    const fx = feeExclusiveEquivalent(25_876, HARTE);
+    expect(fx).toBe(24_981);
+    expect(reconcileGap(25_876, 24_981, 895, fx)).toEqual({ difference: 0, matchedWithDocFee: true });
+  });
+
+  it("still reports a real discrepancy of exactly the fee amount", () => {
+    // The tolerance was NOT widened, so a genuine $895 gap on top of the fee is
+    // still caught. A symmetric add-or-subtract heuristic would have hidden it.
+    const fx = feeExclusiveEquivalent(25_876, HARTE);
+    expect(reconcileGap(25_876, 24_086, 895, fx)).toEqual({ difference: 895, matchedWithDocFee: true });
+  });
+
+  it("declines to substitute when the page never added a fee", () => {
+    expect(feeExclusiveEquivalent(24_981, { website_sale_price: 24_981, advertised_price_before_doc: 24_981 })).toBeNull();
+  });
+
+  it("declines to substitute when the snapshot is not that page's total", () => {
+    // A stale snapshot, or a marketplace channel, must not be re-interpreted
+    // through a ladder parsed off the dealer's own site.
+    expect(feeExclusiveEquivalent(23_400, HARTE)).toBeNull();
+  });
+
+  it("declines to substitute when the ladder was never parsed", () => {
+    expect(feeExclusiveEquivalent(25_876, { website_sale_price: null, advertised_price_before_doc: null })).toBeNull();
+  });
+
+  it("falls back to the old heuristic for snapshots with no ladder", () => {
+    expect(reconcileGap(47_105, 48_000, 895, null)).toEqual({ difference: 0, matchedWithDocFee: true });
   });
 });
 

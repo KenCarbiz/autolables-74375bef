@@ -6,6 +6,7 @@ import { ShieldCheck, AlertTriangle, ExternalLink, Globe } from "lucide-react";
 import { toast } from "sonner";
 import CronStatusBadge from "@/components/admin/CronStatusBadge";
 import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
+import { feeExclusiveEquivalent, reconcileGap } from "@/components/compliance/complianceData";
 
 // PriceIntegrityPanel — reconciles each VIN's lot/sticker price
 // (vehicle_listings.price) against the latest advertised price per
@@ -16,7 +17,13 @@ import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
 
 const TOLERANCE = 1;
 
-interface Listing { vin: string; price: number | null; status: string }
+interface Listing {
+  vin: string;
+  price: number | null;
+  status: string;
+  website_sale_price: number | null;
+  advertised_price_before_doc: number | null;
+}
 interface AdRow { vin: string; advertised_price: number; source_channel: string; source_url: string | null; captured_at: string }
 interface VehicleSeedRow {
   vin: string;
@@ -127,14 +134,18 @@ export const PriceIntegrityPanel = () => {
     (async () => {
       setLoading(true);
       const [listingsRes, adsRes] = await Promise.all([
-        (supabase as any).from("vehicle_listings").select("vin, price, status").limit(1000),
+        (supabase as any).from("vehicle_listings").select("vin, price, status, website_sale_price, advertised_price_before_doc").limit(1000),
         (supabase as any).from("advertised_prices").select("vin, advertised_price, source_channel, source_url, captured_at").order("captured_at", { ascending: false }).limit(2000),
       ]);
       if (!active) return;
 
       const listings = ((listingsRes.data as Listing[]) || []).filter((l) => typeof l.price === "number");
       const lotByVin = new Map<string, number>();
-      for (const l of listings) lotByVin.set(l.vin.toUpperCase(), l.price as number);
+      const ladderByVin = new Map<string, Listing>();
+      for (const l of listings) {
+        lotByVin.set(l.vin.toUpperCase(), l.price as number);
+        ladderByVin.set(l.vin.toUpperCase(), l);
+      }
 
       // Latest advertised price per (vin, channel) — rows arrive newest-first.
       const latest = new Map<string, AdRow>();
@@ -156,12 +167,18 @@ export const PriceIntegrityPanel = () => {
         if (!a.advertised_price) continue;
         vinsWithAds.add(vin);
 
-        // The lot price may carry the doc fee while the website advertised
-        // price may not — accept an exact match OR an advertised+docFee match,
-        // and report the smaller (true) gap.
-        const rawDelta = a.advertised_price - lot;
-        const docDelta = a.advertised_price + docFee - lot;
-        const delta = Math.abs(docDelta) <= Math.abs(rawDelta) ? docDelta : rawDelta;
+        // Same reconciliation the Compliance Center uses, from one place: the
+        // lot price may carry the doc fee while the website price does not, or
+        // the website may show the fee-inclusive total while the lot price does
+        // not. The second case is exact — the crawl stored both halves of the
+        // ladder — so it is resolved by substitution rather than by tolerance.
+        const ladder = ladderByVin.get(vin);
+        const { difference: delta } = reconcileGap(
+          a.advertised_price,
+          lot,
+          docFee,
+          ladder ? feeExclusiveEquivalent(a.advertised_price, ladder) : null,
+        );
         if (Math.abs(delta) >= TOLERANCE) {
           found.push({ vin, lot, advertised: a.advertised_price, channel: a.source_channel, delta, url: a.source_url });
         } else {

@@ -35,6 +35,8 @@ export interface ListingRow {
   status: string;
   price: number | null;
   doc_fee: number | null;
+  website_sale_price: number | null;
+  advertised_price_before_doc: number | null;
   price_parse_status: string | null;
   price_last_verified_at: string | null;
   price_source_url: string | null;
@@ -272,11 +274,51 @@ const isSeedCapture = (s: PriceSnapshotRow): boolean => !s.advertised_price;
  * either an exact match or an advertised + doc-fee match and report whichever
  * gap is genuinely smaller, so a correctly-priced car is not flagged as drift.
  */
+// A website snapshot is the price exactly as the page displayed it, and some
+// dealer sites display the fee-INCLUSIVE total. Harte's VDPs show a Sale Price
+// of $25,876, which is $24,981 plus an $895 conveyance fee, against a feed
+// price of $24,981. Adding the doc fee to the website side -- the only
+// adjustment this made -- moves it further away, so the reconciler would report
+// "differs by $895" on all 132 vehicles the moment the crawl resumed.
+//
+// The fix is deliberately NOT a symmetric tolerance that also tries
+// websitePrice - docFee. That would close this gap by widening the blind spot
+// in both directions, and a real $895 discrepancy would then pass silently --
+// on the one number the FTC actually cares about.
+//
+// Instead the crawl already decomposes the ladder on the page and stores the
+// fee-exclusive figure as advertised_price_before_doc. When the snapshot is
+// recognisably that same page's fee-inclusive total, that figure is
+// substituted and the two sides are compared like with like, exactly, with no
+// adjustment and no widened tolerance. When it is not recognisable the old
+// heuristic still applies, so historic snapshots keep behaving as before.
+export const feeExclusiveEquivalent = (
+  snapshotPrice: number,
+  listing: Pick<ListingRow, "website_sale_price" | "advertised_price_before_doc">,
+): number | null => {
+  const sale = listing.website_sale_price;
+  const beforeDoc = listing.advertised_price_before_doc;
+  if (sale == null || beforeDoc == null) return null;
+  if (!Number.isFinite(sale) || !Number.isFinite(beforeDoc)) return null;
+  // Only when the fee was actually added on the page, and only when this
+  // snapshot is still the number that page was showing.
+  if (beforeDoc >= sale) return null;
+  if (Math.abs(snapshotPrice - sale) >= 1) return null;
+  return beforeDoc;
+};
+
 export const reconcileGap = (
   websitePrice: number,
   referencePrice: number,
   docFee: number,
+  feeExclusiveWebsitePrice?: number | null,
 ): { difference: number; matchedWithDocFee: boolean } => {
+  if (feeExclusiveWebsitePrice != null && Number.isFinite(feeExclusiveWebsitePrice)) {
+    return {
+      difference: feeExclusiveWebsitePrice - referencePrice,
+      matchedWithDocFee: feeExclusiveWebsitePrice !== websitePrice,
+    };
+  }
   const raw = websitePrice - referencePrice;
   const withFee = websitePrice + docFee - referencePrice;
   const useFee = docFee > 0 && Math.abs(withFee) < Math.abs(raw);
@@ -331,7 +373,16 @@ export const buildPriceRows = (args: {
     } else if (!website) {
       state = "awaiting_snapshot";
     } else {
-      const gap = reconcileGap(website.advertised_price, referencePrice, docFee);
+      // Normalise only when the reference is the feed price, which is
+      // fee-exclusive by definition. A dealer-confirmed manual capture may
+      // itself have been taken off the page, fee and all, so backing the fee
+      // out of one side of that comparison would invent a gap.
+      const gap = reconcileGap(
+        website.advertised_price,
+        referencePrice,
+        docFee,
+        confirmed ? null : feeExclusiveEquivalent(website.advertised_price, l),
+      );
       difference = gap.difference;
       matchedWithDocFee = gap.matchedWithDocFee;
       state = Math.abs(gap.difference) >= PRICE_TOLERANCE ? "differs" : "matched";

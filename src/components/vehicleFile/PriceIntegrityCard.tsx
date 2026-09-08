@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from "lucide-react";
 import { Card, EmptyNote, Pair, StatRow, btn, btnPrimary, fmtWhen } from "./primitives";
 import type { VehicleRow } from "./types";
+import { feeExclusiveEquivalent } from "@/components/compliance/complianceData";
 
 // Price integrity for one VIN.
 //
@@ -49,7 +50,15 @@ const AdvertisedPriceCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   for (const r of rows || []) if (!latestByChannel.has(r.source_channel)) latestByChannel.set(r.source_channel, r);
   const channels = [...latestByChannel.values()];
   const lot = vehicle.price;
-  const mismatches = lot == null ? [] : channels.filter((c) => Math.abs(c.advertised_price - lot) > TOLERANCE);
+  // A website channel may show the fee-inclusive total ($25,876 = $24,981 plus
+  // an $895 conveyance fee) while the lot price is fee-exclusive. The crawl
+  // stored both halves of that ladder, so the comparable figure is known
+  // exactly rather than guessed at with a wider tolerance.
+  const comparable = (c: AdRow): number =>
+    feeExclusiveEquivalent(c.advertised_price, vehicle) ?? c.advertised_price;
+  const mismatches = lot == null
+    ? []
+    : channels.filter((c) => Math.abs(comparable(c) - lot) > TOLERANCE);
 
   return (
     <Card title="Advertised price consistency" action={

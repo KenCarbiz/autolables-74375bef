@@ -64,6 +64,8 @@ export interface VehicleRow {
   mileage: number | null;
   condition: "new" | "used" | "cpo" | null;
   price: number | null;
+  website_sale_price: number | null;
+  advertised_price_before_doc: number | null;
   status: "draft" | "published" | "archived";
   published_at: string | null;
   view_count: number;
