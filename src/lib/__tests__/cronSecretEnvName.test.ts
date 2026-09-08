@@ -38,7 +38,6 @@ const cronEnvNamesIn = (src: string): string[] =>
 // only ever SHRINK: migrating one to the shared gate without deleting its entry
 // here fails the "no stale entries" test below.
 const NOT_YET_ON_SHARED_GATE = new Set([
-  "carfax-link-sweep",
   "send-ct-mvp-compliance-digests",
 ]);
 

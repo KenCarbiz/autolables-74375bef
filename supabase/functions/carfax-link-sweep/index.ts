@@ -19,6 +19,7 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { findCarfaxUrls, pickReportUrl } from "../_shared/carfaxLink.ts";
+import { isServiceOrCron } from "../_shared/supabase.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -30,15 +31,18 @@ const json = (b: unknown, s = 200) =>
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
     const body = await req.json().catch(() => ({}));
-    const auth = req.headers.get("authorization") || "";
-    const cron = req.headers.get("x-cron-secret") || "";
-    if (!auth.includes(SERVICE_KEY) && (!CRON_SECRET || cron !== CRON_SECRET)) {
+    // This used to read a private third name for the shared cron secret, which
+    // nothing sets, so the function could only ever be reached with the literal
+    // service key. A cron job cannot supply that: the bearer every schedule
+    // carries is the ANON key, which satisfies the gateway and authorizes
+    // nothing. That is why this sweep was never scheduled and CARFAX links sat
+    // at 1 of 132. isServiceOrCron reads the names that are actually set.
+    if (!isServiceOrCron(req)) {
       return json({ error: "forbidden" }, 403);
     }
 
