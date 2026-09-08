@@ -524,4 +524,4 @@ async function runSweep(admin: Admin, body: Record<string, unknown>): Promise<Re
     vehicles_examined: listings.length, franchised_tenants: franchiseBrands.size,
     targets: targets.length, planned: planned.length,
   });
-});
+}
