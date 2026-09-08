@@ -10967,6 +10967,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      resolve_vin_checkin: { Args: { p_vin: string }; Returns: Json }
       respond_service_clarification: {
         Args: { p_request_id: string; p_response: string }
         Returns: Json
