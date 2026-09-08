@@ -10315,6 +10315,10 @@ export type Database = {
         Returns: boolean
       }
       get_ready_nudge_payload: { Args: { p_tenant_id: string }; Returns: Json }
+      get_ready_template_items: {
+        Args: { p_condition: string; p_department: string; p_tenant_id: string }
+        Returns: Json
+      }
       get_recall_task_for_token: { Args: { _token: string }; Returns: Json }
       get_recon_estimate: { Args: { _approval_token: string }; Returns: Json }
       get_recon_for_token: { Args: { _token: string }; Returns: Json }
@@ -11270,6 +11274,7 @@ export type Database = {
         Returns: Json
       }
       sweep_getready_install_safety_net: { Args: never; Returns: number }
+      sweep_missing_get_ready: { Args: { _limit?: number }; Returns: Json }
       sweep_missing_intake_drafts: { Args: { _limit?: number }; Returns: Json }
       tenant_may_host_oem_documents: {
         Args: { _brand: string; _store_id?: string; _tenant_id: string }
