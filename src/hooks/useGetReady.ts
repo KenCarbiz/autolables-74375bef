@@ -395,10 +395,16 @@ export const useGetReady = (storeId: string) => {
     // "Send to Get-Ready" reported "it may already be in the pipeline" while
     // the accessories the caller asked for were silently dropped. Adding them
     // to the record that exists is what the caller meant.
-    const { data: existingRows } = await (supabase as any)
+    let existingQuery = (supabase as any)
       .from("get_ready_records")
       .select("*")
-      .in("vin", vinKeys(data.vin))
+      .in("vin", vinKeys(data.vin));
+    // storeId is the tenant id every caller passes (it is also what the
+    // addendum RPC below takes as p_tenant_id). Scoped explicitly rather than
+    // leaning on RLS, because a member of two dealerships would otherwise
+    // merge this vehicle into whichever tenant's record came back first.
+    if (storeId) existingQuery = existingQuery.eq("tenant_id", storeId);
+    const { data: existingRows } = await existingQuery
       .order("created_at", { ascending: false })
       .limit(1);
     const existing = ((existingRows as DbRow[]) || [])[0] || null;
