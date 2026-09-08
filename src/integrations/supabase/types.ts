@@ -444,6 +444,54 @@ export type Database = {
           },
         ]
       }
+      advertised_price_crawl_attempts: {
+        Row: {
+          attempts: number
+          detail: string | null
+          first_attempt_at: string
+          http_status: number | null
+          id: string
+          last_attempt_at: string
+          outcome: string
+          render_status: number | null
+          resolved_at: string | null
+          source_label: string
+          source_url: string | null
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          attempts?: number
+          detail?: string | null
+          first_attempt_at?: string
+          http_status?: number | null
+          id?: string
+          last_attempt_at?: string
+          outcome: string
+          render_status?: number | null
+          resolved_at?: string | null
+          source_label?: string
+          source_url?: string | null
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          attempts?: number
+          detail?: string | null
+          first_attempt_at?: string
+          http_status?: number | null
+          id?: string
+          last_attempt_at?: string
+          outcome?: string
+          render_status?: number | null
+          resolved_at?: string | null
+          source_label?: string
+          source_url?: string | null
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: []
+      }
       advertised_prices: {
         Row: {
           advertised_price: number
@@ -10095,6 +10143,17 @@ export type Database = {
         Args: { _patch: Json; _tenant_id: string }
         Returns: undefined
       }
+      advertised_price_crawl_health: {
+        Args: { _tenant_id?: string }
+        Returns: {
+          newest_attempt: string
+          oldest_failure: string
+          outcome: string
+          sample_detail: string
+          total_attempts: number
+          vins: number
+        }[]
+      }
       advertised_price_crawl_queue: {
         Args: { _limit?: number; _tenant_id?: string }
         Returns: {
@@ -11010,6 +11069,19 @@ export type Database = {
           _details?: Json
           _event: string
           _signing_token: string
+        }
+        Returns: undefined
+      }
+      record_advertised_price_crawl_attempt: {
+        Args: {
+          _detail?: string
+          _http_status?: number
+          _outcome: string
+          _render_status?: number
+          _source_label: string
+          _source_url: string
+          _tenant_id: string
+          _vin: string
         }
         Returns: undefined
       }
