@@ -638,6 +638,60 @@ const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 
+/**
+ * Name the failure that actually happened.
+ *
+ * This crawl stopped producing prices on 2026-08-24 and every attempt for the
+ * next fifteen days was recorded as "bot_challenge" -- the dealer's site is
+ * blocking us. It was not. Firecrawl was answering HTTP 402 "Insufficient
+ * credits to perform this request": the account had run dry. The real message
+ * was sitting in render_error the whole time and no operator surface read it,
+ * so a billing problem wore a bot-wall's name for two weeks and the fix
+ * (top up the account) was never obvious.
+ *
+ * "bot_challenge" now means only what it says: we reached the page and the
+ * page refused us, with the renderer available and having genuinely tried.
+ */
+function classifyCrawlOutcome(args: {
+  captured: boolean;
+  reason: string | null;
+  cheapStatus: number | null;
+  renderAttempted: boolean;
+  renderStatus: number | null;
+  renderError: string | null;
+}): { outcome: string; detail: string | null } {
+  const { captured, reason, cheapStatus, renderAttempted, renderStatus, renderError } = args;
+  if (captured) return { outcome: "captured", detail: null };
+
+  const err = (renderError || "").toLowerCase();
+
+  // Renderer problems are OUR problems, and each has a different fix: pay,
+  // rotate the key, slow down, configure it. None of them is the dealer.
+  if (renderStatus === 402 || err.includes("insufficient credits") || err.includes("upgrade your plan")) {
+    return { outcome: "render_credits_exhausted", detail: renderError || "Firecrawl reported insufficient credits" };
+  }
+  if (renderStatus === 401 || renderStatus === 403) {
+    return { outcome: "render_auth_failed", detail: renderError || `Firecrawl rejected the key (${renderStatus})` };
+  }
+  if (renderStatus === 429) {
+    return { outcome: "render_rate_limited", detail: renderError || "Firecrawl rate limit" };
+  }
+  if (!FIRECRAWL_KEY) {
+    return { outcome: "render_unconfigured", detail: "No Firecrawl key is set, so a walled page cannot be rendered" };
+  }
+  if (renderAttempted && renderStatus == null) {
+    return { outcome: "render_unreachable", detail: renderError || "Firecrawl did not respond" };
+  }
+
+  // Only now is the dealer's site a fair thing to blame.
+  if (reason === "bot_challenge") {
+    return renderAttempted
+      ? { outcome: "bot_challenge", detail: `Site refused the request (HTTP ${cheapStatus ?? "?"}) and the rendered page was also refused` }
+      : { outcome: "blocked_no_render_budget", detail: `Site refused the request (HTTP ${cheapStatus ?? "?"}); no render budget left this run` };
+  }
+  return { outcome: reason || "no_price_extracted", detail: cheapStatus ? `HTTP ${cheapStatus}` : null };
+}
+
 interface RenderResult {
   html: string;
   screenshotUrl: string | null;
@@ -1107,6 +1161,33 @@ serve(async (req) => {
           }
         }
       }
+
+      // Ledger every attempt, won or lost. advertised_prices records only
+      // successes, so before this a total outage looked exactly like a quiet
+      // market: fifteen days of failure left nothing to query and the cause
+      // had to be found by invoking this function's test mode by hand.
+      // Wrapped and best-effort — a ledger that can fail a price run would be
+      // worse than no ledger.
+      try {
+        const cls = classifyCrawlOutcome({
+          captured: result.price != null,
+          reason: result.reason,
+          cheapStatus,
+          renderAttempted: renderStatus != null || renderError != null,
+          renderStatus,
+          renderError,
+        });
+        await admin.rpc("record_advertised_price_crawl_attempt", {
+          _tenant_id: row.tenant_id,
+          _vin: row.vin,
+          _source_label: String(row.source_label || "website"),
+          _source_url: fetchUrl,
+          _outcome: cls.outcome,
+          _http_status: cheapStatus,
+          _render_status: renderStatus,
+          _detail: cls.detail,
+        });
+      } catch { /* never fail a price run over telemetry */ }
 
       // Capture the dealer's hero photo for the vehicle file — isolated so a
       // not-yet-migrated hero_image_url column can never affect price logic.
