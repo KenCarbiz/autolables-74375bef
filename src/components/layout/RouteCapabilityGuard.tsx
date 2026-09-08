@@ -25,6 +25,10 @@ const RULES: { prefix: string; cap: DealerCapability }[] = [
   { prefix: "/add-inventory", cap: "can_edit_inventory" },
   { prefix: "/queue", cap: "can_view_work_queue" },
   { prefix: "/leads", cap: "can_view_leads" },
+  // /customers is the renamed /leads: same <Leads /> component, same customer
+  // PII. Without its own entry the rename handed every signed-in role -- an
+  // external vendor included -- a deep link past the /leads rule.
+  { prefix: "/customers", cap: "can_view_leads" },
   { prefix: "/titles", cap: "can_view_compliance" },
 ];
 

@@ -19,7 +19,7 @@ import { validateStickerPacketMatch, type PacketContext } from "@/lib/stickerStu
 import StickerPacketReviewPanel from "@/components/sticker/StickerPacketReviewPanel";
 import { FileCheck2, QrCode as QrIcon, AlertTriangle, Search } from "lucide-react";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
-import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode } from "@/lib/stickerStudio/templates";
+import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode, type StudioTemplate } from "@/lib/stickerStudio/templates";
 import { resolvePriceLabel } from "@/lib/priceModel";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useDealerPrintSettings } from "@/lib/stickerStudio/useDealerPrintSettings";
@@ -71,11 +71,9 @@ const BADGE_TONE = {
   none: "border-border bg-muted/50 text-muted-foreground",
 } as const;
 
-const StickerStudioGenerator = () => {
+const StickerStudioGeneratorInner = ({ baseTemplate }: { baseTemplate: StudioTemplate }) => {
   const { templateId = "" } = useParams();
   const navigate = useNavigate();
-  const { byId } = useStickerCatalog();
-  const baseTemplate = byId(templateId) || getStudioTemplate(templateId);
   const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
   const { tenant, stores, currentStore } = useTenant();
   const { user } = useAuth();
@@ -281,14 +279,6 @@ const StickerStudioGenerator = () => {
     qrRequired: !!template?.config.styleTags.includes("Compliance"),
   });
 
-  if (!template) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-sm text-muted-foreground">Template not found.</p>
-        <button onClick={() => navigate("/sticker-studio")} className="mt-3 text-sm font-semibold text-blue-600">Back to Sticker Studio</button>
-      </div>
-    );
-  }
   const cfg = template.config;
   const setField = (k: keyof StickerData, val: string) => setData((d) => ({ ...d, [k]: val }));
 
@@ -1130,5 +1120,35 @@ const CfgCard = ({ title, children }: { title: string; children: React.ReactNode
     {children}
   </div>
 );
+
+// The template lookup has to happen OUTSIDE the editor. useStickerCatalog seeds
+// the built-in registry and merges the dealer's sticker_templates rows when they
+// arrive, so a dealer-only template is undefined on the first render and defined
+// on the next. With the "not found" branch inside the editor that flip changed
+// the hook count mid-mount and React tore the page down (#310). Resolving here
+// means the editor only ever mounts with a template in hand.
+const StickerStudioGenerator = () => {
+  const { templateId = "" } = useParams();
+  const navigate = useNavigate();
+  const { byId, loading } = useStickerCatalog();
+  const baseTemplate = byId(templateId) || getStudioTemplate(templateId);
+
+  if (!baseTemplate) {
+    if (loading) {
+      return (
+        <div className="p-8 flex justify-center">
+          <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      );
+    }
+    return (
+      <div className="p-8 text-center">
+        <p className="text-sm text-muted-foreground">Template not found.</p>
+        <button onClick={() => navigate("/sticker-studio")} className="mt-3 text-sm font-semibold text-blue-600">Back to Sticker Studio</button>
+      </div>
+    );
+  }
+  return <StickerStudioGeneratorInner baseTemplate={baseTemplate} />;
+};
 
 export default StickerStudioGenerator;

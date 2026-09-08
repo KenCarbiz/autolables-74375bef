@@ -40,7 +40,6 @@ const AdminLayout = () => (
   </AdminGate>
 );
 
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ProcessDashboard = lazy(() => import("./pages/ProcessDashboard"));
 const RoleHome = lazy(() => import("./pages/RoleHome"));
 const GmHome = lazy(() => import("./pages/GmHome"));
@@ -163,12 +162,10 @@ const SaveCarInventory = lazy(() => import("./pages/SaveCarInventory"));
 const DealSigning = lazy(() => import("./pages/DealSigning"));
 const PublicListing = lazy(() => import("./pages/PublicListing"));
 const VehiclePassportV2Detail = lazy(() => import("./pages/VehiclePassportV2Detail"));
-const VehiclePassportV3 = lazy(() => import("./pages/VehiclePassportV3"));
 const VehiclePassportRoute = lazy(() => import("./pages/VehiclePassportRoute"));
 // Draft next-version passport. Lazy + noindex; never linked from the customer
 // passport, and /v/:slug is unaffected by anything it does.
 const VehiclePassportNext = lazy(() => import("./pages/VehiclePassportNext"));
-const VehiclePassportGoverned = lazy(() => import("./pages/VehiclePassportGoverned"));
 const VehiclePassportVerification = lazy(() => import("./pages/VehiclePassportVerification"));
 const VehiclePassportDocuments = lazy(() => import("./pages/VehiclePassportDocuments"));
 const VehiclePassportGreatBuy = lazy(() => import("./pages/VehiclePassportGreatBuy"));

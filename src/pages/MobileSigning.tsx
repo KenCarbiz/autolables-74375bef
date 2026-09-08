@@ -449,6 +449,9 @@ const MobileSigning = () => {
       // the builder, etc. Surface the top failing rules and stop.
       const top = redTeamFindings.filter((f) => f.severity === "fail").slice(0, 2).map((f) => f.rule).join(" \u2022 ");
       toast.error(`Blocked: ${top}${redTeamSummary.fail > 2 ? " \u2026" : ""}`);
+      // Without this the submit button stays disabled forever: the shopper
+      // cannot retry after the dealer clears the block without reloading.
+      setSubmitting(false);
       return;
     }
 
