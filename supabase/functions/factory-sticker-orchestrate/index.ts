@@ -1374,7 +1374,7 @@ serve(async (req) => {
       // re-check the whole inventory.
       const onlyMissing = body.only_missing !== false;
       const { data: listings } = await admin.from("vehicle_listings")
-        .select("*").eq("tenant_id", tenantId).eq("status", "published")
+        .select("*").eq("tenant_id", tenantId).neq("status", "archived")
         .order("updated_at", { ascending: false }).limit(500);
       let rows = (listings || []) as Array<Record<string, unknown>>;
 
@@ -1436,9 +1436,13 @@ serve(async (req) => {
       const includeReview = body.include_review === true;
       const limit = Math.min(Math.max(Number(body.limit) || 500, 1), SWEEP_MAX_ROWS);
 
+      // NOT `status = 'published'`. A vehicle held back by the recall gate or
+      // the prep sign-off is exactly the one whose sticker the dealership needs
+      // ready for the moment it clears; filtering on published made every such
+      // vehicle permanently invisible to this sweep.
       let listingQuery = admin.from("vehicle_listings")
         .select("id, tenant_id, vin")
-        .eq("status", "published")
+        .neq("status", "archived")
         .order("updated_at", { ascending: false })
         .limit(limit);
       if (tenantId) listingQuery = listingQuery.eq("tenant_id", tenantId);

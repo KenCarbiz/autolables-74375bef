@@ -192,7 +192,15 @@ export function buildVinPackageItems(s: VinPackageSources): PackageItem[] {
     docId: s.addendum?.id as string | undefined,
   });
 
-  const win = latestOfType("window");
+  // A new vehicle's window sticker IS the OEM Monroney, filed as
+  // `factory_sticker` by factory-sticker-orchestrate; `window` is the
+  // used-vehicle family and create_draft_window_sticker never files one for a
+  // new car (families.ts marks it not_applicable). Reading only `window` here
+  // reported "Not started" on every new vehicle in the fleet, including the
+  // ones already carrying a published Monroney.
+  const win = used
+    ? latestOfType("window")
+    : latestOfType("factory_sticker") || latestOfType("window");
   items.push({
     key: "window_sticker", label: used ? "Used-Car Sticker" : "Window Sticker",
     ...docPackageStatus(win),

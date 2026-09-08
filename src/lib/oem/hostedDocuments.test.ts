@@ -19,7 +19,7 @@ describe("a stored copy cannot exist without a decision that authorised it", () 
 
   it("claims before it fetches", () => {
     const claimAt = fn.indexOf("claim_oem_document_hosting");
-    const fetchAt = fn.indexOf("await fetch(sourceUrl");
+    const fetchAt = fn.indexOf("await fetch(req.sourceUrl");
     expect(claimAt).toBeGreaterThan(-1);
     expect(fetchAt).toBeGreaterThan(-1);
     expect(claimAt).toBeLessThan(fetchAt);
@@ -42,7 +42,7 @@ describe("a stored copy cannot exist without a decision that authorised it", () 
 
 describe("storage is tenant-scoped, so possession never becomes permission", () => {
   it("writes under the tenant's own folder", () => {
-    expect(fn).toMatch(/const path = `\$\{tenantId\}\//);
+    expect(fn).toMatch(/const path = `\$\{req\.tenantId\}\//);
   });
 
   it("scopes the bucket read policy to the tenant's folder", () => {

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
+import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken, queueDescriptionRefresh } from "../_shared/intake-autoprovision.ts";
 import { newCallMeter, recordCall, estimateCost } from "../_shared/mcCost.ts";
 import {
   classifyListing, isStrictRooftop, normStreet, normZip, prunePreflight,
@@ -596,7 +596,7 @@ serve(async (req) => {
     let tenantSeen = 0, tenantNew = 0, tenantPrices = 0;
     let firstWriteErr: string | null = null;
     const liveVins = new Set<string>();
-    const updatedListingIds: string[] = [];
+    const updatedListingIds: Array<{ id: string; vin: string }> = [];
     const runStartedAt = new Date().toISOString();
 
     // ── Phase 2.3 reconciliation / change-detection state ─────────────────
@@ -1018,7 +1018,7 @@ serve(async (req) => {
           const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
           if (!error) {
             listingsUpserted++;
-            updatedListingIds.push(vl.id);
+            updatedListingIds.push({ id: vl.id, vin });
             // A VIN that left the feed is retired, not deleted, so a car
             // that comes back is an UPDATE now where it used to be a fresh
             // INSERT. Without this it would keep the archived status it was
@@ -1565,24 +1565,18 @@ serve(async (req) => {
         }
       }
 
-      // Description Intelligence for UPDATED vehicles (new inserts are covered by
-      // autoPreload above). Fire-and-forget by design — a description failure must
-      // never block or slow inventory ingestion. The orchestrator is idempotent
-      // on (tenant, vehicle, source_data_version, config_version), and anything
-      // missed here is picked up by the nightly reconcile sweep.
-      for (const vehicleId of updatedListingIds.slice(0, 200)) {
-        try {
-          fetch(`${supabaseUrl}/functions/v1/description-orchestrate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-            body: JSON.stringify({ action: "orchestrate", tenant_id: cfg.tenant_id, vehicle_id: vehicleId, reason: "feed_update" }),
-            signal: AbortSignal.timeout(20000),
-          }).catch(() => { /* best-effort */ });
-        } catch { /* description best-effort */ }
-      }
+      // Description Intelligence for UPDATED vehicles (new inserts are covered
+      // by autoPreload above). Still fire-and-forget — a description failure
+      // must never block or slow inventory ingestion — but through the paced,
+      // recorded artifact queue that EdgeRuntime.waitUntil drains, and only for
+      // vehicles that genuinely need a run. See queueDescriptionRefresh for
+      // what the unpaced, unrecorded 200-wide fetch loop here used to cost.
+      const descriptionRefresh = await queueDescriptionRefresh(
+        admin, supabaseUrl, serviceKey, cfg.tenant_id, updatedListingIds,
+      );
 
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, provider_refused: providerRefused || null, prune_skipped: pruneSkipped,
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, description_refresh: descriptionRefresh, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, provider_refused: providerRefused || null, prune_skipped: pruneSkipped,
         segments: { new: { accepted: segAccepted.new, reported: segReported.new, prior: priorSegVins.new.size, skipped: segSkipped.new }, rest: { accepted: segAccepted.rest, reported: segReported.rest, prior: priorSegVins.rest.size, skipped: segSkipped.rest } }, pinned: cleanRun,
         new_units: { primary_feed: primaryNewUnits, total: newTypeSeen }, supplemental_new: supplementalNew,
         // Operator-only. Public list prices, so an estimate rather than a bill.

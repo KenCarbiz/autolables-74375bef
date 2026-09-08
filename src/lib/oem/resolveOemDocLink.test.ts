@@ -154,7 +154,11 @@ describe("ingest keeps the dealer's own copy", () => {
       harvester.indexOf("Ensure the passport's Documents page"),
     );
     expect(body).toMatch(/maxRetries:\s*0/);       // a retry re-downloads tens of MB
-    expect(body).toMatch(/catch\s*\{[^}]*\}/);      // swallows, per the surrounding doctrine
+    // Swallows, per the surrounding doctrine: it catches, and nothing inside
+    // it rethrows. Whether the catch also files a trace is the caller's
+    // business — what matters here is that ingest never sees the throw.
+    expect(body).toMatch(/\bcatch\s*(\(\w+\)\s*)?\{/);
+    expect(body).not.toMatch(/\bthrow\b/);
   });
 
   it("also back-fills inventory that was already on the lot", () => {
@@ -186,7 +190,7 @@ describe("ingest keeps the dealer's own copy", () => {
     // A manufacturer bot-wall answers 200 with HTML; storing that as "the
     // owner's manual" is worse than storing nothing.
     expect(store).toMatch(/0x25 && bytes\[1\] === 0x50/);
-    expect(store).toMatch(/const path = `\$\{tenantId\}\//);
+    expect(store).toMatch(/const path = `\$\{req\.tenantId\}\//);
   });
 });
 

@@ -126,3 +126,54 @@ export async function hasStoredOemDocCopy(
     return false;
   }
 }
+
+// ── Why this vehicle has, or has not, got a stored copy ───────────────
+
+/**
+ * The copy ledger's last word on this vehicle's document.
+ *
+ * oem_document_copy_attempts holds one row per (tenant, brand, model,
+ * model-year, kind), written by oem-document-store on every terminal outcome —
+ * including the ones that stored nothing. Reading it is what turns "no copy
+ * here" from an unexplained blank into a stated reason with a retry behind it.
+ *
+ * Null on any error or miss: this only enriches a sentence in the Vehicle
+ * File, and an unreadable ledger must not take the Documents tab down.
+ */
+export interface OemDocCopyStatus {
+  outcome: string;
+  attempts: number;
+  detail: string | null;
+  resolved: boolean;
+  lastAttemptAt: string | null;
+}
+
+export async function fetchOemDocCopyStatus(
+  kind: OemDocKind,
+  tenantId: string | null | undefined,
+  ymm: string | null | undefined,
+): Promise<OemDocCopyStatus | null> {
+  const key = oemDocKeyFromYmm(ymm);
+  if (!key || !tenantId) return null;
+  try {
+    const { data, error } = await supabase
+      .from("oem_document_copy_attempts")
+      .select("outcome, attempts, detail, resolved_at, last_attempt_at")
+      .eq("tenant_id", tenantId)
+      .eq("document_kind", kind)
+      .eq("brand_key", key.make.trim().toLowerCase())
+      .eq("model_key", key.model.trim().toLowerCase())
+      .eq("year_key", key.year ?? 0)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      outcome: String(data.outcome),
+      attempts: Number(data.attempts) || 0,
+      detail: data.detail ?? null,
+      resolved: !!data.resolved_at,
+      lastAttemptAt: data.last_attempt_at ?? null,
+    };
+  } catch {
+    return null;
+  }
+}

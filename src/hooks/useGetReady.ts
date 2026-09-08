@@ -301,9 +301,14 @@ export const useGetReady = (storeId: string) => {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Only records the 20260907160000 classification calls current (or ones
+    // created before it ran). Without this the tracker listed all 196 rows —
+    // including 106 vehicles archived months ago — and the work still to do on
+    // the lot today was unfindable inside its own queue.
     const { data } = await (supabase as any)
       .from("get_ready_records")
       .select("*")
+      .or("reconciliation_state.is.null,reconciliation_state.eq.current")
       .order("updated_at", { ascending: false });
     const all = ((data as DbRow[]) || []).map(fromDb);
     setRecords(storeId ? all.filter(r => r.storeId === storeId) : all);
@@ -332,10 +337,13 @@ export const useGetReady = (storeId: string) => {
 
     // Build default checklist — same logic the localStorage
     // version used so saved records read identically across the
-    // migration boundary.
-    const items: GetReadyItem[] = [];
+    // migration boundary. `requested` is what THIS call adds (accessories,
+    // internal service lines, the inspection); `base` is the starter checklist
+    // a brand-new record gets. Only `requested` is merged into a record that
+    // already exists — ingest seeded that one with a fuller detail list.
+    const requested: GetReadyItem[] = [];
     data.accessoriesToInstall.forEach(acc => {
-      items.push({
+      requested.push({
         id: crypto.randomUUID(),
         label: `Install: ${acc.productName}`,
         category: "accessory",
@@ -348,7 +356,7 @@ export const useGetReady = (storeId: string) => {
     });
     (data.serviceItems || []).forEach(s => {
       if (!s.label.trim()) return;
-      items.push({
+      requested.push({
         id: crypto.randomUUID(),
         label: s.label.trim(),
         category: "service",
@@ -362,7 +370,7 @@ export const useGetReady = (storeId: string) => {
       });
     });
     if (data.inspectionRequired) {
-      items.push({
+      requested.push({
         id: crypto.randomUUID(),
         label: `Safety Inspection${data.inspectionFormType ? ` (${data.inspectionFormType})` : ""}`,
         category: "inspection",
@@ -370,16 +378,68 @@ export const useGetReady = (storeId: string) => {
         status: "pending",
       });
     }
-    items.push(
+    const base: GetReadyItem[] = [
       { id: crypto.randomUUID(), label: "Detail — interior", category: "detail", assignedTo: "", status: "pending" },
       { id: crypto.randomUUID(), label: "Detail — exterior wash", category: "detail", assignedTo: "", status: "pending" },
       { id: crypto.randomUUID(), label: "Photos for listing", category: "photo", assignedTo: "", status: "pending" },
-    );
+    ];
 
     const accessories: AccessoryToInstall[] = data.accessoriesToInstall.map(a => ({
       ...a,
       installed: false,
     }));
+
+    // One record per (tenant, VIN). Ingest now seeds one for EVERY vehicle
+    // (create_draft_get_ready), and uniq_get_ready_tenant_store_vin rejects a
+    // second — so an unconditional insert failed here and InventoryModern's
+    // "Send to Get-Ready" reported "it may already be in the pipeline" while
+    // the accessories the caller asked for were silently dropped. Adding them
+    // to the record that exists is what the caller meant.
+    const { data: existingRows } = await (supabase as any)
+      .from("get_ready_records")
+      .select("*")
+      .in("vin", vinKeys(data.vin))
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const existing = ((existingRows as DbRow[]) || [])[0] || null;
+
+    if (existing) {
+      const prior: GetReadyItem[] = (existing.items || []).filter(Boolean);
+      const priorLabels = new Set(prior.map(i => (i.label || "").trim().toLowerCase()));
+      const hasInspection = prior.some(i => i.category === "inspection");
+      const added = requested.filter(i =>
+        !priorLabels.has((i.label || "").trim().toLowerCase()) &&
+        !(i.category === "inspection" && hasInspection));
+      const priorAccessories: AccessoryToInstall[] = (existing.accessories_to_install || []).filter(Boolean);
+      const priorProducts = new Set(priorAccessories.map(a => a.productId));
+      const mergedAccessories = [...priorAccessories, ...accessories.filter(a => !priorProducts.has(a.productId))];
+      const { data: merged, error: mergeError } = await (supabase as any)
+        .from("get_ready_records")
+        .update({
+          items: [...prior, ...added],
+          accessories_to_install: mergedAccessories,
+          stock_number: existing.stock_number || data.stockNumber,
+          ymm: existing.ymm || data.ymm,
+          acquired_date: existing.acquired_date || data.acquiredDate || null,
+          get_ready_start_date: existing.get_ready_start_date || now,
+          inspection_required: existing.inspection_required || data.inspectionRequired,
+          inspection_form_type: existing.inspection_form_type || data.inspectionFormType || null,
+          assigned_technician: existing.assigned_technician || data.assignedTechnician || "",
+          service_advisor: existing.service_advisor || data.serviceAdvisor || "",
+          ro_number: existing.ro_number || data.roNumber || "",
+        })
+        .eq("id", existing.id)
+        .select("*")
+        .single();
+      if (mergeError || !merged) return null;
+      for (const acc of data.accessoriesToInstall) {
+        try {
+          await (supabase as any).rpc("getready_upsert_addendum_line", { p_tenant_id: storeId, p_vin: vinKey(data.vin), p_product_id: acc.productId });
+        } catch { /* addendum sync best-effort */ }
+      }
+      await load();
+      return fromDb(merged as DbRow);
+    }
 
     const { data: row, error } = await (supabase as any)
       .from("get_ready_records")
@@ -396,7 +456,7 @@ export const useGetReady = (storeId: string) => {
         condition: data.condition,
         acquired_date: data.acquiredDate || null,
         get_ready_start_date: now,
-        items,
+        items: [...requested, ...base],
         accessories_to_install: accessories,
         inspection_required: data.inspectionRequired,
         inspection_form_type: data.inspectionFormType || null,
@@ -405,6 +465,7 @@ export const useGetReady = (storeId: string) => {
         ro_number: data.roNumber || "",
         status: "pending",
         created_by: data.createdBy,
+        reconciliation_state: "current",
       })
       .select("*")
       .single();

@@ -3,11 +3,14 @@ import {
   artifactPostsIdle,
   setArtifactPostGapMs,
   autoPreload,
+  descriptionRefreshReason,
   ensureComplianceDrafts,
   ensureOemDocLinks,
   ensureReadyToken,
+  queueDescriptionRefresh,
   recommendedActionFor,
   recordArtifactFailure,
+  resetArtifactDispatchBudget,
   resetOemHarvestDedupe,
 } from "./intake-autoprovision";
 import { oemDocKeyFromYmm, oemDocKeyString, resolveOemMake } from "./oemDocKey";
@@ -211,7 +214,7 @@ describe("ensureReadyToken", () => {
   });
 });
 
-beforeEach(() => { setArtifactPostGapMs(0); resetOemHarvestDedupe(); });
+beforeEach(() => { setArtifactPostGapMs(0); resetOemHarvestDedupe(); resetArtifactDispatchBudget(); });
 
 describe("ensureComplianceDrafts", () => {
   it("calls the four VIN-idempotent draft RPCs", async () => {
@@ -727,5 +730,163 @@ describe("ensureOemDocLinks", () => {
     await expect(
       ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM),
     ).resolves.toBeUndefined();
+  });
+});
+
+// ── The durable trace ──────────────────────────────────────────────────
+//
+// vehicle_exceptions records failures only, so "no exception" read as success
+// for a step that succeeded AND for a step that never ran. The per-VIN ledger
+// (20260729010000_vehicle_ingest_ledger.sql) was built to close that and had
+// no producer: the table, the RPC and the reader shipped, the writer did not.
+
+type RpcCall = { fn: string; args: Record<string, unknown> };
+const ledgerRows = (calls: RpcCall[]) =>
+  calls.filter((c) => c.fn === "record_ingest_step")
+    .map((c) => ({
+      step: String(c.args.p_step),
+      status: String(c.args.p_status),
+      reason: String(c.args.p_reason),
+      vehicleId: c.args.p_vehicle_id,
+    }));
+
+const RENDER = { supabaseUrl: "https://x.supabase.co", serviceKey: "svc" };
+
+describe("every artifact dispatch leaves a queryable row", () => {
+  it("records a SUCCESS, not just a failure", async () => {
+    globalThis.fetch = okFetch() as unknown as typeof fetch;
+    const { admin, rpcCalls } = makeAdmin();
+    await autoPreload(admin, "https://x.supabase.co", "svc", {
+      tenantId: "t1", vin: "VIN123", ymm: null, listingId: "l1",
+    });
+    await artifactPostsIdle();
+    const rows = ledgerRows(rpcCalls);
+    // Silence meaning both "fine" and "never happened" is the defect; a
+    // success has to be written down for absence to mean anything.
+    const byStep = new Map(rows.map((r) => [r.step, r]));
+    for (const step of ["form_pdfs", "oem_window_sticker", "vin_decode", "ingest_orchestrate", "description", "factory_sticker"]) {
+      expect(byStep.get(step)?.status).toBe("succeeded");
+    }
+    expect(byStep.get("description")?.vehicleId).toBe("l1");
+  });
+
+  it("records a refusal with the function that refused and whether anything retries it", async () => {
+    globalThis.fetch = vi.fn(async () => ({ ok: false, status: 500, text: async () => "boom" })) as unknown as typeof fetch;
+    const { admin, rpcCalls } = makeAdmin();
+    await autoPreload(admin, "https://x.supabase.co", "svc", {
+      tenantId: "t1", vin: "VIN123", ymm: null, listingId: null,
+    });
+    await artifactPostsIdle();
+    const forms = ledgerRows(rpcCalls).find((r) => r.step === "form_pdfs");
+    expect(forms?.status).toBe("failed");
+    expect(forms?.reason).toContain("generate-vehicle-forms");
+    expect(forms?.reason).toContain("No nightly sweep re-runs form_pdfs");
+  });
+
+  it("parks a throttle instead of calling it a failed document", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false, status: 429,
+      headers: { get: () => "0" },
+      text: async () => "Rate limit exceeded for function.",
+    })) as unknown as typeof fetch;
+    const { admin, rpcCalls } = makeAdmin();
+    await autoPreload(admin, "https://x.supabase.co", "svc", {
+      tenantId: "t1", vin: "VIN123", ymm: null, listingId: null,
+    });
+    await artifactPostsIdle();
+    const forms = ledgerRows(rpcCalls).find((r) => r.step === "form_pdfs");
+    expect(forms?.status).toBe("parked");
+    expect(forms?.reason).toContain("rate_limited");
+  });
+
+  it("records what it declined to dispatch once the per-run cap is reached", async () => {
+    // A serial 250ms queue is a duration, not a list: everything past what the
+    // isolate can drain used to be discarded with no invocation, no exception
+    // and no ledger row — the exact shape of a gap that never closes.
+    globalThis.fetch = okFetch() as unknown as typeof fetch;
+    const { admin, rpcCalls, state } = makeAdmin();
+    for (let i = 0; i < 60; i++) {
+      await autoPreload(admin, "https://x.supabase.co", "svc", {
+        tenantId: "t1", vin: `VIN${i}`, ymm: null, listingId: `l${i}`,
+      });
+    }
+    await artifactPostsIdle();
+    const parked = ledgerRows(rpcCalls).filter((r) => r.reason.includes("per-run cap"));
+    expect(parked.length).toBeGreaterThan(0);
+    expect(parked.every((r) => r.status === "parked")).toBe(true);
+    // An artifact nothing retries also reaches the queue a human works.
+    const deferred = state("vehicle_exceptions").inserts
+      .filter((row) => String(row.explanation).includes("artifact dispatches before this call was made"));
+    expect(deferred.length).toBeGreaterThan(0);
+  });
+
+  it("says why it re-fired nothing when it could not read the vehicle's artifact state", async () => {
+    globalThis.fetch = okFetch() as unknown as typeof fetch;
+    const { admin, state, rpcCalls } = makeAdmin();
+    state("vehicle_listings").maybeSingleResults.push({ data: { id: "l1", condition: "new" } });
+    state("factory_sticker_records").maybeSingleResults.push({
+      data: null, error: { message: "statement timeout" },
+    } as unknown as { data: unknown });
+    await ensureComplianceDrafts(admin, "t1", "VIN123", RENDER);
+    await artifactPostsIdle();
+    const row = ledgerRows(rpcCalls).find((r) => r.step === "factory_sticker");
+    expect(row?.status).toBe("parked");
+    expect(row?.reason).toContain("statement timeout");
+    expect(row?.reason).toContain("could not read");
+  });
+});
+
+describe("queueDescriptionRefresh", () => {
+  const veh = (n: number) => ({ id: `l${n}`, vin: `VIN${n}` });
+
+  it("verifies an existing description instead of rebuilding it", async () => {
+    // The loop this replaces POSTed for EVERY updated listing — 134 unawaited
+    // fetches in one tick, which is the burst the platform throttles, spent
+    // almost entirely on vehicles the orchestrator would answer "unchanged".
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    state("description_cases").listResults.push({
+      data: [
+        { vehicle_id: "l2", status: "READY", updated_at: new Date().toISOString() },
+        { vehicle_id: "l3", status: "FAILED_RETRYABLE", updated_at: new Date().toISOString() },
+      ],
+    });
+    const out = await queueDescriptionRefresh(
+      admin, "https://x.supabase.co", "svc", "t1", [veh(1), veh(2), veh(3)]);
+    await artifactPostsIdle();
+    expect(out).toEqual({ dispatched: 2, skipped: 1, undecidable: 0 });
+    expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
+      "https://x.supabase.co/functions/v1/description-orchestrate",
+      "https://x.supabase.co/functions/v1/description-orchestrate",
+    ]);
+  });
+
+  it("dispatches nothing it cannot decide about, and counts what it could not read", async () => {
+    // A rejected read looks exactly like "no cases exist", which would re-fire
+    // the whole lot and throttle away the calls that mattered.
+    const fetchMock = okFetch();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { admin, state } = makeAdmin();
+    state("description_cases").listResults.push({ data: null, error: { message: "URL too long" } });
+    const out = await queueDescriptionRefresh(
+      admin, "https://x.supabase.co", "svc", "t1", [veh(1), veh(2)]);
+    await artifactPostsIdle();
+    expect(out).toEqual({ dispatched: 0, skipped: 0, undecidable: 2 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("re-fires a case wedged mid-pipeline, on the sweep's own 30-minute rule", () => {
+    const fresh = new Date().toISOString();
+    const old = new Date(Date.now() - 45 * 60_000).toISOString();
+    const now = Date.now();
+    expect(descriptionRefreshReason(undefined, now)).toContain("no description case");
+    expect(descriptionRefreshReason({ status: "READY", updated_at: fresh }, now)).toBeNull();
+    expect(descriptionRefreshReason({ status: "GENERATING", updated_at: fresh }, now)).toBeNull();
+    expect(descriptionRefreshReason({ status: "GENERATING", updated_at: old }, now)).toContain("over 30 minutes");
+    expect(descriptionRefreshReason({ status: "FAILED_RETRYABLE", updated_at: fresh }, now))
+      .toContain("FAILED_RETRYABLE");
+    expect(descriptionRefreshReason({ status: "READY", archived_at: fresh, updated_at: fresh }, now))
+      .toContain("archived");
   });
 });

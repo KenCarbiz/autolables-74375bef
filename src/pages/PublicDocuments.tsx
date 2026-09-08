@@ -104,8 +104,15 @@ const CATALOG: DocDescriptor[] = [
     title: "OEM Window Sticker",
     description: "Original factory window sticker showing MSRP, standard equipment, and all installed options as delivered from the manufacturer.",
     resolve: ({ listing, pub }) => {
-      const url = listing.oem_sticker_url || listing.factory_sticker_url || pickUrl(pub.window);
-      return url ? { status: "on_file", url, date: listing.oem_sticker_checked_at } : { status: "coming_soon" };
+      // pub.factory_sticker is the published Monroney reproduction. It comes
+      // first because the two listing columns are not written on this project:
+      // oem_sticker_url needs a provider key that is not configured, and
+      // nothing anywhere writes factory_sticker_url at all.
+      const fs = pub.factory_sticker;
+      const url = pickUrl(fs) || listing.oem_sticker_url || listing.factory_sticker_url || pickUrl(pub.window);
+      return url
+        ? { status: "on_file", url, date: fs?.published_at || listing.oem_sticker_checked_at }
+        : { status: "coming_soon" };
     },
   },
   {

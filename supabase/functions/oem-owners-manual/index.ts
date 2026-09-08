@@ -3,9 +3,14 @@
 // make/model/year. Mirrors oem-brochure: searches via Firecrawl but only
 // accepts results hosted on the manufacturer's own allowlisted domains
 // (incl. owner portals + Mopar for Stellantis), then caches the link in the
-// global oem_owners_manual_links table. We link to the OEM's hosted document —
-// never rehost bytes by default. A copy is stored into a vehicle's passport
-// no copy is stored -- the packet links straight to the manufacturer.
+// global oem_owners_manual_links table. This function never fetches document
+// bytes: it finds and caches a LINK, which needs no permission from anyone.
+//
+// Taking a COPY is a separate, gated act and lives in oem-document-store,
+// which hosts only for a dealer franchised for that brand and links for every
+// other vehicle. So a link found here serves both branches: it is what the
+// off-brand packet points at, and it is the source the franchised dealer's
+// copy is taken from.
 //
 // Body: { make, model, year?, refresh? }
 // Auth: tenant user JWT, or service role / cron secret. The service-role path

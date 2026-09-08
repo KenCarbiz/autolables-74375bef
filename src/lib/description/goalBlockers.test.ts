@@ -222,7 +222,9 @@ describe("the master band covers the vAuto floor", () => {
     expect(huge.max_length).toBeGreaterThan(0); // fixture is only illustrative
   });
 
-  it("uses the owner's floor of 3,221 and goal of 3,879", () => {
+  it("set the owner's floor of 3,221 against a goal of 3,879", () => {
+    // The step that fixed the floor. The goal has since moved to 3,979
+    // (20260908150000_master_ceiling_3979_geo_radius_45); the floor has not.
     const mig = readFileSync(join(fnDir,
       "../migrations/20260907015500_master_floor_back_to_3221.sql"), "utf8");
     expect(mig).toMatch(/SET min_length = 3221/);

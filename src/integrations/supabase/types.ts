@@ -5120,6 +5120,78 @@ export type Database = {
           },
         ]
       }
+      oem_document_copy_attempts: {
+        Row: {
+          attempts: number
+          brand: string
+          brand_key: string
+          created_at: string
+          detail: string | null
+          document_kind: string
+          id: string
+          last_attempt_at: string
+          model: string
+          model_key: string
+          model_year: number | null
+          outcome: string
+          resolved_at: string | null
+          source_url: string | null
+          tenant_id: string
+          year_key: number
+        }
+        Insert: {
+          attempts?: number
+          brand: string
+          brand_key: string
+          created_at?: string
+          detail?: string | null
+          document_kind: string
+          id?: string
+          last_attempt_at?: string
+          model: string
+          model_key: string
+          model_year?: number | null
+          outcome: string
+          resolved_at?: string | null
+          source_url?: string | null
+          tenant_id: string
+          year_key?: number
+        }
+        Update: {
+          attempts?: number
+          brand?: string
+          brand_key?: string
+          created_at?: string
+          detail?: string | null
+          document_kind?: string
+          id?: string
+          last_attempt_at?: string
+          model?: string
+          model_key?: string
+          model_year?: number | null
+          outcome?: string
+          resolved_at?: string | null
+          source_url?: string | null
+          tenant_id?: string
+          year_key?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oem_document_copy_attempts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oem_document_copy_attempts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oem_hosted_documents: {
         Row: {
           authorised_by: string

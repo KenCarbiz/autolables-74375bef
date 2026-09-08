@@ -95,6 +95,32 @@ describe("buildVinPackageItems", () => {
     }
   });
 
+  it("reads a new vehicle's window sticker from the OEM Monroney", () => {
+    // A new car never gets a `window` row — create_draft_window_sticker skips
+    // it and families.ts marks the used-vehicle sheet not_applicable. Its
+    // window sticker is the Monroney, filed as `factory_sticker`.
+    const s = finishedUsedCar();
+    s.used = false;
+    s.liveDocs = [
+      { id: "fs1", document_type: "factory_sticker", document_status: "published", version: 2, published_at: "2026-07-06T00:00:00Z", pdf_url: "https://files.test/monroney.pdf" },
+    ];
+    const row = buildVinPackageItems(s).find((i) => i.key === "window_sticker");
+    expect(row?.label).toBe("Window Sticker");
+    expect(row?.status).toBe("published");
+    expect(row?.href).toBe("https://files.test/monroney.pdf");
+  });
+
+  it("keeps a used vehicle on the used-vehicle sheet, never the Monroney", () => {
+    const s = finishedUsedCar();
+    s.liveDocs = [
+      { id: "fs1", document_type: "factory_sticker", document_status: "published", version: 9 },
+      { id: "d2", document_type: "window", document_status: "draft", version: 1 },
+    ];
+    const row = buildVinPackageItems(s).find((i) => i.key === "window_sticker");
+    expect(row?.label).toBe("Used-Car Sticker");
+    expect(row?.docId).toBe("d2");
+  });
+
   it("is not ready to market while one artifact is only produced", () => {
     const s = finishedUsedCar();
     s.liveDocs = [...s.liveDocs.filter((d) => d.document_type !== "window"),

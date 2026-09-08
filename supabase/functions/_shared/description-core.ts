@@ -23,7 +23,7 @@ import {
 } from "./description-features.ts";
 import { toneProfile, toneInstruction, checkTone, isToneKey, TONE_PROFILES } from "./description-tone.ts";
 import {
-  resolveVoiceProfile, computeVoiceProfileVersion, voiceInstruction,
+  resolveVoiceProfile, computeVoiceProfileVersion, voiceInstruction, localitySlate,
   checkDealerClaims, checkLocalityUse, type VoiceProfile,
 } from "./description-voice.ts";
 import {
@@ -36,7 +36,8 @@ export {
   DEFAULT_CHANNEL_POLICIES, resolveChannelPolicy, checkChannelPolicy, computeChannelPolicyVersion,
   normalizeFeatures, prioritizeFeatures, splitByOrigin, featureChecksum,
   toneProfile, toneInstruction, checkTone, isToneKey, TONE_PROFILES,
-  resolveVoiceProfile, computeVoiceProfileVersion, voiceInstruction, checkDealerClaims, checkLocalityUse,
+  resolveVoiceProfile, computeVoiceProfileVersion, voiceInstruction, localitySlate,
+  checkDealerClaims, checkLocalityUse,
   scoreDescription, countFactsUsed, analyzeReadability, analyzeUniqueness, analyzeKeywords, SCORE_VERSION,
 };
 export type {
@@ -176,7 +177,9 @@ export async function computeConfigVersion(settings: Record<string, any>): Promi
   const material = [
     settings.review_mode, JSON.stringify(settings.enabled_channels ?? []), settings.brand_voice,
     settings.default_tone, settings.dealer_name_format, settings.primary_city, settings.state,
-    JSON.stringify(settings.selling_areas ?? []), settings.cta_template,
+    JSON.stringify(settings.selling_areas ?? []),
+    JSON.stringify(settings.selling_areas_meta ?? {}), settings.geo_radius_miles,
+    settings.cta_template,
     JSON.stringify(settings.prohibited_phrases ?? []), settings.required_legal_text,
     settings.min_length, settings.max_length, JSON.stringify(settings.class_rules ?? {}),
     settings.warranty_language_allowed, settings.cpo_language_allowed,
@@ -510,6 +513,10 @@ export interface DescriptionPacket {
   marketContext: Record<string, unknown>;
   factConfidence: number;
   selectedFeatureIds: string[];
+  /** The localities this vehicle may name, rotated across the fleet so the
+   *  measured market area is covered by many descriptions rather than crammed
+   *  into one. Empty when the dealership has no approved area on file. */
+  localities: string[];
 }
 
 export function buildDescriptionPacket(
@@ -554,6 +561,11 @@ export function buildDescriptionPacket(
     marketContext: snap.market_context,
     factConfidence: snap.fact_confidence,
     selectedFeatureIds: [...factory, ...dealerAdded].map((f) => f.canonical_id),
+    // Seeded by the VIN: the same vehicle draws the same slate on every run,
+    // so a regeneration is the same page rather than a differently-located
+    // one, and the input checksum stays stable.
+    localities: localitySlate(
+      voice, String(snap.facts.vin?.value || identity || voice.tenantId)),
   };
 }
 
@@ -714,9 +726,20 @@ export function buildMasterPromptV3(packet: DescriptionPacket, settings: Record<
   // area list, so the instruction is "use a little, correctly" rather than a
   // flat prohibition. The flat ban read as "no geography" while the validator
   // simultaneously required any geography used to come from the approved list.
-  const areas = packet.voice.approvedAreas || [];
+  //
+  // The reach the owner asked for comes from the FLEET, not from this page: the
+  // localities offered here rotate per vehicle across the measured radius, so a
+  // hundred descriptions span it while each one still names three places at the
+  // outside. Cramming the radius into one description is the doorway-page
+  // pattern helpful-content ranking demotes, and an answer engine cannot quote
+  // a town list as a fact about a vehicle.
+  const areas = packet.localities.length ? packet.localities : (packet.voice.approvedAreas || []);
+  const radiusPhrase = packet.voice.geoMethod === "radius_derived" && packet.voice.geoRadiusMiles > 0
+    ? `, measured as a ${packet.voice.geoRadiusMiles}-mile radius around this rooftop,` : "";
   const geoLine = areas.length
-    ? `\n- Local relevance: you may name at most two of the approved localities listed in the dealership voice above, each at most once, only where it reads naturally. Never enumerate them and never write a "serving ..." list.`
+    ? `\n- Local relevance: the approved localities in the dealership voice above${radiusPhrase} are the only places you may name. You may identify the store by its own city, and beyond that name at most two of the approved localities, each at most once, only where it reads naturally. Never enumerate them and never write a "serving ..." list.`
+      + `\n- Never state a distance, a drive time, a direction or a travel comparison to any place. The market area is measured in straight lines from the rooftop and a shopper reads a stated distance as a drive, so any distance in the copy is an invented fact.`
+      + `\n- Where you do write about the area, write one complete sentence that would still make sense quoted on its own — something true about this vehicle for someone shopping there — rather than dropping a place name into an unrelated clause.`
     : `\n- Do not name towns or regions; this dealership has no approved market area on file.`;
   const kw = packet.targeting.primaryKeyword
     ? `\nSEARCH RELEVANCE\n- Shoppers reach this listing searching "${packet.targeting.primaryKeyword}". Use that phrasing ONCE, inside a sentence that would exist anyway. If it cannot be written naturally, leave it out.\n- Do not repeat the phrase and do not add a keyword block.\n- Name the year, make, model and trim naturally where they belong, and vary wording afterwards rather than repeating the full name.${geoLine}`
@@ -743,7 +766,7 @@ ABSOLUTE RULES
 
 ${toneInstruction(packet.tone)}
 
-${voiceInstruction(packet.voice)}
+${voiceInstruction(packet.voice, undefined, packet.localities)}
 
 STRUCTURE
 - Length: write to about ${writeBand.max} characters. ${writeBand.min} is the floor, not the target — copy that stops just past the floor is short. ${writeBand.max} is a hard ceiling: do not go past it.

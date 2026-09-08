@@ -12,6 +12,12 @@
 //      vehicle_exceptions as 'artifact_autogen_failed' (upserted per VIN,
 //      artifacts accumulated in source_values.artifacts) so the exception
 //      queue and the intake summary can surface + retry it.
+//   3. And OUTCOMES are recorded, not only failures. vehicle_exceptions is a
+//      failure-only table, so "no exception" meant both "this succeeded" and
+//      "this never ran" — an ambiguity no operator can resolve and no sweep
+//      can act on. Every dispatch here now files its verdict in
+//      vehicle_ingest_ledger through record_ingest_step, including the
+//      dispatches this module declines to make.
 //
 // Every draft RPC is VIN-idempotent, so calling this twice (re-sync, sweep
 // overlap) is safe. No Deno globals — unit-testable under vitest.
@@ -68,6 +74,45 @@ export function recommendedActionFor(artifacts: string[]): string {
     return `Retry from the vehicle intake summary. No nightly sweep re-runs ${edge.join(", ")} — it will not retry on its own.`;
   }
   return `Retry from the vehicle intake summary. The nightly intake sweep will retry ${sweep.join(", ")}, but ${edge.join(", ")} will not retry on its own.`;
+}
+
+// ── The durable trace ─────────────────────────────────────────────────
+//
+// vehicle_exceptions records FAILURES only, so "no exception" has always read
+// as success — including for a step that never ran at all. The per-VIN ledger
+// (20260729010000_vehicle_ingest_ledger.sql) was built to close exactly that
+// gap, and nothing in the ingest pipeline ever wrote to it: the table, the
+// record_ingest_step RPC and the reader (src/lib/ingest/ingestOutcome.ts) all
+// shipped, and the producer never did. Every outcome below is therefore
+// invisible today unless it happens to fail in a way that opens an exception.
+//
+// One row per (tenant, vin, step), written ONCE per dispatch and carrying the
+// terminal verdict, so attempt_count counts attempts rather than log lines. A
+// dispatch the isolate never reached deliberately leaves no row: the reader
+// calls that "absent", and the sweep rediscovers it from state. Recording a
+// "running" breadcrumb we could not settle would trade one lie for another.
+const LEDGER_STEP: Record<string, string> = { oem_owners_manual: "owners_manual" };
+
+export type LedgerStatus = "running" | "succeeded" | "parked" | "failed" | "skipped";
+
+export async function recordIngestStep(
+  admin: Admin, tenantId: string, vin: string, artifact: string,
+  status: LedgerStatus, reason: string,
+  opts: { vehicleId?: string | null; detail?: Record<string, unknown> } = {},
+): Promise<void> {
+  try {
+    const text = String(reason || "").trim();
+    if (!tenantId || !vin || !text) return;
+    await admin.rpc("record_ingest_step", {
+      p_tenant_id: tenantId,
+      p_vin: vin,
+      p_step: LEDGER_STEP[artifact] ?? artifact,
+      p_status: status,
+      p_reason: text.slice(0, 1000),
+      p_vehicle_id: opts.vehicleId ?? null,
+      p_detail: opts.detail ?? {},
+    });
+  } catch { /* the trace is best-effort — it must never break ingest */ }
 }
 
 const hex16 = () => {
@@ -194,11 +239,65 @@ function enqueue(step: () => Promise<unknown>): void {
     .then(() => pause(postGapMs), () => pause(postGapMs));
 }
 
+// Same queue, no stagger after it. For bookkeeping that makes no invocation:
+// pacing a ledger write would spend the isolate's remaining life recording
+// that we ran out of it.
+function enqueueUnpaced(step: () => Promise<unknown>): void {
+  postQueue = postQueue.then(step).then(() => undefined, () => undefined);
+}
+
+/**
+ * Artifact posts one isolate may dispatch, ever.
+ *
+ * The queue is serial and paced, so its length is a duration: a feed page that
+ * queues a thousand posts has asked for four minutes of dispatch inside an
+ * isolate that will not live that long. Everything past the point where the
+ * worker is torn down was silently discarded — no invocation, no exception, no
+ * ledger row, nothing to sweep — and that is the shape of a gap that never
+ * closes, because the next run queues the same overflow and loses it again.
+ *
+ * Past the cap the work is not attempted and is RECORDED as not attempted, so
+ * the deferral is a fact somebody can query rather than an absence. Everything
+ * deferred is either swept nightly or left in the exception queue by name.
+ */
+const ARTIFACT_DISPATCH_CAP = 250;
+let artifactDispatched = 0;
+
+/** Test hook: the budget is per isolate and leaks across cases. */
+export function resetArtifactDispatchBudget(): void {
+  artifactDispatched = 0;
+}
+
 function firePost(
   admin: Admin, serviceKey: string, tenantId: string, vin: string,
   url: string, body: Record<string, unknown>, timeoutMs: number, artifact: string,
-  opts: { deadlineMs?: number } = {},
+  opts: { deadlineMs?: number; vehicleId?: string | null } = {},
 ): void {
+  const fn = url.split("/").pop() || artifact;
+  const swept = SWEEP_RETRIED.has(artifact)
+    ? "The nightly sweep re-runs this step."
+    : `No nightly sweep re-runs ${artifact}; it has to be retried from the vehicle intake summary.`;
+
+  if (artifactDispatched >= ARTIFACT_DISPATCH_CAP) {
+    enqueueUnpaced(async () => {
+      await recordIngestStep(
+        admin, tenantId, vin, artifact, "parked",
+        `Not dispatched on this run: the paced artifact queue had already reached its per-run cap of ${ARTIFACT_DISPATCH_CAP} dispatches, which is as much as one isolate can drain. ${swept}`,
+        { vehicleId: opts.vehicleId ?? null, detail: { function: fn, cap: ARTIFACT_DISPATCH_CAP } },
+      );
+      // An artifact nothing retries must also reach the queue a human works,
+      // not only the ledger a human has to think to open.
+      if (!SWEEP_RETRIED.has(artifact)) {
+        await recordArtifactFailure(
+          admin, tenantId, vin, artifact,
+          `deferred: the ingest run reached its cap of ${ARTIFACT_DISPATCH_CAP} artifact dispatches before this call was made. Not generated yet.`,
+        );
+      }
+    });
+    return;
+  }
+  artifactDispatched++;
+
   enqueue(async () => {
     // One retry, not three. The serial queue is what keeps us under the
     // limit; a long retry chain here would stall every artifact behind a
@@ -207,19 +306,37 @@ function firePost(
       body, timeoutMs, maxRetries: 1, maxWaitMs: 3_000,
       ...(opts.deadlineMs ? { deadlineMs: opts.deadlineMs } : {}),
     });
-    if (res.ok) return;
+    const detail = { function: fn, status: res.status, attempts: res.attempts };
+    if (res.ok) {
+      // A success has to be recorded too, or the ledger repeats the exact
+      // mistake vehicle_exceptions makes: silence meaning both "fine" and
+      // "never happened".
+      await recordIngestStep(
+        admin, tenantId, vin, artifact, "succeeded",
+        `${fn} accepted the ${artifact} request and answered ${res.status}.`,
+        { vehicleId: opts.vehicleId ?? null, detail },
+      );
+      return;
+    }
     // A throttle is not an artifact failure. Recording it as one buries the
     // real failures under transient noise and tells the operator a document
     // could not be produced when nobody ever asked for it. The nightly
     // sweep re-runs the sweepable artifacts; the rest are surfaced with
     // their own type so they can be found and retried deliberately.
     if (res.rateLimited) {
-      await recordArtifactFailure(
-        admin, tenantId, vin, artifact,
-        `rate_limited: the platform throttled this call${res.retryAfterMs ? ` (asked for ${res.retryAfterMs}ms)` : ""}. Not generated yet.`,
+      const msg = `rate_limited: the platform throttled this call${res.retryAfterMs ? ` (asked for ${res.retryAfterMs}ms)` : ""}. Not generated yet.`;
+      await recordIngestStep(
+        admin, tenantId, vin, artifact, "parked", `${msg} ${swept}`,
+        { vehicleId: opts.vehicleId ?? null, detail: { ...detail, retry_after_ms: res.retryAfterMs } },
       );
+      await recordArtifactFailure(admin, tenantId, vin, artifact, msg);
       return;
     }
+    await recordIngestStep(
+      admin, tenantId, vin, artifact, "failed",
+      `${fn} refused the ${artifact} request: ${res.error ?? "unknown error"}. ${swept}`,
+      { vehicleId: opts.vehicleId ?? null, detail },
+    );
     await recordArtifactFailure(admin, tenantId, vin, artifact, res.error ?? "unknown error");
   });
 }
@@ -360,6 +477,27 @@ async function recordHarvestVerdict(
   } catch { /* the verdict is an optimisation; losing one costs one retry */ }
 }
 
+const LEDGER_HARVEST_STATUS: Record<string, LedgerStatus> = {
+  found: "succeeded", cached: "succeeded",
+  unsupported: "skipped", not_configured: "parked", rate_limited: "parked",
+  not_found: "failed", error: "failed",
+};
+
+function harvestReason(
+  outcome: HarvestOutcome, artifact: string, triple: string,
+  error: string | null, retryAfterMs: number | null,
+): string {
+  switch (outcome) {
+    case "found": return `Harvested the OEM ${artifact} link for ${triple} into the shared cache.`;
+    case "cached": return `The OEM ${artifact} link for ${triple} was already cached; nothing was re-harvested.`;
+    case "unsupported": return `${triple} is not in the OEM harvest allow-list, so no ${artifact} is searched for this vehicle.`;
+    case "not_configured": return `The ${artifact} harvest has no provider key configured, so nothing was searched. This is an install problem, not a vehicle problem.`;
+    case "rate_limited": return `The platform throttled the ${artifact} harvest for ${triple}${retryAfterMs ? ` (asked for ${retryAfterMs}ms)` : ""}. Nothing was learned about this model; the packet backfill sweep re-attempts it.`;
+    case "not_found": return `The manufacturer's own site had no ${artifact} for ${triple}.`;
+    default: return `The ${artifact} harvest for ${triple} errored: ${error ?? "no detail recorded"}. The packet backfill sweep re-attempts it.`;
+  }
+}
+
 function fireOemHarvest(
   admin: Admin, supabaseUrl: string, serviceKey: string,
   tenantId: string, vin: string, spec: OemDocSpec, key: OemDocKey,
@@ -392,6 +530,16 @@ function fireOemHarvest(
       });
       const outcome = classifyHarvest(res);
       await recordHarvestVerdict(admin, spec.kind, key, outcome, res.error);
+      const triple = oemDocKeyString(key);
+      // The verdict above is GLOBAL — keyed on the model, with no tenant and no
+      // VIN. Until this row existed, nothing anywhere said whether a harvest
+      // had ever run for a given vehicle, so the passport reader could only
+      // infer it from the shared cache. This is the per-VIN half.
+      await recordIngestStep(
+        admin, tenantId, vin, spec.artifact, LEDGER_HARVEST_STATUS[outcome] ?? "failed",
+        harvestReason(outcome, spec.artifact, triple, res.error, res.retryAfterMs),
+        { detail: { outcome, triple, kind: spec.kind } },
+      );
 
       // "found"/"cached" is the job done. "not_found"/"unsupported" is a real,
       // now-remembered answer — not a failure, and opening a high-severity
@@ -515,7 +663,18 @@ export async function ensureOemDocCopies(
         // manufacturer link, which is what they had before this step existed.
       })());
     }
-  } catch { /* keeping a copy is never allowed to break ingest */ }
+  } catch (e) {
+    // Never allowed to break ingest — but "never allowed to break ingest" is
+    // not "never allowed to leave a trace", and a bare catch here is
+    // indistinguishable from a vehicle whose brand simply has no documents.
+    for (const spec of OEM_DOCS) {
+      await recordIngestStep(
+        admin, tenantId, vin, spec.artifact, "failed",
+        `Storing the dealer's own copy of the ${spec.kind.replace(/_/g, " ")} threw before anything was dispatched: ${errText(e)}. The packet backfill sweep re-attempts it.`,
+        { vehicleId: listingId },
+      );
+    }
+  }
 }
 
 /**
@@ -551,7 +710,14 @@ export async function ensureOemDocLinks(
       oemHarvestDispatched++;
       fireOemHarvest(admin, supabaseUrl, serviceKey, tenantId, vin, spec, key);
     }
-  } catch { /* link harvesting is never allowed to break ingest */ }
+  } catch (e) {
+    for (const spec of OEM_DOCS) {
+      await recordIngestStep(
+        admin, tenantId, vin, spec.artifact, "failed",
+        `The OEM ${spec.kind.replace(/_/g, " ")} link step threw before any harvest was dispatched: ${errText(e)}. The packet backfill sweep re-attempts it.`,
+      );
+    }
+  }
 }
 
 // Mint the permanent Get-Ready hub token if this vehicle doesn't already have a
@@ -604,6 +770,10 @@ export async function ensureComplianceDrafts(
   let needsFactorySticker = false;
   let listingId: string | null = null;
   let listingYmm: string | null = null;
+  // An undecidable read must not re-render the fleet — but "we could not tell"
+  // and "there was nothing to do" have been the same silence, and every night
+  // that silence looked like a clean pass. The reason is now filed.
+  let probeError: string | null = null;
   if (render) {
     try {
       const { data: listing } = await admin.from("vehicle_listings")
@@ -629,6 +799,8 @@ export async function ensureComplianceDrafts(
               .filter((d) => !!(d.online_url || d.pdf_url))
               .map((d) => String(d.document_type)));
           needsFormRender = !filled.has("buyers_guide") || !filled.has("k208");
+        } else {
+          probeError = `generated_documents could not be read (${errText(error)})`;
         }
       }
       // Factory sticker orchestration (all conditions — new cars get the
@@ -645,9 +817,20 @@ export async function ensureComplianceDrafts(
         if (!fsErr) {
           const status = String((fsr as { generation_status?: string } | null)?.generation_status || "");
           needsFactorySticker = !fsr || ["PENDING_DATA", "FAILED_RETRYABLE", "READY_TO_GENERATE"].includes(status);
+        } else {
+          probeError = `${probeError ? `${probeError}; ` : ""}factory_sticker_records could not be read (${errText(fsErr)})`;
         }
       }
-    } catch { /* undecidable — do not render */ }
+    } catch (e) {
+      probeError = `${probeError ? `${probeError}; ` : ""}${errText(e)}`;
+    }
+    if (probeError) {
+      await recordIngestStep(
+        admin, tenantId, vin, "factory_sticker", "parked",
+        `The resync could not read this vehicle's artifact state, so no render was re-fired on this pass: ${probeError}. The next sync pass and the nightly sweep both retry it.`,
+        { vehicleId: listingId },
+      );
+    }
   }
 
   await draftRpc(admin, tenantId, vin, "create_draft_buyers_guide", "buyers_guide");
@@ -658,13 +841,13 @@ export async function ensureComplianceDrafts(
   if (render && needsFormRender) {
     firePost(admin, render.serviceKey, tenantId, vin,
       `${render.supabaseUrl}/functions/v1/generate-vehicle-forms`,
-      { tenant_id: tenantId, vin }, 25000, "form_pdfs");
+      { tenant_id: tenantId, vin }, 25000, "form_pdfs", { vehicleId: listingId });
   }
   if (render && needsFactorySticker && listingId) {
     firePost(admin, render.serviceKey, tenantId, vin,
       `${render.supabaseUrl}/functions/v1/factory-sticker-orchestrate`,
       { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "resync" },
-      20000, "factory_sticker");
+      20000, "factory_sticker", { vehicleId: listingId });
   }
 
   // Back-fill the dealer's own copy of their brand's documents for inventory
@@ -678,6 +861,106 @@ export async function ensureComplianceDrafts(
       admin, render.supabaseUrl, render.serviceKey, tenantId, vin, listingYmm, listingId, null,
     );
   }
+}
+
+// ── Description Intelligence on the resync path ───────────────────────
+//
+// What this replaces: the feed loop POSTed description-orchestrate for EVERY
+// updated listing — up to 200 unawaited fetches in a single tick, outside the
+// paced queue, outside EdgeRuntime.waitUntil, each ending in `.catch(() => {})`.
+// Three failures compounded there. The fan-out is exactly the burst the
+// platform throttles. Nothing was awaited, so the isolate could be torn down
+// with the calls still unsent. And nothing was recorded either way, so a
+// dropped call, a 429 and a successful no-op were the same event.
+//
+// It also bought almost nothing: the orchestrator is idempotent on
+// (tenant, vehicle, source_data_version, config_version) and answers
+// "unchanged" for a vehicle whose copy is current, which is nearly all of
+// them. So the burst that destroyed the few dispatches that mattered was spent
+// re-asking about the ones that did not.
+//
+// The owner's rule is the fix — if the file already exists you verify it, you
+// do not rebuild it. One batched read decides who genuinely needs a run:
+// no case row at all, a case that failed retryably, or one wedged mid-pipeline
+// past the same 30-minute staleness the nightly reconcile sweep uses. Those go
+// through the paced, recorded queue like every other artifact.
+
+const DESCRIPTION_IN_FLIGHT = new Set([
+  "QUEUED", "BUILDING_FACTS", "GENERATING", "VALIDATING", "PUBLISHING",
+]);
+const DESCRIPTION_STALE_MS = 30 * 60_000;
+
+interface DescriptionCaseRow {
+  vehicle_id?: string | null;
+  status?: string | null;
+  archived_at?: string | null;
+  updated_at?: string | null;
+}
+
+/** Why this vehicle needs a description run, or null when it does not. */
+export function descriptionRefreshReason(
+  row: DescriptionCaseRow | undefined, nowMs: number,
+): string | null {
+  if (!row) return "no description case exists for this vehicle";
+  if (row.archived_at) return "the description case is archived and the vehicle is back in stock";
+  const status = String(row.status || "").toUpperCase();
+  if (status === "FAILED_RETRYABLE") return "the description case is in FAILED_RETRYABLE";
+  if (DESCRIPTION_IN_FLIGHT.has(status)) {
+    const at = Date.parse(String(row.updated_at || ""));
+    if (!Number.isFinite(at)) return `the description case is ${status} with no update time, so it cannot be aged`;
+    if (nowMs - at > DESCRIPTION_STALE_MS) return `the description case has been ${status} for over 30 minutes`;
+  }
+  return null;
+}
+
+export interface DescriptionRefreshResult {
+  /** Vehicles the paced queue was asked to dispatch. */
+  dispatched: number;
+  /** Vehicles whose description is current — verified, not rebuilt. */
+  skipped: number;
+  /** Vehicles whose case state could not be read, so nothing was decided. */
+  undecidable: number;
+}
+
+export async function queueDescriptionRefresh(
+  admin: Admin, supabaseUrl: string, serviceKey: string, tenantId: string,
+  vehicles: ReadonlyArray<{ id: string; vin: string }>,
+): Promise<DescriptionRefreshResult> {
+  const out: DescriptionRefreshResult = { dispatched: 0, skipped: 0, undecidable: 0 };
+  const targets = vehicles.filter((v) => !!v?.id && !!v?.vin);
+  if (targets.length === 0) return out;
+
+  const cases = new Map<string, DescriptionCaseRow>();
+  const unreadable = new Set<string>();
+  // Chunked: a single `in` over a whole inventory builds a URL long enough to
+  // be rejected, which would read as "no cases exist" and re-fire the fleet.
+  for (let i = 0; i < targets.length; i += 150) {
+    const chunk = targets.slice(i, i + 150);
+    try {
+      const { data, error } = await admin.from("description_cases")
+        .select("vehicle_id, status, archived_at, updated_at")
+        .eq("tenant_id", tenantId)
+        .in("vehicle_id", chunk.map((v) => v.id));
+      if (error) { for (const v of chunk) unreadable.add(v.id); continue; }
+      for (const row of ((data || []) as DescriptionCaseRow[])) {
+        const id = String(row?.vehicle_id || "");
+        if (id) cases.set(id, row);
+      }
+    } catch { for (const v of chunk) unreadable.add(v.id); }
+  }
+
+  const now = Date.now();
+  for (const v of targets) {
+    if (unreadable.has(v.id)) { out.undecidable++; continue; }
+    const why = descriptionRefreshReason(cases.get(v.id), now);
+    if (!why) { out.skipped++; continue; }
+    out.dispatched++;
+    firePost(admin, serviceKey, tenantId, v.vin,
+      `${supabaseUrl}/functions/v1/description-orchestrate`,
+      { action: "orchestrate", tenant_id: tenantId, vehicle_id: v.id, reason: "feed_update" },
+      20000, "description", { vehicleId: v.id });
+  }
+  return out;
 }
 
 // Auto-preload a brand-new vehicle the moment it's ingested: hub token, draft
@@ -726,22 +1009,22 @@ export async function autoPreload(
       // NeoVIN is asked strictly first and only then generically, each with a
       // 30s timeout, so this one call can legitimately outlast the default
       // per-attempt and total budgets.
-      55_000, "vin_decode", { deadlineMs: 70_000 });
+      55_000, "vin_decode", { deadlineMs: 70_000, vehicleId: listingId });
     // Fire-once recon orchestration; idempotent server-side, so a re-sync
     // never double-dispatches.
     firePost(admin, serviceKey, tenantId, vin,
       `${supabaseUrl}/functions/v1/ingest-orchestrate`,
-      { tenant_id: tenantId, vin, listing_id: listingId, ymm }, 20000, "ingest_orchestrate");
+      { tenant_id: tenantId, vin, listing_id: listingId, ymm }, 20000, "ingest_orchestrate", { vehicleId: listingId });
     // Description Intelligence: idempotent on (tenant, vehicle, versions); the
     // nightly reconcile sweep picks up anything missed here.
     firePost(admin, serviceKey, tenantId, vin,
       `${supabaseUrl}/functions/v1/description-orchestrate`,
-      { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "ingest" }, 20000, "description");
+      { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "ingest" }, 20000, "description", { vehicleId: listingId });
     // Factory Window Sticker: fingerprint-idempotent server-side; the nightly
     // resync path (ensureComplianceDrafts) re-fires anything missed here.
     firePost(admin, serviceKey, tenantId, vin,
       `${supabaseUrl}/functions/v1/factory-sticker-orchestrate`,
-      { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "ingest" }, 20000, "factory_sticker");
+      { action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "ingest" }, 20000, "factory_sticker", { vehicleId: listingId });
   }
 
   // Official OEM brochure + owner's manual for the passport's Documents page.

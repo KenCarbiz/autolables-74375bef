@@ -6,7 +6,18 @@
 // on every vehicle: the market area is a property of the dealership, and a
 // per-generation geo computation would be both wasteful and non-deterministic.
 //
-//   node scripts/build-selling-areas.mjs <zips.csv> <zip> <radiusMiles> [limit]
+// The market area is a 45-MILE radius (owner direction, 2026-09-08). A wider
+// radius does not mean a longer town list inside one description -- naming
+// more towns per description is doorway-page behaviour. It means a larger POOL
+// that the writer rotates across the fleet, so every vehicle names two or
+// three places and the lot as a whole covers the radius. The limit is
+// therefore the size of that pool, not the size of any one description.
+//
+//   node scripts/build-selling-areas.mjs <zips.csv> <zip> [radiusMiles] [limit]
+//
+// Output is the envelope description_settings.selling_areas_meta stores, plus
+// the plain name list for description_settings.selling_areas. Every distance
+// in it was measured; nothing in this file guesses one.
 
 import { readFileSync } from "node:fs";
 
@@ -98,9 +109,31 @@ export function marketArea(zips, originZip, radiusMiles, limit = 20) {
   return picked.sort((a, b) => a.miles - b.miles).slice(0, limit);
 }
 
-const [csvPath, zip, radius, limit] = process.argv.slice(2);
+export const DEFAULT_RADIUS_MILES = 45;
+export const DEFAULT_POOL_SIZE = 40;
+
+export function marketAreaEnvelope(zips, originZip, radiusMiles, limit, dataset) {
+  const areas = marketArea(zips, originZip, radiusMiles, limit);
+  return {
+    method: "radius_derived",
+    origin_zip: originZip,
+    radius_miles: radiusMiles,
+    dataset: dataset || "unspecified",
+    derived_at: new Date().toISOString(),
+    areas: areas.map(({ area, miles }) => ({ area, miles })),
+  };
+}
+
+const [csvPath, zip, radius, limit, dataset] = process.argv.slice(2);
 if (csvPath) {
-  const areas = marketArea(parseZips(readFileSync(csvPath, "utf8")), zip,
-    Number(radius), Number(limit) || 20);
-  console.log(JSON.stringify(areas, null, 2));
+  const miles = Number(radius) || DEFAULT_RADIUS_MILES;
+  const envelope = marketAreaEnvelope(
+    parseZips(readFileSync(csvPath, "utf8")), zip, miles,
+    Number(limit) || DEFAULT_POOL_SIZE, dataset);
+  console.log(JSON.stringify({
+    selling_areas: envelope.areas.map((a) => a.area),
+    selling_areas_meta: envelope,
+    geo_radius_miles: miles,
+    geo_origin_zip: zip,
+  }, null, 2));
 }

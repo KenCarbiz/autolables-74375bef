@@ -4,6 +4,14 @@ import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 import { invokeFunction } from "../_shared/invoke.ts";
 import { findVehiclesNeedingForms } from "../_shared/complianceFormsSweep.ts";
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
+import {
+  buildUsedVehicleWindowSticker, evaluateUsedStickerAutoPublish, extractUsedStickerEquipment,
+  USED_WINDOW_STICKER_CONTENT_VERSION,
+} from "../_shared/factorySticker/lib/documents/usedVehicleWindowSticker.ts";
+import { renderUsedCarStickerPdf } from "../_shared/usedCarStickerPdf.ts";
+import {
+  BUYERS_GUIDE_POLICY_VERSION, evaluateBuyersGuideAutoPublish,
+} from "../_shared/factorySticker/lib/documents/buyersGuideAutoPublish.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // generate-vehicle-forms — fills the EXACT official government forms for a
@@ -19,12 +27,31 @@ import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 //   CT K-208: fills the header AcroForm (year/make/model/body/VIN×17/mileage +
 //     dealer name/phone/address/town/state/zip/principal/license). The pass/fail
 //     grid + signatures are overlaid in a later pass once the inspection signs.
+//   Used-vehicle window sticker (document_type 'window'): renders the dealer's
+//     own equipment-and-price sheet from the saved NeoVIN build record and,
+//     unlike the two government forms, PUBLISHES it without a human click.
+//     See publishWindowSticker below for why that is the right bar for this
+//     one document and not for the others.
 //
-// Body: { tenant_id, vin, kinds?: ("buyers_guide"|"k208")[] }
+// Body: { tenant_id, vin, kinds?: ("buyers_guide"|"k208"|"window")[] }
 // Auth: service-role/cron OR a signed-in manager member of the tenant.
 // ──────────────────────────────────────────────────────────────────────
 
 const BUCKET = "signed-archives";
+
+// template_id filed on a newly minted version, per document type. "window"
+// matches create_draft_window_sticker's stub so the ingest row and a
+// regenerated version name the same template.
+const TEMPLATE_ID_FOR: Record<string, string> = {
+  k208: "ct-k208",
+  buyers_guide: "ftc-buyers-guide",
+  window: "used-car-sticker",
+};
+
+// The condition vocabulary a used-vehicle document applies to. Kept in one
+// place because the K-208, the window sticker and the sweep must agree; a
+// feed that writes "pre-owned" used to fall out of every one of them.
+const USED_CONDITIONS = ["used", "cpo", "certified", "certified pre-owned", "pre-owned", "preowned"];
 
 // Where the official PDF templates (/public/forms/*.pdf) are served from. These
 // are bundled with the app, so the app's OWN deployed origin serves them — not
@@ -393,7 +420,7 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
     // would fake an approval, so instead the asset row below makes the document
     // servable the instant a human (or autopublish_k208_on_signoff) publishes it.
     const { data: inserted, error: insErr } = await admin.from("generated_documents").insert({
-      tenant_id: tenantId, vehicle_id: vehicleId, template_id: docType === "k208" ? "ct-k208" : "ftc-buyers-guide",
+      tenant_id: tenantId, vehicle_id: vehicleId, template_id: TEMPLATE_ID_FOR[docType] || docType,
       document_type: docType, document_status: "draft", version: nextVersion, template_version: 1,
       online_url: url, pdf_url: url, data_snapshot: snap,
     }).select("id").maybeSingle();
@@ -432,6 +459,55 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
     }
   }
   return url;
+}
+
+// ── What this function publishes on its own, and what it never will ──
+//
+// fileForm above leaves EVERY document it files at `draft`. Two of the three
+// then move themselves, under a policy that lives in a pure, tested module
+// rather than in this file:
+//
+//   window        — the dealership's own used-vehicle equipment-and-price
+//                   sheet. Per src/lib/documents/families.ts it carries no
+//                   required verbatim wording and restates no warranty
+//                   representation, so holding it for review protected nobody
+//                   and simply meant it never existed.
+//                   Policy: evaluateUsedStickerAutoPublish.
+//   buyers_guide  — the federal form. It publishes only when its warranty box
+//                   was DETERMINED rather than guessed: forced by the
+//                   operating state's statute, selected by a named statute, or
+//                   set by the dealership's own configured default. A draft
+//                   that fell through to a bare "as-is" with nothing behind it
+//                   holds, because an unconfigured As-Is understates coverage
+//                   the dealership may actually be offering.
+//                   Policy: evaluateBuyersGuideAutoPublish.
+//
+// The K-208 is not in that list and must not be. It is dealer-only until the
+// service department signs the inspection, and
+// enforce_k208_publish_requires_execution (20260726130000) fails closed on any
+// attempt to publish one without a signed, non-failed inspection. That trigger
+// is the mechanism; nothing here routes around it.
+//
+// Both publishes below are typed and status-conditioned: the update names its
+// document_type and only ever moves a row out of `draft`, so it cannot reach
+// another document, and it cannot re-publish over a manager's rejection.
+// deno-lint-ignore no-explicit-any
+async function publishFiledDocument(
+  admin: any, tenantId: string, vehicleId: string, docType: "window" | "buyers_guide", holds: string[],
+): Promise<"published" | "held" | "human_decision" | "noop"> {
+  if (holds.length) return "held";
+  const { data: rejected } = await admin.from("generated_documents")
+    .select("id").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+    .eq("document_type", docType).eq("document_status", "rejected").limit(1);
+  if (Array.isArray(rejected) && rejected.length) return "human_decision";
+
+  const { data: moved, error } = await admin.from("generated_documents")
+    .update({ document_status: "published", published_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+    .eq("document_type", docType).eq("document_status", "draft")
+    .select("id");
+  if (error) throw new Error(`${docType} publish failed: ${error.message}`);
+  return Array.isArray(moved) && moved.length ? "published" : "noop";
 }
 
 const SWEEP_LOCK_KEY = "compliance_forms_sweep";
@@ -536,7 +612,7 @@ Deno.serve(async (req) => {
   }
 
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
-  const kinds = Array.isArray(body.kinds) && body.kinds.length ? body.kinds : ["buyers_guide", "k208"];
+  const kinds = Array.isArray(body.kinds) && body.kinds.length ? body.kinds : ["buyers_guide", "k208", "window"];
   // Optional box override (as-is | implied | warranty) so a manual selection in
   // the Buyers Guide UI fills the matching official form variant.
   const boxOverride = ["as-is", "implied", "warranty"].includes(String(body.box)) ? String(body.box) : null;
@@ -550,9 +626,10 @@ Deno.serve(async (req) => {
   }
 
   const { data: listing } = await admin.from("vehicle_listings")
-    .select("id, ymm, condition, mileage").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
+    .select("id, ymm, trim, condition, mileage, price, slug, features, key_specs, mc_attributes")
+    .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!listing?.id) return json(404, { error: "vehicle not found" });
-  const { data: vf } = await admin.from("vehicle_files").select("year, make, model").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
+  const { data: vf } = await admin.from("vehicle_files").select("year, make, model, stock_number").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   // parseYmm, not a positional split. Taking token 1 as the make turns
   // "2024 Land Rover Defender 110" into make "Land" — printed onto a
   // federally required FTC Buyers Guide and onto the CT K-208.
@@ -576,26 +653,58 @@ Deno.serve(async (req) => {
   };
 
   const out: Record<string, string> = {};
+  let windowPublish: string | null = null;
+  let windowHolds: string[] = [];
+  let buyersGuidePublish: string | null = null;
+  let buyersGuideHolds: string[] = [];
   try {
     // Resolve the warranty box ONCE — it drives both the Buyers Guide variant and
     // the K-208 A/B/C statutory box, so the two forms can never disagree.
     const { data: bgRow } = await admin.from("generated_documents").select("data_snapshot")
       .eq("tenant_id", tenantId).eq("vehicle_id", listing.id).eq("document_type", "buyers_guide")
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const snap = (bgRow?.data_snapshot || {}) as { box?: string; min_pct?: number; min_duration_days?: number; min_miles?: number };
+    const snap = (bgRow?.data_snapshot || {}) as {
+      box?: string; min_pct?: number; min_duration_days?: number; min_miles?: number;
+      forced?: boolean; citation?: string; default_ftc_warranty?: string; operating_state?: string;
+    };
     const effBox = boxOverride || snap.box || "as-is";
     const pct = Number(snap.min_pct) || 0, dd = Number(snap.min_duration_days) || 0, mi = Number(snap.min_miles) || 0;
 
-    if (kinds.includes("buyers_guide")) {
+    // Condition-guarded, matching create_draft_buyers_guide. The FTC Used Car
+    // Rule (16 CFR 455) governs USED vehicles; a Buyers Guide filed against new
+    // inventory is a used-car disclosure attached to a car it does not apply
+    // to. This branch was the one path with no condition test — the RPC that
+    // drafts the row guards, the sweep that repairs it guards, but
+    // intake-autoprovision fires this function for every new listing, so 16
+    // new vehicles on the reference tenant carry a drafted Buyers Guide.
+    if (kinds.includes("buyers_guide") && USED_CONDITIONS.includes(String(listing.condition || "used").toLowerCase())) {
       const tpl = await loadTemplate(admin, appBase, lang === "es" ? "ftc-buyers-guide-es.pdf" : "ftc-buyers-guide-en.pdf");
       const bytes = lang === "es"
         ? await fillFtcEs(tpl.bytes, effBox, pct, dd, mi, vehicle, dealer)
         : await fillFtc(tpl.bytes, effBox, pct, dd, mi, vehicle, dealer);
+      // The box the FORM was filled with, judged against the drafted snapshot
+      // it came from. A manual `box` override in the request body is a human
+      // choosing the box on this car, which is itself a determination.
+      const bgDecision = evaluateBuyersGuideAutoPublish(
+        boxOverride ? { ...snap, box: effBox, forced: true } : { ...snap, box: effBox },
+        { condition: listing.condition as string | null },
+      );
       out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year, {
         box: effBox, lang, template_version: tpl.version, template_content_hash: tpl.contentHash, template_verified: tpl.verified,
+        // The warranty representation is re-snapshotted on every fill, so a
+        // published Guide always records the statute or setting behind it.
+        forced: snap.forced ?? null, citation: snap.citation ?? null,
+        default_ftc_warranty: snap.default_ftc_warranty ?? null,
+        operating_state: snap.operating_state ?? null,
+        min_pct: pct, min_duration_days: dd, min_miles: mi,
+        box_basis: bgDecision.basis, auto_publish: bgDecision.publish,
+        holds: bgDecision.holds, hold_reasons: bgDecision.reasons,
+        policy_version: BUYERS_GUIDE_POLICY_VERSION,
       });
+      buyersGuidePublish = await publishFiledDocument(admin, tenantId, listing.id as string, "buyers_guide", bgDecision.holds);
+      buyersGuideHolds = bgDecision.reasons;
     }
-    if (kinds.includes("k208") && ["used", "cpo", "certified"].includes(String(listing.condition || "used").toLowerCase())) {
+    if (kinds.includes("k208") && USED_CONDITIONS.includes(String(listing.condition || "used").toLowerCase())) {
       // A/B/C: the licensee's certified result when present, else derive from the
       // same warranty box — warranty/implied → A (roadworthy, covered by a
       // warranty), as-is → B (roadworthy, sold As-Is under §42-224). Never
@@ -612,9 +721,87 @@ Deno.serve(async (req) => {
         template_version: tpl.version, template_content_hash: tpl.contentHash, template_verified: tpl.verified, result_initial: initial,
       });
     }
+    if (kinds.includes("window") && USED_CONDITIONS.includes(String(listing.condition || "used").toLowerCase())) {
+      const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+      const ks = (listing.key_specs || {}) as Record<string, unknown>;
+      const pick = (...keys: string[]): string | null => {
+        for (const k of keys) {
+          const v = ks[k] ?? mc[k];
+          if (typeof v === "string" && v.trim()) return v.trim();
+        }
+        return null;
+      };
+      const num = (...keys: string[]): number | null => {
+        for (const k of keys) {
+          const v = ks[k] ?? mc[k];
+          const n = typeof v === "number" ? v : typeof v === "string" && v.trim() ? Number(v) : NaN;
+          if (Number.isFinite(n)) return n;
+        }
+        return null;
+      };
+      const content = buildUsedVehicleWindowSticker({
+        vehicle: {
+          vin,
+          condition: listing.condition as string | null,
+          year: vehicle.year, make: vehicle.make, model: vehicle.model,
+          trim: (listing.trim as string | null) || null,
+          stockNumber: (vf?.stock_number as string | null) || null,
+          mileage: listing.mileage as number | null,
+          price: listing.price as number | null,
+          exteriorColor: pick("exterior_color"),
+          interiorColor: pick("interior_color"),
+          engine: pick("engine"),
+          transmission: pick("transmission"),
+          drivetrain: pick("drivetrain"),
+          fuelType: pick("fuel", "fuel_type"),
+          cityMpg: num("city_mpg"),
+          highwayMpg: num("highway_mpg"),
+          equipment: extractUsedStickerEquipment(mc, listing.features),
+        },
+        dealer: {
+          name: dealer.name, address: dealer.address, city: dealer.city,
+          state: dealer.state, zip: dealer.zip, phone: dealer.phone,
+          docFeeEnabled: String(s.doc_fee_enabled) === "true",
+          docFeeAmount: Number(s.doc_fee_amount) || null,
+          docFeeLabel: s.doc_fee_label || null,
+        },
+        passportUrl: listing.slug ? `${appBase}/v/${listing.slug}` : null,
+      });
+      const decision = evaluateUsedStickerAutoPublish(content);
+      const bytes = await renderUsedCarStickerPdf(content);
+      // render_attempts bounds the sweep's re-render of an equipment-less
+      // sheet (see WINDOW_MAX_EMPTY_RENDERS): at ingest this function runs
+      // before marketcheck-specs saves the build sheet, so the first sticker
+      // is routinely empty and has to be revisited — but not forever.
+      const { data: priorDoc } = await admin.from("generated_documents")
+        .select("data_snapshot")
+        .eq("tenant_id", tenantId).eq("vehicle_id", listing.id).eq("document_type", "window")
+        .not("document_status", "in", '("superseded","archived","rejected")')
+        .order("version", { ascending: false }).limit(1).maybeSingle();
+      const priorAttempts = Number(
+        ((priorDoc?.data_snapshot || {}) as { render_attempts?: unknown }).render_attempts,
+      ) || 0;
+      out.window = await fileForm(admin, tenantId, vin, listing.id as string, "window", bytes, vehicle.year, {
+        content_version: USED_WINDOW_STICKER_CONTENT_VERSION,
+        template_id: "used-car-sticker",
+        auto_publish: decision.publish,
+        holds: decision.holds,
+        hold_reasons: decision.reasons,
+        equipment_count: content.equipment.length,
+        render_attempts: priorAttempts + 1,
+        price: content.priceText,
+        mileage: content.mileageText,
+      });
+      windowPublish = await publishFiledDocument(admin, tenantId, listing.id as string, "window", decision.holds);
+      if (!decision.publish) windowHolds = decision.reasons;
+    }
   } catch (e) {
     return json(500, { ok: false, error: String((e as Error)?.message || e) });
   }
 
-  return json(200, { ok: true, forms: out });
+  return json(200, {
+    ok: true, forms: out,
+    window_status: windowPublish, window_holds: windowHolds,
+    buyers_guide_status: buyersGuidePublish, buyers_guide_holds: buyersGuideHolds,
+  });
 });
