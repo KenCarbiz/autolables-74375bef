@@ -9,6 +9,35 @@ import {
 } from "../_shared/rooftopMatch.ts";
 import { classifyCondition } from "../_shared/vehicleCondition.ts";
 import { isDue, overdueBy, skipReason, hoursSinceSlot, CATCH_UP_HOURS } from "../_shared/syncSchedule.ts";
+import { describeShape, shapeHash, type JsonType } from "../_shared/payloadShape.ts";
+
+/**
+ * What we want the search feed to answer for us, and cannot answer from stored
+ * rows.
+ *
+ * marketcheck-sync writes `carfax_clean_title: l.carfax_clean_title ?? null`,
+ * so the column is null whether MarketCheck sent null or omitted the field
+ * entirely. Those mean completely different things — "no data for this VIN"
+ * versus "not included in your plan" — and it is the first question the vendor
+ * will ask. jsonType() already separates "absent" from "null", so recording
+ * the shape of a real listing settles it without another support round-trip.
+ *
+ * The link names are candidates, not a claim that any exists: carfax_1_owner
+ * and carfax_clean_title are the only CARFAX fields this integration has ever
+ * received, and the full key list recorded alongside these will show whether a
+ * report URL arrives under any name at all.
+ */
+const MC_SEARCH_DEPENDENCIES: Record<string, JsonType[]> = {
+  carfax_1_owner: ["boolean", "null", "absent"],
+  carfax_clean_title: ["boolean", "null", "absent"],
+  carfax_url: ["string", "null", "absent"],
+  carfax_report_url: ["string", "null", "absent"],
+  vhr_url: ["string", "null", "absent"],
+  history_report_url: ["string", "null", "absent"],
+  vdp_url: ["string", "null", "absent"],
+  owner_count: ["number", "string", "null", "absent"],
+  title_brand: ["string", "null", "absent"],
+};
 
 // Artifact posts are queued and paced, so they can still be in flight when the
 // handler returns. Without this the isolate is torn down mid-queue and the
@@ -1377,6 +1406,29 @@ serve(async (req) => {
         // never again be read as the dealer selling the rest of the lot.
         if (pageData.refused) { providerRefused = pageData.http || 429; break; }
         if (listings.length === 0) break;
+
+        // Record what the search feed actually sends, once per run. Only the
+        // NeoVIN decode was ever instrumented, so nothing could say whether a
+        // field we read as null was sent as null or never sent at all — which
+        // is exactly the open question about carfax_clean_title, empty on all
+        // 284 rows while carfax_1_owner populates on 162. Best-effort: an
+        // observation must never fail the sync it is watching.
+        if (start === 0 && listings[0]) {
+          try {
+            const shape = describeShape(listings[0], MC_SEARCH_DEPENDENCIES);
+            const hash = await shapeHash(shape);
+            await admin.rpc("record_provider_payload_shape", {
+              _provider: "marketcheck_search",
+              _endpoint: `${MC_BASE}/search/car/active`,
+              _shape_hash: hash,
+              _key_names: shape.keys,
+              _dependency_types: shape.dependencyTypes,
+              _findings: [],
+              _parse_failed: false,
+              _sample_vin: String(listings[0].vin || ""),
+            });
+          } catch { /* telemetry must never fail a sync */ }
+        }
 
         for (const l of listings) {
           if (await ingestListing(l) === "capped") break pages;
