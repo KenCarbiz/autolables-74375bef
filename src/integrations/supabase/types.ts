@@ -10716,6 +10716,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: string
       }
+      issue_vehicle_ready_token_service: {
+        Args: { p_tenant_id: string; p_vin: string }
+        Returns: string
+      }
       k208_authority_configured: {
         Args: { p_tenant_id: string }
         Returns: boolean
@@ -11034,6 +11038,15 @@ export type Database = {
             }
             Returns: string
           }
+      record_intake_sweep_exception: {
+        Args: {
+          p_error: string
+          p_stage: string
+          p_tenant_id: string
+          p_vin: string
+        }
+        Returns: undefined
+      }
       record_oem_distribution: {
         Args: {
           _brand: string
