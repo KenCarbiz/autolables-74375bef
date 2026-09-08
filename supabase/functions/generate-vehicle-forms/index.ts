@@ -494,20 +494,30 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
 // deno-lint-ignore no-explicit-any
 async function publishFiledDocument(
   admin: any, tenantId: string, vehicleId: string, docType: "window" | "buyers_guide", holds: string[],
-): Promise<"published" | "held" | "human_decision" | "noop"> {
+): Promise<string> {
   if (holds.length) return "held";
-  const { data: rejected } = await admin.from("generated_documents")
-    .select("id").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
-    .eq("document_type", docType).eq("document_status", "rejected").limit(1);
-  if (Array.isArray(rejected) && rejected.length) return "human_decision";
+  // Reported, never thrown. The document is already filed and addressable by
+  // this point; failing the whole request would also discard the sibling
+  // documents this call filed, and the caller's retry would re-file all of
+  // them. The status travels back in the response and into the log instead.
+  try {
+    const { data: rejected } = await admin.from("generated_documents")
+      .select("id").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+      .eq("document_type", docType).eq("document_status", "rejected").limit(1);
+    if (Array.isArray(rejected) && rejected.length) return "human_decision";
 
-  const { data: moved, error } = await admin.from("generated_documents")
-    .update({ document_status: "published", published_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
-    .eq("document_type", docType).eq("document_status", "draft")
-    .select("id");
-  if (error) throw new Error(`${docType} publish failed: ${error.message}`);
-  return Array.isArray(moved) && moved.length ? "published" : "noop";
+    const { data: moved, error } = await admin.from("generated_documents")
+      .update({ document_status: "published", published_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+      .eq("document_type", docType).eq("document_status", "draft")
+      .select("id");
+    if (error) throw new Error(error.message);
+    return Array.isArray(moved) && moved.length ? "published" : "noop";
+  } catch (e) {
+    const detail = String((e as Error)?.message || e);
+    console.error(`${docType} publish failed`, detail);
+    return `error: ${detail}`;
+  }
 }
 
 const SWEEP_LOCK_KEY = "compliance_forms_sweep";

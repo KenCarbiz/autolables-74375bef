@@ -117,6 +117,7 @@ export async function findVehiclesNeedingForms(
   // Chunked: a single `in` over a whole inventory builds a URL long enough to
   // be rejected by PostgREST.
   const filled = new Map<string, Set<string>>();
+  const facts = new Map(rows.map((r) => [r.id, { price: r.price ?? null, mileage: r.mileage ?? null }]));
   for (let i = 0; i < rows.length; i += CHUNK) {
     const ids = rows.slice(i, i + CHUNK).map((r) => r.id);
     let dq = admin.from("generated_documents")
@@ -126,7 +127,6 @@ export async function findVehiclesNeedingForms(
       .not("document_status", "in", RETIRED_STATUSES);
     if (tenantId) dq = dq.eq("tenant_id", tenantId);
     const { data: docs } = await dq;
-    const facts = new Map(rows.map((r) => [r.id, { price: r.price ?? null, mileage: r.mileage ?? null }]));
     for (const d of (docs || []) as DocRow[]) {
       if (!documentIsSettled(d, facts.get(d.vehicle_id))) continue;
       if (!filled.has(d.vehicle_id)) filled.set(d.vehicle_id, new Set());

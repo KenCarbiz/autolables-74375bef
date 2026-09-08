@@ -14,11 +14,19 @@
 --      sticker by hand, because the renderer now does it on ingest.
 --
 -- What this migration deliberately does NOT change: create_draft_buyers_guide
--- and create_draft_safety_inspection. The FTC Buyers Guide and the CT K-208
--- carry regulatory representations (the warranty box, the A/B/C roadworthy
--- result) that a human confirms, and trg_k208_publish_requires_execution still
--- blocks a K-208 publish until a signed inspection exists. The window sticker
--- publishes itself; those two do not.
+-- and create_draft_safety_inspection. Both keep drafting exactly as they do
+-- today, including the state-by-state warranty ladder the Guide depends on.
+--
+-- Publishing is decided in generate-vehicle-forms, per document:
+--   window        publishes itself (evaluateUsedStickerAutoPublish);
+--   buyers_guide  publishes when its warranty box was DETERMINED — forced by
+--                 the operating state, selected by a named statute, or set by
+--                 the dealership's configured default — and holds only when it
+--                 fell through to a bare as-is nobody chose
+--                 (evaluateBuyersGuideAutoPublish);
+--   k208          never publishes from here. It is dealer-only until service
+--                 signs the inspection, and enforce_k208_publish_requires_
+--                 execution (20260726130000) fails closed on any attempt.
 
 -- The condition vocabulary every used-vehicle document agrees on. Mirrors
 -- classifyCondition in src/lib/documents/families.ts and USED_CONDITIONS in
