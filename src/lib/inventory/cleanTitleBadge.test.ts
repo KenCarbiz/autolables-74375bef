@@ -38,11 +38,19 @@ function buildDetector() {
     listingHref[1].slice(1, listingHref[1].lastIndexOf("/")),
     listingHref[1].slice(listingHref[1].lastIndexOf("/") + 1),
   );
+  const descBlock = /const DESCRIPTION_BLOCK_RE = new RegExp\(([\s\S]*?)\s*,\s*"gi",?\s*\);/.exec(SRC);
+  if (!descBlock) throw new Error("DESCRIPTION_BLOCK_RE not found in the crawl source");
+  const DESCRIPTION_BLOCK_RE = new RegExp(
+    [...descBlock[1].matchAll(/String\.raw`([^`]*)`/g)].map((m) => m[1]).join(""),
+    "gi",
+  );
   const strip = (html: string): string =>
-    html.replace(/<a\b([^>]*)>([\s\S]{0,400}?)<\/a>/gi, (whole, attrs: string) => {
-      const href = /href=["']([^"']*)["']/i.exec(attrs)?.[1] ?? "";
-      return href && LISTING_HREF_RE.test(href) ? " " : whole;
-    });
+    html
+      .replace(/<a\b([^>]*)>([\s\S]{0,400}?)<\/a>/gi, (whole, attrs: string) => {
+        const href = /href=["']([^"']*)["']/i.exec(attrs)?.[1] ?? "";
+        return href && LISTING_HREF_RE.test(href) ? " " : whole;
+      })
+      .replace(DESCRIPTION_BLOCK_RE, " ");
   // Mirrors detectCleanTitleBadge.
   return (raw: string): boolean => {
     const html = strip(raw);

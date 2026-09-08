@@ -227,6 +227,37 @@ const stripNavigationLinks = (html: string): string =>
     return href && LISTING_HREF_RE.test(href) ? " " : whole;
   });
 
+// A VDP's description block is not third-party evidence, and on these pages it
+// is not even the dealer's: it is OUR OWN generated copy syndicated back to the
+// dealer site, unrendered markdown and all ("## 2022 Ram 1500 Big Horn Crew Cab
+// 4x4", "**VIN:** ..."). Reading a CARFAX fact out of that and writing it back
+// as a verified flag would launder our own output into a source of truth --
+// precisely the fabrication this pipeline exists to prevent.
+//
+// It is not hypothetical. On the RAM 1500 fixture, "no title brands" appears in
+// the description and nowhere else, so the clean-title flag was reading a
+// sentence we wrote. What survives the strip is genuinely third-party: CARFAX's
+// own badge art (partnerstatic.carfax.com, alt="carfax-oneowner"), CARFAX's
+// embedded snapshot module, and CarStory's independent "CARFAX One-Owner" panel.
+//
+// The lazy close means a description container with nested elements leaves a
+// tail behind. That is the tolerable direction of failure for a strip whose
+// purpose is to REMOVE evidence, and the detectors it feeds are positive-only.
+const DESCRIPTION_BLOCK_RE = new RegExp(
+  String.raw`<(div|section|article|p)\b[^>]*(?:class|id)=["'][^"']*\b` +
+    String.raw`(?:vehicle-description|vdp-description|inventory-description|` +
+    String.raw`description-(?:text|content|body|section)|vehicle-comments?|seller-comments?)` +
+    String.raw`\b[^"']*["'][^>]*>[\s\S]{0,20000}?</\1>`,
+  "gi",
+);
+const stripDescriptionBlocks = (html: string): string =>
+  html.replace(DESCRIPTION_BLOCK_RE, " ");
+
+// Everything a badge detector is allowed to read: the published page minus its
+// own navigation and minus any free-text description block.
+const evidenceHtml = (html: string): string =>
+  stripDescriptionBlocks(stripNavigationLinks(html));
+
 // One-owner badge on the dealer's own VDP. Provider context (CARFAX/
 // AutoCheck within range, or badge image alt/title) is REQUIRED so loose
 // marketing copy can't set the flag; absence of the badge means nothing —
@@ -240,7 +271,7 @@ const ONE_OWNER_RE = new RegExp(
   "i",
 );
 const detectOneOwnerBadge = (html: string): boolean =>
-  ONE_OWNER_RE.test(stripNavigationLinks(html));
+  ONE_OWNER_RE.test(evidenceHtml(html));
 
 // Manufacturer certification on the dealer's own VDP. The description engine
 // refuses CPO language on a feed flag alone, and rightly so: `condition` is
@@ -261,7 +292,7 @@ const CPO_RE = new RegExp(
 );
 const GENERIC_CERT_RE = /certified\s+(?:technician|mechanic|dealer|service|collision|staff)/i;
 const detectCpoBadge = (rawHtml: string): boolean => {
-  const html = stripNavigationLinks(rawHtml);
+  const html = evidenceHtml(rawHtml);
   return CPO_RE.test(html) && !(GENERIC_CERT_RE.test(html) && !/certified\s+pre[-\s]?owned/i.test(html));
 };
 
@@ -303,7 +334,7 @@ const detectCleanTitleBadge = (rawHtml: string): boolean => {
   // Badge art carries the claim in alt/title text, so those values are searched
   // alongside the rendered text; the pipe keeps one attribute's words from
   // forming a phrase with the next one's.
-  const html = stripNavigationLinks(rawHtml);
+  const html = evidenceHtml(rawHtml);
   const attrs = [...html.matchAll(/(?:alt|title)=["']([^"']{0,120})["']/gi)].map((m) => m[1]);
   const text = `${html.replace(/<[^>]+>/g, " ")} | ${attrs.join(" | ")}`
     .replace(/&nbsp;?/gi, " ").replace(/\s+/g, " ");
