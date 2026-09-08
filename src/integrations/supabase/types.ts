@@ -206,6 +206,7 @@ export type Database = {
       addendums: {
         Row: {
           accepted_at: string | null
+          accepted_by: string | null
           addendum_date: string | null
           cobuyer_name: string | null
           cobuyer_signature_data: string | null
@@ -277,6 +278,7 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
+          accepted_by?: string | null
           addendum_date?: string | null
           cobuyer_name?: string | null
           cobuyer_signature_data?: string | null
@@ -348,6 +350,7 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
+          accepted_by?: string | null
           addendum_date?: string | null
           cobuyer_name?: string | null
           cobuyer_signature_data?: string | null
@@ -10038,6 +10041,7 @@ export type Database = {
         }
         Returns: string
       }
+      accept_addendum: { Args: { _addendum_id: string }; Returns: Json }
       admin_clear_synced_inventory: {
         Args: { _tenant_id: string }
         Returns: Json
@@ -10776,6 +10780,10 @@ export type Database = {
         Returns: string
       }
       mark_addendum_executed: {
+        Args: { _addendum_id: string }
+        Returns: undefined
+      }
+      mark_addendum_getready_dispatched: {
         Args: { _addendum_id: string }
         Returns: undefined
       }
