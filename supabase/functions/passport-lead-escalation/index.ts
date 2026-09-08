@@ -24,6 +24,8 @@ Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
   // Cross-tenant SLA sweep sends escalation emails — gate to service role / cron secret
   // so an anon caller can't force premature escalations or drain the email budget.
+  // The gate is _shared/supabase.ts (one env var name for every schedule); the
+  // pg_cron job invoking this MUST send an x-cron-secret header or it 401s.
   if (!isServiceOrCron(req)) return json(401, { error: "unauthorized" });
   try {
     const admin = adminClient();

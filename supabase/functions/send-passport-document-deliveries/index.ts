@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { isServiceOrCron } from "../_shared/supabase.ts";
 
 type DeliveryOutboxRow = {
   id: string;
@@ -67,7 +68,7 @@ const ageHours = (createdAt: string) => (Date.now() - new Date(createdAt).getTim
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
 const htmlEscape = (value: string) =>
@@ -295,11 +296,12 @@ serve(async (req) => {
     // Cron-only: require the service-role key (or a matching cron secret) to
     // prevent unauthenticated callers from draining the outbox and burning
     // Resend credits. The caller is the `passport-delivery-flush` pg_cron job
-    // (20260728030000_passport_delivery_cron.sql) — browsers cannot reach this.
-    const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-    const cronSecret = Deno.env.get("CRON_SECRET") || "";
-    const headerSecret = req.headers.get("x-cron-secret") || "";
-    if (auth !== serviceKey && !(cronSecret && headerSecret === cronSecret)) {
+    // (20260728030000_passport_delivery_cron.sql), which sends only
+    // x-cron-secret — browsers cannot reach this. The gate lives in
+    // _shared/supabase.ts so the accepted env var name cannot drift from what
+    // the schedules actually send; reading a local CRON_SECRET here 401'd every
+    // run because that name is not set on the project.
+    if (!isServiceOrCron(req)) {
       return new Response(JSON.stringify({ ok: false, error: "not authorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
