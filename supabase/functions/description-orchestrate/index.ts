@@ -39,6 +39,18 @@ import { runGates, vehicleClassOf } from "../_shared/description-gates.ts";
 import { refreshDecision } from "../_shared/description-refresh.ts";
 import { computeCost, type CostRecord } from "../_shared/description-cost.ts";
 
+// The disclosures repair is allowed to append verbatim. The dealer's own
+// required_legal_text has to be in this list: validateContentV3 raises
+// REQUIRED_DISCLOSURE_MISSING against it, and a channel length trim routinely
+// removes it because withRequiredDisclosure appends it at the very end.
+const dealerDisclosures = (
+  settings: Record<string, any>, extra: string[] = [],
+): string[] => {
+  const legal = String(settings?.required_legal_text || "").trim();
+  const all = legal ? [...extra, legal] : [...extra];
+  return Array.from(new Set(all.filter((d) => String(d || "").trim().length > 0)));
+};
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
@@ -1065,7 +1077,12 @@ async function orchestrateVehicle(
     // dealer's own disclosure. It never rewrites a claim and never calls the
     // model again — a generative "fix" is a second chance to hallucinate.
     if (hasRepairableFindings(findings)) {
-      const repaired = repairContent(masterFinal, findings, masterPolicy, voice.requiredDisclosures);
+      // REQUIRED_DISCLOSURE_MISSING is raised against settings.required_legal_text
+      // (see withRequiredDisclosure), and repair's append step is keyed to that
+      // same code — but it was only ever handed the voice/channel disclosures,
+      // so it could never append the one text the validator was asking for.
+      const repaired = repairContent(masterFinal, findings, masterPolicy,
+        dealerDisclosures(settings, voice.requiredDisclosures));
       if (repaired.changed) {
         const after = validateContentV3(repaired.content, snap, settings, packet);
         const before = findings.filter((f) => f.blocking).length;
@@ -1175,12 +1192,21 @@ async function orchestrateVehicle(
         if (hasRepairableFindings(cFindings) || cFindings.some((f) =>
             ["CHANNEL_LENGTH_EXCEEDED", "CHANNEL_FORMAT_INVALID", "CHANNEL_EMOJI_NOT_ALLOWED"]
               .includes(f.validator_code))) {
-          const r = repairContent(content, cFindings, policy, policy.requiredDisclosures);
+          const r = repairContent(content, cFindings, policy,
+            dealerDisclosures(settings, policy.requiredDisclosures));
           if (r.changed) {
             const after = validateContentV3(r.content, snap, settings, channelPacket, policy);
             const beforeBlocking = cFindings.filter((f) => f.blocking).length;
             const afterBlocking = after.filter((f) => f.blocking).length;
-            if (afterBlocking <= beforeBlocking && after.length < cFindings.length) {
+            // Removing the only blocker is an improvement even when the total
+            // finding count does not fall: deleting the offending sentence
+            // routinely trades one blocker for a non-blocking length warning,
+            // and the old "fewer findings overall" rule then discarded a repair
+            // that had made the copy publishable. Blocking count decides first;
+            // the total-count rule still governs blocker-neutral tidying.
+            // Repair only ever deletes, so this can never accept more blockers.
+            if (afterBlocking < beforeBlocking
+                || (afterBlocking === beforeBlocking && after.length < cFindings.length)) {
               content = r.content;
               cFindings = after;
               cRepair = { applied: r.applied, unrepairable: r.unrepairable };
@@ -1261,10 +1287,16 @@ async function orchestrateVehicle(
     let finalStatus = "READY";
     if (eligibility === "blocked") {
       finalStatus = "FAILED_BLOCKED";
+      // decideEligibility weighs findings AND channelBlocking, so the exception
+      // has to report both. Reporting only findings meant a block originating
+      // in a channel policy reached the operator as a high-severity exception
+      // with an empty summary and {"findings": []} — nothing to act on.
+      // channelBlocking is already filtered to blocking at its push site.
+      const blockingFindings = [...findings.filter((f) => f.blocking), ...channelBlocking];
       await raiseException(admin, ctx, "VALIDATION_FAILED", "high", true,
         "Description blocked by validation",
-        findings.filter((f) => f.blocking).map((f) => f.message).join(" · ").slice(0, 400),
-        { findings: findings.filter((f) => f.blocking) });
+        blockingFindings.map((f) => f.message).join(" · ").slice(0, 400),
+        { findings: blockingFindings });
     } else if (eligibility === "review_required") {
       finalStatus = "REVIEW_REQUIRED";
       await raiseException(admin, ctx, "REVIEW_REQUIRED", "medium", false,
