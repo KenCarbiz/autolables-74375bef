@@ -1568,7 +1568,20 @@ serve(async (req) => {
       // inventory; without chaining the backlog simply never reconciled.
       const sweepStart = typeof body.sweep_start === "string" ? body.sweep_start : new Date().toISOString();
       const depth = Number(body.depth) || 0;
+      // Scheduled callers cannot hold a connection open for a 100s hop (pg_net
+      // gives up at 120s and reports the sweep as failed even though it ran).
+      // "kick" starts the chain fire-and-forget and answers immediately.
+      if (body.kick === true) {
+        fetch(`${SUPABASE_URL}/functions/v1/description-orchestrate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`,
+                     "x-cron-secret": CRON_SECRET },
+          body: JSON.stringify({ action: "reconcile", tenant_id: reqTenant, sweep_start: sweepStart, depth: 0 }),
+        }).catch(() => { /* best-effort; the next nightly sweep retries */ });
+        return json({ success: true, kicked: true, sweep_start: sweepStart }, 202);
+      }
       const deadline = Date.now() + RECONCILE_BUDGET_MS;
+
       const results: unknown[] = [];
       const seenThisHop = new Set<string>();
       let examined = 0;
