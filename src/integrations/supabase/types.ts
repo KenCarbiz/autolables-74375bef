@@ -3023,6 +3023,8 @@ export type Database = {
           enabled_channels: Json
           generation_model: string
           generation_provider: string
+          geo_origin_zip: string | null
+          geo_radius_miles: number
           internal_publication_enabled: boolean
           knowledge_revision: string | null
           market_context_allowed: boolean
@@ -3044,6 +3046,7 @@ export type Database = {
           review_mode: string
           review_mode_by_class: Json
           selling_areas: Json
+          selling_areas_meta: Json
           state: string | null
           tenant_id: string
           updated_at: string
@@ -3064,6 +3067,8 @@ export type Database = {
           enabled_channels?: Json
           generation_model?: string
           generation_provider?: string
+          geo_origin_zip?: string | null
+          geo_radius_miles?: number
           internal_publication_enabled?: boolean
           knowledge_revision?: string | null
           market_context_allowed?: boolean
@@ -3085,6 +3090,7 @@ export type Database = {
           review_mode?: string
           review_mode_by_class?: Json
           selling_areas?: Json
+          selling_areas_meta?: Json
           state?: string | null
           tenant_id: string
           updated_at?: string
@@ -3105,6 +3111,8 @@ export type Database = {
           enabled_channels?: Json
           generation_model?: string
           generation_provider?: string
+          geo_origin_zip?: string | null
+          geo_radius_miles?: number
           internal_publication_enabled?: boolean
           knowledge_revision?: string | null
           market_context_allowed?: boolean
@@ -3126,6 +3134,7 @@ export type Database = {
           review_mode?: string
           review_mode_by_class?: Json
           selling_areas?: Json
+          selling_areas_meta?: Json
           state?: string | null
           tenant_id?: string
           updated_at?: string
