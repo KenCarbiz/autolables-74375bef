@@ -511,6 +511,7 @@ export type Database = {
           seat_limit: number | null
           status: string
           stripe_subscription_id: string | null
+          stripe_subscription_item_id: string | null
           tenant_id: string
           trial_ends_at: string | null
           updated_at: string
@@ -527,6 +528,7 @@ export type Database = {
           seat_limit?: number | null
           status?: string
           stripe_subscription_id?: string | null
+          stripe_subscription_item_id?: string | null
           tenant_id: string
           trial_ends_at?: string | null
           updated_at?: string
@@ -543,6 +545,7 @@ export type Database = {
           seat_limit?: number | null
           status?: string
           stripe_subscription_id?: string | null
+          stripe_subscription_item_id?: string | null
           tenant_id?: string
           trial_ends_at?: string | null
           updated_at?: string
@@ -4517,6 +4520,7 @@ export type Database = {
           photo_path: string | null
           product_id: string | null
           product_name: string | null
+          source: string | null
           tenant_id: string | null
           vehicle_vin: string
           verified_at: string | null
@@ -4535,6 +4539,7 @@ export type Database = {
           photo_path?: string | null
           product_id?: string | null
           product_name?: string | null
+          source?: string | null
           tenant_id?: string | null
           vehicle_vin: string
           verified_at?: string | null
@@ -4553,6 +4558,7 @@ export type Database = {
           photo_path?: string | null
           product_id?: string | null
           product_name?: string | null
+          source?: string | null
           tenant_id?: string | null
           vehicle_vin?: string
           verified_at?: string | null
@@ -10157,6 +10163,10 @@ export type Database = {
         Args: { p_stripe_subscription_id: string }
         Returns: number
       }
+      autocurb_sync_entitlements: {
+        Args: { p_items: Json; p_tenant_id: string }
+        Returns: undefined
+      }
       autocurb_upsert_dealer: {
         Args: {
           p_autocurb_tenant_id: string
@@ -10362,6 +10372,14 @@ export type Database = {
           vehicle_ymm: string
         }[]
       }
+      get_crawl_advertised_prices_schedule: {
+        Args: never
+        Returns: {
+          active: boolean
+          cron_expression: string
+          last_run: string
+        }[]
+      }
       get_cron_job_status: {
         Args: { _jobname: string }
         Returns: {
@@ -10517,6 +10535,19 @@ export type Database = {
           name: string
           primary_email: string
           stripe_customer_id: string
+        }[]
+      }
+      get_tenant_billing_summary: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          activated_at: string
+          app_slug: string
+          expires_at: string
+          plan_tier: string
+          renewed_at: string
+          status: string
+          stripe_subscription_id: string
+          stripe_subscription_item_id: string
         }[]
       }
       get_vehicle_file_by_deal_token: {
@@ -10742,6 +10773,17 @@ export type Database = {
         Returns: boolean
       }
       lifecycle_bucket: { Args: { p_state: string }; Returns: string }
+      list_tenant_members: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          accepted_at: string
+          email: string
+          id: string
+          invited_email: string
+          role: string
+          user_id: string
+        }[]
+      }
       listings_with_stale_recalls: {
         Args: { p_limit?: number }
         Returns: {
@@ -10842,6 +10884,20 @@ export type Database = {
           _vehicle_id: string
         }
         Returns: string
+      }
+      missing_expected_functions: {
+        Args: { _expected: string[] }
+        Returns: {
+          missing_function: string
+        }[]
+      }
+      missing_expected_objects: {
+        Args: { _expected: string[] }
+        Returns: {
+          detail: string
+          kind: string
+          object_name: string
+        }[]
       }
       next_description_reconcile_batch: {
         Args: { p_limit?: number; p_sweep_start?: string; p_tenant_id?: string }
@@ -10996,6 +11052,18 @@ export type Database = {
         }
         Returns: string
       }
+      record_getready_install_proof: {
+        Args: {
+          _installer_name: string
+          _photo_path: string
+          _product_id: string
+          _product_name: string
+          _record_id: string
+          _signature_data: string
+          _signature_type: string
+        }
+        Returns: string
+      }
       record_ingest_step: {
         Args: {
           p_detail?: Json
@@ -11107,11 +11175,19 @@ export type Database = {
           prior_keys: string[]
         }[]
       }
+      record_signing_event: {
+        Args: { _details?: Json; _event: string; _signing_token: string }
+        Returns: undefined
+      }
       record_signing_reengagement: {
         Args: { _addendum_id: string; _channel?: string; _details?: Json }
         Returns: undefined
       }
       release_service_lock: { Args: { _key: string }; Returns: undefined }
+      remove_tenant_member: {
+        Args: { p_member_id: string }
+        Returns: undefined
+      }
       remove_vehicle_document: {
         Args: {
           _name: string
@@ -11231,6 +11307,14 @@ export type Database = {
             Returns: undefined
           }
       schedule_compliance_forms_sweep: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
+      schedule_crawl_advertised_prices: {
         Args: {
           _cron_expr?: string
           _service_key?: string
@@ -11376,6 +11460,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      signing_funnel_summary: {
+        Args: { _since_days?: number }
+        Returns: {
+          addendums_signed: number
+          leads_captured: number
+          links_opened: number
+          signing_started: number
+        }[]
+      }
       submit_detail_signoff: {
         Args: {
           _content_hash: string
@@ -11488,6 +11581,7 @@ export type Database = {
         Args: { _holder?: string; _key: string; _ttl_seconds?: number }
         Returns: boolean
       }
+      unschedule_crawl_advertised_prices: { Args: never; Returns: undefined }
       unschedule_marketcheck_sync: { Args: never; Returns: undefined }
       unschedule_reengage_abandoned_signings: {
         Args: never
