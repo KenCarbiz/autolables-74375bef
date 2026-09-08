@@ -10160,6 +10160,10 @@ export type Database = {
         }
         Returns: string
       }
+      backfill_oem_distribution_entitlements: {
+        Args: { _limit?: number; _tenant_id: string }
+        Returns: number
+      }
       bootstrap_tenant: {
         Args: {
           _app_slug?: string
@@ -10837,6 +10841,14 @@ export type Database = {
       oem_distribution_for_vehicle: {
         Args: { _document_kind: string; _tenant_id: string; _vin: string }
         Returns: string
+      }
+      oem_doc_key_from_ymm: {
+        Args: { _ymm: string }
+        Returns: {
+          make: string
+          model: string
+          year: number
+        }[]
       }
       oem_franchise_min_new_units: { Args: never; Returns: number }
       oem_make_from_ymm: { Args: { _ymm: string }; Returns: string }
