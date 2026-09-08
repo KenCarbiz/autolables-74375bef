@@ -2,6 +2,8 @@ import {
   ShieldCheck, ShieldAlert, FileCheck, User, Wrench, TrendingDown,
   BadgeCheck, Sparkles,
 } from "lucide-react";
+import { resolveHistoryFacts, isBadgeworthy, badgeAttribution } from "@/lib/vehicleTruth/historyFacts";
+import type { Confidence } from "@/lib/vehicleTruth/precedence";
 
 // Trust Badge Strip — the signature confidence bar on the Vehicle Passport.
 // Renders ONLY the badges we have real data for (no greyed placeholders), and
@@ -22,23 +24,71 @@ export interface HistoryFactBadge {
   icon: typeof ShieldCheck;
   title: string;
   sub: string;
+  /** Ceiling the resolved source may claim. Never "LOW" — those never render. */
+  confidence: Confidence;
+  /**
+   * How to qualify the claim, when it came from the dealer's page rather than
+   * the history provider. Carried but NOT rendered: the passport copy is
+   * owner-approved and locked, so showing this is a change to ask for, not one
+   * to make while wiring provenance in behind it.
+   */
+  attribution: string | null;
 }
 
-// carfax_1_owner and carfax_clean_title are the only sources of truth for these
-// two claims. Strict === true: false, null, an absent key or the string "true"
-// all say nothing, and neither fact is ever inferred from a title brand, the
-// condition or a clean recall check -- an unearned history claim is the failure
-// that matters on a compliance product.
+/** The listing fields these badges are resolved from. */
+export interface HistoryFactSource {
+  mc_attributes?: Record<string, unknown> | null;
+  certification?: Record<string, unknown> | null;
+  condition?: string | null;
+}
+
+// One-owner and clean title, resolved through the precedence engine rather
+// than read as bare booleans.
+//
+// The flags sit next to each other in mc_attributes but do not come from the
+// same place: MarketCheck relays one, the crawler harvests the other off the
+// dealer's published page, and each carries a provenance tag saying which.
+// The engine turns that tag into a confidence ceiling, and a fact that lands
+// at LOW -- AI inference, or provenance nobody recognises -- never renders.
+// That is what stops a sentence out of a description AutoLabels generated,
+// syndicated to the dealer's site and scraped back off it, from printing as
+// "Clean Title -- no salvage, flood, or lemon".
+//
+// Positive-only and strict, as before: false, null, an absent key or the
+// string "true" all render nothing, and neither fact is ever inferred from a
+// title brand, the condition or a clean recall check.
 export const historyFactBadges = (
-  mcAttributes: Record<string, unknown> | null | undefined,
+  listing: HistoryFactSource | null | undefined,
 ): HistoryFactBadge[] => {
-  const mc = mcAttributes || {};
+  const facts = resolveHistoryFacts({
+    id: "",
+    vin: "",
+    mc_attributes: listing?.mc_attributes ?? null,
+    certification: listing?.certification ?? null,
+    condition: listing?.condition ?? null,
+  });
   const out: HistoryFactBadge[] = [];
-  if (mc.carfax_1_owner === true) {
-    out.push({ key: "one-owner", icon: User, title: "1-Owner Vehicle", sub: "Single previous owner" });
+  const oneOwner = facts.carfax_one_owner;
+  if (isBadgeworthy(oneOwner)) {
+    out.push({
+      key: "one-owner",
+      icon: User,
+      title: "1-Owner Vehicle",
+      sub: "Single previous owner",
+      confidence: oneOwner!.confidence,
+      attribution: badgeAttribution(oneOwner!),
+    });
   }
-  if (mc.carfax_clean_title === true) {
-    out.push({ key: "clean-title", icon: FileCheck, title: "Clean Title", sub: "No salvage, flood, or lemon" });
+  const cleanTitle = facts.carfax_clean_title;
+  if (isBadgeworthy(cleanTitle)) {
+    out.push({
+      key: "clean-title",
+      icon: FileCheck,
+      title: "Clean Title",
+      sub: "No salvage, flood, or lemon",
+      confidence: cleanTitle!.confidence,
+      attribution: badgeAttribution(cleanTitle!),
+    });
   }
   return out;
 };
@@ -54,7 +104,7 @@ export default function TrustStrip({ listing }: { listing: any }) {
   } else if (listing.recall_status === "open_recalls" && (listing.open_recall_count || 0) > 0) {
     badges.push({ icon: ShieldAlert, title: `${listing.open_recall_count} Open Recall${listing.open_recall_count === 1 ? "" : "s"}`, sub: "See details below", tone: "red" });
   }
-  for (const f of historyFactBadges(mc)) badges.push({ icon: f.icon, title: f.title, sub: f.sub, tone: "green" });
+  for (const f of historyFactBadges(listing)) badges.push({ icon: f.icon, title: f.title, sub: f.sub, tone: "green" });
 
   const sr = (listing.service_records?.length || 0) as number;
   if (sr > 0) badges.push({ icon: Wrench, title: "Full Service History", sub: `${sr} service record${sr === 1 ? "" : "s"}`, tone: "green" });

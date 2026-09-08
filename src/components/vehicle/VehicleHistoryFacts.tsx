@@ -6,6 +6,8 @@ import { historyFactBadges } from "@/components/listing/TrustStrip";
 // name it yet.
 interface HistoryFactSources {
   mc_attributes: Record<string, unknown> | null;
+  certification?: Record<string, unknown> | null;
+  condition?: string | null;
   history_report_url?: string | null;
 }
 
@@ -16,7 +18,7 @@ interface HistoryFactSources {
 // history report the group links to it so the claim can be checked; when it
 // does not, the badge still shows and no link is invented.
 export const VehicleHistoryFacts = ({ vehicle }: { vehicle: HistoryFactSources }) => {
-  const facts = historyFactBadges(vehicle.mc_attributes);
+  const facts = historyFactBadges(vehicle);
   if (facts.length === 0) return null;
 
   const href = String(vehicle.history_report_url || "").trim();

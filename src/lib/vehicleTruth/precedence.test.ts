@@ -7,6 +7,7 @@ import {
   precedenceFor,
   resolveFact,
   sourceRank,
+  SOURCE_KINDS,
   type CandidateFact,
 } from "./precedence";
 
@@ -171,5 +172,57 @@ describe("resolving competing facts", () => {
       c("mileage", 13127, "dealer_confirmed", "VERIFIED", "2026-06-01T00:00:00Z"),
     ]);
     expect(newer?.value).toBe(13500);
+  });
+});
+
+// Vehicle-history facts. Neither party to the sale owns them, and the source
+// that most wants to assert them is the one with the least standing to.
+describe("history facts", () => {
+  const HISTORY = ["carfax_one_owner", "carfax_clean_title", "certified_pre_owned", "title_brand", "owner_count"];
+
+  it("are controlled by the history provider, not the dealer", () => {
+    for (const key of HISTORY) expect(factAuthority(key), key).toBe("history_provider");
+  });
+
+  it("rank the provider above the dealer's own page, and both above the dealer", () => {
+    const order = precedenceFor("carfax_clean_title");
+    expect(order.indexOf("marketcheck")).toBeLessThan(order.indexOf("dealer_vdp"));
+    expect(order.indexOf("dealer_vdp")).toBeLessThan(order.indexOf("dealer_confirmed"));
+    expect(order.indexOf("dealer_confirmed")).toBeLessThan(order.indexOf("ai_inference"));
+  });
+
+  it("let the provider's NO overrule a badge on the dealer's page", () => {
+    const resolved = resolveFact([
+      { factKey: "carfax_one_owner", value: true, source: "dealer_vdp", confidence: "VERIFIED" },
+      { factKey: "carfax_one_owner", value: false, source: "marketcheck", confidence: "HIGH" },
+    ]);
+    expect(resolved?.value).toBe(false);
+    expect(resolved?.source).toBe("marketcheck");
+    // Not a dispute: only one of the two may verify, so ranking settles it.
+    expect(resolved?.disputed).toBe(false);
+  });
+});
+
+describe("dealer_vdp", () => {
+  it("can never produce a verified fact, whatever the caller claims", () => {
+    // The cap is the whole mechanism. A badge is read off a page, not out of
+    // the report behind it, and a claim that arrives tagged as coming from a
+    // dealer's website must not inherit the trust of the report it depicts.
+    expect(capConfidence("dealer_vdp", "VERIFIED")).toBe("MEDIUM");
+    expect(canProduceVerifiedFact("dealer_vdp")).toBe(false);
+    expect(isVerified("dealer_vdp", "VERIFIED")).toBe(false);
+  });
+
+  it("still outranks inference", () => {
+    const resolved = resolveFact([
+      { factKey: "carfax_clean_title", value: false, source: "ai_inference", confidence: "VERIFIED" },
+      { factKey: "carfax_clean_title", value: true, source: "dealer_vdp", confidence: "HIGH" },
+    ]);
+    expect(resolved?.value).toBe(true);
+    expect(resolved?.confidence).toBe("MEDIUM");
+  });
+
+  it("is a ranked kind, so a tenant can order it on the Source Authority screen", () => {
+    expect(SOURCE_KINDS).toContain("dealer_vdp");
   });
 });

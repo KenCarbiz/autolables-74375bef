@@ -10,6 +10,14 @@
 // AI inference appears in the ordering so that it can be ranked, never so
 // that it can win: it is capped below every structured source and can
 // never produce a verified fact.
+//
+// `dealer_vdp` is a third party's assertion republished on the dealer's own
+// page -- a CARFAX badge, a CarStory panel. It is real evidence, and it is
+// the ONLY source for facts MarketCheck does not sell, so it has to be
+// rankable. It is capped below verified because we read a badge, not the
+// report behind it. Copy we generated and syndicated back to that same page
+// is not this: it is ai_inference wearing a dealer's domain name, and the
+// cap is what keeps the two apart.
 
 export type SourceKind =
   | "oem_authorized"
@@ -17,6 +25,7 @@ export type SourceKind =
   | "marketcheck"
   | "dealer_confirmed"
   | "vin_decode"
+  | "dealer_vdp"
   | "other_structured"
   | "ai_inference";
 
@@ -26,12 +35,13 @@ export const SOURCE_KINDS: SourceKind[] = [
   "marketcheck",
   "dealer_confirmed",
   "vin_decode",
+  "dealer_vdp",
   "other_structured",
   "ai_inference",
 ];
 
 /** Who controls the fact — which decides whose correction may win. */
-export type FactAuthority = "manufacturer" | "dealer" | "shared";
+export type FactAuthority = "manufacturer" | "dealer" | "history_provider" | "shared";
 
 export type Confidence = "VERIFIED" | "HIGH" | "MEDIUM" | "LOW" | "UNVERIFIED";
 
@@ -42,6 +52,7 @@ const DEFAULT_ORDER: SourceKind[] = [
   "marketcheck",
   "dealer_confirmed",
   "vin_decode",
+  "dealer_vdp",
   "other_structured",
   "ai_inference",
 ];
@@ -82,10 +93,26 @@ const MANUFACTURER_CONTROLLED = new Set([
   "parts_content",
 ]);
 
+// Facts a vehicle-history provider controls. Neither party to the sale owns
+// these: CARFAX or AutoCheck found them, or nobody did. A dealer may DISPUTE
+// one -- which raises a conflict for a human -- but a dealer assertion never
+// silently outranks the provider, because "this car is a one-owner with a
+// clean title" is precisely the claim a seller has the most reason to make
+// and the least standing to make.
+const HISTORY_PROVIDER_CONTROLLED = new Set([
+  "carfax_one_owner",
+  "carfax_clean_title",
+  "title_brand",
+  "accident_history",
+  "owner_count",
+  "certified_pre_owned",
+]);
+
 export function factAuthority(factKey: string): FactAuthority {
   const key = factKey.trim().toLowerCase();
   if (DEALER_CONTROLLED.has(key)) return "dealer";
   if (MANUFACTURER_CONTROLLED.has(key)) return "manufacturer";
+  if (HISTORY_PROVIDER_CONTROLLED.has(key)) return "history_provider";
   return "shared";
 }
 
@@ -95,7 +122,8 @@ export function factAuthority(factKey: string): FactAuthority {
  * For a dealer-controlled fact the dealer's own confirmation moves to the
  * top. For a manufacturer-controlled fact it drops below every verified
  * provider — present, so it can still fill a gap no provider answered,
- * but never able to overwrite the manufacturer.
+ * but never able to overwrite the manufacturer. A history fact behaves the
+ * same way, with the history provider in the manufacturer's place.
  */
 export function precedenceFor(factKey: string): SourceKind[] {
   const authority = factAuthority(factKey);
@@ -107,6 +135,22 @@ export function precedenceFor(factKey: string): SourceKind[] {
       "marketcheck",
       "vin_decode",
       "other_structured",
+      "ai_inference",
+    ];
+  }
+  if (authority === "history_provider") {
+    // MarketCheck relays the provider's own flags, so it leads. The dealer's
+    // published page carries the provider's badge and is the only source for
+    // what MarketCheck does not sell. A dealer confirmation sits below both,
+    // able to fill a gap nobody answered but never to overwrite the provider.
+    return [
+      "marketcheck",
+      "dealer_vdp",
+      "oem_authorized",
+      "neovin",
+      "other_structured",
+      "vin_decode",
+      "dealer_confirmed",
       "ai_inference",
     ];
   }
@@ -151,6 +195,9 @@ const MAX_CONFIDENCE: Record<SourceKind, Confidence> = {
   marketcheck: "HIGH",
   dealer_confirmed: "VERIFIED",
   vin_decode: "MEDIUM",
+  // A badge read off a page, not the report behind it. Enough to show a
+  // shopper; never enough to print as verified.
+  dealer_vdp: "MEDIUM",
   other_structured: "MEDIUM",
   ai_inference: "LOW",
 };

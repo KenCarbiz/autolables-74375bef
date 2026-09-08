@@ -27,6 +27,7 @@ export interface TruthListingRow {
   stock_number?: string | null;
   features?: unknown;
   mc_attributes?: Record<string, unknown> | null;
+  certification?: Record<string, unknown> | null;
 }
 
 export interface IngestCandidate extends CandidateFact {
@@ -239,5 +240,99 @@ export function candidatesFromDealerEdits(
       sourceTimestamp: editedAt,
     });
   }
+  return out;
+}
+
+// ── Vehicle history ──────────────────────────────────────────────────
+//
+// One-owner, clean title and certification are the three claims a shopper
+// weighs most and a seller has the least standing to make unaided, so they
+// are resolved by provenance rather than read as bare booleans.
+//
+// The flags live in `mc_attributes` next to each other, but they do not all
+// come from the same place: MarketCheck relays two of them, the crawler
+// harvests the rest off the dealer's published page, and the writer records
+// which by tagging the value. That tag is the whole mechanism -- without it
+// a badge scraped from a page is indistinguishable from a provider's flag.
+
+/**
+ * A stored provenance tag mapped onto how far it may be trusted.
+ *
+ * An UNRECOGNISED tag falls to `ai_inference`, not to a structured default.
+ * That is deliberate: a tag nobody has vouched for is exactly the case that
+ * put a sentence from our own generated description into the clean-title
+ * flag, and defaulting unknown provenance to "structured" is how that
+ * happens again. Unknown means untrusted.
+ */
+const HISTORY_SOURCE_KINDS: Record<string, SourceKind> = {
+  dealer_vdp: "dealer_vdp",
+  marketcheck: "marketcheck",
+  feed: "marketcheck",
+  manual: "dealer_confirmed",
+  dealer: "dealer_confirmed",
+  dealer_confirmed: "dealer_confirmed",
+  // Free text, whichever domain it was published on. AutoLabels writes the
+  // descriptions that appear on dealer sites, so "it was on their page" says
+  // nothing about who made the claim.
+  description: "ai_inference",
+  dealer_description: "ai_inference",
+  autolabels_description: "ai_inference",
+};
+
+export function historySourceKind(tag: unknown, fallback: SourceKind): SourceKind {
+  const t = typeof tag === "string" ? tag.trim().toLowerCase() : "";
+  if (!t) return fallback;
+  return HISTORY_SOURCE_KINDS[t] ?? "ai_inference";
+}
+
+/**
+ * Candidate history facts from one stored listing row.
+ *
+ * Separate from `candidatesFromListing` because these facts have their own
+ * authority — neither party to the sale owns them — and because the crawler
+ * writes them on a different schedule from the feed sync.
+ */
+export function candidatesFromHistory(
+  listing: TruthListingRow,
+  options: IngestOptions = {},
+): IngestCandidate[] {
+  const out: IngestCandidate[] = [];
+  const mc = (listing.mc_attributes ?? {}) as Record<string, unknown>;
+  const at = options.retrievedAt ?? null;
+  const ids = options.sourceRecordIds ?? {};
+
+  // `false` is carried as well as `true`. A provider saying "not a one-owner"
+  // is a statement, and it has to be rankable against a badge that says
+  // otherwise — which is how a scraped `true` gets overruled rather than
+  // silently winning because nothing contradicted it.
+  if (typeof mc.carfax_1_owner === "boolean") {
+    const src = historySourceKind(mc.one_owner_source, "marketcheck");
+    push(out, "carfax_one_owner", mc.carfax_1_owner, src, "HIGH", at, ids[src]);
+  }
+  if (typeof mc.carfax_clean_title === "boolean") {
+    const src = historySourceKind(mc.clean_title_source, "marketcheck");
+    push(out, "carfax_clean_title", mc.carfax_clean_title, src, "HIGH", at, ids[src]);
+  }
+
+  const owners = posNum(mc.owner_count);
+  if (owners !== undefined) {
+    push(out, "owner_count", owners, "marketcheck", "HIGH", at, ids.marketcheck);
+  }
+  const brand = str(mc.title_brand) ?? str(mc.title_status);
+  if (brand) push(out, "title_brand", brand, "marketcheck", "HIGH", at, ids.marketcheck);
+
+  // Certification, from two independent angles. `condition === "cpo"` is
+  // derived from MarketCheck's is_certified, so it cannot corroborate the
+  // feed flag — it IS the feed flag. The dealer's published page is the
+  // separate assertion, and it is tagged as such.
+  const cert = (listing.certification ?? {}) as Record<string, unknown>;
+  if (cert.certified === true) {
+    const src = historySourceKind(cert.source, "dealer_confirmed");
+    push(out, "certified_pre_owned", true, src, "HIGH", str(cert.verified_at) ?? at, ids[src]);
+  }
+  if (listing.condition === "cpo") {
+    push(out, "certified_pre_owned", true, "marketcheck", "HIGH", at, ids.marketcheck);
+  }
+
   return out;
 }

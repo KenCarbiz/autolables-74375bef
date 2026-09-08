@@ -1308,7 +1308,13 @@ serve(async (req) => {
             const { data: cur } = await admin.from("vehicle_listings")
               .select("mc_attributes").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
             const mc = (cur?.mc_attributes ?? {}) as Record<string, unknown>;
-            if (mc.owner_count == null && mc.carfax_1_owner !== true) {
+            // Gap-fill only. `!== true` also passed when the feed had said
+            // FALSE, so a badge scraped off the page overwrote the provider's
+            // explicit "not a one-owner" -- and since the column holds one
+            // value per flag, that destroyed the candidate the precedence
+            // engine would have used to overrule the badge. Nothing downstream
+            // could recover it. Only an absent value is a gap.
+            if (mc.owner_count == null && mc.carfax_1_owner == null) {
               await admin.from("vehicle_listings")
                 .update({ mc_attributes: { ...mc, carfax_1_owner: true, one_owner_source: "dealer_vdp" } })
                 .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
