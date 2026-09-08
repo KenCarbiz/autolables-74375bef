@@ -59,6 +59,10 @@ export interface AuditPacket {
     install_signature_count: number;
     advertised_price_snapshot_count: number;
     latest_advertised_price: number | null;
+    /** How the headline price was obtained; null when no observed row exists. */
+    latest_advertised_price_method: string | null;
+    advertised_price_rows_total: number;
+    advertised_price_rows_observed: number;
     latest_advertised_source: string | null;
   };
 }
@@ -155,7 +159,26 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
   const auditRows = rows(audits);
   const archiveRows = rows(archive);
   const getReadyRows = rows(getReady);
-  const advertisedPriceRows = rows(advertisedPrices) as Array<{ advertised_price?: number; source_label?: string; snapshot_at?: string }>;
+  const advertisedPriceRows = rows(advertisedPrices) as Array<{
+    advertised_price?: number; source_label?: string; snapshot_at?: string;
+    captured_method?: string | null; source_channel?: string | null;
+  }>;
+
+  // What the dealer actually advertised is what we OBSERVED on their page --
+  // not what their inventory feed reported. Both live in this table, and until
+  // `captured_method` existed the feed rows carried source_channel='website'
+  // and were indistinguishable from screenshot-backed captures. A packet is a
+  // document a dealer hands to a regulator; a feed echo presented as an
+  // observed advertisement is the worst possible thing for it to contain.
+  //
+  // Rows predating the column are LEGACY: their provenance was never recorded
+  // and cannot be reconstructed, so they are excluded from the headline figure
+  // rather than assumed to be observations. The full history stays in the
+  // packet, method and all, so nothing is hidden -- only the single number the
+  // packet asserts is narrowed to rows that earned it.
+  const observedPriceRows = advertisedPriceRows.filter((r) =>
+    r.captured_method === "dealer_vdp_observation"
+    || r.captured_method === "manual_dealer_confirmation");
   const installProofRows = rows(installProofs);
 
   // Wave 23 — derived Add-On Election Record. For every addendum, we
@@ -301,7 +324,10 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
         return sum + accs.filter(a => !!a.installer_signature_data).length;
       }, 0),
       advertised_price_snapshot_count: advertisedPriceRows.length,
-      latest_advertised_price: advertisedPriceRows[0]?.advertised_price ?? null,
+      latest_advertised_price: observedPriceRows[0]?.advertised_price ?? null,
+      latest_advertised_price_method: observedPriceRows[0]?.captured_method ?? null,
+      advertised_price_rows_total: advertisedPriceRows.length,
+      advertised_price_rows_observed: observedPriceRows.length,
       latest_advertised_source: advertisedPriceRows[0]?.source_label ?? null,
     },
   };

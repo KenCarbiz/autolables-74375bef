@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { classifyCrawlOutcome } from "../_shared/crawlOutcome.ts";
 
 // ──────────────────────────────────────────────────────────────
 // crawl-advertised-prices  ·  Wave 24
@@ -257,6 +258,27 @@ const stripDescriptionBlocks = (html: string): string =>
 // own navigation and minus any free-text description block.
 const evidenceHtml = (html: string): string =>
   stripDescriptionBlocks(stripNavigationLinks(html));
+
+// What a PRICE extractor is allowed to read: the page minus description prose,
+// with navigation left in place.
+//
+// The narrower strip is deliberate. Description blocks are where AutoLabels'
+// own generated copy lands after it syndicates to the dealer's site, and that
+// copy talks about money -- "the original window sticker lists a total MSRP of
+// $56,945", "savings", "discount". `extractPriceComponents` matches labels
+// first-match-wins with no rejection list at all, and what it extracts persists
+// to `dealer_discount` / `website_sale_price` and renders a "Dealer Discount"
+// line on the customer passport. So a sentence we wrote could put a discount
+// figure in front of a shopper.
+//
+// Navigation is NOT stripped here, because a listing or search page carries its
+// real prices inside exactly the anchors that strip removes. Taking them out
+// would break discovery to fix a problem discovery does not have.
+//
+// (Similar-vehicle cards on a VDP also carry prices and are not removed by
+// either strip. That is a separate defect -- a card price winning the label
+// scoring -- and is tracked as its own fix, not smuggled in here.)
+const priceEvidenceHtml = (html: string): string => stripDescriptionBlocks(html);
 
 // One-owner badge on the dealer's own VDP. Provider context (CARFAX/
 // AutoCheck within range, or badge image alt/title) is REQUIRED so loose
@@ -691,59 +713,6 @@ const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 
-/**
- * Name the failure that actually happened.
- *
- * This crawl stopped producing prices on 2026-08-24 and every attempt for the
- * next fifteen days was recorded as "bot_challenge" -- the dealer's site is
- * blocking us. It was not. Firecrawl was answering HTTP 402 "Insufficient
- * credits to perform this request": the account had run dry. The real message
- * was sitting in render_error the whole time and no operator surface read it,
- * so a billing problem wore a bot-wall's name for two weeks and the fix
- * (top up the account) was never obvious.
- *
- * "bot_challenge" now means only what it says: we reached the page and the
- * page refused us, with the renderer available and having genuinely tried.
- */
-function classifyCrawlOutcome(args: {
-  captured: boolean;
-  reason: string | null;
-  cheapStatus: number | null;
-  renderAttempted: boolean;
-  renderStatus: number | null;
-  renderError: string | null;
-}): { outcome: string; detail: string | null } {
-  const { captured, reason, cheapStatus, renderAttempted, renderStatus, renderError } = args;
-  if (captured) return { outcome: "captured", detail: null };
-
-  const err = (renderError || "").toLowerCase();
-
-  // Renderer problems are OUR problems, and each has a different fix: pay,
-  // rotate the key, slow down, configure it. None of them is the dealer.
-  if (renderStatus === 402 || err.includes("insufficient credits") || err.includes("upgrade your plan")) {
-    return { outcome: "render_credits_exhausted", detail: renderError || "Firecrawl reported insufficient credits" };
-  }
-  if (renderStatus === 401 || renderStatus === 403) {
-    return { outcome: "render_auth_failed", detail: renderError || `Firecrawl rejected the key (${renderStatus})` };
-  }
-  if (renderStatus === 429) {
-    return { outcome: "render_rate_limited", detail: renderError || "Firecrawl rate limit" };
-  }
-  if (!FIRECRAWL_KEY) {
-    return { outcome: "render_unconfigured", detail: "No Firecrawl key is set, so a walled page cannot be rendered" };
-  }
-  if (renderAttempted && renderStatus == null) {
-    return { outcome: "render_unreachable", detail: renderError || "Firecrawl did not respond" };
-  }
-
-  // Only now is the dealer's site a fair thing to blame.
-  if (reason === "bot_challenge") {
-    return renderAttempted
-      ? { outcome: "bot_challenge", detail: `Site refused the request (HTTP ${cheapStatus ?? "?"}) and the rendered page was also refused` }
-      : { outcome: "blocked_no_render_budget", detail: `Site refused the request (HTTP ${cheapStatus ?? "?"}); no render budget left this run` };
-  }
-  return { outcome: reason || "no_price_extracted", detail: cheapStatus ? `HTTP ${cheapStatus}` : null };
-}
 
 interface RenderResult {
   html: string;
@@ -1176,7 +1145,7 @@ serve(async (req) => {
         html = (res.ok && !looksLikeChallenge(raw, res.headers, res.status)) ? raw : "";
       } catch { html = ""; }
       let result: AdResult & { matched_label?: string | null } = html
-        ? extractAdvertised(html, fetchUrl, row.vin, cfg.labels)
+        ? extractAdvertised(priceEvidenceHtml(html), fetchUrl, row.vin, cfg.labels)
         : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
 
       // Escalate to Firecrawl when the cheap path is walled or empty — this is
@@ -1196,7 +1165,7 @@ serve(async (req) => {
           renderSource = "firecrawl";
           if (r.html) {
             html = r.html;
-            result = extractAdvertised(r.html, fetchUrl, row.vin, cfg.labels);
+            result = extractAdvertised(priceEvidenceHtml(r.html), fetchUrl, row.vin, cfg.labels);
           }
           // Fall back to Firecrawl's structured extract, but only when the VIN
           // it read matches the target — never trust a price off the wrong car.
@@ -1229,6 +1198,7 @@ serve(async (req) => {
           renderAttempted: renderStatus != null || renderError != null,
           renderStatus,
           renderError,
+          renderConfigured: !!FIRECRAWL_KEY,
         });
         await admin.rpc("record_advertised_price_crawl_attempt", {
           _tenant_id: row.tenant_id,
@@ -1394,7 +1364,7 @@ serve(async (req) => {
       // column can never fail the price write. price_parse_status = 'warning'
       // when the displayed sale price disagrees with advertised + doc fee.
       try {
-        const comp = extractPriceComponents(html);
+        const comp = extractPriceComponents(priceEvidenceHtml(html));
         const bd = buildBreakdown(newPrice, comp, cfg.docFee, cfg.inclDocFee);
         // FTC-critical guard: the advertised price the platform stores and
         // protects must never land ABOVE the dealer's own inventory/feed price.
@@ -1455,6 +1425,10 @@ serve(async (req) => {
         vin: row.vin,
         source_url: fetchUrl,
         source_channel: row.source_label,
+        // We fetched the dealer's page and read this number off it. That is a
+        // different act from the feed reporting a price, and the compliance
+        // packet must be able to tell them apart by column, not by note text.
+        captured_method: "dealer_vdp_observation",
         advertised_price: newPrice,
         captured_by: null,
         screenshot_url: screenshot?.path ?? null,
@@ -1465,10 +1439,11 @@ serve(async (req) => {
           : `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
       };
       let insErr = (await admin.from("advertised_prices").insert(insRow)).error;
-      // Resilient to a not-yet-applied screenshot_url / sha256 / bucket column.
-      if (insErr && /screenshot_(url|sha256|bucket)/i.test(insErr.message || "")) {
-        const { screenshot_url, screenshot_sha256, screenshot_bucket, ...rest } = insRow;
-        void screenshot_url; void screenshot_sha256; void screenshot_bucket;
+      // Resilient to a not-yet-applied column, so a deploy that lands ahead of
+      // its migration degrades instead of losing the price entirely.
+      if (insErr && /screenshot_(url|sha256|bucket)|captured_method/i.test(insErr.message || "")) {
+        const { screenshot_url, screenshot_sha256, screenshot_bucket, captured_method, ...rest } = insRow;
+        void screenshot_url; void screenshot_sha256; void screenshot_bucket; void captured_method;
         insErr = (await admin.from("advertised_prices").insert(rest)).error;
       }
       if (insErr) {
@@ -1574,7 +1549,7 @@ serve(async (req) => {
             const r = await fetch(fetchVdp, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
             const html = r.ok ? await r.text() : "";
             if (!r.ok || looksLikeChallenge(html, r.headers, r.status)) { crawledThisTenant++; continue; }
-            const result = extractAdvertised(html, fetchVdp, vin, cfg.labels);
+            const result = extractAdvertised(priceEvidenceHtml(html), fetchVdp, vin, cfg.labels);
             if (result.gated || result.reason === "vin_mismatch" || result.price == null) { crawledThisTenant++; continue; }
             const k = `${vin}|${channel}`;
             const prev = latestByVinChannel.get(k);

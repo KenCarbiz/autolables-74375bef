@@ -4,7 +4,8 @@ import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToke
 import { newCallMeter, recordCall, estimateCost } from "../_shared/mcCost.ts";
 import {
   classifyListing, isStrictRooftop, normStreet, normZip, prunePreflight,
-  segmentOf, segmentPrunePreflight, type InventorySegment,
+  segmentOf, segmentPrunePreflight, probeCoverageSatisfied, sufficientCoverage,
+  type InventorySegment,
   type ListingIdentity, type Rooftop,
 } from "../_shared/rooftopMatch.ts";
 import { classifyCondition } from "../_shared/vehicleCondition.ts";
@@ -27,7 +28,7 @@ import { describeShape, shapeHash, type JsonType } from "../_shared/payloadShape
  * received, and the full key list recorded alongside these will show whether a
  * report URL arrives under any name at all.
  */
-const MC_SEARCH_DEPENDENCIES: Record<string, JsonType[]> = {
+const MC_LISTING_DEPENDENCIES: Record<string, JsonType[]> = {
   carfax_1_owner: ["boolean", "null", "absent"],
   carfax_clean_title: ["boolean", "null", "absent"],
   carfax_url: ["string", "null", "absent"],
@@ -166,7 +167,7 @@ async function resolveDealerId(
 // bill, and the figures never reach a dealer-visible surface.
 let callMeter = newCallMeter();
 
-async function mcFetch(base: string, query: string): Promise<{ listings: MCListing[]; numFound: number; http: number; refused?: boolean }> {
+async function mcFetch(base: string, query: string): Promise<{ listings: MCListing[]; numFound: number; http: number; refused?: boolean; endpoint: string }> {
   const url = `${base}?api_key=${encodeURIComponent(MC_KEY)}&${query}`;
   // A provider refusal is not an answer. Returning an empty page for a 429 or a
   // quota block makes it indistinguishable from "this dealer has no more cars",
@@ -187,22 +188,22 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
           await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
           continue;
         }
-        return { listings: [], numFound: 0, http: res.status, refused: true };
+        return { listings: [], numFound: 0, http: res.status, refused: true, endpoint: base };
       }
-      if (!res.ok) return { listings: [], numFound: 0, http: res.status };
+      if (!res.ok) return { listings: [], numFound: 0, http: res.status, endpoint: base };
       // deno-lint-ignore no-explicit-any
       const data: any = await res.json().catch(() => ({}));
       const listings: MCListing[] = Array.isArray(data?.listings) ? data.listings : [];
       const nf = typeof data?.num_found === "number" ? data.num_found : parseInt(String(data?.num_found ?? ""), 10);
       const numFound = Number.isFinite(nf) ? nf : listings.length;
-      return { listings, numFound, http: res.status };
+      return { listings, numFound, http: res.status, endpoint: base };
     } catch {
       if (attempt < BACKOFF_MS.length) {
         await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
         continue;
       }
       // A timeout is a refusal too: we did not learn the lot is empty.
-      return { listings: [], numFound: 0, http: 0, refused: true };
+      return { listings: [], numFound: 0, http: 0, refused: true, endpoint: base };
     }
   }
 }
@@ -214,6 +215,16 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
 // One page of a rooftop's inventory from the syndication feed. owned=true drops
 // the duplicate non-owned copies that have no price/stock, but it's only honored
 // for source/dealer_id/mc_website_id — so append it only for those params.
+// The provider name recorded against a payload shape, derived from the URL the
+// response came back on. Keeping this a function of the endpoint is what stops
+// the two fields from ever disagreeing again.
+const providerLabelFor = (endpoint: string): string => {
+  if (endpoint.includes("/dealerships/inventory")) return "marketcheck_syndication";
+  if (endpoint.includes("/search/car/active")) return "marketcheck_search";
+  if (endpoint.includes("/decode/car/neovin")) return "marketcheck_neovin";
+  return "marketcheck_other";
+};
+
 const syndPage = (
   param: string, value: string, rows: number, start: number,
   opts?: { carType?: "new" | "used" | "certified"; owned?: boolean },
@@ -721,9 +732,13 @@ serve(async (req) => {
     } catch { /* first run — no history yet */ }
     try {
       // Latest website price per VIN — only append a snapshot when it moved.
+      // Compare the incoming feed price against the last FEED price, not
+      // against a crawl observation. Reading the website channel here meant a
+      // dealer whose site and feed legitimately differ by a doc fee produced a
+      // feed row on every single sync.
       const { data: priceRows } = await admin.from("advertised_prices")
         .select("vin, advertised_price, captured_at")
-        .eq("tenant_id", cfg.tenant_id).eq("source_channel", "website")
+        .eq("tenant_id", cfg.tenant_id).eq("source_channel", "feed")
         .order("captured_at", { ascending: false }).limit(5000);
       const latestWebsite = new Map<string, number>();
       for (const r of (priceRows || []) as Array<{ vin: string; advertised_price: number }>) {
@@ -1193,16 +1208,30 @@ serve(async (req) => {
             // "marketcheck" made every insert fail with 22P02, so the feed has
             // never written a single advertised-price row — prices_recorded
             // read 0 as "nothing moved". Machine writers leave it NULL, exactly
-            // as crawl-advertised-prices does; the provenance lives in notes
-            // ("MarketCheck ...") and in source_url pointing at the VDP.
-            const { error } = await admin.from("advertised_prices").insert({
+            // as crawl-advertised-prices does.
+            //
+            // The channel is 'feed', not 'website'. This function has never
+            // fetched a web page. Writing these rows as website observations
+            // put a feed echo into the evidence table the compliance packet
+            // reads, indistinguishable from a screenshot-backed capture. The
+            // provenance used to live in `notes` — which is prose, and prose is
+            // not queryable, which is exactly how it went unnoticed.
+            const priceRow: Record<string, unknown> = {
               tenant_id: cfg.tenant_id, store_id: "", vin,
-              source_url: l.vdp_url || "", source_channel: "website",
+              source_url: l.vdp_url || "", source_channel: "feed",
+              captured_method: "marketcheck_syndication",
               advertised_price: price, captured_by: null,
               notes: prev == null
                 ? `MarketCheck ${l.inventory_type || ""} · $${price.toLocaleString()}`
                 : `MarketCheck ${l.inventory_type || ""} · $${prev.toLocaleString()} → $${price.toLocaleString()}`,
-            });
+            };
+            let { error } = await admin.from("advertised_prices").insert(priceRow);
+            if (error) {
+              // Tolerate a deploy that lands ahead of the migration: drop the
+              // new column and retry. The truthful source_channel still ships.
+              const { captured_method: _drop, ...withoutMethod } = priceRow;
+              ({ error } = await admin.from("advertised_prices").insert(withoutMethod));
+            }
             if (!error) { tenantPrices++; pricesRecorded++; latestWebsite.set(vin, price); }
             // New or price-changed VIN → queue a full enrichment pull,
             // ZIP-anchored to the tenant's local market.
@@ -1407,7 +1436,7 @@ serve(async (req) => {
         if (pageData.refused) { providerRefused = pageData.http || 429; break; }
         if (listings.length === 0) break;
 
-        // Record what the search feed actually sends, once per run. Only the
+        // Record what the inventory feed actually sends, once per run. Only the
         // NeoVIN decode was ever instrumented, so nothing could say whether a
         // field we read as null was sent as null or never sent at all — which
         // is exactly the open question about carfax_clean_title, empty on all
@@ -1415,11 +1444,18 @@ serve(async (req) => {
         // observation must never fail the sync it is watching.
         if (start === 0 && listings[0]) {
           try {
-            const shape = describeShape(listings[0], MC_SEARCH_DEPENDENCIES);
+            const shape = describeShape(listings[0], MC_LISTING_DEPENDENCIES);
             const hash = await shapeHash(shape);
+            // The endpoint is taken from the response that produced this
+            // payload, never written by hand. The previous version hardcoded
+            // `${MC_BASE}/search/car/active` here while the walk actually runs
+            // against /v2/dealerships/inventory -- a diagnostic built to settle
+            // vendor questions, telling the vendor the wrong endpoint. It
+            // misled a whole analysis before anyone checked it against the
+            // fetch. A label that can drift from execution will.
             await admin.rpc("record_provider_payload_shape", {
-              _provider: "marketcheck_search",
-              _endpoint: `${MC_BASE}/search/car/active`,
+              _provider: providerLabelFor(pageData.endpoint),
+              _endpoint: pageData.endpoint,
               _shape_hash: hash,
               _key_names: shape.keys,
               _dependency_types: shape.dependencyTypes,
@@ -1468,6 +1504,19 @@ serve(async (req) => {
         if (source) pushProbe("source", source, true);
         if (source) pushProbe("source", source, false);
         pushProbe(chosen.param, chosen.value, false);
+        // A probe that returns a handful of cars is not evidence that the
+        // segment IS a handful of cars. On 2026-09-08 a transient 1-car answer
+        // from mc_location_id pre-empted the 70-car answer four probes later,
+        // and `accepted === 1` is precisely the value that used to slip past
+        // every clause of the segment gate.
+        //
+        // So the loop no longer stops at the first probe that ingests
+        // anything. It unions across probes -- ingestListing adds to liveVins,
+        // so a VIN seen twice is ingested once -- and stops early only when a
+        // probe has plausibly covered the segment.
+        const priorNew = priorSegVins.new.size;
+        const sufficientNew = sufficientCoverage(priorNew);
+        let ingestedTotal = 0;
         for (const p of supProbes.slice(0, 5)) {
           const r = await syndPage(p.param, p.value, synRows, 0, { carType: "new", owned: p.owned });
           // The unowned feed can return several copies per VIN; prefer the
@@ -1489,13 +1538,26 @@ serve(async (req) => {
             if (res === "capped") { capped = true; break; }
             if (res === "ok") ingested++;
           }
+          ingestedTotal += ingested;
           tried.push({ param: p.param, id: p.value, owned: p.owned, http: r.http, num_found: r.numFound, got: r.listings.length, matched, ingested });
-          if (ingested > 0 || capped) {
-            supplementalNew = { param: p.param, id: p.value, owned: p.owned, ingested, attempts: tried };
+          if (probeCoverageSatisfied({ ingestedTotal, priorInventory: priorNew, capped })) {
+            supplementalNew = {
+              param: p.param, id: p.value, owned: p.owned,
+              ingested: ingestedTotal, sufficient: sufficientNew,
+              ...(capped ? { capped: true } : {}), attempts: tried,
+            };
             break;
           }
         }
-        if (!supplementalNew) supplementalNew = { exhausted: true, attempts: tried };
+        // Every probe ran and the segment still looks short. Record what was
+        // actually ingested rather than reporting a bare "exhausted": the
+        // segment gate reads `accepted`, and a short result must reach it as a
+        // short result so it can refuse to prune.
+        if (!supplementalNew) {
+          supplementalNew = ingestedTotal > 0
+            ? { partial: true, ingested: ingestedTotal, sufficient: sufficientNew, attempts: tried }
+            : { exhausted: true, ingested: 0, sufficient: sufficientNew, attempts: tried };
+        }
       }
 
       // ── Duplicate stock_number across live VINs ────────────────────
