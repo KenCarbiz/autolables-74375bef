@@ -167,6 +167,25 @@ export type InventorySegment = "new" | "rest";
 export const segmentOf = (condition: unknown): InventorySegment =>
   String(condition ?? "").trim().toLowerCase() === "new" ? "new" : "rest";
 
+/**
+ * How far a segment may fall in one run before the drop is treated as an
+ * outage rather than a sell-down.
+ *
+ * This is not a new constant. It is the run-level collapse threshold from
+ * `prunePreflight` above, applied at the grain where the 2026-08-01 outage
+ * actually happened. The run-level breaker only sees the whole lot, so it
+ * cannot fire for a store whose new-car segment is a minority of inventory:
+ * a dealer with 20 new units in a 120-car lot who loses all 20 still has
+ * 100 >= floor(120 * 0.6), and the run-level gate waves it through.
+ *
+ * Measured against 19 consecutive nightly runs at the reference rooftop:
+ * the largest single-run attrition observed was 15 of ~130 at the run level
+ * (11.5%) and 9 new units of ~80 at the segment level (11%). Allowing a 40%
+ * drop is roughly three and a half times more generous than anything this
+ * feed has ever legitimately done.
+ */
+export const SEGMENT_COLLAPSE_FLOOR = 0.6;
+
 export interface SegmentGateInput {
   segment: InventorySegment;
   /** Run-level: every page was fetched. */
@@ -213,5 +232,57 @@ export function segmentPrunePreflight(i: SegmentGateInput): string | null {
     return `segment_vanished:${i.segment}:0_vs_${i.priorInventory}`;
   }
 
+  // A tiny non-zero result is the same outage wearing a different number, and
+  // it is more dangerous than zero because every clause above tests for zero.
+  // On 2026-09-08 a probe returned 1 new car against 71 in stock; `accepted`
+  // was 1, so all three clauses passed and only the coarse run-level breaker
+  // stopped 70 live cars being archived. At a store with a smaller new-car
+  // share that breaker would not have fired either.
+  //
+  // Ingesting a handful is not evidence that the dealer holds a handful. It
+  // is evidence that we did not see the segment.
+  if (
+    i.priorInventory > 0 &&
+    i.accepted < Math.floor(i.priorInventory * SEGMENT_COLLAPSE_FLOOR)
+  ) {
+    return `segment_collapsed:${i.segment}:${i.accepted}_vs_${i.priorInventory}`;
+  }
+
   return null;
+}
+
+
+// ── Backstop probe coverage ───────────────────────────────────────────
+//
+// When the primary feed returns no units for a segment, the sync probes other
+// scopes for it. The old loop stopped at the first probe that ingested
+// anything at all, so a transient one-car answer pre-empted the real one --
+// and produced exactly the `accepted === 1` that the segment gate above used
+// to wave through. The two bugs compounded into a near-miss on 70 live cars.
+//
+// Coverage is judged against what the dealer still stocks, on the same floor
+// the segment gate uses: seeing less than that is a reason to keep asking,
+// not a reason to conclude the segment shrank.
+
+export interface ProbeCoverageInput {
+  /** Units ingested across every probe so far, deduped by VIN. */
+  ingestedTotal: number;
+  /** Non-archived rows of this segment the dealer has right now. */
+  priorInventory: number;
+  /** The max_vehicles ceiling was hit. A limit, not an outage. */
+  capped: boolean;
+}
+
+/** How many units a probe run must find before the segment counts as covered. */
+export function sufficientCoverage(priorInventory: number): number {
+  // No prior inventory to compare against -- a new tenant, or a store that
+  // stocks none of this segment. Any success is all the evidence available.
+  if (priorInventory <= 0) return 1;
+  return Math.max(1, Math.floor(priorInventory * SEGMENT_COLLAPSE_FLOOR));
+}
+
+/** True when probing should stop. */
+export function probeCoverageSatisfied(i: ProbeCoverageInput): boolean {
+  if (i.capped) return true;
+  return i.ingestedTotal >= sufficientCoverage(i.priorInventory);
 }

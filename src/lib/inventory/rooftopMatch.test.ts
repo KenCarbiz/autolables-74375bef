@@ -187,7 +187,11 @@ describe("mc_rooftop_id invariant", () => {
 // returning new units, the walk completed, every used car came back, and the
 // prune read the absence as 39 sales.
 
-import { segmentOf, segmentPrunePreflight, type SegmentGateInput } from "../../../supabase/functions/_shared/rooftopMatch";
+import {
+  segmentOf, segmentPrunePreflight, SEGMENT_COLLAPSE_FLOOR,
+  probeCoverageSatisfied, sufficientCoverage,
+  type SegmentGateInput,
+} from "../../../supabase/functions/_shared/rooftopMatch";
 
 const seg = (over: Partial<SegmentGateInput> = {}): SegmentGateInput => ({
   segment: "new", feedWalked: true, writeError: false,
@@ -248,5 +252,161 @@ describe("a segment the run did not observe is never retired", () => {
   it("keeps the run-level gates binding on every segment", () => {
     expect(segmentPrunePreflight(seg({ feedWalked: false }))).toBe("partial_feed");
     expect(segmentPrunePreflight(seg({ writeError: true }))).toBe("write_error");
+  });
+});
+
+// ── A tiny non-zero result is the same outage ─────────────────────────
+// Every clause above tests for zero. On 2026-09-08 a probe returned ONE new
+// car against 71 in stock, `accepted` was 1, all three clauses passed, and
+// only the coarse run-level breaker stopped 70 live cars being archived.
+describe("a segment that came back a fraction of itself is never retired", () => {
+  it("blocks 1 accepted of 71 — the case that got through", () => {
+    expect(segmentPrunePreflight(seg({ feedReported: 0, accepted: 1, priorInventory: 71 })))
+      .toBe("segment_collapsed:new:1_vs_71");
+  });
+
+  it("blocks 0 accepted of 71 by the more specific reason", () => {
+    expect(segmentPrunePreflight(seg({ feedReported: 0, accepted: 0, priorInventory: 71 })))
+      .toBe("segment_vanished:new:0_vs_71");
+  });
+
+  it("blocks 5 accepted of 71", () => {
+    expect(segmentPrunePreflight(seg({ feedReported: 5, accepted: 5, priorInventory: 71 })))
+      .toBe("segment_collapsed:new:5_vs_71");
+  });
+
+  it("allows a healthy 70 of 71", () => {
+    expect(segmentPrunePreflight(seg({ feedReported: 70, accepted: 70, priorInventory: 71 })))
+      .toBeNull();
+  });
+
+  it("allows ordinary daily churn — the largest attrition this feed has shown", () => {
+    // 19 nightly runs at the reference rooftop: worst observed was 15 of ~130
+    // run-level and 9 new units of ~80 segment-level. Both must pass, or the
+    // gate stops legitimate archiving.
+    expect(segmentPrunePreflight(seg({ feedReported: 71, accepted: 71, priorInventory: 80 }))).toBeNull();
+    expect(segmentPrunePreflight(seg({ segment: "rest", feedReported: 115, accepted: 115, priorInventory: 130 }))).toBeNull();
+  });
+
+  it("protects a small segment inside a large lot — the store the run-level breaker cannot save", () => {
+    // 20 new units in a 120-car lot. Losing all 20 leaves 100 >= floor(120*0.6),
+    // so the RUN-level gate waves it through. The segment gate must not.
+    expect(segmentPrunePreflight(seg({ feedReported: 0, accepted: 1, priorInventory: 20 })))
+      .toBe("segment_collapsed:new:1_vs_20");
+    expect(segmentPrunePreflight(seg({ feedReported: 20, accepted: 20, priorInventory: 20 })))
+      .toBeNull();
+  });
+
+  it("applies to the used segment too, not just new", () => {
+    expect(segmentPrunePreflight(seg({ segment: "rest", feedReported: 3, accepted: 3, priorInventory: 60 })))
+      .toBe("segment_collapsed:rest:3_vs_60");
+  });
+
+  it("does not fire for a dealer who stocks none of that segment", () => {
+    // priorInventory 0 means there is nothing to protect; a new tenant or a
+    // used-only store must not be permanently blocked.
+    expect(segmentPrunePreflight(seg({ feedReported: 0, accepted: 0, priorInventory: 0 }))).toBeNull();
+  });
+
+  it("still refuses a partial feed or a write error before it looks at counts", () => {
+    expect(segmentPrunePreflight(seg({ feedWalked: false, accepted: 71, priorInventory: 71 })))
+      .toBe("partial_feed");
+    expect(segmentPrunePreflight(seg({ writeError: true, accepted: 71, priorInventory: 71 })))
+      .toBe("write_error");
+  });
+
+  it("uses the run-level collapse threshold, not a second invented one", () => {
+    expect(SEGMENT_COLLAPSE_FLOOR).toBe(0.6);
+    // The boundary is exactly floor(prior * 0.6): 60 of 100 passes, 59 blocks.
+    expect(segmentPrunePreflight(seg({ feedReported: 60, accepted: 60, priorInventory: 100 }))).toBeNull();
+    expect(segmentPrunePreflight(seg({ feedReported: 59, accepted: 59, priorInventory: 100 })))
+      .toBe("segment_collapsed:new:59_vs_100");
+  });
+});
+
+// ── Backstop probe coverage ───────────────────────────────────────────
+// The other half of the 2026-09-08 near-miss: the probe loop stopped at the
+// first probe that ingested anything, so a transient 1-car answer pre-empted
+// the 70-car answer four probes later.
+describe("probing continues until the segment is plausibly covered", () => {
+  const cov = (ingestedTotal: number, priorInventory: number, capped = false) =>
+    probeCoverageSatisfied({ ingestedTotal, priorInventory, capped });
+
+  it("does NOT stop after a transient one-car probe", () => {
+    // The exact 2026-09-08 shape: 1 ingested against 71 in stock.
+    expect(cov(1, 71)).toBe(false);
+  });
+
+  it("stops once a probe covers the segment", () => {
+    expect(cov(70, 71)).toBe(true);
+  });
+
+  it("keeps probing so a later probe can succeed after an early one returned 1", () => {
+    // Probe 1 yields 1, probes 2-4 yield nothing, probe 5 yields 69.
+    // Union crosses the floor only at the end -- which is why the loop must
+    // not have exited at probe 1.
+    expect(cov(1, 71)).toBe(false);
+    expect(cov(1, 71)).toBe(false);
+    expect(cov(70, 71)).toBe(true);
+  });
+
+  it("stops immediately when capped, because that is a ceiling not an outage", () => {
+    expect(cov(1, 71, true)).toBe(true);
+    expect(cov(0, 71, true)).toBe(true);
+  });
+
+  it("accepts any success when there is no prior inventory to measure against", () => {
+    // A new tenant, or a store that stocks none of this segment. Requiring 60%
+    // of zero would loop through every probe on every run forever.
+    expect(sufficientCoverage(0)).toBe(1);
+    expect(cov(1, 0)).toBe(true);
+    expect(cov(0, 0)).toBe(false);
+  });
+
+  it("never demands more than the segment gate would accept", () => {
+    // If coverage were stricter than the gate, the loop would burn all five
+    // probes on a run the gate would have passed anyway.
+    for (const prior of [1, 5, 20, 71, 130]) {
+      const need = sufficientCoverage(prior);
+      expect(segmentPrunePreflight(seg({
+        feedReported: need, accepted: need, priorInventory: prior,
+      }))).toBeNull();
+    }
+  });
+
+  it("uses the same floor as the segment gate", () => {
+    expect(sufficientCoverage(100)).toBe(Math.floor(100 * SEGMENT_COLLAPSE_FLOOR));
+  });
+});
+
+// ── The two gates together ────────────────────────────────────────────
+describe("run-level and segment-level gates in combination", () => {
+  it("blocks a catastrophically incomplete segment even when the run looks fine", () => {
+    // The store the run-level breaker cannot save: 20 new units in a 120-car
+    // lot. Lose all but one new car and the run still reports 101 of 120.
+    expect(prunePreflight({
+      feedWalked: true, writeError: false, matched: 101, liveVins: 101, lastGoodCount: 120,
+    })).toBeNull();
+    // ...and the segment gate is the only thing standing in the way.
+    expect(segmentPrunePreflight(seg({ feedReported: 0, accepted: 1, priorInventory: 20 })))
+      .toBe("segment_collapsed:new:1_vs_20");
+  });
+
+  it("a partial feed stops both gates, however healthy the counts look", () => {
+    // Pagination failure and a transient upstream error both surface as an
+    // unwalked feed; neither may retire anything.
+    expect(prunePreflight({
+      feedWalked: false, writeError: false, matched: 129, liveVins: 129, lastGoodCount: 129,
+    })).toBe("partial_feed");
+    expect(segmentPrunePreflight(seg({ feedWalked: false, accepted: 71, priorInventory: 71 })))
+      .toBe("partial_feed");
+  });
+
+  it("both gates pass on a genuinely healthy run", () => {
+    expect(prunePreflight({
+      feedWalked: true, writeError: false, matched: 129, liveVins: 129, lastGoodCount: 130,
+    })).toBeNull();
+    expect(segmentPrunePreflight(seg({ feedReported: 71, accepted: 71, priorInventory: 71 }))).toBeNull();
+    expect(segmentPrunePreflight(seg({ segment: "rest", feedReported: 58, accepted: 58, priorInventory: 60 }))).toBeNull();
   });
 });
