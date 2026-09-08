@@ -150,10 +150,13 @@ const AppShell = ({ children }: AppShellProps) => {
   // none of the dealer chrome that creates, prices or sells a vehicle.
   const navMode = navModeForRole(role);
 
+  // Someone who completes get-ready work but does not stock the lot is
+  // checking a car IN when they scan it, not adding it to the print queue.
+  const scanPath = can("can_complete_get_ready") && !can("can_edit_inventory") ? "/check-in" : "/scan";
   const openScan = useCallback(() => {
-    if (prefersLiveScanner()) navigate("/scan");
+    if (prefersLiveScanner()) navigate(scanPath);
     else setShowMobileQr(true);
-  }, [navigate]);
+  }, [navigate, scanPath]);
   const vinScanApi = useMemo(() => ({ openScan }), [openScan]);
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -1098,7 +1101,7 @@ const AppShell = ({ children }: AppShellProps) => {
               <h2 className="text-xl font-semibold mb-2">Scan with your phone</h2>
               <p className="text-sm text-muted-foreground mb-4">Open the live VIN scanner on your mobile device.</p>
               <div className="bg-white p-4 rounded-xl inline-block">
-                <QRCodeSVG value={`${window.location.origin}/scan`} size={180} />
+                <QRCodeSVG value={`${window.location.origin}${scanPath}`} size={180} />
               </div>
               <button onClick={() => setShowMobileQr(false)} className="mt-4 w-full h-10 rounded-lg border border-border hover:bg-muted text-sm font-medium">
                 Close

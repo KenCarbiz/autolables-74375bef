@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, CameraOff, ScanLine, X, Zap, ZapOff } from "lucide-react";
+import { normalizeScannedVin } from "@/lib/vinScan";
 
 // ──────────────────────────────────────────────────────────────
 // VinBarcodeScanner — in-browser camera VIN scanner.
@@ -23,9 +24,6 @@ interface Props {
   onClose: () => void;
   formats?: string[]; // default Code-39 + Code-128 + QR
 }
-
-const VIN_CHAR_RE = /^[A-HJ-NPR-Z0-9]{17}$/i;
-const VIN_CLEAN_RE = /[^A-HJ-NPR-Z0-9]/gi;
 
 const hasBarcodeDetector = (): boolean =>
   typeof (window as unknown as { BarcodeDetector?: unknown }).BarcodeDetector === "function";
@@ -52,6 +50,8 @@ export const VinBarcodeScanner = ({
 
   const [error, setError] = useState<string | null>(null);
   const [detected, setDetected] = useState<string | null>(null);
+  const [manual, setManual] = useState("");
+  const [manualError, setManualError] = useState<string | null>(null);
   const [torch, setTorch] = useState(false);
   const [supported, setSupported] = useState(hasBarcodeDetector());
 
@@ -118,10 +118,12 @@ export const VinBarcodeScanner = ({
       try {
         const found = await detector.detect(video);
         for (const r of found) {
-          const clean = (r.rawValue || "").replace(VIN_CLEAN_RE, "").toUpperCase();
-          if (VIN_CHAR_RE.test(clean)) {
-            setDetected(clean);
-            onDetected(clean);
+          // A door-jamb Code 39 payload is not always the bare VIN, so the
+          // shared reader decides what counts — not a second regex here.
+          const read = normalizeScannedVin(r.rawValue || "", "barcode");
+          if (read.ok) {
+            setDetected(read.vin);
+            onDetected(read.vin);
             return;
           }
         }
@@ -246,16 +248,27 @@ export const VinBarcodeScanner = ({
         </label>
         <input
           type="text"
+          value={manual}
           maxLength={17}
           autoCapitalize="characters"
           autoComplete="off"
           onChange={(e) => {
-            const v = e.target.value.replace(VIN_CLEAN_RE, "").toUpperCase();
-            if (VIN_CHAR_RE.test(v)) onDetected(v);
+            const typed = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+            setManual(typed);
+            const read = normalizeScannedVin(typed, "typed");
+            if (read.ok) {
+              setManualError(null);
+              onDetected(read.vin);
+              return;
+            }
+            // Silence until they have typed a full VIN's worth, then say what
+            // is wrong with it — a dead field that does nothing is worse.
+            setManualError(typed.length >= 17 ? read.message : null);
           }}
           placeholder="17-character VIN"
           className="mt-1 w-full h-11 rounded-lg bg-white/10 border border-white/20 text-white px-3 font-mono tracking-widest text-center focus:outline-none focus:border-[#3BB4FF]"
         />
+        {manualError && <p className="mt-2 text-xs text-amber-300">{manualError}</p>}
       </div>
     </div>
   );

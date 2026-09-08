@@ -180,9 +180,10 @@ const EntitlementGate = ({ app, children }: Props) => {
     const params = new URLSearchParams();
     if (consumeSessionExpired()) params.set("expired", "1");
     // Service QR scans must return DIRECTLY to the scanned vehicle after login
-    // (Login.tsx safeNext honors same-origin ?next=). Only this path opts in —
-    // every other route keeps the historic bare /login redirect.
-    if (location.pathname.startsWith("/service/scan/")) {
+    // (Login.tsx safeNext honors same-origin ?next=). VIN check-in opts in for
+    // the same reason: the worker is standing at the car. Every other route
+    // keeps the historic bare /login redirect.
+    if (location.pathname.startsWith("/service/scan/") || location.pathname.startsWith("/check-in")) {
       params.set("next", location.pathname + location.search);
     }
     const qs = params.toString();

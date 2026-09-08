@@ -101,6 +101,7 @@ const About = lazy(() => import("./pages/About"));
 const Trust = lazy(() => import("./pages/Trust"));
 const BrandGuide = lazy(() => import("./pages/BrandGuide"));
 const ScanPage = lazy(() => import("./pages/ScanPage"));
+const CheckIn = lazy(() => import("./pages/CheckIn"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
 // Legacy per-VIN portal is retired — /vehicle/:vin redirects to the single
 // canonical Passport at /v/:vin so there is only one shopper page.
@@ -407,6 +408,11 @@ const App = () => (
                         <Route path="/print-center" element={<DocumentsPrintCenter />} />
                         <Route path="/print-center/:vehicleId" element={<DocumentsPrintCenter />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
+                        {/* VIN check-in for vendor, service and detail. The
+                            printed per-vehicle QR links (/install, /inspect,
+                            /ready) stay live; this is the surface for someone
+                            standing at the car with no link in hand. */}
+                        <Route path="/check-in" element={<CheckIn />} />
                         <Route path="/prep" element={<PrepSignOff />} />
                         <Route path="/prep/:vin" element={<PrepMobile />} />
                         <Route path="/recon" element={<ReconBoard />} />

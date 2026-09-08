@@ -106,3 +106,18 @@ describe("the role screens that had no route", () => {
     expect(APP).toContain('if (navModeForRole(member?.role) === "vendor") return <VendorHome />;');
   });
 });
+
+describe("VIN check-in did not take the printed QR links away", () => {
+  it("routes the check-in surface", () => {
+    expect(routeFor("/check-in")).toBe("<CheckIn />");
+  });
+
+  it("leaves each per-vehicle token link on the page it always opened", () => {
+    // Labels are already on windshields and in vendor inboxes. Scanning a VIN
+    // is an additional way in, never a replacement for a link someone holds.
+    expect(routeFor("/install/:token")).toBe("<InstallerProof />");
+    expect(routeFor("/inspect/:token")).toBe("<ServiceSignoff />");
+    expect(routeFor("/ready/:token")).toBe("<GetReady />");
+    expect(routeFor("/title/:token")).toBe("<TitleUpload />");
+  });
+});
