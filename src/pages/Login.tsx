@@ -223,16 +223,8 @@ const Login = () => {
               : "Sign in to your AutoLabels workspace."}
           </p>
 
-          {!isAdminMode && (
-            <p className="login-info">
-              <IconInfo className="login-info-icon" />
-              <span>
-                Use the email associated with your dealership account. Need
-                access? Contact your dealership administrator or AutoLabels
-                Support.
-              </span>
-            </p>
-          )}
+
+
 
           {sessionExpired && (
             <div role="status" className="login-alert is-warning">

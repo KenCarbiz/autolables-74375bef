@@ -478,9 +478,15 @@
   transition: background-color 9999s ease-in-out 0s;
 }
 
-.login-input:focus {
+/* The shell owns the single focus treatment. Without this the global
+   input:focus-visible ring in index.css paints a second rounded box inside
+   the shell, so the field reads as two stacked outlines. */
+.login-input:focus,
+.login-input:focus-visible {
   outline: none;
+  box-shadow: none;
 }
+
 
 .login-input-action {
   flex: 0 0 auto;
