@@ -39,8 +39,8 @@ function drainArtifactPosts(): void {
 //      NEW VINs create a fresh file ready for the disclosure addendum flow;
 //   2. upserts vehicle_listings (price + sticker record / public packet);
 //   3. appends an advertised_prices snapshot (source_channel='website',
-//      captured_by='marketcheck') when the price moved — the feed the
-//      price-integrity gate reconciles the addendum against.
+//      captured_by=NULL, notes prefixed "MarketCheck") when the price moved —
+//      the feed the price-integrity gate reconciles the addendum against.
 //
 // Contract:
 //   POST /functions/v1/marketcheck-sync
@@ -612,6 +612,9 @@ serve(async (req) => {
     // so each one carries its own accepted count and its own prior VIN set.
     const segAccepted: Record<InventorySegment, number> = { new: 0, rest: 0 };
     const priorSegVins: Record<InventorySegment, Set<string>> = { new: new Set(), rest: new Set() };
+    // Set when the prior-inventory read fails. Prior inventory is the yardstick
+    // every retirement gate measures against, so without it nothing may retire.
+    let priorInventoryUnknown = false;
     const previouslyRemovedVins = new Set<string>();   // VINs with a prior 'removed_from_feed' change
     const authorityRules = new Map<string, { conflict_behavior?: string | null }>();
     // deno-lint-ignore no-explicit-any
@@ -657,15 +660,28 @@ serve(async (req) => {
         if (r?.field_key) authorityRules.set(r.field_key, { conflict_behavior: r.conflict_behavior ?? null });
       }
     } catch { /* rules table optional */ }
+    // supabase-js RESOLVES a failed query as { data: null, error }, so dropping
+    // `error` here turned "we could not read the lot" into "the lot is empty".
+    // An empty priorSegVins makes segmentPrunePreflight's
+    // `accepted === 0 && priorInventory > 0` clause unreachable — the exact
+    // guard added after the 2026-08-01 run that archived a whole new-car lot.
+    // Read the error, and fail closed: no prior inventory, no retirement.
     try {
-      const { data: existingRows } = await admin.from("vehicle_listings")
+      const { data: existingRows, error: existingErr } = await admin.from("vehicle_listings")
         .select("vin, condition, status").eq("tenant_id", cfg.tenant_id).limit(20000);
+      if (existingErr) throw existingErr;
       for (const r of (existingRows || []) as Array<{ vin: string; condition?: string | null; status?: string | null }>) {
         if (!r.vin) continue;
         priorExistingVins.add(normVin(r.vin));
         if (r.status !== "archived") priorSegVins[segmentOf(r.condition)].add(normVin(r.vin));
       }
-    } catch { /* diff best-effort */ }
+    } catch (e) {
+      priorInventoryUnknown = true;
+      priorExistingVins.clear();
+      priorSegVins.new.clear();
+      priorSegVins.rest.clear();
+      console.error(`prior_inventory_read_failed tenant=${cfg.tenant_id}: ${String((e as { message?: string })?.message ?? e)}`);
+    }
     try {
       const { data: removedRows } = await admin.from("vehicle_change_history")
         .select("vin").eq("tenant_id", cfg.tenant_id).eq("field_key", "_lifecycle")
@@ -1144,10 +1160,16 @@ serve(async (req) => {
         if (price != null) {
           const prev = latestWebsite.get(vin);
           if (prev == null || Math.abs(prev - price) >= 1) {
+            // captured_by is a UUID column (the human who captured the row);
+            // "marketcheck" made every insert fail with 22P02, so the feed has
+            // never written a single advertised-price row — prices_recorded
+            // read 0 as "nothing moved". Machine writers leave it NULL, exactly
+            // as crawl-advertised-prices does; the provenance lives in notes
+            // ("MarketCheck ...") and in source_url pointing at the VDP.
             const { error } = await admin.from("advertised_prices").insert({
               tenant_id: cfg.tenant_id, store_id: "", vin,
               source_url: l.vdp_url || "", source_channel: "website",
-              advertised_price: price, captured_by: "marketcheck",
+              advertised_price: price, captured_by: null,
               notes: prev == null
                 ? `MarketCheck ${l.inventory_type || ""} · $${price.toLocaleString()}`
                 : `MarketCheck ${l.inventory_type || ""} · $${prev.toLocaleString()} → $${price.toLocaleString()}`,
@@ -1467,11 +1489,17 @@ serve(async (req) => {
       };
       const segSkipped: Record<InventorySegment, string | null> = { new: null, rest: null };
       for (const sgm of ["new", "rest"] as InventorySegment[]) {
-        segSkipped[sgm] = segmentPrunePreflight({
-          segment: sgm, feedWalked, writeError: !!firstWriteErr,
-          feedReported: segReported[sgm], accepted: segAccepted[sgm],
-          priorInventory: priorSegVins[sgm].size,
-        });
+        // An unread prior inventory reports 0 cars for every segment, which is
+        // indistinguishable from a segment the dealer genuinely sold out of.
+        // Skip the segment outright rather than let the gate pass on a zero we
+        // never measured.
+        segSkipped[sgm] = priorInventoryUnknown
+          ? "prior_inventory_unreadable"
+          : segmentPrunePreflight({
+            segment: sgm, feedWalked, writeError: !!firstWriteErr,
+            feedReported: segReported[sgm], accepted: segAccepted[sgm],
+            priorInventory: priorSegVins[sgm].size,
+          });
         // Protect the blocked segment by making its cars look live to the
         // prune. The other segment still retires normally, so one segment
         // failing never costs the dealer the whole night's cleanup.
@@ -1523,10 +1551,16 @@ serve(async (req) => {
       //     lot because a feed hiccuped.
       let pruned: { listings_deleted?: number; files_deleted?: number } | null = null;
       const lastGood = Number(cfg.last_good_count || 0);
-      const pruneSkipped = prunePreflight({
-        feedWalked, matched: tenantSeen, liveVins: liveVins.size,
-        lastGoodCount: lastGood, writeError: !!firstWriteErr,
-      });
+      // The per-segment gates protect a blocked segment by folding its prior
+      // VINs into liveVins — which protects nothing when the prior VIN sets are
+      // empty because the read failed. So the whole destructive step stands
+      // down instead: better a stale car for a day than an archived live lot.
+      const pruneSkipped = priorInventoryUnknown
+        ? "prior_inventory_unreadable"
+        : prunePreflight({
+          feedWalked, matched: tenantSeen, liveVins: liveVins.size,
+          lastGoodCount: lastGood, writeError: !!firstWriteErr,
+        });
       const collapsed = !!pruneSkipped?.startsWith("inventory_collapsed");
 
       if (!pruneSkipped) {

@@ -629,7 +629,8 @@ async function fetchSoldStats(ymm: string | null, condition: string, stateRaw: s
 // MarketCheck portal — so it silently failed for most cars. NHTSA's public
 // recallsByVehicle API is free, needs no key, and is the same source the
 // publish gate uses, so we fall back to it (model-level) whenever the
-// MarketCheck VIN call doesn't answer. Result: the recall signal always lands.
+// MarketCheck VIN call doesn't answer. When NEITHER provider answers we write
+// nothing at all: a lookup that failed must never be stored as a result.
 async function fetchRecalls(vin: string, ymm: string | null) {
   try {
     const res = await mcFetch(`${MC_BASE}/recall/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, 10000);
@@ -661,18 +662,31 @@ async function fetchNhtsaRecalls(ymm: string | null) {
     if (!year || !make || !model) return null;
     const url = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${encodeURIComponent(year)}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    // NHTSA returns a non-200 (or empty) for vehicles it has no record of —
-    // typical for brand-new model years (2026/2027). That means no recalls are
-    // on file, which is "clear", NOT unknown. Returning null here was leaving the
-    // recall signal grey for every new car; treat no-record as clear instead.
+    // A non-200 is the PROVIDER failing, never a statement about the car. This
+    // branch used to return "clear" for any error status, which stamped "no
+    // open recalls" onto 74 live vehicles off HTTP 400s (and one 500) —
+    // including model years NHTSA certainly holds campaigns for. Every reader
+    // treats a non-null recall_status as a completed check, so the only value
+    // that keeps a failed lookup out of the customer's verified list is no
+    // value at all: write nothing, leave the columns as they were (NULL re-
+    // queues the VIN on the next enrich sweep), and log the body so the cause
+    // of the 400 is diagnosable.
     if (!res.ok) {
-      return { recall_status: "clear", open_recall_count: 0, recall_payload: { campaigns: [], checked_at: new Date().toISOString(), source: "nhtsa", note: `no_nhtsa_record_http_${res.status}` } };
+      const body = await res.text().catch(() => "");
+      console.warn(`nhtsa recallsByVehicle ${res.status} ymm=${JSON.stringify(ymm)} body=${body.slice(0, 300)}`);
+      return null;
     }
     // deno-lint-ignore no-explicit-any
-    const b: any = await res.json().catch(() => ({}));
+    const b: any = await res.json().catch(() => null);
     // NHTSA's modern recalls API uses lowercase `results`; older shape used `Results`.
+    // A 200 whose body carries neither array is not an answer either (a gateway
+    // HTML page, a truncated response) — same rule as a non-200: write nothing.
     // deno-lint-ignore no-explicit-any
-    const list: any[] = Array.isArray(b?.results) ? b.results : Array.isArray(b?.Results) ? b.Results : [];
+    const list: any[] | null = Array.isArray(b?.results) ? b.results : Array.isArray(b?.Results) ? b.Results : null;
+    if (list === null) {
+      console.warn(`nhtsa recallsByVehicle 200 without results array ymm=${JSON.stringify(ymm)}`);
+      return null;
+    }
     return {
       recall_status: list.length === 0 ? "clear" : "open_recalls",
       open_recall_count: list.length,
@@ -689,7 +703,10 @@ async function fetchNhtsaRecalls(ymm: string | null) {
         source: "nhtsa",
       },
     };
-  } catch { return null; }
+  } catch (e) {
+    console.warn(`nhtsa recallsByVehicle threw ymm=${JSON.stringify(ymm)}: ${String((e as { message?: string })?.message || e)}`);
+    return null;
+  }
 }
 
 // ── Black Book via blackbook-values ────────────────────────────
