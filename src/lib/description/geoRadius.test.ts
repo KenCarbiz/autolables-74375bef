@@ -247,8 +247,11 @@ describe("the prompt offers this vehicle's slate, not the whole list", () => {
   });
 
   it("does not hand the writer all twelve", () => {
-    const offered = AREAS.filter((a) => prompt.includes(a));
-    expect(offered.length).toBeLessThanOrEqual(4);
+    const line = prompt.split("\n").find((l) => l.includes("Approved localities")) ?? "";
+    const listed = line.slice(line.indexOf("):") + 2, line.indexOf(". Name AT MOST"))
+      .split(";").map((x) => x.trim()).filter(Boolean);
+    expect(listed).toEqual(packet.localities);
+    expect(listed.length).toBeLessThanOrEqual(4);
   });
 
   it("names the measured radius so the geography is not a guess", () => {

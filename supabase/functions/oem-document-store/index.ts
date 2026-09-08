@@ -371,6 +371,7 @@ async function runSweep(admin: Admin, body: Record<string, unknown>): Promise<Re
   let manualCatalog: CatalogLinkRow[];
   let hosted: OemHostedRow[];
   let attempts: OemCopyAttemptRow[];
+  let tenantIds: string[];
   try {
     let q = admin.from("vehicle_listings")
       .select("id, tenant_id, vin, ymm")
@@ -382,7 +383,7 @@ async function runSweep(admin: Admin, body: Record<string, unknown>): Promise<Re
     if (error) throw new Error(`listing_query_failed: ${error.message}`);
     listings = (rows || []) as OemCopyListingRow[];
 
-    const tenantIds = [...new Set(listings.map((l) => l.tenant_id).filter(Boolean))];
+    tenantIds = [...new Set(listings.map((l) => l.tenant_id).filter(Boolean))];
     if (!tenantIds.length) {
       return json(200, { success: true, scope: tenantId || "all_tenants", vehicles_examined: 0, targets: 0, note: "No published inventory." });
     }
@@ -410,9 +411,7 @@ async function runSweep(admin: Admin, body: Record<string, unknown>): Promise<Re
     return json(500, { error: String((e as Error)?.message || e).slice(0, 300) });
   }
 
-  const franchiseBrands = await loadFranchiseBrands(
-    admin, [...new Set(listings.map((l) => l.tenant_id).filter(Boolean))],
-  );
+  const franchiseBrands = await loadFranchiseBrands(admin, tenantIds);
 
   const now = Date.now();
   const targets = interleaveByTenant(
