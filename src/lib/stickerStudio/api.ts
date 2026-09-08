@@ -205,9 +205,29 @@ export async function markDocumentPublished(documentId: string, onlineUrl: strin
   }
 }
 
-// Publish the vehicle's online passport (the QR destination) and mark the most
-// recent generated document published with its online URL.
-export async function publishToPassport(vehicleId?: string | null, tenantId?: string | null): Promise<ApiResult> {
+// The only statuses documentWorkflow.allowedActions() offers `publish` from.
+// Everything else — draft, pending_approval, rejected, superseded, archived —
+// is a document a manager has NOT released, and the passport is anonymous.
+const PUBLISHABLE_STATUSES = ["approved", "printed"];
+
+// The lanes Sticker Studio's Publish button owns (SaveStickerArgs["docType"]).
+// buyers_guide and k208 rows are machine-generated on a separate track and are
+// published by their own gated writers, never by a sticker publish.
+const STUDIO_DOC_TYPES: SaveStickerArgs["docType"][] = ["window", "addendum", "cpo_sheet"];
+
+// Publish the vehicle's online passport (the QR destination) and mark the
+// dealer's released sticker for this vehicle published with its online URL.
+//
+// This used to flip the NEWEST generated_documents row of ANY type in ANY
+// status, which on a typical vehicle is an auto-generated draft buyers_guide or
+// k208 — pushing a held, statutorily-unreviewed document straight onto the
+// anonymous passport. The type + status filters below are the gate; pass
+// `docType` to name the exact lane being published.
+export async function publishToPassport(
+  vehicleId?: string | null,
+  tenantId?: string | null,
+  docType?: SaveStickerArgs["docType"],
+): Promise<ApiResult> {
   if (!vehicleId) return { ok: false, error: "no_vehicle" };
   const client = sb();
   try {
@@ -220,22 +240,35 @@ export async function publishToPassport(vehicleId?: string | null, tenantId?: st
     if (error) return { ok: false, error: error.message };
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const url = row?.slug ? `${origin}/v/${row.slug}` : undefined;
-    // Best-effort: flag the latest generated doc as published.
+    // Best-effort: flag the released sticker for this vehicle as published.
+    // No eligible document is a normal outcome — the passport itself is live
+    // either way — so this never fails the publish.
+    let publishedDocumentId: string | null = null;
     try {
-      const { data: latest } = await client
+      let q = client
         .from("generated_documents")
         .select("id")
         .eq("vehicle_id", vehicleId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .in("document_status", PUBLISHABLE_STATUSES);
+      if (tenantId) q = q.eq("tenant_id", tenantId);
+      q = docType ? q.eq("document_type", docType) : q.in("document_type", STUDIO_DOC_TYPES);
+      const { data: latest } = await q.order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (latest?.id) {
-        await client.from("generated_documents")
+        // Re-assert the status in the WHERE clause: an approval can be pulled
+        // between the read and the write, and this update is what makes the
+        // document customer-visible.
+        const { data: flipped } = await client.from("generated_documents")
           .update({ document_status: "published", published_at: new Date().toISOString(), online_url: url || null })
-          .eq("id", latest.id);
+          .eq("id", latest.id)
+          .in("document_status", PUBLISHABLE_STATUSES)
+          .select("id");
+        if (Array.isArray(flipped) && flipped.length > 0) publishedDocumentId = latest.id;
       }
     } catch { /* non-blocking */ }
-    await logStickerAudit("passport_published", { tenantId, entityType: "passport", entityId: vehicleId, details: { url } });
+    await logStickerAudit("passport_published", {
+      tenantId, entityType: "passport", entityId: vehicleId,
+      details: { url, document_type: docType || null, document_id: publishedDocumentId },
+    });
     await recordPassportGenerated(buildPersistenceContext({
       tenantId,
       vehicleId,
@@ -243,7 +276,7 @@ export async function publishToPassport(vehicleId?: string | null, tenantId?: st
       stock: row?.stock_number,
     }), { url });
     await recordUsageEvent({ tenantId, featureKey: "vehicle_passport", metric: "documents_published", entityType: "passport", entityId: vehicleId });
-    return { ok: true, url };
+    return { ok: true, url, documentId: publishedDocumentId || undefined };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "publish_failed" };
   }

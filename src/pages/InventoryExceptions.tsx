@@ -122,6 +122,9 @@ export default function InventoryExceptions() {
 
   const [rows, setRows] = useState<Exception[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed load and an empty queue both leave `rows` empty. Only this tells
+  // the dealer which one happened.
+  const [loadError, setLoadError] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("open");
   const [severityFilter, setSeverityFilter] = useState<"all" | Severity>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | string>("all");
@@ -134,10 +137,18 @@ export default function InventoryExceptions() {
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
-    const { data } = await (supabase as any).from("vehicle_exceptions")
+    const { data, error } = await (supabase as any).from("vehicle_exceptions")
       .select("*").eq("tenant_id", tenantId)
       .order("created_at", { ascending: false }).limit(1000);
-    setRows((data as Exception[]) || []);
+    // supabase-js RESOLVES on a query error, so `data` is null and the queue
+    // would have rendered "Nothing needs attention" over an unread worklist.
+    if (error) {
+      setLoadError(error.message || "The exceptions queue could not be loaded.");
+      setRows([]);
+    } else {
+      setLoadError("");
+      setRows((data as Exception[]) || []);
+    }
     setLoading(false);
   }, [tenantId]);
 
@@ -248,7 +259,7 @@ export default function InventoryExceptions() {
         <FilterSelect value={typeFilter} onChange={(v) => setTypeFilter(v)} label="Type"
           options={[["all", "All"], ...typeOptions.map((t) => [t, TYPE_LABEL[t] || t] as [string, string])]} />
         <div className="text-[11px] text-muted-foreground ml-auto">
-          Showing {filtered.length} of {rows.length}
+          {loadError ? "Not loaded" : `Showing ${filtered.length} of ${rows.length}`}
         </div>
       </div>
 
@@ -257,6 +268,20 @@ export default function InventoryExceptions() {
         {loading ? (
           <div className="p-8 text-sm text-muted-foreground flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" /> Loading exceptions…
+          </div>
+        ) : loadError ? (
+          <div role="alert" className="p-10 text-center">
+            <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
+            <div className="font-semibold text-foreground">Couldn't load the exceptions queue</div>
+            <div className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+              This is a load failure, not an empty queue — open exceptions may still be waiting. {loadError}
+            </div>
+            <button
+              onClick={() => load()}
+              className="mt-4 h-8 px-3 rounded-md border border-border bg-background text-xs font-semibold hover:bg-muted"
+            >
+              Try again
+            </button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-10 text-center">

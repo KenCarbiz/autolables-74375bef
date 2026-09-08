@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "./useRealtimeInvalidate";
 import type {
@@ -67,10 +68,13 @@ export const useVehicleFiles = (storeId: string) => {
     queryFn: async (): Promise<VehicleFile[]> => {
       // RLS already scopes to the tenant; store_id filter narrows
       // to the selected store when a dealer group has multiples.
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("vehicle_files")
         .select("*")
         .order("updated_at", { ascending: false });
+      // supabase-js RESOLVES on a query error; returning [] here turned an RLS
+      // denial or a dropped connection into a confident "no vehicle files".
+      if (error) throw error;
       const all = (data as VehicleFile[]) || [];
       return storeId ? all.filter((f) => f.store_id === storeId) : all;
     },
@@ -80,6 +84,15 @@ export const useVehicleFiles = (storeId: string) => {
   });
 
   const files = q.data ?? [];
+
+  // An empty list and a failed load look identical downstream, so name it.
+  useEffect(() => {
+    if (!q.error) return;
+    toast.error("Couldn't load vehicle files — this is a load failure, not an empty file cabinet.", {
+      id: "vehicle-files-load-error",
+    });
+  }, [q.error]);
+
   const invalidate = useCallback(
     () => qc.invalidateQueries({ queryKey: vehicleFilesKey(storeId) }),
     [qc, storeId],
@@ -464,6 +477,8 @@ export const useVehicleFiles = (storeId: string) => {
   return {
     files,
     loading: q.isLoading,
+    error: q.error,
+    isError: q.isError,
     stats,
     getOrCreateFile,
     registerSticker,

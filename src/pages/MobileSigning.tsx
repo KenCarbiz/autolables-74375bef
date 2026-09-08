@@ -76,6 +76,10 @@ const MobileSigning = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // A signing attempt that did NOT persist. Held in state (not just a toast) so
+  // the customer is left looking at "not signed" rather than at a form that
+  // quietly looks the same as before they pressed the button.
+  const [submitFailed, setSubmitFailed] = useState("");
   const [addendum, setAddendum] = useState<any>(null);
   const [error, setError] = useState("");
   // Funnel telemetry: fire opened once on load, started once on first
@@ -284,6 +288,15 @@ const MobileSigning = () => {
     });
   };
 
+  // One exit for every "this did not sign" path: the customer sees a persistent
+  // banner plus a toast, and the dealer sees a customer_sign_failed row on the
+  // deal timeline. Nothing here ever flips `submitted`.
+  const failSubmit = (message: string, reason: string, details: Record<string, unknown> = {}) => {
+    setSubmitFailed(message);
+    toast.error(message);
+    emitTimelineEvent("customer_sign_failed", { reason, customer_name: customerName || null, ...details });
+  };
+
   const handleSubmit = async () => {
     // Price-integrity gate: the server refuses to sign an unverified deal, so
     // surface it clearly here rather than letting the customer complete the
@@ -333,287 +346,298 @@ const MobileSigning = () => {
       return;
     }
 
+    setSubmitFailed("");
     setSubmitting(true);
-
-    // Fetch compliance context in parallel with IP + geoloc. We do
-    // this at signing time so every recorded signature carries:
-    //  - the public IP seen at the moment of signature
-    //  - a best-effort client geolocation (with user consent, null
-    //    if denied or unavailable; never blocks submit)
-    //  - the install-history snapshot of every product shown on the
-    //    addendum (from prep_sign_offs), so later audit reviewers
-    //    can prove the accessory was installed prior to sale and
-    //    when
-    //  - the state rule set that applied at the moment of signing,
-    //    so if the statute changes later we can show what rule the
-    //    disclosure was built against
-    //  - a frozen ComplianceValidator report (PASS/WARN/FAIL)
-    const consent = buildConsentRecord();
-    const [customerIp, geoloc, prepSnapshot, installProofs] = await Promise.all([
-      fetchClientIp(),
-      fetchGeoloc(),
-      (async () => {
-        try {
-          const { data } = await (supabase as any)
-            .from("prep_sign_offs")
-            .select(
-              "id,vin,accessories_installed,inspection_passed,inspection_form_type,foreman_name,signed_at,listing_unlocked"
-            )
-            .eq("vin", addendum.vehicle_vin)
-            .eq("listing_unlocked", true)
-            .order("signed_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          return data || null;
-        } catch {
-          return null;
-        }
-      })(),
-      (async () => {
-        try {
-          const { data } = await (supabase as any)
-            .from("install_proofs")
-            .select("id,product_name,installer_name,installer_company,installed_at,photo_path,created_at")
-            .eq("vehicle_vin", addendum.vehicle_vin)
-            .order("created_at", { ascending: false });
-          return data || [];
-        } catch {
-          return [];
-        }
-      })(),
-    ]);
-
-    const stateCode = (addendum.vehicle_state || "").toString().toUpperCase() || null;
-    const stateRule = stateCode ? getStateRule(stateCode) : null;
-
-    const complianceDraft = {
-      state: stateCode || "",
-      vehiclePrice: addendum.vehicle_price,
-      docFeeAmount: products.find((p) =>
-        p.name.toLowerCase().includes("doc")
-      )?.price,
-      stickerText: products.map((p) => `${p.name} ${p.disclosure || ""}`).join(" "),
-      products: products.map((p) => {
-        const isElectable = p.badge_type === "optional" || isAddedOn(p);
-        // A declined above-advertised upcharge isn't billed, so it isn't a
-        // charged installed line — represent it as optional so the
-        // installed-initials red-team rule doesn't demand an initial on
-        // something the customer turned down.
-        const effBadge =
-          isAddedOn(p) && optionalSelections[p.id] !== "accept" ? "optional" : p.badge_type;
-        return {
-          id: p.id,
-          name: p.name,
-          price: p.price,
-          badge_type: effBadge,
-          disclosure: p.disclosure || undefined,
-          // An electable item's per-item sign-off is its affirmative
-          // Accept/Decline election; non-elective installed items rely on
-          // the initial.
-          separate_signoff: isElectable
-            ? !!optionalSelections[p.id]
-            : !!initials[p.id]?.trim(),
-        };
-      }),
-      spanishVersion: consent.language?.startsWith("es") || false,
-      threeDayAck: sb766ThreeDayAck,
-    };
-    const complianceFindings = validateAddendum(complianceDraft);
-    const complianceSummary = summarizeFindings(complianceFindings);
-
-    // Red-team hard-block — defense in depth on top of the dealer-
-    // side block in Index.tsx. Re-running here with the customer's
-    // actual initials / esign consent / sign timestamp surfaces any
-    // fail-severity issues that aren't visible until the customer is
-    // in the flow (e.g. missing initials on installed products).
-    const redTeamFindings = runComplianceRedTeam({
-      ...complianceDraft,
-      customerName,
-      initialsByProductId: initials,
-      esignConsentAccepted: esignConsent,
-      signedAt: new Date().toISOString(),
-      // Only pass vehicleCondition / buyersGuideAttached if the
-      // addendum row has them explicitly populated. Omitting leaves
-      // those rules inert instead of false-failing on older rows.
-      ...(addendum.vehicle_condition ? { vehicleCondition: addendum.vehicle_condition } : {}),
-      ...(typeof addendum.buyers_guide_id !== "undefined"
-        ? { buyersGuideAttached: addendum.buyers_guide_id != null }
-        : {}),
-    });
-    const redTeamSummary = summarizeRedTeam(redTeamFindings);
-    if (redTeamSummary.blocker) {
-      // Shopper-side is the defense-in-depth layer. The dealer-side
-      // block in Index.tsx handles the primary enforcement (and
-      // logs `compliance_block` to audit_log with rule ids). If we
-      // land here it's an edge case \u2014 legacy link, dealer bypassed
-      // the builder, etc. Surface the top failing rules and stop.
-      const top = redTeamFindings.filter((f) => f.severity === "fail").slice(0, 2).map((f) => f.rule).join(" \u2022 ");
-      toast.error(`Blocked: ${top}${redTeamSummary.fail > 2 ? " \u2026" : ""}`);
-      // Without this the submit button stays disabled forever: the shopper
-      // cannot retry after the dealer clears the block without reloading.
-      setSubmitting(false);
-      return;
-    }
-
-    // Canonical payload = everything that influenced the customer's
-    // decision PLUS the dealer's compliance context. This is what the
-    // SHA-256 hash covers.
-    const canonicalPayload = {
-      addendum_id: addendum.id,
-      vehicle_vin: addendum.vehicle_vin,
-      vehicle_ymm: addendum.vehicle_ymm,
-      vehicle_state: stateCode,
-      vehicle_price: addendum.vehicle_price ?? null,
-      products_snapshot: addendum.products_snapshot,
-      price_overrides: priceOverrides,
-      initials,
-      optional_selections: optionalSelections,
-      addon_election: {
-        disclosure_version: ADDON_ELECTION_DISCLOSURE_VERSION,
-        disclosure_text: ADDON_ELECTION_BANNER,
-        financed: isFinanced,
-        selections: optionalSelections,
-      },
-      payment_walk: {
-        advertised_price: advertisedPrice,
-        included_in_advertised_ids: includedItems.map((p) => p.id),
-        included_in_advertised_total: includedTotal,
-        added_above_advertised_ids: addedItems.map((p) => p.id),
-        added_above_advertised_total: addedTotal,
-        final_all_in: finalAllIn,
-        confirmed: paymentConfirmed,
-      },
-      customer_name: customerName,
-      warranty_ack: warrantyAck,
-      buyers_guide_ack: warrantyAck,
-      k208_ack: hasK208 ? !!customerSig.data : null,
-      sticker_match_ack: stickerMatchAck,
-      generated_documents: signingDocumentRefs(signingDocs),
-      payment_confirmed: paymentConfirmed,
-      delivery_mileage: deliveryMileage,
-      esign_consent_version: consent.version,
-      sb766_three_day_return_ack: sb766ThreeDayAck || null,
-      sb766_financing_disclosure: sb766Disclosure,
-      prep_sign_off_snapshot: prepSnapshot,
-      install_proofs_snapshot: installProofs,
-      state_rule_snapshot: stateRule,
-      compliance_findings: complianceFindings,
-      compliance_summary: complianceSummary,
-      signing_location: geoloc,
-      user_agent: consent.user_agent,
-      customer_ip: customerIp,
-      signed_at: new Date().toISOString(),
-    };
-    const contentHash = await hashPayload(canonicalPayload);
-
-    // Unified signing path: record_customer_signing RPC validates the
-    // token server-side, writes one addendum_signings row, mirrors
-    // legacy addendums columns for backward compat, and emits the
-    // audit_log event in one transaction. See migration 20260418110000.
-    const acknowledgments = {
-      warranty_ack: warrantyAck,
-      buyers_guide_ack: warrantyAck,
-      k208_ack: hasK208 ? !!customerSig.data : null,
-      sticker_match_ack: stickerMatchAck,
-      sb766_three_day_return_ack: sb766ThreeDayAck || false,
-      sb766_financing_disclosure: sb766Disclosure || null,
-      initials,
-      optional_selections: optionalSelections,
-    };
-
-    // The customer signs their CT K-208 first: their name + signature are
-    // stamped onto the completed inspection and it's dated/locked. The
-    // service-signed K-208 is what gates the addendum; this records the buyer's
-    // acknowledgment as part of the same assignment, before the addendum signs.
     try {
-      await (supabase as any).rpc("k208_record_buyer_signature", {
-        _signing_token: token!,
-        _buyer_name: customerName || null,
-        _buyer_signature_data: customerSig.data || null,
+
+      // Fetch compliance context in parallel with IP + geoloc. We do
+      // this at signing time so every recorded signature carries:
+      //  - the public IP seen at the moment of signature
+      //  - a best-effort client geolocation (with user consent, null
+      //    if denied or unavailable; never blocks submit)
+      //  - the install-history snapshot of every product shown on the
+      //    addendum (from prep_sign_offs), so later audit reviewers
+      //    can prove the accessory was installed prior to sale and
+      //    when
+      //  - the state rule set that applied at the moment of signing,
+      //    so if the statute changes later we can show what rule the
+      //    disclosure was built against
+      //  - a frozen ComplianceValidator report (PASS/WARN/FAIL)
+      const consent = buildConsentRecord();
+      const [customerIp, geoloc, prepSnapshot, installProofs] = await Promise.all([
+        fetchClientIp(),
+        fetchGeoloc(),
+        (async () => {
+          try {
+            const { data } = await (supabase as any)
+              .from("prep_sign_offs")
+              .select(
+                "id,vin,accessories_installed,inspection_passed,inspection_form_type,foreman_name,signed_at,listing_unlocked"
+              )
+              .eq("vin", addendum.vehicle_vin)
+              .eq("listing_unlocked", true)
+              .order("signed_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            return data || null;
+          } catch {
+            return null;
+          }
+        })(),
+        (async () => {
+          try {
+            const { data } = await (supabase as any)
+              .from("install_proofs")
+              .select("id,product_name,installer_name,installer_company,installed_at,photo_path,created_at")
+              .eq("vehicle_vin", addendum.vehicle_vin)
+              .order("created_at", { ascending: false });
+            return data || [];
+          } catch {
+            return [];
+          }
+        })(),
+      ]);
+
+      const stateCode = (addendum.vehicle_state || "").toString().toUpperCase() || null;
+      const stateRule = stateCode ? getStateRule(stateCode) : null;
+
+      const complianceDraft = {
+        state: stateCode || "",
+        vehiclePrice: addendum.vehicle_price,
+        docFeeAmount: products.find((p) =>
+          p.name.toLowerCase().includes("doc")
+        )?.price,
+        stickerText: products.map((p) => `${p.name} ${p.disclosure || ""}`).join(" "),
+        products: products.map((p) => {
+          const isElectable = p.badge_type === "optional" || isAddedOn(p);
+          // A declined above-advertised upcharge isn't billed, so it isn't a
+          // charged installed line — represent it as optional so the
+          // installed-initials red-team rule doesn't demand an initial on
+          // something the customer turned down.
+          const effBadge =
+            isAddedOn(p) && optionalSelections[p.id] !== "accept" ? "optional" : p.badge_type;
+          return {
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            badge_type: effBadge,
+            disclosure: p.disclosure || undefined,
+            // An electable item's per-item sign-off is its affirmative
+            // Accept/Decline election; non-elective installed items rely on
+            // the initial.
+            separate_signoff: isElectable
+              ? !!optionalSelections[p.id]
+              : !!initials[p.id]?.trim(),
+          };
+        }),
+        spanishVersion: consent.language?.startsWith("es") || false,
+        threeDayAck: sb766ThreeDayAck,
+      };
+      const complianceFindings = validateAddendum(complianceDraft);
+      const complianceSummary = summarizeFindings(complianceFindings);
+
+      // Red-team hard-block — defense in depth on top of the dealer-
+      // side block in Index.tsx. Re-running here with the customer's
+      // actual initials / esign consent / sign timestamp surfaces any
+      // fail-severity issues that aren't visible until the customer is
+      // in the flow (e.g. missing initials on installed products).
+      const redTeamFindings = runComplianceRedTeam({
+        ...complianceDraft,
+        customerName,
+        initialsByProductId: initials,
+        esignConsentAccepted: esignConsent,
+        signedAt: new Date().toISOString(),
+        // Only pass vehicleCondition / buyersGuideAttached if the
+        // addendum row has them explicitly populated. Omitting leaves
+        // those rules inert instead of false-failing on older rows.
+        ...(addendum.vehicle_condition ? { vehicleCondition: addendum.vehicle_condition } : {}),
+        ...(typeof addendum.buyers_guide_id !== "undefined"
+          ? { buyersGuideAttached: addendum.buyers_guide_id != null }
+          : {}),
       });
-    } catch { /* best-effort — the service-signed K-208 still gates finalization */ }
+      const redTeamSummary = summarizeRedTeam(redTeamFindings);
+      if (redTeamSummary.blocker) {
+        // Shopper-side is the defense-in-depth layer. The dealer-side
+        // block in Index.tsx handles the primary enforcement (and
+        // logs `compliance_block` to audit_log with rule ids). If we
+        // land here it's an edge case \u2014 legacy link, dealer bypassed
+        // the builder, etc. Surface the top failing rules and stop.
+        const top = redTeamFindings.filter((f) => f.severity === "fail").slice(0, 2).map((f) => f.rule).join(" \u2022 ");
+        failSubmit(`Blocked: ${top}${redTeamSummary.fail > 2 ? " \u2026" : ""}`, "compliance_red_team_block");
+        return;
+      }
 
-    const { error } = await (supabase as any).rpc("record_customer_signing", {
-      _signing_token: token!,
-      _signer_type: "customer",
-      _signer_name: customerName || null,
-      _signer_email: null,
-      _signer_phone: null,
-      _signature_data: customerSig.data,
-      _signature_type: customerSig.type,
-      _ip_address: customerIp,
-      _user_agent: consent.user_agent,
-      _signing_location: geoloc as any,
-      _content_hash: contentHash,
-      _esign_consent: consent as any,
-      _canonical_payload: canonicalPayload,
-      _acknowledgments: acknowledgments,
-      _delivery_mileage: deliveryMileage ? parseInt(deliveryMileage, 10) : null,
-      _price_overrides: priceOverrides as any,
-    });
+      // Canonical payload = everything that influenced the customer's
+      // decision PLUS the dealer's compliance context. This is what the
+      // SHA-256 hash covers.
+      const canonicalPayload = {
+        addendum_id: addendum.id,
+        vehicle_vin: addendum.vehicle_vin,
+        vehicle_ymm: addendum.vehicle_ymm,
+        vehicle_state: stateCode,
+        vehicle_price: addendum.vehicle_price ?? null,
+        products_snapshot: addendum.products_snapshot,
+        price_overrides: priceOverrides,
+        initials,
+        optional_selections: optionalSelections,
+        addon_election: {
+          disclosure_version: ADDON_ELECTION_DISCLOSURE_VERSION,
+          disclosure_text: ADDON_ELECTION_BANNER,
+          financed: isFinanced,
+          selections: optionalSelections,
+        },
+        payment_walk: {
+          advertised_price: advertisedPrice,
+          included_in_advertised_ids: includedItems.map((p) => p.id),
+          included_in_advertised_total: includedTotal,
+          added_above_advertised_ids: addedItems.map((p) => p.id),
+          added_above_advertised_total: addedTotal,
+          final_all_in: finalAllIn,
+          confirmed: paymentConfirmed,
+        },
+        customer_name: customerName,
+        warranty_ack: warrantyAck,
+        buyers_guide_ack: warrantyAck,
+        k208_ack: hasK208 ? !!customerSig.data : null,
+        sticker_match_ack: stickerMatchAck,
+        generated_documents: signingDocumentRefs(signingDocs),
+        payment_confirmed: paymentConfirmed,
+        delivery_mileage: deliveryMileage,
+        esign_consent_version: consent.version,
+        sb766_three_day_return_ack: sb766ThreeDayAck || null,
+        sb766_financing_disclosure: sb766Disclosure,
+        prep_sign_off_snapshot: prepSnapshot,
+        install_proofs_snapshot: installProofs,
+        state_rule_snapshot: stateRule,
+        compliance_findings: complianceFindings,
+        compliance_summary: complianceSummary,
+        signing_location: geoloc,
+        user_agent: consent.user_agent,
+        customer_ip: customerIp,
+        signed_at: new Date().toISOString(),
+      };
+      const contentHash = await hashPayload(canonicalPayload);
 
-    setSubmitting(false);
-    if (error) {
-      // Compliance rejections are intentional — never fall through to a direct
-      // update that would bypass the gate. Surface the specific reason.
-      const m = error.message || "";
-      if (/safety_inspection_required/i.test(m)) {
-        toast.error("This vehicle isn't ready to finalize yet — its safety inspection and any pre-installed product verifications must be completed first.");
-        return;
+      // Unified signing path: record_customer_signing RPC validates the
+      // token server-side, writes one addendum_signings row, mirrors
+      // legacy addendums columns for backward compat, and emits the
+      // audit_log event in one transaction. See migration 20260418110000.
+      const acknowledgments = {
+        warranty_ack: warrantyAck,
+        buyers_guide_ack: warrantyAck,
+        k208_ack: hasK208 ? !!customerSig.data : null,
+        sticker_match_ack: stickerMatchAck,
+        sb766_three_day_return_ack: sb766ThreeDayAck || false,
+        sb766_financing_disclosure: sb766Disclosure || null,
+        initials,
+        optional_selections: optionalSelections,
+      };
+
+      // The customer signs their CT K-208 first: their name + signature are
+      // stamped onto the completed inspection and it's dated/locked. The
+      // service-signed K-208 is what gates the addendum; this records the buyer's
+      // acknowledgment as part of the same assignment, before the addendum signs.
+      try {
+        await (supabase as any).rpc("k208_record_buyer_signature", {
+          _signing_token: token!,
+          _buyer_name: customerName || null,
+          _buyer_signature_data: customerSig.data || null,
+        });
+      } catch { /* best-effort — the service-signed K-208 still gates finalization */ }
+
+      const { error } = await (supabase as any).rpc("record_customer_signing", {
+        _signing_token: token!,
+        _signer_type: "customer",
+        _signer_name: customerName || null,
+        _signer_email: null,
+        _signer_phone: null,
+        _signature_data: customerSig.data,
+        _signature_type: customerSig.type,
+        _ip_address: customerIp,
+        _user_agent: consent.user_agent,
+        _signing_location: geoloc as any,
+        _content_hash: contentHash,
+        _esign_consent: consent as any,
+        _canonical_payload: canonicalPayload,
+        _acknowledgments: acknowledgments,
+        _delivery_mileage: deliveryMileage ? parseInt(deliveryMileage, 10) : null,
+        _price_overrides: priceOverrides as any,
+      });
+
+      if (error) {
+        // Compliance rejections are intentional — never fall through to a direct
+        // update that would bypass the gate. Surface the specific reason.
+        const m = error.message || "";
+        if (/safety_inspection_required/i.test(m)) {
+          failSubmit("This vehicle isn't ready to finalize yet — its safety inspection and any pre-installed product verifications must be completed first. Nothing has been signed.", "safety_inspection_required");
+          return;
+        }
+        if (/price not verified/i.test(m)) {
+          failSubmit("This addendum is awaiting price verification by the dealership. Please ask them to confirm the advertised price before signing. Nothing has been signed.", "price_not_verified");
+          return;
+        }
+        if (/check_violation/i.test(m)) {
+          failSubmit("This vehicle can't be finalized yet — a dealership compliance step is still pending. Nothing has been signed.", "check_violation");
+          return;
+        }
+        // Fall back to the legacy direct-update path if the RPC isn't
+        // deployed yet (e.g. migration still propagating in Lovable).
+        // eslint-disable-next-line no-console
+        console.warn("record_customer_signing RPC failed, falling back", error);
+        const { data: legacyRows, error: legacyErr } = await supabase
+          .from("addendums")
+          .update({
+            initials: initials as any,
+            optional_selections: optionalSelections as any,
+            customer_name: customerName || null,
+            customer_signature_data: customerSig.data,
+            customer_signature_type: customerSig.type,
+            customer_signed_at: new Date().toISOString(),
+            status: "signed",
+            content_hash: contentHash,
+            esign_consent: consent as any,
+            user_agent: consent.user_agent,
+            delivery_mileage: deliveryMileage ? parseInt(deliveryMileage, 10) : null,
+            sticker_match_ack: stickerMatchAck,
+            warranty_ack: warrantyAck,
+            customer_ip: customerIp,
+            signing_location: geoloc as any,
+            sb766_three_day_return_ack: sb766ThreeDayAck || null,
+            sb766_financing_disclosure: sb766Disclosure as any,
+            price_overrides: priceOverrides as any,
+          } as any)
+          .eq("signing_token", token!)
+          .select("id");
+        // The signer is anonymous and public.addendums has no anon policy, so
+        // this UPDATE matches zero rows and supabase-js still resolves with
+        // error: null. The returned row — not the absent error — is the only
+        // proof the signature persisted, and without it we must never render
+        // the signed confirmation.
+        if (legacyErr || !legacyRows || legacyRows.length === 0) {
+          console.error("Signature was not recorded", legacyErr || error);
+          failSubmit(
+            "Your signature could not be saved, so nothing has been signed. Please try again, or contact the dealership for a new signing link.",
+            legacyErr ? "legacy_update_failed" : "legacy_update_matched_no_rows",
+            { rpc_error: error.message || null, legacy_error: legacyErr?.message || null, content_hash: contentHash },
+          );
+          return;
+        }
       }
-      if (/price not verified/i.test(m)) {
-        toast.error("This addendum is awaiting price verification by the dealership. Please ask them to confirm the advertised price before signing.");
-        return;
-      }
-      if (/check_violation/i.test(m)) {
-        toast.error("This vehicle can't be finalized yet — a dealership compliance step is still pending.");
-        return;
-      }
-      // Fall back to the legacy direct-update path if the RPC isn't
-      // deployed yet (e.g. migration still propagating in Lovable).
-      // eslint-disable-next-line no-console
-      console.warn("record_customer_signing RPC failed, falling back", error);
-      const { error: legacyErr } = await supabase
-        .from("addendums")
-        .update({
-          initials: initials as any,
-          optional_selections: optionalSelections as any,
-          customer_name: customerName || null,
-          customer_signature_data: customerSig.data,
-          customer_signature_type: customerSig.type,
-          customer_signed_at: new Date().toISOString(),
-          status: "signed",
-          content_hash: contentHash,
-          esign_consent: consent as any,
-          user_agent: consent.user_agent,
-          delivery_mileage: deliveryMileage ? parseInt(deliveryMileage, 10) : null,
-          sticker_match_ack: stickerMatchAck,
-          warranty_ack: warrantyAck,
-          customer_ip: customerIp,
-          signing_location: geoloc as any,
-          sb766_three_day_return_ack: sb766ThreeDayAck || null,
-          sb766_financing_disclosure: sb766Disclosure as any,
-          price_overrides: priceOverrides as any,
-        } as any)
-        .eq("signing_token", token!);
-      if (legacyErr) {
-        toast.error("Failed to submit. Please try again.");
-        console.error(legacyErr);
-        return;
-      }
+      setAuditRecord({
+        dealId: addendum.id,
+        vin: addendum.vehicle_vin ?? null,
+        signedAt: canonicalPayload.signed_at,
+        customerName,
+        ip: customerIp,
+        userAgent: consent.user_agent,
+        contentHash,
+        location: geoloc as { latitude?: number | null; longitude?: number | null } | null,
+      });
+      emitTimelineEvent("customer_signed", { name: customerName });
+      setSubmitted(true);
+    } finally {
+      setSubmitting(false);
     }
-    setAuditRecord({
-      dealId: addendum.id,
-      vin: addendum.vehicle_vin ?? null,
-      signedAt: canonicalPayload.signed_at,
-      customerName,
-      ip: customerIp,
-      userAgent: consent.user_agent,
-      contentHash,
-      location: geoloc as { latitude?: number | null; longitude?: number | null } | null,
-    });
-    emitTimelineEvent("customer_signed", { name: customerName });
-    setSubmitted(true);
   };
 
   if (loading) {
@@ -1356,6 +1380,16 @@ const MobileSigning = () => {
         {/* Submit — Tesla-cadence commitment verb. Solid slate, no
             chrome, no emoji. Once pressed, the addendum is hashed,
             archived, and delivered. */}
+        {submitFailed && (
+          <div role="alert" aria-live="assertive" className="rounded-xl border-2 border-destructive bg-destructive/5 p-4">
+            <p className="text-sm font-bold text-destructive">Not signed</p>
+            <p className="text-[13px] text-foreground leading-relaxed mt-1">{submitFailed}</p>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              The dealership has been notified that this attempt did not go through.
+            </p>
+          </div>
+        )}
+
         <button
           onClick={handleSubmit}
           disabled={submitting}

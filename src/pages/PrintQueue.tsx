@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
-import { Printer, Layers, Car, FileText, ShieldCheck, BookOpen, Tag, QrCode, Loader2, ArrowUpRight } from "lucide-react";
+import { Printer, Layers, Car, FileText, ShieldCheck, BookOpen, Tag, QrCode, Loader2, ArrowUpRight, AlertTriangle } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
 // Print Queue — the operator's batch-printing cockpit.
@@ -34,13 +34,18 @@ export default function PrintQueue() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed load and an empty lot both leave `rows` empty; only this tells the
+  // operator there is nothing to print vs. nothing loaded.
+  const [loadError, setLoadError] = useState("");
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [view, setView] = useState<"type" | "vehicle">("type");
 
   useEffect(() => {
     let off = false;
     (async () => {
       if (!tenant?.id) { setLoading(false); return; }
-      const { data } = await (supabase as any)
+      setLoading(true);
+      const { data, error } = await (supabase as any)
         .from("vehicle_listings")
         .select("id, vin, ymm, condition, mc_attributes, status")
         .eq("tenant_id", tenant.id)
@@ -48,11 +53,19 @@ export default function PrintQueue() {
         .order("created_at", { ascending: false })
         .limit(300);
       if (off) return;
-      setRows(((data as any[]) || []).map((v) => ({ id: v.id, vin: v.vin, ymm: v.ymm, condition: v.condition, stock: (v.mc_attributes?.stock_no as string) || null, status: v.status })));
+      // supabase-js RESOLVES on a query error, so `data` is null and the queue
+      // would have reported an empty lot to an operator with work waiting.
+      if (error) {
+        setLoadError(error.message || "The print queue could not be loaded.");
+        setRows([]);
+      } else {
+        setLoadError("");
+        setRows(((data as any[]) || []).map((v) => ({ id: v.id, vin: v.vin, ymm: v.ymm, condition: v.condition, stock: (v.mc_attributes?.stock_no as string) || null, status: v.status })));
+      }
       setLoading(false);
     })();
     return () => { off = true; };
-  }, [tenant?.id]);
+  }, [tenant?.id, reloadNonce]);
 
   const isUsed = (r: Row) => r.condition !== "new";
   const artifactsFor = (r: Row) => ARTIFACTS.filter((a) => !a.usedOnly || isUsed(r));
@@ -79,7 +92,22 @@ export default function PrintQueue() {
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {loadError ? (
+        <div role="alert" className="rounded-2xl border border-destructive/40 bg-destructive/5 p-5">
+          <div className="inline-flex items-center gap-2 text-sm font-bold text-destructive">
+            <AlertTriangle className="w-4 h-4" /> Couldn't load the print queue
+          </div>
+          <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+            This is a load failure, not an empty lot — vehicles may still be waiting to print. {loadError}
+          </p>
+          <button
+            onClick={() => setReloadNonce((n) => n + 1)}
+            className="mt-3 h-9 px-3 rounded-lg border border-border bg-background text-sm font-semibold hover:bg-muted"
+          >
+            Try again
+          </button>
+        </div>
+      ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">No vehicles in inventory yet.</p>
       ) : view === "type" ? (
         <div className="space-y-4">

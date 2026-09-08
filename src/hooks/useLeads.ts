@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "./useRealtimeInvalidate";
 import type { Lead } from "@/types/tenant";
@@ -23,11 +24,15 @@ export const useLeads = (storeId: string) => {
   const q = useQuery({
     queryKey: leadsKey(storeId),
     queryFn: async (): Promise<Lead[]> => {
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("leads")
         .select("*")
         .eq("store_id", storeId)
         .order("captured_at", { ascending: false });
+      // supabase-js RESOLVES on a query error. Swallowing it here rendered an
+      // RLS denial or a dropped connection as "no leads" — which on the
+      // Customers screen reads as "nobody to call today".
+      if (error) throw error;
       return ((data as Lead[]) || []);
     },
     enabled: !!storeId,
@@ -35,6 +40,15 @@ export const useLeads = (storeId: string) => {
   });
 
   const leads = q.data ?? [];
+
+  // The list is empty in BOTH states, so the failure has to say so out loud.
+  useEffect(() => {
+    if (!q.error) return;
+    toast.error("Couldn't load your customer list — this is a load failure, not an empty list.", {
+      id: `leads-load-error-${storeId}`,
+    });
+  }, [q.error, storeId]);
+
   const invalidate = useCallback(
     () => qc.invalidateQueries({ queryKey: leadsKey(storeId) }),
     [qc, storeId],
@@ -121,5 +135,5 @@ export const useLeads = (storeId: string) => {
     [leads],
   );
 
-  return { leads, loading: q.isLoading, addLead, updateLead, deleteLead, exportCsv };
+  return { leads, loading: q.isLoading, error: q.error, isError: q.isError, addLead, updateLead, deleteLead, exportCsv };
 };
