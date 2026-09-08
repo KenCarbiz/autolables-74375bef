@@ -244,6 +244,58 @@ const GENERIC_CERT_RE = /certified\s+(?:technician|mechanic|dealer|service|colli
 const detectCpoBadge = (html: string): boolean =>
   CPO_RE.test(html) && !(GENERIC_CERT_RE.test(html) && !/certified\s+pre[-\s]?owned/i.test(html));
 
+// Clean-title confirmation on the dealer's own VDP. MarketCheck's feed never
+// supplies carfax_clean_title — it is null on every active vehicle — yet the
+// passport title module, the TrustStrip chip ("No salvage, flood, or lemon")
+// and the buying score all read it, so the dealer's published page is the only
+// source we have.
+//
+// Title-specific and adjacent by construction: "clean title", a "Title Status:
+// Clean" row, or an explicit "Title Brand: None". A bare "clean CARFAX" is NOT
+// accepted — that is a claim about the history report, not about the title
+// brand, and this flag prints as a title-brand claim.
+//
+// Positive-only, exactly like the one-owner and CPO badges: absence of the
+// badge is not evidence of a brand and must never write false.
+const CLEAN_TITLE_RE = new RegExp(
+  [
+    String.raw`\bclean(?:\s+(?:carfax|autocheck|nmvtis|vehicle))?\s+title\b`,
+    String.raw`\btitle\s+(?:status|history|record|check|brand)\s*[:\-]?\s*clean\b`,
+    String.raw`\btitle\s*[:\-]\s*clean\b`,
+    String.raw`\btitle\s+brands?\s*[:\-]?\s*(?:none|no)\b`,
+    String.raw`\bno\s+title\s+brands?\b`,
+  ].join("|"),
+  "gi",
+);
+// The same two words appear on a dealer page without asserting anything about
+// this car: a financing condition ("approval requires a clean title"), a
+// negation, or the title desk ("we handle clean title transfers"). A match is
+// trusted only when neither guard fires in its immediate context — "clean" and
+// "title" are ordinary words, and a false clean-title claim on a compliance
+// product is far worse than a missed one.
+const CLEAN_TITLE_CONDITION_RE =
+  /\b(?:must|needs?|needed|require[sd]?|subject\s+to|unless|if|provided|assum\w+|guarantee\w*|qualif\w+|eligib\w+|cannot|can't|not|loans?|liens?|pawn|apply|application)\b/i;
+const CLEAN_TITLE_PROCESS_RE =
+  /^\W{0,3}(?:paperwork|transfers?|processing|services?|fees?|loans?|liens?|department|clerk|required|only|necessary|guaranteed|unless|except)\b/i;
+
+const detectCleanTitleBadge = (html: string): boolean => {
+  // Badge art carries the claim in alt/title text, so those values are searched
+  // alongside the rendered text; the pipe keeps one attribute's words from
+  // forming a phrase with the next one's.
+  const attrs = [...html.matchAll(/(?:alt|title)=["']([^"']{0,120})["']/gi)].map((m) => m[1]);
+  const text = `${html.replace(/<[^>]+>/g, " ")} | ${attrs.join(" | ")}`
+    .replace(/&nbsp;?/gi, " ").replace(/\s+/g, " ");
+  CLEAN_TITLE_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = CLEAN_TITLE_RE.exec(text))) {
+    const end = m.index + m[0].length;
+    if (CLEAN_TITLE_CONDITION_RE.test(text.slice(Math.max(0, m.index - 40), m.index))) continue;
+    if (CLEAN_TITLE_PROCESS_RE.test(text.slice(end, end + 28))) continue;
+    return true;
+  }
+  return false;
+};
+
 // Generic selling-price labels appended after each dealer's configured labels.
 // These are advertised-price brands (never MSRP/retail), so running them in the
 // custom-label tier is safe and lets common sites resolve without per-dealer
@@ -1125,6 +1177,27 @@ serve(async (req) => {
             if (mc.owner_count == null && mc.carfax_1_owner !== true) {
               await admin.from("vehicle_listings")
                 .update({ mc_attributes: { ...mc, carfax_1_owner: true, one_owner_source: "dealer_vdp" } })
+                .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+            }
+          }
+
+          // Clean-title badge on the dealer's VDP → the carfax_clean_title flag
+          // the passport already trusts. MarketCheck never sends this field, so
+          // without the dealer's own page the title module stays unverified.
+          // mc_attributes is re-read here rather than reused from the one-owner
+          // block above so a write that block just made is not spread back over.
+          // Gap-fill and positive-only: a feed `false`, or any title brand on
+          // the row that is not itself clean, contradicts the page and wins.
+          if (detectCleanTitleBadge(html)) {
+            const { data: curTitle } = await admin.from("vehicle_listings")
+              .select("mc_attributes").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
+            const mct = (curTitle?.mc_attributes ?? {}) as Record<string, unknown>;
+            const brand = String(mct.title_brand ?? mct.title_status ?? "").trim();
+            const contradicted = mct.carfax_clean_title === false
+              || (brand !== "" && !/^(?:clean|clear|none|no\b)/i.test(brand));
+            if (mct.carfax_clean_title !== true && !contradicted) {
+              await admin.from("vehicle_listings")
+                .update({ mc_attributes: { ...mct, carfax_clean_title: true, clean_title_source: "dealer_vdp" } })
                 .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
             }
           }
