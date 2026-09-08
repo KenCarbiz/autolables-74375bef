@@ -17,6 +17,32 @@ const TONE: Record<Tone, { ring: string; icon: string }> = {
   red: { ring: "border-red-200 bg-red-50/40", icon: "bg-red-100 text-red-600" },
 };
 
+export interface HistoryFactBadge {
+  key: "one-owner" | "clean-title";
+  icon: typeof ShieldCheck;
+  title: string;
+  sub: string;
+}
+
+// carfax_1_owner and carfax_clean_title are the only sources of truth for these
+// two claims. Strict === true: false, null, an absent key or the string "true"
+// all say nothing, and neither fact is ever inferred from a title brand, the
+// condition or a clean recall check -- an unearned history claim is the failure
+// that matters on a compliance product.
+export const historyFactBadges = (
+  mcAttributes: Record<string, unknown> | null | undefined,
+): HistoryFactBadge[] => {
+  const mc = mcAttributes || {};
+  const out: HistoryFactBadge[] = [];
+  if (mc.carfax_1_owner === true) {
+    out.push({ key: "one-owner", icon: User, title: "1-Owner Vehicle", sub: "Single previous owner" });
+  }
+  if (mc.carfax_clean_title === true) {
+    out.push({ key: "clean-title", icon: FileCheck, title: "Clean Title", sub: "No salvage, flood, or lemon" });
+  }
+  return out;
+};
+
 // deno-lint-ignore no-explicit-any
 export default function TrustStrip({ listing }: { listing: any }) {
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
@@ -28,8 +54,7 @@ export default function TrustStrip({ listing }: { listing: any }) {
   } else if (listing.recall_status === "open_recalls" && (listing.open_recall_count || 0) > 0) {
     badges.push({ icon: ShieldAlert, title: `${listing.open_recall_count} Open Recall${listing.open_recall_count === 1 ? "" : "s"}`, sub: "See details below", tone: "red" });
   }
-  if (mc.carfax_1_owner === true) badges.push({ icon: User, title: "1-Owner Vehicle", sub: "Single previous owner", tone: "green" });
-  if (mc.carfax_clean_title === true) badges.push({ icon: FileCheck, title: "Clean Title", sub: "No salvage, flood, or lemon", tone: "green" });
+  for (const f of historyFactBadges(mc)) badges.push({ icon: f.icon, title: f.title, sub: f.sub, tone: "green" });
 
   const sr = (listing.service_records?.length || 0) as number;
   if (sr > 0) badges.push({ icon: Wrench, title: "Full Service History", sub: `${sr} service record${sr === 1 ? "" : "s"}`, tone: "green" });

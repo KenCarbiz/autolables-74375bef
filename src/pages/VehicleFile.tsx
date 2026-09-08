@@ -7,6 +7,7 @@ import {
   Gauge, Globe, ShieldCheck, UserRound, Wrench,
 } from "lucide-react";
 import { useRecallTask } from "@/hooks/useRecallTask";
+import VehicleHistoryFacts from "@/components/vehicle/VehicleHistoryFacts";
 import { listingGallery } from "@/lib/photos";
 import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
 import { useVehicleLifecycle } from "@/components/vehicleFile/lifecycle";
@@ -310,6 +311,8 @@ const VehicleFile = () => {
                     {vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced"}
                   </span>
                 </div>
+
+                <VehicleHistoryFacts vehicle={vehicle} />
               </div>
 
               <div className="flex flex-col gap-2 w-full lg:w-[240px] shrink-0">
