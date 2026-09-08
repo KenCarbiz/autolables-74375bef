@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, Download, Printer, Upload, ShieldCheck, CheckCircle2, Users, FileText, Wrench,
-  BadgeCheck, Gauge, Car, Clock, MessageSquare, Sparkles, AlertTriangle, ChevronDown, Factory, ExternalLink,
+  BadgeCheck, Gauge, Car, Clock, MessageSquare, Sparkles, AlertTriangle, ChevronDown, Factory, ExternalLink, Store,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -27,6 +27,166 @@ import { GREEN, CARD } from "@/lib/passportTokens";
 // ──────────────────────────────────────────────────────────────
 
 const TEXT2 = "text-[#64748B]";
+
+// ── Marketplace listing history ───────────────────────────────
+// history_payload.entries is MarketCheck's record of ONLINE LISTINGS for this
+// VIN: who advertised it, at what asking price and odometer, and when it was
+// seen. It is advertising data, NOT a vehicle history report — there is no
+// accident, title, service or ownership record in it — so it is labelled as
+// listing history everywhere it surfaces and never feeds a score.
+//
+// The raw feed is one row per crawled source page, so a single store appears
+// many times (and sometimes under more than one of its own site names). Rows
+// are folded by the advertised dealer name into one record each: an
+// aggregation of what is there, never a merge of names that only look alike.
+
+const SOURCE_ENTRY_CAP = 50;
+const DAY_MS = 86_400_000;
+const USD0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const NUM0 = new Intl.NumberFormat("en-US");
+const DAY_FMT = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
+const MY_FMT = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" });
+
+export type ListingHistoryEntry = {
+  price?: number | null;
+  miles?: number | null;
+  seller_type?: string | null;
+  inventory_type?: string | null;
+  dealer?: string | null;
+  first_seen?: string | null;
+  last_seen?: string | null;
+};
+
+export type ListingHistoryRecord = {
+  key: string;
+  dealer: string | null;
+  sightings: number;
+  from: number | null;
+  to: number | null;
+  days: number | null;
+  firstPrice: number | null;
+  lastPrice: number | null;
+  priceMoves: number;
+  lowMiles: number | null;
+  highMiles: number | null;
+  sellerType: "fsbo" | "auction" | null;
+  advertisedNew: boolean;
+};
+
+export type ListingHistory = {
+  records: ListingHistoryRecord[];
+  sightings: number;
+  from: number | null;
+  to: number | null;
+  atSourceCap: boolean;
+};
+
+const millis = (v: unknown): number | null => {
+  if (typeof v !== "string" || !v) return null;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : null;
+};
+const positive = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null);
+
+/**
+ * Fold raw listing sightings into one record per advertised dealer name.
+ * Every field is carried straight from the feed — a missing price, odometer
+ * or date stays missing rather than being estimated from its neighbours.
+ */
+export function buildListingHistory(entries: ListingHistoryEntry[] | null | undefined): ListingHistory | null {
+  const rows = Array.isArray(entries) ? entries : [];
+  type Acc = { key: string; dealer: string | null; sightings: number; from: number | null; to: number | null; priced: { at: number | null; idx: number; price: number }[]; miles: number[]; seller: Set<string>; inv: Set<string> };
+  const acc = new Map<string, Acc>();
+  rows.forEach((e, idx) => {
+    if (!e || typeof e !== "object") return;
+    const dealer = typeof e.dealer === "string" ? e.dealer.trim() : "";
+    const key = dealer.toLowerCase();
+    let a = acc.get(key);
+    if (!a) { a = { key, dealer: dealer || null, sightings: 0, from: null, to: null, priced: [], miles: [], seller: new Set(), inv: new Set() }; acc.set(key, a); }
+    a.sightings += 1;
+    const first = millis(e.first_seen), last = millis(e.last_seen);
+    for (const t of [first, last]) {
+      if (t == null) continue;
+      a.from = a.from == null ? t : Math.min(a.from, t);
+      a.to = a.to == null ? t : Math.max(a.to, t);
+    }
+    const price = positive(e.price);
+    if (price != null) a.priced.push({ at: first ?? last, idx, price });
+    const miles = positive(e.miles);
+    if (miles != null) a.miles.push(miles);
+    if (typeof e.seller_type === "string" && e.seller_type) a.seller.add(e.seller_type.trim().toLowerCase());
+    a.inv.add(typeof e.inventory_type === "string" ? e.inventory_type.trim().toLowerCase() : "");
+  });
+  if (acc.size === 0) return null;
+
+  const records: ListingHistoryRecord[] = [...acc.values()].map((a) => {
+    // Undated prices cannot be placed in the sequence, so they are dropped from
+    // the first/last derivation whenever any dated price exists.
+    const dated = a.priced.filter((p) => p.at != null);
+    const series = dated.length > 0
+      ? [...dated].sort((x, y) => (x.at as number) - (y.at as number) || x.idx - y.idx)
+      : [...a.priced].sort((x, y) => x.idx - y.idx);
+    let priceMoves = 0;
+    for (let i = 1; i < series.length; i++) if (series[i].price !== series[i - 1].price) priceMoves += 1;
+    const only = a.seller.size === 1 ? [...a.seller][0] : null;
+    return {
+      key: a.key,
+      dealer: a.dealer,
+      sightings: a.sightings,
+      from: a.from,
+      to: a.to,
+      days: a.from != null && a.to != null ? Math.max(1, Math.round((a.to - a.from) / DAY_MS)) : null,
+      firstPrice: series.length > 0 ? series[0].price : null,
+      lastPrice: series.length > 0 ? series[series.length - 1].price : null,
+      priceMoves,
+      lowMiles: a.miles.length > 0 ? Math.min(...a.miles) : null,
+      highMiles: a.miles.length > 0 ? Math.max(...a.miles) : null,
+      sellerType: only === "fsbo" || only === "auction" ? only : null,
+      advertisedNew: a.inv.size === 1 && a.inv.has("new"),
+    };
+  });
+
+  records.sort((x, y) => {
+    if (x.to == null && y.to == null) return 0;
+    if (x.to == null) return 1;
+    if (y.to == null) return -1;
+    return y.to - x.to || (y.from ?? 0) - (x.from ?? 0);
+  });
+
+  const froms = records.map((r) => r.from).filter((t): t is number => t != null);
+  const tos = records.map((r) => r.to).filter((t): t is number => t != null);
+  return {
+    records,
+    sightings: rows.length,
+    from: froms.length > 0 ? Math.min(...froms) : null,
+    to: tos.length > 0 ? Math.max(...tos) : null,
+    atSourceCap: rows.length >= SOURCE_ENTRY_CAP,
+  };
+}
+
+/** "Apr 10 – Apr 12, 2025 · 3 days on record" — null when no date survived. */
+export const describeListingPeriod = (r: Pick<ListingHistoryRecord, "from" | "to" | "days">): string | null => {
+  if (r.from == null && r.to == null) return null;
+  if (r.from == null) return `Seen ${DAY_FMT.format(r.to as number)}`;
+  if (r.to == null) return `Seen ${DAY_FMT.format(r.from)}`;
+  const a = DAY_FMT.format(r.from), b = DAY_FMT.format(r.to);
+  if (a === b) return `Seen ${a}`;
+  return `${a} – ${b}${r.days != null && r.days >= 2 ? ` · ${r.days} days on record` : ""}`;
+};
+
+/** "31,150 mi" or "31,150 – 33,020 mi" — a range, never a direction. */
+export const describeListingOdometer = (r: Pick<ListingHistoryRecord, "lowMiles" | "highMiles">): string | null => {
+  if (r.lowMiles == null) return null;
+  const hi = r.highMiles ?? r.lowMiles;
+  return hi === r.lowMiles ? `${NUM0.format(r.lowMiles)} mi` : `${NUM0.format(r.lowMiles)} – ${NUM0.format(hi)} mi`;
+};
+
+/** "Jul 2026 – Sep 2026" across the whole set. */
+export const describeListingSpan = (h: Pick<ListingHistory, "from" | "to">): string | null => {
+  if (h.from == null || h.to == null) return null;
+  const a = MY_FMT.format(h.from), b = MY_FMT.format(h.to);
+  return a === b ? a : `${a} – ${b}`;
+};
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="text-[20px] font-bold leading-7 tracking-tight text-[#0F172A]">{children}</h2>;
 
@@ -69,6 +229,7 @@ const VehiclePassportHistory = () => {
   const [mOpen, setMOpen] = useState<string | null>(null);  // mobile: one accordion open
   const [ringFill, setRingFill] = useState(false);              // mobile: ring fills on load
   const [recallOpen, setRecallOpen] = useState(false);
+  const [allListings, setAllListings] = useState(false);   // advertising history: preview vs. full list
 
   useEffect(() => { const r = requestAnimationFrame(() => setRingFill(true)); return () => cancelAnimationFrame(r); }, []);
 
@@ -76,6 +237,7 @@ const VehiclePassportHistory = () => {
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
+  const lh = useMemo(() => buildListingHistory(d?.history?.available ? d.history.entries : null), [d]);
 
   if (loading) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
   if (notFound || !listing || !d) return (
@@ -273,6 +435,76 @@ const VehiclePassportHistory = () => {
     </div>
   );
 
+  // Advertising history — curatable like the other packet modules, so a dealer
+  // can switch it off per vehicle. No records means the section is absent, not
+  // an empty shell.
+  const listingHistory = lh && packetVisible(listing, "listingHistory") ? lh : null;
+  const listingSpan = listingHistory ? describeListingSpan(listingHistory) : null;
+  const listingCount = listingHistory ? listingHistory.records.length : 0;
+  const listingCountLbl = `${listingCount} listing record${listingCount === 1 ? "" : "s"}`;
+  const listingSub = `${listingCountLbl} on file${listingSpan ? ` · ${listingSpan}` : ""}. Marketplace advertising records — not a vehicle history report.`;
+  const LISTING_PREVIEW = 6;
+
+  const ListingRow = ({ r }: { r: ListingHistoryRecord }) => {
+    const period = describeListingPeriod(r);
+    const odo = describeListingOdometer(r);
+    return (
+      <li className="relative">
+        <span className="absolute -left-[22px] top-1.5 w-3 h-3 rounded-full bg-[#CBD5E1] ring-2 ring-white" />
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <p className="text-[13px] font-bold leading-tight">{r.dealer || "Listing record"}</p>
+          {r.lastPrice != null && (
+            <p className="text-[13px] font-extrabold leading-tight tabular-nums">
+              {r.firstPrice != null && r.firstPrice !== r.lastPrice && (
+                <><span className="font-semibold text-[#94A3B8]">{USD0.format(r.firstPrice)}</span><span className="text-[#CBD5E1] px-1">→</span></>
+              )}
+              {USD0.format(r.lastPrice)}
+              <span className="text-[11px] font-semibold text-[#94A3B8]"> asking</span>
+            </p>
+          )}
+        </div>
+        {period && <p className="text-[11px] text-[#94A3B8] mt-0.5">{period}</p>}
+        {(odo || r.advertisedNew || r.sellerType) && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+            {odo && <span className="text-[12px] text-[#64748B]">Odometer shown {odo}</span>}
+            {r.advertisedNew && <span className="text-[10px] font-bold uppercase tracking-wide text-[#2563EB] bg-blue-50 rounded-md px-1.5 py-0.5">Advertised as new</span>}
+            {r.sellerType && <span className="text-[10px] font-bold uppercase tracking-wide text-[#64748B] bg-slate-100 rounded-md px-1.5 py-0.5">{r.sellerType === "fsbo" ? "Private seller" : "Auction listing"}</span>}
+          </div>
+        )}
+      </li>
+    );
+  };
+
+  const ListingHistoryBody = () => {
+    if (!listingHistory) return null;
+    const rs = listingHistory.records;
+    const shown = allListings ? rs : rs.slice(0, LISTING_PREVIEW);
+    return (
+      <>
+        <ol className="space-y-4 relative border-l-2 border-slate-100 ml-1.5 pl-4">
+          {shown.map((r) => <ListingRow key={r.key} r={r} />)}
+        </ol>
+        {rs.length > LISTING_PREVIEW && (
+          <button onClick={() => setAllListings((v) => !v)} className="mt-4 min-h-[44px] text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">
+            {allListings ? `Show the ${LISTING_PREVIEW} most recent` : `Show all ${listingCountLbl}`}
+            <ChevronDown className={`w-4 h-4 transition-transform ${allListings ? "rotate-180" : ""}`} />
+          </button>
+        )}
+        <div className={`${CARD} p-4 mt-4 space-y-1.5`}>
+          <p className="text-[12px] text-[#64748B]"><span className="font-bold text-[#0F172A]">What this is.</span> Online listing records for this VIN — the dealership advertising it, the asking price, and the odometer shown at the time.</p>
+          <p className="text-[12px] text-[#64748B]"><span className="font-bold text-[#0F172A]">What it is not.</span> A vehicle history report. There are no accident, title, service, or ownership records here, and nothing on this card is evidence about the vehicle's condition.</p>
+          <p className="text-[12px] text-[#64748B]"><span className="font-bold text-[#0F172A]">About the prices.</span> Asking prices move for many reasons — incentives, model-year changeover, seasonality, and each dealership's own pricing. A difference between listings is normal and says nothing about this car.</p>
+          <p className="text-[12px] text-[#64748B]"><span className="font-bold text-[#0F172A]">About the names.</span> One dealership can appear more than once when it advertises under more than one name or website. Records are grouped exactly as the seller named itself, never merged by resemblance.</p>
+          {listingHistory.atSourceCap && <p className="text-[12px] text-[#64748B]">The source returns at most {SOURCE_ENTRY_CAP} listing records per VIN — earlier advertising may exist beyond what is shown here.</p>}
+        </div>
+      </>
+    );
+  };
+
+  const ListingSection = () => !listingHistory ? null : (
+    <Section title="Advertising History" sub={listingSub}><ListingHistoryBody /></Section>
+  );
+
   const NotOnFile = () => missing.length === 0 ? null : (
     <div className={`${CARD} p-4`}>
       <p className="text-[13px] text-[#64748B]">
@@ -443,6 +675,28 @@ const VehiclePassportHistory = () => {
         </>
       )}
 
+      {listingHistory && (
+        <div className={`vphp-section ${listingHistory.records.length > 6 ? "vphp-break" : ""}`}>
+          <div className="vphp-h2">Advertising History ({listingCountLbl}{listingSpan ? ` · ${listingSpan}` : ""})</div>
+          <p className="vphp-note">Online listing records for this VIN — the dealership advertising it, the asking price, and the odometer shown at the time. This is marketplace advertising data, not a vehicle history report: no accident, title, service, or ownership records are included.</p>
+          <table className="vphp-table">
+            <thead><tr><th>Advertised by</th><th>Period</th><th>Asking price</th><th>Odometer shown</th></tr></thead>
+            <tbody>
+              {listingHistory.records.slice(0, 25).map((r) => (
+                <tr key={r.key}>
+                  <td>{r.dealer || "Listing record"}{r.advertisedNew ? " (advertised as new)" : ""}{r.sellerType ? ` (${r.sellerType === "fsbo" ? "private seller" : "auction listing"})` : ""}</td>
+                  <td>{describeListingPeriod(r) || "—"}</td>
+                  <td>{r.lastPrice != null ? (r.firstPrice != null && r.firstPrice !== r.lastPrice ? `${USD0.format(r.firstPrice)} \u2192 ${USD0.format(r.lastPrice)}` : USD0.format(r.lastPrice)) : "—"}</td>
+                  <td>{describeListingOdometer(r) || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {listingHistory.records.length > 25 && <p className="vphp-note">Showing the 25 most recent of {listingCountLbl}.</p>}
+          <p className="vphp-note">Asking prices move for many reasons — incentives, model-year changeover, seasonality, and each dealership's own pricing. A difference between listings says nothing about this vehicle's condition. One dealership can appear more than once when it advertises under more than one name or website.{listingHistory.atSourceCap ? ` The source returns at most ${SOURCE_ENTRY_CAP} listing records per VIN.` : ""}</p>
+        </div>
+      )}
+
       {meansItems.length > 0 && (
         <div className="vphp-section">
           <div className="vphp-h2">What This Means To You</div>
@@ -566,6 +820,13 @@ const VehiclePassportHistory = () => {
               <h2 className="text-[18px] font-bold mb-4">From the factory to you</h2>
               <Provenance />
             </div>
+            {listingHistory && (
+              <div className={`${CARD} p-5`}>
+                <h2 className="text-[18px] font-bold">Advertising History</h2>
+                <p className="text-[13px] text-[#64748B] mt-1 mb-4">{listingSub}</p>
+                <ListingHistoryBody />
+              </div>
+            )}
             {d.hasRecallCheck && (d.recallClear ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4"><p className="text-[15px] font-extrabold text-[#16A34A] inline-flex items-center gap-1.5"><CheckCircle2 className="w-5 h-5" /> No Open Recalls</p><p className="text-[12px] text-[#64748B] mt-1">No active manufacturer recalls were found with NHTSA.</p></div>
             ) : (
@@ -609,6 +870,12 @@ const VehiclePassportHistory = () => {
               </MAcc>
             )}
             <MileageTrail />
+            {listingHistory && (
+              <MAcc open={mOpen === "advertising"} onToggle={() => setMOpen(mOpen === "advertising" ? null : "advertising")} icon={Store} title="Advertising History" desc={`${listingCountLbl}${listingSpan ? ` \u00b7 ${listingSpan}` : ""}`} status="info">
+                <p className="text-[12px] text-[#64748B] mb-3">Where this vehicle has been advertised online. Marketplace listing records — not a vehicle history report.</p>
+                <ListingHistoryBody />
+              </MAcc>
+            )}
             {d.hasRecallCheck && (
               <MAcc open={mOpen === "recall"} onToggle={() => setMOpen(mOpen === "recall" ? null : "recall")} icon={BadgeCheck} title="Recall Status" desc="Open recalls (NHTSA)" status={d.recallClear ? "verified" : "attention"}>
                 {d.recallClear ? (
@@ -732,6 +999,7 @@ const VehiclePassportHistory = () => {
             <Section title="From the factory to you" sub="Every event here is backed by a record — nothing is inferred.">
               <Provenance />
             </Section>
+            <ListingSection />
             {d.hasRecallCheck && (
               <Section title="Recall Status">
                 {d.recallClear ? (
@@ -814,6 +1082,8 @@ const VehiclePassportHistory = () => {
             )}
 
             <MileageTrail />
+
+            <ListingSection />
 
             {d.hasRecallCheck && (
               <Section title="Recall Status">
