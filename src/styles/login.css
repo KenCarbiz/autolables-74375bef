@@ -66,8 +66,12 @@
     linear-gradient(160deg, var(--al-navy-700) 0%, var(--al-navy-800) 28%, #00193d 55%, var(--al-navy-900) 100%);
 }
 
-/* Phone-only elements; the desktop composition has neither. */
-.login-hero-fade,
+/* Phone-only element; the desktop composition has none. */
+.login-hero-fade {
+  display: none;
+}
+
+
 
 .login-hero::before {
   content: "";
