@@ -40,10 +40,10 @@ const SWEEP_CAP = 200;
 //
 //   * A listing that stayed DRAFT. Auto-publish is one UPDATE inside the
 //     claimed window; a recall block, a write error or the isolate dying loses
-//     it, and the claim is already stamped. The dedicated factory-sticker
-//     sweep selects `status = 'published'`, so a stuck draft is invisible to
-//     the one job that would have produced its window sticker — a single
-//     missed UPDATE silently removes the vehicle from a whole nightly.
+//     it, and the claim is already stamped, so nothing tried again. A draft
+//     listing is not served to shoppers at all, which makes it the one gap
+//     that costs the dealer whether or not every artifact underneath it
+//     succeeded.
 //   * A missing description case or an absent/parked sticker record. Both had
 //     exactly one automatic producer for a vehicle already on the lot: the
 //     MarketCheck resync, which needs the tenant to have a feed AND the VIN to
@@ -77,8 +77,7 @@ const errText = (e: unknown): string =>
  *
  * supabase-js REPORTS a blocked publish as { error }; it does not throw. The
  * block therefore has to be read off the result, or a car the recall gate
- * refused to publish leaves no trace anywhere — and a draft is invisible to
- * the factory-sticker sweep, which selects published listings only.
+ * refused to publish leaves no trace anywhere.
  */
 // deno-lint-ignore no-explicit-any
 async function autoPublish(admin: any, tenantId: string, vin: string, listingId: string): Promise<boolean> {
@@ -98,7 +97,7 @@ async function autoPublish(admin: any, tenantId: string, vin: string, listingId:
       });
     } catch { /* audit is best-effort; it must never fail intake */ }
     await recordIngestStep(admin, tenantId, vin, "auto_publish", "parked",
-      `The passport could not be published on intake, so this vehicle is still a draft and the nightly factory-sticker sweep (published listings only) cannot see it: ${reason}`,
+      `The passport could not be published on intake, so this vehicle is still a draft and no shopper can reach it: ${reason}. The nightly ingest reconcile re-attempts the publish.`,
       { vehicleId: listingId, detail: { code: error.code ?? null } });
     return false;
   } catch (e) {
@@ -293,8 +292,9 @@ async function reconcileArtifacts(admin: any, scopeTenantId: string | null): Pro
   await mapWithConcurrency(targets, RECONCILE_CONCURRENCY, async (v) => {
     if (Date.now() >= deadline) return;
 
-    // A draft is invisible to the factory-sticker sweep, so republishing it is
-    // worth more than any single artifact this pass could fire.
+    // A draft passport is not served to shoppers, so re-attempting the publish
+    // is worth more than any single artifact this pass could fire. The intake
+    // publish is a single UPDATE with no retry behind it.
     if (v.status === "draft" && (publishAllowed.get(v.tenant_id) ?? true)) {
       if (await autoPublish(admin, v.tenant_id, v.vin, v.id)) summary.published++;
     }

@@ -122,13 +122,15 @@ describe("the intake notifications stop disappearing", () => {
 });
 
 describe("the sweep reconciles state, not a replay of what was queued", () => {
-  it("re-publishes a stuck draft, because the sticker sweep cannot see drafts", () => {
-    // factory-sticker-orchestrate's orchestrate_sweep selects
-    // `.eq("status", "published")`, so one lost UPDATE removes the vehicle
-    // from a whole nightly job.
-    const stickerFn = fn("factory-sticker-orchestrate/index.ts");
-    expect(stickerFn).toMatch(/\.eq\("status", "published"\)/);
+  it("re-attempts a publish that was lost inside the claimed window", () => {
+    // The intake publish is a single UPDATE with no retry behind it, and the
+    // claim is stamped before it runs, so a blocked or dropped publish left a
+    // draft nothing would look at again. A draft passport is not served to
+    // shoppers at all.
     expect(orchestrate).toMatch(/if \(v\.status === "draft" && \(publishAllowed\.get\(v\.tenant_id\) \?\? true\)\)/);
+    // The dealer's own setting still decides, read once per tenant.
+    expect(orchestrate).toMatch(/ingest_auto_publish\) !== "false"/);
+    expect(orchestrate).toMatch(/"auto_publish", "parked"/);
   });
 
   it("asks what is missing rather than replaying a queue", () => {
