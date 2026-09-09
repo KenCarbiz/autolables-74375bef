@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { classifyCrawlOutcome } from "../_shared/crawlOutcome.ts";
+import { fetchCreditUsage, selectRenderKey, type RenderKeyCandidate } from "../_shared/renderKey.ts";
 import {
   createRenderPacer, deriveRenderBudget, parseRetryAfter, resolveRendersPerMinute,
 } from "../_shared/renderPacer.ts";
@@ -741,7 +742,16 @@ const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml
 //
 // The screenshot (our evidence image) is its own render, requested only when
 // there is something new to evidence: see shouldCaptureEvidence below.
-const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
+const FIRECRAWL_KEYS: RenderKeyCandidate[] = [
+  { env: "FIRECRAWL_API_KEY_1", key: Deno.env.get("FIRECRAWL_API_KEY_1") || "" },
+  { env: "FIRECRAWL_API_KEY", key: Deno.env.get("FIRECRAWL_API_KEY") || "" },
+].filter((c) => !!c.key);
+const FIRECRAWL_KEY = FIRECRAWL_KEYS[0]?.key || "";
+// The key a run spends. Chosen per run by selectRenderKey from the provider's
+// own balance report (see _shared/renderKey.ts); module state because the
+// renderer and the pacer are module functions. Two overlapping runs in one
+// isolate would at worst share the same sensible choice.
+let activeRenderKey = FIRECRAWL_KEY;
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 const RENDERS_PER_MINUTE = resolveRendersPerMinute(Deno.env.get("FIRECRAWL_RPM"));
 const MAX_RATE_LIMIT_RETRIES = 2;
@@ -762,11 +772,11 @@ interface RenderResult {
 }
 
 async function firecrawlRender(url: string, formats: RenderFormat[] = HTML_ONLY_FORMATS): Promise<RenderResult | null> {
-  if (!FIRECRAWL_KEY) return null;
+  if (!activeRenderKey) return null;
   try {
     const res = await fetch(FIRECRAWL_ENDPOINT, {
       method: "POST",
-      headers: { "Authorization": `Bearer ${FIRECRAWL_KEY}`, "Content-Type": "application/json" },
+      headers: { "Authorization": `Bearer ${activeRenderKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         url,
         formats,
@@ -998,40 +1008,31 @@ serve(async (req) => {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const primary = Deno.env.get("FIRECRAWL_API_KEY_1") || "";
-    const secondary = Deno.env.get("FIRECRAWL_API_KEY") || "";
-    const keys: Array<{ env: string; key: string; in_use: boolean }> = [];
-    if (primary) keys.push({ env: "FIRECRAWL_API_KEY_1", key: primary, in_use: true });
-    if (secondary) keys.push({ env: "FIRECRAWL_API_KEY", key: secondary, in_use: !primary });
     const checks: Array<Record<string, unknown>> = [];
-    for (const k of keys) {
-      const entry: Record<string, unknown> = {
-        env: k.env, in_use: k.in_use, key_length: k.key.length,
-        same_as_primary: k.env !== "FIRECRAWL_API_KEY_1" && k.key === primary,
-      };
-      try {
-        const res = await fetch("https://api.firecrawl.dev/v2/team/credit-usage", {
-          headers: { "Authorization": `Bearer ${k.key}` },
-          signal: AbortSignal.timeout(15000),
-        });
-        const text = await res.text();
-        let parsed: unknown = null;
-        try { parsed = JSON.parse(text); } catch { /* provider answered with non-JSON */ }
-        entry.status = res.status;
-        entry.response = parsed ?? text.slice(0, 500);
-      } catch (e) {
-        entry.status = null;
-        entry.error = String(e).slice(0, 300);
-      }
-      checks.push(entry);
+    for (const k of FIRECRAWL_KEYS) {
+      const u = await fetchCreditUsage(k.key);
+      checks.push({
+        env: k.env, in_use: k.key === activeRenderKey, key_length: k.key.length,
+        status: u.status, remaining_credits: u.remaining, plan_credits: u.plan, period_end: u.periodEnd, error: u.error,
+      });
     }
     return new Response(JSON.stringify({
       ok: true,
       credit_check: checks,
-      keys_configured: keys.length,
+      keys_configured: FIRECRAWL_KEYS.length,
       renders_per_minute: RENDERS_PER_MINUTE,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
+
+  // ── Renderer key selection ─────────────────────────────────
+  // Before anything renders, ask the provider which configured key can pay.
+  // Free call; recorded by env name in the run summary so a 402 can never
+  // again hide behind a dashboard that is showing a different team.
+  const renderKey = await selectRenderKey(FIRECRAWL_KEYS);
+  if (renderKey.key) activeRenderKey = renderKey.key;
+  const renderKeyReport = {
+    env: renderKey.env, reason: renderKey.reason, remaining_credits: renderKey.remaining, checked: renderKey.checked,
+  };
 
   // ── Per-tenant scrape settings ──────────────────────────────
   // dealer_profiles.settings.vdp_price_labels (comma-separated, priority
@@ -1127,6 +1128,7 @@ serve(async (req) => {
         paced_wait_ms: pacedWaitMs,
         rate_limit_retries: rateLimitRetries,
         renders_per_minute: RENDERS_PER_MINUTE,
+        render_key: renderKeyReport,
         http_status: httpStatus,
         msrp: result.msrp,
         candidates: result.candidates.slice(0, 30),
@@ -1863,6 +1865,7 @@ serve(async (req) => {
       render_budget: renderBudgetStart,
       render_budget_left: renderBudget,
       evidence_renders: evidenceRenders,
+      render_key: renderKeyReport,
       ...pacer.snapshot(),
     },
   }), {

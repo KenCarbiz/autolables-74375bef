@@ -279,3 +279,34 @@ describe("retired listings leave the rotation", () => {
     expect(queueLoop.indexOf("archivedKeys.has(key)")).toBeLessThan(queueLoop.indexOf("pricedKeys.add(key)"));
   });
 });
+
+describe("the run spends the key that can pay", () => {
+  it("selects the renderer key from the provider's balance before any render", () => {
+    expect(SRC).toMatch(/import \{ fetchCreditUsage, selectRenderKey, type RenderKeyCandidate \} from "\.\.\/_shared\/renderKey\.ts";/);
+    const selection = SRC.indexOf("const renderKey = await selectRenderKey(FIRECRAWL_KEYS);");
+    const testMode = SRC.indexOf("if (body.test_url) {");
+    const loop = SRC.indexOf("for (const row of rows) {");
+    expect(selection).toBeGreaterThan(0);
+    expect(selection).toBeLessThan(testMode);
+    expect(selection).toBeLessThan(loop);
+    expect(SRC).toMatch(/if \(renderKey\.key\) activeRenderKey = renderKey\.key;/);
+  });
+
+  it("renders with the selected key, not the first configured one", () => {
+    const renderFn = between("async function firecrawlRender(", "const sleep =");
+    expect(renderFn).toContain("`Bearer ${activeRenderKey}`");
+    expect(renderFn).not.toContain("`Bearer ${FIRECRAWL_KEY}`");
+  });
+
+  it("records the choice by env name in both run summaries", () => {
+    expect(SRC.match(/render_key: renderKeyReport,/g)?.length).toBe(2);
+    expect(SRC).not.toMatch(/key: renderKey\.key/);
+  });
+
+  it("lets a platform caller read the balance without a dealer session", () => {
+    const block = between("if (body.credit_check === true) {", "// ── Renderer key selection");
+    expect(block).toContain("if (auth !== serviceKey && !isCron) {");
+    expect(block).toContain("key_length: k.key.length");
+    expect(block).not.toMatch(/key: k\.key/);
+  });
+});
