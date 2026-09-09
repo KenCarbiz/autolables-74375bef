@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
-import { PUBLIC_VIEW_DENY } from "../_shared/lotFeedRow.ts";
+import { PUBLIC_VIEW_DENY, scrubTitleVerification } from "../_shared/lotFeedRow.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
@@ -907,6 +907,15 @@ serve(async (req) => {
     // _shared/lotFeedRow.ts, which is where that exemption is spelled out and
     // the only reason a denied field can fall out of scope.
     for (const k of PUBLIC_VIEW_DENY) delete (row as Record<string, unknown>)[k];
+
+    // The title attestation is shown to the shopper, but the employee who
+    // signed it is not. The deny sweep above works on whole columns and this
+    // one has to survive with its inside changed, so it is scrubbed rather
+    // than dropped -- the same treatment history_payload gets.
+    if ((row as Record<string, unknown>).title_verification) {
+      (row as Record<string, unknown>).title_verification =
+        scrubTitleVerification((row as Record<string, unknown>).title_verification);
+    }
 
     return json(200, { listing: row });
   } catch (err) {

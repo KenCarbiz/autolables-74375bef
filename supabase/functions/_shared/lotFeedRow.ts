@@ -86,6 +86,40 @@ export const PUBLIC_VIEW_DENY = new Set(
  * stays — it is provenance, and the timeline is meaningless without knowing a
  * change of hands happened.
  */
+/**
+ * The dealer's NMVTIS title attestation, minus who signed it.
+ *
+ * `vehicle_listings.title_verification` is a dealership business record and
+ * the shopper is meant to see it: the passport's title check reads status and
+ * the verified date off this object. What the shopper is not meant to see is
+ * `verified_by`, the internal auth.users id of the employee who attested.
+ *
+ * This is an ALLOW-list on purpose. Every other payload on this row is
+ * filtered by naming what to remove, which is why a column added later
+ * arrives at an anonymous shopper by default. The attestation shape is fixed
+ * by the migration that defines it, so here the safe direction is the other
+ * one: a key nobody has thought about does not ship.
+ */
+const TITLE_VERIFICATION_PUBLIC = [
+  "status",
+  "verified_at",
+  "source",
+  "report_generated_at",
+  "report_expires_at",
+  "brand_note",
+] as const;
+
+// deno-lint-ignore no-explicit-any
+export function scrubTitleVerification(payload: any): any {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const out: Record<string, unknown> = {};
+  for (const k of TITLE_VERIFICATION_PUBLIC) {
+    const v = (payload as Record<string, unknown>)[k];
+    if (v !== undefined && v !== null) out[k] = v;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 export function scrubHistory(payload: any, cap = 40): any {
   if (!payload || typeof payload !== "object") return null;
   const entries = Array.isArray(payload.entries) ? payload.entries : null;
@@ -292,6 +326,7 @@ export function shapeLotRow(
   out.passport_url = passportUrl(row?.slug);
   out.documents_url = documentsUrl(row?.slug);
   if (row?.history_payload) out.history_payload = scrubHistory(row.history_payload);
+  if (row?.title_verification) out.title_verification = scrubTitleVerification(row.title_verification);
 
   // Manufacturing specification.
   //

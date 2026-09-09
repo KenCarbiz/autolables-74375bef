@@ -560,7 +560,12 @@ const Index = () => {
     () => advertisedForVin ?? (vehiclePriceNum > 0 ? {
       id: "", vin: (vehicle.vin || "").toUpperCase(), source_url: "",
       source_label: "website" as AdvertisedSource, advertised_price: vehiclePriceNum,
-      snapshot_at: new Date().toISOString(), captured_by: null, notes: "MarketCheck feed price",
+      snapshot_at: new Date().toISOString(), captured_by: null,
+      // The label says website because that is the only source this type
+      // offers, but the number is the inventory feed's. Stating the method
+      // truthfully keeps it out of isCurrentObservation, so a fallback can
+      // never be mistaken for evidence that someone read the dealer's page.
+      captured_method: "marketcheck_syndication", notes: "MarketCheck feed price",
     } : undefined),
     [advertisedForVin, vehiclePriceNum, vehicle.vin],
   );

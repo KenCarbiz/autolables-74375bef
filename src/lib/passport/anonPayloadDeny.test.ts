@@ -5,7 +5,7 @@ import { join } from "node:path";
 // vitest unchanged and a rename in the denylist fails here rather than
 // silently re-opening the hole.
 import {
-  LOT_FEED_DENY, PUBLIC_VIEW_DENY,
+  LOT_FEED_DENY, PUBLIC_VIEW_DENY, scrubTitleVerification,
 } from "../../../supabase/functions/_shared/lotFeedRow.ts";
 
 // public-listing-view answers /v/:slug for anyone on the internet, and its RPC
@@ -106,7 +106,10 @@ describe("one denylist, not two", () => {
     for (const k of PUBLIC_VIEW_DENY) {
       expect(LOT_FEED_DENY.has(k), `${k} is not on the shared list`).toBe(true);
     }
-    expect(view).toMatch(/import \{ PUBLIC_VIEW_DENY \} from "\.\.\/_shared\/lotFeedRow\.ts";/);
+    // The list is imported, never redefined here. Other names may ride the
+    // same import; what must not appear is a second copy of the list.
+    expect(view).toMatch(/import \{[^}]*\bPUBLIC_VIEW_DENY\b[^}]*\} from "\.\.\/_shared\/lotFeedRow\.ts";/);
+    expect(view).not.toMatch(/const PUBLIC_VIEW_DENY\s*=/);
   });
 
   it("the sweep is wired into the function, over the whole row", () => {
@@ -176,5 +179,61 @@ describe("the locked passport still gets everything it renders", () => {
     ]) {
       expect(PUBLIC_VIEW_DENY.has(k)).toBe(false);
     }
+  });
+});
+
+describe("the title attestation reaches the shopper without the employee who signed it", () => {
+  // vehicle_listings.title_verification is a dealership business record and the
+  // passport's title check renders it. Its verified_by is an internal
+  // auth.users id, and both sister-app feeds are allow-by-default, so the id
+  // would have shipped to anonymous consumers the moment a dealer attested.
+  const attestation = {
+    status: "clean",
+    verified_at: "2026-09-09T12:00:00Z",
+    verified_by: "8f14e45f-ceea-467a-9d1a-0b1cbb9f6d4e",
+    source: "nmvtis_vindata",
+    report_generated_at: "2026-09-09T11:59:00Z",
+    report_expires_at: "2026-12-08T11:59:00Z",
+    brand_note: null,
+  };
+
+  it("keeps what the passport renders", () => {
+    const out = scrubTitleVerification(attestation) as Record<string, unknown>;
+    expect(out.status).toBe("clean");
+    expect(out.verified_at).toBe("2026-09-09T12:00:00Z");
+    expect(out.source).toBe("nmvtis_vindata");
+    expect(out.report_generated_at).toBe("2026-09-09T11:59:00Z");
+    expect(out.report_expires_at).toBe("2026-12-08T11:59:00Z");
+  });
+
+  it("drops the internal user id", () => {
+    const out = scrubTitleVerification(attestation) as Record<string, unknown>;
+    expect(out.verified_by).toBeUndefined();
+    expect(JSON.stringify(out)).not.toContain("8f14e45f");
+  });
+
+  it("allows by name, so a key nobody thought about does not ship", () => {
+    const out = scrubTitleVerification({
+      ...attestation,
+      internal_notes: "called the auction",
+      dealer_cost: 41200,
+    }) as Record<string, unknown>;
+    expect(out.internal_notes).toBeUndefined();
+    expect(out.dealer_cost).toBeUndefined();
+  });
+
+  it("returns null rather than an empty husk", () => {
+    expect(scrubTitleVerification(null)).toBeNull();
+    expect(scrubTitleVerification({ verified_by: "x" })).toBeNull();
+    expect(scrubTitleVerification("clean")).toBeNull();
+  });
+
+  it("is wired into both surfaces", () => {
+    expect(view).toContain("scrubTitleVerification((row as Record<string, unknown>).title_verification)");
+    const shaper = readFileSync(
+      join(__dirname, "../../../supabase/functions/_shared/lotFeedRow.ts"),
+      "utf8",
+    );
+    expect(shaper).toContain("out.title_verification = scrubTitleVerification(row.title_verification)");
   });
 });

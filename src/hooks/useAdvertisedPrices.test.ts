@@ -27,6 +27,7 @@ const makeAp = (overrides: Partial<AdvertisedPrice> = {}): AdvertisedPrice => ({
   advertised_price: 22_000,
   snapshot_at: "2026-06-13T22:00:00Z",
   captured_by: "ken@dealer.com",
+  captured_method: "dealer_vdp_observation",
   notes: "",
   ...overrides,
 });

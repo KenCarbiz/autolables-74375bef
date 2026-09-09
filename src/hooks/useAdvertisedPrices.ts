@@ -52,8 +52,32 @@ export interface AdvertisedPrice {
   // uuid of the human who captured the row, or null for machine-written rows
   // (the crawler). Never a display string — the column is a uuid.
   captured_by: string | null;
+  // How the row was obtained. 'dealer_vdp_observation' is the only value that
+  // means someone looked at the dealer's page; 'marketcheck_syndication' is
+  // the inventory feed, 'crawl_seed' is a placeholder, and null is a legacy
+  // row whose provenance was never recorded.
+  captured_method: string | null;
   notes: string;
 }
+
+/**
+ * How long a website observation speaks for today.
+ *
+ * The crawler holds a refused VIN out of its rotation for exactly this long,
+ * which makes it the longest interval the platform ever intends to go without
+ * looking at a dealer's page. The same bound is enforced server-side in
+ * verify_addendum_price, and the two must agree: the client number is what a
+ * signer sees on the addendum, and the server number is what lets them sign.
+ */
+export const OBSERVATION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** A website row that is genuinely evidence of what the dealer's page shows. */
+export const isCurrentObservation = (p: AdvertisedPrice, now = Date.now()): boolean => {
+  if (p.source_label !== "website") return false;
+  if (p.captured_method !== "dealer_vdp_observation") return false;
+  const t = Date.parse(p.snapshot_at || "");
+  return Number.isFinite(t) && now - t <= OBSERVATION_MAX_AGE_MS;
+};
 
 export interface CaptureArgs {
   vin: string;
@@ -102,7 +126,7 @@ export const useAdvertisedPrices = (storeId: string = "") => {
       // dedupe to the latest row per VIN.
       const { data } = await (supabase as any)
         .from("advertised_prices")
-        .select("id, vin, source_url, source_label:source_channel, advertised_price, snapshot_at:captured_at, captured_by, notes")
+        .select("id, vin, source_url, source_label:source_channel, advertised_price, snapshot_at:captured_at, captured_by, captured_method, notes")
         .order("captured_at", { ascending: false })
         .limit(2000);
       // Keep the latest snapshot per (VIN, source) — one canonical price per
@@ -132,18 +156,25 @@ export const useAdvertisedPrices = (storeId: string = "") => {
   });
 
   // Map vin → canonical latest price (one entry per VIN) for cheap O(1) lookup
-  // from row renderers in /inventory etc. Prefer the dealer's own website as
-  // authoritative; otherwise the newest snapshot across sites. q.data is
-  // newest-first, so the first website row (or first row) per VIN wins.
+  // from row renderers in /inventory etc.
+  //
+  // A website row wins only while it is still evidence. It used to win on its
+  // label alone, with no age and no provenance test, so on 2026-07-05 a
+  // $90,403 capture of JN8AZ3AE1T9720885 outranked the dealer's own $78,084
+  // and that stale number was written onto the addendum a customer signs.
+  // Three vehicles were in that state. A row that is too old, or that the
+  // feed wrote and merely labelled 'website', now loses to the newest row,
+  // which is the dealer's current claim -- so nothing loses a price, it just
+  // stops being called an observation.
   const byVin = useMemo(() => {
     const m = new Map<string, AdvertisedPrice>();
+    const now = Date.now();
     for (const p of q.data || []) {
       const v = (p.vin || "").toUpperCase();
+      if (!v) continue;
       const existing = m.get(v);
-      if (!existing || (p.source_label === "website" && existing.source_label !== "website")) {
-        if (!existing) m.set(v, p);
-        else if (p.source_label === "website") m.set(v, p);
-      }
+      if (!existing) { m.set(v, p); continue; }
+      if (isCurrentObservation(p, now) && !isCurrentObservation(existing, now)) m.set(v, p);
     }
     return m;
   }, [q.data]);
