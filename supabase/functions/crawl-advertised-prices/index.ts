@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { classifyCrawlOutcome } from "../_shared/crawlOutcome.ts";
+import {
+  createRenderPacer, deriveRenderBudget, parseRetryAfter, resolveRendersPerMinute,
+} from "../_shared/renderPacer.ts";
 
 // ──────────────────────────────────────────────────────────────
 // crawl-advertised-prices  ·  Wave 24
@@ -28,14 +31,19 @@ import { classifyCrawlOutcome } from "../_shared/crawlOutcome.ts";
 // Contract:
 //   POST /functions/v1/crawl-advertised-prices
 //   Headers: Authorization: Bearer <SERVICE_ROLE_KEY>
-//   Body: { limit?: number; tenant_id?: string }
+//   Body: { limit?: number; tenant_id?: string; force_screenshot?: boolean }
 //     · limit       — max URLs to crawl this invocation (default 200)
 //     · tenant_id   — restrict to one tenant; default = all tenants
+//     · force_screenshot — take an evidence screenshot for every row this
+//                   run, not only on change / first capture
+//   Env: FIRECRAWL_RPM — renders per minute (default 10, clamped 1..60);
+//        the provider enforces 11.
 //   Returns: {
 //     ok: true,
 //     picked: number,    // URLs we attempted to crawl
-//     updated: number,   // snapshots inserted because price changed
-//     unchanged: number, // crawl succeeded but price matched latest
+//     updated: number,   // observations recorded with a changed price
+//     unchanged: number, // observations recorded with the price held (still
+//                        // written, so the staleness queue keeps rotating)
 //     failed: number,    // crawl errored (network, no price found)
 //   }
 //
@@ -61,6 +69,19 @@ interface LatestRow {
   // A seed row has no prior snapshot (advertised_price 0): it comes from a
   // synced vehicle_listing whose VDP url we crawl to capture a FIRST price.
   seed?: boolean;
+}
+
+// A feed row names the dealer's inventory system as its channel. The crawler
+// only ever observes a page, so whatever channel a queue row carried in, what
+// it writes back is an observation on the website channel. The queue function
+// stopped handing out feed rows (20260909020000); this is the belt to that
+// suspender, so a feed row can never become a "feed" observation with
+// captured_method dealer_vdp_observation.
+const FEED_CHANNELS = new Set(["feed", "marketcheck", "marketcheck_syndication"]);
+function observationChannel(label: string | null | undefined): string {
+  const l = String(label || "").trim();
+  if (!l || FEED_CHANNELS.has(l.toLowerCase())) return "website";
+  return l;
 }
 
 // SSRF guard — reject private/loopback/link-local/cloud-metadata hosts.
@@ -707,12 +728,27 @@ const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml
 
 // ── Firecrawl rendering + screenshot ─────────────────────────────
 // Plain fetch can't see prices on JS-walled dealer sites / marketplaces.
-// When the cheap path fails, escalate to Firecrawl: it returns rendered HTML,
-// a full-page screenshot (our FTC evidence image), and an LLM-extracted
-// {price, vin} we accept only when the VIN matches.
+// When the cheap path fails, escalate to Firecrawl for the rendered HTML.
+//
+// The routine render asks for html only. It used to bundle a full-page
+// screenshot and an LLM json extract into every request; that bundle was
+// what the provider refused at 402 on 2026-09-08 ("try changing the request
+// limit to a lower value") while the balance was healthy and a plain html
+// scrape of the same page cost one credit. The json extract was a fallback of
+// a fallback that never decided a Harte price -- the label ladder resolves
+// "Sale Price" deterministically -- so it is gone. jsonPrice / jsonVin stay on
+// the shape, always null, so the consumers still compile.
+//
+// The screenshot (our evidence image) is its own render, requested only when
+// there is something new to evidence: see shouldCaptureEvidence below.
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
+const RENDERS_PER_MINUTE = resolveRendersPerMinute(Deno.env.get("FIRECRAWL_RPM"));
+const MAX_RATE_LIMIT_RETRIES = 2;
 
+type RenderFormat = string | { type: string; fullPage?: boolean };
+const HTML_ONLY_FORMATS: RenderFormat[] = ["html"];
+const EVIDENCE_FORMATS: RenderFormat[] = ["html", { type: "screenshot", fullPage: true }];
 
 interface RenderResult {
   html: string;
@@ -722,9 +758,10 @@ interface RenderResult {
   ok: boolean;
   status: number | null;
   error: string | null;
+  retryAfterHeader?: string | null;
 }
 
-async function firecrawlRender(url: string): Promise<RenderResult | null> {
+async function firecrawlRender(url: string, formats: RenderFormat[] = HTML_ONLY_FORMATS): Promise<RenderResult | null> {
   if (!FIRECRAWL_KEY) return null;
   try {
     const res = await fetch(FIRECRAWL_ENDPOINT, {
@@ -732,20 +769,19 @@ async function firecrawlRender(url: string): Promise<RenderResult | null> {
       headers: { "Authorization": `Bearer ${FIRECRAWL_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         url,
-        formats: ["html", { type: "screenshot", fullPage: true }, {
-          type: "json",
-          prompt: "Extract the vehicle's advertised selling/internet price in USD (not the MSRP) and its 17-character VIN.",
-          schema: { type: "object", properties: { price: { type: "number" }, vin: { type: "string" }, currency: { type: "string" } } },
-        }],
+        formats,
         onlyMainContent: false,
-        waitFor: 10000,
-        timeout: 90000,
+        waitFor: 4000,
+        timeout: 60000,
       }),
-      signal: AbortSignal.timeout(110000),
+      signal: AbortSignal.timeout(70000),
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      return { html: "", screenshotUrl: null, jsonPrice: null, jsonVin: null, ok: false, status: res.status, error: body.slice(0, 300) || res.statusText };
+      return {
+        html: "", screenshotUrl: null, jsonPrice: null, jsonVin: null, ok: false, status: res.status,
+        error: body.slice(0, 300) || res.statusText, retryAfterHeader: res.headers.get("retry-after"),
+      };
     }
     // deno-lint-ignore no-explicit-any
     const data: any = await res.json();
@@ -753,8 +789,8 @@ async function firecrawlRender(url: string): Promise<RenderResult | null> {
     return {
       html: d?.html || "",
       screenshotUrl: d?.screenshot || d?.screenshotUrl || d?.actions?.screenshots?.[0] || (d?.metadata?.screenshot) || null,
-      jsonPrice: norm(d?.json?.price ?? null),
-      jsonVin: d?.json?.vin ? normVin(d.json.vin) : null,
+      jsonPrice: null,
+      jsonVin: null,
       ok: true,
       status: res.status,
       error: null,
@@ -763,6 +799,49 @@ async function firecrawlRender(url: string): Promise<RenderResult | null> {
     const msg = err instanceof Error ? err.message : String(err);
     return { html: "", screenshotUrl: null, jsonPrice: null, jsonVin: null, ok: false, status: null, error: msg.slice(0, 300) };
   }
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+interface PacedRender {
+  render: RenderResult | null;
+  formats: RenderFormat[];
+  pacedWaitMs: number;
+  rateLimitRetries: number;
+  gaveUp: "out_of_time" | "rate_limited" | null;
+}
+
+// One render, paced. Waits for the pacer's slot, retries a 429 for the wait
+// the provider names (at most MAX_RATE_LIMIT_RETRIES times), and gives up
+// rather than sleep past the run's deadline. Every request -- refused ones
+// included -- counts against the provider's per-minute window, so each is
+// recorded with the pacer before it is sent.
+const pacer = createRenderPacer({ rpm: RENDERS_PER_MINUTE });
+async function pacedRender(url: string, formats: RenderFormat[], deadlineAt: number): Promise<PacedRender> {
+  let pacedWaitMs = 0;
+  let rateLimitRetries = 0;
+  let last: RenderResult | null = null;
+  for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
+    const now = Date.now();
+    const wait = pacer.waitBeforeRender(now);
+    if (now + wait > deadlineAt) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "out_of_time" };
+    if (wait > 0) { await sleep(wait); pacedWaitMs += wait; }
+    pacer.noteRenderStarted(Date.now());
+    last = await firecrawlRender(url, formats);
+    if (last?.ok) {
+      pacer.noteSuccess();
+      return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: null };
+    }
+    if (last?.status !== 429) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: null };
+    const retryAfterMs = parseRetryAfter(last.retryAfterHeader, last.error, Date.now());
+    const backoff = pacer.noteRateLimited(retryAfterMs);
+    if (attempt === MAX_RATE_LIMIT_RETRIES) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "rate_limited" };
+    if (Date.now() + backoff > deadlineAt) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "out_of_time" };
+    await sleep(backoff);
+    pacedWaitMs += backoff;
+    rateLimitRetries++;
+  }
+  return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "rate_limited" };
 }
 
 // Download Firecrawl's (ephemeral) screenshot and persist it to our private
@@ -841,13 +920,28 @@ serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let body: { limit?: number; tenant_id?: string; discover?: boolean; vin?: string; test_url?: string } = {};
+  let body: {
+    limit?: number; tenant_id?: string; discover?: boolean; vin?: string; test_url?: string;
+    force_screenshot?: boolean;
+  } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
   const targetVin = body.vin ? normVin(body.vin) : null;
-  // Firecrawl is metered — cap renders per run. A single-VIN re-scrape (the
+  // Each row is a serial fetch with a 12s timeout, optionally a Firecrawl
+  // render on top. 500 of those cannot finish inside an edge function's wall
+  // clock, so the run used to be killed mid-loop — no summary, no audit row,
+  // and no signal that the tail of the list had not been touched. Stopping
+  // deliberately keeps the reporting honest; the staleness ordering means
+  // whatever is left is simply first in line tomorrow.
+  const RUN_BUDGET_MS = 220_000;
+  const startedAt = Date.now();
+  const deadlineAt = startedAt + RUN_BUDGET_MS;
+  // Firecrawl is metered and rate limited — cap renders per run at what the
+  // paced rate can actually fit inside the wall clock, so the loop never plans
+  // a burst it would have to fire all at once. A single-VIN re-scrape (the
   // Ready-for-Signatures verify) gets a small dedicated budget, and the
   // dealer "Test" button gets exactly one render.
-  let renderBudget = FIRECRAWL_KEY ? (body.test_url ? 1 : (targetVin ? 3 : 30)) : 0;
+  const pacedBudget = deriveRenderBudget(RUN_BUDGET_MS, RENDERS_PER_MINUTE);
+  let renderBudget = FIRECRAWL_KEY ? (body.test_url ? 1 : (targetVin ? 3 : pacedBudget)) : 0;
 
   // ── Auth gate ────────────────────────────────────────────────
   // Two callers: (1) the scheduled cron with the service-role key or the
@@ -952,22 +1046,20 @@ serve(async (req) => {
     let result: AdResult & { matched_label?: string | null } = html
       ? extractAdvertised(html, fetchUrl, "", cfg.labels)
       : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
+    let pacedWaitMs = 0;
+    let rateLimitRetries = 0;
     if (result.price == null && renderBudget > 0) {
       renderBudget--;
-      const fr = await firecrawlRender(fetchUrl);
+      const pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt);
+      const fr = pr.render;
+      pacedWaitMs = pr.pacedWaitMs;
+      rateLimitRetries = pr.rateLimitRetries;
       renderStatus = fr?.status ?? null;
       renderError = fr?.error ?? null;
       if (fr?.ok) {
         rendered = true;
         if (fr.html) {
           result = extractAdvertised(fr.html, fetchUrl, "", cfg.labels);
-        }
-        if (result.price == null && fr.jsonPrice != null && sane(fr.jsonPrice)) {
-          if (result.msrp != null && fr.jsonPrice < result.msrp * 0.3) {
-            result = { ...result, reason: "implausible_vs_msrp" };
-          } else {
-            result = { ...result, price: fr.jsonPrice, source: "jsonld", reason: null };
-          }
         }
       }
     }
@@ -981,6 +1073,10 @@ serve(async (req) => {
         rendered,
         render_status: renderStatus,
         render_error: renderError,
+        render_formats: HTML_ONLY_FORMATS,
+        paced_wait_ms: pacedWaitMs,
+        rate_limit_retries: rateLimitRetries,
+        renders_per_minute: RENDERS_PER_MINUTE,
         http_status: httpStatus,
         msrp: result.msrp,
         candidates: result.candidates.slice(0, 30),
@@ -1027,8 +1123,28 @@ serve(async (req) => {
     source_url: string | null; source_channel: string | null;
     advertised_price: number | null; captured_at: string | null;
   };
+  // Retired listings leave the rotation. advertised_price_crawl_queue reads
+  // only advertised_prices, so a car that left the dealer's feed kept its
+  // place in the queue and kept spending renders on a page that no longer
+  // exists. A single-VIN re-check is still honoured for a retired car: the
+  // caller named it.
+  const archivedKeys = new Set<string>();
+  try {
+    let archivedQuery = admin
+      .from("vehicle_listings")
+      .select("tenant_id, vin")
+      .or("archived_at.not.is.null,status.eq.archived")
+      .limit(5000);
+    if (body.tenant_id) archivedQuery = archivedQuery.eq("tenant_id", body.tenant_id);
+    const { data: archivedRows } = await archivedQuery;
+    for (const a of (archivedRows || []) as Array<{ tenant_id: string; vin: string | null }>) {
+      archivedKeys.add(a.tenant_id + "|" + (a.vin || "").toUpperCase());
+    }
+  } catch { /* an unreadable archive list must not stop the run; it only widens it */ }
+
   for (const q of (queued || []) as QueueRow[]) {
     const key = q.tenant_id + "|" + (q.vin || "").toUpperCase();
+    if (!targetVin && archivedKeys.has(key)) continue;
     pricedKeys.add(key);
     // Single-VIN re-scrape (Ready-for-Signatures verify) only touches that VIN.
     if (targetVin && (q.vin || "").toUpperCase() !== targetVin) continue;
@@ -1036,7 +1152,7 @@ serve(async (req) => {
     seen.add(key);
     rows.push({
       id: q.id, tenant_id: q.tenant_id, store_id: q.store_id || "", vin: q.vin,
-      source_url: q.source_url || "", source_label: q.source_channel || "website",
+      source_url: q.source_url || "", source_label: observationChannel(q.source_channel),
       advertised_price: q.advertised_price ?? 0, snapshot_at: q.captured_at,
     });
   }
@@ -1056,6 +1172,8 @@ serve(async (req) => {
       .select("tenant_id, store_id, vin, source_url")
       .neq("source_url", "")
       .not("source_url", "is", null)
+      .is("archived_at", null)
+      .neq("status", "archived")
       .limit(2000);
     if (body.tenant_id) seedQuery = seedQuery.eq("tenant_id", body.tenant_id);
     const { data: seedRows } = await seedQuery;
@@ -1101,15 +1219,29 @@ serve(async (req) => {
   let discovered = 0;
   let processed = 0;
   let ranOutOfTime = false;
+  let evidenceRenders = 0;
 
-  // Each row is a serial fetch with a 12s timeout, optionally a Firecrawl
-  // render on top. 500 of those cannot finish inside an edge function's wall
-  // clock, so the run used to be killed mid-loop — no summary, no audit row,
-  // and no signal that the tail of the list had not been touched. Stopping
-  // deliberately keeps the reporting honest; the staleness ordering means
-  // whatever is left is simply first in line tomorrow.
-  const RUN_BUDGET_MS = 220_000;
-  const startedAt = Date.now();
+  // Whether this row needs an evidence screenshot before we know its price:
+  // the caller demanded one, this is the pre-signature single-VIN re-check
+  // (which promises a timestamped picture), or no screenshot-backed
+  // observation exists for this VIN on this channel yet. A price or fee change
+  // found after parsing is the third trigger, decided below.
+  const hasEvidenceScreenshot = async (tenantId: string, vin: string, channel: string): Promise<boolean> => {
+    try {
+      const { data, error } = await admin.from("advertised_prices")
+        .select("id").eq("tenant_id", tenantId).eq("vin", normVin(vin)).eq("source_channel", channel)
+        .not("screenshot_sha256", "is", null).limit(1);
+      // A query that failed cannot prove there is no screenshot. The cheap
+      // mistake is to skip one render; the expensive one is a render for
+      // every VIN on the night the table is unreachable.
+      if (error) return true;
+      return (data?.length ?? 0) > 0;
+    } catch { return true; }
+  };
+  const shouldCaptureEvidence = async (row: LatestRow): Promise<boolean> => {
+    if (body.force_screenshot === true || targetVin) return true;
+    return !(await hasEvidenceScreenshot(row.tenant_id, row.vin, observationChannel(row.source_label)));
+  };
 
   for (const row of rows) {
     if (Date.now() - startedAt > RUN_BUDGET_MS) { ranOutOfTime = true; break; }
@@ -1149,40 +1281,67 @@ serve(async (req) => {
         : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
 
       // Escalate to Firecrawl when the cheap path is walled or empty — this is
-      // what makes JS-rendered dealer sites + marketplaces return a real price,
-      // and it's where we capture the FTC evidence screenshot.
+      // what makes JS-rendered dealer sites + marketplaces return a real price.
+      // Html only, unless this row is already known to need an evidence
+      // screenshot, in which case the one render carries both so a second
+      // request is not spent on the same page.
       let screenshot: CapturedScreenshot | null = null;
       let renderSource: string | null = null;
       let renderStatus: number | null = null;
       let renderError: string | null = null;
+      let pacedWaitMs = 0;
+      let rateLimitRetries = 0;
+      let renderFormats: RenderFormat[] | null = null;
+      let evidenceDue = false;
+      // Set when the html+screenshot bundle was refused and the price was
+      // taken from a plain html retry instead. The second stage then does not
+      // spend another render asking for the same refused picture.
+      let evidenceRefused: { status: number | null; error: string | null } | null = null;
       const cheapFailed = result.price == null && result.reason !== "vin_mismatch" && !result.gated;
       if (cheapFailed && renderBudget > 0) {
         renderBudget--;
-        const r = await firecrawlRender(fetchUrl);
+        evidenceDue = await shouldCaptureEvidence(row);
+        let pr = await pacedRender(fetchUrl, evidenceDue ? EVIDENCE_FORMATS : HTML_ONLY_FORMATS, deadlineAt);
+        pacedWaitMs += pr.pacedWaitMs;
+        rateLimitRetries += pr.rateLimitRetries;
+        // The price must never depend on the screenshot. When the bundle is
+        // refused for any reason other than a rate limit (a 402 on the
+        // screenshot format, a provider error), one plain html retry still
+        // makes the observation; only the picture is lost, and the refusal
+        // is recorded so the ledger shows why there is none.
+        if (evidenceDue && pr.render && !pr.render.ok && pr.render.status !== 429 && pr.gaveUp == null && renderBudget > 0) {
+          evidenceRefused = { status: pr.render.status, error: pr.render.error };
+          evidenceDue = false;
+          renderBudget--;
+          pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt);
+          pacedWaitMs += pr.pacedWaitMs;
+          rateLimitRetries += pr.rateLimitRetries;
+        }
+        const r = pr.render;
+        renderFormats = pr.formats;
         renderStatus = r?.status ?? null;
         renderError = r?.error ?? null;
         if (r?.ok) {
           renderSource = "firecrawl";
+          if (evidenceDue) {
+            // On render success, not parse success: a page we could not read
+            // is exactly the one a person needs to look at.
+            screenshot = await captureScreenshot(admin, r.screenshotUrl, row.tenant_id, row.vin);
+            if (screenshot) evidenceRenders++;
+          }
           if (r.html) {
             html = r.html;
             result = extractAdvertised(priceEvidenceHtml(r.html), fetchUrl, row.vin, cfg.labels);
           }
-          // Fall back to Firecrawl's structured extract, but only when the VIN
-          // it read matches the target — never trust a price off the wrong car.
-          if (result.price == null && r.jsonPrice != null && sane(r.jsonPrice)
-              && (!r.jsonVin || r.jsonVin === normVin(row.vin))) {
-            // Apply the same MSRP plausibility guard to the LLM-extracted price.
-            if (result.msrp != null && r.jsonPrice < result.msrp * 0.3) {
-              result = { ...result, reason: "implausible_vs_msrp" };
-            } else {
-              result = { ...result, price: r.jsonPrice, source: "jsonld", gated: false, reason: null };
-            }
-          }
-          if (result.price != null) {
-            screenshot = await captureScreenshot(admin, r.screenshotUrl, row.tenant_id, row.vin);
-          }
         }
       }
+      const pacing = {
+        paced_wait_ms: pacedWaitMs,
+        rate_limit_retries: rateLimitRetries,
+        render_formats: renderFormats,
+        renders_per_minute: RENDERS_PER_MINUTE,
+        evidence_refused: evidenceRefused,
+      };
 
       // Ledger every attempt, won or lost. advertised_prices records only
       // successes, so before this a total outage looked exactly like a quiet
@@ -1200,6 +1359,11 @@ serve(async (req) => {
           renderError,
           renderConfigured: !!FIRECRAWL_KEY,
         });
+        // The pacer's decision rides on the ledger detail so a canary run can
+        // prove the renderer was paced, not just that it answered.
+        const pacingNote = renderFormats
+          ? `[paced_wait_ms=${pacedWaitMs} rate_limit_retries=${rateLimitRetries} formats=${renderFormats.map((f) => typeof f === "string" ? f : f.type).join("+")}${evidenceRefused ? ` evidence_refused=${evidenceRefused.status ?? "err"}` : ""}]`
+          : null;
         await admin.rpc("record_advertised_price_crawl_attempt", {
           _tenant_id: row.tenant_id,
           _vin: row.vin,
@@ -1208,7 +1372,7 @@ serve(async (req) => {
           _outcome: cls.outcome,
           _http_status: cheapStatus,
           _render_status: renderStatus,
-          _detail: cls.detail,
+          _detail: [pacingNote, cls.detail].filter(Boolean).join(" ") || null,
         });
       } catch { /* never fail a price run over telemetry */ }
 
@@ -1319,7 +1483,7 @@ serve(async (req) => {
         await admin.from("audit_log").insert({
           action: "advertised_price_crawl_skipped", entity_type: "advertised_price",
           entity_id: row.vin, store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, fetch_url: fetchUrl, http_status: cheapStatus, reason: "bot_challenge", rendered: !!renderSource, render_status: renderStatus, render_error: renderError },
+          details: { vin: row.vin, url: row.source_url, fetch_url: fetchUrl, http_status: cheapStatus, reason: "bot_challenge", rendered: !!renderSource, render_status: renderStatus, render_error: renderError, ...pacing, screenshot_path: screenshot?.path ?? null },
         }).then(() => undefined, () => undefined);
         continue;
       }
@@ -1351,6 +1515,10 @@ serve(async (req) => {
             rendered: !!renderSource,
             render_status: renderStatus,
             render_error: renderError,
+            ...pacing,
+            // A failed parse still leaves a picture a person can read.
+            screenshot_path: screenshot?.path ?? null,
+            screenshot_sha256: screenshot?.sha256 ?? null,
             msrp: result.msrp,
             candidates: result.candidates.slice(0, 12),
           },
@@ -1363,9 +1531,30 @@ serve(async (req) => {
       // store each field on vehicle_listings. Isolated so a not-yet-migrated
       // column can never fail the price write. price_parse_status = 'warning'
       // when the displayed sale price disagrees with advertised + doc fee.
+      let componentsChanged = false;
       try {
         const comp = extractPriceComponents(priceEvidenceHtml(html));
         const bd = buildBreakdown(newPrice, comp, cfg.docFee, cfg.inclDocFee);
+        // A fee or discount that moved is a change in what the shopper was
+        // shown even when the headline price held, so it earns a screenshot.
+        try {
+          const { data: prev } = await admin.from("vehicle_listings")
+            .select("doc_fee, retail_cash, dealer_discount, website_sale_price")
+            .eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
+          const differs = (a: unknown, b: unknown) => {
+            const x = a == null ? null : Number(a);
+            const y = b == null ? null : Number(b);
+            if (x == null && y == null) return false;
+            if (x == null || y == null) return true;
+            return Math.abs(x - y) >= 1;
+          };
+          componentsChanged = !!prev && (
+            differs(prev.doc_fee, bd.doc_fee)
+            || differs(prev.retail_cash, bd.retail_cash)
+            || differs(prev.dealer_discount, bd.dealer_discount)
+            || differs(prev.website_sale_price, bd.website_sale_price)
+          );
+        } catch { /* breakdown columns may not be migrated yet */ }
         // FTC-critical guard: the advertised price the platform stores and
         // protects must never land ABOVE the dealer's own inventory/feed price.
         // A scrape above the feed means the extractor grabbed the sticker/MSRP
@@ -1413,18 +1602,51 @@ serve(async (req) => {
         if (misparse) { skipped++; continue; }
       } catch { /* price breakdown columns may not be migrated yet */ }
 
-      // Skip a no-op write only when nothing changed AND we have no fresh
-      // evidence screenshot to record (a render always logs its screenshot).
-      if (Math.abs(newPrice - row.advertised_price) < 1 && !screenshot) {
-        unchanged++;
-        continue;
+      // Second stage: the evidence screenshot. Rendered only when there is
+      // something new to evidence -- the price or a fee component moved, or
+      // this VIN+channel has no screenshot-backed observation yet, or the
+      // caller asked -- and not already taken by the escalation render above.
+      // A price that came off the cheap fetch spends a render here too: a
+      // change the dealer's page shows deserves the picture of it.
+      const priceChanged = Math.abs(newPrice - row.advertised_price) >= 1;
+      if (!screenshot && !evidenceRefused && renderBudget > 0 && (priceChanged || componentsChanged || evidenceDue || (!cheapFailed && await shouldCaptureEvidence(row)))) {
+        renderBudget--;
+        const ev = await pacedRender(fetchUrl, EVIDENCE_FORMATS, deadlineAt);
+        pacedWaitMs += ev.pacedWaitMs;
+        rateLimitRetries += ev.rateLimitRetries;
+        if (ev.render?.ok) {
+          screenshot = await captureScreenshot(admin, ev.render.screenshotUrl, row.tenant_id, row.vin);
+          if (screenshot) evidenceRenders++;
+        }
+        await admin.from("audit_log").insert({
+          action: "advertised_price_evidence_render",
+          entity_type: "advertised_price",
+          entity_id: row.vin,
+          store_id: row.tenant_id,
+          details: {
+            vin: row.vin, fetch_url: fetchUrl,
+            trigger: priceChanged ? "price_changed" : componentsChanged ? "components_changed" : evidenceDue ? "no_prior_screenshot_or_forced" : "no_prior_screenshot",
+            render_status: ev.render?.status ?? null, render_error: ev.render?.error ?? null,
+            paced_wait_ms: ev.pacedWaitMs, rate_limit_retries: ev.rateLimitRetries, gave_up: ev.gaveUp,
+            render_formats: ev.formats, renders_per_minute: RENDERS_PER_MINUTE,
+            screenshot_path: screenshot?.path ?? null,
+          },
+        }).then(() => undefined, () => undefined);
       }
+
+      // An unchanged price is still an observation and is still written. The
+      // work list is advertised_price_crawl_queue, ordered by the latest row's
+      // captured_at; skipping the write here would leave a held price's
+      // captured_at frozen, so the same stalest vehicles would be re-rendered
+      // every run and the rest of a walled lot never reached. Without a new
+      // screenshot the row carries none: a screenshot-less crawler observation
+      // is a valid dealer_vdp_observation (20260908280000).
       const insRow: Record<string, unknown> = {
         tenant_id: row.tenant_id,
         store_id: row.store_id || "",
         vin: row.vin,
         source_url: fetchUrl,
-        source_channel: row.source_label,
+        source_channel: observationChannel(row.source_label),
         // We fetched the dealer's page and read this number off it. That is a
         // different act from the feed reporting a price, and the compliance
         // packet must be able to tell them apart by column, not by note text.
@@ -1436,7 +1658,9 @@ serve(async (req) => {
         screenshot_bucket: screenshot?.bucket ?? PRICE_EVIDENCE_BUCKET,
         notes: row.seed
           ? `First crawl (${result.source})${result.matched_label ? ` · ${result.matched_label}` : ""} · $${newPrice.toLocaleString()}`
-          : `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
+          : priceChanged
+            ? `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`
+            : `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · unchanged $${newPrice.toLocaleString()}`,
       };
       let insErr = (await admin.from("advertised_prices").insert(insRow)).error;
       // Resilient to a not-yet-applied column, so a deploy that lands ahead of
@@ -1457,7 +1681,7 @@ serve(async (req) => {
         }).then(() => undefined, () => undefined);
         continue;
       }
-      updated++;
+      if (priceChanged) updated++; else unchanged++;
     } catch (err) {
       failed++;
       const msg = err instanceof Error ? err.message : String(err);
@@ -1582,6 +1806,15 @@ serve(async (req) => {
     failed,
     skipped,
     discovered,
+    // What the renderer was allowed to do and how it was held back, so a
+    // canary run can prove pacing from the response alone.
+    render_pacing: {
+      renders_per_minute: RENDERS_PER_MINUTE,
+      render_budget: pacedBudget,
+      render_budget_left: renderBudget,
+      evidence_renders: evidenceRenders,
+      ...pacer.snapshot(),
+    },
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
