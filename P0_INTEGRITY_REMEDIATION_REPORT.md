@@ -203,7 +203,7 @@ Cost ceiling: ≤ 5 VINs × 2 renders ≈ 10–15 credits.
 
 ---
 
-## 5. Results — Gate 0 status (2026-09-09, as of 02:01Z)
+## 5. Results — Gate 0 status (2026-09-09, as of 03:20Z)
 
 ### 5.1 WHAT CHANGED
 All on `main` (Lovable-watched). Pre-change main was `4ebb0479`.
@@ -303,7 +303,7 @@ Second run, 01:49–01:52Z, five single-VIN invocations (`render_key.env = FIREC
 - Live self-checks: every migration's DO block passed; queue self-check 0 feed rows.
 
 ### 5.8 OPEN RISKS
-1. The 03:07Z nightly `marketcheck-sync` with pruning **enabled** has not run yet; a reminder is set for 03:14Z to read it and append the result here.
+1. ~~The 03:07Z nightly with pruning enabled had not run yet~~ — ran 03:07Z, PASS (§5.10a).
 2. The 06:00Z crawl cron is the first unattended paced run on the new code (25 VINs, ≤ 25 credits expected).
 3. Two Firecrawl teams are billed; the owner may want to retire `FIRECRAWL_API_KEY_1` from the secrets (owner action; nothing here changes secrets).
 4. New-car VDP label tuning (hartecars.com) before new cars get page-observed prices.
@@ -314,7 +314,21 @@ Second run, 01:49–01:52Z, five single-VIN invocations (`render_key.env = FIREC
 Nothing rolled back; nothing needs to be. Per-migration rollback SQL is in §2. Function rollback = redeploy the prior commit through Lovable (`4ebb0479` is the last pre-change main; `marketcheck-sync` at `c60fa9db` is the current good state). Secrets and crons untouched, so no rollback there.
 
 ### 5.10 GO / NO-GO for Gate 0
-**GO** — every P0 migration is applied and self-verified; every P0 function is deployed from a diff-verified commit; both provider canaries pass with provenance, pacing, evidence and cost recorded; the one ledger defect the canary exposed is fixed and re-verified. Total Firecrawl spend for Gate 0: 6 credits. The 03:07Z nightly (pruning enabled) is an observation, not a gate condition; its result will be appended here.
+**GO** — every P0 migration is applied and self-verified; every P0 function is deployed from a diff-verified commit; both provider canaries pass with provenance, pacing, evidence and cost recorded; the one ledger defect the canary exposed is fixed and re-verified. Total Firecrawl spend for Gate 0: 6 credits. The 03:07Z nightly with pruning enabled ran and passed (§5.10a).
+
+### 5.10a Nightly `marketcheck-sync` with pruning ENABLED — observed 03:14Z: PASS
+Cron fired 03:07:00Z (`cron.job_run_details` succeeded), function ran 03:07:02–03:07:59, `inventory_sync_runs` status `success`.
+
+| Criterion | Observed |
+|---|---|
+| Coverage | `seen 128`, owned feed `num_found 57` · new **71 of 72** · rest **57 of 60** — identical to the canary |
+| Gates | `segments.new.gate = null`, `segments.rest.gate = null` — pruning allowed at 98% / 95%; no `segment_collapsed` |
+| Probe union | probe ① again returned the one-car answer (`mc_location_id` → 1); loop continued to probe ⑤ (70); `ingested 71 ≥ sufficient 43` |
+| Removed | **2**, both `archive_reason = left_feed`, both `feed_source = marketcheck`, both created by the 2026-09-08 03:07 nightly and absent from every probe at 01:02 and 03:07: `JN8AZ2NE5L9251062`, `YV4102PK5M1682085`. Rows retained (`status = archived`, `archived_at` set); nothing deleted — the RPC's `listings_deleted` key is a compatibility alias of `listings_archived` |
+| Not removed, correctly | two other unseen VINs (`5N1AT3CB7MC736556`, `JN8AZ3CC5T9624253`) have `feed_source = null` (added by hand, no `source_url`); the prune touches only feed-sourced rows |
+| Provenance of writes | `prices_recorded 0` and **0** `advertised_prices` rows since 03:00 — feed prices were unchanged after the canary's baseline; nothing written, nothing mislabelled |
+| Counts | active 132 → **130**, archived 152 → **154** |
+| Cost | 8 MarketCheck calls (~$7), projected ~$210/month at this cadence — unchanged from before |
 
 ### 5.11 NEXT GATE
 Stopping here. Gate 1 (Vehicle File current-state read model, shadow mode) begins only on owner approval. Decisions for the owner before Gate 1:
