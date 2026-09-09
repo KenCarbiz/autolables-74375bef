@@ -143,3 +143,42 @@ Decisions for the owner before Gate 2:
 | 4 | Apply the three never-applied title migrations | APPROVED. One idempotent migration brings the database to the state the three describe: `vehicle_listings.title_verification` and the `title_report_pulls` meter, and **not** `title_reports` — the VINData terms forbid persisting the provider response, which is why the third original migration dropped it. Applying the meter is what makes the 50/month NMVTIS cap bind; today it reads "0 of 50" forever and nothing stops a pull. |
 | 5 | Licensing review list (§34) | ACCEPTED as the standing list. No customer-facing expansion of any UNKNOWN-REVIEW REQUIRED family until a human checks the contracts; the read model carries the license class per candidate so a customer projection can withhold them mechanically. Nothing here can be resolved by reading the repository: MarketCheck and NeoVIN redistribution rights need the agreements themselves. |
 | 6 | Gate 0 leftovers: Firecrawl cadence, the exhausted key, the description model rate card | **Cadence: DONE.** `autolabels_crawl_advertised_prices` moved from `0 */6 * * *` to `20 7 * * *` via `cron.alter_job` (schedule only; the command and its secret were never read or rewritten). Daily at limit 25 is ~750 credits/month against a 1,000 plan and rotates the 57 crawlable used/CPO cars every two to three days; the old cadence would have exhausted the 1,292 remaining credits around 22 September. 07:20 keeps it clear of the 06:00 description reconcile and the hourly sync at :07. **Exhausted key: OWNER ACTION.** Removing `FIRECRAWL_API_KEY_1` is a dashboard and billing decision; until then the balance-based selection uses whichever team can pay, which is correct behaviour and costs nothing. **Rate card: BLOCKED ON DATA.** A pricing entry for `gpt-5.6-luna` needs the real per-token rates; inventing them would make the dollar budget bind on fiction, which is worse than the count cap alone. Supply the rates and it is a one-line table entry. |
+
+---
+
+## P0 security and title batch — applied and verified (2026-09-09, 11:53Z–12:46Z)
+
+All four owner-approved database changes are applied. Each was prepared read-only with §55 discipline,
+reviewed, then applied through Lovable from the committed file; Lovable recorded byte-identical copies
+under its own timestamps (`20260909115524`, `20260909115717`, `20260909115938`), which is independent
+confirmation that what ran is what was written.
+
+| Change | Result | Proof |
+|---|---|---|
+| `20260909100000` — revoke anon/authenticated EXECUTE on `get_vehicle_listing_by_slug` | APPLIED | A direct `/rest/v1/rpc/` call with the anon key now returns **401, `permission denied for function get_vehicle_listing_by_slug`**; before, it returned all 86 columns of any published or archived listing. `has_function_privilege`: anon `false`, authenticated `false`, service_role `true`. |
+| `20260909101000` — DELETE policy on `stale_document_flags` + collapse | APPLIED | Open rows **7,080 → 2**; 7,078 duplicates removed, both survivors the newest of their group (asserted by the migration's own self-check). Policy `tenant delete stale_document_flags` present, `TO authenticated`, `(SELECT auth.uid())`. |
+| `20260909102000` — `verify_addendum_price` observation bound | APPLIED | Live function body now requires `captured_method = 'dealer_vdp_observation'`, bounds the observation at seven days, and treats a later `price_rejected` as superseding. Four active vehicles change the number the gate compares against. |
+| `20260909103000` — title backlog | APPLIED | `vehicle_listings.title_verification` present; `title_report_pulls` present with RLS on and its tenant-read policy; **`title_reports` correctly still absent** (VINData terms forbid persisting the provider response). The NMVTIS 50/month cap can now bind — it read "0 of 50" forever because its meter table did not exist. |
+
+**Passport regression, run at every step.** `public-listing-view` called with the anon key for a real
+published slug returned HTTP 200 with identity and price intact and no `install_token`, `mc_raw` or
+`price_parse_notes`, before the revoke, after the revoke, after the scrub redeploy, and after the title
+column landed. Payload 41,555 bytes, 94 keys.
+
+**Two code fixes shipped alongside** (commit `5c8da6aa`), because neither database change was sufficient
+on its own:
+- The signing gate's other half lives in the browser. `useAdvertisedPrices.byVin` fed
+  `addendums.vehicle_price` and preferred any row labelled `website` at any age from any writer. It now
+  applies the same seven-day, `dealer_vdp_observation`-only bound as the server, so the two agree and a
+  two-month-old capture can no longer reach a customer's signature page.
+- `title_verification` carries `verified_by`, an internal user id, and both sister-app feeds and the
+  public view copy the listing row allow-by-default. It is now scrubbed through an allow-list in
+  `_shared/lotFeedRow.ts` and `public-listing-view`, deployed before the column existed. This is what
+  the title migration was held on.
+
+**Residual items** recorded by the preparation agents, none blocking: the browser's `getBySlug` survives
+as dead code that would now fail if wired up; a future migration copying the old `GRANT EXECUTE ... TO
+anon` line would silently re-open the RPC; the partial unique index that would make flag duplication
+structurally impossible was deliberately NOT added, on evidence it breaks the orchestrator's addendum
+path; past NMVTIS spend is unrecoverable, so this month's cap starts from zero.
+
