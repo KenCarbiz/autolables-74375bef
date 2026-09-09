@@ -203,16 +203,121 @@ Cost ceiling: ≤ 5 VINs × 2 renders ≈ 10–15 credits.
 
 ---
 
-## 5. Results — PENDING
+## 5. Results — Gate 0 status (2026-09-09, as of 02:01Z)
 
 ### 5.1 WHAT CHANGED
+All on `main` (Lovable-watched). Pre-change main was `4ebb0479`.
+
+| Commit | Change |
+|---|---|
+| `438ab533` | `_shared/rooftopMatch.ts`: proportional segment-collapse gate (`SEGMENT_COLLAPSE_FLOOR = 0.6`), `sufficientCoverage`, `probeCoverageSatisfied` |
+| `0ed9a930` | `marketcheck-sync`: backstop probe union (no `break` on a one-car probe); endpoint-derived telemetry label; feed rows written `source_channel='feed'` / `captured_method='marketcheck_syndication'`. `_shared/crawlOutcome.ts`: status-first classifier. Crawler: `captured_method='dealer_vdp_observation'`, description strip on every VIN-scoped price extraction. Migrations 260000 / 270000 / 280000. `auditPacket.ts`: headline price from observed rows only |
+| `c60fa9db` | `no_prune` canary flag on `marketcheck-sync`; migration 280000 PL/pgSQL fix |
+| `46c93b2f` | `truth.ts`: `upsertRowsWithFallback` (batch then row-by-row, errors to `audit_log` as `vehicle_truth_write_error`, `facts_written` / `fact_write_errors` on the result). Migration 20260909010000 (CHECKs widened). `autofilm-feed`: dealer-controlled facts withheld from `facts[]`, `facts_excluded_dealer_controlled` count |
+| `71838b3b` | Crawler: html-only routine render; separate evidence render (price/fee change, no prior screenshot, or `force_screenshot`); `_shared/renderPacer.ts` (10/min default via `FIRECRAWL_RPM`, Retry-After, ≤2 429 retries, deadline-aware); html-only fallback when the evidence bundle is refused (non-429); unchanged price still writes an observation row (queue rotation); `observationChannel()` so a feed channel is never inherited; failed screenshot query reads as "has screenshot"; archived listings leave the rotation (queue rows skipped unless the VIN was named; seeds exclude archived). Migration 20260909020000 (queue ignores feed rows) |
+| `1f7745b4` | `src/lib/evidence/priceEvidenceUrl.ts` + `PriceIntegrityCard`: signed URL minted on click under the viewer's session; bucket stays private |
+| `7657e25d` | Migration 20260909030000: `vehicle_fact_conflicts.authority` CHECK widened (reviewer finding) |
+| `8d27373e` | Crawler `credit_check` mode (platform callers only; env names and key lengths, never values); `render_budget` reports the budget the run started with |
+| `f4022e95` | `_shared/renderKey.ts`: per-run key selection from the provider's credit-usage answer; choice recorded by env name in the run summary |
+| `e1bc9450` | Guard-rejected price recorded in the ledger as `price_rejected` (was `captured`); the screenshot already taken is named in the audit row |
+
+Tests added: `rooftopMatch` (57), `crawlOutcome` (16), `priceEvidence` (9), `renderPacer` (29), `crawlFormat` (44), `renderKey` (12), `checkConstraintDrift` (6), `factWriteFallback`, `autofilmFeedFacts`, `priceEvidenceUrl`, `PriceIntegrityCard`.
+
+Not changed: the Passport (`VehiclePassportGoverned.tsx`) and its price arithmetic; `vehicle_facts` / `vehicle_snapshots` data; any consumer's read path; any secret; any cron; the `price-evidence` bucket (still `public = false`).
+
 ### 5.2 WHAT WAS DEPLOYED
+
+| Function | Commit deployed | When (UTC) | Via |
+|---|---|---|---|
+| `marketcheck-sync` | `c60fa9db` | 01:01:04 | Lovable `supabase--deploy_edge_functions`, diff-verified |
+| `crawl-advertised-prices` | `1f7745b4` → `8d27373e` → `f4022e95` → `e1bc9450` | 01:36 → 01:43 → 01:49 → 01:58 | same, each diff-verified against the named SHA |
+| `autofilm-feed` | `1f7745b4` | 01:36 | same |
+| `factory-sticker-orchestrate` | `1f7745b4` | 01:36 | same |
+
+Migrations applied live (all via `query_database`, each self-verifying): 260000, 270000, 280000 (§2.1–2.3), 20260909020000 (§2.5, ~01:25), 20260909010000 (§2.4, 01:35), 20260909030000 (§2.6, 01:37).
+
 ### 5.3 WHAT WAS VERIFIED
+
+**MarketCheck canary (§4.1): PASS on every criterion** (table above, 01:02Z).
+
+**Firecrawl canary (§4.2): PASS after one root-cause fix.**
+
+First run, 01:38Z, VIN `1C6SRFFT2NN400176`: cheap fetch 403 (Harte's site refuses plain fetches, so every visit is a render); evidence bundle refused **402**; html-only fallback also refused **402**; ledger `render_cost_refused` with `evidence_refused=402`, `paced_wait_ms=6220` (the pacer held the second render 6.2 s — pacing proven). The provider's message named credits, and an html render had cost one credit the day before against a dashboard showing 1,328. The new `credit_check` mode settled it:
+
+| Env var | Team balance (01:43Z) | Plan | Period ends |
+|---|---|---|---|
+| `FIRECRAWL_API_KEY_1` (was preferred) | **−11** | 1,000 | 2026-09-17 |
+| `FIRECRAWL_API_KEY` (the dashboard's team) | **1,316** | 1,000 | 2026-10-04 |
+
+Every 402 since at least 2026-09-06 (144 `render_status 402` audit rows, 181 at 429, 0 successes) was the function spending an exhausted team while the owner read a healthy one. Fix `f4022e95`: one free credit-usage GET per key at run start, spend the key with the highest positive balance. No credits were bought.
+
+Second run, 01:49–01:52Z, five single-VIN invocations (`render_key.env = FIRECRAWL_API_KEY`, reason `most_credits`):
+
+| VIN | Cheap | Render | Ledger | Observation row | Listing components written |
+|---|---|---|---|---|---|
+| `1C6SRFFT2NN400176` (used RAM, fixture) | 403 | 200 html+screenshot | `captured` | `website` / `dealer_vdp_observation` / $25,876 / screenshot `…/1788918584329.png` sha `30d76ae5…` | before-doc **24,981** · sale **25,876** · doc fee **895** · dealer discount **11,944** (the page's own ladder, not description copy) · term "Selling Price" · CARFAX tokenized link · `title_status` null (no clean-title write) |
+| `3GNAXUEV9LS593826` (used Equinox) | 403 | 200 | `captured` | $14,861, screenshot + sha | 13,966 / 14,861 / 895 / 3,548 · CARFAX link |
+| `3PCAJ5BB6PF110401` (CPO QX50) | 403 | 200 | `captured` | $30,129, screenshot + sha | 29,234 / 30,129 / 895 / 1,288 · CARFAX link |
+| `JN8AZ3DB3T9431184` (CPO QX80) | 403 | 200 | `captured` | $85,478, screenshot + sha | 84,583 / 85,478 / 895 / 13,997 · CARFAX link |
+| `5N1BT3BB2TC779545` (new Rogue, hartecars.com) | 403 | 200 | `captured` at 01:51 → **`price_rejected`** after `e1bc9450` (01:58) | none — misparse guard: scraped 36,100 > feed 34,390 × 1.02 | `price_parse_status = warning`; components untouched |
+
+- Provenance: all 4 new rows carry `source_channel='website'` + `captured_method='dealer_vdp_observation'`; 0 rows inherited `feed`.
+- Evidence: 5 objects in `price-evidence` (1.5–2.0 MB each), bucket `public=false`, `price_evidence_view` SELECT policy for accepted tenant members / admins is in place, so the click-to-sign path in `PriceIntegrityCard` has the permission it needs.
+- Badge writes: `carfax_1_owner=true` on the four used/CPO VINs was **already there from the feed** (`one_owner_source` null, not `dealer_vdp`); the crawl wrote no badge and no title status.
+- Pacing: `renders_per_minute 10`, no 429 in the second run; first run showed the 6.2 s hold.
+- Queue: Harte `advertised_price_crawl_queue` 21 → **25 VINs, 0 feed rows** (the four observed VINs joined the rotation).
+- Cost measured: team balance 1,316 → **1,311 after five html+screenshot renders = 1 credit per evidence render**.
+- The Rogue's ledger row said `captured` for a visit that wrote nothing: fixed in `e1bc9450` — re-canaried at 01:58Z after deploy: ledger now `price_rejected` (attempts 1, detail `advertised_above_feed scraped=36100 feed=34390`), the audit row names the screenshot (`…/1788919119276.png`), no observation row written, 1 credit spent. PASS.
+
+**AutoFilm feed:** on 132 live Harte VINs there are 2,440 facts, of which **204 are dealer-controlled** and now withheld from `facts[]`; 119 VINs carried an `advertised_price` fact labelled VERIFIED and **99 disagreed with the listing** — none of those reach the feed any more; the live listing row is the only price in the payload.
+
+**Truth writer:** CHECKs widened (§2.4, §2.6) with 0 rows affected; write errors now land in `audit_log` (`vehicle_truth_write_error`). No `vehicle_facts` / `vehicle_snapshots` / `vehicle_source_records` row was changed (5,042 / 313 / 222 before and after).
+
 ### 5.4 WHAT FAILED
+1. First Firecrawl canary: 402 on both formats. Root cause: key precedence pointed at a team at −11 credits. Fixed (`f4022e95`), re-canaried, PASS.
+2. Ledger said `captured` for the Rogue while the misparse guard wrote nothing. Fixed (`e1bc9450`). Re-verified 01:58Z: ledger reads `price_rejected`. PASS.
+3. `render_budget` in the run summary reported the paced ceiling (36) on a 3-render single-VIN run. Fixed (`8d27373e`).
+4. hartecars.com **new-car** VDP: the extractor reads 36,100 (MSRP-shaped) as the selling price; the guard correctly refused it. Label tuning for that template is a Gate 1 item, not P0. One screenshot object from the first Rogue run (`…/5N1BT3BB2TC779545/1788918692748.png`) is unreferenced by any row (the audit row now names the path going forward).
+5. Nothing else failed. No migration rolled back. No deploy failed.
+
 ### 5.5 DATA IMPACT
+- `advertised_prices`: +70 feed rows (MarketCheck canary, 01:02) and +4 observation rows (Firecrawl canary); relabels from §2.3 (1,532 observed, 58 feed, 0 UNKNOWN); no deletes.
+- `vehicle_listings`: 4 VINs updated with price components, `website_price_term`, `history_report_url`, `price_source_url`; the Rogue got `price_parse_status='warning'`. The Passport reads these columns, so those four vehicles now show a page-derived Dealer Discount line where the feed had none — the intended data wiring, arithmetic unchanged.
+- `advertised_price_crawl_attempts`: relabelled (15 → `render_rate_limited`, 10 → `render_cost_refused`); 5 canary rows.
+- `provider_payload_shapes`: 1 row relabelled `marketcheck_syndication`.
+- `vehicle_facts` / `vehicle_snapshots` / `vehicle_source_records` / `vehicle_fact_conflicts`: 0 rows changed.
+- Storage: +5 objects (~8.7 MB) in the private bucket.
+- `audit_log`: canary rows only.
+
 ### 5.6 COST IMPACT
+- MarketCheck: 8 calls (~$7 list) for the canary; nightly cadence unchanged.
+- Firecrawl: **6 credits** spent (five canary renders plus the Rogue re-check). Measured rate: 1 credit per html render and 1 per html+screenshot render.
+- Projection the owner must decide on: Harte refuses plain fetches, so every visit is a render. Cron is `0 */6 * * *` with `limit 25` → up to **100 renders/day ≈ 3,000/month** against a 1,000-credit plan (1,311 on hand until 2026-10-04; the other team resets to 1,000 on 2026-09-17 and selection will use it when it holds more). Daily cadence at `limit 35` would be ≈ 1,050/month. Nothing was changed; the cron runs as configured.
+- Lovable agent credits for four deploys: 2.4.
+
 ### 5.7 TEST RESULTS
+- Full suite: 274 files, **4,567 passed**, 1 skipped, 0 failed (01:59Z, at `e1bc9450`).
+- Typecheck (`tsc -p tsconfig.app.json --noEmit`): exit 0.
+- esbuild bundle of `crawl-advertised-prices`, `autofilm-feed`, `factory-sticker-orchestrate`, `marketcheck-sync`: OK.
+- Edge sticker mirror (`bun run sync:edge-sticker`): in sync.
+- Live self-checks: every migration's DO block passed; queue self-check 0 feed rows.
+
 ### 5.8 OPEN RISKS
+1. The 03:07Z nightly `marketcheck-sync` with pruning **enabled** has not run yet; a reminder is set for 03:14Z to read it and append the result here.
+2. The 06:00Z crawl cron is the first unattended paced run on the new code (25 VINs, ≤ 25 credits expected).
+3. Two Firecrawl teams are billed; the owner may want to retire `FIRECRAWL_API_KEY_1` from the secrets (owner action; nothing here changes secrets).
+4. New-car VDP label tuning (hartecars.com) before new cars get page-observed prices.
+5. Screenshot orphan (one object) from §5.4.4.
+6. Reviewer note carried forward: `notes ILIKE '%crawl%'` backfill in §2.3 may have over-matched by ≤ 58 rows; not fixed here.
+
 ### 5.9 ROLLBACK STATUS
+Nothing rolled back; nothing needs to be. Per-migration rollback SQL is in §2. Function rollback = redeploy the prior commit through Lovable (`4ebb0479` is the last pre-change main; `marketcheck-sync` at `c60fa9db` is the current good state). Secrets and crons untouched, so no rollback there.
+
 ### 5.10 GO / NO-GO for Gate 0
+**GO** — every P0 migration is applied and self-verified; every P0 function is deployed from a diff-verified commit; both provider canaries pass with provenance, pacing, evidence and cost recorded; the one ledger defect the canary exposed is fixed and re-verified. Total Firecrawl spend for Gate 0: 6 credits. The 03:07Z nightly (pruning enabled) is an observation, not a gate condition; its result will be appended here.
+
 ### 5.11 NEXT GATE
+Stopping here. Gate 1 (Vehicle File current-state read model, shadow mode) begins only on owner approval. Decisions for the owner before Gate 1:
+1. Firecrawl cadence / per-run limit (§5.6).
+2. Whether to retire the exhausted key from the secrets.
+3. Approval to tune new-car price labels for hartecars.com.
