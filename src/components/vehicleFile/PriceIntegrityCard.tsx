@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from "lucide-rea
 import { Card, EmptyNote, Pair, StatRow, btn, btnPrimary, fmtWhen } from "./primitives";
 import type { VehicleRow } from "./types";
 import { feeExclusiveEquivalent } from "@/components/compliance/complianceData";
+import { EVIDENCE_UNAVAILABLE_MESSAGE, signPriceEvidenceUrl } from "@/lib/evidence/priceEvidenceUrl";
 
 // Price integrity for one VIN.
 //
@@ -21,12 +22,16 @@ interface AdRow {
   source_url: string | null;
   captured_at: string;
   screenshot_url: string | null;
+  screenshot_bucket: string | null;
 }
+
+type EvidenceState = "opening" | "unavailable";
 
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
 const AdvertisedPriceCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   const [rows, setRows] = useState<AdRow[] | null>(null);
+  const [evidence, setEvidence] = useState<Record<string, EvidenceState>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +40,7 @@ const AdvertisedPriceCard = ({ vehicle }: { vehicle: VehicleRow }) => {
       // deno-lint-ignore no-explicit-any
       const { data } = await (supabase as unknown as { from: (t: string) => any })
         .from("advertised_prices")
-        .select("advertised_price, source_channel, source_url, captured_at, screenshot_url")
+        .select("advertised_price, source_channel, source_url, captured_at, screenshot_url, screenshot_bucket")
         .eq("tenant_id", vehicle.tenant_id)
         .eq("vin", vehicle.vin.toUpperCase())
         .order("captured_at", { ascending: false })
@@ -59,6 +64,19 @@ const AdvertisedPriceCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   const mismatches = lot == null
     ? []
     : channels.filter((c) => Math.abs(comparable(c) - lot) > TOLERANCE);
+
+  // Signed under the viewer's own session so storage RLS decides access; a
+  // fresh short-lived link is minted per click rather than one per row on load.
+  const openEvidence = async (c: AdRow) => {
+    setEvidence((m) => ({ ...m, [c.source_channel]: "opening" }));
+    const res = await signPriceEvidenceUrl(supabase, c);
+    if (!res.url) {
+      setEvidence((m) => ({ ...m, [c.source_channel]: "unavailable" }));
+      return;
+    }
+    setEvidence((m) => { const next = { ...m }; delete next[c.source_channel]; return next; });
+    window.open(res.url, "_blank", "noopener");
+  };
 
   return (
     <Card title="Advertised price consistency" action={
@@ -108,7 +126,18 @@ const AdvertisedPriceCard = ({ vehicle }: { vehicle: VehicleRow }) => {
                   </a>
                 )}
                 {c.screenshot_url && (
-                  <a href={c.screenshot_url} target="_blank" rel="noreferrer" className={btn}>Evidence</a>
+                  evidence[c.source_channel] === "unavailable" ? (
+                    <span className="text-al-meta text-muted-foreground shrink-0">{EVIDENCE_UNAVAILABLE_MESSAGE}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { void openEvidence(c); }}
+                      disabled={evidence[c.source_channel] === "opening"}
+                      className={btn}
+                    >
+                      {evidence[c.source_channel] === "opening" ? "Opening…" : "Evidence"}
+                    </button>
+                  )
                 )}
               </div>
             );
