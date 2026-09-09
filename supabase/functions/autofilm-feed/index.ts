@@ -4,6 +4,7 @@ import {
   shapeLotRow, identityIncomplete, detailVersion,
   type LotFeedFile, type DetailVersionSnapshot,
 } from "../_shared/lotFeedRow.ts";
+import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/precedence.ts";
 
 // ──────────────────────────────────────────────────────────────
 // autofilm-feed
@@ -21,7 +22,11 @@ import {
 //   DETAIL GET /vehicle/<17-char VIN>?tenant_id=<uuid>   (or ?vin=)
 //          One vehicle plus its verified-fact ledger — the call that backs
 //          generated talking points.
-//          { vin, vehicle, facts[], fact_count, verified_fact_count, truth }
+//          { vin, vehicle, facts[], fact_count, verified_fact_count,
+//            facts_excluded_dealer_controlled, truth }
+//          facts[] carries factory and history facts only. Dealer-controlled
+//          facts (price, mileage, stock number) come from `vehicle`, which is
+//          the live listing row.
 //   Headers: x-lookup-secret: <AUTOLABELS_LOOKUP_SECRET>
 //            (x-autofilm-key is accepted as an alias for the same value)
 //
@@ -75,6 +80,14 @@ const timingSafeEqual = (a: string, b: string) => {
 
 const MAX_LIMIT = 1000;
 const DEFAULT_LIMIT = 500;
+
+// A dealer-controlled fact is one the listing row is the authority for, and
+// the listing row is already in the same payload as `vehicle`. The ledger
+// copy lags it: on 2026-09-09, 99 of 119 live VINs carried an advertised_price
+// fact that no longer matched the listing, labelled VERIFIED. One payload with
+// two prices and VERIFIED on the stale one is worse than one price, so the
+// ledger copy is withheld and only the live row speaks for the dealer.
+const isDealerControlledFact = (factKey: unknown) => factAuthority(String(factKey ?? "")) === "dealer";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -184,14 +197,18 @@ serve(async (req) => {
       // all HIGH from the provider — and a talking-point writer that cannot see
       // the engine is not much of one. Labelled, so the consumer decides what
       // it is willing to assert.
-      const facts = ((factRes.data as Record<string, unknown>[]) ?? []).map((f) => ({
-        key: f.fact_key,
-        value: (f.fact_value as { v?: unknown } | null)?.v ?? f.fact_value,
-        source: f.source_kind,
-        confidence: f.confidence,
-        authority: f.authority,
-        observed_at: f.observed_at,
-      }));
+      const factRows = (factRes.data as Record<string, unknown>[]) ?? [];
+      const facts = factRows
+        .filter((f) => !isDealerControlledFact(f.fact_key))
+        .map((f) => ({
+          key: f.fact_key,
+          value: (f.fact_value as { v?: unknown } | null)?.v ?? f.fact_value,
+          source: f.source_kind,
+          confidence: f.confidence,
+          authority: f.authority,
+          observed_at: f.observed_at,
+        }));
+      const facts_excluded_dealer_controlled = factRows.length - facts.length;
 
       const snap = snapRes.data as Record<string, unknown> | null;
       // Same value the list carried, computed from the same inputs, so a caller
@@ -204,6 +221,7 @@ serve(async (req) => {
         facts,
         fact_count: facts.length,
         verified_fact_count: facts.filter((f) => f.confidence === "VERIFIED").length,
+        facts_excluded_dealer_controlled,
         // A vehicle whose truth record still has an unresolved conflict is one
         // where two sources disagree. Stated, not hidden: a consumer generating
         // copy should know before it writes a sentence.

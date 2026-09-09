@@ -44,6 +44,64 @@ export interface TruthResult {
   affected_families: string[];
   conflicts: number;
   blocking_conflicts: number;
+  facts_written: number;
+  fact_write_errors: FactWriteError[];
+}
+
+export interface FactWriteError {
+  fact_key: string;
+  message: string;
+}
+
+export interface FactWriteOutcome {
+  written: number;
+  batch_failed: boolean;
+  errors: FactWriteError[];
+}
+
+export type RowUpsert<R> = (rows: R[]) => Promise<{ error?: { message?: string } | null } | null | void>;
+
+const errorMessage = (e: unknown): string => {
+  if (e && typeof e === "object") return String((e as { message?: unknown }).message ?? "");
+  return String(e ?? "");
+};
+
+/**
+ * Write a batch, and when the batch is refused, write it row by row.
+ *
+ * supabase-js resolves rather than throws on a constraint violation, and a
+ * multi-row upsert is one statement: one rejected row rejects every row in
+ * it. Before this the result was discarded, so a single fact with a value
+ * the CHECK constraints did not know would silently drop all twenty facts
+ * for that vehicle while the refresh reported success. Never throws; the
+ * caller decides what a partial write means.
+ */
+export async function upsertRowsWithFallback<R extends { fact_key: string }>(
+  rows: R[],
+  upsert: RowUpsert<R>,
+): Promise<FactWriteOutcome> {
+  if (!rows.length) return { written: 0, batch_failed: false, errors: [] };
+  let batchError: string | null = null;
+  try {
+    const res = await upsert(rows);
+    if (res?.error) batchError = errorMessage(res.error) || "upsert failed";
+  } catch (e) {
+    batchError = errorMessage(e) || "upsert threw";
+  }
+  if (batchError === null) return { written: rows.length, batch_failed: false, errors: [] };
+
+  let written = 0;
+  const errors: FactWriteError[] = [];
+  for (const row of rows) {
+    try {
+      const res = await upsert([row]);
+      if (res?.error) errors.push({ fact_key: row.fact_key, message: errorMessage(res.error) || batchError });
+      else written++;
+    } catch (e) {
+      errors.push({ fact_key: row.fact_key, message: errorMessage(e) || batchError });
+    }
+  }
+  return { written, batch_failed: true, errors };
 }
 
 interface CurrentSnapshotRow {
@@ -151,10 +209,16 @@ export async function refreshVehicleTruth(
     evidence: fact.evidence,
     observed_at: fact.observedAt ?? now,
   }));
-  if (factRows.length) {
-    await admin.from("vehicle_facts")
-      .upsert(factRows, { onConflict: "vehicle_id,fact_key,source_kind" });
+  const factWrite = await upsertRowsWithFallback(factRows, (rows) =>
+    admin.from("vehicle_facts")
+      .upsert(rows, { onConflict: "vehicle_id,fact_key,source_kind" }));
+  if (factWrite.errors.length) {
+    await recordFactWriteErrors(admin, tenantId, vehicleId, vin, factWrite);
   }
+  const writeSummary = {
+    facts_written: factWrite.written,
+    fact_write_errors: factWrite.errors,
+  };
 
   const decision = decideSnapshotVersion(
     current ? { snapshot: current.snapshot_json, version: current.snapshot_version } : null,
@@ -202,6 +266,7 @@ export async function refreshVehicleTruth(
       affected_families: [],
       conflicts: built.conflicts.length,
       blocking_conflicts: blocking.length,
+      ...writeSummary,
     };
   }
 
@@ -234,6 +299,7 @@ export async function refreshVehicleTruth(
       affected_families: [],
       conflicts: built.conflicts.length,
       blocking_conflicts: blocking.length,
+      ...writeSummary,
     };
   }
 
@@ -250,7 +316,41 @@ export async function refreshVehicleTruth(
     affected_families: decision.affectedFamilies,
     conflicts: built.conflicts.length,
     blocking_conflicts: blocking.length,
+    ...writeSummary,
   };
+}
+
+// Same shape as audit() in index.ts, written directly because a partial
+// fact write must be visible even on the paths that never reach a sticker
+// record. Never throws: the sticker still generates off the facts that did
+// land, and the caller sees the shortfall in fact_write_errors.
+async function recordFactWriteErrors(
+  admin: Admin,
+  tenantId: string,
+  vehicleId: string,
+  vin: string,
+  outcome: FactWriteOutcome,
+): Promise<void> {
+  try {
+    await admin.from("audit_log").insert({
+      action: "vehicle_truth_write_error",
+      entity_type: "vehicle",
+      entity_id: vehicleId,
+      store_id: tenantId,
+      details: {
+        vin,
+        facts_written: outcome.written,
+        facts_failed: outcome.errors.length,
+        batch_failed: outcome.batch_failed,
+        errors: outcome.errors.map((e) => ({
+          fact_key: e.fact_key,
+          message: e.message.slice(0, 300),
+        })),
+      },
+    });
+  } catch {
+    // Audit must never break the pipeline.
+  }
 }
 
 /**
