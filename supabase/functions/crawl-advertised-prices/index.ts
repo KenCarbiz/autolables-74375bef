@@ -765,6 +765,14 @@ const RENDER_HEADROOM_MS = 40_000;
 // visit takes 30-60 s. Each link works inside RUN_BUDGET_MS, then hands the
 // rest of its list to a fresh request, at most this many times.
 const MAX_CHAIN_DEPTH = 12;
+// A vehicle whose page price the misparse guard refused writes no row, so its
+// clock never advances and it comes back first on every run. On 2026-09-09
+// the same new QX60 was rendered and refused at 06:37 and again at 06:41;
+// with 71 new vehicles reading above their feed price, every run would have
+// spent its whole budget refusing the same pages. A refused vehicle waits
+// this long before it is visited again; the fix for the refusal itself is
+// the new-car price labels, not more visits.
+const REJECTED_BACKOFF_MS = 7 * 24 * 60 * 60 * 1000;
 
 type RenderFormat = string | { type: string; fullPage?: boolean };
 const HTML_ONLY_FORMATS: RenderFormat[] = ["html"];
@@ -1212,9 +1220,26 @@ serve(async (req) => {
     }
   } catch { /* an unreadable archive list must not stop the run; it only widens it */ }
 
+  const rejectedKeys = new Set<string>();
+  let backoffSkipped = 0;
+  try {
+    let rejectedQuery = admin
+      .from("advertised_price_crawl_attempts")
+      .select("tenant_id, vin")
+      .eq("outcome", "price_rejected")
+      .gte("last_attempt_at", new Date(Date.now() - REJECTED_BACKOFF_MS).toISOString())
+      .limit(5000);
+    if (body.tenant_id) rejectedQuery = rejectedQuery.eq("tenant_id", body.tenant_id);
+    const { data: rejectedRows } = await rejectedQuery;
+    for (const r of (rejectedRows || []) as Array<{ tenant_id: string; vin: string | null }>) {
+      rejectedKeys.add(r.tenant_id + "|" + (r.vin || "").toUpperCase());
+    }
+  } catch { /* an unreadable ledger widens the run; it never stops it */ }
+
   for (const q of (queued || []) as QueueRow[]) {
     const key = q.tenant_id + "|" + (q.vin || "").toUpperCase();
     if (!targetVin && archivedKeys.has(key)) continue;
+    if (!targetVin && rejectedKeys.has(key)) { backoffSkipped++; continue; }
     pricedKeys.add(key);
     // Single-VIN re-scrape (Ready-for-Signatures verify) only touches that VIN.
     if (targetVin && (q.vin || "").toUpperCase() !== targetVin) continue;
@@ -1254,6 +1279,7 @@ serve(async (req) => {
       if (targetVin && vin !== targetVin) continue;
       const k = s.tenant_id + "|" + vin;
       if (pricedKeys.has(k) || seen.has(k)) continue;
+      if (!targetVin && rejectedKeys.has(k)) { backoffSkipped++; continue; }
       seen.add(k);
       seeds.push({
         id: "", tenant_id: s.tenant_id, store_id: s.store_id || "", vin: s.vin,
@@ -1927,6 +1953,7 @@ serve(async (req) => {
     details: {
       depth, picked: rows.length, processed, queue_depth: queueDepth, unvisited: Math.max(queueDepth - processed, 0),
       ran_out_of_time: ranOutOfTime, updated, unchanged, failed, skipped, discovered,
+      backoff_skipped: backoffSkipped,
       elapsed_ms: Date.now() - startedAt, render_pacing: renderPacing, next_link: nextLink,
     },
   }).then(() => undefined, () => undefined);
@@ -1947,6 +1974,9 @@ serve(async (req) => {
     failed,
     skipped,
     discovered,
+    // Vehicles left alone because the guard refused their page price inside
+    // the backoff window.
+    backoff_skipped: backoffSkipped,
     // What the renderer was allowed to do and how it was held back, so a
     // canary run can prove pacing from the response alone.
     render_pacing: renderPacing,

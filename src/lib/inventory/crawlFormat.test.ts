@@ -373,3 +373,25 @@ describe("one request never tries to hold the whole list", () => {
     expect(SRC).toMatch(/deriveRenderBudget\(RUN_BUDGET_MS, RENDERS_PER_MINUTE\)/);
   });
 });
+
+describe("a refused page price does not buy a render every run", () => {
+  // The same new QX60 was rendered and refused at 06:37 and again at 06:41 on
+  // 2026-09-09: a refusal writes no row, so the VIN's clock never advances and
+  // it is first in line every time. 71 of 130 vehicles are new.
+  it("backs a refused vehicle off for a week", () => {
+    expect(SRC).toMatch(/const REJECTED_BACKOFF_MS = 7 \* 24 \* 60 \* 60 \* 1000;/);
+    expect(SRC).toMatch(/\.eq\("outcome", "price_rejected"\)/);
+    expect(SRC).toMatch(/\.gte\("last_attempt_at", new Date\(Date\.now\(\) - REJECTED_BACKOFF_MS\)\.toISOString\(\)\)/);
+  });
+
+  it("skips refused vehicles on both the queue path and the seed path, but not a named VIN", () => {
+    const queueLoop = between("for (const q of (queued || []) as QueueRow[]) {", "// Seed pass:");
+    expect(queueLoop).toContain("if (!targetVin && rejectedKeys.has(key)) { backoffSkipped++; continue; }");
+    const seed = between("const seeds: LatestRow[] = [];", "rows.unshift(...seeds);");
+    expect(seed).toContain("if (!targetVin && rejectedKeys.has(k)) { backoffSkipped++; continue; }");
+  });
+
+  it("reports how many it left alone", () => {
+    expect(SRC.match(/backoff_skipped: backoffSkipped,/g)?.length).toBe(2);
+  });
+});
