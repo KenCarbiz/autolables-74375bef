@@ -104,12 +104,37 @@ Invocation for 11/12 reuses the cron's own `net.http_post` call shape (URL, `api
   advertised_prices DROP COLUMN captured_method;` — reversible; both writers tolerate the column's
   absence (insert retry without it). Dropping it re-contaminates the compliance packet.
 
-### 2.4 `20260909010000_vehicle_facts_check_widen.sql` — PENDING (from Phase 3 build)
-- **Purpose:** the TypeScript enums carry `dealer_vdp` and `history_provider`; the live CHECKs do not.
-  Nothing persists them today, but the write path discards the upsert error, so the first attempt
-  would silently drop every fact for that VIN. Widen the three CHECKs; the code fix makes the error
-  visible.
-- **Preflight / result / rollback:** PENDING.
+### 2.4 `20260909010000_vehicle_facts_check_widen.sql` — APPLIED 01:35Z
+- **Purpose:** the TypeScript enums carry `dealer_vdp` and `history_provider`; the live CHECKs did not.
+  Nothing persisted them yet, but the write path discarded the upsert error, so the first attempt
+  would have silently dropped every fact for that VIN. Widen the three CHECKs; the code fix
+  (commit `46c93b2f`) makes any future error visible.
+- **Preflight (01:35Z):** live `vehicle_facts_source_kind_check` and `vehicle_source_records_source_kind_check`
+  listed the seven original kinds (no `dealer_vdp`); `vehicle_facts_authority_check` listed
+  `manufacturer/dealer/shared` (no `history_provider`). Rows that would need the new values: **0**
+  (`vehicle_facts` 5,042 total, `vehicle_source_records` 222 total) — superset change, no row can fail.
+- **Result:** all three constraints re-read via `pg_get_constraintdef` and now include `dealer_vdp` /
+  `history_provider`; the migration's own DO block passed. Row counts unchanged.
+- **Rollback:** re-add each constraint with the previous value list (recorded in the preflight above).
+  Safe only while no row carries the new values; check `WHERE source_kind='dealer_vdp' OR
+  authority='history_provider'` first.
+
+### 2.5 `20260909020000_crawl_queue_observations_only.sql` — APPLIED 01:2xZ (before the crawler deploy)
+- **Purpose:** after 2.3 relabelled the feed rows, they were the LATEST row for 128 of 132 active
+  Harte VINs, so `advertised_price_crawl_queue` handed the crawler feed rows as "last observation":
+  the crawler would have inherited `source_channel='feed'` for its own observations and escalated all
+  128 to an evidence render on the first night. The queue now ignores feed rows; a VIN with only feed
+  rows enters via the seed path as a first crawl.
+- **Result:** the migration's DO self-check passed (0 feed rows returned). Harte queue after: **21 VINs**,
+  0 feed rows. Rows/data untouched (function body only).
+- **Rollback:** `CREATE OR REPLACE` the previous body (without the two channel predicates).
+
+### 2.6 `20260909030000_vehicle_fact_conflicts_authority_widen.sql` — APPLIED 01:37Z
+- **Purpose:** reviewers flagged that `vehicle_fact_conflicts.authority` had the same three-value
+  CHECK; `truth.ts` writes `conflict.authority` into it, so a history-provider conflict would be
+  rejected. Same family as 2.4.
+- **Preflight / result:** 0 conflict rows exist; constraint re-read and now includes `history_provider`.
+- **Rollback:** re-add with `manufacturer/dealer/shared`.
 
 ---
 
@@ -118,9 +143,9 @@ Invocation for 11/12 reuses the cron's own `net.http_post` call shape (URL, `api
 | Function | Commit | Contains | Status |
 |---|---|---|---|
 | `marketcheck-sync` (+ `_shared/rooftopMatch.ts`) | `c60fa9db` | proportional segment gate · backstop probe union · `source_channel='feed'` + `captured_method` on feed rows · endpoint-derived telemetry label · `no_prune` canary flag | deploy queued |
-| `crawl-advertised-prices` (+ `_shared/crawlOutcome.ts`, `_shared/renderPacer.ts`) | PENDING | status-first outcome classifier · `captured_method='dealer_vdp_observation'` · description strip on all VIN-scoped price extraction · rate pacing ≤10/min with Retry-After · html-only routine format · conditional screenshot | after build |
-| `autofilm-feed` | PENDING | dealer-controlled facts excluded from `facts[]` | after build |
-| `factory-sticker-orchestrate` (`truth.ts`) | PENDING | upsert errors surfaced; per-row fallback; audit row on partial write | after build |
+| `crawl-advertised-prices` (+ `_shared/crawlOutcome.ts`, `_shared/renderPacer.ts`) | `71838b3b` (main `1f7745b4`) | status-first outcome classifier · `captured_method='dealer_vdp_observation'` · description strip on all VIN-scoped price extraction · rate pacing ≤10/min with Retry-After · html-only routine format · conditional screenshot · html-only fallback when the evidence bundle is refused · never inherits a feed channel · archived listings leave the rotation · unchanged price still writes an observation | deploy requested 01:35Z via Lovable |
+| `autofilm-feed` | `46c93b2f` (main `1f7745b4`) | dealer-controlled facts excluded from `facts[]`; `facts_excluded_dealer_controlled` count | deploy requested 01:35Z via Lovable |
+| `factory-sticker-orchestrate` (`truth.ts`) | `46c93b2f` (main `1f7745b4`) | upsert errors surfaced; per-row fallback; `vehicle_truth_write_error` audit row on partial write | deploy requested 01:35Z via Lovable |
 
 Secrets/env dependencies: `FIRECRAWL_API_KEY(_1)` (existing), optional `FIRECRAWL_RPM` (new, default 10).
 No new secrets required.
