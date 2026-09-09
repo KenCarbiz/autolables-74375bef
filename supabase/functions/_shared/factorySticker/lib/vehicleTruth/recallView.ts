@@ -215,6 +215,19 @@ interface Evidence {
   inCatalogue: boolean | null;
   /** This store, read alone, reports no open campaign. */
   saysClear: boolean;
+  /**
+   * The writer named the scope itself, rather than us inferring it from the
+   * provider's name.
+   *
+   * This is the difference between a real clearance and a fabricated one.
+   * `marketcheck-recalls` turned an HTTP 404 into an empty recall list and
+   * stamped it clear, and the row it left behind is byte-for-byte what a
+   * genuine "no open recalls" answer looks like. Nothing in it can be told
+   * apart -- except that it predates the writer that declares its own scope.
+   * So an inferred scope may report an OPEN campaign, which is positive
+   * evidence and must never be withdrawn, but it may not clear a VIN.
+   */
+  scopeDeclared: boolean;
 }
 
 const catalogueVerdict = (b: Bag): boolean | null => {
@@ -234,6 +247,7 @@ function readEvidence(raw: unknown, fallbackScope: RecallScope | null): Evidence
   // answer we already hold look scopeless.
   const source = str(b.source) ?? str(b.provider) ?? str(b.rawProvider);
   const declared = lower(b.scope ?? b.level);
+  const scopeDeclared = declared === "vin" || declared === "model";
   const scope: RecallScope | null =
     declared === "vin" ? "vin"
     : declared === "model" ? "model"
@@ -241,6 +255,7 @@ function readEvidence(raw: unknown, fallbackScope: RecallScope | null): Evidence
   const campaigns = [...list(b.campaigns), ...list(b.recalls)];
   return {
     scope,
+    scopeDeclared,
     source,
     note: str(b.note) ?? str(b.error) ?? str(b.reason),
     campaigns,
@@ -316,13 +331,23 @@ export function deriveRecallView(
 
   const writtenVin = WRITTEN_VIN_STATE[vinToken];
   let vinState: RecallVinState;
-  if (writtenVin != null && (writtenVin === "UNKNOWN" || vinCheckedAt != null)) {
+  if (writtenVin === "VERIFIED_CLEAR" && vinAnswer != null && !vinAnswer.scopeDeclared) {
+    // Only the writer that declares its own scope may state a clearance, even
+    // when a legacy row happens to carry the newer word for it.
+    vinState = "UNKNOWN";
+  } else if (writtenVin != null && (writtenVin === "UNKNOWN" || vinCheckedAt != null)) {
     vinState = writtenVin;
   } else if (vinAnswer == null || vinNoteFailed || vinCheckedAt == null) {
     vinState = "UNKNOWN";
   } else if ((vinOpen ?? 0) > 0 || vinCampaigns.some(campaignOpen)
     || ["open", "open_recalls", "open_recall"].includes(vinToken)) {
     vinState = "OPEN";
+  } else if (!vinAnswer.scopeDeclared) {
+    // A legacy row whose VIN scope we inferred from the provider name. It may
+    // be a real clearance or a 404 that was written down as one; the stored
+    // shape is identical either way, and three published customer pages were
+    // carrying the fabricated version. Unknown is the only honest reading.
+    vinState = "UNKNOWN";
   } else if (["clear", "verified_clear", "no_open_recalls", "none"].includes(vinToken) || vinOpen === 0) {
     vinState = "VERIFIED_CLEAR";
   } else {

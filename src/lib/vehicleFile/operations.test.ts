@@ -467,11 +467,14 @@ describe("buildCompliance", () => {
       }),
     }), { now: NOW });
 
-    expect(section.recallStatus.value).toBe("clear");
-    expect(section.recallStatus.chosen?.provider).toContain("MarketCheck AutoRecalls");
-    expect(section.recallStatus.chosen?.license).toBe("UNKNOWN_REVIEW_REQUIRED");
-    expect(section.recallStatus.chosen?.observedAt).toBe("2026-09-04T16:43:52.593Z");
-    expect(section.openRecallCount.value).toBe(0);
+    // This is the live shape of JN8AZ3CC5T9624253, a published customer page
+    // whose "clear" came from MarketCheck answering 404. The row is
+    // byte-identical to a genuine clearance, so the only thing that separates
+    // them is that this one predates the writer that declares its own scope.
+    // It must not clear, and it must not carry a count: a fabricated zero is
+    // exactly what the two-scope model exists to stop.
+    expect(section.recallStatus.value).not.toBe("clear");
+    expect(section.openRecallCount.value).toBeNull();
   });
 
   it("surfaces a disagreement between two recall stores without inventing a dispute", () => {
