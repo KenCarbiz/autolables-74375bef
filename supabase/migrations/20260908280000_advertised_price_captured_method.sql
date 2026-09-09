@@ -50,7 +50,7 @@ COMMENT ON COLUMN public.advertised_prices.captured_method IS
 -- note and no capturing user stays NULL, because "we do not know" is the true
 -- answer and inventing one here would repeat the mistake this migration undoes.
 DO $$
-DECLARE v_feed int; v_obs int; v_manual int; v_seed int; v_unknown int;
+DECLARE v_feed int; v_obs int; v_obs2 int; v_manual int; v_seed int; v_unknown int;
 BEGIN
   -- The feed writer stamps its own name into notes. Unambiguous.
   UPDATE public.advertised_prices
@@ -76,7 +76,8 @@ BEGIN
   UPDATE public.advertised_prices
      SET captured_method = 'dealer_vdp_observation'
    WHERE captured_method IS NULL AND notes ILIKE '%crawl%';
-  GET DIAGNOSTICS v_obs = v_obs + ROW_COUNT;
+  GET DIAGNOSTICS v_obs2 = ROW_COUNT;
+  v_obs := v_obs + v_obs2;
 
   -- A capturing user is a person at the dealership.
   UPDATE public.advertised_prices

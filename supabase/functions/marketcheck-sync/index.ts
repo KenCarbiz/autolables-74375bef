@@ -569,6 +569,12 @@ serve(async (req) => {
   const reachable = (configs || [])
     .filter((c: SyncConfig) => toSourceHost(c.source) || (c.dealer_id || "").trim());
   const forced = !!(body.force && body.tenant_id);
+  // A canary walks the feed, writes every listing it sees, records every
+  // segment gate decision -- and retires nothing. It exists so a rollout can
+  // prove the coverage guards behave before they are allowed to archive.
+  // Honoured only on a single-tenant manual run: the batch cron never passes
+  // it, so a stale invocation cannot leave archiving quietly disabled.
+  const noPrune = !!(body.no_prune && body.tenant_id);
   const due = reachable.filter((c: SyncConfig) => forced ? true : isDue(c, now));
 
   // A tenant that was considered and passed over used to leave no trace at
@@ -1602,18 +1608,25 @@ serve(async (req) => {
         rest: feedReportedNew == null || numFound <= 0 ? null : Math.max(0, numFound - feedReportedNew),
       };
       const segSkipped: Record<InventorySegment, string | null> = { new: null, rest: null };
+      // The gate's own verdict, before any canary override, so a run record
+      // can show what WOULD have happened.
+      const segGateDecision: Record<InventorySegment, string | null> = { new: null, rest: null };
       for (const sgm of ["new", "rest"] as InventorySegment[]) {
         // An unread prior inventory reports 0 cars for every segment, which is
         // indistinguishable from a segment the dealer genuinely sold out of.
         // Skip the segment outright rather than let the gate pass on a zero we
         // never measured.
-        segSkipped[sgm] = priorInventoryUnknown
+        const segGate = priorInventoryUnknown
           ? "prior_inventory_unreadable"
           : segmentPrunePreflight({
             segment: sgm, feedWalked, writeError: !!firstWriteErr,
             feedReported: segReported[sgm], accepted: segAccepted[sgm],
             priorInventory: priorSegVins[sgm].size,
           });
+        // Under a canary the real gate decision is kept in the run record so
+        // it can be read afterwards, but the segment is never retired.
+        segGateDecision[sgm] = segGate;
+        segSkipped[sgm] = noPrune ? `canary_no_prune${segGate ? ":" + segGate : ""}` : segGate;
         // Protect the blocked segment by making its cars look live to the
         // prune. The other segment still retires normally, so one segment
         // failing never costs the dealer the whole night's cleanup.
@@ -1669,12 +1682,13 @@ serve(async (req) => {
       // VINs into liveVins — which protects nothing when the prior VIN sets are
       // empty because the read failed. So the whole destructive step stands
       // down instead: better a stale car for a day than an archived live lot.
-      const pruneSkipped = priorInventoryUnknown
+      const runGate = priorInventoryUnknown
         ? "prior_inventory_unreadable"
         : prunePreflight({
           feedWalked, matched: tenantSeen, liveVins: liveVins.size,
           lastGoodCount: lastGood, writeError: !!firstWriteErr,
         });
+      const pruneSkipped = noPrune ? `canary_no_prune${runGate ? ":" + runGate : ""}` : runGate;
       const collapsed = !!pruneSkipped?.startsWith("inventory_collapsed");
 
       if (!pruneSkipped) {
@@ -1725,7 +1739,7 @@ serve(async (req) => {
 
       tenantsSynced++;
       const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, description_refresh: descriptionRefresh, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, provider_refused: providerRefused || null, prune_skipped: pruneSkipped,
-        segments: { new: { accepted: segAccepted.new, reported: segReported.new, prior: priorSegVins.new.size, skipped: segSkipped.new }, rest: { accepted: segAccepted.rest, reported: segReported.rest, prior: priorSegVins.rest.size, skipped: segSkipped.rest } }, pinned: cleanRun,
+        segments: { new: { accepted: segAccepted.new, reported: segReported.new, prior: priorSegVins.new.size, skipped: segSkipped.new, gate: segGateDecision.new }, rest: { accepted: segAccepted.rest, reported: segReported.rest, prior: priorSegVins.rest.size, skipped: segSkipped.rest, gate: segGateDecision.rest } }, pinned: cleanRun, canary_no_prune: noPrune,
         new_units: { primary_feed: primaryNewUnits, total: newTypeSeen }, supplemental_new: supplementalNew,
         // Operator-only. Public list prices, so an estimate rather than a bill.
         api_usage: estimateCost(callMeter, 30) };
