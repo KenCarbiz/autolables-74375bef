@@ -372,3 +372,54 @@ Read from `net._http_response`, `cron.job_run_details`, `audit_log` and the tabl
 
 ### A.2 Not acted on, per the standing instruction
 Empty `addendum product_rules` (owner's product data); CT "AS IS" Buyers Guides (legal document); `packet-backfill` and `send-ct-mvp-compliance-digests` scheduling — both are now present in `cron.job` (jobs 27 at 09:40 and 28 hourly); `packet-backfill` spends money and has not been reviewed here.
+
+---
+
+## Appendix B — 06:00Z first unattended crawl run, and the description reconcile (checked 06:25Z)
+
+### B.1 The 06:00 crawl: a defect, found and fixed
+The cron fired `crawl-advertised-prices` with `limit 25`. The gateway answered **504 `IDLE_TIMEOUT` (150 s)**;
+the function kept working to its own 220 s budget. What it did before stopping:
+
+| VIN | Captured at | Seconds in | Result |
+|---|---|---|---|
+| `3VWEM7BU8RM082795` | 06:00:51 | 51 | observation row, screenshot + sha |
+| `5N1AL1FWXTC358105` | 06:01:50 | 110 | observation row, screenshot + sha |
+| `3N1AB8BV3MY259117` | 06:02:46 | 166 | observation row, screenshot + sha (after the gateway had already given up) |
+| `5UXCW2C03N9J22405` | 06:03:27 | 207 | observation row, screenshot + sha |
+| fifth vehicle | ~06:03:33 | 213 | render fired inside the last 7 s of the budget, **1 credit paid, nothing written** |
+
+- 4 of 25 vehicles reached; 21 untouched; the run summary was lost with the 504. All four rows are
+  `website / dealer_vdp_observation`, all `First crawl`, pacing recorded, key `FIRECRAWL_API_KEY`.
+- Credits: 1,310 → **1,305** (four renders written + one lost). Queue 25 → 29 VINs, 0 feed rows.
+- Root cause: a paced, screenshot-backed visit of this dealer's pages takes 30–60 s (Firecrawl full-page
+  render + 1.5–2 MB screenshot copy), so one request can hold four or five vehicles, not twenty-five,
+  and the 220 s budget was already past the gateway's 150 s idle limit.
+- Fix, commit `593fb5d2`: each request works inside a **120 s link budget**, refuses to start a render it
+  cannot finish (**40 s headroom**), and when it runs out of time with rows left it **chains the remainder
+  to a fresh request** with `limit` reduced by what it processed, at most 12 links deep. Single-VIN and
+  test-button calls never chain. Every link writes an `advertised_price_crawl_run` audit row (summary,
+  pacing, next-link status) so a lost response still leaves a record.
+- Chain canary (`{tenant_id, limit: 4}` after deploy): PENDING — deploy of `593fb5d2` in progress at 06:32Z; result recorded below when read.
+
+Cost consequence for the owner's cadence decision (§5.6): with chaining the cron now does what it was
+asked — up to 25 renders per run, 4 runs a day. Until the cadence is changed that is ≈100 credits/day
+against 1,305 on hand.
+
+### B.2 Description reconcile (06:00Z)
+`description-reconcile-nightly` answered **202 `kicked`** at 06:00:05. As of 06:25 the kicked sweep had
+produced **no new preflight or validation rows** and the day's model executions were still **207**
+(unchanged since 03:11), so the blocked-count comparison cannot be made yet. For the record, blocking
+validation findings by code:
+
+| Code | 8 Sep (findings / cases) | 9 Sep to 06:25 (findings / cases) |
+|---|---|---|
+| `CHANNEL_PRICE_NOT_ALLOWED` | 243 / 50 | 112 / 21 |
+| `REQUIRED_DISCLOSURE_MISSING` | 63 / 40 | 17 / 12 |
+| `UNSUPPORTED_FEATURE_CLAIM` | 0 | 3 / 2 |
+| `CHANNEL_LENGTH_EXCEEDED` | 0 in this table | 0 |
+
+The 8 Sep preflight table shows 51 passed, 4 `BUDGET_EXCEEDED`, 1 `DEALER_IDENTITY_INCOMPLETE`. The
+routine's "57 / 15 / 33" figures were counted from a different surface than these two tables; the
+per-case counts above are the comparable series going forward. Budget and crons untouched.
+
