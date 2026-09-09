@@ -400,11 +400,28 @@ the function kept working to its own 220 s budget. What it did before stopping:
   to a fresh request** with `limit` reduced by what it processed, at most 12 links deep. Single-VIN and
   test-button calls never chain. Every link writes an `advertised_price_crawl_run` audit row (summary,
   pacing, next-link status) so a lost response still leaves a record.
-- Chain canary (`{tenant_id, limit: 4}` after deploy): PENDING — deploy of `593fb5d2` in progress at 06:32Z; result recorded below when read.
+- Chain canary, deployed 06:35Z from `bbea9939` (function dirs identical to `593fb5d2`):
+  - `limit 4` (06:36:55): one link, 4 processed in 60 s, HTTP 200 with the full body, `next_link null`,
+    audit row written. Renders were faster this time (~15 s each), so no handoff was needed.
+  - `limit 8` (06:41:32): **link 0** picked 8, processed 5 in 94 s, `ran_out_of_time true`,
+    `next_link {depth 1, limit 3, fired}`, answered 200 (no 504); **link 1** picked 3, processed 3 in
+    60 s, `next_link null`. Both links left `advertised_price_crawl_run` audit rows. 8 renders, 5
+    observation rows with screenshots, 3 refused by the guard. Pacer wait recorded (3.1 s / 4.0 s).
+    **The chain works.**
+- The two canaries exposed a second defect: a vehicle whose page price the guard refuses writes no row,
+  so its clock never advances and it is first in line every run — the same new QX60 was rendered and
+  refused at 06:37 and again at 06:41. 128 of Harte's 130 active listings carry a VDP URL and **71 are
+  new cars**, whose pages read above the feed price (MSRP-shaped) on both harteinfiniti.com and
+  hartecars.com; without a fix, every run would spend its budget refusing the same pages. Fix, commit
+  `16bcff2e`: a vehicle with a `price_rejected` ledger entry inside the last **seven days** is left
+  alone on both the queue and seed paths (a named VIN is still visited), reported as `backoff_skipped`.
+  Verification after deploy: PENDING at 06:52Z (deploy of `16bcff2e` in progress).
+- Credits: 1,305 → 1,293 across the two chain canaries (12 renders). Gate 0 total: **23 credits**.
 
 Cost consequence for the owner's cadence decision (§5.6): with chaining the cron now does what it was
-asked — up to 25 renders per run, 4 runs a day. Until the cadence is changed that is ≈100 credits/day
-against 1,305 on hand.
+asked — up to 25 renders per run, 4 runs a day, over a universe of 128 crawlable VINs (57 used/CPO once
+the 71 new cars are backed off). Until the cadence is changed that is up to ≈100 credits/day against
+1,293 on hand; with the new cars backed off and the used cars rotating, closer to 57 per rotation.
 
 ### B.2 Description reconcile (06:00Z)
 `description-reconcile-nightly` answered **202 `kicked`** at 06:00:05. As of 06:25 the kicked sweep had
