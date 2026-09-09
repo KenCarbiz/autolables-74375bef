@@ -497,6 +497,7 @@ export type Database = {
           advertised_price: number
           captured_at: string
           captured_by: string | null
+          captured_method: string | null
           created_at: string
           id: string
           notes: string | null
@@ -514,6 +515,7 @@ export type Database = {
           advertised_price: number
           captured_at?: string
           captured_by?: string | null
+          captured_method?: string | null
           created_at?: string
           id?: string
           notes?: string | null
@@ -531,6 +533,7 @@ export type Database = {
           advertised_price?: number
           captured_at?: string
           captured_by?: string | null
+          captured_method?: string | null
           created_at?: string
           id?: string
           notes?: string | null
@@ -10160,6 +10163,7 @@ export type Database = {
           advertised_price: number
           captured_at: string
           captured_by: string | null
+          captured_method: string | null
           created_at: string
           id: string
           notes: string | null
