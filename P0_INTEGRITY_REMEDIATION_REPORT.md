@@ -335,3 +335,40 @@ Stopping here. Gate 1 (Vehicle File current-state read model, shadow mode) begin
 1. Firecrawl cadence / per-run limit (§5.6).
 2. Whether to retire the exhausted key from the secrets.
 3. Approval to tune new-car price labels for hartecars.com.
+
+---
+
+## Appendix A. Overnight job verification (routine check-in, read 04:30–04:45Z)
+
+Read from `net._http_response`, `cron.job_run_details`, `audit_log` and the tables the jobs write. Nothing was changed by this pass.
+
+| Job (UTC) | Result | Verdict |
+|---|---|---|
+| `carfax-link-sweep` 04:15, dry run (`apply:false`, limit 100) | HTTP 200. `examined 100, found 0, written 0, no_vdp_url 2, fetch_failed 98` — every fetch failed `blocked_by_site` 403 (the dealer's WAF refuses plain fetches, the same 403 the crawler's cheap fetch gets) | **Left dry. Not flipped to write** — it found nothing to write. The crawler already harvests the tokenized CARFAX link off each Firecrawl-rendered VDP (4 written tonight, §5.3), so for Harte this sweep is redundant unless it is given a rendered fetch |
+| `specs-backfill` 03:45 (first scheduled run) | HTTP 200 `{"ok":true,"depth":0}`; one link only (no depth-1 chain); 0 listings touched 03:44–04:00; no NeoVIN payload shape observed tonight | **0 paid calls.** The only published listing without a build sheet (`JTMABABA5PA005774`) is at `specs_attempts 3` with `specs_strict_attempted true`, so the sweep stopped at the attempt cap. No runaway chaining |
+| `passport-delivery-flush` (every 5 min, 00–02h and 06–23h) | HTTP 200 `{"ok":true,"sent":[],"failed":[],"retrying":[],"cancelled":[]}` on every firing 00:00–02:55; all 89 pg_net responses 00:00–03:00 were 200 | **401 gone — the deploy landed** |
+| `intake-draft-sweep` 03:20 | audit `intake_draft_sweep_run`: `scanned 173, failed 0, clearance_recomputed 173` | PASS |
+| `get-ready-sweep` 03:25 | cron succeeded. `sweep_missing_get_ready()` returns its counts as jsonb and writes **no audit row** (pg_cron discards the return value), so there is nothing in `audit_log` to confirm by design | ran; counts not recoverable after the fact |
+| `getready-install-safety-net` 04:30 | audit `install_safety_net_run`: `candidates 0, lines_flipped 0, addendums_updated 0` | PASS |
+| `ingest-orchestrate-sweep` 03:30 | pg_net reports a 5,000 ms timeout (job 7 sets no `timeout_milliseconds`, so the default applies) but the function ran: audit `ingest_orchestrate_sweep` 03:30:40 | ran; the cron entry needs a timeout so its response is kept (owner change) |
+| `advertised_prices` feed rows | 70 feed rows written by the 01:02 canary sync with `captured_by null`, `source_channel 'feed'`, `captured_method 'marketcheck_syndication'` | fixed, confirmed |
+
+### A.1 Description spend — the item that costs money
+`description_model_executions` (all tenants; requester null = system):
+
+| Day (UTC) | Executions | Tokens in / out |
+|---|---|---|
+| 09-06 | 19 | 462,573 / 16,080 |
+| 09-07 | **562** | 1,852,001 / 167,769 |
+| 09-08 | **506** | 2,850,878 / 301,240 |
+| 09-09 to 04:30 | **207** | 1,115,938 / 127,289 |
+
+- Budget row (Harte): `daily_generation_limit 500`, `monthly_generation_budget $135`, `max_cost_per_generation $0.10`, `hard_stop_pct 100`. Both 09-07 and 09-08 finished **over the 500/day count cap**.
+- `cost_state = 'unavailable'` and `cost_amount = 0` on **all 1,294 rows** (provider `openai`, model `gpt-5.6-luna`): the pricing table has no entry for that model, so the dollar budget and the per-generation cap cannot bind; only the count cap does. Five `description_model_cost_unmeasured` audit rows were written tonight alone.
+- Where today's 207 came from: **157 executions across 16 vehicles at 01:03–01:09**, directly after the 01:02 MarketCheck canary sync, and **50 across 5 vehicles at 03:08–03:10** after the nightly. A sync that changes a vehicle's description inputs re-fires generation plus a repair pass per channel — about ten model executions per vehicle. The 01h burst is therefore a cost consequence of the canary run that this report should own.
+- Tonight's five gate evaluations: 1 PASS, 1 REVIEW, 3 REJECT (evidence gate blocking). The 06:00 reconcile has not run, so the `CHANNEL_PRICE_NOT_ALLOWED` / `REQUIRED_DISCLOSURE_MISSING` / `CHANNEL_LENGTH_EXCEEDED` comparison is still pending.
+
+**Owner decisions:** supply pricing for `gpt-5.6-luna` (or switch the configured model to one the cost table knows) so the dollar budget binds; decide whether a sync-triggered regeneration should be rate-limited per day; the 500/day count cap has been exceeded two days running.
+
+### A.2 Not acted on, per the standing instruction
+Empty `addendum product_rules` (owner's product data); CT "AS IS" Buyers Guides (legal document); `packet-backfill` and `send-ct-mvp-compliance-digests` scheduling — both are now present in `cron.job` (jobs 27 at 09:40 and 28 hourly); `packet-backfill` spends money and has not been reviewed here.
