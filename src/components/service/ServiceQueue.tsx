@@ -1,3 +1,4 @@
+import { identityFromListing, identityTrim } from "@/lib/factorySticker/vehicleIdentity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -151,7 +152,7 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
     setLoadError(null);
     try {
       const { data: vehicles, error: vehErr } = await sb().from("vehicle_listings")
-        .select("id, vin, ymm, condition, status, mc_attributes, hero_image_url, recall_status, created_at, deal_processed_at")
+        .select("id, vin, ymm, condition, status, mc_attributes, hero_image_url, recall_status, recall_payload, recall_check, recall_checked_at, open_recall_count, created_at, deal_processed_at")
         .eq("tenant_id", tenant.id)
         .in("condition", ["used", "cpo", "certified"])
         .order("created_at", { ascending: false })
@@ -299,9 +300,9 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
           : s.grState === "in_progress" ? "in_progress"
           : "get_ready";
         const ymm = String(v.ymm || "Vehicle");
-        const parts = ymm.split(/\s+/);
+        const identity = identityFromListing(v);
         return {
-          id: v.id, vin, ymm, trim: parts.slice(3).join(" "),
+          id: v.id, vin, ymm, trim: identityTrim(v.ymm, identity),
           stock: stockByVin.get(vin) || (v.mc_attributes?.stock_no as string) || "",
           photo: (v.hero_image_url as string) || (Array.isArray(v.mc_attributes?.photo_links) ? v.mc_attributes.photo_links[0] : "") || "",
           condition: String(v.condition || "used").toUpperCase(),

@@ -296,6 +296,57 @@ describe("issues and overview", () => {
     expect(issueRows[0].critical).toBe(1);
   });
 
+  // Compliance may not read a zero as clear. On 74 of the pilot tenant's 130
+  // active cars `open_recall_count = 0` sits beside an NHTSA lookup that never
+  // answered, and compliance used to raise nothing at all for them.
+  it("raises an exception rather than passing a vehicle with no VIN-level recall answer", () => {
+    const { issueRows } = build({
+      listings: [listing({
+        open_recall_count: 0,
+        recall_status: null,
+        recall_payload: { source: "nhtsa", note: "no_nhtsa_record_http_400", checked_at: "2026-09-08T03:00:00Z" },
+      })],
+    });
+    const recall = issueRows[0].issues.filter((i) => i.category === "recall");
+    expect(recall).toHaveLength(1);
+    expect(recall[0].label).toBe("Recall verification unavailable for this VIN");
+    expect(recall[0].severity).toBe("attention");
+    expect(recall[0].detail).toMatch(/Model not in NHTSA's records/);
+  });
+
+  // NHTSA recognising the model and returning zero campaigns is a real answer
+  // about the MODEL LINE. It still does not clear the car.
+  it("does not treat NO_MODEL_CAMPAIGNS_FOUND as compliance clearance", () => {
+    const { issueRows } = build({
+      listings: [listing({
+        open_recall_count: 0,
+        recall_status: "clear",
+        recall_payload: {
+          source: "nhtsa", checked_at: "2026-09-08T03:00:00Z",
+          model_in_catalog: true, open_recall_count: 0,
+        },
+      })],
+    });
+    const recall = issueRows[0].issues.filter((i) => i.category === "recall");
+    expect(recall).toHaveLength(1);
+    expect(recall[0].label).toBe("Recall verification unavailable for this VIN");
+    expect(recall[0].detail).toMatch(/No campaigns on this model/);
+  });
+
+  it("clears the recall exception only on a VIN-level answer", () => {
+    const { issueRows } = build({
+      listings: [listing({
+        open_recall_count: 0,
+        recall_status: "clear",
+        recall_payload: {
+          source: "marketcheck", scope: "vin", open_recall_count: 0,
+          checked_at: new Date().toISOString(),
+        },
+      })],
+    });
+    expect(issueRows[0].issues.filter((i) => i.category === "recall")).toHaveLength(0);
+  });
+
   it("does not report a certification state for a vehicle that was never run", () => {
     const { issueRows } = build();
     expect(issueRows[0].certificationReady).toBeNull();

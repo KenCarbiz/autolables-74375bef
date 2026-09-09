@@ -23,7 +23,13 @@ describe("derivePassportVerification — shared source of truth", () => {
   it("a clean, fully-checked vehicle completes every category", () => {
     const s = derivePassportVerification(
       dOf({ cleanTitle: true, recallClear: true, ownerCount: 1, accidentCount: 0, marketAvg: 61000, warrantyStr: "4 yr / 60,000 mi", serviceCount: 3 }),
-      lOf({ vin: "5N1AL1F83VC332076", recall_status: "clear" }),
+      lOf({
+        vin: "5N1AL1F83VC332076",
+        recall_status: "clear",
+        // A VIN-level answer. `recall_status = 'clear'` alone is a MODEL-level
+        // NHTSA result and no longer completes this category.
+        recall_payload: { source: "marketcheck", scope: "vin", checked_at: new Date().toISOString(), open_recall_count: 0 },
+      } as Partial<VehicleListing>),
     );
     expect(s.completed).toBe(7);
     expect(s.completedPct).toBe(100);
@@ -33,17 +39,44 @@ describe("derivePassportVerification — shared source of truth", () => {
   it("a pending MATERIAL check (title) is surfaced and never all-complete", () => {
     const s = derivePassportVerification(
       dOf({ cleanTitle: false, recallClear: true, marketAvg: 61000, warrantyStr: "4 yr", serviceCount: 2, ownerCount: 1 }),
-      lOf({ vin: "ABC", recall_status: "clear" }),
+      lOf({
+        vin: "ABC",
+        recall_status: "clear",
+        recall_payload: { source: "marketcheck", scope: "vin", checked_at: new Date().toISOString(), open_recall_count: 0 },
+      } as Partial<VehicleListing>),
     );
     expect(s.completed).toBeLessThan(s.total);
     expect(s.materialPending).toBe(1);
     expect(s.categories.find((c) => c.key === "title")?.state).toBe("pending");
   });
 
+  // The forbidden collapse: NHTSA answers for a year/make/model, so its
+  // legitimate zero cannot complete a check that is about this VIN.
+  it("leaves the MATERIAL recall check pending on a model-level answer", () => {
+    const s = derivePassportVerification(
+      dOf({ cleanTitle: true, ownerCount: 1, accidentCount: 0, marketAvg: 61000, warrantyStr: "4 yr", serviceCount: 3 }),
+      lOf({
+        vin: "5N1AL1F83VC332076",
+        recall_status: "clear",
+        open_recall_count: 0,
+        recall_payload: { source: "nhtsa", checked_at: new Date().toISOString(), model_in_catalog: true, open_recall_count: 0 },
+      } as Partial<VehicleListing>),
+    );
+    const recall = s.categories.find((c) => c.key === "recall");
+    expect(recall?.state).toBe("pending");
+    expect(recall?.material).toBe(true);
+    expect(s.materialPending).toBe(1);
+    expect(s.completedPct).toBeLessThan(100);
+  });
+
   it("classifies source types and states distinctly (market = calculated, warranty = dealer_confirmed)", () => {
     const s = derivePassportVerification(
       dOf({ cleanTitle: true, recallClear: true, marketAvg: 61000, warrantyStr: "4 yr", serviceCount: 1, ownerCount: 1 }),
-      lOf({ vin: "ABC", recall_status: "clear" }),
+      lOf({
+        vin: "ABC",
+        recall_status: "clear",
+        recall_payload: { source: "marketcheck", scope: "vin", checked_at: new Date().toISOString(), open_recall_count: 0 },
+      } as Partial<VehicleListing>),
     );
     expect(s.categories.find((c) => c.key === "market")?.state).toBe("calculated");
     expect(s.categories.find((c) => c.key === "market")?.sourceType).toBe("autolabels_calculated");

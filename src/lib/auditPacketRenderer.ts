@@ -106,7 +106,11 @@ const renderSummaryCards = (packet: AuditPacket): string => {
     { label: "Install photos", value: s.install_photo_count ?? 0, note: `${s.install_signature_count ?? 0} installer signatures` },
     { label: "Advertised snapshots", value: s.advertised_price_snapshot_count ?? 0, note: s.latest_advertised_price != null ? `Latest $${s.latest_advertised_price.toLocaleString()} · ${s.latest_advertised_source || "manual"}` : "no snapshots" },
     { label: "Audit events", value: s.audit_event_count },
-    { label: "Open recalls", value: s.open_recall_count, note: s.do_not_drive ? "DO NOT DRIVE" : "" },
+    {
+      label: "Open recalls",
+      value: s.open_recall_count ?? "Not verified",
+      note: s.do_not_drive ? "DO NOT DRIVE" : `VIN ${s.recall_vin_state ?? "UNKNOWN"}${s.recall_model_state ? ` · model ${s.recall_model_state}` : ""}`,
+    },
   ];
   return cards.map(c => `
     <div class="kpi">

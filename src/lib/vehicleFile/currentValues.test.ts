@@ -123,25 +123,35 @@ describe("currentDisplayedValues — happy path (live pilot vehicle)", () => {
   });
 });
 
-describe("currentDisplayedValues — the ymm defect the maps named", () => {
-  it("splits a two-word make in half, because OemDocFinders.tsx:33-40 is positional", () => {
+describe("currentDisplayedValues — the ymm defect the maps named, now closed", () => {
+  it("keeps a two-word make whole, from the feed's own key rather than a split", () => {
     const shown = currentDisplayedValues(live());
     expect(shown.year.value).toBe(2020);
-    expect(shown.make.value).toBe("Alfa");
-    expect(shown.model.value).toBe("Romeo Stelvio");
-    expect(shown.make.origin).toContain("vehicle_listings.ymm");
-    expect(shown.make.origin).toContain("token 1");
+    expect(shown.make.value).toBe("Alfa Romeo");
+    expect(shown.model.value).toBe("Stelvio");
+    expect(shown.make.origin).toContain("mc_attributes");
   });
 
-  it("gets a single-word make right, so the defect is the make and not the parser", () => {
-    const shown = currentDisplayedValues(live({ listing: listing({ ymm: "2026 INFINITI QX60" }) }));
+  it("leaves a single-word make untouched", () => {
+    const shown = currentDisplayedValues(live({
+      listing: listing({ ymm: "2026 INFINITI QX60", mc_attributes: { make: "INFINITI", model: "QX60" } }),
+    }));
     expect(shown.year.value).toBe(2026);
     expect(shown.make.value).toBe("INFINITI");
     expect(shown.model.value).toBe("QX60");
   });
 
-  it("reports year, make and model as absent when ymm is empty", () => {
-    const shown = currentDisplayedValues(live({ listing: listing({ ymm: null }) }));
+  it("falls back to the shared parser when the row carries no structured key", () => {
+    const shown = currentDisplayedValues(live({
+      listing: listing({ ymm: "2024 Land Rover Defender 110", mc_attributes: {} }),
+    }));
+    expect(shown.make.value).toBe("Land Rover");
+    expect(shown.model.value).toBe("Defender 110");
+    expect(shown.make.origin).toContain("parseYmm");
+  });
+
+  it("reports year, make and model as absent when nothing states them", () => {
+    const shown = currentDisplayedValues(live({ listing: listing({ ymm: null, mc_attributes: {} }) }));
     expect(shown.year.value).toBeNull();
     expect(shown.make.value).toBeNull();
     expect(shown.model.value).toBeNull();
@@ -303,12 +313,13 @@ describe("currentDisplayedValues — disagreement between the two price surfaces
     expect(shown.condition.value).toBe("cpo");
   });
 
-  it("ignores vehicle_files.year/make/model, which no Vehicle File surface reads", () => {
+  it("reads the listing's own structured keys, not vehicle_files, when both exist", () => {
     const shown = currentDisplayedValues(live({
       file: file({ make: "Alfa Romeo", model: "Stelvio", year: "2020" }),
     }));
-    expect(shown.make.value).toBe("Alfa");
-    expect(shown.model.value).toBe("Romeo Stelvio");
+    expect(shown.make.value).toBe("Alfa Romeo");
+    expect(shown.model.value).toBe("Stelvio");
+    expect(shown.make.origin).toContain("mc_attributes");
   });
 });
 

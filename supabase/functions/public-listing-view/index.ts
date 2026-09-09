@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
-import { PUBLIC_VIEW_DENY, scrubTitleVerification } from "../_shared/lotFeedRow.ts";
+import { PUBLIC_VIEW_DENY, scrubTitleVerification, applyRecallProjection } from "../_shared/lotFeedRow.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
@@ -916,6 +916,11 @@ serve(async (req) => {
       (row as Record<string, unknown>).title_verification =
         scrubTitleVerification((row as Record<string, unknown>).title_verification);
     }
+
+    // Recall last, on the finished row: the shopper's copy carries a clear
+    // status and a zero count only where a VIN-level check produced them, and
+    // the model line's campaign context ships labelled as model-level.
+    applyRecallProjection(row as Record<string, unknown>);
 
     return json(200, { listing: row });
   } catch (err) {

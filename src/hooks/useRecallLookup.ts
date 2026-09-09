@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { recallScopeOfSource, type RecallScope } from "@/lib/vehicleTruth/recallView";
 
 export interface Recall {
   campaignNumber: string;
@@ -17,6 +18,15 @@ export interface RecallResult {
   hasStopSale: boolean;
   hasTakata: boolean;
   lastChecked: string;
+  /**
+   * Which question this answer actually answers. NHTSA's recallsByVehicle is
+   * MODEL scope — it takes a year/make/model and cannot take a VIN — so an
+   * empty result from it means "no campaigns on this model line", never "this
+   * car is clear". `marketcheck-recalls` self-falls-back to NHTSA server-side,
+   * so its `provider` decides rather than which function was called.
+   */
+  scope: RecallScope | null;
+  source: string | null;
 }
 
 // The shared Normalized recall shape returned by marketcheck-recalls (single
@@ -38,6 +48,8 @@ interface McNormalized {
   recallStatus?: string;
   openRecallCount?: number;
   checkedAt?: string;
+  provider?: string;
+  rawProvider?: string;
 }
 
 const DND_RE = /do not drive|stop sale|park outside|fire risk/i;
@@ -66,12 +78,15 @@ async function lookupMarketCheck(vin: string, tenantId: string): Promise<RecallR
       manufacturer: r.manufacturer || "",
     }));
     const text = (r: McNormalRecall) => `${r.title || ""} ${r.description || ""} ${r.consequence || ""} ${r.component || ""}`;
+    const source = d.provider ?? d.rawProvider ?? null;
     return {
       recalls,
       hasOpenRecall: recalls.length > 0 || d.recallStatus === "open_recalls" || (d.openRecallCount ?? 0) > 0,
       hasStopSale: open.some((r) => DND_RE.test(text(r))),
       hasTakata: open.some((r) => TAKATA_RE.test(text(r))),
       lastChecked: d.checkedAt || new Date().toISOString(),
+      scope: recallScopeOfSource(source),
+      source,
     };
   } catch {
     return null;
@@ -130,7 +145,10 @@ export const useRecallLookup = () => {
           return null;
         }
 
-        const result = data as RecallResult;
+        // nhtsa-recall answers for a year/make/model. Stamping the scope here
+        // is what stops the banner turning its empty answer into "no open
+        // recalls for this vehicle".
+        const result: RecallResult = { ...(data as RecallResult), scope: "model", source: "nhtsa" };
         cacheRef.current[cacheKey] = { at: now, data: result };
         return result;
       } catch (err) {

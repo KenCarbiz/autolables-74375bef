@@ -12,6 +12,7 @@ import { useZebraPrint } from "@/hooks/useZebraPrint";
 import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
 import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
+import { canQueryIdentity, resolveVehicleIdentity } from "@/lib/factorySticker/vehicleIdentity";
 import { saveStickerToVehicle, markDocumentPublished } from "@/lib/stickerStudio/api";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { curatePrintEquipment } from "@/lib/equipmentPanel";
@@ -91,9 +92,8 @@ const UsedCarSticker = () => {
 
   // The printed star block is a government claim — pull real NHTSA ratings
   // for the YMM and gap-fill blank fields instead of trusting typed values.
-  const nhtsaYmm = vehicle.year && vehicle.make && vehicle.model
-    ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : null;
-  const { data: nhtsaSafety } = useNhtsaSafety(nhtsaYmm, !!nhtsaYmm);
+  const nhtsaIdentity = resolveVehicleIdentity({ file: vehicle });
+  const { data: nhtsaSafety } = useNhtsaSafety(nhtsaIdentity, canQueryIdentity(nhtsaIdentity));
   useEffect(() => {
     const r = nhtsaSafety?.ratings;
     if (!r) return;

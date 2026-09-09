@@ -1,3 +1,4 @@
+import { identityFromListing } from "@/lib/factorySticker/vehicleIdentity";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Printer, ChevronLeft, Download } from "lucide-react";
@@ -60,18 +61,6 @@ const SAMPLE: AddendumLabelData = {
   compact: false,
 };
 
-const splitYmm = (ymm: string): { year: string; make: string; model: string } => {
-  const parts = ymm.trim().split(/\s+/);
-  if (/^\d{4}$/.test(parts[0] || "")) {
-    const rest = parts.slice(1);
-    // Two-word makes (Land Rover, Alfa Romeo) keep the model intact.
-    const twoWord = /^(land|alfa|aston)$/i.test(rest[0] || "");
-    const make = twoWord ? rest.slice(0, 2).join(" ") : rest[0] || "";
-    return { year: parts[0], make, model: rest.slice(twoWord ? 2 : 1).join(" ") };
-  }
-  return { year: "", make: parts[0] || "", model: parts.slice(1).join(" ") };
-};
-
 const AddendumLabelPrint = () => {
   const { id } = useParams<{ id: string }>();
   const [params] = useSearchParams();
@@ -105,7 +94,7 @@ const AddendumLabelPrint = () => {
     if (isPreview) return SAMPLE;
     if (!listing) return null;
     const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
-    const { year, make, model } = splitYmm(listing.ymm || "");
+    const { year, make, model } = identityFromListing(listing);
     const bodyStyle = String(mc.body_type || mc.body || "");
     const condition = (listing.condition || "used").toLowerCase();
     const { installed, upgrades } = splitProducts(products || [], settings.product_default_mode, bodyStyle, model);

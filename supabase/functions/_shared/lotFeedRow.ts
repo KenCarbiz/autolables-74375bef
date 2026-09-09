@@ -16,6 +16,11 @@
 
 // deno-lint-ignore-file no-explicit-any
 
+import {
+  deriveRecallView,
+  type RecallRowInput,
+} from "./factorySticker/lib/vehicleTruth/recallView.ts";
+
 /** Never leaves the building. Everything else does. */
 export const LOT_FEED_DENY = new Set([
   // Credential.
@@ -285,6 +290,57 @@ export function specifications(row: any): Record<string, unknown> | null {
   return Object.keys(out).length ? out : null;
 }
 
+// ── Recall: two scopes on the wire, never one ─────────────────────────
+//
+// Both consumers of this module receive the listing row essentially as it is,
+// so `recall_status = 'clear'` and `open_recall_count = 0` used to leave the
+// building as facts about the car. They are neither: every recall answer in
+// this database came from NHTSA's recallsByVehicle, which answers for a
+// year/make/model, and on 74 of the pilot tenant's 130 active vehicles that
+// answer was an unanswered HTTP 400 with a zero sitting beside it.
+//
+// A sister app and an anonymous shopper cannot see any of that, so the
+// projection resolves it here: the two summary columns carry only what a
+// VIN-level check actually established, and the full two-scope truth ships
+// beside them under `recall`, with the model line's campaign context labelled
+// as exactly that.
+export function applyRecallProjection<T extends Record<string, unknown>>(row: T): T {
+  const view = deriveRecallView(row as RecallRowInput);
+  const out = row as Record<string, unknown>;
+  out.recall = {
+    vin: {
+      state: view.vin.state,
+      open_recall_count: view.vin.openCount,
+      check_complete: view.vin.checkComplete,
+      clear_claim_allowed: view.vin.clearClaimAllowed,
+      source: view.vin.source,
+      checked_at: view.vin.checkedAt,
+      label: view.vin.label,
+      detail: view.vin.detail,
+    },
+    model_campaign_context: view.model
+      ? {
+        state: view.model.state,
+        campaign_count: view.model.campaignCount,
+        source: view.model.source,
+        checked_at: view.model.checkedAt,
+        label: view.model.label,
+        detail: view.model.detail,
+      }
+      : null,
+    do_not_drive: view.doNotDrive,
+    campaigns: view.campaigns,
+  };
+  // An open answer is preserved whatever its scope — this correction must
+  // never hide a risk — while a clear one survives only from a VIN-level
+  // check that answered.
+  out.recall_status = view.riskSignalled
+    ? "open_recalls"
+    : view.vin.clearClaimAllowed ? "clear" : null;
+  out.open_recall_count = view.vin.openCount;
+  return row;
+}
+
 export function shapeLotRow(
   row: any,
   file?: LotFeedFile | null,
@@ -345,6 +401,8 @@ export function shapeLotRow(
   const sticker = windowSticker(row, opts);
   out.window_sticker_url = sticker.url;
   out.window_sticker_kind = sticker.kind;
+
+  applyRecallProjection(out);
 
   return out;
 }

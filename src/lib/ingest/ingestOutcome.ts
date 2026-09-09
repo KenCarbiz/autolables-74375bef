@@ -1,3 +1,5 @@
+import { identityFromListing, identityYear } from "../factorySticker/vehicleIdentity";
+
 // ──────────────────────────────────────────────────────────────────────
 // Per-VIN ingest outcome — the honest reading of "did it auto-generate?".
 //
@@ -104,6 +106,9 @@ export interface IngestOutcomeInput {
   vin: string;
   /** "2026 Toyota Camry XSE" — the shape vehicle_listings.ymm carries. */
   ymm?: string | null;
+  /** The feed's own year/make/model keys, preferred over any split of `ymm`. */
+  mc_attributes?: unknown;
+  mc_raw?: unknown;
   ledger?: IngestLedgerRow[] | null;
   sticker?: StickerRecordRow | null;
   brochureLinks?: OemLinkRow[] | null;
@@ -119,20 +124,20 @@ export interface IngestOutcomeInput {
   autogenArtifacts?: Record<string, unknown> | null;
 }
 
+
 const clean = (v: unknown): string => String(v ?? "").trim();
 const norm = (v: unknown): string => clean(v).toLowerCase().replace(/\s+/g, " ");
 
-/** Splits vehicle_listings.ymm the same way the harvest callers do. */
-export function parseYmm(ymm: string | null | undefined): {
+/**
+ * The identity the harvest callers send. OemDocFinders resolves structured
+ * identity, so this ledger has to resolve it the same way or it would report
+ * an attempt key the finder never used.
+ */
+export function harvestIdentity(listing: { ymm?: unknown; mc_attributes?: unknown; mc_raw?: unknown } | null): {
   year: number | null; make: string; model: string;
 } {
-  const parts = clean(ymm).split(/\s+/).filter(Boolean);
-  const year = Number.parseInt(parts[0] || "", 10);
-  return {
-    year: Number.isFinite(year) ? year : null,
-    make: parts[1] || "",
-    model: parts.slice(2).join(" "),
-  };
+  const identity = identityFromListing(listing);
+  return { year: identityYear(identity), make: identity.make, model: identity.model };
 }
 
 /**
@@ -343,7 +348,7 @@ function linkOutcome(
     };
   }
 
-  const { year, make, model } = parseYmm(input.ymm);
+  const { year, make, model } = harvestIdentity(input);
   if (!make || !model) {
     return {
       status: "not_run",

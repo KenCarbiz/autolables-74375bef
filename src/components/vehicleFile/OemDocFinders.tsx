@@ -13,6 +13,7 @@ import {
 import { explainCopyOutcome } from "../../../supabase/functions/_shared/oemDocCopy";
 import { recordIngestStep } from "@/lib/ingest/recordIngestStep";
 import { Card, btn } from "./primitives";
+import { identityFromListing, identityYear } from "@/lib/factorySticker/vehicleIdentity";
 import type { VehicleRow } from "./types";
 
 // File the harvest outcome against this VIN. Best-effort: a ledger write that
@@ -28,15 +29,6 @@ const recordHarvestVerdict = async (vehicle: VehicleRow, verdict: HarvestVerdict
     reason: verdict.reason,
     detail: { trigger: "vehicle_file_manual" },
   });
-};
-
-const ymmParts = (ymm: string | null) => {
-  const parts = (ymm || "").trim().split(/\s+/);
-  return {
-    year: Number.parseInt(parts[0] || "", 10) || null,
-    make: parts[1] || "",
-    model: parts.slice(2).join(" "),
-  };
 };
 
 interface FinderState {
@@ -101,7 +93,9 @@ interface FinderProps {
 const OemDocFinder = ({ vehicle, kind, fn, title, noun, action, body }: FinderProps) => {
   const [busy, setBusy] = useState(false);
   const [state, setState] = useOemDocState(kind, vehicle);
-  const { year, make, model } = ymmParts(vehicle.ymm);
+  const identity = identityFromListing(vehicle);
+  const { make, model } = identity;
+  const year = identityYear(identity);
 
   const find = async () => {
     if (!make || !model) { toast.error("Vehicle year/make/model is incomplete"); return; }

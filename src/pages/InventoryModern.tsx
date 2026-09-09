@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { deriveRecallView, recallScopeOfSource, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useViewTransitionNavigate } from "@/lib/navigation";
@@ -51,6 +52,9 @@ interface VehicleRow {
   source_url?: string | null;
   recall_status?: string | null;
   open_recall_count?: number | null;
+  recall_payload?: unknown;
+  recall_check?: unknown;
+  recall_checked_at?: string | null;
   market_position?: string | null;
   market_value?: number | null;
 }
@@ -190,9 +194,17 @@ const InventoryModern = () => {
     try {
       const { data, error } = await supabase.functions.invoke("marketcheck-recalls", { body: { vin, tenant_id: tenant?.id } });
       if (error) throw error;
-      const d = (data || {}) as { openRecallCount?: number; error?: string };
+      const d = (data || {}) as { openRecallCount?: number; error?: string; provider?: string };
       if (d.error === "not_configured") { toast.error("Recall lookup isn't configured."); return; }
-      toast.success((d.openRecallCount || 0) > 0 ? `${d.openRecallCount} open recall${d.openRecallCount === 1 ? "" : "s"} found` : "No active recalls");
+      // marketcheck-recalls falls back to NHTSA server-side, so the provider it
+      // answered with decides whether this is a VIN answer or a model answer.
+      toast.success(
+        (d.openRecallCount || 0) > 0
+          ? `${d.openRecallCount} open recall${d.openRecallCount === 1 ? "" : "s"} found`
+          : recallScopeOfSource(d.provider ?? null) === "vin"
+            ? "No active recalls on this VIN"
+            : "No campaigns found for this model — VIN-level verification unavailable",
+      );
       load();
     } catch { toast.error("Recall check failed"); }
   };
@@ -241,7 +253,8 @@ const InventoryModern = () => {
     let error: { message?: string; code?: string } | null = null;
     try {
       for (const cols of [
-        `${baseCols},hero_image_url,recall_status,open_recall_count,market_position,market_value`,
+        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value`,
+        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at`,
         `${baseCols},hero_image_url,recall_status,open_recall_count`,
         baseCols,
       ]) {
@@ -346,8 +359,8 @@ const InventoryModern = () => {
         if (derived === "needs-sticker" && s.stickerDone) return false;
         if (derived === "missing-addendum" && s.hasAddendum) return false;
         if (derived === "price-verify" && !s.needsPriceVerify) return false;
-        if (derived === "open-recalls" && !((r.open_recall_count || 0) > 0)) return false;
-        if (derived === "needs-attention" && s.hasAddendum && !s.needsPriceVerify && !((r.open_recall_count || 0) > 0)) return false;
+        if (derived === "open-recalls" && !deriveRecallView(r).riskSignalled) return false;
+        if (derived === "needs-attention" && s.hasAddendum && !s.needsPriceVerify && !deriveRecallView(r).riskSignalled) return false;
       }
       if (!lc) return true;
       return (
@@ -399,8 +412,9 @@ const InventoryModern = () => {
       if (s.needsPriceVerify) priceVerify++;
       if (s.stickerDone && s.hasAddendum && !s.needsPriceVerify) clean++;
       if (r.ymm) vinDecoded++;
-      const openR = (r.open_recall_count || 0) > 0;
-      openRecallsTotal += (r.open_recall_count || 0);
+      const rv = deriveRecallView(r);
+      const openR = rv.riskSignalled;
+      openRecallsTotal += rv.vin.openCount ?? rv.model?.campaignCount ?? (openR ? 1 : 0);
       if (openR) openRecallVehicles++;
       if (!s.hasAddendum || s.needsPriceVerify || openR) needsAttention++;
       if (r.market_value && r.price) { marketSum += (Number(r.market_value) - r.price); marketCount++; }
@@ -632,7 +646,7 @@ const InventoryModern = () => {
                           <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
                         </td>
                         <td className="px-3 py-2 align-middle">
-                          <ComplianceCell ymm={r.ymm} recallStatus={r.recall_status} openRecallCount={r.open_recall_count} />
+                          <ComplianceCell ymm={r.ymm} row={r} />
                         </td>
                         <td className="px-3 py-2 align-middle">
                           <PriceCell price={r.price} docFee={settings.doc_fee_amount} ap={byVin.get((r.vin || "").toUpperCase())} position={r.market_position} value={r.market_value} />
@@ -1025,7 +1039,7 @@ const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }:
       </div>
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
         <StatusPill status={r.status} signal={signal} />
-        <RecallChip status={r.recall_status} open={r.open_recall_count} />
+        <RecallChip row={r} />
         {!signal.hasAddendum && <span className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-red-100 text-red-700">Addendum Missing</span>}
         <div className="ml-auto flex items-center gap-1.5">
           {r.status === "published" ? (
@@ -1053,17 +1067,21 @@ const VinDecodeCell = ({ ymm }: { ymm?: string | null }) =>
     ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" />Decoded</span>
     : <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600"><AlertTriangle className="w-3.5 h-3.5" />Decode Failed</span>;
 
-const RecallChip = ({ status, open }: { status?: string | null; open?: number | null }) => {
-  const n = open || 0;
-  // Only show warning colors when a real issue exists; gray for pending/unknown.
-  if (status === "open_recalls" && n > 0) {
-    const cls = n >= 2 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700";
-    return <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${cls}`}><AlertTriangle className="w-2.5 h-2.5" />{n} Open Recall{n === 1 ? "" : "s"}</span>;
+// Green means a VIN-level check answered clear. `recall_status === "clear"` is
+// a MODEL-level NHTSA answer, and `open_recall_count === 0` is that answer's
+// zero — neither may colour a chip green.
+const RecallChip = ({ row }: { row: RecallRowInput }) => {
+  const v = deriveRecallView(row);
+  const n = v.vin.openCount ?? v.model?.campaignCount ?? 0;
+  if (v.riskSignalled) {
+    const cls = v.doNotDrive || n >= 2 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700";
+    const label = v.doNotDrive ? "Do-Not-Drive Recall"
+      : n > 0 ? `${n} Open Recall${n === 1 ? "" : "s"}` : "Recall Reported";
+    return <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${cls}`}><AlertTriangle className="w-2.5 h-2.5" />{label}</span>;
   }
-  if (status === "clear")
+  if (v.vin.clearClaimAllowed)
     return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><ShieldCheck className="w-2.5 h-2.5" />No Recalls</span>;
-  if (status === "error" || status === "unknown")
-    return <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Recall Unavailable</span>;
+  return <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Recall Unverified</span>;
   return <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Recall Pending</span>;
 };
 
@@ -1106,13 +1124,14 @@ const ComplianceBadge = ({ tone, icon: Icon, label }: { tone: "green" | "amber" 
     </span>
   );
 };
-const ComplianceCell = ({ ymm, recallStatus, openRecallCount }: { ymm?: string | null; recallStatus?: string | null; openRecallCount?: number | null }) => {
-  const n = openRecallCount || 0;
-  const recall = recallStatus === "open_recalls" && n > 0
-    ? { tone: "amber" as const, icon: AlertTriangle, label: `${n} Open Recall${n === 1 ? "" : "s"}` }
-    : recallStatus === "clear"
+const ComplianceCell = ({ ymm, row }: { ymm?: string | null; row: RecallRowInput }) => {
+  const v = deriveRecallView(row);
+  const n = v.vin.openCount ?? v.model?.campaignCount ?? 0;
+  const recall = v.riskSignalled
+    ? { tone: "amber" as const, icon: AlertTriangle, label: v.doNotDrive ? "Do-Not-Drive Recall" : n > 0 ? `${n} Open Recall${n === 1 ? "" : "s"}` : "Recall Reported" }
+    : v.vin.clearClaimAllowed
       ? { tone: "green" as const, icon: ShieldCheck, label: "No Open Recalls" }
-      : { tone: "muted" as const, icon: ShieldCheck, label: "Recall Pending" };
+      : { tone: "muted" as const, icon: ShieldCheck, label: "Recall Unverified" };
   return (
     <div className="flex flex-col items-start gap-1">
       {ymm

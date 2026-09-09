@@ -109,6 +109,14 @@ interface VehicleQuery {
    * unusual, not that the plan is too small to read a normal one.
    */
   perVehicle: number;
+  /**
+   * Columns to read. Default `*`. Narrow it only where `*` drags a column no
+   * builder reads: PostgREST renders the whole row through `json_agg`, so a
+   * wide unread column is paid for in detoast and serialisation on every
+   * batch. Anything named here must still cover `keyColumn` (grouping),
+   * `timeColumn` (ordering) and any `eq`/`isNull` column.
+   */
+  columns?: string;
   eq?: Array<[string, string]>;
   /** `.is(column, null)` — an open row is one nothing has resolved. */
   isNull?: string;
@@ -148,7 +156,16 @@ const VEHICLE_QUERIES: VehicleQuery[] = [
   { table: "customer_engagement_events", tenantColumn: "tenant_id", keyColumn: "vehicle_id", keyKind: "id", timeColumn: "occurred_at", perVehicle: 300 },
   { table: "leads", tenantColumn: "tenant_id", keyColumn: "vehicle_vin", keyKind: "vin", timeColumn: "captured_at", perVehicle: 20 },
   { table: "vehicle_change_history", tenantColumn: "tenant_id", keyColumn: "vehicle_listing_id", keyKind: "id", timeColumn: "changed_at", perVehicle: 150 },
-  { table: "vehicle_value_history", tenantColumn: "tenant_id", keyColumn: "vin", keyKind: "vin", timeColumn: "captured_at", perVehicle: 200 },
+  // `payload` is 24 MB of jsonb over the pilot tenant's 6,696 rows and no
+  // builder reads it: 4,383 of those rows are `marketcheck_sync` snapshots
+  // that carry a payload and no `market_value`, which is exactly what
+  // market.ts and presentation.ts discard. Selecting it cost 2,927 shared
+  // buffers a batch against 351, and PostgREST's `json_agg` over it measured
+  // mean 3,359 ms / max 7,676 ms against the 8 s statement timeout, which is
+  // the cancellation Gate 2 saw on 50 of 130 vehicles. Naming the four read
+  // columns is the fix; the plan was already an index scan on
+  // `idx_vehicle_value_history_vin` and no index could have helped.
+  { table: "vehicle_value_history", tenantColumn: "tenant_id", keyColumn: "vin", keyKind: "vin", timeColumn: "captured_at", perVehicle: 200, columns: "vin,source,market_value,captured_at,created_at" },
 ];
 
 /**
@@ -211,7 +228,7 @@ async function runVehicleQuery(
 ): Promise<Map<string, Row[]>> {
   const keys = spec.keyKind === "vin" ? vins : ids;
   const cap = Math.max(spec.perVehicle * keys.length, spec.perVehicle);
-  let query = db.from(spec.table).select("*").eq(spec.tenantColumn, tenantId);
+  let query = db.from(spec.table).select(spec.columns ?? "*").eq(spec.tenantColumn, tenantId);
   for (const [column, value] of spec.eq ?? []) query = query.eq(column, value);
   if (spec.isNull) query = query.is(spec.isNull, null);
   const { data, error } = await query

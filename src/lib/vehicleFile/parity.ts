@@ -155,16 +155,6 @@ const olderLedgerCopy = (ctx: RuleContext, factKey: string): string | null => {
     + "(SOURCE_TO_FACT_MATRIX §5, §6), so this comparison understates the copy's age.";
 };
 
-const twoWordMakeSplit = (ctx: RuleContext): { rest: string; resolvedMake: string; currentMake: string } | null => {
-  const resolvedMake = str(ctx.model.identity.make.value);
-  const currentMake = str(ctx.currentAll.make.value);
-  if (!resolvedMake || !currentMake) return null;
-  const tokens = words(resolvedMake);
-  if (tokens.length < 2) return null;
-  if (normalise(currentMake) !== tokens[0]) return null;
-  return { rest: tokens.slice(1).join(" "), resolvedMake, currentMake };
-};
-
 const RULES: Record<CriticalField, (ctx: RuleContext) => Extras> = {
   // §51 field. Any difference between two records of the same VIN is a real
   // problem, and no map established a reason for one, so none is offered.
@@ -172,30 +162,14 @@ const RULES: Record<CriticalField, (ctx: RuleContext) => Extras> = {
 
   year: () => ({}),
 
-  make: (ctx) => {
-    const split = twoWordMakeSplit(ctx);
-    if (!split) return {};
-    return {
-      currentKnownWrong:
-        `The Vehicle File splits vehicle_listings.ymm on whitespace and takes token 1 as the make `
-        + `(OemDocFinders.tsx:33-40), so "${split.resolvedMake}" is cut after its first word and the page shows `
-        + `"${split.currentMake}". Live instance: VIN ZASPAKBN5L7C99407, ymm "2020 Alfa Romeo Stelvio".`,
-    };
-  },
+  // Both arms now resolve make and model through the one
+  // `resolveVehicleIdentity`, so the two-word-make split that explained
+  // ZASPAKBN5L7C99407 ("Alfa" / "Romeo Stelvio") can no longer arise. No rule
+  // stands in its place deliberately: if identity ever diverges again it must
+  // surface as UNEXPLAINED rather than be narrated away.
+  make: () => ({}),
 
-  model: (ctx) => {
-    const split = twoWordMakeSplit(ctx);
-    if (!split) return {};
-    const resolvedModel = str(ctx.resolved.value);
-    const currentModel = str(ctx.current.value);
-    if (!resolvedModel || !currentModel) return {};
-    if (normalise(currentModel) !== normalise(`${split.rest} ${resolvedModel}`)) return {};
-    return {
-      currentKnownWrong:
-        `The same whitespace split (OemDocFinders.tsx:33-40) leaves the words the make lost ("${split.rest}") on the `
-        + `front of the model: the page shows "${currentModel}" where the model is "${resolvedModel}".`,
-    };
-  },
+  model: () => ({}),
 
   trim: (ctx) => {
     const chosen = ctx.resolved.chosen;

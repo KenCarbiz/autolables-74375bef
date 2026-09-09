@@ -290,3 +290,100 @@ describe("the bundle it assembles is the contract's bundle", () => {
     expect(assembly).toContain('const vin = typeof listing.vin === "string" ? listing.vin.toUpperCase() : "";');
   });
 });
+
+/**
+ * Every VEHICLE_QUERIES entry, parsed from the one line that declares it.
+ * `columns` is "" when the entry does not narrow its projection.
+ */
+const vehicleSpecs = (): Array<{
+  table: string;
+  keyColumn: string;
+  timeColumn: string;
+  columns: string;
+  isNull: string;
+  eq: string[];
+}> =>
+  vehicleQueryBlock
+    .split("\n")
+    .filter((line) => line.trim().startsWith("{ table:"))
+    .map((line) => {
+      const field = (name: string): string =>
+        line.match(new RegExp(`[\\s,{]${name}: "([^"]*)"`))?.[1] ?? "";
+      return {
+        table: field("table"),
+        keyColumn: field("keyColumn"),
+        timeColumn: field("timeColumn"),
+        columns: field("columns"),
+        isNull: field("isNull"),
+        eq: [...line.matchAll(/\[\["([^"]+)",/g)].map((m) => m[1]),
+      };
+    });
+
+describe("a query reads the columns its builders read, and not the ones they discard", () => {
+  const specs = vehicleSpecs();
+
+  it("parses every spec line, so the checks below cover the whole plan", () => {
+    expect(specs).toHaveLength(30);
+    for (const spec of specs) {
+      expect(spec.table, "a spec line without a table").not.toBe("");
+      expect(spec.keyColumn, `${spec.table} has no keyColumn`).not.toBe("");
+      expect(spec.timeColumn, `${spec.table} has no timeColumn`).not.toBe("");
+    }
+  });
+
+  it("reads whole rows by default, so a new table cannot start out half-read", () => {
+    expect(SRC).toContain('.select(spec.columns ?? "*")');
+    expect(SRC).not.toContain('.select("*").eq(spec.tenantColumn');
+  });
+
+  it("narrows exactly one table, and says which", () => {
+    // Narrowing is a silent contract: a builder that later reads a column
+    // left out here gets `undefined` and loses the fact without an error, so
+    // a second narrowed table has to be argued for here before it lands.
+    expect(specs.filter((spec) => spec.columns !== "").map((spec) => spec.table))
+      .toEqual(["vehicle_value_history"]);
+  });
+
+  it("reads the five vehicle_value_history columns the builders read", () => {
+    const spec = specs.find((s) => s.table === "vehicle_value_history");
+    expect(spec?.columns.split(",")).toEqual([
+      "vin",          // groupRows keys the batch on it
+      "source",       // market.ts names the snapshot's writer from it
+      "market_value", // market.ts's candidate and presentation.ts's event
+      "captured_at",  // the order key, and the event's stamp
+      "created_at",   // presentation.ts's latestStamp fallback
+    ]);
+  });
+
+  it("leaves out the payload column that caused the Gate 2 timeout", () => {
+    // `payload` is 24 MB of jsonb over the pilot tenant's 6,696 rows, and
+    // 4,383 of those are marketcheck_sync snapshots carrying a payload and no
+    // market_value at all — exactly the rows both builders discard. PostgREST
+    // renders the whole row through json_agg, so selecting it measured mean
+    // 3,359 ms and max 7,676 ms against the 8 s statement timeout and was
+    // cancelled for 50 of the pilot's 130 vehicles. The plan was never the
+    // problem: it is a bitmap scan on idx_vehicle_value_history_vin either
+    // way, 2,927 shared buffers with the column and 351 without.
+    const spec = specs.find((s) => s.table === "vehicle_value_history");
+    for (const unread of ["payload", "listing_price", "position", "below_market"]) {
+      expect(spec?.columns.split(","), `${unread} is read by nothing`).not.toContain(unread);
+    }
+  });
+
+  it("keeps every narrowed projection able to answer its own query", () => {
+    for (const spec of specs) {
+      if (spec.columns === "") continue;
+      const named = spec.columns.split(",");
+      // groupRows reads keyColumn off the returned row; without it the batch
+      // groups to nothing and every vehicle reads as having no history.
+      expect(named, `${spec.table}: grouping reads ${spec.keyColumn}`).toContain(spec.keyColumn);
+      // The stamp the model reports as the row's observation time.
+      expect(named, `${spec.table}: the model reports ${spec.timeColumn}`).toContain(spec.timeColumn);
+      // A filtered row has to be able to show why it is in the bundle.
+      if (spec.isNull) expect(named, `${spec.table}: filtered on ${spec.isNull}`).toContain(spec.isNull);
+      for (const column of spec.eq) {
+        expect(named, `${spec.table}: filtered on ${column}`).toContain(column);
+      }
+    }
+  });
+});

@@ -4,6 +4,8 @@
 // from the SQL that writes it. clearance.test.ts cross-checks the enums
 // against the migration text.
 
+import type { RecallView } from "@/lib/vehicleTruth/recallView";
+
 export const CLEARANCE_STATES = [
   "blocked_inspection_not_started",
   "blocked_inspection_in_progress",
@@ -42,6 +44,15 @@ export interface ClearanceInput {
   /** Any item failure whose repair_state != passed_on_reinspection. */
   hasOpenItemFailures: boolean;
   recallStatus?: string | null;
+  /**
+   * The resolved recall truth. Delivery clearance is a VIN-level question, so
+   * a MODEL-level answer may never satisfy it: only `doNotDrive` — evidence of
+   * a campaign, at any scope — participates in the decision, and a model-level
+   * NO_MODEL_CAMPAIGNS_FOUND contributes nothing at all. The legacy
+   * `recallStatus` substring test is kept beside it because the SQL that
+   * writes the stored state still performs exactly that test.
+   */
+  recall?: RecallView | null;
   /** get_ready_blocks_finalize(tenant, vin). */
   finalizeGateBlocked: boolean;
 }
@@ -55,7 +66,9 @@ export function deriveClearance(i: ClearanceInput): ClearanceResult {
   const codes: ClearanceReasonCode[] = [];
   const condition = String(i.condition || "used").toLowerCase();
   const recall = String(i.recallStatus || "").toLowerCase();
-  const recallBlock = recall.includes("do_not_drive") || recall.includes("do-not-drive");
+  const recallBlock = recall.includes("do_not_drive")
+    || recall.includes("do-not-drive")
+    || i.recall?.doNotDrive === true;
   const signedFail = i.hasSignedInspection && i.latestSignedResult === "fail";
   const wf = String(i.workflowState || "not_started");
 

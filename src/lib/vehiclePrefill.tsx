@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { deriveRecallView, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
 import { useSearchParams, Link } from "react-router-dom";
 import { FileText, ArrowLeft, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { identityFromListing } from "@/lib/factorySticker/vehicleIdentity";
 
 // ──────────────────────────────────────────────────────────────────────
 // Vehicle prefill — connects the Vehicle Command Center's Labels tab to
@@ -52,7 +54,8 @@ export interface PrefillVehicle {
   photos: string[];
   heroImage: string;
   recallStatus: string;
-  openRecallCount: number;
+  /** NULL where no VIN-level recall check answered. Never a stand-in zero. */
+  openRecallCount: number | null;
   slug: string;
   /** Dealership location the vehicle is assigned to (vehicle_listings.store_id). */
   storeId: string;
@@ -80,17 +83,6 @@ const toStrArr = (v: unknown): string[] =>
         .filter(Boolean)
     : [];
 
-// "2022 Toyota Tundra SR5" → year/make/model. The trim is stored
-// separately, so model is everything after make.
-const splitYmm = (ymm: string): { year: string; make: string; model: string } => {
-  const parts = ymm.trim().split(/\s+/).filter(Boolean);
-  let year = "";
-  if (/^\d{4}$/.test(parts[0] || "")) year = parts.shift() as string;
-  const make = parts.shift() || "";
-  const model = parts.join(" ");
-  return { year, make, model };
-};
-
 // Pull the first present key from a bag — MarketCheck's field names drift
 // across feed generations (mpg_city vs city_mpg), so we accept either.
 const pick = (bag: Record<string, unknown>, ...keys: string[]): unknown => {
@@ -104,7 +96,7 @@ const pick = (bag: Record<string, unknown>, ...keys: string[]): unknown => {
 function normalizeRow(row: Record<string, any>): PrefillVehicle {
   const mc = (row.mc_attributes || {}) as Record<string, unknown>;
   const ymm = s(row.ymm);
-  const { year, make, model } = splitYmm(ymm);
+  const { year, make, model } = identityFromListing(row);
   const condition = (s(row.condition) as PrefillVehicle["condition"]) || "";
   return {
     id: s(row.id),
@@ -145,7 +137,7 @@ function normalizeRow(row: Record<string, any>): PrefillVehicle {
     photos: Array.isArray(row.photos) ? row.photos.map(s).filter(Boolean) : [],
     heroImage: s(row.hero_image_url),
     recallStatus: s(row.recall_status),
-    openRecallCount: typeof row.open_recall_count === "number" ? row.open_recall_count : 0,
+    openRecallCount: deriveRecallView(row as RecallRowInput).vin.openCount,
     slug: s(row.slug),
     storeId: s(row.store_id),
     warrantyInfo: (row.warranty_info as Record<string, unknown>) || null,

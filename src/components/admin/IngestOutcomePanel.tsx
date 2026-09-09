@@ -6,7 +6,7 @@ import { AUTOGEN_EXCEPTION_TYPE } from "@/lib/commandCenter/autogenExceptions";
 import {
   INGEST_STEPS,
   buildIngestOutcomes,
-  parseYmm,
+  harvestIdentity,
   summarizeIngestOutcomes,
   type IngestLedgerRow,
   type IngestStep,
@@ -36,6 +36,7 @@ interface ListingRow {
   id: string;
   vin: string;
   ymm: string | null;
+  mc_attributes: Record<string, unknown> | null;
   condition: string | null;
   created_at: string | null;
 }
@@ -93,7 +94,7 @@ export default function IngestOutcomePanel() {
     try {
       const { data: vData, error: vErr } = await sb()
         .from("vehicle_listings")
-        .select("id, vin, ymm, condition, created_at")
+        .select("id, vin, ymm, condition, created_at, mc_attributes")
         .eq("tenant_id", tenantId)
         .neq("status", "archived")
         .order("created_at", { ascending: false })
@@ -183,12 +184,13 @@ export default function IngestOutcomePanel() {
 
   const rows = useMemo(() => listings.map((v) => {
     const vin = String(v.vin).toUpperCase();
-    const { year, make, model } = parseYmm(v.ymm);
+    const { year, make, model } = harvestIdentity(v);
     const attemptFor = (kind: string) =>
       attemptByKey.get([kind, make.toLowerCase(), model.toLowerCase(), year ?? 0].join("|")) ?? null;
     const outcomes = buildIngestOutcomes({
       vin,
       ymm: v.ymm,
+      mc_attributes: v.mc_attributes,
       ledger: ledger[vin],
       sticker: stickers[v.id] ?? null,
       brochureLinks: brochures,

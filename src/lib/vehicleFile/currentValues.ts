@@ -12,10 +12,12 @@
 //
 //   vin               `vehicle_listings.vin` — VehicleFile.tsx:301, OverviewTab.tsx:68
 //   year/make/model   `vehicle_listings.ymm`, ONE unsplit string — VehicleFile.tsx:282,
-//                     OverviewTab.tsx:69. The only splitter the Vehicle File owns is
-//                     `ymmParts` in OemDocFinders.tsx:33-40, and it is whitespace-
-//                     positional, so a two-word make lands half in `make` and half in
-//                     `model` (live: ZASPAKBN5L7C99407, ymm "2020 Alfa Romeo Stelvio").
+//                     OverviewTab.tsx:69. The only splitter the Vehicle File owns is in
+//                     OemDocFinders.tsx, and it now resolves structured identity through
+//                     the shared `resolveVehicleIdentity` (mc_attributes, then
+//                     mc_raw.build, then the NeoVIN payload, then the shared parser), so
+//                     ZASPAKBN5L7C99407 reads "Alfa Romeo" / "Stelvio" from the feed's
+//                     own keys instead of splitting the string they were joined into.
 //   trim              `vehicle_listings.trim` — VehicleFile.tsx:284, OverviewTab.tsx:70
 //   stock             seven-candidate client precedence, vehicleStockNumber.ts:38-47,
 //                     called at VehicleFile.tsx:161 and printed at :291-298 /
@@ -45,6 +47,7 @@
 //      that VehicleFile.tsx:279 prints for a null condition all come back as
 //      `value: null` with an `origin` that says the field was not filled.
 
+import { identityFromListing, identityYear, type VehicleIdentity } from "../factorySticker/vehicleIdentity.ts";
 import type { CriticalField } from "./readModelTypes.ts";
 import { dig, num, obj, str, type Row, type VehicleFileSources } from "./sources.ts";
 
@@ -103,18 +106,12 @@ const stockCandidates = (listing: Row, file: Row | null): StockCandidate[] => {
 };
 
 /**
- * `ymmParts` from OemDocFinders.tsx:33-40, unchanged including its defect: the
- * make is whatever single token sits at index 1, so "2020 Alfa Romeo Stelvio"
- * yields make "Alfa" and model "Romeo Stelvio".
+ * The Vehicle File's only year/make/model splitter, OemDocFinders.tsx, now
+ * resolves structured identity through the shared `resolveVehicleIdentity`.
+ * This arm mirrors that call so the parity verdict keeps measuring the page
+ * rather than the difference between the page and this file.
  */
-const ymmParts = (ymm: string | null): { year: number | null; make: string; model: string } => {
-  const parts = (ymm || "").trim().split(/\s+/);
-  return {
-    year: Number.parseInt(parts[0] || "", 10) || null,
-    make: parts[1] || "",
-    model: parts.slice(2).join(" "),
-  };
-};
+const ymmParts = (listing: Row): VehicleIdentity => identityFromListing(listing);
 
 /**
  * VehicleTruthCard.tsx:98-109 keyed by fact_key: the first row for a key wins,
@@ -192,7 +189,10 @@ export function currentDisplayedValues(
   }
 
   const ymm = str(listing.ymm);
-  const parts = ymmParts(ymm);
+  const parts = ymmParts(listing);
+  const identityOrigin = parts.origin === "ymm_parsed"
+    ? "vehicle_listings.ymm -> shared parseYmm (no structured make/model on the row)"
+    : `vehicle_listings.${parts.origin === "mc_raw_build" ? "mc_raw.build" : parts.origin}`;
   const ymmOrigin = ymm
     ? "vehicle_listings.ymm"
     : "not rendered: vehicle_listings.ymm is empty, so the header prints "
@@ -211,19 +211,11 @@ export function currentDisplayedValues(
       ? "vehicle_listings.vin"
       : "not rendered: vehicle_listings.vin is empty (VehicleFile.tsx:301 prints nothing)"),
 
-    year: entry(parts.year, ymm
-      ? "vehicle_listings.ymm, whitespace token 0 (the header shows the unsplit string; "
-        + "OemDocFinders.tsx:33-40 is the only splitter)"
-      : ymmOrigin),
+    year: entry(identityYear(parts), parts.year ? identityOrigin : ymmOrigin),
 
-    make: entry(parts.make || null, ymm
-      ? "vehicle_listings.ymm, whitespace token 1 (OemDocFinders.tsx:33-40; a two-word make "
-        + "loses its second word to the model)"
-      : ymmOrigin),
+    make: entry(parts.make || null, parts.make ? identityOrigin : ymmOrigin),
 
-    model: entry(parts.model || null, ymm
-      ? "vehicle_listings.ymm, whitespace tokens 2.. (OemDocFinders.tsx:33-40)"
-      : ymmOrigin),
+    model: entry(parts.model || null, parts.model ? identityOrigin : ymmOrigin),
 
     trim: entry(trim, trim
       ? "vehicle_listings.trim"

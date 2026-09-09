@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListing";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { PublicLocaleProvider, usePublicLocale } from "@/lib/i18n/public";
 import Logo from "@/components/brand/Logo";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
@@ -328,7 +329,12 @@ const PublicListingBody = () => {
     || (dealer.price_label as string) || "Our Price";
 
   const serviceCount = listing.service_records?.length ?? 0;
-  const recallCount = listing.open_recall_count ?? 0;
+  // `open_recall_count` is a MODEL-level NHTSA number and is 0 on 74 of 130
+  // pilot cars whose lookup never answered. Only a VIN-level check that
+  // answered may produce a count, and only `clearClaimAllowed` may produce a
+  // clean claim.
+  const recall = deriveRecallView(listing);
+  const recallCount = recall.vin.openCount;
   const ownerCount = (mc.owner_count as number) ?? null;
   const accidentCount = (mc.accident_count as number) ?? null;
 
@@ -340,7 +346,7 @@ const PublicListingBody = () => {
     return [yrs ? `${yrs} yr` : null, mi].filter(Boolean).join(" / ") || null;
   })();
 
-  const rating = deriveVehicleRating(accidentCount ?? 0, ownerCount ?? 1, recallCount, serviceCount);
+  const rating = deriveVehicleRating(accidentCount ?? 0, ownerCount ?? 1, recallCount ?? 0, serviceCount);
 
   const ymm = listing.ymm || "";
   const [ymmYear, ...ymmRest] = ymm.split(" ");
@@ -421,14 +427,14 @@ const PublicListingBody = () => {
   // invented service counts, warranty terms, title claims, or return policies.
   const titleBrand = String(((mc.title_brand ?? mc.title_status) ?? "") as string).toLowerCase();
   const titleClean = titleBrand ? /clean|none|clear/.test(titleBrand) : false;
-  const recallChecked = !!(listing as unknown as { recall_check?: { checked_at?: string } }).recall_check?.checked_at;
+  const recallChecked = recall.vin.clearClaimAllowed;
   const trustBadges = [
     accidentCount === 0 && { icon: Shield, title: "No Accidents Reported", sub: "Per vehicle history" },
     ownerCount != null && { icon: User, title: `${ownerCount}-Owner Vehicle`, sub: ownerCount === 1 ? "Personal use" : "Ownership history" },
     serviceCount > 0 && { icon: Wrench, title: "Service History", sub: `${serviceCount} Service Record${serviceCount > 1 ? "s" : ""}` },
     titleClean && { icon: FileText, title: "Clean Title", sub: "No branded-title issues on record" },
     warrantyStr && { icon: ShieldCheck, title: "Factory Warranty", sub: warrantyStr },
-    recallChecked && recallCount === 0 && { icon: ShieldCheck, title: "No Open Recalls", sub: "NHTSA checked" },
+    recallChecked && { icon: ShieldCheck, title: "No Open Recalls", sub: "Verified for this VIN" },
   ].filter(Boolean) as { icon: typeof Shield; title: string; sub: string }[];
 
   const quickActions = [
@@ -625,7 +631,7 @@ const PublicListingBody = () => {
               {(() => {
                 const points: string[] = [];
                 if (belowMarket > 0) points.push("Priced below market average");
-                if (recallCount === 0) points.push("No open safety recalls");
+                if (recall.vin.clearClaimAllowed) points.push("No open safety recalls");
                 if (accidentCount === 0) points.push("No accidents reported");
                 if (ownerCount === 1) points.push("Single owner");
                 if (warrantyStr) points.push("Factory warranty remaining");

@@ -281,7 +281,10 @@ const VehiclePassportHistory = () => {
 
   const services = (listing.service_records || []).filter((s) => s && (s.date || s.type || s.mileage));
 
-  const recallCampaigns = ((listing.open_recall_count ?? 0) > 0 ? listing.recall_check?.campaigns ?? [] : [])
+  // Gated on `open_recall_count > 0` this panel disappeared the moment the
+  // count stopped standing in for an answer. A stored campaign is evidence in
+  // its own right, so the detail renders whenever one exists.
+  const recallCampaigns = d.recall.campaigns
     .filter((c) => c.component || c.summary || c.remedy);
 
   // Odometer trail renders only when every dated sighting is non-decreasing —
@@ -321,12 +324,12 @@ const VehiclePassportHistory = () => {
   if (isNewCar) {
     meansItems.push("No prior owners and no accident exposure — you are the first chapter of this vehicle's history.");
     if (d.warrantyStr) meansItems.push("Full factory warranty coverage begins the day you take delivery.");
-    if (d.recallClear && d.hasRecallCheck) meansItems.push("No open recalls means the vehicle is ready to drive with nothing outstanding.");
+    if (d.recallClear) meansItems.push("No open recalls means the vehicle is ready to drive with nothing outstanding.");
   } else {
     if (d.ownerCount === 1) meansItems.push("One-owner vehicles typically retain their value better and carry fewer surprises.");
     if (d.serviceCount > 0) meansItems.push("A documented service history reduces the chance of unexpected repair costs.");
     if (d.cleanTitle) meansItems.push("A clean title with no brands protects resale value and financing options.");
-    if (d.recallClear && d.hasRecallCheck) meansItems.push("No open recalls means the vehicle is ready to drive with nothing outstanding.");
+    if (d.recallClear) meansItems.push("No open recalls means the vehicle is ready to drive with nothing outstanding.");
     if (isCpo) meansItems.push("Factory certification adds inspection standards and extended coverage a regular used car doesn't carry.");
   }
 
@@ -413,8 +416,8 @@ const VehiclePassportHistory = () => {
       {recallOpen && (
         <div className="px-4 pb-4 space-y-3">
           {recallCampaigns.map((c, i) => (
-            <div key={c.campaignNumber || i} className="border-t border-[#EEF1F4] pt-3 first:border-t-0 first:pt-0">
-              <p className="text-[13px] font-bold">{c.component || `NHTSA campaign${c.campaignNumber ? ` ${c.campaignNumber}` : ""}`}</p>
+            <div key={c.number || i} className="border-t border-[#EEF1F4] pt-3 first:border-t-0 first:pt-0">
+              <p className="text-[13px] font-bold">{c.component || `NHTSA campaign${c.number ? ` ${c.number}` : ""}`}</p>
               {c.summary && <p className="text-[12px] text-[#64748B] mt-0.5">{c.summary}</p>}
               {c.remedy && <p className="text-[12px] font-semibold text-[#0F172A] mt-1">Remedy: free repair at any authorized dealer</p>}
             </div>
@@ -572,17 +575,19 @@ const VehiclePassportHistory = () => {
               ))}
             </ol>
           </div>
-          {d.hasRecallCheck && (
+          {(d.hasRecallCheck || d.recall.riskSignalled || d.recall.model) && (
             <div className="vphp-section">
               <div className="vphp-h2">Recall Status</div>
               {d.recallClear ? (
-                <p className="vphp-ok">No open safety recalls found with NHTSA.</p>
+                <p className="vphp-ok">No open safety recalls were returned for this VIN.</p>
+              ) : !d.recall.riskSignalled ? (
+                <p className="vphp-muted">{d.recall.vin.detail}</p>
               ) : (
                 <>
                   <p className="vphp-warn">Open recall on record — ask the dealer to confirm completion before delivery.</p>
                   {recallCampaigns.length > 0 && (
                     <ul className="vphp-list">{recallCampaigns.map((c, i) => (
-                      <li key={c.campaignNumber || i}><span className="vphp-tl-t">{c.component || `NHTSA campaign${c.campaignNumber ? ` ${c.campaignNumber}` : ""}`}</span>{c.summary ? ` — ${c.summary}` : ""}{c.remedy ? " Remedy: free repair at any authorized dealer." : ""}</li>
+                      <li key={c.number || i}><span className="vphp-tl-t">{c.component || `NHTSA campaign${c.number ? ` ${c.number}` : ""}`}</span>{c.summary ? ` — ${c.summary}` : ""}{c.remedy ? " Remedy: free repair at any authorized dealer." : ""}</li>
                     ))}</ul>
                   )}
                 </>
@@ -655,17 +660,19 @@ const VehiclePassportHistory = () => {
             </div>
           )}
 
-          {d.hasRecallCheck && (
+          {(d.hasRecallCheck || d.recall.riskSignalled || d.recall.model) && (
             <div className="vphp-section">
               <div className="vphp-h2">Recall Status</div>
               {d.recallClear ? (
-                <p className="vphp-ok">No open safety recalls were found for this vehicle with NHTSA.</p>
+                <p className="vphp-ok">No open safety recalls were returned for this VIN.</p>
+              ) : !d.recall.riskSignalled ? (
+                <p className="vphp-muted">{d.recall.vin.detail}</p>
               ) : (
                 <>
                   <p className="vphp-warn">{d.openRecalls != null ? `${d.openRecalls} open recall${d.openRecalls === 1 ? "" : "s"} on record` : "Open recall on record"} — ask the dealer to confirm these are completed before delivery.</p>
                   {recallCampaigns.length > 0 && (
                     <ul className="vphp-list">{recallCampaigns.map((c, i) => (
-                      <li key={c.campaignNumber || i}><span className="vphp-tl-t">{c.component || `NHTSA campaign${c.campaignNumber ? ` ${c.campaignNumber}` : ""}`}</span>{c.summary ? ` — ${c.summary}` : ""}{c.remedy ? " Remedy: free repair at any authorized dealer." : ""}</li>
+                      <li key={c.number || i}><span className="vphp-tl-t">{c.component || `NHTSA campaign${c.number ? ` ${c.number}` : ""}`}</span>{c.summary ? ` — ${c.summary}` : ""}{c.remedy ? " Remedy: free repair at any authorized dealer." : ""}</li>
                     ))}</ul>
                   )}
                 </>

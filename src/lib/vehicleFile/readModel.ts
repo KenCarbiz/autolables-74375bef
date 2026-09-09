@@ -31,6 +31,7 @@ import {
 } from "./presentation.ts";
 import { buildPricing, buildPublicAdvertisement } from "./pricing.ts";
 import { emptyField } from "./resolveField.ts";
+import { deriveRecallView } from "../vehicleTruth/recallView.ts";
 import type {
   ComplianceSection,
   ConflictEntry,
@@ -148,6 +149,7 @@ const emptyDocuments = (why: string): DocumentsSection => ({
 });
 
 const emptyCompliance = (why: string): ComplianceSection => ({
+  recall: deriveRecallView(null),
   recallStatus: emptyField<string>("recall_status", why),
   openRecallCount: emptyField<number>("open_recall_count", why),
   doNotDrive: false,

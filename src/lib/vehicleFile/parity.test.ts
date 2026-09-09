@@ -180,15 +180,15 @@ const verdicts = (rows: ParityRow[]): Record<string, string> =>
   Object.fromEntries(rows.map((r) => [r.field, r.verdict]));
 
 describe("compareVehicle", () => {
-  it("compares all twelve fields, and on a real vehicle only the ymm splitter differs", () => {
+  it("compares all twelve fields, and on a real vehicle every one now matches", () => {
     const rows = compare(stelvio());
 
     expect(rows.length).toBe(12);
     expect(verdicts(rows)).toEqual({
       vin: "MATCH",
       year: "MATCH",
-      make: "CURRENT_OLD_VALUE_WRONG",
-      model: "CURRENT_OLD_VALUE_WRONG",
+      make: "MATCH",
+      model: "MATCH",
       trim: "MATCH",
       stock: "MATCH",
       mileage: "MATCH",
@@ -211,19 +211,21 @@ describe("compareVehicle", () => {
     expect(rows.every((r) => r.explanation.length > 0)).toBe(true);
   });
 
-  it("names the two-word make split, on both halves of it", () => {
+  // The two-word make split that made ZASPAKBN5L7C99407 read "Alfa" /
+  // "Romeo Stelvio" is closed: both arms resolve identity from the feed's own
+  // mc_attributes keys instead of splitting the string those keys were joined
+  // into. This test is what fails if either arm goes back to splitting.
+  it("reads the two-word make from the feed's own key on both halves of it", () => {
     const rows = compare(stelvio());
 
     const make = row(rows, "make");
-    expect(make.currentValue).toBe("Alfa");
+    expect(make.currentValue).toBe("Alfa Romeo");
     expect(make.resolvedValue).toBe("Alfa Romeo");
-    expect(make.explanation).toContain("OemDocFinders.tsx:33-40");
-    expect(make.explanation).toContain("ZASPAKBN5L7C99407");
+    expect(make.currentOrigin).toContain("mc_attributes");
 
     const model = row(rows, "model");
-    expect(model.currentValue).toBe("Romeo Stelvio");
+    expect(model.currentValue).toBe("Stelvio");
     expect(model.resolvedValue).toBe("Stelvio");
-    expect(model.explanation).toContain("Romeo");
   });
 
   it("does not blame the splitter when the make is one word", () => {
@@ -445,10 +447,11 @@ describe("summariseParity", () => {
 
     expect(summary.activeVins).toBe(130);
     expect(summary.comparedVins).toBe(1);
-    expect(summary.totals.MATCH).toBe(10);
-    expect(summary.totals.CURRENT_OLD_VALUE_WRONG).toBe(2);
+    expect(summary.totals.MATCH).toBe(12);
+    expect(summary.totals.CURRENT_OLD_VALUE_WRONG).toBe(0);
     expect(summary.totals.UNEXPLAINED).toBe(0);
-    expect(summary.byField.make.CURRENT_OLD_VALUE_WRONG).toBe(1);
+    expect(summary.byField.make.CURRENT_OLD_VALUE_WRONG).toBe(0);
+    expect(summary.byField.make.MATCH).toBe(1);
     expect(summary.byField.vin.MATCH).toBe(1);
     expect(summary.byField.msrp.UNEXPLAINED).toBe(0);
     expect(summary.unexplained).toEqual([]);

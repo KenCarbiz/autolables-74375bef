@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -26,6 +27,7 @@ interface VRow {
   slug: string; published_at: string | null; updated_at: string;
   stock_number?: string | null; hero_image_url?: string | null;
   recall_status?: string | null; open_recall_count?: number | null;
+  recall_payload?: unknown; recall_check?: unknown; recall_checked_at?: string | null;
   market_position?: string | null; market_value?: number | null;
 }
 
@@ -42,8 +44,11 @@ const fmt$ = (n: number | null | undefined) => (n != null ? `$${Math.round(n).to
 // Per-row signal + readiness, all from real data.
 const signalOf = (r: VRow, hasAddendum: boolean) => {
   const decoded = !!r.ymm;
-  const openRecall = (r.open_recall_count || 0) > 0 || r.recall_status === "open_recalls";
-  const recallClear = r.recall_status === "clear";
+  // `open_recall_count === 0` beside `recall_status = 'clear'` is a MODEL-level
+  // NHTSA answer. It may raise a warning; it may never score the car as clear.
+  const rv = deriveRecallView(r);
+  const openRecall = rv.riskSignalled;
+  const recallClear = rv.vin.clearClaimAllowed;
   const hasPrice = r.price != null;
   const published = r.status === "published";
   const checks = [decoded, hasAddendum, !openRecall, hasPrice];
@@ -114,7 +119,8 @@ const InventoryCommandCenterV2 = () => {
         !!e && (/column|does not exist|schema cache/i.test(e.message || "") || ["42703", "PGRST204", "42P01"].includes(e.code || ""));
       let data: unknown = null; let error: { message?: string; code?: string } | null = null;
       for (const cols of [
-        `${baseCols},hero_image_url,recall_status,open_recall_count,market_position,market_value`,
+        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value`,
+        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at`,
         `${baseCols},hero_image_url,recall_status,open_recall_count`,
         baseCols,
       ]) {

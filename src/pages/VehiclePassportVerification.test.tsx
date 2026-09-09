@@ -115,7 +115,15 @@ describe("VehiclePassportVerification — rendered report", () => {
 
   it("an all-verified vehicle shows the green completed banner and no exceptions", () => {
     fixture = { ...reviewListing(), condition: "new", recall_status: "clear", open_recall_count: 0,
-      recall_check: { has_open: false }, mc_attributes: { owner_count: 1, accident_count: 0, carfax_clean_title: true, msrp: 45000 } } as unknown as VehicleListing;
+      // A VIN-level recall answer with a source and a time. `{ has_open:
+      // false }` alone is a zero with no provenance, and no surface may make a
+      // clean claim from one.
+      recall_check: {
+        has_open: false, source: "marketcheck", scope: "vin",
+        open_recall_count: 0, checked_at: new Date().toISOString(),
+      },
+      recall_payload: null,
+      mc_attributes: { owner_count: 1, accident_count: 0, carfax_clean_title: true, msrp: 45000 } } as unknown as VehicleListing;
     renderReport();
     expect(screen.getByRole("heading", { level: 2, name: "Verification checks completed" })).toBeInTheDocument();
     expect(screen.getByText(/Nothing needs your attention/)).toBeInTheDocument();

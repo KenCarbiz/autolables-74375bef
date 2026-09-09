@@ -142,10 +142,32 @@ export default function RecallBanner({
     );
   }
 
+  // A green "no open recalls for this vehicle" is a VIN-level claim. NHTSA
+  // answers for the model line, so its empty result renders as the model-level
+  // context it is — never as a clearance for the car on the lot.
+  if (result.scope !== "vin") {
+    return (
+      <div className="rounded-xl px-4 py-3 bg-gray-100 border border-gray-300 text-gray-800 text-sm flex items-center gap-3">
+        <Info className="w-5 h-5 flex-shrink-0" />
+        <div className="flex-1">
+          No recall campaigns listed for this {year} {make} {model}. This is a model-level
+          NHTSA answer — recall verification for this VIN is not available.
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="p-1 hover:bg-gray-200 rounded"
+          aria-label="Dismiss"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl px-4 py-3 bg-green-100 border border-green-300 text-green-900 text-sm flex items-center gap-3">
       <Check className="w-5 h-5 flex-shrink-0" />
-      <div className="flex-1">No open recalls for this vehicle.</div>
+      <div className="flex-1">No open recalls for this VIN.</div>
       <button
         onClick={() => setDismissed(true)}
         className="p-1 hover:bg-green-200 rounded"

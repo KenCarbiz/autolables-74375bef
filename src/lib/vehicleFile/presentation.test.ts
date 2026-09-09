@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { deriveRecallView } from "../vehicleTruth/recallView";
 import {
   buildCustomer,
   buildMedia,
@@ -1080,6 +1081,7 @@ const attentionModel = (over: Partial<AttentionInput> = {}): AttentionInput => (
     counts: { generated: 2, signed: 0, stale: 0 },
   },
   compliance: {
+    recall: deriveRecallView(null),
     recallStatus: resolved("recall_status", "clear"),
     openRecallCount: resolved("open_recall_count", 0),
     doNotDrive: false,

@@ -1,6 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { parseYmm, canQueryMakeModel } from "../_shared/ymm.ts";
+import {
+  HttpGet,
+  HttpOutcome,
+  IdentitySource,
+  ModelRecallAnswer,
+  NhtsaModelCatalogue,
+  ResolvedIdentity,
+  VinRecallAnswer,
+  classifyMarketcheckVinRecall,
+  isVinAnswered,
+  mayOverwriteVinWithUnanswered,
+  modelRecallColumns,
+  resolveNhtsaIdentity,
+  resolveNhtsaModelRecall,
+  vinRecallColumns,
+} from "../_shared/recallState.ts";
 
 // ──────────────────────────────────────────────────────────────
 // vehicle-enrich — pull EVERYTHING for one VIN at ingest and persist it.
@@ -623,90 +639,75 @@ async function fetchSoldStats(ymm: string | null, condition: string, stateRaw: s
   } catch { return null; }
 }
 
-// ── Recall lookup: MarketCheck (VIN-specific) → NHTSA (free) fallback ──
-// MarketCheck recalls come from the licensed 3rd-party AutoRecalls product,
-// which returns nothing until that product's terms are accepted in the
-// MarketCheck portal — so it silently failed for most cars. NHTSA's public
-// recallsByVehicle API is free, needs no key, and is the same source the
-// publish gate uses, so we fall back to it (model-level) whenever the
-// MarketCheck VIN call doesn't answer. When NEITHER provider answers we write
-// nothing at all: a lookup that failed must never be stored as a result.
-async function fetchRecalls(vin: string, ymm: string | null) {
-  try {
-    const res = await mcFetch(`${MC_BASE}/recall/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, 10000);
-    if (res && res.ok) {
-      // deno-lint-ignore no-explicit-any
-      const b: any = await res.json().catch(() => ({}));
-      // deno-lint-ignore no-explicit-any
-      const list: any[] = Array.isArray(b?.recalls) ? b.recalls : Array.isArray(b) ? b : [];
-      // A valid MarketCheck response (even an empty "no recalls" one) is
-      // authoritative and VIN-specific — prefer it over the model-level fallback.
-      if (Array.isArray(b?.recalls) || Array.isArray(b)) {
-        const open = list.filter((r) => !String(r.status || r.recall_status || "").toLowerCase().includes("close"));
-        return {
-          recall_status: list.length === 0 ? "clear" : open.length ? "open_recalls" : "clear",
-          open_recall_count: open.length,
-          recall_payload: { campaigns: list, checked_at: new Date().toISOString(), source: "marketcheck" },
-        };
-      }
-    }
-  } catch { /* fall through to NHTSA */ }
-  return await fetchNhtsaRecalls(ymm);
+// ── Recall lookup: TWO SCOPES, written to two different stores ─────────
+// MarketCheck AutoRecalls is the VIN-level product and the only source
+// allowed to clear a VIN. It answers nothing until its terms are accepted in
+// the MarketCheck portal, so today every vehicle is honestly UNKNOWN at VIN
+// scope — and the moment the product is switched on, the very same call
+// starts producing VERIFIED_CLEAR and OPEN with no further change here.
+//
+// NHTSA recallsByVehicle is free and MODEL-level: it answers for a
+// year/make/model, never for a VIN. Its answer is campaign context and is
+// written to recall_payload alone. It can never reach recall_status,
+// open_recall_count or recall_check — the types make that impossible, and
+// the CHECK constraints on those columns make it impossible in the database
+// too.
+async function fetchRecalls(
+  vin: string,
+  identitySource: IdentitySource,
+): Promise<{ vin: VinRecallAnswer; model: ModelRecallAnswer | null; identity: ResolvedIdentity }> {
+  const at = new Date().toISOString();
+  const prov = { vin, source: "marketcheck_autorecalls", checkedAt: at };
+  const mcOutcome = await mcRecallOutcome(vin);
+  const vinAnswer = classifyMarketcheckVinRecall(mcOutcome, prov);
+
+  const identity = resolveNhtsaIdentity(identitySource);
+  const model = await fetchNhtsaRecalls(identity);
+  return { vin: vinAnswer, model, identity };
 }
 
-// ── NHTSA recallsByVehicle (free, model-level) ─────────────────
-async function fetchNhtsaRecalls(ymm: string | null) {
+async function mcRecallOutcome(vin: string): Promise<HttpOutcome> {
   try {
-    if (!ymm) return null;
-    const { year, make, model } = parseYmm(ymm);
-    if (!year || !make || !model) return null;
-    const url = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${encodeURIComponent(year)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    // A non-200 is the PROVIDER failing, never a statement about the car. This
-    // branch used to return "clear" for any error status, which stamped "no
-    // open recalls" onto 74 live vehicles off HTTP 400s (and one 500) —
-    // including model years NHTSA certainly holds campaigns for. Every reader
-    // treats a non-null recall_status as a completed check, so the only value
-    // that keeps a failed lookup out of the customer's verified list is no
-    // value at all: write nothing, leave the columns as they were (NULL re-
-    // queues the VIN on the next enrich sweep), and log the body so the cause
-    // of the 400 is diagnosable.
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.warn(`nhtsa recallsByVehicle ${res.status} ymm=${JSON.stringify(ymm)} body=${body.slice(0, 300)}`);
-      return null;
-    }
-    // deno-lint-ignore no-explicit-any
-    const b: any = await res.json().catch(() => null);
-    // NHTSA's modern recalls API uses lowercase `results`; older shape used `Results`.
-    // A 200 whose body carries neither array is not an answer either (a gateway
-    // HTML page, a truncated response) — same rule as a non-200: write nothing.
-    // deno-lint-ignore no-explicit-any
-    const list: any[] | null = Array.isArray(b?.results) ? b.results : Array.isArray(b?.Results) ? b.Results : null;
-    if (list === null) {
-      console.warn(`nhtsa recallsByVehicle 200 without results array ymm=${JSON.stringify(ymm)}`);
-      return null;
-    }
-    return {
-      recall_status: list.length === 0 ? "clear" : "open_recalls",
-      open_recall_count: list.length,
-      recall_payload: {
-        // deno-lint-ignore no-explicit-any
-        campaigns: list.map((r: any) => ({
-          campaign: r.NHTSACampaignNumber ?? r.CampaignNumber ?? null,
-          component: r.Component ?? null,
-          summary: r.Summary ?? null,
-          consequence: r.Consequence ?? null,
-          remedy: r.Remedy ?? null,
-        })),
-        checked_at: new Date().toISOString(),
-        source: "nhtsa",
-      },
-    };
+    const res = await mcFetch(`${MC_BASE}/recall/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, 10000);
+    if (!res) return { kind: "transport_error", reason: "no_response" };
+    const body = await res.json().catch(() => undefined);
+    return { kind: "response", status: res.status, body };
   } catch (e) {
-    console.warn(`nhtsa recallsByVehicle threw ymm=${JSON.stringify(ymm)}: ${String((e as { message?: string })?.message || e)}`);
-    return null;
+    return { kind: "transport_error", reason: String((e as { message?: string })?.message || e) };
   }
+}
+
+// The isolate outlives one VIN, and a bulk run walks the lot one car at a
+// time, so the models catalogue is cached here rather than per call. The TTL
+// exists because NHTSA adds models to a year mid-season and a permanently
+// cached list would keep answering "absent" for a model it has since listed.
+const NHTSA_CATALOGUE_TTL_MS = 6 * 60 * 60 * 1000;
+
+const nhtsaGet: HttpGet = async (url) => {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const body = await res.json().catch(() => undefined);
+    return { kind: "response", status: res.status, body };
+  } catch (e) {
+    return { kind: "transport_error", reason: String((e as { message?: string })?.message || e) };
+  }
+};
+
+const nhtsaCatalogue = new NhtsaModelCatalogue(nhtsaGet, NHTSA_CATALOGUE_TTL_MS);
+
+// ── NHTSA recallsByVehicle (free, MODEL-level) ─────────────────
+// A 400 carrying {"Count":0,"Message":"Results returned successfully"} is
+// returned both for a model NHTSA knows and has no campaigns for and for a
+// model it has never heard of. The models catalogue separates the two, so a
+// genuine zero is recorded as a zero and an unrecognised vehicle is recorded
+// as MODEL_NOT_FOUND instead of being discarded. Neither is a VIN answer.
+async function fetchNhtsaRecalls(identity: ResolvedIdentity): Promise<ModelRecallAnswer | null> {
+  if (!identity.year || !identity.make || !identity.model) return null;
+  const answer = await resolveNhtsaModelRecall(identity, { get: nhtsaGet, catalogue: nhtsaCatalogue });
+  if (answer.state === "LOOKUP_FAILED") {
+    console.warn(`nhtsa model recall ${answer.note} identity=${JSON.stringify(identity)}`);
+  }
+  return answer;
 }
 
 // ── Black Book via blackbook-values ────────────────────────────
@@ -769,7 +770,7 @@ serve(async (req) => {
   }
 
   const { data: row } = await admin.from("vehicle_listings")
-    .select("id, vin, ymm, trim, condition, price, mileage, dealer_snapshot, market_meta, drivetrain:mc_attributes->>drivetrain")
+    .select("id, vin, ymm, trim, condition, price, mileage, dealer_snapshot, market_meta, recall_status, mc_attributes, mc_raw, drivetrain:mc_attributes->>drivetrain")
     .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!row) return json(404, { error: "listing_not_found" });
   // What is already stored, so a pass that returns only part of the picture
@@ -833,7 +834,7 @@ serve(async (req) => {
   const mds = wantMC && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
   const soldStats = wantMC ? await fetchSoldStats(ymm, condition, dealerState) : null;
   const history = wantMC ? await fetchHistory(vin) : null;
-  const recalls = wantMC ? await fetchRecalls(vin, ymm) : null;
+  const recalls = wantMC ? await fetchRecalls(vin, { ymm, mc_attributes: row.mc_attributes, mc_raw: row.mc_raw }) : null;
   const blackbook = await blackbookP;
 
   const patch: Record<string, unknown> = { enriched_at: new Date().toISOString() };
@@ -905,7 +906,16 @@ serve(async (req) => {
     patch.history_payload = history;
     if (history.inServiceDate) patch.in_service_date = history.inServiceDate;
   }
-  if (recalls) { patch.recall_status = recalls.recall_status; patch.open_recall_count = recalls.open_recall_count; patch.recall_payload = recalls.recall_payload; }
+  if (recalls) {
+    // The VIN columns take a VIN answer only, and only when it answered: an
+    // UNKNOWN must never replace a stored OPEN, and it must never overwrite a
+    // real clearance either. The model answer goes to recall_payload, which is
+    // the model-scope store and is never read as VIN clearance.
+    if (isVinAnswered(recalls.vin) || mayOverwriteVinWithUnanswered(row.recall_status as string | null)) {
+      Object.assign(patch, vinRecallColumns(recalls.vin));
+    }
+    if (recalls.model) Object.assign(patch, modelRecallColumns(recalls.model));
+  }
   if (blackbook) patch.blackbook = blackbook;
 
   // Persist (each column already migrated; isolate so a missing column can't 500).
@@ -940,8 +950,11 @@ serve(async (req) => {
       history: history?.available ? (history.entries?.length ?? 0) : 0,
       owners: history?.owners ?? null,
       in_service_date: history?.inServiceDate ?? null,
-      recalls: !!recalls,
-      open_recalls: recalls?.open_recall_count ?? null,
+      recall_vin_state: recalls?.vin.state ?? null,
+      recall_vin_open_count: recalls?.vin.openCount ?? null,
+      recall_model_state: recalls?.model?.state ?? null,
+      recall_model_campaign_count: recalls?.model?.campaignCount ?? null,
+      recall_identity_origin: recalls?.identity.origin ?? null,
       blackbook: !!blackbook,
     },
   });

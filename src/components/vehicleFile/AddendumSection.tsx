@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -201,9 +202,19 @@ export const AddendumSection = ({ vehicle }: { vehicle: VehicleRow }) => {
     if (vehicle.trim) params.set("trim", vehicle.trim);
     if (vehicle.mileage != null) params.set("mileage", String(vehicle.mileage));
     // Carry the recall signal so the addendum's compliance receipt reflects the
-    // real NHTSA status instead of a generic "check ready" line.
-    if (vehicle.recall_status) params.set("recall", vehicle.recall_status);
-    if (vehicle.open_recall_count != null) params.set("open", String(vehicle.open_recall_count));
+    // real status instead of a generic "check ready" line. The status and the
+    // count are the VIN-level ones: `recall_status = 'clear'` and
+    // `open_recall_count = 0` are a MODEL-level NHTSA answer and must not
+    // print a clearance onto a customer document.
+    const recall = deriveRecallView(vehicle);
+    if (recall.vin.checkComplete) {
+      params.set("recall", recall.vin.state === "OPEN" ? "open_recalls" : "clear");
+      if (recall.vin.openCount != null) params.set("open", String(recall.vin.openCount));
+    } else if (recall.riskSignalled) {
+      params.set("recall", "open_recalls");
+    } else {
+      params.set("recall", "unverified");
+    }
     navigate(`/addendum?${params.toString()}`);
   };
 

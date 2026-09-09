@@ -37,6 +37,7 @@
 //     light up Source Health every hour.
 
 import { FRESHNESS_DAYS } from "./resolveField.ts";
+import { deriveRecallView } from "../vehicleTruth/recallView.ts";
 import type {
   CustomerSection,
   MediaSection,
@@ -790,11 +791,18 @@ const recallHealth = (sources: VehicleFileSources, now: number): SourceHealthEnt
   const state = freshnessState(lastSuccessAt, WINDOW_DAYS.recall, now);
   const status = str(listing?.recall_status);
   const hasPayload = Object.keys(payload).length > 0;
+  const recall = deriveRecallView(listing ?? null, { now });
 
   let attention: string | null = null;
   if (state === "UNKNOWN") attention = "No recall check has been recorded for this vehicle.";
   else if (state === "STALE") attention = `The recall answer is older than ${WINDOW_DAYS.recall} days and must be re-asked.`;
   else if (hasPayload && !status) attention = "A recall payload was stored without a recall status, so the result is unreadable.";
+  // Health is about the SOURCE, and the source here answers at model scope.
+  // A green NHTSA row beside an unverifiable VIN is the same collapse this
+  // whole correction exists to stop, so the scope is named in the row itself.
+  else if (!recall.vin.checkComplete) {
+    attention = `${recall.vin.label}: ${recall.model ? `NHTSA answered at model scope (${recall.model.state}), which cannot verify this VIN.` : "no VIN-level recall source has answered."}`;
+  }
 
   return {
     source: "NHTSA recall",
@@ -803,7 +811,9 @@ const recallHealth = (sources: VehicleFileSources, now: number): SourceHealthEnt
     // A failed NHTSA lookup leaves `recall_status` NULL by design and records
     // no failure row, so there is nothing to date.
     lastFailureAt: null,
-    supplies: ["open recall count", "recall status", "do-not-drive campaigns"],
+    supplies: recall.vin.checkComplete
+      ? ["open recall count", "recall status", "do-not-drive campaigns"]
+      : ["model-level campaign context", "do-not-drive campaigns"],
     attention,
   };
 };

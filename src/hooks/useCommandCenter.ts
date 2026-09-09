@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { deriveRecallView, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -463,7 +464,7 @@ function useLoader<T>(
 
 const VEHICLE_COLUMNS =
   "id, vin, ymm, trim, condition, mileage, hero_image_url, mc_attributes, created_at, " +
-  "slug, status, published_at, packet_modules, recall_check, recall_checked_at, open_recall_count";
+  "slug, status, published_at, packet_modules, recall_check, recall_payload, recall_checked_at, recall_status, open_recall_count";
 
 async function fetchVehicleRow(tenantId: string, vehicleId: string): Promise<Row> {
   const { data, error } = await sb().from("vehicle_listings")
@@ -615,7 +616,6 @@ export async function loadVinCommand(r: SourceReader, tenantId: string, vehicleI
   const authorizedAt = authorization.at;
   const dispatched = !!authorizedAt;
 
-  const rc = (v.recall_check || {}) as Row;
   // Every package row is derived by one pure builder, so "Ready to Market" is a
   // claim about rows that were measured and can be exercised without a browser.
   const items = buildVinPackageItems({
@@ -627,12 +627,10 @@ export async function loadVinCommand(r: SourceReader, tenantId: string, vehicleI
     },
     addendum: addendums[0] || null,
     recall: {
-      checkedAt: v.recall_checked_at || rc.checked_at || null,
-      doNotDrive: !!rc.do_not_drive,
-      openCount:
-        typeof v.open_recall_count === "number" ? v.open_recall_count
-        : typeof rc.open_recall_count === "number" ? rc.open_recall_count
-        : Array.isArray(rc.recalls) ? rc.recalls.length : 0,
+      // One resolved view, two scopes. The old shape flattened a MODEL-level
+      // NHTSA zero into `openCount: 0` and the package row read it as a
+      // finished, green check.
+      view: deriveRecallView(v as RecallRowInput),
       tasks: recallTasks,
     },
     qrTokens,

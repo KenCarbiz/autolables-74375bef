@@ -14,6 +14,7 @@
 // row is emitted for a check that did not run.
 // ──────────────────────────────────────────────────────────────────────
 
+import { identityFromListing, identityYear } from "../factorySticker/vehicleIdentity";
 import type { PassportData } from "@/lib/passportV2Data";
 import type { SalePriceCard } from "@/lib/priceModel";
 import type { ReportCheck, VerificationReport, VerificationStatus } from "@/lib/passport/verificationSummary";
@@ -126,6 +127,9 @@ export interface NextPassportListing {
   vin?: string | null;
   stock_number?: string | null;
   ymm?: string | null;
+  /** The feed's own year/make/model keys; `ymm` is only their concatenation. */
+  mc_attributes?: Record<string, unknown> | null;
+  mc_raw?: Record<string, unknown> | null;
   trim?: string | null;
   mileage?: number | null;
   condition?: string | null;
@@ -148,20 +152,15 @@ export interface BuildNextPassportArgs {
 
 // ── Vehicle ───────────────────────────────────────────────────────────
 
-const splitYmm = (ymm: string | null | undefined) => {
-  const parts = String(ymm || "").trim().split(/\s+/).filter(Boolean);
-  const yearRaw = parts[0] && /^\d{4}$/.test(parts[0]) ? Number(parts[0]) : null;
-  const rest = yearRaw != null ? parts.slice(1) : parts;
-  return { year: yearRaw, make: rest[0] || "", model: rest.slice(1).join(" ") };
-};
-
 export function buildNextPassportData(args: BuildNextPassportArgs): NextPassportData {
   const { d, listing, report, saleCard, gallery } = args;
   const pv = args.isVisible || (() => true);
   const condition = String(listing.condition || "").toLowerCase();
   const isNew = condition === "new";
   const isCpo = condition === "cpo" || condition.includes("certified");
-  const { year, make, model } = splitYmm(listing.ymm);
+  const identity = identityFromListing(listing);
+  const { make, model } = identity;
+  const year = identityYear(identity);
 
   // keySpecs is already the shopper-facing pairs derived from key_specs /
   // mc_attributes, so the layout shows exactly what the live passport shows.
@@ -469,7 +468,7 @@ export function buildNextPassportDealer(d: PassportData, listing: NextPassportLi
     const n = parseInt(String(dt.yearsInBusiness || "").replace(/[^\d]/g, ""), 10);
     return Number.isFinite(n) && n > 0 ? n : null;
   })();
-  const make = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || "";
+  const make = identityFromListing(listing).make;
   const authorized = !!make && (
     dt.certifications.some((c) => c.toLowerCase().includes(make.toLowerCase())) ||
     name.toLowerCase().includes(make.toLowerCase())

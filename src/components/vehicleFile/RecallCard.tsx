@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { OUTCOME_LABELS, useRecallTask, type RecallOutcome } from "@/hooks/useRecallTask";
 import { Card, btn, btnPrimary } from "./primitives";
 import { normalizeRecalls, type RecallItem, type VehicleRow } from "./types";
+import { deriveRecallView, recallScopeOfSource, type RecallView } from "@/lib/vehicleTruth/recallView";
 
 type RecallHook = ReturnType<typeof useRecallTask>;
 
@@ -114,14 +115,19 @@ const RecallReviewActions = ({ recall, vehicle }: { recall: RecallHook; vehicle:
   );
 };
 
-// MarketCheck AutoRecalls — live four-state card (clear / open / unknown / error).
+// Recall card — VIN verification and model campaign context, kept apart.
+// "Clear" is a claim about THIS VIN, so it renders only from a VIN-level
+// source that answered; the provider the function actually used comes back on
+// `provider`, and an NHTSA answer is model scope however it reached us.
 export const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: RecallHook }) => {
-  const [status, setStatus] = useState<string | null>(vehicle.recall_status);
-  const [checkedAt, setCheckedAt] = useState<string | null>(vehicle.recall_checked_at);
-  const [open, setOpen] = useState<number>(vehicle.open_recall_count ?? 0);
+  const [view, setView] = useState<RecallView>(() => deriveRecallView(vehicle));
+  const [failed, setFailed] = useState(false);
   const [recalls, setRecalls] = useState<RecallItem[]>(normalizeRecalls(vehicle.recall_payload));
   const [checking, setChecking] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+
+  const checkedAt = view.vin.checkedAt ?? view.model?.checkedAt ?? null;
+  const open = view.vin.openCount ?? view.model?.campaignCount ?? 0;
 
   const run = async () => {
     if (!vehicle.vin) { toast.error("No VIN to check"); return; }
@@ -129,20 +135,36 @@ export const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: R
     try {
       const { data, error } = await supabase.functions.invoke("marketcheck-recalls", { body: { vin: vehicle.vin, tenant_id: vehicle.tenant_id } });
       if (error) throw error;
-      const d = (data || {}) as { error?: string; recallStatus?: string; checkedAt?: string; openRecallCount?: number; recalls?: RecallItem[] };
-      if (d.error === "not_configured") { toast.error("Recall lookup isn't configured yet (MarketCheck AutoRecalls key)."); setStatus("error"); }
-      else if (d.error === "no_endpoint_matched") { toast.error("MarketCheck recall endpoint not reachable — likely no AutoRecalls access on the key."); setStatus("error"); }
-      else if (d.recallStatus === "error") { toast.error("We could not check recalls right now. Try again."); setStatus("error"); }
+      const d = (data || {}) as { error?: string; recallStatus?: string; checkedAt?: string; openRecallCount?: number; recalls?: RecallItem[]; provider?: string; note?: string };
+      if (d.error === "not_configured") { toast.error("Recall lookup isn't configured yet (MarketCheck AutoRecalls key)."); setFailed(true); }
+      else if (d.error === "no_endpoint_matched") { toast.error("MarketCheck recall endpoint not reachable — likely no AutoRecalls access on the key."); setFailed(true); }
+      else if (d.recallStatus === "error") { toast.error("We could not check recalls right now. Try again."); setFailed(true); }
       else {
-        setStatus(d.recallStatus || "unknown");
-        setCheckedAt(d.checkedAt || null);
-        setOpen(d.openRecallCount || 0);
+        setFailed(false);
         setRecalls(d.recalls || []);
-        toast.success((d.openRecallCount || 0) > 0 ? `${d.openRecallCount} open recall${d.openRecallCount === 1 ? "" : "s"} found` : "No active recalls");
+        setView(deriveRecallView({
+          recall_status: d.recallStatus ?? null,
+          open_recall_count: d.openRecallCount ?? null,
+          recall_checked_at: d.checkedAt ?? null,
+          recall_payload: {
+            source: d.provider ?? null,
+            checked_at: d.checkedAt ?? null,
+            note: d.note ?? null,
+            campaigns: d.recalls ?? [],
+            open_recall_count: d.openRecallCount ?? null,
+          },
+        }));
+        toast.success(
+          (d.openRecallCount || 0) > 0
+            ? `${d.openRecallCount} open recall${d.openRecallCount === 1 ? "" : "s"} found`
+            : recallScopeOfSource(d.provider ?? null) === "vin"
+              ? "No active recalls on this VIN"
+              : "No campaigns found for this model — VIN-level verification unavailable",
+        );
       }
     } catch {
       toast.error("We could not check recalls right now. Try again.");
-      setStatus("error");
+      setFailed(true);
     } finally {
       setChecking(false);
     }
@@ -152,7 +174,7 @@ export const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: R
     <button onClick={run} disabled={checking} className={btn}>{checking ? "Checking…" : label}</button>
   );
 
-  if (status === "open_recalls" && open > 0) {
+  if (view.riskSignalled) {
     return (
       <>
         <Card title="Recall" action={
@@ -164,9 +186,12 @@ export const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: R
           <div className="flex items-start gap-3">
             <span className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0"><ShieldAlert className="w-5 h-5" /></span>
             <div className="min-w-0">
-              <p className="text-al-card text-foreground">Recall review required</p>
+              <p className="text-al-card text-foreground">{view.vin.label}</p>
               <p className="text-al-body text-muted-foreground mt-0.5">
-                Open recall detected ({open} active). Service must confirm whether it is completed, no fix is available, or it does not apply to this vehicle.
+                {view.vin.checkComplete
+                  ? `Open recall detected (${open} active) on this VIN.`
+                  : `A safety campaign is on record${view.model ? ` at model scope (${view.model.label})` : ""}, and no VIN-level check has answered.`}
+                {" "}Service must confirm whether it is completed, no fix is available, or it does not apply to this vehicle.
               </p>
             </div>
           </div>
@@ -182,7 +207,9 @@ export const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: R
               <SheetTitle className="flex items-center gap-2 text-red-700"><ShieldAlert className="w-5 h-5" /> Recall details</SheetTitle>
             </SheetHeader>
             <p className="text-al-meta text-muted-foreground mt-1">
-              {open} active manufacturer recall{open === 1 ? "" : "s"} on this vehicle.
+              {view.vin.checkComplete
+                ? `${open} active manufacturer recall${open === 1 ? "" : "s"} on this VIN.`
+                : `${open} manufacturer recall campaign${open === 1 ? "" : "s"} on record. ${view.vin.detail}`}
             </p>
             <div className="mt-4 space-y-3">
               {recalls.map((r, i) => (
@@ -207,7 +234,7 @@ export const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: R
     );
   }
 
-  if (status === "error") {
+  if (failed) {
     return (
       <Card title="Recall" action={
         <div className="flex items-center gap-2">
@@ -226,7 +253,7 @@ export const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: R
     );
   }
 
-  if (status === "clear") {
+  if (view.vin.clearClaimAllowed) {
     return (
       <Card title="Recall" action={
         <div className="flex items-center gap-2">
@@ -238,7 +265,9 @@ export const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: R
           <span className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5" /></span>
           <div>
             <p className="text-al-card text-foreground">No active recalls</p>
-            <p className="text-al-body text-muted-foreground">Last checked {checkedAt ? new Date(checkedAt).toLocaleDateString() : "today"}</p>
+            <p className="text-al-body text-muted-foreground">
+              VIN-level check{view.vin.source ? ` (${view.vin.source})` : ""} · last checked {checkedAt ? new Date(checkedAt).toLocaleDateString() : "today"}
+            </p>
           </div>
         </div>
       </Card>
@@ -248,15 +277,18 @@ export const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: R
   return (
     <Card title="Recall" action={
       <div className="flex items-center gap-2">
-        <span className="text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Not checked</span>
+        <span className="text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Not verified</span>
         {checkBtn("Run recall check")}
       </div>
     }>
       <div className="flex items-center gap-3">
         <span className="w-9 h-9 rounded-lg bg-muted text-muted-foreground flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5" /></span>
         <div>
-          <p className="text-al-card text-foreground">Not checked yet</p>
-          <p className="text-al-body text-muted-foreground">NHTSA recall status has not been checked for this VIN.</p>
+          <p className="text-al-card text-foreground">{view.vin.label}</p>
+          <p className="text-al-body text-muted-foreground">{view.vin.detail}</p>
+          {view.model ? (
+            <p className="text-al-meta text-muted-foreground mt-1">Model-level context: {view.model.label}. {view.model.detail}</p>
+          ) : null}
         </div>
       </div>
     </Card>

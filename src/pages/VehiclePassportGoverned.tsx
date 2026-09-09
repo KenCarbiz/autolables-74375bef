@@ -1,3 +1,4 @@
+import { identityFromListing } from "@/lib/factorySticker/vehicleIdentity";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import {
@@ -469,7 +470,7 @@ export default function VehiclePassportGoverned() {
   // Founded year is derived from the years count; without a founding month we
   // show "Since <year>" rather than an exact-day claim (still concrete).
   const dealerFoundedYear = dealerYears != null ? new Date().getFullYear() - dealerYears : null;
-  const makeName = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || "";
+  const makeName = identityFromListing(listing).make;
   const authorizedByMake = !!makeName && (
     dt.certifications.some((c) => c.toLowerCase().includes(makeName.toLowerCase())) ||
     dealerName.toLowerCase().includes(makeName.toLowerCase())

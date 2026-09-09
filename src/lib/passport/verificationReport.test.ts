@@ -7,6 +7,17 @@ import {
 import type { PassportData } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 
+// A VIN-level recall answer with a source and a time. `{ has_open: false }`
+// alone is a zero with no provenance, and a zero without source, scope and
+// time is not a clean claim — so it no longer verifies anything.
+const VIN_LEVEL_CLEAR = {
+  has_open: false,
+  source: "marketcheck",
+  scope: "vin",
+  open_recall_count: 0,
+  checked_at: new Date().toISOString(),
+};
+
 // Minimal PassportData stub — only the fields the report derivation reads.
 const dOf = (o: Partial<PassportData>): PassportData => ({
   accidentCount: null, ownerCount: null, cleanTitle: false, titleStatus: "unknown",
@@ -76,7 +87,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("an all-verified vehicle shows the green completed banner", () => {
     const r = deriveVerificationReport(
       dOf({ accidentCount: 0, ownerCount: 1, titleStatus: "clean", cleanTitle: true, marketAvg: 61000, belowMarket: 3000, warrantyStr: "4 yr / 60,000 mi" }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", mileage: 17, condition: "new", recall_status: "clear", open_recall_count: 0, recall_check: { has_open: false } }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", mileage: 17, condition: "new", recall_status: "clear", open_recall_count: 0, recall_check: VIN_LEVEL_CLEAR }),
     );
     assertArithmetic(r);
     expect(r.verifiedChecks).toBe(8);
@@ -85,10 +96,52 @@ describe("deriveVerificationReport — canonical customer summary", () => {
     expect(r.banner.heading).toBe("Verification checks completed");
   });
 
+  // The owner's worked example, and the collapse a previous build shipped:
+  // NHTSA recognises 2027 INFINITI QX60 and returns zero campaigns. That is a
+  // real answer about the MODEL LINE. It may not verify this VIN, and the
+  // customer report must not show a green check for it.
+  it("does not verify the recall check from a model-level NHTSA zero", () => {
+    const r = deriveVerificationReport(
+      dOf({ accidentCount: 0, ownerCount: 1, titleStatus: "clean", cleanTitle: true, marketAvg: 61000, warrantyStr: "4 yr" }),
+      lOf({
+        vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", mileage: 17, condition: "new",
+        recall_status: "clear", open_recall_count: 0,
+        recall_payload: {
+          source: "nhtsa", checked_at: new Date().toISOString(),
+          model_in_catalog: true, open_recall_count: 0, campaigns: [],
+        },
+      }),
+    );
+    assertArithmetic(r);
+    const recall = r.checks.find((c) => c.key === "recall");
+    expect(recall?.status).toBe("pending");
+    expect(recall?.finding).toMatch(/Recall verification is unavailable for this VIN/);
+    expect(recall?.finding).toMatch(/model-level context, not a check of this VIN/i);
+    expect(r.banner.tone).not.toBe("green");
+  });
+
+  // The 74 pilot rows: NHTSA answered the ambiguous HTTP 400, the writer left
+  // the status NULL, and a zero stayed behind in open_recall_count.
+  it("does not verify the recall check from an unanswered NHTSA lookup", () => {
+    const r = deriveVerificationReport(
+      dOf({ accidentCount: 0, ownerCount: 1, titleStatus: "clean", cleanTitle: true }),
+      lOf({
+        vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX65", condition: "new",
+        recall_status: null, open_recall_count: 0,
+        recall_payload: { source: "nhtsa", note: "no_nhtsa_record_http_400", checked_at: new Date().toISOString() },
+      }),
+    );
+    const recall = r.checks.find((c) => c.key === "recall");
+    expect(recall?.status).toBe("pending");
+    expect(recall?.evidence.find((e) => e.label === "Open recalls on this VIN")?.value).toBeNull();
+    expect(recall?.evidence.find((e) => e.label === "Model-level campaign context")?.value)
+      .toBe("Model not in NHTSA's records");
+  });
+
   it("a branded title is a conclusive actionable finding (needs_attention), not a conflict", () => {
     const r = deriveVerificationReport(
       dOf({ titleStatus: "branded", accidentCount: 0, ownerCount: 1, marketAvg: 40000, warrantyStr: "3 yr" }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", mileage: 40000, condition: "used", recall_status: "clear", recall_check: { has_open: false } }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", mileage: 40000, condition: "used", recall_status: "clear", recall_check: VIN_LEVEL_CLEAR }),
     );
     assertArithmetic(r);
     const title = r.checks.find((c) => c.key === "title");
@@ -146,7 +199,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("a partial report still renders available checks and marks the rest unavailable", () => {
     const r = deriveVerificationReport(
       dOf({ marketAvg: 40000, belowMarket: 1000 }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used", recall_status: "clear", recall_check: { has_open: false } }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used", recall_status: "clear", recall_check: VIN_LEVEL_CLEAR }),
     );
     assertArithmetic(r);
     expect(r.valid).toBe(true);
@@ -181,7 +234,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("never labels dealer-provided data as independent, and market as AutoLabels-derived", () => {
     const r = deriveVerificationReport(
       dOf({ marketAvg: 40000, warrantyStr: "3 yr", accidentCount: 0 }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used", recall_status: "clear", recall_check: { has_open: false } }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used", recall_status: "clear", recall_check: VIN_LEVEL_CLEAR }),
     );
     expect(r.checks.find((c) => c.key === "market")?.provenance).toBe("autolabels_derived");
     expect(r.checks.find((c) => c.key === "history")?.provenance).toBe("independent_history");

@@ -1,4 +1,5 @@
 import type { GetReadyItem } from "@/hooks/useGetReady";
+import type { RecallView } from "@/lib/vehicleTruth/recallView";
 import { vinKey } from "@/lib/vinKeys";
 import { columnFor } from "./getReadyColumns";
 import { currentDocumentOfType } from "./documentSet";
@@ -41,9 +42,8 @@ export interface VinPackageSources {
   inspection: { latestSigned: SafetyInspectionRow | null; latest: SafetyInspectionRow | null };
   addendum: ReaderRow | null;
   recall: {
-    checkedAt: string | null;
-    doNotDrive: boolean;
-    openCount: number;
+    /** Resolved VIN + model scopes. The ONLY source of a clean recall claim. */
+    view: RecallView;
     /** recall_service_tasks for this vehicle, newest first. */
     tasks: ReaderRow[];
   };
@@ -101,26 +101,41 @@ export function addendumPackageState(add: ReaderRow | null): ItemState {
  * "the recall is handled" rendered a green "Ready · Resolved by service" with
  * no date, dropped the vehicle out of both the exception count and the blocking
  * panel, and left the manager staring at a publish the database refuses.
+ *
+ * The green "Ready · no open recalls" it ended on was the second half of the
+ * same defect: it came from `open_recall_count === 0`, which on 74 of 130
+ * pilot cars is a MODEL-level NHTSA lookup that never answered. A row is Ready
+ * only where a VIN-level check answered clear; an unanswered check is pending
+ * work, not a finished item.
  */
 export function recallPackageState(r: VinPackageSources["recall"]): ItemState {
+  const v = r.view;
   const openTask = r.tasks.find((t) => String(t.status || "") === "open_review") || null;
   const resolvedTask = r.tasks.find((t) => String(t.status || "") === "resolved") || null;
+  const evidenced = v.vin.openCount ?? v.model?.campaignCount ?? 0;
   const openCount = openTask && typeof openTask.open_recall_count === "number"
-    ? Math.max(r.openCount, openTask.open_recall_count as number)
-    : r.openCount;
+    ? Math.max(evidenced, openTask.open_recall_count as number)
+    : evidenced;
   const plural = (n: number) => `${n} open recall${n === 1 ? "" : "s"}`;
-  if (!r.checkedAt) return { status: "pending", detail: "Not started" };
-  if (r.doNotDrive) return { status: "blocked", detail: "Do-not-drive campaign open — publishing is blocked" };
+  if (v.doNotDrive) return { status: "blocked", detail: "Do-not-drive campaign open — publishing is blocked" };
   if (openTask) {
     return { status: "retry_required", detail: `${plural(Math.max(openCount, 1))} — service review required` };
   }
-  if (r.openCount > 0 && resolvedTask) {
+  if (v.riskSignalled && resolvedTask) {
     return { status: "ready", detail: `Resolved by service ${fmtDate(resolvedTask.completed_at as string | null)}`.trim() };
   }
-  if (r.openCount > 0) {
-    return { status: "retry_required", detail: `${plural(r.openCount)} — service review required` };
+  if (v.riskSignalled) {
+    return { status: "retry_required", detail: `${plural(Math.max(openCount, 1))} — service review required` };
   }
-  return { status: "ready", detail: `Checked ${fmtDate(r.checkedAt)} · no open recalls` };
+  if (v.vin.clearClaimAllowed) {
+    return { status: "ready", detail: `Checked ${fmtDate(v.vin.checkedAt)} · no open recalls on this VIN` };
+  }
+  return {
+    status: "pending",
+    detail: v.model
+      ? `VIN recall verification unavailable · model-level context: ${v.model.label}`
+      : "Not started",
+  };
 }
 
 export function getReadyHalfState(args: {

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "sonner";
@@ -25,6 +26,9 @@ interface Row {
   history_payload: { available?: boolean; owners?: number | null; entries?: unknown[]; inServiceDate?: string | null } | null;
   recall_status: string | null;
   open_recall_count: number | null;
+  recall_payload?: unknown;
+  recall_check?: unknown;
+  recall_checked_at?: string | null;
   blackbook: { available?: boolean } | null;
   enriched_at: string | null;
   source_url: string | null;
@@ -56,7 +60,12 @@ const SIGNALS = [
   { key: "value", label: "Market value", core: true, has: (r: Row) => r.market_value != null },
   { key: "comps", label: "Comparables", core: true, has: (r: Row) => Array.isArray(r.comparables) && r.comparables.length > 0 },
   { key: "mds", label: "Days supply", core: false, has: (r: Row) => r.market_meta?.market_days_supply != null },
-  { key: "recall", label: "Recalls", core: true, has: (r: Row) => !!r.recall_status },
+  // "Has recall data" means a VIN-level recall answer, which is what
+  // MarketCheck AutoRecalls would supply. `recall_status` is written from the
+  // free NHTSA model-level fallback on every row in this database, so counting
+  // it here reported full MarketCheck recall coverage for a product that has
+  // never returned a single result.
+  { key: "recall", label: "Recalls (VIN-level)", core: true, has: (r: Row) => deriveRecallView(r).vin.checkComplete },
   { key: "history", label: "VIN history", core: false, has: (r: Row) => !!r.history_payload?.available },
   { key: "blackbook", label: "Black Book", core: false, has: (r: Row) => !!r.blackbook?.available },
 ] as const;
@@ -76,7 +85,7 @@ const needsEnrich = (r: Row, sources: Sources): boolean => {
 };
 
 const SELECT =
-  "vin, ymm, condition, price, market_value, market_meta, comparables, history_payload, recall_status, open_recall_count, blackbook, enriched_at, source_url, mc_attributes, status";
+  "vin, ymm, condition, price, market_value, market_meta, comparables, history_payload, recall_status, open_recall_count, recall_payload, recall_checked_at, blackbook, enriched_at, source_url, mc_attributes, status";
 
 interface SyncState {
   last_run_at: string | null;

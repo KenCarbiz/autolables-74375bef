@@ -10,6 +10,7 @@
 
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
+import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView";
 
 export type VerificationCategoryState =
   | "verified"
@@ -62,6 +63,7 @@ const TERMINAL: VerificationCategoryState[] = ["verified", "dealer_confirmed", "
  */
 export function derivePassportVerification(d: PassportData, listing: VehicleListing): PassportVerificationSummary {
   const checkedAt = d.marketCheckedAt || undefined;
+  const recall = d.recall ?? deriveRecallView(listing);
   const cat = (
     key: string,
     label: string,
@@ -81,7 +83,10 @@ export function derivePassportVerification(d: PassportData, listing: VehicleList
   const categories: VerificationCategory[] = [
     cat("vin", "VIN", !!listing.vin, "verified", "oem", true),
     cat("title", "Title & Brand", d.cleanTitle, "verified", "commercial", true),
-    cat("recall", "Recall", !!listing.recall_status || d.recallClear, "verified", "government", true),
+    // A MODEL-level NHTSA answer can never complete this check. With no
+    // VIN-level result the category stays pending — the state this summary
+    // already refuses to roll up into an all-complete badge.
+    cat("recall", "Recall", recall.vin.checkComplete, "verified", "government", true),
     cat("history", "Vehicle History", d.ownerCount != null || d.accidentCount != null || d.cleanTitle, "verified", "commercial", false),
     cat("market", "Market Data", d.marketAvg != null, "calculated", "autolabels_calculated", false),
     cat("warranty", "Warranty", !!d.warrantyStr, "dealer_confirmed", "oem", false),
@@ -264,34 +269,23 @@ const dateFmt = (iso: string | null): string | null =>
   iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
 
 interface RecallSignals {
-  hasCheck: boolean;
-  clearStatus: boolean;
-  openCount: number | null;
-  detailOpen: boolean | null;
-  doNotDrive: boolean;
-  checkedAt: string | null;
+  view: RecallView;
   campaign: { number: string | null; component: string | null; summary: string | null; remedy: string | null };
 }
 
 function readRecall(listing: VehicleListing): RecallSignals {
-  const rc = listing.recall_check || null;
-  const first = rc?.campaigns?.[0] || null;
+  // deriveRecallView tolerates every writer's field names, so a
+  // MarketCheck-sourced campaign (nhtsaCampaignNumber / title / description)
+  // renders the same detail as an NHTSA or manual one.
+  const view = deriveRecallView(listing);
+  const first = view.campaigns[0] || null;
   return {
-    hasCheck: !!listing.recall_status || !!rc,
-    clearStatus: listing.recall_status === "clear",
-    openCount: listing.open_recall_count ?? null,
-    detailOpen: rc ? !!rc.has_open : null,
-    doNotDrive: !!rc?.do_not_drive,
-    checkedAt: rc?.checked_at || null,
-    // Tolerate every writer's field names so a MarketCheck-sourced recall
-    // (nhtsaCampaignNumber / title / description) renders the same detail as an
-    // NHTSA/manual one (campaignNumber / summary). Without this the passport
-    // showed a blank campaign number + summary for MarketCheck-first recalls.
+    view,
     campaign: {
-      number: first?.campaignNumber || first?.nhtsaCampaignNumber || first?.campaignId || first?.campaign || null,
-      component: first?.component || null,
-      summary: first?.summary || first?.description || first?.title || null,
-      remedy: first?.remedy || null,
+      number: first?.number ?? null,
+      component: first?.component ?? null,
+      summary: first?.summary ?? null,
+      remedy: first?.remedy ?? null,
     },
   };
 }
@@ -449,46 +443,50 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   // 6 — Open safety recalls (NHTSA) — MATERIAL
   checks.push((() => {
     const s = src("nhtsa");
-    // A genuine, detectable cross-source conflict: the aggregate status says
-    // clear while the detailed NHTSA campaign check reports an open campaign
-    // (or a positive open-recall count). Sources disagree → NEEDS CONFIRMATION,
-    // never "issue found".
-    const conflict = recall.hasCheck &&
-      ((recall.clearStatus && (recall.detailOpen === true || (recall.openCount ?? 0) > 0)) ||
-       (!recall.clearStatus && recall.detailOpen === false));
+    // Two scopes, never one. NHTSA answers for a year/make/model; only a
+    // VIN-level source can verify THIS car. So "verified" requires
+    // `vin.clearClaimAllowed`, and a model-level zero — including NHTSA's
+    // legitimate NO_MODEL_CAMPAIGNS_FOUND — leaves the check pending with the
+    // model finding shown as the model-level context it is.
+    const v = recall.view;
+    const model = v.model;
     let status: VerificationStatus;
     let highSeverity = false;
-    if (!recall.hasCheck) status = "pending";
-    else if (recall.doNotDrive) { status = "needs_attention"; highSeverity = true; }
-    else if (conflict) status = "needs_confirmation";
-    else if (recall.detailOpen === true || (recall.openCount ?? 0) > 0) status = "needs_attention";
-    else status = "verified";
-    const asOf = dateFmt(recall.checkedAt || reportTime);
+    if (v.doNotDrive) { status = "needs_attention"; highSeverity = true; }
+    else if (v.conflict) status = "needs_confirmation";
+    else if (v.riskSignalled) status = "needs_attention";
+    else if (v.vin.clearClaimAllowed) status = "verified";
+    else status = "pending";
+    const asOf = dateFmt(v.vin.checkedAt ?? model?.checkedAt ?? null);
+    const modelContext = model
+      ? `${model.label} — ${model.detail}`
+      : "No recall lookup has returned a result for this vehicle.";
     return {
       key: "recall", name: "Open safety recalls", ...s, material: true, highSeverity,
       status,
       finding:
-        status === "verified" ? `No open safety recalls found in NHTSA campaigns${asOf ? ` as of ${asOf}` : ""}.`
+        status === "verified" ? `No open safety recalls were returned for this VIN${asOf ? ` as of ${asOf}` : ""}.`
         : status === "needs_confirmation" ? "AutoLabels found conflicting recall information across available sources."
         : status === "needs_attention" && highSeverity ? "This vehicle has a do-not-drive recall — do not drive it until the remedy is completed."
-        : status === "needs_attention" ? "NHTSA data shows an open recall associated with this VIN. Ask whether the remedy has been completed or is available."
-        : null,
+        : status === "needs_attention" ? `A safety recall campaign is on record. ${modelContext} Ask the dealer whether the remedy has been completed or is available.`
+        : `Recall verification is unavailable for this VIN. ${modelContext}`,
       reviewNote:
         status === "needs_confirmation" ? "confirm the recall status with the dealer"
         : status === "needs_attention" && highSeverity ? "a do-not-drive recall is reported"
         : status === "needs_attention" ? "an open recall is reported"
-        : status === "pending" ? "the recall check has not completed" : null,
+        : status === "pending" ? "recall verification for this VIN is unavailable" : null,
       evidence: [
         { label: "Campaign number", value: recall.campaign.number },
         { label: "Affected component", value: recall.campaign.component },
         { label: "Summary", value: recall.campaign.summary },
         { label: "Remedy availability", value: recall.campaign.remedy },
-        { label: "NHTSA status", value: recall.detailOpen == null ? null : recall.detailOpen ? "Open campaign reported" : "No open campaign" },
-        { label: "Aggregate status", value: listing.recall_status || null },
+        { label: "VIN-level verification", value: v.vin.label },
+        { label: "Model-level campaign context", value: model ? model.label : null },
+        { label: "Open recalls on this VIN", value: v.vin.openCount == null ? null : String(v.vin.openCount) },
         { label: "Last checked", value: asOf },
-        { label: "Source", value: FAMILY_META.nhtsa.label },
+        { label: "Source", value: v.vin.source ?? model?.source ?? FAMILY_META.nhtsa.label },
       ],
-      checkedAt: status !== "pending" ? (recall.checkedAt || reportTime) : null,
+      checkedAt: status !== "pending" ? (v.vin.checkedAt ?? model?.checkedAt ?? reportTime) : null,
     };
   })());
 

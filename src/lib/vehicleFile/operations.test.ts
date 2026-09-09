@@ -379,16 +379,45 @@ describe("buildCompliance", () => {
     }), { now: NOW });
     expect(columnNewer.recallStatus.chosen?.observedAt).toBe("2026-09-08T00:00:00.000Z");
 
+    // A VIN-level answer is the only kind that can BE stale: a model-level
+    // zero never became this car's answer in the first place.
     const stale = buildCompliance(src({
       listing: listingRow({
         recall_checked_at: "2026-06-29T15:43:25.467Z",
-        recall_payload: { source: "nhtsa", checked_at: "2026-06-29T15:43:25.467Z", campaigns: [] },
+        recall_payload: {
+          source: "marketcheck", scope: "vin", checked_at: "2026-06-29T15:43:25.467Z",
+          campaigns: [], openRecallCount: 0,
+        },
         recall_status: "clear",
         open_recall_count: 0,
       }),
     }), { now: NOW });
     expect(stale.recallStatus.freshness).toBe("STALE");
     expect(blockerMatching(stale.blockers, /Recall answer is stale/)).toBeTruthy();
+  });
+
+  // The forbidden collapse, at the Vehicle File. NHTSA recognises the model and
+  // returns zero campaigns; that is a real answer about the MODEL LINE, and it
+  // may not emit a clear status or a zero count for this VIN.
+  it("emits no clear status and no zero count from a model-level NHTSA answer", () => {
+    const section = buildCompliance(src({
+      listing: listingRow({
+        recall_status: "clear",
+        recall_checked_at: "2026-09-08T03:00:00.000Z",
+        open_recall_count: 0,
+        recall_payload: {
+          source: "nhtsa", checked_at: "2026-09-08T03:00:00.000Z",
+          model_in_catalog: true, openRecallCount: 0, campaigns: [],
+        },
+      }),
+    }), { now: NOW });
+
+    expect(section.recall.model?.state).toBe("NO_MODEL_CAMPAIGNS_FOUND");
+    expect(section.recall.vin.state).toBe("UNKNOWN");
+    expect(section.recall.vin.checkComplete).toBe(false);
+    expect(section.recallStatus.value).toBeNull();
+    expect(section.openRecallCount.value).toBeNull();
+    expect(blockerMatching(section.blockers, /No store holds a VIN-level answer/)).toBeTruthy();
   });
 
   it("never reports a failed lookup as a clean car", () => {
@@ -456,11 +485,16 @@ describe("buildCompliance", () => {
       }),
     }), { now: NOW });
 
-    expect(section.recallStatus.value).toBe("clear");
-    expect(section.recallStatus.disagreeing.map((c) => c.origin)).toContain("vehicle_listings.recall_status");
+    // The newer `recall_check` reports no open campaign, but three campaigns
+    // are on record in the older stores. A clear value can no longer be
+    // emitted while any store reports a campaign, so the open answer stands
+    // and the disagreement is still reported as a disagreement. This
+    // correction must never hide a risk to stop manufacturing a clean claim.
+    expect(section.recallStatus.value).toBe("open_recalls");
+    expect(section.recall.conflict).toBe(true);
+    expect(section.recall.vin.clearClaimAllowed).toBe(false);
     expect(section.recallStatus.disputed).toBe(false);
-    expect(section.openRecallCount.value).toBe(0);
-    expect(section.openRecallCount.disagreeing.length).toBeGreaterThan(0);
+    expect(section.openRecallCount.value).toBe(3);
   });
 
   it("raises do-not-drive from any store, including campaign text with no recall_check", () => {

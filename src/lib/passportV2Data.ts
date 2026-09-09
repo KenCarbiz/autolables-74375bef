@@ -1,4 +1,5 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
+import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView";
 import { resolveDisplayPrice, getPriceDisplayMode, buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
 import { DEFAULT_APR_PERCENT, getPaymentDisplay, buildPaymentAssumptions } from "@/lib/affordability";
 import type { OemFactoryWarranty } from "@/lib/oemWarranty";
@@ -275,6 +276,8 @@ export interface PassportData {
   /** Who is making that claim. Rendered beside it; never omitted. */
   titlePolicyAttestedBy: string | null;
   serviceCount: number;
+  /** VIN-scope + model-scope recall truth. The ONLY recall source this page reads. */
+  recall: RecallView;
   recallClear: boolean;
   openRecalls: number | null;
   hasRecallCheck: boolean;
@@ -602,9 +605,13 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     ? ((dealer.dealership_name as string) || (dealer.name as string) || null)
     : null;
   const serviceCount = listing.service_records?.length ?? 0;
-  const recallClear = listing.recall_status === "clear";
-  const openRecalls = listing.open_recall_count ?? null;
-  const hasRecallCheck = !!listing.recall_status;
+  // `recall_status === "clear"` and `open_recall_count` are MODEL-level NHTSA
+  // answers on every pilot vehicle, and on 74 of 130 they are an unanswered
+  // HTTP 400 sitting beside a zero. Neither may become a claim about this car.
+  const recall = deriveRecallView(listing);
+  const recallClear = recall.vin.clearClaimAllowed;
+  const openRecalls = recall.vin.openCount;
+  const hasRecallCheck = recall.vin.checkComplete;
   const verificationChecks =
     (listingEquipment(listing).length > 0 ? 1 : 0) +
     (marketAvg != null || marketMeta.similarCount != null ? 1 : 0) +
@@ -644,14 +651,14 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // marketing. A score that can visibly go down (and shows why) is evidence.
   const knownSignals =
     (typeof mc.carfax_clean_title === "boolean" ? 1 : 0) + (accidentCount != null ? 1 : 0) +
-    (ownerCount != null ? 1 : 0) + (listing.recall_status ? 1 : 0) +
+    (ownerCount != null ? 1 : 0) + (hasRecallCheck ? 1 : 0) +
     (serviceCount > 0 ? 1 : 0) + (warrantyStr ? 1 : 0);
   const confDeductions: { label: string; points: number }[] = [];
   const ded = (cond: boolean, label: string, points: number) => { if (cond) confDeductions.push({ label, points }); };
   ded(typeof mc.carfax_clean_title === "boolean" && !cleanTitle, "Title not confirmed clean", 14);
   ded(accidentCount != null && accidentCount > 0, `${accidentCount} reported accident${accidentCount === 1 ? "" : "s"}`, Math.min(18, (accidentCount ?? 0) * 9));
   ded(!isNew && ownerCount != null && ownerCount > 1, `${ownerCount} previous owners`, 6);
-  ded(!!listing.recall_status && !recallClear, "Open recall — needs remedy", 12);
+  ded(recall.riskSignalled, "Open recall — needs remedy", 12);
   ded(!isNew && serviceCount === 0 && knownSignals >= 2, "No service records on file", 4);
   ded(!warrantyStr && knownSignals >= 2, "No factory warranty remaining", 5);
   ded(!isNew && typeof mc.carfax_clean_title !== "boolean" && accidentCount == null, "History report not yet attached", 7);
@@ -679,13 +686,13 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   const verifiedBy = [
     { label: "Vehicle History", on: typeof mc.carfax_clean_title === "boolean" || ownerCount != null },
     { label: "Live Market Data", on: marketAvg != null || Object.keys(mc).length > 0 },
-    { label: "NHTSA", on: !!listing.recall_status },
+    { label: "NHTSA", on: hasRecallCheck },
   ].filter((x) => x.on).map((x) => x.label);
 
   const verifyRows: VerifyRow[] = [
     { label: "VIN Verified", done: !!listing.vin },
     { label: "Vehicle History", done: typeof mc.carfax_clean_title === "boolean" || ownerCount != null || accidentCount != null },
-    { label: "Recall Verification", done: !!listing.recall_status },
+    { label: "Recall Verification", done: hasRecallCheck },
     { label: "Market Data", done: marketAvg != null || verifiedBy.includes("Live Market Data") },
     { label: "Title & Brand", done: cleanTitle },
     { label: "Warranty Checked", done: !!warrantyStr },
@@ -750,7 +757,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   else if (belowOriginalMsrp) whyBuy.push(`Priced ${fmt$(belowOriginalMsrp)} below original MSRP`);
   if (belowMarket && belowMarket > 0) whyBuy.push(`${fmt$(belowMarket)} below market average`);
   if (warrantyStr && !warrantyExpired) whyBuy.push("Factory warranty remaining");
-  if (recallClear) whyBuy.push("No open recalls");
+  if (recall.vin.clearClaimAllowed) whyBuy.push("No open recalls");
   if (dealerVerified) whyBuy.push("Dealer-verified listing");
   if (ownerCount === 1) whyBuy.push("One owner — personal use");
   if (listing.mileage != null && listing.mileage < 30000) whyBuy.push(`Low mileage — ${listing.mileage.toLocaleString()} mi`);
@@ -804,7 +811,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     marketAvg, marketLow, marketHigh, belowMarket, marketBasisWeak,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
-    ownerCount, accidentCount, cleanTitle, titleStatus, titleVerifiedAt, titleVerifiedSource, titlePolicyAttested, titlePolicyAttestedBy, serviceCount, recallClear, openRecalls, hasRecallCheck,
+    ownerCount, accidentCount, cleanTitle, titleStatus, titleVerifiedAt, titleVerifiedSource, titlePolicyAttested, titlePolicyAttestedBy, serviceCount, recall, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr, warrantyExpired,
     oemWarranty: ((listing as unknown as { oem_warranty?: OemWarrantyView }).oem_warranty) || null,
     confScore, confLabel, confDeductions, confBlockedBy, verifiedBy, dealerVerified, verifyRows,

@@ -1,3 +1,4 @@
+import { parseYmm } from "@/lib/factorySticker/ymm";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useProducts, Product, type ProductUpgrade } from "@/hooks/useProducts";
 import { useAuth } from "@/contexts/AuthContext";
@@ -738,14 +739,13 @@ const Index = () => {
     const ymmFull = [ymmParam, trim].filter(Boolean).join(" ").trim();
     setVehicle((v) => ({ ...v, vin: vin || v.vin, ymm: ymmFull || v.ymm }));
     // Parse "year make model" so the rules engine + saved row get structured YMM.
-    const parts = ymmParam.trim().split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) {
-      const [year, make, ...modelRest] = parts;
+    const scanned = parseYmm(ymmParam);
+    if (scanned.make) {
       setVehicleContext((c) => ({
         ...c,
-        year: /^\d{4}$/.test(year) ? year : c.year,
-        make: make || c.make,
-        model: modelRest.join(" ") || c.model,
+        year: scanned.year || c.year,
+        make: scanned.make || c.make,
+        model: scanned.model || c.model,
         trim: trim || c.trim,
       }));
     }
@@ -1133,14 +1133,20 @@ const Index = () => {
       { label: "Payload hashed (SHA-256) for tamper evidence" },
     ];
     if (vehicle.vin && vehicle.vin.length === 17) {
+      // `clear` reaches this receipt only from a VIN-level check that
+      // answered (AddendumSection sends `unverified` otherwise), so the
+      // compliance line can no longer print a clearance for a model-level
+      // NHTSA zero.
       const rc = searchParams.get("recall");
       const rn = Number(searchParams.get("open") || 0);
       receipt.push({
-        label: rc === "open_recalls" && rn > 0
-          ? `${rn} open NHTSA recall${rn === 1 ? "" : "s"} — review before sale`
+        label: rc === "open_recalls"
+          ? (rn > 0
+            ? `${rn} open recall${rn === 1 ? "" : "s"} on record — review before sale`
+            : "Safety recall campaign on record — review before sale")
           : rc === "clear"
-            ? "NHTSA recall check: no open recalls"
-            : "VIN recorded · NHTSA recall check ready",
+            ? "VIN-level recall check: no open recalls"
+            : "VIN recorded · recall verification for this VIN unavailable",
       });
     }
     if (settings.feature_buyers_guide) {
@@ -1355,12 +1361,12 @@ const Index = () => {
 
       // Register in vehicle file system — creates per-VIN compliance record + sticker tracking code
       if (vehicle.vin.trim().length === 17) {
-        const ymmParts = vehicle.ymm.split(" ");
+        const ymmParts = parseYmm(vehicle.ymm);
         const file = await getOrCreateFile({
           vin: vehicle.vin.trim().toUpperCase(),
-          year: vehicleContext.year || ymmParts[0] || "",
-          make: vehicleContext.make || ymmParts[1] || "",
-          model: vehicleContext.model || ymmParts.slice(2).join(" ") || "",
+          year: vehicleContext.year || ymmParts.year,
+          make: vehicleContext.make || ymmParts.make,
+          model: vehicleContext.model || ymmParts.model,
           trim: vehicleContext.trim || "",
           stock_number: vehicle.stock,
           condition: "used",

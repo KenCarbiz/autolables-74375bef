@@ -27,6 +27,7 @@ import { buildPassportSaleCard } from "@/lib/passport/saleCard";
 import { scorePassportCard, selectCards, type CardSignals } from "@/lib/passportCards";
 import { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/passportPanelKeys";
 import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
+import { identityFromListing } from "@/lib/factorySticker/vehicleIdentity";
 import type { InfoModalKey } from "@/components/passport/PassportInfoModal";
 import { Info } from "lucide-react";
 import { BLUE, GREEN, CARD } from "@/lib/passportTokens";
@@ -213,6 +214,18 @@ const Semi = ({ score }: { score: number }) => {
 // Never used for real shoppers — only renders when the query flag is present and
 // the page shows a prominent "Sample preview" banner. Lets the layout be judged
 // against the design goal before live data/back-end deploys land.
+// Preview fixtures carry a VIN-LEVEL recall answer, because a clean claim on
+// the passport now requires one: a source, a scope and a time. A bare
+// `recall_status: "clear"` renders as "Recall verification unavailable", which
+// is correct for a car nobody checked and wrong for the approved happy path.
+const DEMO_VIN_RECALL = {
+  source: "marketcheck",
+  scope: "vin",
+  open_recall_count: 0,
+  campaigns: [] as unknown[],
+  checked_at: new Date().toISOString(),
+};
+
 export const MOCK_LISTING = {
   id: "mock", slug: "sample", vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", trim: "LUXE AWD",
   condition: "new", status: "published", mileage: 17, price: 58140, market_value: 61300,
@@ -287,7 +300,7 @@ export const MOCK_LISTING = {
     thirdParty: [{ product: "Ceramic coating", company: "ProShield" }],
     photos: [],
   },
-  recall_status: "clear", open_recall_count: 0, view_count: 89, service_records: [{}, {}, {}],
+  recall_status: "clear", open_recall_count: 0, recall_payload: DEMO_VIN_RECALL, view_count: 89, service_records: [{}, {}, {}],
   prep_status: { foreman_signed_at: "2025-04-12" },
   dealer_snapshot: { name: "Harte INFINITI", phone: "8605551234", address: "1 Auto Way", city: "Hartford", state: "CT", zip: "06103", review_rating: 4.8, review_count: 1248 },
   dealer_coverage: [{ title: "Lifetime Powertrain Warranty", coverage: "Powertrain", term_years: null, term_miles: null, lifetime: true, mode: "included", offer: "Dealer-added lifetime powertrain coverage — engine, transmission, and drive components for as long as you own the vehicle.", disclosure: "Valid for the original purchaser with documented factory-scheduled maintenance. See dealer for the written warranty." }],
@@ -332,7 +345,7 @@ export const MOCK_NEW_2026 = {
   mc_attributes: { ...MOCK_LISTING.mc_attributes, msrp: 65200, owner_count: 0, accident_count: 0, dom: 6 },
   warranty_info: { factory_months: 48, factory_miles: 60000, in_service_date: "2026-07-01" },
   recon: undefined,
-  recall_status: "clear", open_recall_count: 0, view_count: 14, service_records: [],
+  recall_status: "clear", open_recall_count: 0, recall_payload: DEMO_VIN_RECALL, view_count: 14, service_records: [],
   market_payload: { high: 67100, low: 61900, belowMarket: 1205 },
 };
 
@@ -479,7 +492,7 @@ const VehiclePassportV3 = () => {
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const rating = useMemo(() => (listing && d ? deriveRating(listing, d) : null), [listing, d]);
-  const { data: nhtsa } = useNhtsaSafety(listing?.ymm, !!listing?.ymm);
+  const { data: nhtsa } = useNhtsaSafety(identityFromListing(listing), !!listing);
   // Photos module off = lead photo only, no gallery chrome (server also
   // trims the payload; this keeps preview/mock rendering honest).
   const gallery = useMemo(() => {
@@ -1184,7 +1197,7 @@ const VehiclePassportV3 = () => {
               // The flagship comp sentence: a named sample, a radius, and a
               // count it beats — only when the data actually supports it.
               const compN = d.marketMeta.similarCount, compPct = d.marketMeta.percentile, compRadius = d.marketMeta.radius;
-              const modelName = (listing.ymm || "").split(/\s+/).slice(2).join(" ").trim();
+              const modelName = identityFromListing(listing).model;
               const compNoun = `similar ${modelName ? `${modelName} ` : ""}listings`;
               const flagship = compN != null && compN >= 5
                 ? compPct != null && compPct <= 50
@@ -1424,7 +1437,7 @@ const VehiclePassportV3 = () => {
             {(() => {
               const yearsNum = Number(dt.yearsInBusiness) || 0;
               const foundingYear = yearsNum > 0 ? new Date().getFullYear() - yearsNum : null;
-              const make = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || "";
+              const make = identityFromListing(listing).make;
               const factoryCert = make ? dt.certifications.find((c) => c.toLowerCase().includes(make.toLowerCase())) : undefined;
               // One primary award for the badge — never repeated as the Factory
               // Certified caption (which uses only the brand).
@@ -1526,7 +1539,7 @@ const VehiclePassportV3 = () => {
             <div className="flex items-start gap-3">
               <span className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6" /></span>
               <div>
-                <h2 className="text-[22px] font-extrabold leading-tight">Ready to take the next step on this {(listing.ymm || "").split(/\s+/).slice(2).join(" ").trim() || "vehicle"}?</h2>
+                <h2 className="text-[22px] font-extrabold leading-tight">Ready to take the next step on this {identityFromListing(listing).model || "vehicle"}?</h2>
                 <p className="text-[13px] opacity-90 mt-0.5">Reserve the vehicle, schedule a test drive, or contact the dealer to confirm final details.</p>
                 {(() => {
                   const dw = d.dealerCoverage.find((c) => c.mode === "included");

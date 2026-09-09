@@ -1,4 +1,5 @@
 import { decideWarrantyLanguage } from "./description-warranty-policy.ts";
+import { deriveRecallView, type RecallRowInput } from "./factorySticker/lib/vehicleTruth/recallView.ts";
 // ─────────────────────────────────────────────────────────────────────
 // Description Intelligence — server-side core.
 //
@@ -409,12 +410,24 @@ export function buildFactSnapshot(
   if (cleanTitle && hasReport) put("clean_history", true, "vehicle_history_report", "verified");
   else if (cleanTitle) excluded.push({ field: "clean_history", reason: "no_history_report", claim: "clean history" });
 
-  // Recalls are a safety signal, never merchandising copy.
-  if (listing.recall_status) {
-    facts.recall_status = {
-      field: "recall_status", value: listing.recall_status, source: "nhtsa/marketcheck",
-      status: "verified", observed_at: listing.recall_checked_at || null, usable_in_copy: false,
-    };
+  // Recalls are a safety signal, never merchandising copy — and the fact
+  // ledger must not label a MODEL-level NHTSA answer "verified". A VIN-level
+  // check that answered is verified; anything else is unverified, whatever the
+  // status column says. `usable_in_copy` stays false either way.
+  {
+    const rv = deriveRecallView(listing as RecallRowInput);
+    if (listing.recall_status || rv.model) {
+      facts.recall_status = {
+        field: "recall_status",
+        value: rv.vin.checkComplete
+          ? (rv.vin.state === "OPEN" ? "open_recalls" : "clear")
+          : `vin_${rv.vin.state.toLowerCase()}${rv.model ? `_model_${rv.model.state.toLowerCase()}` : ""}`,
+        source: rv.vin.source ?? rv.model?.source ?? "nhtsa",
+        status: rv.vin.checkComplete ? "verified" : "pending",
+        observed_at: rv.vin.checkedAt ?? rv.model?.checkedAt ?? listing.recall_checked_at ?? null,
+        usable_in_copy: false,
+      };
+    }
   }
 
   // Dealer identity

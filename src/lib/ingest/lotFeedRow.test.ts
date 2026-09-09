@@ -7,7 +7,7 @@ import { join } from "node:path";
 // have kept passing, which is the whole failure this file exists to prevent.
 import {
   shapeLotRow, windowSticker, detailVersion, scrubHistory,
-  LOT_FEED_DENY, identityIncomplete, lotIdentity,
+  LOT_FEED_DENY, identityIncomplete, lotIdentity, applyRecallProjection,
 } from "../../../supabase/functions/_shared/lotFeedRow.ts";
 
 // autofilm-feed named its output fields one by one and therefore shipped 140
@@ -604,5 +604,92 @@ describe("AutoFilm receives the full vehicle detail", () => {
       join(fnDir, "marketcheck-market-pricing/index.ts"), "utf8");
     expect(pricing).toMatch(/market_payload: m,/);
     expect(pricing).not.toMatch(/^\s*mc_raw: m,/m);
+  });
+});
+
+// ── Recall: the feed withholds rather than asserting ──────────────────
+//
+// AutoFilm receives the listing row essentially as it is, so `recall_status =
+// 'clear'` and `open_recall_count = 0` used to leave the building as facts
+// about the car. Every recall answer in this database came from NHTSA's
+// recallsByVehicle, which answers for a year/make/model — and on 74 of the
+// pilot tenant's 130 active vehicles that answer never came back at all.
+describe("recall reaches a sister app with its scope attached", () => {
+  const modelClear = {
+    vin: "1", ymm: "2027 INFINITI QX60",
+    recall_status: "clear",
+    open_recall_count: 0,
+    recall_payload: {
+      source: "nhtsa", checked_at: new Date().toISOString(),
+      model_in_catalog: true, open_recall_count: 0, campaigns: [],
+    },
+  };
+
+  it("withholds the summary columns when only a model-level answer exists", () => {
+    const out = shapeLotRow(modelClear) as Record<string, any>;
+    expect(out.recall_status).toBeNull();
+    expect(out.open_recall_count).toBeNull();
+    expect(out.recall.vin.state).toBe("UNKNOWN");
+    expect(out.recall.vin.clear_claim_allowed).toBe(false);
+  });
+
+  it("ships the model answer as labelled model-level context, not as this car's status", () => {
+    const out = shapeLotRow(modelClear) as Record<string, any>;
+    expect(out.recall.model_campaign_context.state).toBe("NO_MODEL_CAMPAIGNS_FOUND");
+    expect(out.recall.model_campaign_context.campaign_count).toBe(0);
+    expect(out.recall.model_campaign_context.detail)
+      .toMatch(/model-level context, not a check of this VIN/i);
+  });
+
+  it("never sends a zero for an unanswered NHTSA lookup", () => {
+    const out = shapeLotRow({
+      vin: "1", ymm: "2027 INFINITI QX65",
+      recall_status: null, open_recall_count: 0,
+      recall_payload: { source: "nhtsa", note: "no_nhtsa_record_http_400", checked_at: new Date().toISOString() },
+    }) as Record<string, any>;
+    expect(out.open_recall_count).toBeNull();
+    expect(out.recall_status).toBeNull();
+    expect(out.recall.model_campaign_context.state).toBe("MODEL_NOT_FOUND");
+  });
+
+  it("sends a clear status only from a VIN-level check that answered", () => {
+    const out = shapeLotRow({
+      vin: "1", ymm: "2025 INFINITI QX50",
+      recall_status: "clear", open_recall_count: 0,
+      recall_payload: {
+        source: "marketcheck", scope: "vin", open_recall_count: 0,
+        checked_at: new Date().toISOString(), campaigns: [],
+      },
+    }) as Record<string, any>;
+    expect(out.recall_status).toBe("clear");
+    expect(out.open_recall_count).toBe(0);
+    expect(out.recall.vin.state).toBe("VERIFIED_CLEAR");
+    expect(out.recall.vin.clear_claim_allowed).toBe(true);
+  });
+
+  // Withholding a claim must never withhold a warning.
+  it("still reports a campaign found at model scope", () => {
+    const out = shapeLotRow({
+      vin: "1", ymm: "2022 Toyota Camry",
+      recall_status: "open_recalls", open_recall_count: 1,
+      recall_payload: {
+        source: "nhtsa", checked_at: new Date().toISOString(),
+        campaigns: [{ campaignNumber: "22V001", status: "open", component: "Fuel pump" }],
+      },
+    }) as Record<string, any>;
+    expect(out.recall_status).toBe("open_recalls");
+    expect(out.recall.model_campaign_context.state).toBe("MODEL_CAMPAIGNS_FOUND");
+    expect(out.recall.campaigns).toHaveLength(1);
+    // Still not a VIN-level finding.
+    expect(out.recall.vin.check_complete).toBe(false);
+  });
+
+  it("is the same projection the anonymous shopper gets", () => {
+    const shopper = applyRecallProjection({ ...modelClear }) as Record<string, any>;
+    expect(shopper.recall_status).toBeNull();
+    expect(shopper.open_recall_count).toBeNull();
+    expect(shopper.recall.model_campaign_context.state).toBe("NO_MODEL_CAMPAIGNS_FOUND");
+    const view = readFileSync(join(fnDir, "public-listing-view/index.ts"), "utf8");
+    expect(view).toMatch(/applyRecallProjection\(row as Record<string, unknown>\)/);
   });
 });

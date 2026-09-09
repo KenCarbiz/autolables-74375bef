@@ -36,6 +36,11 @@ const MASTER = "mv-1";
 
 // A used car where every artifact the automation owns has been finished by a
 // writer that exists: documents generated and published, K-208 signed, addendum
+// A VIN-level recall answer, dated relative to the run: a recall check ages out
+// at 30 days, and this fixture is about whether a finished state is REACHABLE,
+// not about freshness — a fixed date would turn the assertion into a clock.
+const RECALL_CHECKED_AT = new Date(Date.now() - 2 * 86_400_000).toISOString();
+
 // signed by the customer, recall checked clean, get-ready authorized and worked
 // to completion, description published. The QR sheet is minted separately, by
 // the RPC, so a test can show the difference it makes.
@@ -45,8 +50,16 @@ const finishedUsedCar = (): Record<string, MockRow[]> => ({
     trim: "Sensory AWD", condition: "used", mileage: 12000, hero_image_url: null,
     mc_attributes: { stock_no: "H12345" }, created_at: "2026-07-01T10:00:00Z",
     slug: "2025-infiniti-qx80", status: "published", published_at: "2026-07-06T00:00:00Z",
-    packet_modules: null, recall_check: { checked_at: "2026-07-04T00:00:00Z", open_recall_count: 0 },
-    recall_checked_at: "2026-07-04T00:00:00Z", open_recall_count: 0,
+    // A VIN-level answer. A model-level NHTSA zero can no longer finish this
+    // row: `open_recall_count = 0` is that answer's zero, and on 74 of 130
+    // pilot cars it is a lookup that never answered at all.
+    packet_modules: null,
+    recall_check: {
+      checked_at: RECALL_CHECKED_AT, open_recall_count: 0,
+      source: "marketcheck", scope: "vin", has_open: false,
+    },
+    recall_status: "clear",
+    recall_checked_at: RECALL_CHECKED_AT, open_recall_count: 0,
   }],
   generated_documents: [
     { id: "d1", tenant_id: TENANT, vehicle_id: VEHICLE_ID, template_id: "t", document_type: "buyers_guide", document_status: "published", version: 2, pdf_url: "https://files.test/bg.pdf", published_at: "2026-07-06T00:00:00Z", created_at: "2026-07-02T00:00:00Z" },

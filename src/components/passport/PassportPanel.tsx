@@ -23,6 +23,7 @@ import { readDealerAlternatives, type DealerAlternative } from "@/lib/dealerAlte
 import { rememberPassportOrigin } from "@/lib/passportOrigin";
 import { recordPanelView } from "@/lib/shopperIntent";
 import { useNhtsaSafety, type NhtsaSafetyResult } from "@/hooks/useNhtsaSafety";
+import { identityFromListing } from "@/lib/factorySticker/vehicleIdentity";
 import { DealerMapPreview } from "@/components/artwork/DealerPageArtwork";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
@@ -427,7 +428,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { name: "Live Market Data", on: avg != null || Object.keys(mc).length > 0 },
         { name: "CARFAX", on: typeof mc.carfax_clean_title === "boolean" || hasCarfaxDoc },
         { name: "OEM", on: Object.keys(ks).length > 0 },
-        { name: "NHTSA", on: !!listing.recall_status },
+        { name: "NHTSA", on: d.hasRecallCheck },
         { name: "Local Listings", on: avg != null },
         { name: "Dealer Pricing", on: true },
       ].filter((s) => s.on);
@@ -1027,7 +1028,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         : eff.usedLibrary || lookupOemReference(listing.ymm) ? "oem_reference"
         : "unknown";
       const hasProgram = !!(w.factory_months || w.powertrain_months || eff.usedLibrary || isFactoryCpo || d.oemWarranty);
-      const makeLabel = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || null;
+      const makeLabel = identityFromListing(listing).make || null;
       const governedState: WarrantyStateView = resolveWarrantyState({
         isNew,
         hasProgram,
@@ -1107,7 +1108,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const statusStartSub = isNew ? null : (startDate ? "(In-Service Date)" : null);
       const yTerm = (mo?: number | null) => (mo ? `${Math.round(mo / 12)} ${Math.round(mo / 12) === 1 ? "Year" : "Years"}` : null);
       const mTerm = (mi?: number | null) => (mi ? `${mi.toLocaleString()} Miles` : null);
-      const brand = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || null;
+      const brand = identityFromListing(listing).make || null;
       const benefitCards: BenefitRow[] = benefitRows.map((r) => ({
         icon: COVERAGE_ICON[r.key] ?? LifeBuoy,
         title: r.label,
@@ -1623,7 +1624,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         listing.mileage != null ? { icon: Gauge, v: listing.mileage.toLocaleString(), s: "Miles", fn: () => openPanel("key-specs") } : null,
         d.belowMarket && d.belowMarket > 0 ? { icon: BadgeCheck, v: fmt$(d.belowMarket), s: "Below market", fn: () => openPanel("market-price") } : null,
         drivetrain ? { icon: Car, v: drivetrain, s: "Drivetrain", fn: () => openPanel("key-specs") } : null,
-        d.recallClear ? { icon: CheckCircle2, v: "No Recalls", s: "NHTSA checked", fn: () => go("vehicle-history") } : null,
+        d.recallClear ? { icon: CheckCircle2, v: "No Recalls", s: "Verified for this VIN", fn: () => go("vehicle-history") } : null,
       ].filter(Boolean) as { icon: React.ElementType; v: string; s: string; fn: () => void }[]).slice(0, 4);
       const carousel = (d.highlights.length ? d.highlights.map((h) => ({ t: h.label, s: h.sub })) : Object.values(groups).flat().map((x) => ({ t: x, s: "" }))).slice(0, 12);
       const explore: { icon: React.ElementType; t: string; s: string; fn: () => void }[] = [
@@ -2181,7 +2182,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const inService = w.in_service_date || d.history?.inServiceDate || null;
       const prep = listing.prep_status?.foreman_signed_at || null;
       const services = (listing.service_records || []).filter((s) => s && (s.date || s.type || s.mileage));
-      const hasHistory = d.ownerCount != null || d.accidentCount != null || d.cleanTitle || d.serviceCount > 0 || !!listing.recall_status;
+      const hasHistory = d.ownerCount != null || d.accidentCount != null || d.cleanTitle || d.serviceCount > 0 || d.hasRecallCheck;
       const published = listing.status === "published";
       const firstSeen = d.history?.firstSeen || null;
       // Most recent listing-history entry approximates arrival at the current
@@ -3380,7 +3381,7 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
   // same-rooftop alternatives lead (price vs equipment vs coverage).
   useEffect(() => { if (panel) recordPanelView(panel); }, [panel]);
   const key = panel ?? shown;
-  const { data: nhtsa } = useNhtsaSafety(listing.ymm, key === "owner-reviews");
+  const { data: nhtsa } = useNhtsaSafety(identityFromListing(listing), key === "owner-reviews");
   if (!key) return null;
 
   // Trust / document / dealer drawers live in their own module; the dispatcher

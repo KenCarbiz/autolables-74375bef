@@ -7,6 +7,7 @@
 // two surfaces can never disagree about the state or the single next action.
 
 import type { Tone } from "@/lib/service/serviceStatus";
+import type { RecallView } from "@/lib/vehicleTruth/recallView";
 
 export const WORKSPACE_BANNER_KEYS = [
   "not_started",
@@ -51,6 +52,8 @@ export interface WorkspaceStatusInput {
   awaitingApproval: boolean;
   grStarted: boolean;
   recallStatus?: string | null;
+  /** Resolved recall truth. Only do-not-drive evidence blocks; scope-blind. */
+  recall?: RecallView | null;
   /** Stored vehicle_delivery_clearance.state, when read. */
   clearanceState?: string | null;
   clearanceReasons?: string[];
@@ -87,8 +90,14 @@ export const CLEARANCE_REASON_LABELS: Record<string, string> = {
 export const clearanceReasonLabel = (code: string): string =>
   CLEARANCE_REASON_LABELS[code] ?? code.replace(/_/g, " ").toLowerCase();
 
-const isDoNotDrive = (recall?: string | null): boolean => {
-  const r = String(recall || "").toLowerCase();
+// `recall_status` only ever holds 'clear' or 'open_recalls', so this substring
+// test never fired on a real row. The resolved view reads the campaign text and
+// the do_not_drive flag where they are actually stored, so the block the code
+// always intended is now reachable — at any scope, because a do-not-drive
+// campaign warns about the car whether or not a VIN check has answered.
+const isDoNotDrive = (i: WorkspaceStatusInput): boolean => {
+  if (i.recall?.doNotDrive === true) return true;
+  const r = String(i.recallStatus || "").toLowerCase();
   return r.includes("do_not_drive") || r.includes("do-not-drive");
 };
 
@@ -147,7 +156,7 @@ export function deriveWorkspaceStatus(i: WorkspaceStatusInput): WorkspaceStatus 
     };
   }
 
-  if (isDoNotDrive(i.recallStatus)) {
+  if (isDoNotDrive(i)) {
     return {
       key: "delivery_blocked",
       label: "Delivery blocked: open recall",

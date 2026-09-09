@@ -15,6 +15,7 @@
 // Both carry a canonical passport_url of https://autolabels.io/v/<slug>.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { applyRecallProjection } from "../_shared/lotFeedRow.ts";
 import { shapeLotRow, type LotFeedFile } from "../_shared/lotFeedRow.ts";
 
 const cors = {
@@ -36,6 +37,7 @@ const COLS = [
   "status", "published_at", "hero_image_url", "photos", "photo_count",
   "tenant_id", "store_id", "mc_attributes", "key_specs", "features",
   "certification", "recall_status", "open_recall_count", "closed_recall_count",
+  "recall_payload", "recall_check", "recall_checked_at",
   "market_value", "market_position", "market_payload", "history_report_url",
   "warranty_info", "epa_economy", "payment_estimate", "in_service_date",
   "website_sale_price", "retail_cash", "dealer_discount", "doc_fee",
@@ -86,7 +88,7 @@ const shape = (r: any, stockFromFiles?: string | null) => {
   const photos = normalizePhotos(r.photos);
   const stock = pickStock(r) ?? stockFromFiles ?? null;
 
-  return compact({
+  const shaped = compact({
     // Identity
     vin: r.vin ?? null,
     year: year ?? null,
@@ -139,6 +141,10 @@ const shape = (r: any, stockFromFiles?: string | null) => {
     slug: r.slug ?? null,
     passport_url: slug ? `${PASSPORT_BASE}/${slug}` : null,
   });
+  // The same projection the lot feed and the shopper's view get: the summary
+  // columns carry only what a VIN-level check established, and the model
+  // line's campaign context ships beside them labelled as model-level.
+  return applyRecallProjection(shaped as Record<string, unknown>);
 };
 
 // ── List mode ─────────────────────────────────────────────────────────

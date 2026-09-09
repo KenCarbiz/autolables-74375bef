@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { resolveHistoryFacts, isBadgeworthy, badgeAttribution } from "@/lib/vehicleTruth/historyFacts";
 import type { Confidence } from "@/lib/vehicleTruth/precedence";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 
 // Trust Badge Strip — the signature confidence bar on the Vehicle Passport.
 // Renders ONLY the badges we have real data for (no greyed placeholders), and
@@ -99,10 +100,23 @@ export default function TrustStrip({ listing }: { listing: any }) {
   const cond = listing.condition as string | null;
   const badges: Badge[] = [];
 
-  if (listing.recall_status === "clear") {
-    badges.push({ icon: ShieldCheck, title: "No Open Recalls", sub: "NHTSA verified clean", tone: "green" });
-  } else if (listing.recall_status === "open_recalls" && (listing.open_recall_count || 0) > 0) {
-    badges.push({ icon: ShieldAlert, title: `${listing.open_recall_count} Open Recall${listing.open_recall_count === 1 ? "" : "s"}`, sub: "See details below", tone: "red" });
+  // A green "No Open Recalls" badge is a claim about THIS VIN. `recall_status`
+  // is written from a MODEL-level NHTSA answer, so it can never earn one; only
+  // a VIN-level check that answered can. Absence of a badge is the correct
+  // rendering of an unanswered check — this strip already omits what it cannot
+  // evidence.
+  const recall = deriveRecallView(listing);
+  if (recall.vin.clearClaimAllowed) {
+    badges.push({ icon: ShieldCheck, title: "No Open Recalls", sub: "Verified for this VIN", tone: "green" });
+  } else if (recall.riskSignalled) {
+    const n = recall.vin.openCount ?? recall.model?.campaignCount ?? null;
+    badges.push({
+      icon: ShieldAlert,
+      title: recall.doNotDrive ? "Do-Not-Drive Recall"
+        : n != null ? `${n} Open Recall${n === 1 ? "" : "s"}` : "Safety Recall Reported",
+      sub: "See details below",
+      tone: "red",
+    });
   }
   for (const f of historyFactBadges(listing)) badges.push({ icon: f.icon, title: f.title, sub: f.sub, tone: "green" });
 

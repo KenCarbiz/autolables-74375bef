@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, FolderCheck, ShieldCheck } from "lucide-react";
@@ -136,12 +137,32 @@ export const ComplianceTab = ({ vehicle, ready, recall, onReload }: {
           blockers: ready.blockers.map((b) => b.label),
           open_items: ready.remaining.map((b) => b.label),
         },
-        recall: {
-          status: vehicle.recall_status,
-          checked_at: vehicle.recall_checked_at,
-          open_count: vehicle.open_recall_count,
-          review_task: recall.task,
-        },
+        recall: (() => {
+          // The compliance packet is evidence. It carries the scope of every
+          // recall answer so a reader can never mistake a model-level zero for
+          // a verified VIN, and the raw columns stay beside it as provenance.
+          const view = deriveRecallView(vehicle);
+          return {
+            vin_verification: {
+              state: view.vin.state,
+              check_complete: view.vin.checkComplete,
+              clear_claim_allowed: view.vin.clearClaimAllowed,
+              open_count: view.vin.openCount,
+              source: view.vin.source,
+              checked_at: view.vin.checkedAt,
+            },
+            model_campaign_context: view.model
+              ? { state: view.model.state, campaign_count: view.model.campaignCount, source: view.model.source, checked_at: view.model.checkedAt }
+              : null,
+            do_not_drive: view.doNotDrive,
+            stored_columns: {
+              status: vehicle.recall_status,
+              checked_at: vehicle.recall_checked_at,
+              open_count: vehicle.open_recall_count,
+            },
+            review_task: recall.task,
+          };
+        })(),
         truth_conflicts: truth.conflicts.map((c) => ({
           fact_key: c.fact_key,
           blocks_generation: c.blocks_generation,

@@ -1,4 +1,25 @@
 import { describe, it, expect } from "vitest";
+import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView";
+
+const NOW = Date.parse("2026-07-10T00:00:00Z");
+/** A VIN-level MarketCheck answer — the only kind that may clear a vehicle. */
+const vinClear = (at: string): RecallView =>
+  deriveRecallView({
+    recall_status: "clear",
+    open_recall_count: 0,
+    recall_payload: { source: "marketcheck", scope: "vin", checked_at: at, open_recall_count: 0, campaigns: [] },
+  }, { now: NOW });
+const vinOpen = (at: string, n: number): RecallView =>
+  deriveRecallView({
+    recall_status: "open_recalls",
+    open_recall_count: n,
+    recall_payload: {
+      source: "marketcheck", scope: "vin", checked_at: at, open_recall_count: n,
+      campaigns: Array.from({ length: n }, (_, i) => ({ campaignNumber: `C${i}`, status: "open" })),
+    },
+  }, { now: NOW });
+const vinDoNotDrive = (): RecallView =>
+  deriveRecallView({ recall_check: { do_not_drive: true, checked_at: "2026-07-04T00:00:00Z", source: "marketcheck" } }, { now: NOW });
 import type { GetReadyItem } from "@/hooks/useGetReady";
 import { getReadyStep } from "./getReadyColumns";
 import { countExceptions, countFinished, isReadyToMarket } from "./packageState";
@@ -27,7 +48,7 @@ const finishedUsedCar = (): VinPackageSources => ({
     latest: { id: "i1", status: "signed", result: "pass", signed_at: "2026-07-02T00:00:00Z" },
   },
   addendum: { id: "a1", customer_signed_at: "2026-07-03T00:00:00Z" },
-  recall: { checkedAt: "2026-07-04T00:00:00Z", doNotDrive: false, openCount: 0, tasks: [] },
+  recall: { view: vinClear("2026-07-04T00:00:00Z"), tasks: [] },
   // The shape issue_vehicle_ready_token writes (20260629010000:80-81). Nothing
   // here is hand-shaped to satisfy a predicate: it is what the RPC inserts.
   qrTokens: [{
@@ -152,7 +173,7 @@ describe("vehicleQrPackageState", () => {
 });
 
 describe("recallPackageState", () => {
-  const base = { checkedAt: "2026-07-04T00:00:00Z", doNotDrive: false, openCount: 1 };
+  const base = { view: vinOpen("2026-07-04T00:00:00Z", 1) };
 
   // V2, the most dangerous single defect. 20260627070000:56-63 blocks publish
   // while ANY recall_service_task is `open_review`, and 20260627060000:126-135
@@ -187,14 +208,29 @@ describe("recallPackageState", () => {
   });
 
   it("blocks outright on a do-not-drive campaign", () => {
-    expect(recallPackageState({ ...base, doNotDrive: true, tasks: [] }).status).toBe("blocked");
+    expect(recallPackageState({ view: vinDoNotDrive(), tasks: [] }).status).toBe("blocked");
   });
 
   it("is not started until a check has been run", () => {
-    expect(recallPackageState({ ...base, checkedAt: null, tasks: [] }).status).toBe("pending");
+    expect(recallPackageState({ view: deriveRecallView(null), tasks: [] }).status).toBe("pending");
   });
 
-  it("is finished when the check found nothing", () => {
-    expect(recallPackageState({ ...base, openCount: 0, tasks: [] }).status).toBe("ready");
+  it("is finished when a VIN-LEVEL check found nothing", () => {
+    expect(recallPackageState({ view: vinClear("2026-07-04T00:00:00Z"), tasks: [] }).status).toBe("ready");
+  });
+
+  // The half of the defect that survived the first fix: a MODEL-level NHTSA
+  // zero is not this car's clearance, so the row is pending work rather than a
+  // finished green check.
+  it("is pending, not ready, when only a model-level answer exists", () => {
+    const view = deriveRecallView({
+      recall_status: "clear",
+      open_recall_count: 0,
+      recall_payload: { source: "nhtsa", checked_at: "2026-07-04T00:00:00Z", model_in_catalog: true, open_recall_count: 0 },
+    }, { now: Date.parse("2026-07-10T00:00:00Z") });
+    expect(view.model?.state).toBe("NO_MODEL_CAMPAIGNS_FOUND");
+    const state = recallPackageState({ view, tasks: [] });
+    expect(state.status).toBe("pending");
+    expect(state.detail).toMatch(/model-level context/i);
   });
 });

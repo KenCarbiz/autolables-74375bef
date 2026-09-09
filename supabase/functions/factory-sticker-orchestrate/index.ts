@@ -41,6 +41,11 @@ import {
   AUTO_PUBLISH_POLICY_VERSION, evaluateAutoPublish, reconcileMsrp,
 } from "../_shared/factorySticker/lib/autoPublish.ts";
 import { recordSourcePayload, refreshVehicleTruth } from "./truth.ts";
+import {
+  countByStickerStatus, parseTruthRefreshMode, selectTruthRefreshWorklist,
+  TRUTH_REFRESH_MIN_AGE_MS,
+  type TruthRefreshCandidate, type TruthRefreshMode,
+} from "../_shared/factorySticker/lib/vehicleTruth/refreshPolicy.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -74,9 +79,17 @@ const SWEEP_INFLIGHT_STALE_MS = 15 * 60_000;
 // settled documents — regenerating one behind the dealer's back can replace
 // what a customer is already looking at. FAILED_PERMANENT and ARCHIVED only
 // re-enter through an explicitly forced regeneration.
+//
+// This set bounds STICKER GENERATION only. It must never be consulted by the
+// truth refresh: truth belongs to the vehicle, a sticker is one downstream
+// consumer of it, and letting a settled document decide whether the vehicle
+// may re-resolve is what froze Vehicle Truth at publication. See
+// vehicleTruth/refreshPolicy.ts for the other half of that separation.
 const SWEEP_NEVER_RERUN_STATUSES = new Set([
   "PUBLISHED", "APPROVED", "SUPERSEDED", "ARCHIVED", "FAILED_PERMANENT",
 ]);
+// Cross-tenant sweeps: the nightly cron has no tenant to name.
+const ALL_TENANT_SWEEP_ACTIONS = new Set(["orchestrate_sweep", "refresh_truth_sweep"]);
 const SWEEP_LOCK_KEY = "factory_sticker_sweep";
 const SWEEP_LOCK_TTL_SECONDS = 300;
 const SWEEP_BUDGET_MS = 90_000;
@@ -1070,7 +1083,7 @@ serve(async (req) => {
     // The nightly cron has no tenant to name — it sweeps every dealer. Only a
     // service-role or cron caller may omit the scope; an interactive caller
     // still has to say which tenant it is acting for.
-    const allTenantSweep = action === "orchestrate_sweep" && !tenantId && (isService || isCron);
+    const allTenantSweep = ALL_TENANT_SWEEP_ACTIONS.has(action) && !tenantId && (isService || isCron);
     if (!tenantId && !allTenantSweep) return json({ error: "tenant_id required" }, 400);
     if (tenantId && !allowed(tenantId)) return json({ error: "forbidden" }, 403);
 
@@ -1376,60 +1389,134 @@ serve(async (req) => {
       });
     }
 
-    // Re-resolve every published vehicle for the tenant. Reads only saved
-    // data — no provider call, so it cannot spend money however often it is
-    // run. Bounded by a wall-clock budget rather than a row count so it
-    // cannot exceed the function timeout on a large inventory; re-invoke
-    // until `remaining` is 0.
+    // Re-resolve the vehicle, not the document.
+    //
+    // TRUTH REFRESH is separate from STICKER GENERATION and PUBLICATION, and
+    // this is the whole of the separated path: it reads only saved data — no
+    // provider call, so it cannot spend money however often it runs — and it
+    // writes only truth. A material change appends a NEW snapshot version
+    // (vehicle_snapshots is append-only; nothing here edits a stored one) and
+    // raises stale_document_flags on the documents built from the previous
+    // one. Nothing is regenerated and nothing is republished: what to do
+    // about a stale sticker stays a downstream decision, made by the human
+    // reading that queue.
+    //
+    // Bounded by a wall-clock budget rather than a row count so it cannot
+    // exceed the function timeout on a large inventory; the worklist is
+    // ordered oldest-truth-first, so re-invoking resumes where the previous
+    // pass stopped instead of re-resolving the same head of the list.
     if (action === "refresh_truth_sweep") {
-      if (!can(tenantId, "regenerate")) return json({ error: "insufficient_permission" }, 403);
-      // `only_missing` (the default) skips vehicles already resolved, so a
-      // run that hits the budget resumes where the last one stopped instead
-      // of spending it re-resolving settled work. Pass only_missing: false to
-      // re-check the whole inventory.
-      const onlyMissing = body.only_missing !== false;
-      const { data: listings } = await admin.from("vehicle_listings")
-        .select("*").eq("tenant_id", tenantId).neq("status", "archived")
-        .order("updated_at", { ascending: false }).limit(500);
-      let rows = (listings || []) as Array<Record<string, unknown>>;
+      if (tenantId && !can(tenantId, "regenerate")) return json({ error: "insufficient_permission" }, 403);
+      // `mode` is the current vocabulary: due (age-based, what the nightly
+      // job runs), only_missing (never resolved), all. `only_missing` is the
+      // older boolean and still decides when no mode is named, so the admin
+      // button and any saved curl keep the behaviour they had.
+      const mode: TruthRefreshMode = parseTruthRefreshMode(
+        body.mode,
+        body.only_missing === false ? "all" : "only_missing",
+      );
+      const limit = Math.min(Math.max(Number(body.limit) || 500, 1), SWEEP_MAX_ROWS);
+      const minAgeHours = Number(body.min_age_hours);
+      const minAgeMs = body.min_age_hours !== undefined && body.min_age_hours !== null
+          && Number.isFinite(minAgeHours) && minAgeHours >= 0
+        ? minAgeHours * 3_600_000
+        : TRUTH_REFRESH_MIN_AGE_MS;
 
-      if (onlyMissing && rows.length) {
-        const { data: existing } = await admin.from("vehicle_snapshots")
-          .select("vehicle_id").eq("tenant_id", tenantId);
-        const resolved = new Set(
-          ((existing || []) as Array<{ vehicle_id: string }>).map((r) => r.vehicle_id),
-        );
-        rows = rows.filter((r) => !resolved.has(String(r.id)));
+      // One row per vehicle carrying its last resolution time, which lives in
+      // vehicle_facts and cannot be aggregated over PostgREST without pulling
+      // every fact row for every vehicle.
+      const { data: candidateRows, error: candidateError } = await admin.rpc("truth_refresh_candidates", {
+        _tenant_id: tenantId || null,
+        _limit: SWEEP_MAX_ROWS,
+      });
+      if (candidateError) {
+        return json({
+          error: "truth_refresh_candidates_unavailable",
+          detail: String(candidateError.message || candidateError).slice(0, 300),
+        }, 500);
       }
+      const candidates = ((candidateRows || []) as Array<{
+        vehicle_id: string; tenant_id: string | null; listing_status: string | null;
+        sticker_status: string | null; last_resolved_at: string | null; has_snapshot: boolean | null;
+      }>).map((r): TruthRefreshCandidate => ({
+        vehicleId: r.vehicle_id,
+        tenantId: r.tenant_id,
+        listingStatus: r.listing_status,
+        stickerStatus: r.sticker_status,
+        lastResolvedAt: r.last_resolved_at,
+        hasSnapshot: r.has_snapshot === true,
+      }));
+      const worklist = selectTruthRefreshWorklist(candidates, { mode, limit, minAgeMs });
+
+      const listingById = new Map<string, Record<string, unknown>>();
+      for (let i = 0; i < worklist.length; i += 200) {
+        const ids = worklist.slice(i, i + 200).map((c) => c.vehicleId);
+        const { data: chunk } = await admin.from("vehicle_listings").select("*").in("id", ids);
+        for (const row of (chunk || []) as Array<Record<string, unknown>>) {
+          listingById.set(String(row.id), row);
+        }
+      }
+      const rows = worklist
+        .map((c) => ({ candidate: c, listing: listingById.get(c.vehicleId) }))
+        .filter((r): r is { candidate: TruthRefreshCandidate; listing: Record<string, unknown> } => !!r.listing);
 
       // Callers (the admin curl tool, the app button) have short client-side
       // deadlines that a 90s inline sweep blows past. Ack immediately and let
       // EdgeRuntime.waitUntil finish the work; re-invoke to see remaining.
       const sync = !!body.sync;
       const worker = async () => {
-        const deadline = Date.now() + 90_000;
-        let created = 0, reused = 0, failed = 0, processed = 0;
+        const deadline = Date.now() + SWEEP_BUDGET_MS;
+        let created = 0, reused = 0, failed = 0, processed = 0, factsWritten = 0;
         const conflicts: string[] = [];
-        for (const listing of rows) {
+        const refreshed: TruthRefreshCandidate[] = [];
+        for (const { candidate, listing } of rows) {
           if (Date.now() >= deadline) break;
           processed++;
           try {
-            const res = await refreshVehicleTruth(admin, tenantId, listing);
+            const res = await refreshVehicleTruth(admin, String(listing.tenant_id || candidate.tenantId || ""), listing);
             if (res.created) created++; else reused++;
+            factsWritten += res.facts_written;
+            refreshed.push(candidate);
             if (res.blocking_conflicts > 0) conflicts.push(String(listing.vin || ""));
           } catch { failed++; }
         }
-        return { created, reused, failed, processed, conflicts };
+        // pg_cron's `succeeded` says the request returned. This says what the
+        // run did, and which sticker states its vehicles were in — the
+        // evidence that a settled document no longer freezes its vehicle.
+        try {
+          await admin.from("audit_log").insert({
+            action: "vehicle_truth_refresh_sweep",
+            entity_type: "system",
+            entity_id: "truth-refresh-sweep",
+            store_id: tenantId || null,
+            details: {
+              mode, scope: tenantId || "all_tenants",
+              total: rows.length, processed, created, reused, failed,
+              facts_written: factsWritten,
+              sticker_status_refreshed: countByStickerStatus(refreshed),
+            },
+          });
+        } catch { /* audit must never break the sweep */ }
+        return {
+          created, reused, failed, processed,
+          facts_written: factsWritten,
+          conflicts,
+          sticker_status_refreshed: countByStickerStatus(refreshed),
+        };
       };
       if (sync) {
         const r = await worker();
-        return json({ success: true, total: rows.length, ...r, remaining: Math.max(0, rows.length - r.processed) });
+        return json({ success: true, mode, total: rows.length, ...r, remaining: Math.max(0, rows.length - r.processed) });
       }
       // deno-lint-ignore no-explicit-any
       const er = (globalThis as any).EdgeRuntime;
       if (er && typeof er.waitUntil === "function") er.waitUntil(worker());
       else worker();
-      return json({ success: true, started: true, total: rows.length, note: "Sweep running in background; re-invoke to see remaining." });
+      return json({
+        success: true, started: true, mode, total: rows.length,
+        scope: tenantId || "all_tenants",
+        note: "Sweep running in background; re-invoke to see remaining.",
+      });
     }
 
     // Nightly self-heal for the sticker itself. A factory_sticker_record is

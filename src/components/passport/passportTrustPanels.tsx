@@ -1,3 +1,4 @@
+import { identityFromListing } from "@/lib/factorySticker/vehicleIdentity";
 import {
   ShieldCheck, FileText, ExternalLink, Download, ChevronRight, MessageSquare,
   AlertTriangle, CheckCircle2, Clock, HelpCircle, MapPin, Phone, Navigation,
@@ -353,7 +354,7 @@ function collectDocuments(listing: VehicleListing, d: PassportData): DocRow[] {
     });
   }
 
-  const brand = (listing.ymm || "").trim().split(/\s+/)[1] || "";
+  const brand = identityFromListing(listing).make;
   const hist = d.historyReport && packetVisible(listing, "historyReport") ? d.historyReport : null;
   if (hist) {
     rows.push({
@@ -439,10 +440,11 @@ const AVAIL_TONE: Record<DocRow["availability"], string> = {
 function DocumentList({ ctx }: { ctx: TrustPanelContext }) {
   const { listing, d, track } = ctx;
   const rows = collectDocuments(listing, d);
+  const identity = identityFromListing(listing);
   const vehicle = {
-    year: (listing.ymm || "").trim().split(/\s+/)[0] || "",
-    make: (listing.ymm || "").trim().split(/\s+/)[1] || "",
-    model: (listing.ymm || "").trim().split(/\s+/).slice(2).join(" "),
+    year: identity.year,
+    make: identity.make,
+    model: identity.model,
     trim: listing.trim || "",
     vin: listing.vin || "",
     photo: listingHero(listing) || null,

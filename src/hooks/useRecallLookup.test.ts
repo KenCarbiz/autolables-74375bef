@@ -12,7 +12,15 @@ const RESULT: RecallResult = {
   hasStopSale: false,
   hasTakata: false,
   lastChecked: "2026-06-28T00:00:00Z",
+  scope: "vin",
+  source: "marketcheck",
 };
+
+// The nhtsa-recall function answers for a year/make/model, so whatever it
+// returns is stamped MODEL scope on the way out — that stamp is what stops the
+// addendum banner turning an empty NHTSA answer into "no open recalls for this
+// vehicle".
+const NHTSA_RESULT: RecallResult = { ...RESULT, scope: "model", source: "nhtsa" };
 
 const INPUT = { vin: "1HGCM82633A123456", make: "Honda", model: "Accord", year: "2024" };
 
@@ -24,7 +32,7 @@ describe("useRecallLookup.lookup", () => {
     const { result } = renderHook(() => useRecallLookup());
     let out: RecallResult | null = null;
     await act(async () => { out = await result.current.lookup(INPUT); });
-    expect(out).toEqual(RESULT);
+    expect(out).toEqual(NHTSA_RESULT);
     expect(invoke).toHaveBeenCalledWith("nhtsa-recall", { body: INPUT });
     expect(result.current.loading).toBe(false);
     expect(result.current.error).toBeNull();
@@ -99,6 +107,31 @@ describe("useRecallLookup.lookup", () => {
     await act(async () => { out = await result.current.lookup({ ...INPUT, tenantId: "t-1" }); });
     expect(invoke).toHaveBeenNthCalledWith(1, "marketcheck-recalls", { body: { vin: INPUT.vin, tenant_id: "t-1" } });
     expect(invoke).toHaveBeenNthCalledWith(2, "nhtsa-recall", { body: { vin: INPUT.vin, make: INPUT.make, model: INPUT.model, year: INPUT.year } });
-    expect(out).toEqual(RESULT);
+    expect(out).toEqual(NHTSA_RESULT);
+  });
+
+  // marketcheck-recalls falls back to NHTSA server-side, so the function it
+  // was called on cannot decide the scope — the provider it answers with does.
+  it("stamps MODEL scope when marketcheck-recalls answers from NHTSA", async () => {
+    invoke.mockResolvedValueOnce({
+      data: { recalls: [], recallStatus: "clear", openRecallCount: 0, checkedAt: "2026-06-28T00:00:00Z", provider: "nhtsa" },
+      error: null,
+    });
+    const { result } = renderHook(() => useRecallLookup());
+    let out: RecallResult | null = null;
+    await act(async () => { out = await result.current.lookup({ ...INPUT, tenantId: "t-1" }); });
+    expect((out as RecallResult | null)?.scope).toBe("model");
+    expect((out as RecallResult | null)?.hasOpenRecall).toBe(false);
+  });
+
+  it("stamps VIN scope only when the licensed VIN-level product answered", async () => {
+    invoke.mockResolvedValueOnce({
+      data: { recalls: [], recallStatus: "clear", openRecallCount: 0, checkedAt: "2026-06-28T00:00:00Z", provider: "marketcheck_autorecalls" },
+      error: null,
+    });
+    const { result } = renderHook(() => useRecallLookup());
+    let out: RecallResult | null = null;
+    await act(async () => { out = await result.current.lookup({ ...INPUT, tenantId: "t-1" }); });
+    expect((out as RecallResult | null)?.scope).toBe("vin");
   });
 });

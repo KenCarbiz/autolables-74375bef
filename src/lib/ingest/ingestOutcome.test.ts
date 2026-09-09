@@ -4,7 +4,7 @@ import {
   RECORDABLE_STATUSES,
   buildIngestOutcomes,
   modelMatches,
-  parseYmm,
+  harvestIdentity,
   pickOemLink,
   summarizeIngestOutcomes,
   type IngestOutcomeInput,
@@ -28,14 +28,16 @@ describe("the storable status vocabulary", () => {
   });
 });
 
-describe("parseYmm", () => {
-  it("splits year / make / model the way the harvest callers do", () => {
-    expect(parseYmm("2026 Toyota Camry XSE")).toEqual({ year: 2026, make: "Toyota", model: "Camry XSE" });
+describe("harvestIdentity", () => {
+  it("uses the feed's own keys, the way the harvest callers do", () => {
+    expect(harvestIdentity({ ymm: "2020 Alfa Romeo Stelvio", mc_attributes: { year: 2020, make: "Alfa Romeo", model: "Stelvio" } }))
+      .toEqual({ year: 2020, make: "Alfa Romeo", model: "Stelvio" });
   });
 
-  it("returns a null year rather than NaN when the string is not a year", () => {
-    expect(parseYmm("Toyota Camry")).toEqual({ year: null, make: "Camry", model: "" });
-    expect(parseYmm(null)).toEqual({ year: null, make: "", model: "" });
+  it("falls back to the shared parser, which does not lose a two-token make", () => {
+    expect(harvestIdentity({ ymm: "2026 Toyota Camry XSE" })).toEqual({ year: 2026, make: "Toyota", model: "Camry XSE" });
+    expect(harvestIdentity({ ymm: "Toyota Camry" })).toEqual({ year: null, make: "Toyota", model: "Camry" });
+    expect(harvestIdentity(null)).toEqual({ year: null, make: "", model: "" });
   });
 });
 

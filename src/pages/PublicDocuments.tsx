@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { useParams, useNavigate } from "react-router-dom";
 import { listingHero } from "@/lib/photos";
 import {
@@ -212,13 +213,29 @@ const CATALOG: DocDescriptor[] = [
     title: "Safety & Recall Clearance",
     description: "Confirms open NHTSA safety recalls have been identified and addressed prior to sale.",
     resolve: ({ listing }) => {
-      const open = listing.open_recall_count ?? 0;
-      const rc = listing.recall_check;
-      if (open > 0) {
-        const lines = (rc?.campaigns || []).map((c) => `${c.campaignNumber ? c.campaignNumber + ": " : ""}${c.summary || c.component || "Open campaign"}`);
-        return { status: "action_required", statusText: "Recall Pending — See Dealer", detailLines: lines.length ? lines : ["One or more open recalls on record. Contact the dealer before purchase."] };
+      // "No Open Recalls — NHTSA Verified" used to come from
+      // `open_recall_count ?? 0`, so an unanswered lookup printed a clearance
+      // into a customer document packet. Only a VIN-level check that answered
+      // may produce that line; NHTSA's model-level answer is shown as the
+      // model-level context it is.
+      const v = deriveRecallView(listing);
+      if (v.riskSignalled) {
+        const lines = v.campaigns.map((c) => `${c.number ? c.number + ": " : ""}${c.summary || c.component || "Open campaign"}`);
+        return { status: "action_required", statusText: "Recall Pending — See Dealer", detailLines: lines.length ? lines : ["One or more recall campaigns on record. Contact the dealer before purchase."] };
       }
-      return { status: "on_file", statusText: "No Open Recalls — NHTSA Verified", date: rc?.checked_at, detailLines: ["This vehicle has no open NHTSA safety recalls on record."] };
+      if (v.vin.clearClaimAllowed) {
+        return {
+          status: "on_file",
+          statusText: "No Open Recalls — Verified for this VIN",
+          date: v.vin.checkedAt ?? undefined,
+          detailLines: [`A VIN-level recall check${v.vin.source ? ` (${v.vin.source})` : ""} returned no open safety campaigns.`],
+        };
+      }
+      return {
+        status: "coming_soon",
+        statusText: "Recall Verification Unavailable",
+        detailLines: [v.vin.detail],
+      };
     },
   },
   {

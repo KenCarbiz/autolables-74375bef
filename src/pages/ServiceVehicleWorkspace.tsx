@@ -1,4 +1,6 @@
+import { identityFromListing, identityTrim } from "@/lib/factorySticker/vehicleIdentity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { deriveRecallView, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,6 +52,8 @@ const sb = () => supabase as any;
 interface Listing {
   id: string; vin: string; ymm: string | null; condition: string | null; status: string | null;
   mileage: number | null; recall_status: string | null; hero_image_url: string | null;
+  recall_payload?: unknown; recall_check?: unknown; recall_checked_at?: string | null;
+  open_recall_count?: number | null;
   mc_attributes: Record<string, unknown> | null; created_at: string | null; deal_processed_at: string | null;
 }
 interface InspRow {
@@ -131,7 +135,7 @@ export default function ServiceVehicleWorkspace() {
     try {
       const [vehRes, grRes, siRes, srRes, memRes, auditRes, vfRes] = await Promise.all([
         sb().from("vehicle_listings")
-          .select("id, vin, ymm, condition, status, mileage, recall_status, hero_image_url, mc_attributes, created_at, deal_processed_at")
+          .select("id, vin, ymm, condition, status, mileage, recall_status, recall_payload, recall_check, recall_checked_at, open_recall_count, hero_image_url, mc_attributes, created_at, deal_processed_at")
           .eq("tenant_id", tenantId).eq("vin", vin).limit(1).maybeSingle(),
         sb().from("get_ready_records")
           .select("id, status, items, get_ready_complete_date, get_ready_start_date, delivery_target, assigned_technician, ro_number")
@@ -246,6 +250,9 @@ export default function ServiceVehicleWorkspace() {
     awaitingApproval: pendingRequests > 0,
     grStarted,
     recallStatus: veh?.recall_status,
+    // The do-not-drive block reads the campaign evidence, not the status
+    // column: `recall_status` only ever holds 'clear' or 'open_recalls'.
+    recall: deriveRecallView((veh ?? null) as RecallRowInput | null),
     clearanceState: clearance?.state ?? null,
     clearanceReasons: clearance?.reason_codes ?? [],
     canExecute,
@@ -321,7 +328,8 @@ export default function ServiceVehicleWorkspace() {
 
   const stock = fileStock || String((veh.mc_attributes as Record<string, unknown> | null)?.stock_no || "") || null;
   const ymm = veh.ymm || "Vehicle";
-  const trim = ymm.split(/\s+/).slice(3).join(" ") || null;
+  const identity = identityFromListing(veh);
+  const trim = identityTrim(veh.ymm, identity) || null;
   const assignedMember = members.find((m) => m.user_id === newestActive?.assigned_to);
   const sold = !!veh.deal_processed_at || String(veh.status || "") === "sold";
   const singleActionSticky = ws.key !== "cleared";
@@ -340,7 +348,7 @@ export default function ServiceVehicleWorkspace() {
 
         <VehicleIdentityStrip
           imageUrl={veh.hero_image_url}
-          ymm={ymm.split(/\s+/).slice(0, 3).join(" ") || ymm}
+          ymm={[identity.year, identity.make, identity.model].filter(Boolean).join(" ") || ymm}
           trim={trim}
           stockNumber={stock}
           vin={vin}
@@ -443,7 +451,7 @@ export default function ServiceVehicleWorkspace() {
               tenantId={tenantId}
               vin={vin}
               gr={gr}
-              vehRecall={veh.recall_status}
+              vehRecall={deriveRecallView(veh as RecallRowInput).vin.label}
               canCompleteWork={canCompleteWork}
               userLabel={user?.email?.split("@")[0] || "member"}
               onChanged={() => void load()}

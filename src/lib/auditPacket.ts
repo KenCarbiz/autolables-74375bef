@@ -1,3 +1,5 @@
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
+
 // ──────────────────────────────────────────────────────────────
 // Audit-Defense Packet (Wave 14.1)
 //
@@ -51,7 +53,12 @@ export interface AuditPacket {
     archived_document_count: number;
     has_vehicle_file: boolean;
     has_recall_snapshot: boolean;
-    open_recall_count: number;
+    /** Open recalls ON THIS VIN. Null unless a VIN-level check answered. */
+    open_recall_count: number | null;
+    /** Campaigns held in the snapshot at any scope — evidence, not clearance. */
+    recall_campaigns_on_record: number;
+    recall_vin_state: string;
+    recall_model_state: string | null;
     do_not_drive: boolean;
     // Wave 22 — install-photo + advertised-price summary so
     // the cover KPI strip can quote both at a glance.
@@ -278,11 +285,13 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
   );
   const chainRoot = await sha256Hex(chainPayload);
 
-  // Recall summary fields are best-effort; the snapshot shape is
-  // controlled by the nhtsa-recall edge function and may change.
-  const recallObj = (recall ?? {}) as { recalls?: unknown[]; do_not_drive?: boolean };
-  const openRecallCount = Array.isArray(recallObj.recalls) ? recallObj.recalls.length : 0;
-  const doNotDrive = !!recallObj.do_not_drive;
+  // Recall summary fields are best-effort; the snapshot shape is controlled by
+  // the nhtsa-recall edge function and may change. An audit packet is evidence,
+  // so the count is NULL where no VIN-level check answered — `recalls.length`
+  // of an absent array used to print a hard 0 into a compliance record.
+  const recallView = deriveRecallView({ recall_payload: recall ?? null });
+  const openRecallCount = recallView.vin.openCount;
+  const doNotDrive = recallView.doNotDrive;
 
   const manifest: AuditPacketManifest = {
     version: VERSION,
@@ -312,6 +321,9 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
       has_vehicle_file: !!vehicleFileRow,
       has_recall_snapshot: recall !== null && !(recall as { error?: string }).error,
       open_recall_count: openRecallCount,
+      recall_campaigns_on_record: recallView.campaigns.length,
+      recall_vin_state: recallView.vin.state,
+      recall_model_state: recallView.model?.state ?? null,
       do_not_drive: doNotDrive,
       // Wave 22 — install-photo + signature aggregates across
       // every accessory on every get-ready record for this VIN.

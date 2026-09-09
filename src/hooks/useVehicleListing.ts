@@ -179,6 +179,13 @@ export interface VehicleListing {
   hero_image_url?: string | null;
   recall_status?: string | null;
   open_recall_count?: number | null;
+  recall_checked_at?: string | null;
+  /**
+   * The provider's own answer, carrying the source, the scope and the time
+   * that `recall_status` and `open_recall_count` do not. Read it through
+   * `deriveRecallView` — never directly.
+   */
+  recall_payload?: unknown;
   market_value?: number | null;
   market_position?: string | null;
   market_payload?: { listingPrice?: number | null; low?: number | null; high?: number | null; belowMarket?: number } | null;

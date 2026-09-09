@@ -22,6 +22,7 @@
 //      second truth table, and a projection that has to be migrated is a
 //      projection that cannot be corrected in one deploy.
 
+import type { RecallView } from "../vehicleTruth/recallView.ts";
 import type { Confidence, SourceKind } from "../vehicleTruth/precedence.ts";
 
 /** Where a value stands relative to the world, per directive §10. */
@@ -238,6 +239,13 @@ export interface DocumentsSection {
 }
 
 export interface ComplianceSection {
+  /**
+   * The two recall scopes, resolved once. `recall.vin.checkComplete` is the
+   * only thing that may satisfy a VIN-level requirement — a verified badge, a
+   * clearance, a clean claim. `recallStatus` and `openRecallCount` below stay
+   * as the provenance-carrying projections of the underlying columns.
+   */
+  recall: RecallView;
   recallStatus: ResolvedField<string>;
   openRecallCount: ResolvedField<number>;
   doNotDrive: boolean;

@@ -6,6 +6,7 @@
 // "task" table.
 
 import { isExecutedSignoff, isFailedInspection } from "@/lib/commandCenter/inspectionState";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 
 export type GRState = "not_started" | "in_progress" | "complete" | "failed";
 // Renamed from K208State: inspectionState.ts exports the row-level K208State
@@ -57,8 +58,12 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean,
   const someComplete = items.some((i) => i.status === "complete");
   const allComplete = anyItems && items.every((i) => i.status === "complete");
   const grComplete = !!gr?.get_ready_complete_date || allComplete;
+  // `recall_status` holds only 'clear' or 'open_recalls', so this substring
+  // test never fired. The resolved view reads do_not_drive where it is stored.
   const rs = String(v?.recall_status || "").toLowerCase();
-  const recallBlocking = rs.includes("do_not_drive") || rs.includes("do-not-drive");
+  const recallBlocking = rs.includes("do_not_drive")
+    || rs.includes("do-not-drive")
+    || deriveRecallView(v ?? null).doNotDrive;
   // Both callers query .eq("status","signed") (the banner's select even omits
   // the status column), so `si` IS the newest signed row — normalize it and let
   // the ONE predicate decide. A legacy signed row with a NULL result counts;

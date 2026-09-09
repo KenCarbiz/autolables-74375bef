@@ -1,4 +1,5 @@
 import { canonicalCondition } from "@/lib/vehicleCondition";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
 
 export type ComplianceSectionId =
@@ -43,6 +44,9 @@ export interface ListingRow {
   source_url: string | null;
   open_recall_count: number | null;
   recall_status: string | null;
+  recall_checked_at?: string | null;
+  recall_payload?: unknown;
+  recall_check?: unknown;
   created_at: string;
   mc_attributes: Record<string, unknown> | null;
   sticker_snapshot: Record<string, unknown> | null;
@@ -584,15 +588,35 @@ export const buildIssueRows = (args: {
       });
     }
 
-    const openRecalls = l.open_recall_count ?? 0;
-    if (openRecalls > 0) {
+    // `open_recall_count` is written from a MODEL-level NHTSA answer and is 0
+    // on every vehicle whose lookup never answered, so compliance may neither
+    // read a zero as clear nor read a positive count as a VIN-level finding.
+    // UNKNOWN is its own exception here: an unverifiable recall is an open
+    // compliance item, not a silent pass.
+    const recall = deriveRecallView(l);
+    const openRecalls = recall.vin.openCount ?? recall.model?.campaignCount ?? 0;
+    if (recall.riskSignalled) {
       issues.push({
         category: "recall",
         severity: "critical",
-        label: `${openRecalls} open NHTSA recall${openRecalls === 1 ? "" : "s"}`,
-        detail: "Count carried on the vehicle record from the last NHTSA check.",
+        label: recall.doNotDrive
+          ? "Do-not-drive recall campaign on record"
+          : recall.vin.checkComplete
+            ? `${openRecalls} open NHTSA recall${openRecalls === 1 ? "" : "s"} on this VIN`
+            : `${openRecalls} recall campaign${openRecalls === 1 ? "" : "s"} on record — VIN scope unverified`,
+        detail: recall.vin.checkComplete
+          ? `VIN-level check${recall.vin.source ? ` (${recall.vin.source})` : ""} as of ${recall.vin.checkedAt ?? "an unrecorded date"}.`
+          : `${recall.vin.detail}${recall.model ? ` Model-level context: ${recall.model.label}.` : ""}`,
       });
-    } else if (reviewRecallVins.has(vin)) {
+    } else if (!recall.vin.checkComplete) {
+      issues.push({
+        category: "recall",
+        severity: "attention",
+        label: "Recall verification unavailable for this VIN",
+        detail: `${recall.vin.detail}${recall.model ? ` Model-level context: ${recall.model.label}.` : ""}`,
+      });
+    }
+    if (!recall.riskSignalled && reviewRecallVins.has(vin)) {
       issues.push({
         category: "recall",
         severity: "attention",

@@ -1,4 +1,5 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 
 // ──────────────────────────────────────────────────────────────────────
 // Shopper-facing vehicle insights — turns the MarketCheck enrichment and
@@ -64,10 +65,12 @@ export function vehicleInsights(l: VehicleListing): VehicleInsight[] {
     out.push({ id: "low-miles", label: "Low mileage", detail: `Only ${l.mileage.toLocaleString()} miles.`, tone: "emerald", strength: 68 });
   }
 
-  // Recall status.
-  const openRecalls = l.open_recall_count != null ? Number(l.open_recall_count) : null;
-  if (openRecalls === 0) {
-    out.push({ id: "no-recalls", label: "No open recalls", detail: "No open NHTSA safety recalls at last check.", tone: "emerald", strength: 64 });
+  // Recall status. A selling point is a claim about THIS car, so it needs a
+  // VIN-level check that answered — `open_recall_count === 0` is a MODEL-level
+  // NHTSA number and is zero on every vehicle whose lookup never answered.
+  const recall = deriveRecallView(l);
+  if (recall.vin.clearClaimAllowed) {
+    out.push({ id: "no-recalls", label: "No open recalls", detail: "A VIN-level recall check returned no open safety campaigns.", tone: "emerald", strength: 64 });
   }
 
   // Days on market — freshness.

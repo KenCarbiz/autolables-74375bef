@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import type { LucideIcon } from "lucide-react";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { useVinScan } from "@/contexts/VinScanContext";
@@ -160,7 +161,12 @@ const InventoryMobileRestored = () => {
       usedCount: rows.filter((row) => row.condition === "used").length,
       cpoCount: rows.filter((row) => row.condition === "cpo").length,
       health: rows.length ? Math.round(readinessTotal / rows.length) : 0,
-      openRecalls: rows.reduce((sum, row) => sum + (row.open_recall_count || 0), 0),
+      // Sums evidenced campaigns only. A null or zero count is an unanswered
+      // check, not a clean car, and contributes nothing either way.
+      openRecalls: rows.reduce((sum, row) => {
+        const v = deriveRecallView(row);
+        return sum + (v.riskSignalled ? (row.open_recall_count || 1) : 0);
+      }, 0),
     };
   }, [rows, addendumVins, verifiedPriceVins]);
 

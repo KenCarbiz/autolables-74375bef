@@ -207,7 +207,22 @@ describe("buildAuditPacket — summary stats", () => {
     const sb = makeSupabase({}, { recalls: [{ campaign_id: "24V001" }], do_not_drive: true });
     const p = await buildAuditPacket({ supabase: sb, vin: "X", tenantId: null, tenantName: null });
     expect(p.summary.do_not_drive).toBe(true);
-    expect(p.summary.open_recall_count).toBe(1);
+    // The campaign is on record and counted as evidence. `open_recall_count`
+    // is the count FOR THIS VIN, and the nhtsa-recall snapshot names no
+    // VIN-level source, so it stays null rather than asserting one.
+    expect(p.summary.recall_campaigns_on_record).toBe(1);
+    expect(p.summary.open_recall_count).toBeNull();
+    expect(p.summary.recall_vin_state).toBe("UNKNOWN");
+  });
+
+  // An audit packet is evidence. `recalls.length` of an absent array printed a
+  // hard 0 into a compliance record for a vehicle nobody had checked.
+  it("records no recall count at all when nothing answered", async () => {
+    const sb = makeSupabase({}, {});
+    const p = await buildAuditPacket({ supabase: sb, vin: "X", tenantId: null, tenantName: null });
+    expect(p.summary.open_recall_count).toBeNull();
+    expect(p.summary.recall_campaigns_on_record).toBe(0);
+    expect(p.summary.do_not_drive).toBe(false);
   });
 
   it("survives recall-edge-function errors without throwing", async () => {

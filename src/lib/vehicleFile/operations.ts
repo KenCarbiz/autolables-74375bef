@@ -36,6 +36,7 @@ import type {
   LicenseClass,
 } from "./readModelTypes.ts";
 import { emptyField, resolveField } from "./resolveField.ts";
+import { deriveRecallView } from "../vehicleTruth/recallView.ts";
 import { arr, bool, iso, latestStamp, num, obj, str, type Row, type VehicleFileSources } from "./sources.ts";
 
 // GetReadySection and DocumentsSection carry no FieldCandidate, so they have
@@ -521,6 +522,7 @@ export function buildCompliance(
   if (!listing) {
     const why = "No vehicle_listings row was read for this vehicle.";
     return {
+      recall: deriveRecallView(null, { now }),
       recallStatus: emptyField<string>("recall_status", why),
       openRecallCount: emptyField<number>("open_recall_count", why),
       doNotDrive: false,
@@ -561,6 +563,26 @@ export function buildCompliance(
   // 74 pilot rows whose payload note reads `no_nhtsa_record_http_400` are in
   // exactly this state, and all 74 carry open_recall_count = 0.
   const checkCompleted = statusColumn != null && !payloadFailed;
+  // NHTSA answers for a year/make/model. Its zero describes the model line and
+  // may never become this car's clearance, so a CLEAR status — and a zero
+  // count — is emitted only where a VIN-level source produced it. A POSITIVE
+  // count and an open status are emitted whatever the scope: model-level
+  // evidence must still be able to warn, it just may never clear.
+  const recall = deriveRecallView(listing, { now });
+  // A clear value survives only where a VIN-level source produced an answer.
+  // STALE counts as an answer on purpose: the resolver's own freshness layer
+  // is what ages it, and suppressing it here would lose the STALE blocker.
+  // Whether that answer may be PRESENTED as clean is `recall.vin
+  // .clearClaimAllowed`, which every consumer of this section reads instead.
+  const vinAnswered = recall.vin.state === "VERIFIED_CLEAR"
+    || recall.vin.state === "OPEN"
+    || recall.vin.state === "STALE";
+  const scopeNote = vinAnswered
+    ? undefined
+    : "This store holds no VIN-level recall answer, so it cannot emit a clear status or a zero count. "
+      + `VIN scope: ${recall.vin.state}. Model scope: ${recall.model ? recall.model.state : "no model lookup on record"}.`;
+  const clearable = <T,>(value: T | null, isClear: boolean): T | null =>
+    isClear && !vinAnswered ? null : value;
   const failureNote = payloadFailed
     ? `The recall lookup did not return a record (recall_payload.note = ${payloadNote}), so neither a `
       + "status nor a count is emitted from this store. A zero here is a failed lookup, not a clean car."
@@ -568,7 +590,7 @@ export function buildCompliance(
 
   const statusCandidates: Array<FieldCandidate<string>> = [
     candidate<string>({
-      value: statusColumn,
+      value: clearable(statusColumn, lower(statusColumn) === "clear"),
       source: provider.kind,
       origin: "vehicle_listings.recall_status",
       provider: provider.name,
@@ -576,6 +598,7 @@ export function buildCompliance(
       confidence: provider.confidence,
       license: provider.license,
       note: failureNote
+        ?? scopeNote
         ?? "The column every customer and employee surface reads. Written by marketcheck-recalls and by "
           + "vehicle-enrich; it holds only 'clear' or 'open_recalls', so every do_not_drive substring "
           + "test against it in the clearance and service code is dead.",
@@ -583,7 +606,7 @@ export function buildCompliance(
     candidate<string>({
       value: check.has_open === undefined
         ? null
-        : (bool(check.has_open) === true ? "open_recalls" : "clear"),
+        : (bool(check.has_open) === true ? "open_recalls" : clearable("clear", true)),
       source: "other_structured",
       origin: "vehicle_listings.recall_check->has_open",
       provider: "Recall check record (marketcheck-recalls, or the client publish path — the store "
@@ -598,7 +621,8 @@ export function buildCompliance(
     candidate<string>({
       value: payloadFailed
         ? null
-        : (str(payload.recallStatus) ?? (payloadCampaigns.length ? "open_recalls" : (payloadCheckedAt ? "clear" : null))),
+        : (clearable(str(payload.recallStatus), lower(payload.recallStatus) === "clear")
+          ?? (payloadCampaigns.length ? "open_recalls" : (payloadCheckedAt ? clearable("clear", true) : null))),
       source: provider.kind,
       origin: "vehicle_listings.recall_payload",
       provider: provider.name,
@@ -621,7 +645,7 @@ export function buildCompliance(
 
   const countCandidates: Array<FieldCandidate<number>> = [
     candidate<number>({
-      value: checkCompleted ? num(listing.open_recall_count) : null,
+      value: checkCompleted ? clearable(num(listing.open_recall_count), num(listing.open_recall_count) === 0) : null,
       source: provider.kind,
       origin: "vehicle_listings.open_recall_count",
       provider: provider.name,
@@ -631,7 +655,9 @@ export function buildCompliance(
       note: failureNote,
     }),
     candidate<number>({
-      value: check.campaigns === undefined ? null : openCampaigns(checkCampaigns),
+      value: check.campaigns === undefined
+        ? null
+        : clearable(openCampaigns(checkCampaigns), openCampaigns(checkCampaigns) === 0),
       source: "other_structured",
       origin: "vehicle_listings.recall_check->campaigns",
       provider: "Recall check record (writer unmarked)",
@@ -642,7 +668,10 @@ export function buildCompliance(
     candidate<number>({
       value: payloadFailed
         ? null
-        : (num(payload.openRecallCount) ?? (payloadCheckedAt ? openCampaigns(payloadCampaigns) : null)),
+        : clearable(
+          num(payload.openRecallCount) ?? (payloadCheckedAt ? openCampaigns(payloadCampaigns) : null),
+          (num(payload.openRecallCount) ?? (payloadCheckedAt ? openCampaigns(payloadCampaigns) : null)) === 0,
+        ),
       source: provider.kind,
       origin: "vehicle_listings.recall_payload",
       provider: provider.name,
@@ -741,8 +770,16 @@ export function buildCompliance(
     blockers.push(
       couldNotRead(sources, "vehicle_listings")
         ? "The listing row could not be read, so recall state is unknown."
-        : "No recall store holds a status for this vehicle: recall_status, recall_check and "
-          + "recall_payload are all empty of an answer.",
+        : `${recall.vin.detail} No store holds a VIN-level answer, so no surface may present this `
+          + "vehicle as having no open recalls.",
+    );
+  }
+
+  if (!recall.vin.checkComplete && !payloadFailed && recallStatus.value != null) {
+    blockers.push(
+      `Recall verification for this VIN is ${recall.vin.state}. `
+        + `${recall.model ? `Model-level context: ${recall.model.label}. ` : ""}`
+        + "A model-level answer cannot satisfy a workflow that requires a VIN-specific recall check.",
     );
   }
 
@@ -799,6 +836,7 @@ export function buildCompliance(
   }
 
   return {
+    recall,
     recallStatus,
     openRecallCount,
     doNotDrive,

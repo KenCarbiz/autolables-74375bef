@@ -1,3 +1,4 @@
+import { identityFromListing } from "@/lib/factorySticker/vehicleIdentity";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -515,7 +516,7 @@ const VehiclePassportGreatBuy = () => {
   const recCopy =
     score == null ? "This report is still gathering verification data. Check back shortly, or ask the dealer to complete the vehicle's verification checks."
     : `This vehicle shows ${strengthWords.length ? strengthWords.join(", ") : "verified"} signals.${confirmWords.length ? ` Confirm ${confirmWords.join(", ")} with the dealer before moving forward.` : " The verified data in this report supports moving forward."}`;
-  const shortModel = (listing.ymm || "").split(/\s+/).slice(2).join(" ").trim() || "vehicle";
+  const shortModel = identityFromListing(listing).model || "vehicle";
   const verifyDate = listing.prep_status?.foreman_signed_at ? new Date(listing.prep_status.foreman_signed_at).toLocaleDateString() : new Date().toLocaleDateString();
   const generatedAt = new Date().toLocaleString();
   const recTint = score != null && score >= 80 ? "bg-emerald-50/70 border-emerald-200" : "bg-white border-[#E6E8EC]";
