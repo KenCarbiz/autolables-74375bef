@@ -204,3 +204,45 @@ describe("Market verdict basis governance", () => {
     expect((price?.evidence ?? []).some((e) => e.includes("recently sold"))).toBe(false);
   });
 });
+
+describe("Symmetric spike guard", () => {
+  it("drops a transient single-capture DOWN-spike (fee-stripped scrape artifact)", () => {
+    const r = computePriceHistory(listingWithHistory([
+      { at: "2026-06-01", price: 56895 },
+      { at: "2026-06-28", price: 56895 },
+      { at: "2026-07-03", price: 51895 }, // artifact: one capture, immediately reverts
+      { at: "2026-07-05", price: 56895 },
+    ]));
+    expect(r.valueHistory.map((h) => h.listing_price)).not.toContain(51895);
+    expect(r.priceChangeLatest).toBeNull();
+  });
+});
+
+describe("Anchor precedence and sample confidence", () => {
+  const listing = (over: Record<string, unknown>) => over as unknown as VehicleListing;
+
+  it("a well-fed like-for-like median outranks the trim-blind sold median", () => {
+    const l = listing({
+      price: 75000, mileage: 12000,
+      market_meta: {
+        like_count: 5, like_median: 76000,
+        sold_stats: { count: 20, scope: "model_year_state", price_median: 58000, miles_median: 12500, dom_median: 30, state: "CT", checked_at: new Date().toISOString() },
+      },
+    });
+    const price = deriveRating(l, derivePassport(l)).factors.find((f) => f.key === "price")!;
+    expect(price.evidence.join(" ")).toContain("closely matched");
+    expect(price.evidence.join(" ")).not.toContain("recently sold");
+    expect(price.score ?? 0).toBeGreaterThanOrEqual(80);
+  });
+
+  it("a thin like sample (3-4) still anchors but is capped and marked directional", () => {
+    const l = listing({
+      price: 60000, mileage: 12000,
+      market_meta: { like_count: 3, like_median: 76000 },
+    });
+    const price = deriveRating(l, derivePassport(l)).factors.find((f) => f.key === "price")!;
+    expect(price.score).not.toBeNull();
+    expect(price.score as number).toBeLessThanOrEqual(88);
+    expect(price.evidence.join(" ")).toContain("directional");
+  });
+});

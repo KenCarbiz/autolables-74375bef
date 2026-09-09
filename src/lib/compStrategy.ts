@@ -82,6 +82,18 @@ export const isWithinMileageBand = (compMiles: number | null | undefined, ourMil
   return Math.abs(compMiles - ourMiles) <= band;
 };
 
+// Stale comps — distress-priced, auction-bound, or phantom listings — are not
+// market evidence in either direction: a 150-day undercut is not real cheaper
+// competition, and a 150-day higher sticker is not proof of value. Cutoff is
+// velocity-relative (dealers work a 60/90-day turn): twice the comp set's own
+// MEDIAN days-on-market (median so stale rows can't inflate their own
+// threshold) with a 90-day floor so thin or slow markets are not gutted.
+export const staleCompCutoff = (comps: CompLike[]): number => {
+  const doms = comps.map((c) => c.daysOnMarket).filter((n): n is number => n != null && n > 0).sort((a, z) => a - z);
+  const medDom = doms.length ? doms[Math.floor(doms.length / 2)] : null;
+  return Math.max(90, medDom != null ? Math.round(medDom * 2) : 180);
+};
+
 // Strategy-dependent filter. value_building never lets a cheaper comp
 // through unless the dealer explicitly enabled the small tolerance.
 export function filterCompsForValueStory<T extends CompLike>(
@@ -89,7 +101,9 @@ export function filterCompsForValueStory<T extends CompLike>(
 ): T[] {
   if (settings.compStrategy === "all_comps") return comps;
   const ourPrice = vehicle.price ?? null;
+  const staleCutoff = staleCompCutoff(comps);
   return comps.filter((comp) => {
+    if (comp.daysOnMarket != null && comp.daysOnMarket > staleCutoff) return false;
     let priceOk = true;
     if (ourPrice != null && ourPrice > 0 && comp.price != null) {
       if (settings.compStrategy === "value_building") {
@@ -122,6 +136,7 @@ export function scoreCompForValueStory(comp: CompLike, vehicle: CompSubject): nu
   if (vehicle.price != null && comp.price != null && comp.price > vehicle.price) score += 10;
   if (comp.distanceMiles != null && comp.distanceMiles <= 25) score += 10;
   if (comp.daysOnMarket != null && comp.daysOnMarket <= 90) score += 5;
+  if (comp.daysOnMarket != null && comp.daysOnMarket > 180) score -= 15;
   return score;
 }
 
