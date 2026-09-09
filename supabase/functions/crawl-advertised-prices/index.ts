@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { classifyCrawlOutcome } from "../_shared/crawlOutcome.ts";
-import { fetchCreditUsage, selectRenderKey, type RenderKeyCandidate } from "../_shared/renderKey.ts";
+import { fetchCreditUsage, pickRenderKey, selectRenderKey, type RenderKeyCandidate } from "../_shared/renderKey.ts";
 import {
   createRenderPacer, deriveRenderBudget, parseRetryAfter, resolveRendersPerMinute,
 } from "../_shared/renderPacer.ts";
@@ -1012,13 +1012,16 @@ serve(async (req) => {
     for (const k of FIRECRAWL_KEYS) {
       const u = await fetchCreditUsage(k.key);
       checks.push({
-        env: k.env, in_use: k.key === activeRenderKey, key_length: k.key.length,
+        env: k.env, key_length: k.key.length,
         status: u.status, remaining_credits: u.remaining, plan_credits: u.plan, period_end: u.periodEnd, error: u.error,
       });
     }
+    // Which key the next run would spend, decided the same way a run decides.
+    const pick = pickRenderKey(checks.map((c) => ({ env: String(c.env), remaining: c.remaining_credits as number | null })));
     return new Response(JSON.stringify({
       ok: true,
       credit_check: checks,
+      selected: pick.index >= 0 ? { env: checks[pick.index].env, reason: pick.reason } : null,
       keys_configured: FIRECRAWL_KEYS.length,
       renders_per_minute: RENDERS_PER_MINUTE,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -1629,8 +1632,27 @@ serve(async (req) => {
           await admin.from("audit_log").insert({
             action: "advertised_price_crawl_skipped", entity_type: "advertised_price",
             entity_id: row.vin, store_id: row.tenant_id,
-            details: { vin: row.vin, reason: "advertised_above_feed", scraped: bd.advertised_price_before_doc, feed: feedPrice, url: fetchUrl },
+            details: {
+              vin: row.vin, reason: "advertised_above_feed", scraped: bd.advertised_price_before_doc, feed: feedPrice, url: fetchUrl,
+              // The evidence render may already have run; name the picture so
+              // it is not an orphan in the bucket.
+              screenshot_path: screenshot?.path ?? null,
+            },
           }).then(() => undefined, () => undefined);
+          // The ledger row above says "captured" because a price was read.
+          // Nothing was written, so the ledger must say so too.
+          try {
+            await admin.rpc("record_advertised_price_crawl_attempt", {
+              _tenant_id: row.tenant_id,
+              _vin: row.vin,
+              _source_label: observationChannel(row.source_label),
+              _source_url: fetchUrl,
+              _outcome: "price_rejected",
+              _http_status: cheapStatus,
+              _render_status: renderStatus,
+              _detail: `advertised_above_feed scraped=${bd.advertised_price_before_doc} feed=${feedPrice}`,
+            });
+          } catch { /* never fail a price run over telemetry */ }
         } else if (bd.advertised_price_before_doc != null) {
           // The terminology the dealer's own VDP uses next to its price, cleaned
           // for the passport's "Match my website" label option. Only written on

@@ -67,6 +67,11 @@ export const CRAWL_OUTCOMES = [
   "render_unreachable",
   "bot_challenge",
   "blocked_no_render_budget",
+  // A price was read off the page and then refused by the misparse guard
+  // (above the feed price: a sticker, MSRP or lease figure). Recorded by the
+  // crawler after the guard, never by the classifier, so a ledger row can
+  // no longer say "captured" for a visit that wrote nothing.
+  "price_rejected",
 ] as const;
 
 // Body-text fallbacks, used ONLY when there is no HTTP status to read.

@@ -282,7 +282,7 @@ describe("retired listings leave the rotation", () => {
 
 describe("the run spends the key that can pay", () => {
   it("selects the renderer key from the provider's balance before any render", () => {
-    expect(SRC).toMatch(/import \{ fetchCreditUsage, selectRenderKey, type RenderKeyCandidate \} from "\.\.\/_shared\/renderKey\.ts";/);
+    expect(SRC).toMatch(/import \{ fetchCreditUsage, pickRenderKey, selectRenderKey, type RenderKeyCandidate \} from "\.\.\/_shared\/renderKey\.ts";/);
     const selection = SRC.indexOf("const renderKey = await selectRenderKey(FIRECRAWL_KEYS);");
     const testMode = SRC.indexOf("if (body.test_url) {");
     const loop = SRC.indexOf("for (const row of rows) {");
@@ -308,5 +308,25 @@ describe("the run spends the key that can pay", () => {
     expect(block).toContain("if (auth !== serviceKey && !isCron) {");
     expect(block).toContain("key_length: k.key.length");
     expect(block).not.toMatch(/key: k\.key/);
+    // Reports the key the next run would choose, by the same rule a run uses.
+    expect(block).toContain("const pick = pickRenderKey(");
+    expect(block).not.toContain("in_use:");
+  });
+});
+
+describe("a rejected price is not a captured one", () => {
+  // The Rogue canary (5N1BT3BB2TC779545) read $36,100 off a page whose feed
+  // price was $34,390; the guard refused it and wrote nothing, while the
+  // ledger row said "captured".
+  const misparse = between('if (misparse) {\n          await admin.from("vehicle_listings").update({', "} else if (bd.advertised_price_before_doc != null) {");
+
+  it("re-records the ledger with price_rejected after the guard refuses", () => {
+    expect(misparse).toContain('_outcome: "price_rejected"');
+    expect(misparse).toMatch(/_detail: `advertised_above_feed scraped=\$\{bd\.advertised_price_before_doc\} feed=\$\{feedPrice\}`/);
+    expect(misparse).toContain("_source_label: observationChannel(row.source_label)");
+  });
+
+  it("names the screenshot that may already have been taken", () => {
+    expect(misparse).toContain("screenshot_path: screenshot?.path ?? null");
   });
 });
