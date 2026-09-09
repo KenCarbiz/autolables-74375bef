@@ -443,7 +443,10 @@ export function deriveRecallView(
     clearClaimAllowed,
     checkComplete: clearClaimAllowed || vinState === "OPEN",
     source: vinAnswer?.source ?? null,
-    checkedAt: vinCheckedAt,
+    // Only an ANSWER carries a check date. An attempt that resolved to UNKNOWN
+    // has `attemptedAt` and nothing else, or a surface renders "checked June 29"
+    // beside "verification unavailable" and re-implies the check that failed.
+    checkedAt: vinAnswered ? vinCheckedAt : null,
     attemptedAt,
     ...vinCopy(vinState, openCount, doNotDrive, conflict, vinAsOf, model),
   };

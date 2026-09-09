@@ -40,3 +40,20 @@ describe("today's un-migrated rows must not read as clean", () => {
     expect(v.vin.state).toBe("UNKNOWN");
   });
 });
+
+describe("an unanswered VIN check carries no check date", () => {
+  it("the fabricated clear reports attemptedAt and no checkedAt", () => {
+    const v = deriveRecallView({
+      recall_status: "clear",
+      open_recall_count: 0,
+      recall_checked_at: "2026-09-04T16:43:52.593Z",
+      recall_payload: {
+        rawProvider: "marketcheck_autorecalls", recalls: [], recallStatus: "clear",
+        checkedAt: "2026-09-04T16:43:52.593Z", openRecallCount: 0,
+      },
+    } as never);
+    expect(v.vin.state).toBe("UNKNOWN");
+    expect(v.vin.checkedAt).toBeNull();
+    expect(v.vin.attemptedAt).toBe("2026-09-04T16:43:52.593Z");
+  });
+});
