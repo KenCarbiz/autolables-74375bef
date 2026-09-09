@@ -7884,6 +7884,54 @@ export type Database = {
         }
         Relationships: []
       }
+      title_report_pulls: {
+        Row: {
+          action: string
+          charged: boolean
+          created_at: string
+          id: string
+          pulled_by: string | null
+          tenant_id: string
+          unit_cost: number
+          vin: string
+        }
+        Insert: {
+          action: string
+          charged?: boolean
+          created_at?: string
+          id?: string
+          pulled_by?: string | null
+          tenant_id: string
+          unit_cost?: number
+          vin: string
+        }
+        Update: {
+          action?: string
+          charged?: boolean
+          created_at?: string
+          id?: string
+          pulled_by?: string | null
+          tenant_id?: string
+          unit_cost?: number
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "title_report_pulls_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "title_report_pulls_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trade_in_records: {
         Row: {
           customer_name: string
@@ -9077,6 +9125,7 @@ export type Database = {
           store_id: string
           suppressed_programs: Json
           tenant_id: string | null
+          title_verification: Json | null
           trim: string | null
           updated_at: string
           value_props: Json
@@ -9165,6 +9214,7 @@ export type Database = {
           store_id: string
           suppressed_programs?: Json
           tenant_id?: string | null
+          title_verification?: Json | null
           trim?: string | null
           updated_at?: string
           value_props?: Json
@@ -9253,6 +9303,7 @@ export type Database = {
           store_id?: string
           suppressed_programs?: Json
           tenant_id?: string | null
+          title_verification?: Json | null
           trim?: string | null
           updated_at?: string
           value_props?: Json
@@ -10739,6 +10790,7 @@ export type Database = {
           store_id: string
           suppressed_programs: Json
           tenant_id: string | null
+          title_verification: Json | null
           trim: string | null
           updated_at: string
           value_props: Json
