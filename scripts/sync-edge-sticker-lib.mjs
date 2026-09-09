@@ -17,17 +17,22 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const SOURCE_DIR = join(root, "src/lib/factorySticker");
 export const TARGET_DIR = join(root, "supabase/functions/_shared/factorySticker/lib");
 
-// The truth layer is a sibling of the engine in src/ and imports across to
-// it (`../factorySticker/fingerprint.ts`). The mirror flattens the engine
-// into lib/, so the copy lands one level down as lib/vehicleTruth/ and its
-// cross-imports are rewritten to `../` — the same modules, one directory
-// closer. Rewriting on copy keeps src/ readable as ordinary sibling
-// imports instead of contorting it to suit the mirror's shape.
+// The truth layer and the Vehicle File read model are siblings of the engine
+// in src/ and import across to it (`../factorySticker/fingerprint.ts`,
+// `../factorySticker/ymm.ts`). The mirror flattens the engine into lib/, so
+// each copy lands one level down as lib/vehicleTruth/ or lib/vehicleFile/ and
+// its cross-imports are rewritten to `../` — the same modules, one directory
+// closer. Sibling imports between the two mirrored trees
+// (`../vehicleTruth/precedence.ts`) already resolve and are left alone.
+// Rewriting on copy keeps src/ readable as ordinary sibling imports instead
+// of contorting it to suit the mirror's shape.
 export const TRUTH_SOURCE_DIR = join(root, "src/lib/vehicleTruth");
 export const TRUTH_PREFIX = "vehicleTruth/";
 export const DOCUMENTS_SOURCE_DIR = join(root, "src/lib/documents");
 export const DOCUMENTS_PREFIX = "documents/";
-const rewriteTruthImports = (body) => body.replace(/from "\.\.\/factorySticker\//g, 'from "../');
+export const VEHICLE_FILE_SOURCE_DIR = join(root, "src/lib/vehicleFile");
+export const VEHICLE_FILE_PREFIX = "vehicleFile/";
+const rewriteEngineImports = (body) => body.replace(/from "\.\.\/factorySticker\//g, 'from "../');
 
 const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__"]);
 const isCopyable = (name) => name.endsWith(".ts") && !name.endsWith(".test.ts");
@@ -57,18 +62,23 @@ export function collect(dir, base = dir, out = new Map(), withHeader = true) {
   return out;
 }
 
-/** Every file the mirror should contain: the engine, the truth layer, and shared document primitives. */
+/** Every file the mirror should contain: the engine, the truth layer, shared document primitives, and the Vehicle File read model. */
 export function collectAll() {
   const out = collect(SOURCE_DIR);
   const truth = collect(TRUTH_SOURCE_DIR, TRUTH_SOURCE_DIR, new Map(), false);
   for (const [rel, body] of truth) {
     const key = TRUTH_PREFIX + rel;
-    out.set(key, HEADER.replace("{src}", `src/lib/vehicleTruth/${rel}`) + rewriteTruthImports(body));
+    out.set(key, HEADER.replace("{src}", `src/lib/vehicleTruth/${rel}`) + rewriteEngineImports(body));
   }
   const documents = collect(DOCUMENTS_SOURCE_DIR, DOCUMENTS_SOURCE_DIR, new Map(), false);
   for (const [rel, body] of documents) {
     const key = DOCUMENTS_PREFIX + rel;
     out.set(key, HEADER.replace("{src}", `src/lib/documents/${rel}`) + body);
+  }
+  const vehicleFile = collect(VEHICLE_FILE_SOURCE_DIR, VEHICLE_FILE_SOURCE_DIR, new Map(), false);
+  for (const [rel, body] of vehicleFile) {
+    const key = VEHICLE_FILE_PREFIX + rel;
+    out.set(key, HEADER.replace("{src}", `src/lib/vehicleFile/${rel}`) + rewriteEngineImports(body));
   }
   return out;
 }

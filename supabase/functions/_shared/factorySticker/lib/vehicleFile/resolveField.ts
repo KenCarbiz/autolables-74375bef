@@ -1,3 +1,7 @@
+// GENERATED — do not edit.
+// Mirror of src/lib/vehicleFile/resolveField.ts, copied so the edge runtime can
+// bundle the engine (Supabase ships only supabase/functions/). Edit the
+// source file and run `bun run sync:edge-sticker`.
 // Choosing between candidates, and saying how current the winner is.
 //
 // The ranking is NOT reimplemented here. `precedenceFor` / `sourceRank` /
