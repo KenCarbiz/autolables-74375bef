@@ -326,6 +326,16 @@ describe("buildPricing — fee-exclusive tenant and missing inputs", () => {
     expect(exclusive.sellingPrice.chosen?.origin).toBe("vehicle_listings.price");
   });
 
+  it("does not offer the fee-inclusive ladder as the advertised total of a fee-exclusive tenant", () => {
+    const exclusive = buildPricing(
+      pilot({ dealerProfile: profileRow({ advertised_includes_doc_fee: "false" }) }),
+      opts,
+    );
+    expect(exclusive.advertisedRetail.candidates.map((c) => c.origin))
+      .not.toContain("vehicle_listings.website_sale_price");
+    expect(exclusive.advertisedRetail.value).toBe(58382);
+  });
+
   it("returns zero, not silence, for a tenant whose doc fee is switched off", () => {
     const noFee = buildPricing(
       pilot({ dealerProfile: profileRow({ doc_fee_enabled: "false" }) }),

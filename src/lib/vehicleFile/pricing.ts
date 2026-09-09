@@ -137,6 +137,13 @@ const withDocFee = (beforeDoc: number | null, docFee: number | null, includesFee
 
 // ── Candidate assembly ──────────────────────────────────────────────
 
+export interface BuildPricingOptions {
+  /** Milliseconds since the epoch; injected so a projection is testable. */
+  now?: number;
+  /** Tenant's configured source order, from `source_authority_rules`. */
+  configuredOrder?: SourceKind[] | null;
+}
+
 interface Spec<T> {
   value: T | null | undefined;
   source: SourceKind;
@@ -366,7 +373,13 @@ function advertisedRetailCandidates(ctx: PriceContext): Array<FieldCandidate<num
   // the feed price, and the crawl's clean branch writes the observed page
   // total. Nothing records which one wrote it, so it is read back from the
   // value — the same comparison the crawl's own change detector makes.
-  const websiteSale = num(listing.website_sale_price);
+  //
+  // It is a fee-INCLUSIVE total by construction, so it answers the same
+  // question as the advertised total only for a tenant that advertises
+  // fee-inclusive. For a fee-exclusive tenant it is `price + doc_fee`, a
+  // different number about a different question, and offering it here would
+  // report a disagreement on every vehicle forever.
+  const websiteSale = ctx.includesDocFee ? num(listing.website_sale_price) : null;
   const latestWebPrice = num(ctx.latestWeb?.advertised_price);
   const ladderIsPageTotal = near(websiteSale, latestWebPrice);
   add(out, {
@@ -468,8 +481,8 @@ function sellingPrice(
   }
 
   const beforeDoc = num(listing?.advertised_price_before_doc);
-  const feedLadder = near(beforeDoc, beforeDocFee(num(listing?.price), fee, true));
-  const pageLadder = near(beforeDoc, beforeDocFee(num(ctx.latestWeb?.advertised_price), fee, true));
+  const feedLadder = near(beforeDoc, beforeDocFee(num(listing?.price), fee, ctx.includesDocFee));
+  const pageLadder = near(beforeDoc, beforeDocFee(num(ctx.latestWeb?.advertised_price), fee, ctx.includesDocFee));
   add(out, {
     value: beforeDoc,
     source: feedLadder ? "marketcheck" : pageLadder ? "dealer_vdp" : "other_structured",
@@ -840,11 +853,6 @@ export function buildPublicAdvertisement(
 }
 
 // ── Pricing ─────────────────────────────────────────────────────────
-
-export interface BuildPricingOptions {
-  now?: number;
-  configuredOrder?: SourceKind[] | null;
-}
 
 export function buildPricing(
   sources: VehicleFileSources,
