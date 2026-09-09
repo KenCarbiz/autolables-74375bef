@@ -17,6 +17,7 @@ import { freshPublishedAssetUrl } from "@/hooks/usePublishedWindowSticker";
 import { isSignedStorageUrl } from "@/lib/filedDocumentUrl";
 import Logo from "@/components/brand/Logo";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
+import { vinRecallState } from "@/lib/passport/recallScope";
 
 // ──────────────────────────────────────────────────────────────
 // PublicDocuments — /v/:slug/documents
@@ -26,7 +27,11 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 // and resolves its status against real listing data.
 // ──────────────────────────────────────────────────────────────
 
-type DocStatus = "on_file" | "coming_soon" | "action_required";
+// not_confirmed: a check ran and no authoritative answer came back for this
+// VIN. Deliberately neither "on file" (which asserts a result we do not have)
+// nor "action required" (which implies a defect was found) — the honest state
+// is that the record is unconfirmed and the dealer should be asked.
+type DocStatus = "on_file" | "coming_soon" | "action_required" | "not_confirmed";
 type DocCategory = "pricing" | "history" | "inspection" | "warranty" | "ownership";
 type VehType = "new" | "used" | "cpo" | "demo";
 
@@ -218,6 +223,11 @@ const CATALOG: DocDescriptor[] = [
         const lines = (rc?.campaigns || []).map((c) => `${c.campaignNumber ? c.campaignNumber + ": " : ""}${c.summary || c.component || "Open campaign"}`);
         return { status: "action_required", statusText: "Recall Pending — See Dealer", detailLines: lines.length ? lines : ["One or more open recalls on record. Contact the dealer before purchase."] };
       }
+      // Absence of a reported recall is not a clearance. Without a VIN-scope
+      // answer this document states what is actually known — see recallScope.ts.
+      if (vinRecallState(listing) !== "verified_clear") {
+        return { status: "not_confirmed", statusText: "Recall Status Not Confirmed", date: rc?.checked_at, detailLines: ["No recall record was returned for this VIN. Ask the dealer to confirm recall status with the manufacturer before purchase."] };
+      }
       return { status: "on_file", statusText: "No Open Recalls — NHTSA Verified", date: rc?.checked_at, detailLines: ["This vehicle has no open NHTSA safety recalls on record."] };
     },
   },
@@ -354,6 +364,7 @@ const STATUS_UI: Record<DocStatus, { strip: string; label: string; labelText: st
   on_file:        { strip: "bg-emerald-500", label: "text-emerald-600", labelText: "ON FILE", icon: CheckCircle2, iconColor: "text-emerald-500" },
   coming_soon:    { strip: "bg-slate-300", label: "text-slate-400", labelText: "COMING SOON", icon: Clock, iconColor: "text-slate-400" },
   action_required:{ strip: "bg-red-500", label: "text-red-600", labelText: "ACTION REQUIRED", icon: AlertTriangle, iconColor: "text-red-500" },
+  not_confirmed:  { strip: "bg-amber-400", label: "text-amber-600", labelText: "NOT CONFIRMED", icon: Clock, iconColor: "text-amber-500" },
 };
 
 // ── Send / capture modal (text · email · notify) ──────────────
@@ -764,7 +775,7 @@ const PublicDocuments = () => {
               <div key={doc.key} className="break-inside-avoid py-1.5 border-b border-slate-100">
                 <div className="flex items-baseline justify-between gap-4">
                   <p className="text-[13px] font-semibold">{doc.title}</p>
-                  <span className="text-[10px] text-slate-600 shrink-0 whitespace-nowrap">{resolved.status === "action_required" ? (resolved.statusText || "Action required") : (resolved.date ? `On file · ${fmtDate(resolved.date)}` : "On file")}</span>
+                  <span className="text-[10px] text-slate-600 shrink-0 whitespace-nowrap">{resolved.status === "action_required" || resolved.status === "not_confirmed" ? (resolved.statusText || "Action required") : (resolved.date ? `On file · ${fmtDate(resolved.date)}` : "On file")}</span>
                 </div>
                 {resolved.url && <p className="text-[10px] text-blue-700 break-all">{resolved.url}</p>}
               </div>

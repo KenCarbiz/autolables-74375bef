@@ -11,6 +11,14 @@ const dOf = (o: Partial<PassportData>): PassportData => ({
 } as PassportData);
 const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ ...(o as object) } as VehicleListing);
 
+// A genuinely VIN-clear answer — campaign records came back for this VIN and
+// none is open. A bare recall_status of "clear" carries no such proof; see
+// lib/passport/recallScope.ts.
+const CLEAR_RECALL = {
+  has_open: false,
+  campaigns: [{ campaignNumber: "21V-100", summary: "Remedy completed", component: "AIR BAGS", remedy: "Completed" }],
+};
+
 describe("derivePassportVerification — shared source of truth", () => {
   it("reports the FULL category set with pending visible (not just completed rows)", () => {
     const s = derivePassportVerification(dOf({}), lOf({}));
@@ -23,7 +31,7 @@ describe("derivePassportVerification — shared source of truth", () => {
   it("a clean, fully-checked vehicle completes every category", () => {
     const s = derivePassportVerification(
       dOf({ cleanTitle: true, recallClear: true, ownerCount: 1, accidentCount: 0, marketAvg: 61000, warrantyStr: "4 yr / 60,000 mi", serviceCount: 3 }),
-      lOf({ vin: "5N1AL1F83VC332076", recall_status: "clear" }),
+      lOf({ vin: "5N1AL1F83VC332076", recall_status: "clear", recall_check: CLEAR_RECALL }),
     );
     expect(s.completed).toBe(7);
     expect(s.completedPct).toBe(100);
@@ -33,7 +41,7 @@ describe("derivePassportVerification — shared source of truth", () => {
   it("a pending MATERIAL check (title) is surfaced and never all-complete", () => {
     const s = derivePassportVerification(
       dOf({ cleanTitle: false, recallClear: true, marketAvg: 61000, warrantyStr: "4 yr", serviceCount: 2, ownerCount: 1 }),
-      lOf({ vin: "ABC", recall_status: "clear" }),
+      lOf({ vin: "ABC", recall_status: "clear", recall_check: CLEAR_RECALL }),
     );
     expect(s.completed).toBeLessThan(s.total);
     expect(s.materialPending).toBe(1);

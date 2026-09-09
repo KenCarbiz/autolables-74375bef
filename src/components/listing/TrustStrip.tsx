@@ -2,6 +2,7 @@ import {
   ShieldCheck, ShieldAlert, FileCheck, User, Wrench, TrendingDown,
   BadgeCheck, Sparkles,
 } from "lucide-react";
+import { vinRecallClear } from "@/lib/passport/recallScope";
 
 // Trust Badge Strip — the signature confidence bar on the Vehicle Passport.
 // Renders ONLY the badges we have real data for (no greyed placeholders), and
@@ -23,7 +24,9 @@ export default function TrustStrip({ listing }: { listing: any }) {
   const cond = listing.condition as string | null;
   const badges: Badge[] = [];
 
-  if (listing.recall_status === "clear") {
+  // A green trust badge is the strongest claim on the page, so it needs a real
+  // VIN-scope answer behind it — a stored "clear" alone is not one.
+  if (vinRecallClear(listing)) {
     badges.push({ icon: ShieldCheck, title: "No Open Recalls", sub: "NHTSA verified clean", tone: "green" });
   } else if (listing.recall_status === "open_recalls" && (listing.open_recall_count || 0) > 0) {
     badges.push({ icon: ShieldAlert, title: `${listing.open_recall_count} Open Recall${listing.open_recall_count === 1 ? "" : "s"}`, sub: "See details below", tone: "red" });

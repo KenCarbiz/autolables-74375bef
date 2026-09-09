@@ -16,6 +16,15 @@ const dOf = (o: Partial<PassportData>): PassportData => ({
 } as PassportData);
 const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ ...(o as object) } as VehicleListing);
 
+// A genuinely VIN-clear answer: the provider returned campaign records FOR THIS
+// VIN and none is open. A bare recall_status of "clear" with no campaigns is
+// indistinguishable from a provider 404 and reads as UNKNOWN — see
+// lib/passport/recallScope.ts.
+const CLEAR_RECALL = {
+  has_open: false,
+  campaigns: [{ campaignNumber: "21V-100", summary: "Remedy completed", component: "AIR BAGS", remedy: "Completed" }],
+};
+
 // Every report must satisfy the two arithmetic invariants, always.
 const assertArithmetic = (r: VerificationReport) => {
   expect(r.totalChecks).toBe(
@@ -76,13 +85,50 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("an all-verified vehicle shows the green completed banner", () => {
     const r = deriveVerificationReport(
       dOf({ accidentCount: 0, ownerCount: 1, titleStatus: "clean", cleanTitle: true, marketAvg: 61000, belowMarket: 3000, warrantyStr: "4 yr / 60,000 mi" }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", mileage: 17, condition: "new", recall_status: "clear", open_recall_count: 0, recall_check: { has_open: false } }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", mileage: 17, condition: "new", recall_status: "clear", open_recall_count: 0, recall_check: CLEAR_RECALL }),
     );
     assertArithmetic(r);
     expect(r.verifiedChecks).toBe(8);
     expect(r.needsConfirmationChecks + r.needsAttentionChecks + r.pendingChecks).toBe(0);
     expect(r.banner.tone).toBe("green");
     expect(r.banner.heading).toBe("Verification checks completed");
+  });
+
+  // Three published cars carried recall_status "clear" written from a
+  // MarketCheck 404 — no provider ever answered for those VINs — and the
+  // passport published "No open safety recalls found in NHTSA campaigns" on
+  // that basis. Absence of a returned campaign is not evidence of no campaign.
+  it("a stored 'clear' with no campaign evidence is unavailable, never verified", () => {
+    const r = deriveVerificationReport(
+      dOf({ accidentCount: 0, ownerCount: 1, titleStatus: "clean", cleanTitle: true, marketAvg: 61000, warrantyStr: "4 yr" }),
+      lOf({
+        vin: "5N1AL1F94VC330815", ymm: "2027 INFINITI QX60", condition: "new",
+        recall_status: "clear", open_recall_count: 0,
+        recall_check: { has_open: false, campaigns: [], checked_at: "2026-06-29T15:43:31.933Z" },
+      }),
+    );
+    assertArithmetic(r);
+    const recall = r.checks.find((c) => c.key === "recall");
+    expect(recall?.status).toBe("unavailable");
+    expect(recall?.finding).not.toMatch(/no open safety recalls/i);
+    // The stored word "clear" must not reach the customer as evidence either.
+    expect(recall?.evidence.find((e) => e.label === "Aggregate status")?.value).toBeNull();
+    expect(recall?.evidence.find((e) => e.label === "NHTSA status")?.value).toBeNull();
+    expect(r.banner.heading).not.toBe("Verification checks completed");
+  });
+
+  it("an open campaign still reports, whatever the stored aggregate says", () => {
+    const r = deriveVerificationReport(
+      dOf({}),
+      lOf({
+        vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used",
+        recall_status: "clear", open_recall_count: 0,
+        recall_check: { has_open: true, campaigns: [{ campaignNumber: "24V-900", summary: "Open campaign" }] },
+      }),
+    );
+    const recall = r.checks.find((c) => c.key === "recall");
+    expect(recall?.status).not.toBe("verified");
+    expect(["needs_attention", "needs_confirmation"]).toContain(recall?.status);
   });
 
   it("a branded title is a conclusive actionable finding (needs_attention), not a conflict", () => {
@@ -146,7 +192,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("a partial report still renders available checks and marks the rest unavailable", () => {
     const r = deriveVerificationReport(
       dOf({ marketAvg: 40000, belowMarket: 1000 }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used", recall_status: "clear", recall_check: { has_open: false } }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used", recall_status: "clear", recall_check: CLEAR_RECALL }),
     );
     assertArithmetic(r);
     expect(r.valid).toBe(true);

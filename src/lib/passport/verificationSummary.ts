@@ -10,6 +10,7 @@
 
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
+import { vinRecallState, vinRecallAnswered } from "@/lib/passport/recallScope";
 
 export type VerificationCategoryState =
   | "verified"
@@ -81,7 +82,7 @@ export function derivePassportVerification(d: PassportData, listing: VehicleList
   const categories: VerificationCategory[] = [
     cat("vin", "VIN", !!listing.vin, "verified", "oem", true),
     cat("title", "Title & Brand", d.cleanTitle, "verified", "commercial", true),
-    cat("recall", "Recall", !!listing.recall_status || d.recallClear, "verified", "government", true),
+    cat("recall", "Recall", vinRecallAnswered(listing), "verified", "government", true),
     cat("history", "Vehicle History", d.ownerCount != null || d.accidentCount != null || d.cleanTitle, "verified", "commercial", false),
     cat("market", "Market Data", d.marketAvg != null, "calculated", "autolabels_calculated", false),
     cat("warranty", "Warranty", !!d.warrantyStr, "dealer_confirmed", "oem", false),
@@ -265,7 +266,12 @@ const dateFmt = (iso: string | null): string | null =>
 
 interface RecallSignals {
   hasCheck: boolean;
+  // A lookup was recorded for this VIN, whether or not it produced a VIN-scope
+  // answer. Separates "still coming" (pending) from "asked, nobody answered"
+  // (unavailable) so neither is dressed up as the other.
+  attempted: boolean;
   clearStatus: boolean;
+  rawClearStatus: boolean;
   openCount: number | null;
   detailOpen: boolean | null;
   doNotDrive: boolean;
@@ -276,11 +282,23 @@ interface RecallSignals {
 function readRecall(listing: VehicleListing): RecallSignals {
   const rc = listing.recall_check || null;
   const first = rc?.campaigns?.[0] || null;
+  const state = vinRecallState(listing);
   return {
-    hasCheck: !!listing.recall_status || !!rc,
-    clearStatus: listing.recall_status === "clear",
+    // An UNKNOWN VIN has no VIN-scope answer, so there is no check to report.
+    // Reading a stored "clear" as a completed check is what published a
+    // fabricated clearance — see recallScope.ts.
+    hasCheck: state !== "unknown",
+    attempted: !!listing.recall_status || !!rc,
+    clearStatus: state === "verified_clear",
+    // The stored aggregate, uncorrected. Cross-source conflict detection has to
+    // compare what the two stores actually say — correcting the aggregate first
+    // would hide a real "column says clear, campaign says open" disagreement.
+    rawClearStatus: listing.recall_status === "clear",
     openCount: listing.open_recall_count ?? null,
-    detailOpen: rc ? !!rc.has_open : null,
+    // has_open:false on a check that returned no campaigns is the same
+    // unproven claim as the stored "clear" — it must not surface as evidence
+    // that no campaign exists.
+    detailOpen: state === "unknown" ? null : rc ? !!rc.has_open : null,
     doNotDrive: !!rc?.do_not_drive,
     checkedAt: rc?.checked_at || null,
     // Tolerate every writer's field names so a MarketCheck-sourced recall
@@ -454,11 +472,14 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
     // (or a positive open-recall count). Sources disagree → NEEDS CONFIRMATION,
     // never "issue found".
     const conflict = recall.hasCheck &&
-      ((recall.clearStatus && (recall.detailOpen === true || (recall.openCount ?? 0) > 0)) ||
-       (!recall.clearStatus && recall.detailOpen === false));
+      ((recall.rawClearStatus && (recall.detailOpen === true || (recall.openCount ?? 0) > 0)) ||
+       (!recall.rawClearStatus && recall.detailOpen === false));
     let status: VerificationStatus;
     let highSeverity = false;
-    if (!recall.hasCheck) status = "pending";
+    // No VIN-scope answer. If a lookup was recorded, the honest report is that
+    // the source had nothing for this VIN — not that the check is still running
+    // and never that it came back clear.
+    if (!recall.hasCheck) status = recall.attempted ? "unavailable" : "pending";
     else if (recall.doNotDrive) { status = "needs_attention"; highSeverity = true; }
     else if (conflict) status = "needs_confirmation";
     else if (recall.detailOpen === true || (recall.openCount ?? 0) > 0) status = "needs_attention";
@@ -472,11 +493,13 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         : status === "needs_confirmation" ? "AutoLabels found conflicting recall information across available sources."
         : status === "needs_attention" && highSeverity ? "This vehicle has a do-not-drive recall — do not drive it until the remedy is completed."
         : status === "needs_attention" ? "NHTSA data shows an open recall associated with this VIN. Ask whether the remedy has been completed or is available."
+        : status === "unavailable" ? "No recall record was returned for this VIN. Ask the dealer to confirm recall status with the manufacturer before purchase."
         : null,
       reviewNote:
         status === "needs_confirmation" ? "confirm the recall status with the dealer"
         : status === "needs_attention" && highSeverity ? "a do-not-drive recall is reported"
         : status === "needs_attention" ? "an open recall is reported"
+        : status === "unavailable" ? "no recall record was returned for this VIN"
         : status === "pending" ? "the recall check has not completed" : null,
       evidence: [
         { label: "Campaign number", value: recall.campaign.number },
@@ -484,7 +507,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         { label: "Summary", value: recall.campaign.summary },
         { label: "Remedy availability", value: recall.campaign.remedy },
         { label: "NHTSA status", value: recall.detailOpen == null ? null : recall.detailOpen ? "Open campaign reported" : "No open campaign" },
-        { label: "Aggregate status", value: listing.recall_status || null },
+        { label: "Aggregate status", value: status === "unavailable" ? null : listing.recall_status || null },
         { label: "Last checked", value: asOf },
         { label: "Source", value: FAMILY_META.nhtsa.label },
       ],
@@ -592,27 +615,34 @@ function buildBanner(a: {
   if (a.completedChecks === 0) {
     return { tone: "neutral", heading: "Verification has not started", body: "No checks have returned a result yet for this vehicle. Check back soon or ask the dealer for the latest information.", reviewCount: 0 };
   }
+  // A MATERIAL check that returned nothing has not "returned a result". Letting
+  // one sit under the green banner reproduces, one level up, the same
+  // overstatement as publishing an unverified recall clear: the vehicle reads as
+  // fully checked while a safety-material answer is missing.
+  const materialUnavailable = a.checks.filter((c) => c.material && c.status === "unavailable").length;
+
   // Counts line, e.g. "6 checks verified · 1 needs confirmation · 1 pending".
   const parts: string[] = [`${a.verifiedChecks} ${a.verifiedChecks === 1 ? "check" : "checks"} verified`];
   if (a.needsConfirmationChecks > 0) parts.push(`${a.needsConfirmationChecks} needs confirmation`);
   if (a.needsAttentionChecks > 0) parts.push(`${a.needsAttentionChecks} needs attention`);
   if (a.pendingChecks > 0) parts.push(`${a.pendingChecks} pending`);
+  if (materialUnavailable > 0) parts.push(`${materialUnavailable} not available`);
   const countsLine = parts.join(" · ");
 
   // The headline counts items that genuinely need buyer action (attention +
   // confirmation). When there are none, outstanding PENDING checks are what to
   // watch, so they drive the count instead. Green only when neither exists.
   const actionCount = a.needsAttentionChecks + a.needsConfirmationChecks;
-  const headlineCount = actionCount > 0 ? actionCount : a.pendingChecks;
+  const headlineCount = actionCount > 0 ? actionCount : a.pendingChecks + materialUnavailable;
 
-  if (actionCount === 0 && a.pendingChecks === 0) {
+  if (actionCount === 0 && a.pendingChecks === 0 && materialUnavailable === 0) {
     return { tone: "green", heading: "Verification checks completed", body: `${countsLine}. Every check returned a result — no items need review before purchase.`, reviewCount: 0 };
   }
 
   // Actionable notes (imperative, verb-led — "confirm the recall...") are asked
   // first; status notes ("the title check is still pending") follow as context.
   const reviewNotes = a.checks
-    .filter((c) => c.reviewNote && (c.status === "needs_attention" || c.status === "needs_confirmation" || c.status === "pending"))
+    .filter((c) => c.reviewNote && (c.status === "needs_attention" || c.status === "needs_confirmation" || c.status === "pending" || (c.material && c.status === "unavailable")))
     .map((c) => c.reviewNote as string);
   const actions = reviewNotes.filter(startsWithVerb);
   const statuses = reviewNotes.filter((n) => !startsWithVerb(n));

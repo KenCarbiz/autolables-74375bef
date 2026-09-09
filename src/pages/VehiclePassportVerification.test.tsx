@@ -115,11 +115,50 @@ describe("VehiclePassportVerification — rendered report", () => {
 
   it("an all-verified vehicle shows the green completed banner and no exceptions", () => {
     fixture = { ...reviewListing(), condition: "new", recall_status: "clear", open_recall_count: 0,
-      recall_check: { has_open: false }, mc_attributes: { owner_count: 1, accident_count: 0, carfax_clean_title: true, msrp: 45000 } } as unknown as VehicleListing;
+      // Campaign evidence is what makes this VIN genuinely clear rather than
+      // merely unanswered — see lib/passport/recallScope.ts.
+      recall_check: { has_open: false, campaigns: [{ campaignNumber: "21V-100", summary: "Remedy completed" }] },
+      mc_attributes: { owner_count: 1, accident_count: 0, carfax_clean_title: true, msrp: 45000 } } as unknown as VehicleListing;
     renderReport();
     expect(screen.getByRole("heading", { level: 2, name: "Verification checks completed" })).toBeInTheDocument();
     expect(screen.getByText(/Nothing needs your attention/)).toBeInTheDocument();
   });
+});
+
+// ── Fabricated-clear canary ───────────────────────────────────────────────────
+// These are the exact stored shapes of the three published cars whose recall
+// row was written from a MarketCheck 404: recall_status "clear", zero counts,
+// recall_check.has_open false, and no campaigns. The page must never render a
+// VIN-clear statement from them. JN8AZ3CC5T9624253 additionally has no ymm, so
+// the model-level NHTSA fallback never ran for it either.
+describe("VehiclePassportVerification — no fabricated recall clearance", () => {
+  const CLEAR_CLAIM = /no open safety recalls|no open recalls|verified clean/i;
+
+  const fabricated = (vin: string, ymm: string | null, checkedAt: string): VehicleListing => ({
+    ...reviewListing(),
+    vin, ymm,
+    recall_status: "clear", open_recall_count: 0, closed_recall_count: 0,
+    recall_check: { checked_at: checkedAt, has_open: false, do_not_drive: false, campaigns: [] },
+  } as unknown as VehicleListing);
+
+  const cases: Array<[string, string | null, string]> = [
+    ["JN8AZ3CC5T9624253", null, "2026-09-04T16:43:52.593Z"],
+    ["5N1AL1F94VC330815", "2027 INFINITI QX60", "2026-06-29T15:43:31.933Z"],
+    ["5N1AL1F81VC331105", "2027 INFINITI QX60", "2026-06-29T15:43:25.467Z"],
+  ];
+
+  for (const [vin, ymm, checkedAt] of cases) {
+    it(`${vin} never renders a VIN-clear recall statement`, () => {
+      fixture = fabricated(vin, ymm, checkedAt);
+      renderReport();
+      const onScreen = Array.from(document.querySelectorAll("*"))
+        .filter((el) => !el.closest("[data-print-doc]") && el.children.length === 0)
+        .map((el) => el.textContent || "")
+        .join(" ");
+      expect(onScreen).not.toMatch(CLEAR_CLAIM);
+      expect(screen.queryByRole("heading", { level: 2, name: "Verification checks completed" })).toBeNull();
+    });
+  }
 });
 
 // ── Evidence-card interaction repair (desktop "What checked out" grid) ─────────

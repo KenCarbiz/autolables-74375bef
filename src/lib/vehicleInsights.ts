@@ -1,4 +1,5 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
+import { vinRecallClear } from "@/lib/passport/recallScope";
 
 // ──────────────────────────────────────────────────────────────────────
 // Shopper-facing vehicle insights — turns the MarketCheck enrichment and
@@ -65,8 +66,9 @@ export function vehicleInsights(l: VehicleListing): VehicleInsight[] {
   }
 
   // Recall status.
-  const openRecalls = l.open_recall_count != null ? Number(l.open_recall_count) : null;
-  if (openRecalls === 0) {
+  // open_recall_count === 0 also covers VINs no provider ever answered for, so
+  // the clear-state predicate governs this strength — see recallScope.ts.
+  if (vinRecallClear(l)) {
     out.push({ id: "no-recalls", label: "No open recalls", detail: "No open NHTSA safety recalls at last check.", tone: "emerald", strength: 64 });
   }
 
