@@ -415,8 +415,8 @@ the function kept working to its own 220 s budget. What it did before stopping:
   hartecars.com; without a fix, every run would spend its budget refusing the same pages. Fix, commit
   `16bcff2e`: a vehicle with a `price_rejected` ledger entry inside the last **seven days** is left
   alone on both the queue and seed paths (a named VIN is still visited), reported as `backoff_skipped`.
-  Verification after deploy: PENDING at 06:52Z (deploy of `16bcff2e` in progress).
-- Credits: 1,305 → 1,293 across the two chain canaries (12 renders). Gate 0 total: **23 credits**.
+  Verification after deploy (06:52Z, `limit 1`, function dirs at `16bcff2e`): `backoff_skipped 5` — all five refused VINs left alone — and the one vehicle visited (`5N1AC0FX9VC607600`) was captured with a screenshot. **PASS.** Full suite after both fixes: 274 files, 4,576 passed, 1 skipped; typecheck clean.
+- Credits: 1,305 → 1,292 across the two chain canaries and the backoff check (13 renders). Gate 0 total: **24 credits**.
 
 Cost consequence for the owner's cadence decision (§5.6): with chaining the cron now does what it was
 asked — up to 25 renders per run, 4 runs a day, over a universe of 128 crawlable VINs (57 used/CPO once
