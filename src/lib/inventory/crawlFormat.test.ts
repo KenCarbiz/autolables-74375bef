@@ -184,7 +184,7 @@ describe("the renderer is paced", () => {
   it("writes the pacing decision where a canary can read it", () => {
     expect(SRC).toContain("paced_wait_ms");
     expect(SRC).toMatch(/_detail: \[pacingNote, cls\.detail\]/);
-    expect(SRC).toMatch(/render_pacing: \{/);
+    expect(SRC).toMatch(/render_pacing: renderPacing/);
   });
 });
 
@@ -328,5 +328,48 @@ describe("a rejected price is not a captured one", () => {
 
   it("names the screenshot that may already have been taken", () => {
     expect(misparse).toContain("screenshot_path: screenshot?.path ?? null");
+  });
+});
+
+describe("one request never tries to hold the whole list", () => {
+  // The 06:00 run on 2026-09-09 kept working past the gateway's 150 s idle
+  // limit: four vehicles written, a 504 answered to nobody, a fifth render
+  // paid for and lost, and twenty-one vehicles never reached.
+  it("budgets a link under the gateway's idle limit, with room for the last render", () => {
+    expect(SRC).toMatch(/const RUN_BUDGET_MS = 120_000;/);
+    expect(SRC).toMatch(/const RENDER_HEADROOM_MS = 40_000;/);
+    expect(SRC).toMatch(/const MAX_CHAIN_DEPTH = 12;/);
+  });
+
+  it("does not start a render it cannot finish inside the budget", () => {
+    const pacedFn = between("async function pacedRender(", "serve(async (req)");
+    expect(pacedFn).toMatch(/if \(now \+ wait \+ RENDER_HEADROOM_MS > deadlineAt\) return \{[^}]*gaveUp: "out_of_time"/);
+    const loop = between("for (const row of rows) {", "// ── Discovery:");
+    expect(loop).toMatch(/Date\.now\(\) - startedAt > RUN_BUDGET_MS - RENDER_HEADROOM_MS\) \{ ranOutOfTime = true; break; \}/);
+  });
+
+  it("chains the unreached remainder, shrinking the limit, and never for a single VIN or the test button", () => {
+    const chain = between("// ── Chain the remainder", "return new Response(JSON.stringify({\n    ok: true,\n    depth,");
+    expect(chain).toContain("const remaining = Math.max(rows.length - processed, 0);");
+    expect(chain).toMatch(/if \(ranOutOfTime && remaining > 0 && !targetVin && !body\.test_url && depth < MAX_CHAIN_DEPTH && supabaseUrl && serviceKey\)/);
+    expect(chain).toContain("const nextBody = { ...body, depth: depth + 1, limit: remaining };");
+    expect(chain).toContain("`${supabaseUrl}/functions/v1/crawl-advertised-prices`");
+    expect(chain).toMatch(/Authorization: `Bearer \$\{serviceKey\}`/);
+  });
+
+  it("clamps the depth a caller can claim", () => {
+    expect(SRC).toMatch(/const depth = Math\.max\(0, Math\.min\(Number\(body\.depth\) \|\| 0, MAX_CHAIN_DEPTH\)\);/);
+  });
+
+  it("writes the run summary to audit_log so a lost response still leaves a record", () => {
+    expect(SRC).toContain('action: "advertised_price_crawl_run"');
+    const chain = between("// ── Chain the remainder", "return new Response(JSON.stringify({\n    ok: true,\n    depth,");
+    expect(chain).toMatch(/details: \{\s*depth, picked: rows\.length, processed/);
+    expect(chain).toContain("next_link: nextLink");
+    expect(chain).toContain("render_pacing: renderPacing");
+  });
+
+  it("still derives the render budget from the link budget", () => {
+    expect(SRC).toMatch(/deriveRenderBudget\(RUN_BUDGET_MS, RENDERS_PER_MINUTE\)/);
   });
 });

@@ -755,6 +755,16 @@ let activeRenderKey = FIRECRAWL_KEY;
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 const RENDERS_PER_MINUTE = resolveRendersPerMinute(Deno.env.get("FIRECRAWL_RPM"));
 const MAX_RATE_LIMIT_RETRIES = 2;
+// A render is not started unless it can finish inside the link's budget. On
+// 2026-09-09 06:00 the fifth render of a run was fired at 213 s of a 220 s
+// budget, paid for, and lost when the run ended; a full-page render of a
+// dealer page takes 20-45 s.
+const RENDER_HEADROOM_MS = 40_000;
+// One cron request cannot hold the whole list: the edge gateway closes a
+// request that has sent nothing for 150 s, and a paced, screenshot-backed
+// visit takes 30-60 s. Each link works inside RUN_BUDGET_MS, then hands the
+// rest of its list to a fresh request, at most this many times.
+const MAX_CHAIN_DEPTH = 12;
 
 type RenderFormat = string | { type: string; fullPage?: boolean };
 const HTML_ONLY_FORMATS: RenderFormat[] = ["html"];
@@ -834,7 +844,7 @@ async function pacedRender(url: string, formats: RenderFormat[], deadlineAt: num
   for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
     const now = Date.now();
     const wait = pacer.waitBeforeRender(now);
-    if (now + wait > deadlineAt) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "out_of_time" };
+    if (now + wait + RENDER_HEADROOM_MS > deadlineAt) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "out_of_time" };
     if (wait > 0) { await sleep(wait); pacedWaitMs += wait; }
     pacer.noteRenderStarted(Date.now());
     last = await firecrawlRender(url, formats);
@@ -942,9 +952,14 @@ serve(async (req) => {
   // and no signal that the tail of the list had not been touched. Stopping
   // deliberately keeps the reporting honest; the staleness ordering means
   // whatever is left is simply first in line tomorrow.
-  const RUN_BUDGET_MS = 220_000;
+  // 120 s, not 220: the gateway's idle limit is 150 s, and the 06:00 run on
+  // 2026-09-09 kept working past it -- four vehicles written, the summary
+  // answered to nobody (504), the tail of the list never reached. A link
+  // that runs out of time chains the remainder to a fresh request instead.
+  const RUN_BUDGET_MS = 120_000;
   const startedAt = Date.now();
   const deadlineAt = startedAt + RUN_BUDGET_MS;
+  const depth = Math.max(0, Math.min(Number(body.depth) || 0, MAX_CHAIN_DEPTH));
   // Firecrawl is metered and rate limited — cap renders per run at what the
   // paced rate can actually fit inside the wall clock, so the loop never plans
   // a burst it would have to fire all at once. A single-VIN re-scrape (the
@@ -1299,7 +1314,7 @@ serve(async (req) => {
   };
 
   for (const row of rows) {
-    if (Date.now() - startedAt > RUN_BUDGET_MS) { ranOutOfTime = true; break; }
+    if (Date.now() - startedAt > RUN_BUDGET_MS - RENDER_HEADROOM_MS) { ranOutOfTime = true; break; }
     processed++;
     try {
       if (!isUrlSafe(row.source_url)) {
@@ -1866,8 +1881,60 @@ serve(async (req) => {
     }
   }
 
+  // ── Chain the remainder ────────────────────────────────────────────
+  // The rows this link did not reach keep their old captured_at, so the next
+  // link's queue read puts them first. `limit` shrinks by what was processed,
+  // so a chain never visits more than the caller asked for. Single-VIN and
+  // test-button calls never chain.
+  const remaining = Math.max(rows.length - processed, 0);
+  let nextLink: Record<string, unknown> | null = null;
+  if (ranOutOfTime && remaining > 0 && !targetVin && !body.test_url && depth < MAX_CHAIN_DEPTH && supabaseUrl && serviceKey) {
+    const nextBody = { ...body, depth: depth + 1, limit: remaining };
+    nextLink = { depth: depth + 1, limit: remaining, status: "fired" };
+    try {
+      // The next link answers only when it is done, minutes from now; a short
+      // wait here confirms the request left, nothing more.
+      await fetch(`${supabaseUrl}/functions/v1/crawl-advertised-prices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify(nextBody),
+        signal: AbortSignal.timeout(3000),
+      });
+    } catch (e) {
+      const msg = String(e);
+      if (!/abort|timeout/i.test(msg)) nextLink = { depth: depth + 1, limit: remaining, status: `failed: ${msg.slice(0, 160)}` };
+    }
+  } else if (ranOutOfTime && remaining > 0) {
+    nextLink = { depth: depth + 1, limit: remaining, status: depth >= MAX_CHAIN_DEPTH ? "max_depth_reached" : "not_chained" };
+  }
+
+  const renderPacing = {
+    renders_per_minute: RENDERS_PER_MINUTE,
+    render_budget: renderBudgetStart,
+    render_budget_left: renderBudget,
+    evidence_renders: evidenceRenders,
+    render_key: renderKeyReport,
+    ...pacer.snapshot(),
+  };
+
+  // The cron's response can be lost to the gateway; the run summary is
+  // written where it can always be read.
+  await admin.from("audit_log").insert({
+    action: "advertised_price_crawl_run",
+    entity_type: "advertised_price",
+    entity_id: body.tenant_id || "all",
+    store_id: body.tenant_id || null,
+    details: {
+      depth, picked: rows.length, processed, queue_depth: queueDepth, unvisited: Math.max(queueDepth - processed, 0),
+      ran_out_of_time: ranOutOfTime, updated, unchanged, failed, skipped, discovered,
+      elapsed_ms: Date.now() - startedAt, render_pacing: renderPacing, next_link: nextLink,
+    },
+  }).then(() => undefined, () => undefined);
+
   return new Response(JSON.stringify({
     ok: true,
+    depth,
+    next_link: nextLink,
     picked: rows.length,
     processed,
     // Coverage, stated plainly. "picked 500, updated 40" never said whether the
@@ -1882,14 +1949,7 @@ serve(async (req) => {
     discovered,
     // What the renderer was allowed to do and how it was held back, so a
     // canary run can prove pacing from the response alone.
-    render_pacing: {
-      renders_per_minute: RENDERS_PER_MINUTE,
-      render_budget: renderBudgetStart,
-      render_budget_left: renderBudget,
-      evidence_renders: evidenceRenders,
-      render_key: renderKeyReport,
-      ...pacer.snapshot(),
-    },
+    render_pacing: renderPacing,
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
