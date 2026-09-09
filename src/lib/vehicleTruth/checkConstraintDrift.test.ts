@@ -13,6 +13,10 @@ const MIGRATION = readFileSync(
   join(__dirname, "../../../supabase/migrations/20260909010000_vehicle_facts_check_widen.sql"),
   "utf8",
 );
+const CONFLICTS_MIGRATION = readFileSync(
+  join(__dirname, "../../../supabase/migrations/20260909030000_vehicle_fact_conflicts_authority_widen.sql"),
+  "utf8",
+);
 
 // Exhaustive by construction: adding a FactAuthority member without listing it
 // here is a type error, so the runtime list cannot lag the type.
@@ -24,11 +28,11 @@ const AUTHORITY_TABLE: Record<FactAuthority, true> = {
 };
 const FACT_AUTHORITIES = Object.keys(AUTHORITY_TABLE) as FactAuthority[];
 
-function checkListFor(constraint: string, column: string): string[] {
+function checkListFor(constraint: string, column: string, source: string = MIGRATION): string[] {
   const re = new RegExp(
     `ADD CONSTRAINT ${constraint} CHECK \\(${column} IN \\(([^)]*)\\)\\)`,
   );
-  const m = re.exec(MIGRATION);
+  const m = re.exec(source);
   if (!m) throw new Error(`${constraint} not found in migration`);
   return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
 }
@@ -47,6 +51,15 @@ describe("vehicle truth CHECK constraints track the engine enums", () => {
   it("vehicle_facts.authority allows every FactAuthority", () => {
     const allowed = checkListFor("vehicle_facts_authority_check", "authority");
     for (const authority of FACT_AUTHORITIES) expect(allowed, authority).toContain(authority);
+  });
+
+  it("vehicle_fact_conflicts.authority allows every FactAuthority", () => {
+    // truth.ts writes conflict.authority into this column; it was created with
+    // the three original authorities and widened by nothing.
+    const allowed = checkListFor("vehicle_fact_conflicts_authority_check", "authority", CONFLICTS_MIGRATION);
+    for (const authority of FACT_AUTHORITIES) expect(allowed, authority).toContain(authority);
+    expect(allowed.filter((a) => !FACT_AUTHORITIES.includes(a as FactAuthority))).toEqual([]);
+    expect(CONFLICTS_MIGRATION).toMatch(/pg_get_constraintdef/);
   });
 
   it("widens by exactly the two values the engine defines", () => {
