@@ -922,7 +922,7 @@ serve(async (req) => {
 
   let body: {
     limit?: number; tenant_id?: string; discover?: boolean; vin?: string; test_url?: string;
-    force_screenshot?: boolean;
+    force_screenshot?: boolean; credit_check?: boolean;
   } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
   const targetVin = body.vin ? normVin(body.vin) : null;
@@ -942,6 +942,7 @@ serve(async (req) => {
   // dealer "Test" button gets exactly one render.
   const pacedBudget = deriveRenderBudget(RUN_BUDGET_MS, RENDERS_PER_MINUTE);
   let renderBudget = FIRECRAWL_KEY ? (body.test_url ? 1 : (targetVin ? 3 : pacedBudget)) : 0;
+  const renderBudgetStart = renderBudget;
 
   // ── Auth gate ────────────────────────────────────────────────
   // Two callers: (1) the scheduled cron with the service-role key or the
@@ -981,6 +982,55 @@ serve(async (req) => {
     // Pin the batch to the caller's tenant and keep manual runs bounded.
     body.tenant_id = tenantId;
     body.limit = Math.min(body.limit ?? 300, 500);
+  }
+
+  // ── Credit check ───────────────────────────────────────────
+  // Reports the renderer account's balance as the provider states it, for
+  // the key this function actually holds, so a 402 can be told apart from a
+  // key that belongs to a different team than the dashboard being read.
+  // Platform callers only (cron secret or service role): a dealer's session
+  // has no business with the platform's provider balance. Names the env var
+  // that supplied each key; the key itself never leaves the function. Writes
+  // nothing and renders nothing.
+  if (body.credit_check === true) {
+    if (auth !== serviceKey && !isCron) {
+      return new Response(JSON.stringify({ error: "platform callers only" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const primary = Deno.env.get("FIRECRAWL_API_KEY_1") || "";
+    const secondary = Deno.env.get("FIRECRAWL_API_KEY") || "";
+    const keys: Array<{ env: string; key: string; in_use: boolean }> = [];
+    if (primary) keys.push({ env: "FIRECRAWL_API_KEY_1", key: primary, in_use: true });
+    if (secondary) keys.push({ env: "FIRECRAWL_API_KEY", key: secondary, in_use: !primary });
+    const checks: Array<Record<string, unknown>> = [];
+    for (const k of keys) {
+      const entry: Record<string, unknown> = {
+        env: k.env, in_use: k.in_use, key_length: k.key.length,
+        same_as_primary: k.env !== "FIRECRAWL_API_KEY_1" && k.key === primary,
+      };
+      try {
+        const res = await fetch("https://api.firecrawl.dev/v2/team/credit-usage", {
+          headers: { "Authorization": `Bearer ${k.key}` },
+          signal: AbortSignal.timeout(15000),
+        });
+        const text = await res.text();
+        let parsed: unknown = null;
+        try { parsed = JSON.parse(text); } catch { /* provider answered with non-JSON */ }
+        entry.status = res.status;
+        entry.response = parsed ?? text.slice(0, 500);
+      } catch (e) {
+        entry.status = null;
+        entry.error = String(e).slice(0, 300);
+      }
+      checks.push(entry);
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      credit_check: checks,
+      keys_configured: keys.length,
+      renders_per_minute: RENDERS_PER_MINUTE,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   // ── Per-tenant scrape settings ──────────────────────────────
@@ -1810,7 +1860,7 @@ serve(async (req) => {
     // canary run can prove pacing from the response alone.
     render_pacing: {
       renders_per_minute: RENDERS_PER_MINUTE,
-      render_budget: pacedBudget,
+      render_budget: renderBudgetStart,
       render_budget_left: renderBudget,
       evidence_renders: evidenceRenders,
       ...pacer.snapshot(),
