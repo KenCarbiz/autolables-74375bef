@@ -21,7 +21,13 @@
 // Body: { vin, tenant_id, force?: boolean, dry_run?: boolean }
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
-import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
+import { adminClient } from "../_shared/supabase.ts";
+import { createSupabaseContext } from "https://esm.sh/@supabase/server@1.6.0";
+import {
+  buildSecretKeySet, credentialCarrier, decideUserAuthorization,
+  denyForVerifierStatus, jwksSource,
+  DENY_UNAUTHENTICATED, type CallerDecision,
+} from "../_shared/functionAuth.ts";
 
 import { buildMarketView } from "../_shared/factorySticker/lib/market/marketView.ts";
 import {
@@ -43,6 +49,24 @@ const MC_BASE = "https://api.marketcheck.com";
 const PROVIDER = "marketcheck";
 const REQUEST_TIMEOUT_MS = 10_000;
 
+// Trusted server credentials, as a SET so a rotation does not need a code
+// change, and the JWKS the project actually publishes so user tokens are
+// verified by signature rather than taken on trust.
+const SECRET_KEYS = buildSecretKeySet((n) => Deno.env.get(n));
+const JWKS_SOURCE = jwksSource((n) => Deno.env.get(n));
+const JWKS = JWKS_SOURCE
+  ? ("url" in JWKS_SOURCE ? new URL(JWKS_SOURCE.url) : safeJwks(JWKS_SOURCE.inline))
+  : null;
+
+function safeJwks(raw: string): { keys: unknown[] } | null {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.keys) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 
 // deno-lint-ignore no-explicit-any
@@ -59,6 +83,60 @@ const num = (v: any): number | null => {
  */
 const callProvider = (url: string) => callProviderOnce(url, fetch as unknown as ProviderFetch, REQUEST_TIMEOUT_MS);
 
+/**
+ * Who is calling, and may they act on this tenant.
+ *
+ * Verification is Supabase's, not ours: `createSupabaseContext` checks a user
+ * JWT's signature against the project JWKS, and matches a server credential in
+ * constant time against the configured key SET. What used to live here was a
+ * single `auth !== SERVICE_KEY`, which admitted exactly one credential, could
+ * not see a key presented in the `apikey` header at all, and compared a secret
+ * in variable time.
+ *
+ * Mode order matters. `secret` is tried first because a legacy service-role
+ * key is a JWT with no `sub` claim: offered to `user` mode it is not merely
+ * unmatched but definitively rejected, which would stop the chain before
+ * `secret` ever ran. The `:*` suffix is equally load-bearing — plain `secret`
+ * resolves to the key literally named `default`, so a named set would match
+ * nothing and 401 every trusted caller.
+ */
+async function authenticateCaller(
+  req: Request,
+  tenantId: string,
+  admin: ReturnType<typeof adminClient>,
+): Promise<CallerDecision> {
+  const { data: ctx, error } = await createSupabaseContext(credentialCarrier(req), {
+    auth: ["secret:*", "user"],
+    env: { secretKeys: SECRET_KEYS, ...(JWKS ? { jwks: JWKS } : {}) },
+  });
+
+  if (error) {
+    // The CODE only. `error.toJSON()` carries hints and details, and nothing
+    // derived from a credential belongs in a log line.
+    console.error("writer_auth_denied", error.code);
+    return denyForVerifierStatus(error.status);
+  }
+
+  // A trusted server credential is not a person: there is no membership row to
+  // look for, and the scheduler and the proxy both arrive this way.
+  if (ctx.authMode !== "user") return { ok: true, mode: "secret", userId: null };
+
+  const userId = ctx.userClaims?.id ?? null;
+  if (!userId) return DENY_UNAUTHENTICATED;
+
+  const { data: isAdmin } = await admin.from("user_roles")
+    .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+
+  let isTenantMember = false;
+  if (!isAdmin) {
+    const { data: member } = await admin.from("tenant_members")
+      .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId).maybeSingle();
+    isTenantMember = !!member;
+  }
+
+  return decideUserAuthorization({ userId, isPlatformAdmin: !!isAdmin, isTenantMember });
+}
+
 Deno.serve(async (req) => {
   const pf = preflight(req);
   if (pf) return pf;
@@ -74,21 +152,11 @@ Deno.serve(async (req) => {
   if (!tenantId) return json(400, { error: "tenant_id required" });
 
   // ── 1. Authorisation ──────────────────────────────────────────────
-  // Service role (the scheduler) passes; anyone else must be a member of the
-  // tenant they are asking about, or a platform admin.
-  const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!SERVICE_KEY || auth !== SERVICE_KEY) {
-    const { data: who } = await admin.auth.getUser(auth);
-    const userId = who?.user?.id;
-    if (!userId) return json(401, { error: "authentication required" });
-    const { data: isAdmin } = await admin.from("user_roles")
-      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-    if (!isAdmin) {
-      const { data: member } = await admin.from("tenant_members")
-        .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId).maybeSingle();
-      if (!member) return json(403, { error: "not a member of this tenant" });
-    }
-  }
+  // Nothing below this line may run for an unauthenticated caller: no
+  // reservation, no provider request, no insert. Section 13 spends money and
+  // it is reached only from here.
+  const caller = await authenticateCaller(req, tenantId, admin);
+  if (!caller.ok) return json(caller.status, { error: caller.error });
 
   // ── 2-6. Subject and dealer configuration ─────────────────────────
   const { data: listing } = await admin.from("vehicle_listings")
