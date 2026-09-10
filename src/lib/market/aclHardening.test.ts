@@ -17,12 +17,26 @@ import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-const HISTORICAL_PATH = "supabase/migrations/20260910090000_market_intelligence_v2_audit.sql";
-const ACL_PATH = "supabase/migrations/20260910120000_market_v2_acl_hardening.sql";
+const HISTORICAL_PATH = "supabase/migrations/20260910140209_d9884db9-8fc7-4d63-bd50-b5e2ba5e5002.sql";
+const ACL_PATH = "supabase/migrations/20260910140315_62c76cbb-6d47-4745-9ebe-a8568a3b9bc4.sql";
 
-/** The Gate 14A-2 content, already applied to production. Immutable. */
+/**
+ * The applied content, pinned.
+ *
+ * Both migrations were applied by Lovable's managed runner, which records its
+ * own version timestamps rather than the repository filename versions. The
+ * files it wrote back are the ones the ledger names, so those are the files
+ * this suite guards. They differ from the originally approved files by exactly
+ * one byte each — a missing trailing newline — with byte-identical executable
+ * SQL and identical statement counts (119 and 22).
+ *
+ *   ledger 20260910140209  <-  was 20260910090000_market_intelligence_v2_audit
+ *   ledger 20260910140315  <-  was 20260910120000_market_v2_acl_hardening
+ */
 const HISTORICAL_SHA256 =
-  "894e9c034ab012afe81093724b476a744740bf652bb5dd37c98822090480a3b5";
+  "bdeb39417866aa351dd65245490f14f28df79d335139a859b11e7da64c6e0c7a";
+const ACL_SHA256 =
+  "41b0a4a87c9929024ca5b05b5513107c300ccf4266fcb3cb494ef0d6a6831dd4";
 
 const MARKET_V2_TABLES = [
   "vehicle_market_valuations",
@@ -141,10 +155,17 @@ const held = (table: string, role: string): string[] =>
 
 describe("the historical migration is immutable", () => {
   it("has not been modified since it was applied to production", () => {
-    // 20260910090000 is live production state. Editing it would silently
-    // desynchronise the repository from a schema that already exists.
+    // Ledger version 20260910140209 is live production state. Editing it would
+    // silently desynchronise the repository from a schema that already exists.
     const actual = createHash("sha256").update(readFileSync(HISTORICAL_PATH)).digest("hex");
     expect(actual).toBe(HISTORICAL_SHA256);
+  });
+
+  it("pins the applied ACL migration too", () => {
+    // Both files are now historical: the ledger records them as applied, so
+    // neither may drift without the suite noticing.
+    const actual = createHash("sha256").update(readFileSync(ACL_PATH)).digest("hex");
+    expect(actual).toBe(ACL_SHA256);
   });
 });
 
@@ -209,7 +230,7 @@ describe("the ACL migration changes privileges and nothing else", () => {
 
   it("revokes ALL from every grantee it touches before granting anything back", () => {
     // This is what makes the simulation sound, and it is the defect that let
-    // TRUNCATE survive 20260910090000: revoking by name leaves the unnamed
+    // TRUNCATE survive the audit migration: revoking by name leaves the unnamed
     // privileges in place.
     for (const table of MARKET_V2_TABLES) {
       const grantees = PARSED

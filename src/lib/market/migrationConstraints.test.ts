@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
-const SQL = readFileSync("supabase/migrations/20260910090000_market_intelligence_v2_audit.sql", "utf8");
+const SQL = readFileSync("supabase/migrations/20260910140209_d9884db9-8fc7-4d63-bd50-b5e2ba5e5002.sql", "utf8");
 
 const EVIDENCE_TABLES = ["vehicle_market_valuations", "vehicle_market_comparables"];
 
