@@ -29,15 +29,22 @@ const report = shadowFleet(
     identity: {
       dealerIds: ["1013372"],
       domains: ["harteinfiniti.com"],
-      groupIds: ["Harte Auto Group"],
+      // "Harte Auto Group" is the group's TRADING NAME, not MarketCheck's
+      // group_id, so it goes in groupNames. In groupIds it would be compared
+      // against dealer.group_id, never match, and still report itself as a
+      // stable identification.
+      groupIds: [],
+      groupNames: ["Harte Auto Group"],
       names: ["Harte Infiniti", "Harte INFINITI"],
     },
     // Not configured for any tenant yet. Null unless the caller supplies one,
     // so the default run says "blocked" instead of assuming franchise.
     dealerType: dealerTypeArg === "franchise" || dealerTypeArg === "independent" ? dealerTypeArg : null,
     // Nobody has answered the mandatory-add-on question for this tenant, so
-    // the price basis is ambiguous rather than assumed to be zero.
-    mandatoryAddOnsUsd: null,
+    // the price basis is ambiguous rather than assumed to be zero. Six Harte
+    // vehicles do carry priced installed items, so a tenant-wide zero would be
+    // factually wrong as well as unverified.
+    mandatoryAddOns: null,
     zip: "06120",
     nowMs: Date.parse(generatedAt),
     providerCallCostUsd: 0.07,

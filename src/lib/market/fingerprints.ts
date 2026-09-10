@@ -98,6 +98,7 @@ export interface ValuationFingerprintInput {
   docFee: number | null;
   conditionalDiscounts: number | null;
   mandatoryDealerAddOns: number | null;
+  mandatoryAddOnsIncludedInDisplayedPrice: boolean | null;
   comparableSnapshotHash: string;
   dealerIdentityVersion: string;
   similarityVersion: string;
@@ -117,6 +118,7 @@ export function valuationInputFingerprint(input: ValuationFingerprintInput): str
     doc_fee: input.docFee,
     conditional_discounts: input.conditionalDiscounts,
     mandatory_add_ons: input.mandatoryDealerAddOns,
+    mandatory_add_ons_inside_price: input.mandatoryAddOnsIncludedInDisplayedPrice,
     comparables: input.comparableSnapshotHash,
     dealer_identity: input.dealerIdentityVersion,
     similarity: input.similarityVersion,

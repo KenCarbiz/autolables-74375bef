@@ -243,7 +243,79 @@ describe("global model metrics are not readable by dealership users", () => {
 
   it("reserves the global set for an internal platform administrator", () => {
     expect(SQL).toContain('"market_value_model_metrics platform admin read"');
-    expect(SQL).toMatch(/user_roles[\s\S]{0,120}role::text = 'admin'/);
+    // Through the SECURITY DEFINER helper, not a raw EXISTS on user_roles: a
+    // subquery against an RLS-protected table inside a policy evaluates that
+    // table's own policies, which is a policy inside a policy and the shape
+    // this repository's recursion incidents came from.
+    expect(SQL).toContain("public.has_role((SELECT auth.uid()), 'admin'::public.app_role)");
+    expect(SQL).not.toMatch(/CREATE POLICY[\s\S]{0,400}FROM public\.user_roles/);
+  });
+});
+
+describe("what a dealership is charged is not vehicle data", () => {
+  // A salesperson needs the valuation. They have no business reading the
+  // monthly provider budget, the cost of each paid lookup, or how much of the
+  // month's spend is gone.
+  const MANAGER_ONLY = ["market_provider_budgets", "provider_request_reservations"];
+
+  it("restricts budget and reservation reads to tenant managers", () => {
+    for (const table of MANAGER_ONLY) {
+      expect(SQL).toContain(`"${table} manager read"`);
+      expect(SQL).not.toContain(`CREATE POLICY "${table} tenant read"`);
+    }
+  });
+
+  it("calls is_tenant_manager with the tenant first", () => {
+    // Reversed, the helper silently returns false for everyone and the table
+    // reads as empty rather than as an error — a bug with no symptom.
+    // Only real call sites: the doc comment above the policy quotes the
+    // declared signature, which is not a call.
+    const calls = [...SQL.matchAll(/public\.is_tenant_manager\((.*)\)\n/g)].map((m) => m[1].trim());
+    expect(calls.length).toBeGreaterThan(0);
+    for (const args of calls) {
+      expect(args).toMatch(/^tenant_id\s*,\s*\(SELECT auth\.uid\(\)\)$/);
+    }
+  });
+
+  it("still lets a platform administrator see them", () => {
+    for (const table of MANAGER_ONLY) {
+      const policy = SQL.slice(SQL.indexOf(`"${table} manager read"`));
+      expect(policy.slice(0, 400)).toContain("public.has_role((SELECT auth.uid()), 'admin'::public.app_role)");
+    }
+  });
+
+  it("leaves the valuation tables readable by any tenant member", () => {
+    for (const table of EVIDENCE_TABLES) {
+      expect(SQL).toContain(`"${table} tenant read"`);
+    }
+  });
+});
+
+describe("every function pins its search path", () => {
+  const FUNCTIONS = [
+    "reject_valuation_mutation",
+    "admin_purge_tenant_market_evidence",
+    "market_reserve_provider_call",
+    "market_complete_provider_call",
+    "market_valuation_commit",
+  ];
+
+  it("declares SET search_path on each one", () => {
+    // A trigger fires implicitly on every write, so the caller's search_path
+    // is attacker-adjacent input. Pinning is defence in depth on top of the
+    // schema-qualified references the bodies already use.
+    const declared = [...SQL.matchAll(/SET search_path = pg_catalog, public/g)];
+    expect(declared.length).toBe(FUNCTIONS.length);
+  });
+
+  it("leaves no CREATE FUNCTION without one", () => {
+    const created = [...SQL.matchAll(/CREATE (?:OR REPLACE )?FUNCTION public\.(\w+)/g)].map((m) => m[1]);
+    expect(new Set(created)).toEqual(new Set(FUNCTIONS));
+    for (const fn of created) {
+      const body = SQL.slice(SQL.indexOf(`FUNCTION public.${fn}`));
+      const head = body.slice(0, body.indexOf("AS $"));
+      expect(head, fn).toContain("SET search_path = pg_catalog, public");
+    }
   });
 });
 

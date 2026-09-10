@@ -33,8 +33,23 @@ export interface MarketPriceBasis {
   vehicleComparisonPrice: number | null;
   advertisedPriceBeforeDoc: number | null;
   docFee: number | null;
-  /** Dealer-installed products the customer cannot decline. Disclosed, never folded into the comparison. */
+  /**
+   * Dealer-installed products the customer cannot decline. Disclosed, never
+   * folded into the comparison. NULL means the question is unanswered — which
+   * is not zero, and must never be presented to a customer as "no add-ons".
+   */
   mandatoryDealerAddOns: number | null;
+  /** TRUE when that money is inside `displayedTotalPrice`, FALSE when it is charged on top. Null when unknown. */
+  mandatoryAddOnsIncludedInDisplayedPrice: boolean | null;
+  /** Where the add-on answer came from. "unknown" means nobody has answered at any scope. */
+  mandatoryAddOnSource: "vehicle" | "tenant_default" | "unknown";
+  /**
+   * What the customer owes once a mandatory add-on charged OUTSIDE the
+   * displayed price is included. Equals `displayedTotalPrice` when the add-on
+   * is already inside it; null while the treatment is unknown, because there is
+   * then no total we can honestly state.
+   */
+  totalWithMandatoryAddOns: number | null;
   /** Incentives not available to every buyer, added BACK so they cannot lower the comparison price. */
   conditionalDiscountsExcluded: number | null;
   /** Always false: tax, title and registration are never inside either price. */
@@ -143,6 +158,8 @@ export interface MarketComparable {
   dealerId: string | null;
   rooftopId: string | null;
   dealerGroupId: string | null;
+  /** The group's trading name. A name, not an identifier — see dealerIdentity. */
+  dealerGroupName: string | null;
   dealerDomain: string | null;
   dealerType: string | null;
   distanceMiles: number | null;
@@ -180,6 +197,7 @@ export interface ComparableCandidate {
   dealerId?: unknown;
   rooftopId?: unknown;
   dealerGroupId?: unknown;
+  dealerGroupName?: unknown;
   dealerDomain?: unknown;
   dealerType?: unknown;
   distanceMiles?: unknown;

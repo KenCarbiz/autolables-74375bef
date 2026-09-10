@@ -22,6 +22,7 @@ import { resolvePriceBasis } from "./priceBasis.ts";
 import { buildPredictionRequest } from "./providerAdapter.ts";
 import { canonicalizeComparable } from "./comparables.ts";
 import type { TenantDealerIdentity } from "./dealerIdentity.ts";
+import type { MandatoryAddOnAnswer } from "./priceBasis.ts";
 import type { MarketView, ProviderValuation, SubjectCondition } from "./types.ts";
 
 /** What one vehicle looks like coming out of `vehicle_listings`. */
@@ -58,10 +59,12 @@ export interface ShadowOptions {
   /** Per-VIN cost of one provider call, for the budget estimate. */
   providerCallCostUsd: number;
   /**
-   * The tenant's declared mandatory dealer add-on amount. `null` means the
-   * question has not been answered, which yields an ambiguous price basis.
+   * The tenant's DEFAULT mandatory dealer add-on answer, applied to every
+   * vehicle in the run. Omitted or unverified means the question has not been
+   * answered, which yields an ambiguous price basis rather than an assumed
+   * zero.
    */
-  mandatoryAddOnsUsd?: number | null;
+  mandatoryAddOns?: MandatoryAddOnAnswer | null;
 }
 
 export interface ShadowVehicleResult {
@@ -178,7 +181,7 @@ export function shadowVehicle(row: ShadowListingRow, opts: ShadowOptions): Shado
     websiteSalePrice: row.website_sale_price,
     docFee: row.doc_fee,
     advertisedExcludesDocFee: row.advertised_excludes_doc_fee,
-    mandatoryDealerAddOns: opts.mandatoryAddOnsUsd,
+    tenantMandatoryAddOns: opts.mandatoryAddOns,
   });
 
   // ── Findings ────────────────────────────────────────────────────────────
@@ -218,7 +221,7 @@ export function shadowVehicle(row: ShadowListingRow, opts: ShadowOptions): Shado
   if (!disagreement.contradictory && Object.values(disagreement.surfaces).some((c) => c.direction !== "none")) {
     findings.push("surfaces_agree");
   }
-  if (opts.mandatoryAddOnsUsd == null) findings.push("mandatory_add_on_treatment_unknown");
+  if (basis.mandatoryAddOnSource === "unknown") findings.push("mandatory_add_on_treatment_unknown");
 
   // ── V2, shadow ──────────────────────────────────────────────────────────
   const { view: v2 } = buildMarketView({
@@ -230,7 +233,7 @@ export function shadowVehicle(row: ShadowListingRow, opts: ShadowOptions): Shado
       price: row.price, advertisedPriceBeforeDoc: row.advertised_price_before_doc,
       websiteSalePrice: row.website_sale_price, docFee: row.doc_fee,
       advertisedExcludesDocFee: row.advertised_excludes_doc_fee,
-      mandatoryDealerAddOns: opts.mandatoryAddOnsUsd,
+      tenantMandatoryAddOns: opts.mandatoryAddOns,
       dealerType: opts.dealerType, zip: row.zip ?? opts.zip,
     },
     condition,

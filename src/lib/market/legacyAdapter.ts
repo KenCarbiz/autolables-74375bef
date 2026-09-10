@@ -90,6 +90,7 @@ export function legacyComparableToCandidate(
     dealerId: null,
     rooftopId: null,
     dealerGroupId: null,
+    dealerGroupName: null,
     dealerDomain: null,
     dealerType: null,
     equipmentCodes: [],

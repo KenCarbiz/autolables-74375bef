@@ -231,3 +231,141 @@ describe("the complete price identity", () => {
     expect(b.basisReasons.some((r) => r.startsWith("price_identity_failed"))).toBe(true);
   });
 });
+
+// ── Mandatory dealer add-ons: two questions, both of which can be unanswered ─
+//
+// Harte is the live case. Six vehicles carry priced installed items on a DRAFT
+// addendum, and on every one of them `price − advertised − doc_fee` is exactly
+// 0.00 — the money is not inside the displayed price. A tenant-wide zero would
+// be factually wrong; folding the amount into the advertised price would
+// restate a published number. Both are refused here.
+describe("mandatory add-ons — scope resolution", () => {
+  const noAnswer = (() => { const { mandatoryDealerAddOns: _o, ...rest } = QX50; return rest; })();
+
+  it("takes a verified per-vehicle zero as a real answer", () => {
+    const b = resolvePriceBasis({
+      ...noAnswer,
+      vehicleMandatoryAddOns: { amountUsd: 0, verified: true },
+    });
+    expect(b.mandatoryDealerAddOns).toBe(0);
+    expect(b.mandatoryAddOnSource).toBe("vehicle");
+    expect(b.basisStatus).toBe("verified");
+    expect(b.totalWithMandatoryAddOns).toBe(43876);
+  });
+
+  it("takes a verified per-vehicle non-zero answer", () => {
+    const b = resolvePriceBasis({
+      ...noAnswer, price: 45371, websiteSalePrice: 45371,
+      vehicleMandatoryAddOns: { amountUsd: 1495, verified: true, includedInDisplayedPrice: true },
+    });
+    expect(b.mandatoryDealerAddOns).toBe(1495);
+    expect(b.mandatoryAddOnSource).toBe("vehicle");
+    expect(b.basisStatus).toBe("verified");
+    expect(b.vehicleComparisonPrice).toBe(42981);
+  });
+
+  it("uses a verified tenant default when the vehicle has no answer", () => {
+    const b = resolvePriceBasis({
+      ...noAnswer,
+      tenantMandatoryAddOns: { amountUsd: 0, verified: true },
+    });
+    expect(b.mandatoryDealerAddOns).toBe(0);
+    expect(b.mandatoryAddOnSource).toBe("tenant_default");
+    expect(b.basisReasons).toContain("mandatory_add_ons_from_verified_tenant_default");
+    expect(b.basisStatus).toBe("verified");
+  });
+
+  it("refuses an unverified tenant default rather than assuming it", () => {
+    const b = resolvePriceBasis({
+      ...noAnswer,
+      tenantMandatoryAddOns: { amountUsd: 0 },
+    });
+    expect(b.mandatoryDealerAddOns).toBeNull();
+    expect(b.mandatoryAddOnSource).toBe("unknown");
+    expect(b.basisReasons).toContain("tenant_mandatory_add_on_default_not_verified");
+    expect(b.basisStatus).toBe("ambiguous");
+  });
+
+  it("lets the vehicle override the tenant default", () => {
+    const b = resolvePriceBasis({
+      ...noAnswer, price: 45371, websiteSalePrice: 45371,
+      vehicleMandatoryAddOns: { amountUsd: 1495, verified: true, includedInDisplayedPrice: true },
+      tenantMandatoryAddOns: { amountUsd: 0, verified: true },
+    });
+    expect(b.mandatoryDealerAddOns).toBe(1495);
+    expect(b.mandatoryAddOnSource).toBe("vehicle");
+  });
+
+  it("treats a draft addendum's priced items as unanswered, not as verified", () => {
+    // The six Harte vehicles: real installed items, real dollars, but the
+    // addendum is a DRAFT. A draft is not a disclosure the dealer has made, so
+    // it cannot become a mandatory charge we assert on their behalf.
+    const b = resolvePriceBasis({
+      ...noAnswer,
+      vehicleMandatoryAddOns: { amountUsd: 2343.99, verified: false },
+    });
+    expect(b.mandatoryDealerAddOns).toBeNull();
+    expect(b.mandatoryAddOnSource).toBe("unknown");
+    expect(b.basisStatus).toBe("ambiguous");
+    expect(b.basisReasons).toContain("mandatory_add_on_treatment_unknown");
+    // Never assumed to be zero, and never quietly folded into the total.
+    expect(b.displayedTotalPrice).toBe(43876);
+    expect(b.totalWithMandatoryAddOns).toBeNull();
+  });
+
+  it("stays ambiguous when nobody has answered at any scope", () => {
+    const b = resolvePriceBasis(noAnswer);
+    expect(b.mandatoryDealerAddOns).toBeNull();
+    expect(b.mandatoryAddOnsIncludedInDisplayedPrice).toBeNull();
+    expect(b.mandatoryAddOnSource).toBe("unknown");
+    expect(b.basisStatus).toBe("ambiguous");
+    expect(b.totalWithMandatoryAddOns).toBeNull();
+  });
+});
+
+describe("mandatory add-ons — inside the displayed price or on top of it", () => {
+  const noAnswer = (() => { const { mandatoryDealerAddOns: _o, ...rest } = QX50; return rest; })();
+
+  it("subtracts an add-on that is inside the displayed price", () => {
+    const b = resolvePriceBasis({
+      ...noAnswer, price: 45371, websiteSalePrice: 45371,
+      vehicleMandatoryAddOns: { amountUsd: 1495, verified: true, includedInDisplayedPrice: true },
+    });
+    expect(b.mandatoryAddOnsIncludedInDisplayedPrice).toBe(true);
+    expect(b.displayedTotalPrice).toBe(45371);
+    expect(b.totalWithMandatoryAddOns).toBe(45371);
+    expect(b.vehicleComparisonPrice).toBe(42981);
+    expect(b.basisReasons).toContain("mandatory_add_ons_inside_displayed_price");
+    expect(b.basisStatus).toBe("verified");
+  });
+
+  it("leaves the advertised price alone when the add-on is charged on top", () => {
+    // This is the Harte shape: price − advertised − doc_fee = 0, and the
+    // product is charged at the desk. Subtracting it would restate a published
+    // advertised price by $2,343.99.
+    const b = resolvePriceBasis({
+      ...noAnswer,
+      vehicleMandatoryAddOns: { amountUsd: 2343.99, verified: true, includedInDisplayedPrice: false },
+    });
+    expect(b.mandatoryAddOnsIncludedInDisplayedPrice).toBe(false);
+    expect(b.displayedTotalPrice).toBe(43876);
+    expect(b.vehicleComparisonPrice).toBe(42981);
+    expect(b.totalWithMandatoryAddOns).toBeCloseTo(46219.99, 2);
+    expect(b.basisReasons).toContain("mandatory_add_ons_outside_displayed_price");
+    expect(b.basisStatus).toBe("verified");
+  });
+
+  it("is ambiguous when the amount is known but its placement is not", () => {
+    const b = resolvePriceBasis({
+      ...noAnswer,
+      vehicleMandatoryAddOns: { amountUsd: 2343.99, verified: true },
+    });
+    expect(b.mandatoryDealerAddOns).toBeCloseTo(2343.99, 2);
+    expect(b.mandatoryAddOnsIncludedInDisplayedPrice).toBeNull();
+    expect(b.basisStatus).toBe("ambiguous");
+    expect(b.basisReasons).toContain("mandatory_add_on_placement_unknown");
+    // No total can be stated without knowing which side of the price it sits on.
+    expect(b.totalWithMandatoryAddOns).toBeNull();
+    expect(b.displayedTotalPrice).toBe(43876);
+  });
+});

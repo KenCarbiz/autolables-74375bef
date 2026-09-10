@@ -118,7 +118,22 @@ Deno.serve(async (req) => {
   const dealerType = resolveDealerType(settings);
   const zip = (settings.dealer_zip as string) || null;
   const identity = (settings.dealer_identity ?? {}) as Record<string, string[]>;
-  const mandatoryAddOns = num(settings.mandatory_add_ons_usd);
+  // The tenant setting is a DEFAULT for every car on the lot, so it is used
+  // only when someone has explicitly confirmed it. An unconfirmed number — and
+  // an absent one — resolves to unknown, which makes the basis ambiguous and
+  // forecloses red. It never resolves to an assumed zero.
+  //
+  // There is no per-vehicle column yet, so the vehicle scope is not supplied
+  // here; `resolveMandatoryAddOns` still checks it first, which is what the
+  // Vehicle File surface uses when a listing carries its own answer.
+  const tenantMandatoryAddOns = {
+    amountUsd: num(settings.mandatory_add_ons_usd),
+    verified: settings.mandatory_add_ons_verified === true,
+    includedInDisplayedPrice:
+      typeof settings.mandatory_add_ons_included_in_displayed_price === "boolean"
+        ? settings.mandatory_add_ons_included_in_displayed_price
+        : null,
+  };
   const condition = listing.condition === "new" || listing.condition === "used" || listing.condition === "cpo"
     ? listing.condition : null;
 
@@ -233,7 +248,7 @@ Deno.serve(async (req) => {
       websiteSalePrice: listing.website_sale_price,
       docFee: listing.doc_fee,
       advertisedExcludesDocFee: (settings.advertised_excludes_doc_fee as boolean) ?? null,
-      mandatoryDealerAddOns: mandatoryAddOns,
+      tenantMandatoryAddOns,
       dealerType,
       zip,
     },
@@ -271,6 +286,10 @@ Deno.serve(async (req) => {
     vehicle_comparison_price: view.vehicleComparisonPrice,
     conditional_discounts: explanation.priceBasis.conditionalDiscountsExcluded,
     mandatory_dealer_add_ons: explanation.priceBasis.mandatoryDealerAddOns,
+    mandatory_add_ons_included_in_displayed_price:
+      explanation.priceBasis.mandatoryAddOnsIncludedInDisplayedPrice,
+    mandatory_add_on_source: explanation.priceBasis.mandatoryAddOnSource,
+    total_with_mandatory_add_ons: explanation.priceBasis.totalWithMandatoryAddOns,
     doc_fee: view.docFee,
     fee_decomposition: explanation.priceBasis.provenance,
     price_basis_status: explanation.priceBasis.basisStatus,
@@ -335,7 +354,8 @@ Deno.serve(async (req) => {
     certified: c.certified,
     certification_program: c.certificationProgram,
     dealer_name: c.dealerName, dealer_id: c.dealerId, rooftop_id: c.rooftopId,
-    dealer_group_id: c.dealerGroupId, dealer_domain: c.dealerDomain,
+    dealer_group_id: c.dealerGroupId, dealer_group_name: c.dealerGroupName,
+    dealer_domain: c.dealerDomain,
     distance_miles: c.distanceMiles, days_on_market: c.daysOnMarket,
     listing_observed_at: c.listingObservedAt,
     history_status: c.historyStatus, condition_status: c.conditionStatus,

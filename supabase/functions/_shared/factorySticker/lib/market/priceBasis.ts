@@ -43,6 +43,25 @@
 // pilot lot today, and it is not something the resolver may assume: an unknown
 // add-on treatment produces an AMBIGUOUS basis, which costs confidence and
 // forecloses a red verdict, rather than a confident number built on a guess.
+//
+// MANDATORY ADD-ONS ARE TWO QUESTIONS, NOT ONE:
+//
+//   1. How much?  — resolved per vehicle first, then from a tenant default
+//      that is used ONLY when someone has explicitly verified it, then
+//      unknown. A tenant-wide default is a claim about every car on the lot;
+//      it does not get to be inferred from silence.
+//   2. Where does it sit? — INSIDE the displayed price, or added on top of it
+//      at the desk. The two produce different customer totals from the same
+//      dollars, and the second is what Harte actually does: on all six of the
+//      lot's cars carrying priced installed items, `price − advertised −
+//      doc_fee` is exactly 0.00, so the money is NOT inside the displayed
+//      price. Folding it in would restate the advertised price of a published
+//      vehicle.
+//
+// Either question unanswered makes the basis ambiguous. Unknown never becomes
+// an assumed zero, is never added to the displayed price on its own authority,
+// and is never described to a customer as a mandatory charge — an unverified
+// guess about what a dealer requires is a disclosure claim we cannot make.
 
 import {
   PRICE_BASIS_TOLERANCE,
@@ -75,16 +94,127 @@ export interface SubjectPriceInput {
    */
   advertisedExcludesDocFee?: boolean | null;
   /**
-   * Dealer-installed products the customer cannot decline, in dollars.
+   * Per-vehicle shorthand: dealer-installed products the customer cannot
+   * decline, in dollars, ALREADY INSIDE the displayed price.
    *
-   * A number — including 0 — means the question has been ANSWERED. `null` or
-   * absent means nobody has told us, which is not the same as none, and yields
-   * an ambiguous basis.
+   * A number — including 0 — means the question has been ANSWERED for this
+   * vehicle. `null` or absent means nobody has told us, which is not the same
+   * as none, and yields an ambiguous basis. This is the historical shape and
+   * carries the historical assumption; a dealer who adds the product at the
+   * desk instead must use `vehicleMandatoryAddOns` and say so.
    */
   mandatoryDealerAddOns?: number | null;
+  /** The per-vehicle answer. Overrides the tenant default whenever it exists. */
+  vehicleMandatoryAddOns?: MandatoryAddOnAnswer | null;
+  /**
+   * The tenant-wide default. Used ONLY when `verified` is explicitly true: a
+   * default nobody has confirmed is a guess about every car on the lot, and a
+   * guess is exactly what the ambiguous basis exists to refuse.
+   */
+  tenantMandatoryAddOns?: MandatoryAddOnAnswer | null;
   /** Rebates not available to every buyer. Added back so they cannot lower the comparison. */
   conditionalDiscounts?: number | null;
   provenance?: Record<string, unknown>;
+}
+
+export type MandatoryAddOnSource = "vehicle" | "tenant_default" | "unknown";
+
+export interface MandatoryAddOnAnswer {
+  /** Dollars. 0 is a real answer; null or absent is not an answer at all. */
+  amountUsd?: number | null;
+  /**
+   * Whether a human has confirmed this answer for this scope. Required for a
+   * tenant default; a per-vehicle answer is taken as confirmed unless this is
+   * explicitly false.
+   */
+  verified?: boolean | null;
+  /**
+   * TRUE when the money is already inside the displayed price, FALSE when it
+   * is added at the desk on top of it. Null means we do not know where it
+   * sits, which is not a smaller problem than not knowing the amount.
+   */
+  includedInDisplayedPrice?: boolean | null;
+}
+
+export interface MandatoryAddOnResolution {
+  amountUsd: number | null;
+  includedInDisplayedPrice: boolean | null;
+  source: MandatoryAddOnSource;
+  /** An amount has been answered. */
+  known: boolean;
+  /** Amount AND placement are both answered, so the price identity may use it. */
+  usableForIdentity: boolean;
+  reasons: string[];
+}
+
+const answerAmount = (a: MandatoryAddOnAnswer | null | undefined): number | null => {
+  const n = money(a?.amountUsd);
+  return n != null && n >= 0 ? n : null;
+};
+
+/**
+ * Per vehicle, then a verified tenant default, then unknown.
+ *
+ * Zero is the one amount whose placement does not matter — nothing moves
+ * whichever side of the displayed price it sits on — so it alone is usable for
+ * the identity without a placement answer.
+ */
+export function resolveMandatoryAddOns(input: SubjectPriceInput): MandatoryAddOnResolution {
+  const reasons: string[] = [];
+
+  const vehicle = input.vehicleMandatoryAddOns;
+  const vehicleAmount = answerAmount(vehicle);
+  const legacyAmount = money(input.mandatoryDealerAddOns);
+
+  let amountUsd: number | null = null;
+  let includedInDisplayedPrice: boolean | null = null;
+  let source: MandatoryAddOnSource = "unknown";
+
+  if (vehicleAmount != null && vehicle?.verified !== false) {
+    amountUsd = vehicleAmount;
+    includedInDisplayedPrice = vehicle?.includedInDisplayedPrice ?? null;
+    source = "vehicle";
+  } else if (legacyAmount != null && legacyAmount >= 0) {
+    amountUsd = legacyAmount;
+    includedInDisplayedPrice = true;
+    source = "vehicle";
+  } else {
+    const tenant = input.tenantMandatoryAddOns;
+    const tenantAmount = answerAmount(tenant);
+    if (tenantAmount != null && tenant?.verified === true) {
+      amountUsd = tenantAmount;
+      includedInDisplayedPrice = tenant?.includedInDisplayedPrice ?? null;
+      source = "tenant_default";
+      reasons.push("mandatory_add_ons_from_verified_tenant_default");
+    } else if (tenantAmount != null) {
+      reasons.push("tenant_mandatory_add_on_default_not_verified");
+    }
+  }
+
+  if (amountUsd == null) {
+    reasons.push("mandatory_add_on_treatment_unknown");
+    return {
+      amountUsd: null, includedInDisplayedPrice: null, source: "unknown",
+      known: false, usableForIdentity: false, reasons,
+    };
+  }
+
+  const placementKnown = amountUsd === 0 || includedInDisplayedPrice != null;
+  if (!placementKnown) reasons.push("mandatory_add_on_placement_unknown");
+  if (amountUsd > 0) {
+    reasons.push(`mandatory_add_ons_disclosed_${amountUsd}`);
+    if (includedInDisplayedPrice === false) reasons.push("mandatory_add_ons_outside_displayed_price");
+    else if (includedInDisplayedPrice === true) reasons.push("mandatory_add_ons_inside_displayed_price");
+  }
+
+  return {
+    amountUsd,
+    includedInDisplayedPrice,
+    source,
+    known: true,
+    usableForIdentity: placementKnown,
+    reasons,
+  };
 }
 
 /**
@@ -107,12 +237,12 @@ export function resolvePriceBasis(input: SubjectPriceInput): MarketPriceBasis {
   const website = money(input.websiteSalePrice);
   const rawDocFee = money(input.docFee);
   const docFee = rawDocFee != null && rawDocFee >= 0 ? rawDocFee : null;
-  const mandatory = money(input.mandatoryDealerAddOns);
-  const mandatoryKnown = mandatory != null && mandatory >= 0;
+  const addOns = resolveMandatoryAddOns(input);
   const conditional = money(input.conditionalDiscounts) ?? 0;
 
   if (rawDocFee != null && rawDocFee < 0) reasons.push("doc_fee_negative");
-  if (mandatory != null && mandatory < 0) reasons.push("mandatory_add_ons_negative");
+  const rawMandatory = money(input.mandatoryDealerAddOns) ?? money(input.vehicleMandatoryAddOns?.amountUsd);
+  if (rawMandatory != null && rawMandatory < 0) reasons.push("mandatory_add_ons_negative");
 
   // Which side of the fee the dealer's advertised price sits on.
   let includesDocFee: boolean | null =
@@ -150,7 +280,11 @@ export function resolvePriceBasis(input: SubjectPriceInput): MarketPriceBasis {
   // fee and any mandatory product taken back off, before conditional money is
   // restored. This is the leg the stored `advertised_price_before_doc` column
   // is supposed to hold, so it is also what the identity is checked against.
-  const mandatoryForIdentity = mandatoryKnown ? (mandatory as number) : 0;
+  // Only money that is INSIDE the displayed price belongs in the identity. An
+  // add-on charged at the desk never entered this arithmetic, so subtracting it
+  // here would restate a published advertised price by the size of the add-on.
+  const mandatoryForIdentity =
+    addOns.usableForIdentity && addOns.includedInDisplayedPrice === true ? (addOns.amountUsd as number) : 0;
   let advertisedLeg: number | null = advertised;
   if (advertisedLeg == null && displayedTotalPrice != null && docFee != null) {
     advertisedLeg = displayedTotalPrice - docFee - mandatoryForIdentity;
@@ -178,31 +312,41 @@ export function resolvePriceBasis(input: SubjectPriceInput): MarketPriceBasis {
   }
 
   // Nobody has told us whether this dealer bolts a mandatory product onto every
-  // car. Absent that answer the comparison price is a guess, so the basis is
-  // ambiguous — which costs confidence and forecloses red — rather than
-  // confidently wrong.
-  if (!mandatoryKnown && status === "verified") {
+  // car, or — knowing the amount — whether it sits inside the advertised price
+  // or lands at the desk. Absent either answer the customer total is a guess,
+  // so the basis is ambiguous — which costs confidence and forecloses red —
+  // rather than confidently wrong.
+  if (!addOns.usableForIdentity && status === "verified") {
     status = "ambiguous";
   }
-  if (!mandatoryKnown) {
-    reasons.push("mandatory_add_on_treatment_unknown");
-  } else if ((mandatory as number) > 0) {
-    reasons.push(`mandatory_add_ons_disclosed_${mandatory}`);
-  }
+  reasons.push(...addOns.reasons);
   if (conditional > 0) {
     reasons.push(`conditional_discounts_added_back_${conditional}`);
   }
 
-  // comparison = displayed + conditional − fee − mandatory
+  // comparison = displayed + conditional − fee − mandatory-inside-the-price
   const vehicleComparisonPrice =
     status === "invalid" || advertisedLeg == null ? null : advertisedLeg + conditional;
+
+  // The displayed price is never rewritten by an add-on. What the customer
+  // actually owes, when a mandatory product is charged on top of it, is
+  // published as its OWN number so a surface can disclose the charge without
+  // the advertised price silently changing underneath it. Null while unknown —
+  // there is no honest total to state.
+  const totalWithMandatoryAddOns =
+    status === "invalid" || displayedTotalPrice == null || !addOns.usableForIdentity
+      ? null
+      : displayedTotalPrice + (addOns.includedInDisplayedPrice === false ? (addOns.amountUsd as number) : 0);
 
   return {
     displayedTotalPrice: status === "invalid" ? displayedTotalPrice ?? null : displayedTotalPrice,
     vehicleComparisonPrice,
     advertisedPriceBeforeDoc: advertisedLeg,
     docFee,
-    mandatoryDealerAddOns: mandatoryKnown ? mandatory : null,
+    mandatoryDealerAddOns: addOns.amountUsd,
+    mandatoryAddOnsIncludedInDisplayedPrice: addOns.includedInDisplayedPrice,
+    mandatoryAddOnSource: addOns.source,
+    totalWithMandatoryAddOns,
     conditionalDiscountsExcluded: conditional || null,
     governmentFeesIncluded: false,
     advertisedIncludesDocFee: includesDocFee,
@@ -214,8 +358,10 @@ export function resolvePriceBasis(input: SubjectPriceInput): MarketPriceBasis {
       website_sale_price: input.websiteSalePrice ?? null,
       doc_fee: input.docFee ?? null,
       advertised_excludes_doc_fee: input.advertisedExcludesDocFee ?? null,
-      mandatory_dealer_add_ons: input.mandatoryDealerAddOns ?? null,
-      mandatory_add_on_treatment: mandatoryKnown ? "known" : "unknown",
+      mandatory_dealer_add_ons: addOns.amountUsd,
+      mandatory_add_on_source: addOns.source,
+      mandatory_add_on_included_in_displayed_price: addOns.includedInDisplayedPrice,
+      mandatory_add_on_treatment: addOns.usableForIdentity ? "known" : "unknown",
       conditional_discounts: input.conditionalDiscounts ?? null,
       ...(input.provenance ?? {}),
     },

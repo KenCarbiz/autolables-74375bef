@@ -50,7 +50,13 @@ CREATE TABLE IF NOT EXISTS public.vehicle_market_valuations (
   displayed_total_price       numeric(12,2),
   vehicle_comparison_price    numeric(12,2),
   conditional_discounts       numeric(12,2),
+  -- NULL is UNKNOWN, never zero. A row that cannot say where the add-on sits
+  -- cannot state a customer total, which is why the two columns below are
+  -- nullable and why `total_with_mandatory_add_ons` is null alongside them.
   mandatory_dealer_add_ons    numeric(12,2),
+  mandatory_add_ons_included_in_displayed_price boolean,
+  mandatory_add_on_source     text,
+  total_with_mandatory_add_ons numeric(12,2),
   doc_fee                     numeric(12,2),
   fee_decomposition           jsonb NOT NULL DEFAULT '{}'::jsonb,
   -- NOT NULL: a nullable basis is exactly how a red row slipped past the
@@ -266,6 +272,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_market_comparables (
   dealer_id               text,
   rooftop_id              text,
   dealer_group_id         text,
+  dealer_group_name       text,
   dealer_domain           text,
   distance_miles          numeric(8,2),
   days_on_market          integer,
@@ -419,6 +426,12 @@ COMMENT ON TABLE public.provider_request_reservations IS
 CREATE OR REPLACE FUNCTION public.reject_valuation_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
+-- Pinned so a caller's search_path cannot influence resolution inside a trigger
+-- that fires implicitly on every write. Every reference below is already
+-- schema-qualified; this is defence in depth, not a fix for a live exposure.
+-- (The repository's 231 existing SECURITY DEFINER functions pin `public`; the
+-- explicit `pg_catalog, public` used here is the stricter superset.)
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_owner name;
@@ -478,7 +491,7 @@ CREATE OR REPLACE FUNCTION public.admin_purge_tenant_market_evidence(
 RETURNS TABLE (comparables_deleted bigint, valuations_deleted bigint)
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_comparables bigint;
@@ -528,6 +541,7 @@ RETURNS TABLE (
   month_budget_usd   numeric
 )
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_budget  public.market_provider_budgets%ROWTYPE;
@@ -601,6 +615,7 @@ CREATE OR REPLACE FUNCTION public.market_complete_provider_call(
 )
 RETURNS void
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
   IF p_status NOT IN ('succeeded', 'failed') THEN
@@ -625,6 +640,7 @@ CREATE OR REPLACE FUNCTION public.market_valuation_commit(
 )
 RETURNS uuid
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_id      uuid := gen_random_uuid();
@@ -726,39 +742,50 @@ CREATE POLICY "market_value_model_metrics tenant read"
     )
   );
 
+-- The platform-admin check goes through the repository's existing helper rather
+-- than reading user_roles directly. `has_role` is SECURITY DEFINER with a pinned
+-- search_path, so it does NOT re-enter user_roles' own RLS the way a raw EXISTS
+-- does — one policy evaluation instead of a policy inside a policy, and no
+-- enum-to-text cast on a column that is indexed as an enum.
 DROP POLICY IF EXISTS "market_value_model_metrics platform admin read" ON public.market_value_model_metrics;
 CREATE POLICY "market_value_model_metrics platform admin read"
   ON public.market_value_model_metrics FOR SELECT
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.user_roles
-      WHERE user_id = (SELECT auth.uid()) AND role::text = 'admin'
-    )
-  );
+  USING ( public.has_role((SELECT auth.uid()), 'admin'::public.app_role) );
 
--- Budgets and the spend ledger are dealer-visible for their own tenant so a
--- dealership can see what it is being charged, and writable only by the writer.
+-- What a dealership is being CHARGED is financial and operational data, not
+-- vehicle data. A salesperson needs the valuation; they have no business
+-- reading the monthly provider budget, what each paid lookup cost, or how much
+-- of the month's spend is gone. The valuation tables above stay readable by any
+-- tenant member; these two do not.
+--
+-- Management is decided by the repository's existing helper, which is SECURITY
+-- DEFINER with a pinned search_path and already means "an ACCEPTED owner or
+-- admin of this tenant" — so it cannot recurse into tenant_members' own RLS and
+-- it cannot be satisfied by an unaccepted invitation.
+--
+-- Argument order matters and is easy to get backwards:
+--   is_tenant_manager(_tenant_id uuid, _user_id uuid)   -- tenant FIRST
+-- Reversed, it silently returns false for everyone and the table reads as empty
+-- rather than as an error.
 DROP POLICY IF EXISTS "market_provider_budgets tenant read" ON public.market_provider_budgets;
-CREATE POLICY "market_provider_budgets tenant read"
+DROP POLICY IF EXISTS "market_provider_budgets manager read" ON public.market_provider_budgets;
+CREATE POLICY "market_provider_budgets manager read"
   ON public.market_provider_budgets FOR SELECT
   TO authenticated
   USING (
-    tenant_id IN (
-      SELECT tenant_id FROM public.tenant_members
-      WHERE user_id = (SELECT auth.uid())
-    )
+    public.is_tenant_manager(tenant_id, (SELECT auth.uid()))
+    OR public.has_role((SELECT auth.uid()), 'admin'::public.app_role)
   );
 
 DROP POLICY IF EXISTS "provider_request_reservations tenant read" ON public.provider_request_reservations;
-CREATE POLICY "provider_request_reservations tenant read"
+DROP POLICY IF EXISTS "provider_request_reservations manager read" ON public.provider_request_reservations;
+CREATE POLICY "provider_request_reservations manager read"
   ON public.provider_request_reservations FOR SELECT
   TO authenticated
   USING (
-    tenant_id IN (
-      SELECT tenant_id FROM public.tenant_members
-      WHERE user_id = (SELECT auth.uid())
-    )
+    public.is_tenant_manager(tenant_id, (SELECT auth.uid()))
+    OR public.has_role((SELECT auth.uid()), 'admin'::public.app_role)
   );
 
 REVOKE INSERT, UPDATE, DELETE ON public.market_value_model_metrics    FROM anon, authenticated;

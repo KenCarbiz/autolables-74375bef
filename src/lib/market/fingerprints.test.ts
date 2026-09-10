@@ -22,6 +22,7 @@ const VALUATION = {
   docFee: 895,
   conditionalDiscounts: null,
   mandatoryDealerAddOns: 0,
+  mandatoryAddOnsIncludedInDisplayedPrice: true,
   comparableSnapshotHash: "cs",
   dealerIdentityVersion: DEALER_IDENTITY_VERSION,
   similarityVersion: "similarity-v1-shadow",
@@ -69,6 +70,9 @@ describe("the valuation fingerprint answers 'may I reuse the decision'", () => {
   it("moves for the fee, conditional money, add-ons and the basis status", () => {
     for (const patch of [
       { docFee: 500 }, { conditionalDiscounts: 1000 }, { mandatoryDealerAddOns: 1495 },
+      // The same dollars inside the price and charged at the desk are two
+      // different customer totals, so they are two different decisions.
+      { mandatoryAddOnsIncludedInDisplayedPrice: false },
       { priceBasisStatus: "ambiguous" },
     ]) {
       expect(valuationInputFingerprint({ ...VALUATION, ...patch }), JSON.stringify(patch))

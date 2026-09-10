@@ -19,6 +19,14 @@
 // website id, rooftop id, group id, the dealer's own domain, or an explicit
 // tenant mapping), and a name match is accepted only as a last resort and is
 // labelled as such so confidence can pay for it. Distance is never identity.
+//
+// IDENTIFIERS AND NAMES ARE DIFFERENT KINDS OF THING and the type keeps them
+// apart. `groupIds` holds provider-issued group identifiers; `groupNames`
+// holds a group's trading name. Putting "Harte Auto Group" in `groupIds`
+// compares a name against MarketCheck's `dealer.group_id`, never matches, and
+// reports itself as a stable identification while doing nothing at all — the
+// worst of the three outcomes, because it is a silent false negative wearing
+// a stable-identity label. `identityConfigIssues` exists to catch exactly that.
 
 export type OwnershipRelation = "own_rooftop" | "own_group" | "external";
 export type IdentityConfidence = "stable" | "name_only" | "none";
@@ -28,7 +36,18 @@ export interface TenantDealerIdentity {
   dealerIds?: string[];
   websiteIds?: string[];
   domains?: string[];
+  /**
+   * Provider-issued group identifiers ONLY — MarketCheck's `dealer.group_id`
+   * and equivalents. A group's trading name belongs in `groupNames`.
+   */
   groupIds?: string[];
+  /**
+   * A group's trading name. Last-resort matching only: it can miss affiliated
+   * inventory outright (a rooftop the provider labels differently) and it can
+   * over-match an unrelated group that happens to share a word, so a match
+   * here is reported as `name_only` and never counts as stable identity.
+   */
+  groupNames?: string[];
   /** Last-resort matching only. Never the sole basis for a confident answer. */
   names?: string[];
 }
@@ -38,6 +57,7 @@ export interface ComparableIdentityFields {
   rooftopId?: string | null;
   websiteId?: string | null;
   dealerGroupId?: string | null;
+  dealerGroupName?: string | null;
   dealerDomain?: string | null;
   dealerName?: string | null;
   distanceMiles?: number | null;
@@ -65,11 +85,23 @@ const has = (list: string[] | undefined, value: string | null | undefined): bool
 };
 
 /**
+ * Fuzzy name equality, used for rooftop names and group names alike.
+ *
+ * Exact equality after normalization, or containment when both sides are long
+ * enough that containment is not an accident. "Harte Auto Group" normalizes to
+ * "harte", so the containment arm is deliberately unreachable for short trading
+ * names — only the exact arm can match them.
+ */
+const nameMatches = (own: string, other: string): boolean =>
+  own === other || (own.length >= 6 && other.length >= 6 && (other.includes(own) || own.includes(other)));
+
+/**
  * Decide whether a listing belongs to the dealer we are measuring.
  *
- * A name-only match still returns own_rooftop — keeping a dealer's own car out
- * of its own market is the safer error — but it reports `name_only` so the
- * confidence engine can require stable identity before allowing a red verdict.
+ * A name-only match still returns own_rooftop / own_group — keeping a dealer's
+ * own car out of its own market is the safer error — but it reports
+ * `name_only` so the confidence engine can require stable identity before
+ * allowing a red verdict.
  */
 export function classifyOwnership(
   comp: ComparableIdentityFields,
@@ -90,9 +122,22 @@ export function classifyOwnership(
   if (name && identity.names?.length) {
     for (const own of identity.names.map(normalizeDealerName)) {
       if (!own) continue;
-      if (own === name || (own.length >= 6 && name.length >= 6 && (name.includes(own) || own.includes(name)))) {
+      if (nameMatches(own, name)) {
         cautions.push("own_rooftop_matched_by_name_only");
         return ok("own_rooftop", "dealer_name", "name_only", cautions);
+      }
+    }
+  }
+
+  // Group-name fallback. It runs after the rooftop-name check so a car at the
+  // measured rooftop is reported as own_rooftop rather than merely own_group.
+  const groupName = normalizeDealerName(comp.dealerGroupName);
+  if (groupName && identity.groupNames?.length) {
+    for (const own of identity.groupNames.map(normalizeDealerName)) {
+      if (!own) continue;
+      if (nameMatches(own, groupName)) {
+        cautions.push("own_group_matched_by_name_only");
+        return ok("own_group", "dealer_group_name", "name_only", cautions);
       }
     }
   }
@@ -137,9 +182,16 @@ export function rooftopKey(comp: ComparableIdentityFields): string {
   );
 }
 
-/** Group key, falling back to the rooftop when no group is known — a rooftop is its own group of one. */
+/**
+ * Group key, falling back to the group's normalized name and then to the
+ * rooftop — a rooftop is its own group of one.
+ *
+ * Collapsing by name is the conservative direction: it can only merge two
+ * rooftops into one counted source, never split one into two, so the error it
+ * makes is to understate independence rather than to overstate it.
+ */
 export function groupKey(comp: ComparableIdentityFields): string {
-  return comp.dealerGroupId?.trim() || rooftopKey(comp);
+  return comp.dealerGroupId?.trim() || normalizeDealerName(comp.dealerGroupName) || rooftopKey(comp);
 }
 
 /** True when at least one comparable actually carried a group id. */
@@ -153,8 +205,10 @@ export const groupIdsKnown = (comps: ComparableIdentityFields[]): boolean =>
  * cars sat inside Harte's own market because a name comparison was the only
  * thing standing between them and the median, and a name comparison is one
  * rebrand or one franchise-sale away from failing silently. Until a stable
- * rooftop, dealer, website id or domain exists for a tenant, high confidence —
- * and therefore red — stays out of reach.
+ * rooftop, dealer, website, group id or domain exists for a tenant, high
+ * confidence — and therefore red — stays out of reach.
+ *
+ * `groupNames` is a name and counts as one, no matter how many are configured.
  */
 export function tenantIdentityStability(identity: TenantDealerIdentity): IdentityConfidence {
   const stable =
@@ -164,5 +218,29 @@ export function tenantIdentityStability(identity: TenantDealerIdentity): Identit
     + (identity.domains?.length ?? 0)
     + (identity.groupIds?.length ?? 0);
   if (stable > 0) return "stable";
-  return (identity.names?.length ?? 0) > 0 ? "name_only" : "none";
+  const named = (identity.names?.length ?? 0) + (identity.groupNames?.length ?? 0);
+  return named > 0 ? "name_only" : "none";
+}
+
+const looksLikeAName = (v: string): boolean => /[a-z]/i.test(v) && /\s/.test(v.trim());
+
+/**
+ * Configuration lint for a tenant's identity mapping.
+ *
+ * A trading name in `groupIds` is compared against the provider's group id,
+ * never matches, and still reports itself as stable identity — so it is worth
+ * naming loudly rather than discovering it as a missing exclusion months later.
+ */
+export function identityConfigIssues(identity: TenantDealerIdentity): string[] {
+  const issues: string[] = [];
+  for (const id of identity.groupIds ?? []) {
+    if (looksLikeAName(String(id))) issues.push(`group_id_looks_like_a_name:${id}`);
+  }
+  for (const id of identity.dealerIds ?? []) {
+    if (looksLikeAName(String(id))) issues.push(`dealer_id_looks_like_a_name:${id}`);
+  }
+  for (const id of identity.rooftopIds ?? []) {
+    if (looksLikeAName(String(id))) issues.push(`rooftop_id_looks_like_a_name:${id}`);
+  }
+  return issues;
 }

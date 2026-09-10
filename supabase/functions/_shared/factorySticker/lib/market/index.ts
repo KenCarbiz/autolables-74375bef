@@ -17,7 +17,10 @@ export {
   assignTier, canonicalizeComparable, dedupeByVin, inclusionFor, isInternalInventory,
   isPrimaryTier, isContextTier, readCertified, selectTier, TIER_ORDER,
 } from "./comparables.ts";
-export { classifyOwnership, groupKey, rooftopKey, normalizeDealerName, normalizeDomain } from "./dealerIdentity.ts";
+export {
+  classifyOwnership, groupKey, rooftopKey, normalizeDealerName, normalizeDomain,
+  identityConfigIssues, tenantIdentityStability,
+} from "./dealerIdentity.ts";
 export { scoreSimilarity, SIMILARITY_COEFFICIENTS, SIMILARITY_VERSION } from "./similarity.ts";
 export { applyConcentrationCaps, CONCENTRATION_CAP, MIN_SOURCES_FOR_CAP } from "./concentration.ts";
 export { reviewOutliers, MIN_SAMPLE_FOR_OUTLIER_REMOVAL, DEFAULT_MAD_THRESHOLD } from "./outliers.ts";

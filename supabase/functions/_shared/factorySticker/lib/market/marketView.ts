@@ -320,6 +320,7 @@ export function buildMarketView(input: MarketEngineInput): MarketEngineResult {
     docFee: priceBasis.docFee,
     conditionalDiscounts: priceBasis.conditionalDiscountsExcluded,
     mandatoryDealerAddOns: priceBasis.mandatoryDealerAddOns,
+    mandatoryAddOnsIncludedInDisplayedPrice: priceBasis.mandatoryAddOnsIncludedInDisplayedPrice,
     comparableSnapshotHash: snapshotHash,
     dealerIdentityVersion: DEALER_IDENTITY_VERSION,
     similarityVersion: SIMILARITY_VERSION,
