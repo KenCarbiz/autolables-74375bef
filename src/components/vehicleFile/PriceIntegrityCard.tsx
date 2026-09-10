@@ -6,6 +6,7 @@ import { Card, EmptyNote, Pair, StatRow, btn, btnPrimary, fmtWhen } from "./prim
 import type { VehicleRow } from "./types";
 import { feeExclusiveEquivalent } from "@/components/compliance/complianceData";
 import { EVIDENCE_UNAVAILABLE_MESSAGE, signPriceEvidenceUrl } from "@/lib/evidence/priceEvidenceUrl";
+import { presentLegacyPosition } from "@/lib/market/presentation";
 
 // Price integrity for one VIN.
 //
@@ -148,13 +149,9 @@ const AdvertisedPriceCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   );
 };
 
-const MARKET_LABEL: Record<string, string> = {
-  great_deal: "Great deal",
-  good_deal: "Good deal",
-  fair_deal: "Fair price",
-  above_market: "Above market",
-  unknown: "Not checked",
-};
+// Label and tone come from src/lib/market/presentation.ts — one map for the
+// whole app, so this card cannot disagree with the inventory grid about the
+// same car.
 
 const MarketPositionCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   const [pos, setPos] = useState<string>(vehicle.market_position || "unknown");
@@ -234,7 +231,7 @@ const MarketPositionCard = ({ vehicle }: { vehicle: VehicleRow }) => {
               value={below === 0 ? "At market" : `${money(Math.abs(below))} ${below > 0 ? "below" : "above"} market`}
             />
           </div>
-          <StatRow label="Position" value={MARKET_LABEL[pos] || MARKET_LABEL.unknown} />
+          <StatRow label="Position" value={presentLegacyPosition(pos).label} />
           <StatRow label="Comparables used" value={compCount ? compCount.toLocaleString() : "Not recorded"} tone={compCount ? undefined : "muted"} />
           {valueSource === "comps_median" && avgCompMiles != null && vehicle.mileage != null && vehicle.mileage < avgCompMiles * 0.7 && (
             <p className="text-al-meta text-muted-foreground">

@@ -27,6 +27,7 @@
 // and no test can accidentally spend money.
 
 import { digest, stableStringify } from "./hash.ts";
+import { providerRequestFingerprint } from "./fingerprints.ts";
 import {
   type DealerType,
   type MarketPredictionRequest,
@@ -159,7 +160,16 @@ export function buildPredictionRequest(subject: SubjectForPrediction): BuiltRequ
   return {
     request,
     sanitizedParams,
-    requestFingerprint: digest({ path: MARKETCHECK_PREDICT_PATH, params: sanitizedParams, v: MARKETCHECK_REQUEST_VERSION }),
+    // Provider inputs only. The subject's asking price is deliberately not in
+    // here: a price change must not buy the same prediction twice.
+    requestFingerprint: providerRequestFingerprint({
+      provider: "marketcheck",
+      endpointVersion: MARKETCHECK_ENDPOINT_VERSION,
+      vin, miles, dealerType,
+      zip, city: zip ? null : city, state: zip ? null : state,
+      isCertified: request.isCertified,
+      requestVersion: MARKETCHECK_REQUEST_VERSION,
+    }),
     path: MARKETCHECK_PREDICT_PATH,
     blockers: [],
   };

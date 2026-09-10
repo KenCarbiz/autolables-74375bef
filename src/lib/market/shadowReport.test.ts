@@ -77,7 +77,8 @@ describe("shadowVehicle on the QX50", () => {
     expect(result.findings).toContain("own_rooftop_in_market");
     expect(result.findings).toContain("missing_certification_on_comparables");
     expect(result.findings).toContain("provider_request_not_reconstructable");
-    expect(result.findings).toContain("contradictory_surface_verdicts");
+    expect(result.findings).toContain("contradictory_surface_amounts");  // grid $4,718 vs Passport $3,823
+    expect(result.findings).toContain("mandatory_add_on_treatment_unknown");
   });
 
   it("counts the corrected provider call this vehicle needs", () => {

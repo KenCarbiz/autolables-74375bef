@@ -43,6 +43,7 @@ import { normalizeComparables } from "@/lib/passport/comparables";
 import { resolveFuelEconomy, FUEL_MODULE_HEADING } from "@/lib/passport/fuelEconomy";
 import { trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
+import { presentLegacyPosition } from "@/lib/market/presentation";
 
 // One shared sticky offset for the desktop header + action center so they can
 // never disagree (header height 64 + 24 gap).
@@ -229,6 +230,13 @@ export default function VehiclePassportGoverned() {
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : []), [listing]);
+  // Whether this car reads as a good price is decided in one place for the
+  // whole app; this page keeps its own palette and only asks which tone
+  // applies. Semantic wiring only — no layout or copy change.
+  const marketPresentationTone = useMemo(
+    () => presentLegacyPosition(listing?.market_position).tone,
+    [listing?.market_position],
+  );
 
   const [idx, setIdx] = useState(0);
   const [saved, setSaved] = useState<boolean | null>(null);
@@ -917,7 +925,7 @@ export default function VehiclePassportGoverned() {
               <div className={`${CARD} mt-3 p-4`}>
                 <div className="grid grid-cols-3 gap-3">
                   <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Analyzed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "nearby"}</div></div>
-                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>vs market</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : d.aboveMarket != null ? fmt$(d.aboveMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below value" : "vs value"}</div></div>
+                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>vs market</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: marketPresentationTone === "positive" ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : d.aboveMarket != null ? fmt$(d.aboveMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below value" : "vs value"}</div></div>
                   <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Days listed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.dom != null ? d.dom : d.marketMeta.avgDom != null ? d.marketMeta.avgDom : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.dom != null ? "this car" : "market avg"}</div></div>
                 </div>
                 <div className="mt-4">

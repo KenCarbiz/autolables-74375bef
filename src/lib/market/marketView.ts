@@ -23,15 +23,20 @@ import {
 } from "./comparables.ts";
 import { resolveConfidence, providerDisagreement } from "./confidence.ts";
 import { applyConcentrationCaps } from "./concentration.ts";
-import { groupIdsKnown, groupKey, rooftopKey, type TenantDealerIdentity } from "./dealerIdentity.ts";
+import { groupIdsKnown, groupKey, rooftopKey, tenantIdentityStability, type TenantDealerIdentity } from "./dealerIdentity.ts";
 import { buildPredictionRequest, PROVIDER_FRESH_DAYS, validateProviderValuation, type SubjectForPrediction } from "./providerAdapter.ts";
 import { resolvePriceBasis, type SubjectPriceInput } from "./priceBasis.ts";
 import { reviewOutliers, type OutlierCandidate, type SupportingExclusionEvidence } from "./outliers.ts";
-import { scoreSimilarity } from "./similarity.ts";
+
 import {
   effectiveSampleSize, weightedMean, weightedMad, weightedQuantile, weightedStdDev,
 } from "./statistics.ts";
 import { shadowComposite } from "./composite.ts";
+import {
+  CONFIDENCE_RULES_VERSION, DEALER_IDENTITY_VERSION, VERDICT_RULES_VERSION,
+  comparableSnapshotHash, valuationInputFingerprint,
+} from "./fingerprints.ts";
+import { SIMILARITY_VERSION, scoreSimilarity } from "./similarity.ts";
 import { resolveVerdict } from "./verdict.ts";
 import {
   MARKET_ENGINE_VERSION,
@@ -67,7 +72,10 @@ const emptyStats = (): WeightedStats => ({
   independentGroupCount: 0, effectiveSampleSize: 0,
   p10: null, p25: null, p50: null, p75: null, p90: null,
   mean: null, stdDev: null, mad: null,
-  topRooftopShare: 0, topGroupShare: 0, marketFloor: null,
+  topRooftopShare: 0, topGroupShare: 0,
+  effectiveRooftopCap: 1, effectiveGroupCap: 1,
+  strictConcentrationSatisfied: false, insufficientMarketDiversity: true,
+  marketFloor: null,
 });
 
 export function buildMarketView(input: MarketEngineInput): MarketEngineResult {
@@ -206,10 +214,21 @@ export function buildMarketView(input: MarketEngineInput): MarketEngineResult {
     mad: weightedMad(weighted),
     topRooftopShare: concentration.topRooftopShare,
     topGroupShare: concentration.topGroupShare,
+    effectiveRooftopCap: concentration.effectiveRooftopCap,
+    effectiveGroupCap: concentration.effectiveGroupCap,
+    strictConcentrationSatisfied: concentration.strictConcentrationSatisfied,
+    insufficientMarketDiversity: concentration.underAllocated,
     // The floor is context. It is the minimum eligible price and it gets no
     // weight, no special standing and no ability to become the market value.
     marketFloor: eligiblePrices.length ? Math.min(...eligiblePrices) : null,
-  } : { ...emptyStats(), rawCandidateCount: input.candidates.length };
+  } : {
+    ...emptyStats(),
+    rawCandidateCount: input.candidates.length,
+    effectiveRooftopCap: concentration.effectiveRooftopCap,
+    effectiveGroupCap: concentration.effectiveGroupCap,
+    strictConcentrationSatisfied: concentration.strictConcentrationSatisfied,
+    insufficientMarketDiversity: concentration.underAllocated,
+  };
 
   // 9 — Confidence.
   const { confidence, reasons: confidenceReasons } = resolveConfidence({
@@ -220,6 +239,7 @@ export function buildMarketView(input: MarketEngineInput): MarketEngineResult {
     stats,
     winningTier: selection.winningTier,
     groupIdentityKnown: groupIdsKnown(capped),
+    tenantIdentityStability: tenantIdentityStability(input.identity),
     concentrationUnderAllocated: concentration.underAllocated,
     materialContradictions: input.materialContradictions ?? [],
   });
@@ -275,8 +295,39 @@ export function buildMarketView(input: MarketEngineInput): MarketEngineResult {
     explanationAvailable: true,
   };
 
+  // The decision's own fingerprint. Distinct from the provider's, so a price
+  // change invalidates the CONCLUSION without invalidating the paid prediction.
+  const snapshotHash = comparableSnapshotHash(
+    capped.map((c) => ({
+      vin: c.vin,
+      normalizedVehiclePrice: c.normalizedVehiclePrice,
+      mileage: c.mileage,
+      certified: c.certified,
+      rooftopKey: rooftopKey(c),
+      observedAt: c.listingObservedAt,
+    })),
+  );
+  const decisionFingerprint = valuationInputFingerprint({
+    algorithmVersion: MARKET_ENGINE_VERSION,
+    providerRequestFingerprint: input.provider?.requestFingerprint ?? null,
+    providerResponseHash: input.provider?.responseHash ?? null,
+    vehicleComparisonPrice: priceBasis.vehicleComparisonPrice,
+    priceBasisStatus: priceBasis.basisStatus,
+    docFee: priceBasis.docFee,
+    conditionalDiscounts: priceBasis.conditionalDiscountsExcluded,
+    mandatoryDealerAddOns: priceBasis.mandatoryDealerAddOns,
+    comparableSnapshotHash: snapshotHash,
+    dealerIdentityVersion: DEALER_IDENTITY_VERSION,
+    similarityVersion: SIMILARITY_VERSION,
+    confidenceRulesVersion: CONFIDENCE_RULES_VERSION,
+    verdictRulesVersion: VERDICT_RULES_VERSION,
+  });
+
   const explanation: MarketExplanation = {
     engineVersion: MARKET_ENGINE_VERSION,
+    providerRequestFingerprint: input.provider?.requestFingerprint ?? null,
+    valuationInputFingerprint: decisionFingerprint,
+    comparableSnapshotHash: snapshotHash,
     priceBasis,
     providerValidation,
     provider: input.provider,

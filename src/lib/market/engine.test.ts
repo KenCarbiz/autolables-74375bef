@@ -40,13 +40,16 @@ const subject = {
   year: 2025, make: "INFINITI", model: "QX50", trim: "Sport",
   drivetrain: "AWD", powertrain: null, mileage: 12912, certified: true,
   price: 43876, advertisedPriceBeforeDoc: 42981, websiteSalePrice: 43876,
-  docFee: 895, advertisedExcludesDocFee: false,
+  docFee: 895, advertisedExcludesDocFee: false, mandatoryDealerAddOns: 0,
   dealerType: "franchise" as const, zip: "06120",
 };
 
 const build = (candidates: ComparableCandidate[], p: ProviderValuation | null, over: Record<string, unknown> = {}) =>
   buildMarketView({
-    subject, condition: "cpo", candidates, identity: { names: ["Harte Infiniti"] },
+    subject, condition: "cpo", candidates,
+    // A stable rooftop id, because a name-only identity deliberately blocks
+    // high confidence — see the dealer-identity block below.
+    identity: { rooftopIds: ["own-rooftop"], names: ["Harte Infiniti"] },
     provider: p, nowMs: NOW, ...over,
   });
 
@@ -478,5 +481,110 @@ describe("shadow composite", () => {
     const { explanation } = build(healthyComps([41000, 41500, 42000, 42500, 43000, 43500, 44000]), provider(42981));
     const shares = explanation.shadowComposite!.signals.map((s) => s.share).sort();
     expect(shares).not.toEqual([0.4, 0.6]);
+  });
+});
+
+describe("insufficient market diversity", () => {
+  const sources = (n: number) =>
+    healthyComps(Array.from({ length: n }, (_, i) => 41000 + i * 250));
+
+  it("emits insufficient_market_diversity below five independent sources", () => {
+    for (const n of [1, 2, 3, 4]) {
+      const { view } = build(sources(n), provider(41500));
+      expect(view.confidenceReasons, `${n} sources`).toContain("insufficient_market_diversity");
+    }
+  });
+
+  it("stops emitting it at five sources", () => {
+    const { view } = build(sources(5), provider(41500));
+    expect(view.confidenceReasons).not.toContain("insufficient_market_diversity");
+  });
+
+  it("never claims the strict 20% rule was satisfied by a relaxed allocation", () => {
+    for (const n of [1, 2, 3, 4]) {
+      const r = applyConcentrationCaps(Array.from({ length: n }, (_, i) => ({
+        key: `k${i}`, rooftop: `R${i}`, group: `G${i}`, weight: 1 + i,
+      })));
+      expect(r.strictConcentrationSatisfied, `${n} sources`).toBe(false);
+      expect(r.effectiveRooftopCap).toBeGreaterThan(CONCENTRATION_CAP - 1e-9);
+      expect(r.underAllocated).toBe(true);
+    }
+  });
+
+  it("reports the strict rule as satisfied only when it genuinely is", () => {
+    const r = applyConcentrationCaps(Array.from({ length: 6 }, (_, i) => ({
+      key: `k${i}`, rooftop: `R${i}`, group: `G${i}`, weight: 1,
+    })));
+    expect(r.strictConcentrationSatisfied).toBe(true);
+    expect(r.underAllocated).toBe(false);
+  });
+
+  it("forbids high confidence and red below five sources, whatever the price", () => {
+    for (const n of [1, 2, 3, 4]) {
+      for (const subjectPrice of [20000, 43876, 90000]) {
+        const { view, explanation } = buildMarketView({
+          subject: { ...subject, price: subjectPrice, advertisedPriceBeforeDoc: subjectPrice - 895, websiteSalePrice: subjectPrice },
+          condition: "cpo", candidates: sources(n), identity: {}, provider: provider(41500), nowMs: NOW,
+        });
+        expect(view.confidence, `${n} sources @ ${subjectPrice}`).not.toBe("high");
+        expect(explanation.tone, `${n} sources @ ${subjectPrice}`).not.toBe("red");
+      }
+    }
+  });
+
+  it("stores the source count, caps, weights and both diversity answers", () => {
+    const { explanation } = build(sources(3), provider(41500));
+    const s = explanation.stats;
+    expect(s.independentRooftopCount).toBe(3);
+    expect(s.effectiveRooftopCap).toBeCloseTo(1 / 3, 6);
+    expect(s.effectiveGroupCap).toBeCloseTo(1 / 3, 6);
+    expect(s.strictConcentrationSatisfied).toBe(false);
+    expect(s.insufficientMarketDiversity).toBe(true);
+    const voting = explanation.comparables.filter((c) => c.cappedWeight > 0);
+    expect(voting.every((c) => c.rawWeight > 0 && c.cappedWeight > 0)).toBe(true);
+  });
+
+  it("may still return neutral market context", () => {
+    const { view, explanation } = build(sources(3), provider(41500));
+    expect(view.marketP50).not.toBeNull();
+    expect(["neutral", "amber", "green"]).toContain(explanation.tone);
+  });
+});
+
+
+describe("stable dealer identity is required for high confidence", () => {
+  const healthy = healthyComps([41000, 41500, 42000, 42500, 43000, 43500, 44000]);
+
+  const withIdentity = (identity: Record<string, string[]>) => buildMarketView({
+    subject, condition: "cpo", candidates: healthy, identity,
+    provider: provider(42981), nowMs: NOW,
+  });
+
+  it("a rooftop id reaches high", () => {
+    expect(withIdentity({ rooftopIds: ["r-own"] }).view.confidence).toBe("high");
+  });
+
+  it("a name-only identity cannot", () => {
+    const { view, explanation } = withIdentity({ names: ["Harte Infiniti"] });
+    expect(view.confidence).not.toBe("high");
+    expect(view.confidenceReasons).toContain("dealer_identity_name_only");
+    expect(explanation.tone).not.toBe("red");
+  });
+
+  it("no identity at all cannot either", () => {
+    const { view } = withIdentity({});
+    expect(view.confidence).not.toBe("high");
+    expect(view.confidenceReasons).toContain("dealer_identity_name_only");
+  });
+
+  it("a name-only tenant can never show red, whatever the price", () => {
+    for (const price of [20000, 43876, 250000]) {
+      const { explanation } = buildMarketView({
+        subject: { ...subject, price, advertisedPriceBeforeDoc: price - 895, websiteSalePrice: price },
+        condition: "cpo", candidates: healthy, identity: { names: ["Harte Infiniti"] },
+        provider: provider(42981), nowMs: NOW,
+      });
+      expect(explanation.tone, String(price)).not.toBe("red");
+    }
   });
 });

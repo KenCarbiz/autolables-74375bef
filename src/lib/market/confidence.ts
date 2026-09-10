@@ -36,6 +36,8 @@ export interface ConfidenceInput {
   winningTier: ComparableTier | null;
   /** True when at least one comparable carried a real dealer-group id. */
   groupIdentityKnown: boolean;
+  /** How well the tenant's OWN rooftop can be identified. */
+  tenantIdentityStability: "stable" | "name_only" | "none";
   /** True when the 20% rule could not be satisfied because sources were too few. */
   concentrationUnderAllocated: boolean;
   /** Unresolved contradictions between sources about history or condition. */
@@ -99,8 +101,10 @@ export function resolveConfidence(input: ConfidenceInput): ConfidenceResult {
       `independent_rooftops_below_${HIGH_MIN_ROOFTOPS}`],
     [stats.topRooftopShare <= CONCENTRATION_CAP + 1e-9, "one_rooftop_exceeds_concentration_cap"],
     [stats.topGroupShare <= CONCENTRATION_CAP + 1e-9, "one_dealer_group_exceeds_concentration_cap"],
-    [!input.concentrationUnderAllocated, "too_few_sources_for_concentration_rule"],
+    [stats.strictConcentrationSatisfied, "strict_twenty_percent_rule_not_satisfied"],
+    [!input.concentrationUnderAllocated, "insufficient_market_diversity"],
     [input.groupIdentityKnown, "dealer_group_identity_unknown"],
+    [input.tenantIdentityStability === "stable", "dealer_identity_name_only"],
     [input.winningTier != null && isPrimaryTier(input.winningTier), "no_primary_comparable_tier"],
     [disagreement != null && disagreement <= HIGH_MAX_PROVIDER_DISAGREEMENT,
       "provider_and_comparable_evidence_disagree"],
@@ -125,6 +129,8 @@ export function resolveConfidence(input: ConfidenceInput): ConfidenceResult {
   const mediumFailures = mediumChecks.filter(([ok]) => !ok).map(([, why]) => why);
   if (!mediumFailures.length) {
     reasons.push(...highFailures);
+    // Medium is neutral market context. It is explicitly NOT a claim that the
+    // diversity requirement was met, and the reason travels with the answer.
     return { confidence: "medium", reasons };
   }
 

@@ -1,6 +1,7 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { TrendingDown } from "lucide-react";
 import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
+import { presentLegacyPosition } from "@/lib/market/presentation";
 
 // Shopper-facing market-value report — the transparency module that turns
 // "below market" into a picture. Shows the local market range with the
@@ -16,7 +17,9 @@ export default function MarketValueReport({ listing }: { listing: VehicleListing
 
   const marketView = legacyMarketView(listing as unknown as LegacyListingFields, "passport", { comparePrice: price });
   const below = mv != null && marketView.difference != null ? Math.round(-marketView.difference) : null;
-  const isDeal = below != null && below >= 250;
+  // "Is this a deal" is one decision for the whole app.
+  const presentation = presentLegacyPosition(listing.market_position);
+  const isDeal = below != null && below >= 250 && presentation.tone === "positive";
 
   // Build a range bar when we have a band; otherwise a simple avg comparison.
   const lo = low != null ? low : mv != null ? Math.round(mv * 0.94) : price;

@@ -326,7 +326,7 @@ const PublicListingBody = () => {
   const marketAvg = listing.market_value ?? 0;
   // The comparison itself lives in src/lib/market/surfaceCompat.ts. Same
   // number, one home.
-  const publicMarketView = legacyMarketView(listing as unknown as LegacyListingFields, "passport");
+  const publicMarketView = legacyMarketView(listing as unknown as LegacyListingFields, "passport", { comparePrice: price });
   const belowMarket = mp.belowMarket
     ?? (publicMarketView.difference != null && publicMarketView.difference < 0 ? -publicMarketView.difference : 0);
   const marketHigh = mp.high ?? 0;

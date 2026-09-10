@@ -5,6 +5,7 @@ import {
 import { resolveHistoryFacts, isBadgeworthy, badgeAttribution } from "@/lib/vehicleTruth/historyFacts";
 import type { Confidence } from "@/lib/vehicleTruth/precedence";
 import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
+import { presentLegacyPosition } from "@/lib/market/presentation";
 
 // Trust Badge Strip — the signature confidence bar on the Vehicle Passport.
 // Renders ONLY the badges we have real data for (no greyed placeholders), and
@@ -123,11 +124,20 @@ export default function TrustStrip({ listing }: { listing: any }) {
   const sr = (listing.service_records?.length || 0) as number;
   if (sr > 0) badges.push({ icon: Wrench, title: "Full Service History", sub: `${sr} service record${sr === 1 ? "" : "s"}`, tone: "green" });
 
-  if (["below_market", "great_deal", "good_deal"].includes(listing.market_position)) {
+  // Label, tone and the sentence under it all come from the shared market
+  // presentation map. This block used to carry its own list of position
+  // strings, which is a third vocabulary for the same question.
+  const marketPresentation = presentLegacyPosition(listing.market_position);
+  if (marketPresentation.tone !== "neutral" || marketPresentation.code === "within") {
     const below = listing.market_payload?.belowMarket;
-    badges.push({ icon: TrendingDown, title: "Priced Below Market", sub: below ? `$${Number(below).toLocaleString()} below average` : "Competitively priced", tone: "green" });
-  } else if (["at_market", "fair_deal"].includes(listing.market_position)) {
-    badges.push({ icon: TrendingDown, title: "Priced At Market", sub: "In line with comparable listings", tone: "blue" });
+    badges.push({
+      icon: TrendingDown,
+      title: marketPresentation.label,
+      sub: below ? `$${Number(below).toLocaleString()} below average` : marketPresentation.explanation,
+      tone: marketPresentation.tone === "positive" ? "green"
+        : marketPresentation.tone === "caution" ? "amber"
+        : marketPresentation.tone === "negative" ? "red" : "blue",
+    });
   }
 
   if (cond === "new") badges.push({ icon: Sparkles, title: "Factory New", sub: "0 miles — never titled", tone: "blue" });

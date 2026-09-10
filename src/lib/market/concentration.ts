@@ -48,6 +48,12 @@ export interface ConcentrationResult {
   effectiveGroupCap: number;
   /** True when there were too few sources for the 20% rule to be satisfiable. */
   underAllocated: boolean;
+  /**
+   * The strict rule, answered honestly: five or more independent sources AND
+   * every source at or under 20%. A relaxed 1/n allocation removes dominance
+   * but does NOT satisfy this, and must never be reported as if it did.
+   */
+  strictConcentrationSatisfied: boolean;
 }
 
 function sharesBy(
@@ -120,5 +126,10 @@ export function applyConcentrationCaps(items: ConcentrationInput[]): Concentrati
     effectiveRooftopCap,
     effectiveGroupCap,
     underAllocated: rooftops.length < MIN_SOURCES_FOR_CAP,
+    strictConcentrationSatisfied:
+      rooftops.length >= MIN_SOURCES_FOR_CAP
+      && groups.length >= MIN_SOURCES_FOR_CAP
+      && top(rooftopShares) <= CONCENTRATION_CAP + EPSILON
+      && top(groupShares) <= CONCENTRATION_CAP + EPSILON,
   };
 }

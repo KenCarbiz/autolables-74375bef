@@ -60,9 +60,9 @@ const run = (s: { candidates: ComparableCandidate[]; price: number; provider: Pr
       vin: "3PCAJ5FB1SF109999", year: 2025, make: "INFINITI", model: "QX50", trim: "Sport",
       drivetrain: "AWD", powertrain: null, mileage: 12912, certified: true,
       price: s.price, advertisedPriceBeforeDoc: s.price - 895, websiteSalePrice: s.price,
-      docFee: 895, advertisedExcludesDocFee: false, dealerType: "franchise", zip: "06120",
+      docFee: 895, advertisedExcludesDocFee: false, mandatoryDealerAddOns: 0, dealerType: "franchise", zip: "06120",
     },
-    condition: "cpo", candidates: s.candidates, identity: {}, provider: s.provider, nowMs: NOW,
+    condition: "cpo", candidates: s.candidates, identity: { rooftopIds: ["r-own"] }, provider: s.provider, nowMs: NOW,
   });
 
 const all = [...scenarios()];

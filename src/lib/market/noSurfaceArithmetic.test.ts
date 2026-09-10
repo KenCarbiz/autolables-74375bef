@@ -62,3 +62,61 @@ describe("no surface calculates its own market position", () => {
     expect(offenders, `market arithmetic must live in src/lib/market:\n${offenders.join("\n")}`).toEqual([]);
   });
 });
+
+// Part two: the same guard for PRESENTATION. Centralising the labels and
+// colours is only worth something if a component cannot quietly grow its own
+// table again — which is exactly how five of them ended up disagreeing.
+describe("no surface picks its own market label or colour", () => {
+  const files = ROOTS.flatMap((r) => walk(r));
+
+  /** A file that renders a market position must go through the shared map. */
+  const MARKET_POSITION = /market_position/;
+  /**
+   * A local table keyed on the legacy position vocabulary. The value has to
+   * look like a label or a class — `below_market: 2300` is a price-history
+   * FIELD, not a second opinion about what to call it.
+   */
+  const LOCAL_MAP = /(?<![A-Za-z_])(great_deal|good_deal|fair_deal|above_market|below_market|at_market)\s*:\s*[{"']/;
+  /** A colour chosen from a market position or difference in the same expression. */
+  const LOCAL_COLOUR =
+    /(market_position|marketPosition|belowMarket|aboveMarket)[^\n]{0,120}(bg-(emerald|amber|red|blue|slate)-|text-(emerald|amber|red|blue|slate)-)/;
+
+  it("defines no local position-to-label table outside the engine", () => {
+    const offenders = files.filter((f) => {
+      const body = readFileSync(f, "utf8");
+      return LOCAL_MAP.test(body);
+    });
+    expect(offenders, `these files keep their own market label table:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  it("chooses no colour directly from a market position or difference", () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      readFileSync(f, "utf8").split("\n").forEach((line, i) => {
+        if (line.trimStart().startsWith("//") || line.trimStart().startsWith("*")) return;
+        // A line that consults the shared map is not choosing for itself —
+        // that is the whole point of routing through it.
+        const consultsMap = /presentLegacyPosition|presentMarketView|presentVerdict|\.classes\.|marketPresentationTone/.test(line);
+        if (LOCAL_COLOUR.test(line) && !consultsMap) offenders.push(`${f}:${i + 1}`);
+      });
+    }
+    expect(offenders, `these lines pick a market colour locally:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  it("every surface that reads market_position imports the shared presentation", () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const body = readFileSync(f, "utf8");
+      if (!MARKET_POSITION.test(body)) continue;
+      // Files that only pass the column through (selects, type declarations,
+      // fixtures) neither label nor colour it.
+      const rendersIt = /presentLegacyPosition|presentMarketView|presentVerdict/.test(body);
+      // A type declaration (`market_position?: string`) or a select list
+      // carries the column without judging it.
+      const merelyCarriesIt =
+        !/market_position\s*===|market_position\s*\?[^:]|\[\s*.*market_position.*\s*\]/.test(body);
+      if (!rendersIt && !merelyCarriesIt) offenders.push(f);
+    }
+    expect(offenders, `these surfaces judge market_position without the shared map:\n${offenders.join("\n")}`).toEqual([]);
+  });
+});

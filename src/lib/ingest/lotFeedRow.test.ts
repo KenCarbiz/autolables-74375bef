@@ -596,14 +596,20 @@ describe("AutoFilm receives the full vehicle detail", () => {
   });
 
   it("stops the pricing job from writing mc_raw at all", () => {
-    // The fix above makes the feed survive the clobber. This stops the clobber:
-    // the identical object is already written to market_payload on the same
-    // update and appended to vehicle_value_history, and nothing reads market
-    // data back out of mc_raw.
+    // The fix above makes the feed survive the clobber. This stops the clobber.
+    //
+    // It used to be enough that the pricing job wrote its prediction to
+    // market_payload instead of over mc_raw. The job now writes NO column at
+    // all: it is a proxy in front of market-valuation-write, which is the sole
+    // owner of a market decision. So the guarantee is stronger than it was, and
+    // the assertion is that the function performs no vehicle_listings update
+    // whatsoever rather than that it writes to the right one.
     const pricing = readFileSync(
       join(fnDir, "marketcheck-market-pricing/index.ts"), "utf8");
-    expect(pricing).toMatch(/market_payload: m,/);
+    expect(pricing).toMatch(/market-valuation-write/);
+    expect(pricing).not.toMatch(/from\("vehicle_listings"\)\s*\.update/);
     expect(pricing).not.toMatch(/^\s*mc_raw: m,/m);
+    expect(pricing).not.toMatch(/^\s*market_payload:/m);
   });
 });
 

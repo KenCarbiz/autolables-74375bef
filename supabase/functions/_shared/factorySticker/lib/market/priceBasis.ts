@@ -18,15 +18,31 @@
 // production caller — only its own test. That is the dead code this replaces:
 // the concept was right and nothing was wired to it.
 //
-// Formula, applied identically to the subject and to every competitor:
+// The complete identity, both directions:
 //
-//   BasePrice = AdvertisedPrice
-//             + ConditionalDiscountsNotUniversallyAvailable
-//             − IncludedDocOrConveyanceFees
+//   displayedTotalPrice    = vehicleComparisonPrice
+//                          − conditionalDiscountsApplied
+//                          + docFee
+//                          + mandatoryDealerAddOns
+//
+//   vehicleComparisonPrice = displayedTotalPrice
+//                          + conditionalDiscountsApplied
+//                          − docFee
+//                          − mandatoryDealerAddOns
 //
 // Conditional money is added BACK because a rebate only some buyers qualify
 // for is not a lower price for the market; treating it as one makes every
 // competitor running a military or college offer look cheaper than it is.
+//
+// Mandatory dealer-installed products come OFF, because they are not the
+// vehicle. They are disclosed as their own line — never folded into the
+// comparison, and never silently dropped from what the customer pays.
+//
+// The simplified `comparison + fee = displayed` holds only when conditional
+// discounts and mandatory add-ons are both zero. That is every vehicle in the
+// pilot lot today, and it is not something the resolver may assume: an unknown
+// add-on treatment produces an AMBIGUOUS basis, which costs confidence and
+// forecloses a red verdict, rather than a confident number built on a guess.
 
 import {
   PRICE_BASIS_TOLERANCE,
@@ -58,7 +74,13 @@ export interface SubjectPriceInput {
    * the advertised price already contains the fee.
    */
   advertisedExcludesDocFee?: boolean | null;
-  /** Dealer-installed products the customer cannot decline. Disclosed, never folded in. */
+  /**
+   * Dealer-installed products the customer cannot decline, in dollars.
+   *
+   * A number — including 0 — means the question has been ANSWERED. `null` or
+   * absent means nobody has told us, which is not the same as none, and yields
+   * an ambiguous basis.
+   */
   mandatoryDealerAddOns?: number | null;
   /** Rebates not available to every buyer. Added back so they cannot lower the comparison. */
   conditionalDiscounts?: number | null;
@@ -86,9 +108,11 @@ export function resolvePriceBasis(input: SubjectPriceInput): MarketPriceBasis {
   const rawDocFee = money(input.docFee);
   const docFee = rawDocFee != null && rawDocFee >= 0 ? rawDocFee : null;
   const mandatory = money(input.mandatoryDealerAddOns);
+  const mandatoryKnown = mandatory != null && mandatory >= 0;
   const conditional = money(input.conditionalDiscounts) ?? 0;
 
   if (rawDocFee != null && rawDocFee < 0) reasons.push("doc_fee_negative");
+  if (mandatory != null && mandatory < 0) reasons.push("mandatory_add_ons_negative");
 
   // Which side of the fee the dealer's advertised price sits on.
   let includesDocFee: boolean | null =
@@ -122,10 +146,14 @@ export function resolvePriceBasis(input: SubjectPriceInput): MarketPriceBasis {
     reasons.push("fee_treatment_unknown");
   }
 
-  // The advertised leg: the vehicle price with the fee taken back off.
+  // The advertised leg: what the dealer advertises for the VEHICLE, with the
+  // fee and any mandatory product taken back off, before conditional money is
+  // restored. This is the leg the stored `advertised_price_before_doc` column
+  // is supposed to hold, so it is also what the identity is checked against.
+  const mandatoryForIdentity = mandatoryKnown ? (mandatory as number) : 0;
   let advertisedLeg: number | null = advertised;
   if (advertisedLeg == null && displayedTotalPrice != null && docFee != null) {
-    advertisedLeg = displayedTotalPrice - docFee;
+    advertisedLeg = displayedTotalPrice - docFee - mandatoryForIdentity;
     reasons.push("advertised_leg_derived_from_displayed_total");
   }
 
@@ -137,22 +165,35 @@ export function resolvePriceBasis(input: SubjectPriceInput): MarketPriceBasis {
   } else if (docFee == null) {
     status = "ambiguous";
     reasons.push("doc_fee_unknown");
-  } else if (Math.abs(advertisedLeg + docFee - displayedTotalPrice) > PRICE_BASIS_TOLERANCE) {
+  } else if (
+    Math.abs(advertisedLeg + docFee + mandatoryForIdentity - displayedTotalPrice) > PRICE_BASIS_TOLERANCE
+  ) {
     status = "invalid";
     reasons.push(
-      `fee_identity_failed advertised=${advertisedLeg} doc_fee=${docFee} displayed=${displayedTotalPrice}`,
+      `price_identity_failed advertised=${advertisedLeg} doc_fee=${docFee}`
+      + ` mandatory=${mandatoryForIdentity} displayed=${displayedTotalPrice}`,
     );
   } else if (includesDocFee == null) {
     status = "ambiguous";
   }
 
-  if (mandatory != null && mandatory > 0) {
+  // Nobody has told us whether this dealer bolts a mandatory product onto every
+  // car. Absent that answer the comparison price is a guess, so the basis is
+  // ambiguous — which costs confidence and forecloses red — rather than
+  // confidently wrong.
+  if (!mandatoryKnown && status === "verified") {
+    status = "ambiguous";
+  }
+  if (!mandatoryKnown) {
+    reasons.push("mandatory_add_on_treatment_unknown");
+  } else if ((mandatory as number) > 0) {
     reasons.push(`mandatory_add_ons_disclosed_${mandatory}`);
   }
   if (conditional > 0) {
     reasons.push(`conditional_discounts_added_back_${conditional}`);
   }
 
+  // comparison = displayed + conditional − fee − mandatory
   const vehicleComparisonPrice =
     status === "invalid" || advertisedLeg == null ? null : advertisedLeg + conditional;
 
@@ -161,7 +202,7 @@ export function resolvePriceBasis(input: SubjectPriceInput): MarketPriceBasis {
     vehicleComparisonPrice,
     advertisedPriceBeforeDoc: advertisedLeg,
     docFee,
-    mandatoryDealerAddOns: mandatory,
+    mandatoryDealerAddOns: mandatoryKnown ? mandatory : null,
     conditionalDiscountsExcluded: conditional || null,
     governmentFeesIncluded: false,
     advertisedIncludesDocFee: includesDocFee,
@@ -173,6 +214,9 @@ export function resolvePriceBasis(input: SubjectPriceInput): MarketPriceBasis {
       website_sale_price: input.websiteSalePrice ?? null,
       doc_fee: input.docFee ?? null,
       advertised_excludes_doc_fee: input.advertisedExcludesDocFee ?? null,
+      mandatory_dealer_add_ons: input.mandatoryDealerAddOns ?? null,
+      mandatory_add_on_treatment: mandatoryKnown ? "known" : "unknown",
+      conditional_discounts: input.conditionalDiscounts ?? null,
       ...(input.provenance ?? {}),
     },
   };

@@ -23,7 +23,7 @@ const run = (overrides: Partial<Parameters<typeof buildMarketView>[0]> = {}) =>
       advertisedPriceBeforeDoc: QX50_LISTING.advertisedPriceBeforeDoc,
       websiteSalePrice: QX50_LISTING.websiteSalePrice,
       docFee: QX50_LISTING.docFee,
-      advertisedExcludesDocFee: QX50_LISTING.advertisedExcludesDocFee,
+      advertisedExcludesDocFee: QX50_LISTING.advertisedExcludesDocFee, mandatoryDealerAddOns: 0,
       dealerType: QX50_LISTING.dealerType,
       zip: QX50_LISTING.zip,
     },

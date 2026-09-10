@@ -209,6 +209,17 @@ export interface WeightedStats {
   /** Largest share of total weight held by one rooftop, 0–1. */
   topRooftopShare: number;
   topGroupShare: number;
+  /** The tightest share actually enforceable given how many sources exist. */
+  effectiveRooftopCap: number;
+  effectiveGroupCap: number;
+  /**
+   * TRUE only when the strict 20% rule was genuinely met — five or more
+   * independent sources AND no source above 0.20. A relaxed 1/n allocation is
+   * never reported as satisfying it.
+   */
+  strictConcentrationSatisfied: boolean;
+  /** Fewer than five independent qualified external sources. */
+  insufficientMarketDiversity: boolean;
   marketFloor: number | null;
 }
 
@@ -271,6 +282,11 @@ export interface MarketView {
 /** Everything a UI or an auditor needs to reconstruct a verdict. Never public verbatim. */
 export interface MarketExplanation {
   engineVersion: string;
+  /** What the provider was asked. Excludes price, so a price change is free. */
+  providerRequestFingerprint: string | null;
+  /** The whole decision. Moves whenever any input to the conclusion moves. */
+  valuationInputFingerprint: string;
+  comparableSnapshotHash: string;
   priceBasis: MarketPriceBasis;
   providerValidation: ProviderValidation;
   provider: ProviderValuation | null;

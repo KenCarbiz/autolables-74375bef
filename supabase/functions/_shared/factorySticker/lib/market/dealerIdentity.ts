@@ -145,3 +145,24 @@ export function groupKey(comp: ComparableIdentityFields): string {
 /** True when at least one comparable actually carried a group id. */
 export const groupIdsKnown = (comps: ComparableIdentityFields[]): boolean =>
   comps.some((c) => !!c.dealerGroupId?.trim());
+
+/**
+ * How well we can identify the DEALER WE ARE MEASURING — not a comparable.
+ *
+ * Name-only is not good enough for a high-confidence conclusion. Two Harte
+ * cars sat inside Harte's own market because a name comparison was the only
+ * thing standing between them and the median, and a name comparison is one
+ * rebrand or one franchise-sale away from failing silently. Until a stable
+ * rooftop, dealer, website id or domain exists for a tenant, high confidence —
+ * and therefore red — stays out of reach.
+ */
+export function tenantIdentityStability(identity: TenantDealerIdentity): IdentityConfidence {
+  const stable =
+    (identity.rooftopIds?.length ?? 0)
+    + (identity.dealerIds?.length ?? 0)
+    + (identity.websiteIds?.length ?? 0)
+    + (identity.domains?.length ?? 0)
+    + (identity.groupIds?.length ?? 0);
+  if (stable > 0) return "stable";
+  return (identity.names?.length ?? 0) > 0 ? "name_only" : "none";
+}

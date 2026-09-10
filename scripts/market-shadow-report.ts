@@ -22,13 +22,22 @@ const generatedAt = nowIso ?? new Date().toISOString();
 const report = shadowFleet(
   rows,
   {
-    // Harte INFINITI. Only a name is available: no dealer id, website id,
-    // rooftop id or domain was ever stored on a comparable, which is itself
-    // one of the report's findings.
-    identity: { names: ["Harte Infiniti", "Harte INFINITI"] },
+    // Harte INFINITI, from MarketCheck's own stored dealer object rather than
+    // from a name guess: dealer id 1013372 at harteinfiniti.com, inside the
+    // "Harte Auto Group" group, whose second rooftop is 1028492 at
+    // hartecars.com. Read-only evidence, not applied to any tenant setting.
+    identity: {
+      dealerIds: ["1013372"],
+      domains: ["harteinfiniti.com"],
+      groupIds: ["Harte Auto Group"],
+      names: ["Harte Infiniti", "Harte INFINITI"],
+    },
     // Not configured for any tenant yet. Null unless the caller supplies one,
     // so the default run says "blocked" instead of assuming franchise.
     dealerType: dealerTypeArg === "franchise" || dealerTypeArg === "independent" ? dealerTypeArg : null,
+    // Nobody has answered the mandatory-add-on question for this tenant, so
+    // the price basis is ambiguous rather than assumed to be zero.
+    mandatoryAddOnsUsd: null,
     zip: "06120",
     nowMs: Date.parse(generatedAt),
     providerCallCostUsd: 0.07,

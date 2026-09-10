@@ -57,6 +57,11 @@ export interface ShadowOptions {
   nowMs: number;
   /** Per-VIN cost of one provider call, for the budget estimate. */
   providerCallCostUsd: number;
+  /**
+   * The tenant's declared mandatory dealer add-on amount. `null` means the
+   * question has not been answered, which yields an ambiguous price basis.
+   */
+  mandatoryAddOnsUsd?: number | null;
 }
 
 export interface ShadowVehicleResult {
@@ -85,13 +90,17 @@ export const SHADOW_FINDINGS = [
   "duplicate_vin",
   "dealer_concentration_over_cap",
   "stale_valuation",
-  "contradictory_surface_verdicts",
   "missing_certification_on_comparables",
   "missing_dealer_identity_on_comparables",
   "missing_history_on_comparables",
   "no_stored_comparables",
   "provider_request_not_reconstructable",
   "provider_source_not_recorded",
+  "contradictory_surface_directions",
+  "contradictory_surface_amounts",
+  "surfaces_agree",
+  "mandatory_add_on_treatment_unknown",
+  "insufficient_market_diversity",
 ] as const;
 
 export type ShadowFinding = (typeof SHADOW_FINDINGS)[number];
@@ -169,6 +178,7 @@ export function shadowVehicle(row: ShadowListingRow, opts: ShadowOptions): Shado
     websiteSalePrice: row.website_sale_price,
     docFee: row.doc_fee,
     advertisedExcludesDocFee: row.advertised_excludes_doc_fee,
+    mandatoryDealerAddOns: opts.mandatoryAddOnsUsd,
   });
 
   // ── Findings ────────────────────────────────────────────────────────────
@@ -202,7 +212,13 @@ export function shadowVehicle(row: ShadowListingRow, opts: ShadowOptions): Shado
   if (canonical.some((c) => c.identityConfidence === "none")) findings.push("missing_dealer_identity_on_comparables");
   if (canonical.some((c) => c.historyStatus === "unknown")) findings.push("missing_history_on_comparables");
 
-  if (contradictoryVerdicts(legacyFields).contradictory) findings.push("contradictory_surface_verdicts");
+  const disagreement = contradictoryVerdicts(legacyFields);
+  if (disagreement.directionalContradiction) findings.push("contradictory_surface_directions");
+  if (disagreement.numericContradiction) findings.push("contradictory_surface_amounts");
+  if (!disagreement.contradictory && Object.values(disagreement.surfaces).some((c) => c.direction !== "none")) {
+    findings.push("surfaces_agree");
+  }
+  if (opts.mandatoryAddOnsUsd == null) findings.push("mandatory_add_on_treatment_unknown");
 
   // ── V2, shadow ──────────────────────────────────────────────────────────
   const { view: v2 } = buildMarketView({
@@ -214,6 +230,7 @@ export function shadowVehicle(row: ShadowListingRow, opts: ShadowOptions): Shado
       price: row.price, advertisedPriceBeforeDoc: row.advertised_price_before_doc,
       websiteSalePrice: row.website_sale_price, docFee: row.doc_fee,
       advertisedExcludesDocFee: row.advertised_excludes_doc_fee,
+      mandatoryDealerAddOns: opts.mandatoryAddOnsUsd,
       dealerType: opts.dealerType, zip: row.zip ?? opts.zip,
     },
     condition,
@@ -222,6 +239,10 @@ export function shadowVehicle(row: ShadowListingRow, opts: ShadowOptions): Shado
     provider,
     nowMs: opts.nowMs,
   });
+
+  if (v2.confidenceReasons.includes("insufficient_market_diversity")) {
+    findings.push("insufficient_market_diversity");
+  }
 
   const built = buildPredictionRequest({
     vin: row.vin, mileage: row.mileage, condition,

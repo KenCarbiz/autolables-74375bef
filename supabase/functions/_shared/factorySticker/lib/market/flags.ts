@@ -23,6 +23,13 @@ export const MARKET_FLAGS = {
   marketcheck_premium_comparables: false,
   /** Recommended pricing position, shadow only. */
   pricing_position_v2_shadow: false,
+  /**
+   * Refuse to make a market claim about a vehicle whose own price is missing,
+   * zero, negative or implausible. OFF in production: three published pages
+   * currently render such a claim and removing them is a deliberate, canaried
+   * change, not a refactor side effect.
+   */
+  market_invalid_claim_suppression: false,
 } as const;
 
 export type MarketFlag = keyof typeof MARKET_FLAGS;

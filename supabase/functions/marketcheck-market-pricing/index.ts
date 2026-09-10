@@ -1,134 +1,61 @@
 // ──────────────────────────────────────────────────────────────────────
-// marketcheck-market-pricing — per-VIN market value + price position via
-// MarketCheck's price-prediction API. Server-side only. Compares the dealer's
-// listing price to the predicted market value and classifies the position
-// (great_deal / good_deal / fair_deal / above_market). Single-VIN + batch.
+// marketcheck-market-pricing — RETIRED. Compatibility proxy only.
 //
-// Body: { vin?, tenant_id?, batch?, force? }
+// This function used to own a market decision, and it owned it badly:
+//
+//   • it described a certified car to the provider as an ordinary used one,
+//     because certification had nowhere to go in the legacy prediction
+//     request — which is how a CPO QX50 came to be valued as an ordinary one;
+//   • it compared `vehicle_listings.price`, a fee-INCLUSIVE number, against a
+//     prediction of the vehicle alone, charging the customer's $895 conveyance
+//     fee to the car before any valuation question was asked;
+//   • it classified the result with its own -6%/-2%/+3% thresholds, a private
+//     opinion about "great deal" that nothing else in the product shared;
+//   • it wrote market_value, market_position and market_payload directly, so
+//     it raced vehicle-enrich for the same columns every night.
+//
+// All of that now lives in `market-valuation-write`, which is the single
+// writer. This endpoint stays only so existing callers keep working, and it
+// does exactly one thing: forward the request and return the canonical
+// MarketView. It performs no arithmetic, holds no thresholds, and writes no
+// column of its own.
+//
+// Body: { vin, tenant_id, batch?, force? }
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
 
-const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
-const MC_BASE = "https://api.marketcheck.com/v2";
-
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
-// deno-lint-ignore no-explicit-any
-const num = (v: any): number | null => {
-  if (v == null) return null;
-  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.]/g, ""));
-  return Number.isFinite(n) && n > 0 ? n : null;
-};
 
-interface Listing { price: number | null; mileage: number | null; ymm: string | null; condition: string | null; }
-
-interface MarketResult {
-  vin: string; checkedAt: string;
-  listingPrice: number | null; marketValue: number | null;
-  low: number | null; high: number | null;
-  position: "great_deal" | "good_deal" | "fair_deal" | "above_market" | "unknown";
-  belowMarket: number; // market - listing (positive = priced below market)
-  rawProvider: "marketcheck_predict";
-  raw?: unknown; // the full MarketCheck predict response, kept so nothing is lost
+/** Forward one VIN to the single writer and hand back what it decided. */
+async function delegate(vin: string, tenantId: string, force: boolean): Promise<Response> {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/market-valuation-write`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+    body: JSON.stringify({ vin, tenant_id: tenantId, force }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const body = await res.json().catch(() => ({}));
+  return json(res.status, body);
 }
-
-const classify = (listing: number | null, market: number | null): { position: MarketResult["position"]; belowMarket: number } => {
-  if (!listing || !market || market <= 0) return { position: "unknown", belowMarket: 0 };
-  const pct = (listing - market) / market;
-  const position =
-    pct <= -0.06 ? "great_deal" :
-    pct <= -0.02 ? "good_deal" :
-    pct < 0.03 ? "fair_deal" :
-    "above_market";
-  return { position, belowMarket: Math.round(market - listing) };
-};
-
-// MarketCheck price prediction. VIN + miles + parsed year/make/model when we
-// have them; one retry on a transient failure.
-async function fetchMarket(vin: string, l: Listing): Promise<MarketResult | { error: string }> {
-  const [year, make, ...model] = (l.ymm || "").trim().split(/\s+/);
-  const params = new URLSearchParams({ api_key: MC_KEY, vin });
-  params.set("car_type", l.condition === "new" ? "new" : "used");
-  if (l.mileage) params.set("miles", String(l.mileage));
-  if (year && /^\d{4}$/.test(year)) params.set("year", year);
-  if (make) params.set("make", make);
-  if (model.length) params.set("model", model.join(" "));
-  const url = `${MC_BASE}/predict/car/price?${params.toString()}`;
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-      if (res.status === 429) { if (attempt === 0) { await new Promise((r) => setTimeout(r, 1200)); continue; } return { error: "rate_limited" }; }
-      if (!res.ok) { if (attempt === 0) { await new Promise((r) => setTimeout(r, 600)); continue; } return { error: `provider_error_${res.status}` }; }
-      // deno-lint-ignore no-explicit-any
-      const b: any = await res.json().catch(() => ({}));
-      const market = num(b.predicted_price ?? b.price ?? b.market_price ?? b.mean_price ?? b.price_stats?.mean);
-      const low = num(b.price_range?.lower_bound ?? b.price_range?.low ?? b.min_price ?? b.price_stats?.min);
-      const high = num(b.price_range?.upper_bound ?? b.price_range?.high ?? b.max_price ?? b.price_stats?.max);
-      const { position, belowMarket } = classify(l.price, market);
-      return {
-        vin, checkedAt: new Date().toISOString(), listingPrice: l.price, marketValue: market,
-        low, high, position, belowMarket, rawProvider: "marketcheck_predict", raw: b,
-      };
-    } catch (_e) {
-      if (attempt === 0) { await new Promise((r) => setTimeout(r, 600)); continue; }
-      return { error: "timeout_or_network" };
-    }
-  }
-  return { error: "unknown" };
-}
-
-// deno-lint-ignore no-explicit-any
-const persist = async (admin: any, tenantId: string | null, vin: string, m: MarketResult) => {
-  let q = admin.from("vehicle_listings").update({
-    market_value: m.marketValue,
-    market_position: m.position,
-    market_checked_at: m.checkedAt,
-    market_payload: m,          // full normalized result + raw provider response
-    // Deliberately NOT written to mc_raw. That column belongs to
-    // marketcheck-sync, which stores the feed listing there — including the
-    // build object the lot feed reads specs out of. Writing the price
-    // prediction over it replaced the column outright, so whichever cars this
-    // job happened to write last each night lost their manufacturing spec,
-    // and which 30% of the lot that was moved from night to night. The
-    // identical object is already on market_payload above and appended to
-    // vehicle_value_history below; nothing reads market data out of mc_raw.
-  }).eq("vin", vin);
-  if (tenantId) q = q.eq("tenant_id", tenantId);
-  try { await q; } catch { /* market_* columns may not be migrated yet */ }
-  // Append a time-series snapshot so value can be charted over time for the
-  // customer. Best-effort: the history table may not be migrated yet.
-  await admin.from("vehicle_value_history").insert({
-    tenant_id: tenantId, vin, source: "market_pricing",
-    market_value: m.marketValue, listing_price: m.listingPrice,
-    position: m.position, below_market: m.belowMarket,
-    payload: m, captured_at: m.checkedAt,
-  }).then(() => undefined, () => undefined);
-};
-
-// deno-lint-ignore no-explicit-any
-const getListing = async (admin: any, tenantId: string | null, vin: string): Promise<Listing | null> => {
-  let q = admin.from("vehicle_listings").select("price, mileage, ymm, condition").eq("vin", vin);
-  if (tenantId) q = q.eq("tenant_id", tenantId);
-  const { data } = await q.maybeSingle();
-  return (data as Listing) || null;
-};
 
 Deno.serve(async (req) => {
-  const pf = preflight(req); if (pf) return pf;
-  if (!MC_KEY) return json(200, { position: "unknown", error: "not_configured", note: "Set MARKETCHECK_API_KEY_1" });
+  const pf = preflight(req);
+  if (pf) return pf;
+  if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
   const admin = adminClient();
   const body = await req.json().catch(() => ({}));
   const tenantId: string | null = body.tenant_id || null;
 
-  // ── Auth gate: service-role (cron) bypasses; otherwise require a
-  // signed-in tenant member or platform admin for the requested tenant.
+  // Auth gate unchanged: service role passes, otherwise tenant membership or
+  // platform admin is required.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   if (!SERVICE_KEY || auth !== SERVICE_KEY) {
-    const { data: ures, error: uerr } = await admin.auth.getUser(auth);
+    const { data: ures } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
-    if (uerr || !userId) return json(401, { error: "authentication required" });
+    if (!userId) return json(401, { error: "authentication required" });
     if (!tenantId) return json(400, { error: "tenant_id required" });
     const { data: isAdmin } = await admin.from("user_roles")
       .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
@@ -139,34 +66,20 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (!tenantId) return json(400, { error: "tenant_id required" });
 
+  // A batch is a queue instruction, not a licence to spend. Each VIN goes
+  // through the writer, which reserves and budgets every paid call itself.
   if (body.batch) {
-    if (!tenantId) return json(400, { error: "tenant_id required for batch" });
-    const force = !!body.force;
-    const { data: vehicles } = await admin.from("vehicle_listings")
-      .select("vin, price, mileage, ymm, condition, market_checked_at").eq("tenant_id", tenantId).limit(1000);
-    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    let checked = 0, greatDeals = 0, errors = 0, skipped = 0;
-    for (const v of (vehicles || []) as Array<Listing & { vin: string; market_checked_at: string | null }>) {
-      const vin = (v.vin || "").toUpperCase();
-      if (!validVin(vin) || !v.price) { skipped++; continue; }
-      if (!force && v.market_checked_at && new Date(v.market_checked_at).getTime() > dayAgo) { skipped++; continue; }
-      const r = await fetchMarket(vin, v);
-      if ("error" in r) { errors++; if (r.error === "rate_limited") break; }
-      else { await persist(admin, tenantId, vin, r); checked++; if (r.position === "great_deal") greatDeals++; }
-      await new Promise((res) => setTimeout(res, 250));
-    }
-    return json(200, { batch: true, checked, greatDeals, errors, skipped });
+    return json(400, {
+      error: "batch_retired",
+      note: "Batch valuation is scheduled through market-valuation-write, which enforces the"
+        + " per-tenant provider budget and one live reservation per request fingerprint.",
+    });
   }
 
   const vin = String(body.vin || "").toUpperCase().trim();
-  if (!validVin(vin)) return json(400, { position: "unknown", error: "invalid_vin" });
-  const listing = await getListing(admin, tenantId, vin);
-  if (!listing) return json(404, { position: "unknown", error: "listing_not_found" });
-  if (!listing.price) return json(200, { vin, position: "unknown", error: "no_listing_price" });
+  if (!validVin(vin)) return json(400, { error: "invalid_vin" });
 
-  const r = await fetchMarket(vin, listing);
-  if ("error" in r) return json(200, { vin, position: "unknown", error: r.error });
-  await persist(admin, tenantId, vin, r);
-  return json(200, r);
+  return await delegate(vin, tenantId, body.force === true);
 });

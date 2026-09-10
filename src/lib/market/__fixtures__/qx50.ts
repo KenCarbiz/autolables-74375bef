@@ -24,6 +24,10 @@ export const QX50_LISTING = {
   websiteSalePrice: 43876,
   docFee: 895,
   advertisedExcludesDocFee: false,
+  // Harte bolts nothing mandatory onto its cars. Recorded as an ANSWER of zero,
+  // not left absent — absent means nobody asked, and that is an ambiguous basis.
+  mandatoryDealerAddOns: 0,
+  conditionalDiscounts: 0,
   dealerType: "franchise" as const,
   zip: "06120",
   dealerName: "Harte Infiniti",
