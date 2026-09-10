@@ -79,6 +79,40 @@ const parsePrivileges = (raw: string): string[] => {
  * the final state would depend on the pre-existing grants, which this file
  * cannot see.
  */
+interface AclStatement {
+  verb: "GRANT" | "REVOKE";
+  privileges: string[];
+  tables: string[];
+  roles: string[];
+}
+
+/**
+ * One statement may name several tables:
+ *
+ *   REVOKE ALL PRIVILEGES ON TABLE public.a, public.b FROM sandbox_exec;
+ *
+ * so the table list is parsed as a list. An earlier version of this parser
+ * matched a single table immediately before FROM, which silently registered
+ * only the LAST table of a multi-table statement and would have reported the
+ * others as untouched.
+ */
+function parseStatements(): AclStatement[] {
+  const parsed: AclStatement[] = [];
+  for (const stmt of statements) {
+    const m = /^(GRANT|REVOKE)\s+(.+?)\s+ON\s+(?:TABLE\s+)?(.+?)\s+(?:TO|FROM)\s+(.+)$/i.exec(stmt);
+    if (!m) continue;
+    parsed.push({
+      verb: m[1].toUpperCase() as "GRANT" | "REVOKE",
+      privileges: parsePrivileges(m[2]),
+      tables: [...m[3].matchAll(/public\.(\w+)/g)].map((t) => t[1]),
+      roles: parseRoles(m[4]),
+    });
+  }
+  return parsed;
+}
+
+const PARSED = parseStatements();
+
 function simulate(): Map<string, Set<string>> {
   const state = new Map<string, Set<string>>();
   const key = (t: string, r: string) => `${t}|${r}`;
@@ -87,22 +121,14 @@ function simulate(): Map<string, Set<string>> {
     return state.get(key(t, r))!;
   };
 
-  for (const stmt of statements) {
-    const revoke = /^REVOKE\s+(.+?)\s+ON\s+(?:TABLE\s+)?public\.(\w+)\s+FROM\s+(.+)$/i.exec(stmt);
-    if (revoke) {
-      const privs = parsePrivileges(revoke[1]);
-      for (const role of parseRoles(revoke[3])) {
-        const held = touch(revoke[2], role);
-        for (const p of privs) held.delete(p);
-      }
-      continue;
-    }
-    const grant = /^GRANT\s+(.+?)\s+ON\s+(?:TABLE\s+)?public\.(\w+)\s+TO\s+(.+)$/i.exec(stmt);
-    if (grant) {
-      const privs = parsePrivileges(grant[1]);
-      for (const role of parseRoles(grant[3])) {
-        const held = touch(grant[2], role);
-        for (const p of privs) held.add(p);
+  for (const { verb, privileges, tables, roles } of PARSED) {
+    for (const table of tables) {
+      for (const role of roles) {
+        const holds = touch(table, role);
+        for (const p of privileges) {
+          if (verb === "REVOKE") holds.delete(p);
+          else holds.add(p);
+        }
       }
     }
   }
@@ -162,11 +188,16 @@ describe("the ACL migration changes privileges and nothing else", () => {
     expect(EXECUTABLE.toUpperCase()).not.toContain("ALTER DEFAULT PRIVILEGES");
   });
 
-  it("does not touch sandbox_exec while its purpose is unresolved", () => {
-    // sandbox_exec can log in and bypasses RLS, and nothing in this repository
-    // references it. Revoking access for a role whose consumer is unknown could
-    // break platform tooling, so it stays untouched until Lovable reports.
-    expect(EXECUTABLE).not.toContain("sandbox_exec");
+  it("does not alter sandbox_exec's role attributes", () => {
+    // Its table grants are narrowed below, but LOGIN and BYPASSRLS are
+    // platform-managed and the sandbox depends on them. This migration has no
+    // business reaching outside its five tables to alter a platform identity.
+    const upper = EXECUTABLE.toUpperCase();
+    expect(upper).not.toContain("ALTER ROLE");
+    expect(upper).not.toContain("NOLOGIN");
+    expect(upper).not.toContain("NOBYPASSRLS");
+    expect(upper).not.toContain("CREATE ROLE");
+    expect(upper).not.toContain("DROP ROLE");
   });
 
   it("touches only the five allowlisted tables", () => {
@@ -181,12 +212,13 @@ describe("the ACL migration changes privileges and nothing else", () => {
     // TRUNCATE survive 20260910090000: revoking by name leaves the unnamed
     // privileges in place.
     for (const table of MARKET_V2_TABLES) {
-      const revokeAll = statements.filter((s) =>
-        new RegExp(`^REVOKE ALL PRIVILEGES ON TABLE public\\.${table}\\b`, "i").test(s));
-      const grantees = revokeAll.flatMap((s) =>
-        parseRoles(/\sFROM\s+(.+)$/i.exec(s)![1]));
+      const grantees = PARSED
+        .filter((s) => s.verb === "REVOKE"
+          && s.tables.includes(table)
+          && ALL_PRIVILEGES.every((p) => s.privileges.includes(p)))
+        .flatMap((s) => s.roles);
       expect(grantees, table).toEqual(
-        expect.arrayContaining(["PUBLIC", "anon", "authenticated", "service_role"]),
+        expect.arrayContaining(["PUBLIC", "anon", "authenticated", "service_role", "sandbox_exec"]),
       );
     }
   });
@@ -272,5 +304,43 @@ describe("service_role holds the minimum each table's callers require", () => {
         expect(held(table, role), `${table}:${role}`).not.toContain("DELETE");
       }
     }
+  });
+});
+
+describe("sandbox_exec keeps diagnostic read access and loses everything else", () => {
+  // Lovable's platform diagnostic SQL identity connects as
+  // sandbox_exec.<project_ref> through the Supabase pooler. It needs to READ
+  // these tables to answer diagnostic questions, and denying SELECT would not
+  // even hide the data — the role holds BYPASSRLS regardless.
+  //
+  // INSERT is the one that matters, and it is the one the append-only design
+  // cannot cover: the triggers reject UPDATE and DELETE, so they stop history
+  // being rewritten or erased, but a fabricated INSERT is a brand-new row and
+  // passes straight through them.
+  for (const table of MARKET_V2_TABLES) {
+    it(`holds exactly SELECT on ${table}`, () => {
+      expect(held(table, "sandbox_exec")).toEqual(["SELECT"]);
+    });
+
+    it(`holds no write or whole-table privilege on ${table}`, () => {
+      for (const priv of ["INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER", "MAINTAIN"]) {
+        expect(held(table, "sandbox_exec"), `${table}:${priv}`).not.toContain(priv);
+      }
+    });
+  }
+
+  it("revokes from sandbox_exec on all five tables before granting back", () => {
+    const revoked = new Set(
+      PARSED.filter((s) => s.verb === "REVOKE" && s.roles.includes("sandbox_exec"))
+        .flatMap((s) => s.tables),
+    );
+    expect([...revoked].sort()).toEqual([...MARKET_V2_TABLES].sort());
+  });
+
+  it("grants sandbox_exec nothing but SELECT anywhere in the migration", () => {
+    const granted = PARSED
+      .filter((s) => s.verb === "GRANT" && s.roles.includes("sandbox_exec"))
+      .flatMap((s) => s.privileges);
+    expect([...new Set(granted)]).toEqual(["SELECT"]);
   });
 });

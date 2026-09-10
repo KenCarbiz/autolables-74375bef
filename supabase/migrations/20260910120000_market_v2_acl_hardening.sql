@@ -49,16 +49,47 @@
 -- runs as the owner and service_role needs no table privilege at all. That is a
 -- behaviour change and belongs in its own reviewed migration, not here.
 --
+-- sandbox_exec — SELECT KEPT, EVERYTHING ELSE REMOVED
+--
+-- sandbox_exec is Lovable's platform diagnostic SQL identity. Its sandbox shell
+-- connects as `sandbox_exec.<project_ref>` through the Supabase pooler, which is
+-- how the platform answers diagnostic questions about this database. It is
+-- platform-required but undocumented: no Supabase or Lovable documentation names
+-- it, and nothing in this repository references it.
+--
+-- It KEEPS SELECT on these five tables. Diagnostic inspection is a real need and
+-- removing it would break platform tooling for no security gain — the role holds
+-- BYPASSRLS regardless, so denying SELECT here would not hide the data.
+--
+-- It LOSES INSERT and every other table privilege. INSERT is not vestigial — the
+-- sandbox has a documented generic data-load path, `COPY <table> FROM STDIN`, and
+-- that is what the grant backs. But it is an ANY-TABLE capability that arrives
+-- here through the blanket default privilege above, and no workflow loads a CSV
+-- into a Market V2 table. Removing it for these five is the point, not a
+-- regression: these are machine-written evidence and ledger tables.
+--
+-- INSERT is also precisely the privilege the append-only design does not defend
+-- against. The triggers reject UPDATE and DELETE, so they stop history being
+-- rewritten or erased — but a fabricated INSERT is a brand-new row and passes
+-- straight through them. Every legitimate Market V2 write goes through the
+-- service-role writer and the RPC boundary.
+--
+-- This narrows five tables. It is not a posture change: sandbox_exec keeps INSERT
+-- on every other table in public via the same default privilege.
+--
+-- The role's own attributes are NOT changed. It stays LOGIN and BYPASSRLS: those
+-- are platform-managed, the sandbox depends on them, and this migration has no
+-- business reaching outside its five tables to alter a platform identity.
+--
 -- WHAT IS DELIBERATELY NOT DONE
 --
---   * sandbox_exec is NOT modified. It can log in, it bypasses RLS, and its
---     purpose is unresolved. Revoking access to a role whose consumer is
---     unknown risks breaking platform tooling. It is under investigation and
---     THIS MIGRATION MUST NOT BE APPLIED TO PRODUCTION UNTIL THAT INVESTIGATION
---     REPORTS.
 --   * ALTER DEFAULT PRIVILEGES is NOT changed. The default above applies to
 --     every table in public, not just these five, so correcting it needs an
---     audit of all of them. Out of scope by design.
+--     audit of all of them. It remains a separate future governance change with
+--     its own blast-radius review.
+--   * sandbox_exec's role attributes (LOGIN, BYPASSRLS) are NOT changed.
+--   * No RLS setting, policy, trigger, function or application behaviour is
+--     touched anywhere in this file.
 --
 -- ROLLBACK PLAN (reviewed, NOT executed, do not run without instruction)
 --
@@ -77,6 +108,11 @@
 --     ON public.market_value_model_metrics, public.market_provider_budgets,
 --        public.provider_request_reservations
 --     TO service_role;
+--   GRANT INSERT, SELECT
+--     ON public.vehicle_market_valuations, public.vehicle_market_comparables,
+--        public.market_value_model_metrics, public.market_provider_budgets,
+--        public.provider_request_reservations
+--     TO sandbox_exec;
 --
 -- Idempotent: REVOKE and GRANT both converge on re-run.
 -- ──────────────────────────────────────────────────────────────────────
@@ -142,3 +178,29 @@ GRANT SELECT, INSERT, UPDATE ON public.provider_request_reservations TO service_
 REVOKE ALL PRIVILEGES ON TABLE public.market_value_model_metrics FROM service_role;
 
 GRANT SELECT ON public.market_value_model_metrics TO service_role;
+
+-- ══ 7. Lovable's sandbox diagnostic identity ══════════════════════════
+-- Lovable's sandbox execution role needs cross-tenant SELECT for diagnostic
+-- inspection, but no observed workflow requires direct Market V2 writes.
+-- Remove the incidental default INSERT grant and preserve SELECT only.
+--
+-- INSERT is the privilege the append-only triggers cannot cover: they reject
+-- UPDATE and DELETE, so a fabricated row would be inserted, not caught.
+
+REVOKE ALL PRIVILEGES
+  ON TABLE
+    public.vehicle_market_valuations,
+    public.vehicle_market_comparables,
+    public.market_value_model_metrics,
+    public.market_provider_budgets,
+    public.provider_request_reservations
+  FROM sandbox_exec;
+
+GRANT SELECT
+  ON TABLE
+    public.vehicle_market_valuations,
+    public.vehicle_market_comparables,
+    public.market_value_model_metrics,
+    public.market_provider_budgets,
+    public.provider_request_reservations
+  TO sandbox_exec;
