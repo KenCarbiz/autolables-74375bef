@@ -34,3 +34,6 @@ MARKET_V2_SHADOW_FLEET_REPORT*.md
 # Generated gate reports and shadow fleet runs stay out of the repository.
 GATE_*_REPORT.md
 MARKET_V2_SHADOW_FLEET_REPORT*.md
+
+# Local Deno typecheck artifact; the edge runtime resolves its own imports.
+deno.lock
