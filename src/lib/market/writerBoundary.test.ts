@@ -164,3 +164,41 @@ describe("the writer's imports resolve in the edge tree", () => {
     }
   });
 });
+
+// A `.select()` argument must be ONE string literal.
+//
+// supabase-js parses the select list at the TYPE level and that parser needs a
+// literal. Written across lines as `"a," + "b"`, TypeScript widens the argument
+// to `string`, the parser returns `GenericStringError`, and because that is
+// itself a string literal type every subsequent column access fails with
+// "property does not exist on GenericStringError". One line break in
+// market-valuation-write produced twenty-one compile errors and blocked a
+// deployment. The runtime string was correct the whole time, which is exactly
+// what makes it easy to reintroduce.
+describe("select lists stay type-inferable", () => {
+  const files = walk(FUNCTIONS_DIR);
+
+  const offenders = files.flatMap((file) => {
+    const src = readFileSync(file, "utf8");
+    // `.select(` followed by a string that is not closed before a `+`.
+    return [...src.matchAll(/\.select\(\s*"[^"]*"\s*\+/g)].map(() => file);
+  });
+
+  it("no edge function builds a select list by concatenation", () => {
+    expect([...new Set(offenders)]).toEqual([]);
+  });
+
+  it("the writer's listing select is a single literal naming every column it reads", () => {
+    const src = readFileSync(`${FUNCTIONS_DIR}/${SOLE_WRITER}/index.ts`, "utf8");
+    const select = /\.select\("([^"]+)"\)\s*\n?\s*\.eq\("tenant_id"/.exec(src);
+    expect(select, "the vehicle_listings select could not be found as one literal").not.toBeNull();
+    const columns = select![1].split(",").map((c) => c.trim());
+    for (const required of [
+      "id", "vin", "condition", "mileage", "price", "advertised_price_before_doc",
+      "website_sale_price", "doc_fee", "market_payload", "market_checked_at",
+      "comparables", "mc_raw", "mc_attributes", "trim",
+    ]) {
+      expect(columns, `${required} is read from the row but not selected`).toContain(required);
+    }
+  });
+});

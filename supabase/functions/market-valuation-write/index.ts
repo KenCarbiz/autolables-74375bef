@@ -105,9 +105,14 @@ Deno.serve(async (req) => {
 
   // ── 2-6. Subject and dealer configuration ─────────────────────────
   const { data: listing } = await admin.from("vehicle_listings")
-    .select("id, vin, ymm, trim, condition, mileage, price, advertised_price_before_doc,"
-      + " website_sale_price, doc_fee, market_value, market_position, market_checked_at,"
-      + " market_payload, market_meta, comparables, mc_raw, mc_attributes")
+    // ONE string literal, deliberately. supabase-js parses the select list at the
+    // TYPE level, and that parser needs a literal. Split across lines with `+`,
+    // TypeScript widens the argument to `string`, the parser gives up and returns
+    // `GenericStringError` — which is itself a string literal type, so every
+    // column access below became "property does not exist on GenericStringError",
+    // and `listing.trim` silently resolved to String.prototype.trim. Twenty-one
+    // compile errors from one line break. Keep this on one line.
+    .select("id, vin, ymm, trim, condition, mileage, price, advertised_price_before_doc, website_sale_price, doc_fee, market_value, market_position, market_checked_at, market_payload, market_meta, comparables, mc_raw, mc_attributes")
     .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!listing) return json(404, { error: "listing_not_found" });
 
