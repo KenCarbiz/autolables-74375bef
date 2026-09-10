@@ -22,6 +22,8 @@ import {
   AlertCircle, ShieldAlert, TrendingUp, Gauge, Rocket,
 } from "lucide-react";
 import SharedEmptyState from "@/components/ui/empty-state";
+import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
+import { presentLegacyPosition } from "@/lib/market/presentation";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
 
 // ──────────────────────────────────────────────────────────────
@@ -417,7 +419,9 @@ const InventoryModern = () => {
       openRecallsTotal += rv.vin.openCount ?? rv.model?.campaignCount ?? (openR ? 1 : 0);
       if (openR) openRecallVehicles++;
       if (!s.hasAddendum || s.needsPriceVerify || openR) needsAttention++;
-      if (r.market_value && r.price) { marketSum += (Number(r.market_value) - r.price); marketCount++; }
+      // One market subtraction for the whole app: src/lib/market/surfaceCompat.
+      const mv = legacyMarketView(r as LegacyListingFields, "dealer_inventory");
+      if (mv.marketP50 != null && mv.difference != null) { marketSum += -mv.difference; marketCount++; }
       readinessSum += rowReadiness(r);
     }
     const total = rows.length;
@@ -1054,12 +1058,11 @@ const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }:
   );
 };
 
-const MARKET_CHIP: Record<string, { label: string; cls: string }> = {
-  great_deal:   { label: "Great Deal",   cls: "bg-emerald-100 text-emerald-700" },
-  good_deal:    { label: "Good Deal",    cls: "bg-emerald-100 text-emerald-700" },
-  fair_deal:    { label: "Fair Price",   cls: "bg-blue-100 text-blue-700" },
-  above_market: { label: "Above Market", cls: "bg-amber-100 text-amber-700" },
-};
+// The label, tone and colour for a market position come from
+// src/lib/market/presentation.ts. This file used to keep its own table, which
+// had no entry for `below_market` or `at_market` — the two most common stored
+// values — so nearly two thirds of the lot fell through it.
+
 // VIN decode status — green "Decoded" once the VIN resolves to a YMM,
 // red "Decode Failed" otherwise.
 const VinDecodeCell = ({ ymm }: { ymm?: string | null }) =>
@@ -1150,14 +1153,13 @@ const PriceCell = ({ price, docFee, ap, position, value }: { price?: number | nu
   const drift = assessDrift(price, ap, docFee || 0);
   const delta = value != null ? Number(value) - price : null; // > 0 → price below market value (good)
   const above = delta != null && delta < 0;
-  const dealLabel = position === "above_market"
-    ? "Above Market"
-    : position && MARKET_CHIP[position]
-      ? MARKET_CHIP[position].label
-      : delta == null ? null : above ? "Above Market" : "Good Price";
-  const marketTone = dealLabel === "Above Market" ? "text-red-600" : dealLabel === "Fair Price" ? "text-amber-600" : "text-emerald-600";
-  const dotTone = dealLabel === "Above Market" ? "bg-red-500" : dealLabel === "Fair Price" ? "bg-amber-500" : "bg-emerald-500";
-  const marketText = above && delta != null ? `$${Math.abs(delta).toLocaleString()} Above Market` : dealLabel;
+  const presentation = position
+    ? presentLegacyPosition(position)
+    : delta == null ? null : presentLegacyPosition(above ? "above_market" : "below_market");
+  const dealLabel = presentation?.label ?? null;
+  const marketTone = presentation?.classes.text ?? "text-slate-600";
+  const dotTone = presentation?.classes.dot ?? "bg-slate-400";
+  const marketText = above && delta != null ? `$${Math.abs(delta).toLocaleString()} ${dealLabel ?? ""}`.trim() : dealLabel;
 
   const tip = [
     drift.status === "drift"

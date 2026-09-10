@@ -1,5 +1,7 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
+import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
+import { presentLegacyPosition } from "@/lib/market/presentation";
 
 // ──────────────────────────────────────────────────────────────────────
 // Shopper-facing vehicle insights — turns the MarketCheck enrichment and
@@ -34,10 +36,16 @@ export function vehicleInsights(l: VehicleListing): VehicleInsight[] {
   const out: VehicleInsight[] = [];
 
   // Below market — the strongest shopper signal we have.
-  const mv = l.market_value != null ? Number(l.market_value) : null;
-  const price = l.price != null ? Number(l.price) : null;
-  if (mv != null && price != null && mv - price >= 250) {
-    const delta = Math.round(mv - price);
+  //
+  // The subtraction itself lives in src/lib/market/surfaceCompat.ts. This file
+  // used to do its own, against `l.price`, which is a third answer to the same
+  // question the inventory grid and the Passport were each answering
+  // differently. The arithmetic is unchanged; it just has one home now.
+  const marketView = legacyMarketView(l as LegacyListingFields, "insights");
+  const mv = marketView.marketP50;
+  const belowBy = marketView.difference != null ? -marketView.difference : null;
+  if (mv != null && belowBy != null && belowBy >= 250) {
+    const delta = Math.round(belowBy);
     out.push({
       id: "below-market",
       label: `$${delta.toLocaleString()} below market`,
@@ -45,10 +53,17 @@ export function vehicleInsights(l: VehicleListing): VehicleInsight[] {
       tone: "emerald",
       strength: 100,
     });
-  } else if (l.market_position === "good_deal" || l.market_position === "great_deal") {
-    out.push({ id: "good-deal", label: "Great price", detail: "Priced below comparable listings in this market.", tone: "emerald", strength: 95 });
-  } else if (l.market_position === "fair_deal" || l.market_position === "fair_price") {
-    out.push({ id: "fair-price", label: "Fair market price", detail: "Priced in line with comparable listings in this market.", tone: "blue", strength: 55 });
+  } else {
+    // The label, the sentence and the tone all come from the shared market
+    // presentation map. This block used to test three position strings by
+    // hand and had no branch for `below_market` or `at_market`, which is most
+    // of the lot.
+    const position = presentLegacyPosition(l.market_position);
+    if (position.tone === "positive") {
+      out.push({ id: "good-deal", label: position.label, detail: position.explanation, tone: "emerald", strength: 95 });
+    } else if (position.code === "within") {
+      out.push({ id: "fair-price", label: position.label, detail: position.explanation, tone: "blue", strength: 55 });
+    }
   }
 
   // Certified Pre-Owned.

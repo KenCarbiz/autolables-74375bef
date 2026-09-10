@@ -22,6 +22,7 @@ import TodaysPriceExperience from "@/components/passport/TodaysPriceExperience";
 import TestDriveExperience from "@/components/passport/TestDriveExperience";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
+import { presentLegacyPosition } from "@/lib/market/presentation";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV2Detail — /passport-v2/:vehicleSlug/:section
@@ -879,7 +880,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
   },
   "market-price": {
     title: "Market Price Analysis",
-    render: ({ d }) => {
+    render: ({ d, listing }) => {
       const hasRange = d.marketLow != null && d.marketHigh != null;
       const showAvg = d.marketAvg != null && d.price != null && d.price <= d.marketAvg && !d.marketBasisWeak;
       return (
@@ -887,7 +888,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
           <SectionHeading icon={DollarSign} title="Market Price Analysis" subtitle="How this vehicle's price compares to the market." />
           {d.price != null && (hasRange || showAvg) ? (
             <Card className="p-5">
-              {d.belowMarket && d.belowMarket > 0 && <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-[13px] font-bold mb-3"><BadgeCheck className="w-4 h-4" /> Great Price · {fmt$(d.belowMarket)} below market average</div>}
+              {d.belowMarket && d.belowMarket > 0 && presentLegacyPosition(listing.market_position).tone === "positive" && <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-[13px] font-bold mb-3"><BadgeCheck className="w-4 h-4" /> Great Price · {fmt$(d.belowMarket)} below market average</div>}
               {hasRange ? (
                 <div className="grid grid-cols-3 text-center text-[13px] gap-2">
                   <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Market Low</div><div className="font-bold mt-0.5">{fmt$(d.marketLow)}</div></div>

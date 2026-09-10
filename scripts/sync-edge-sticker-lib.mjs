@@ -32,6 +32,11 @@ export const DOCUMENTS_SOURCE_DIR = join(root, "src/lib/documents");
 export const DOCUMENTS_PREFIX = "documents/";
 export const VEHICLE_FILE_SOURCE_DIR = join(root, "src/lib/vehicleFile");
 export const VEHICLE_FILE_PREFIX = "vehicleFile/";
+// The market engine is a third sibling tree. It imports the shared YMM parser
+// as `../factorySticker/ymm`, which the same rewrite turns into `../ymm` —
+// one directory up from lib/market/, where the flattened engine lives.
+export const MARKET_SOURCE_DIR = join(root, "src/lib/market");
+export const MARKET_PREFIX = "market/";
 const rewriteEngineImports = (body) => body.replace(/from "\.\.\/factorySticker\//g, 'from "../');
 
 const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__"]);
@@ -62,7 +67,7 @@ export function collect(dir, base = dir, out = new Map(), withHeader = true) {
   return out;
 }
 
-/** Every file the mirror should contain: the engine, the truth layer, shared document primitives, and the Vehicle File read model. */
+/** Every file the mirror should contain: the engine, the truth layer, shared document primitives, the Vehicle File read model, and the market engine. */
 export function collectAll() {
   const out = collect(SOURCE_DIR);
   const truth = collect(TRUTH_SOURCE_DIR, TRUTH_SOURCE_DIR, new Map(), false);
@@ -74,6 +79,10 @@ export function collectAll() {
   for (const [rel, body] of documents) {
     const key = DOCUMENTS_PREFIX + rel;
     out.set(key, HEADER.replace("{src}", `src/lib/documents/${rel}`) + body);
+  }
+  const market = collect(MARKET_SOURCE_DIR, MARKET_SOURCE_DIR, new Map(), false);
+  for (const [rel, body] of market) {
+    out.set(MARKET_PREFIX + rel, HEADER.replace("{src}", `src/lib/market/${rel}`) + rewriteEngineImports(body));
   }
   const vehicleFile = collect(VEHICLE_FILE_SOURCE_DIR, VEHICLE_FILE_SOURCE_DIR, new Map(), false);
   for (const [rel, body] of vehicleFile) {

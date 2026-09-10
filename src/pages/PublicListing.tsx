@@ -18,6 +18,7 @@ import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { PublicLocaleProvider, usePublicLocale } from "@/lib/i18n/public";
 import Logo from "@/components/brand/Logo";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
+import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
 
 // ──────────────────────────────────────────────────────────────
 // PublicListing — /v/:slug
@@ -323,7 +324,11 @@ const PublicListingBody = () => {
 
   const price = listing.price ?? 0;
   const marketAvg = listing.market_value ?? 0;
-  const belowMarket = mp.belowMarket ?? (marketAvg > 0 && price < marketAvg ? marketAvg - price : 0);
+  // The comparison itself lives in src/lib/market/surfaceCompat.ts. Same
+  // number, one home.
+  const publicMarketView = legacyMarketView(listing as unknown as LegacyListingFields, "passport", { comparePrice: price });
+  const belowMarket = mp.belowMarket
+    ?? (publicMarketView.difference != null && publicMarketView.difference < 0 ? -publicMarketView.difference : 0);
   const marketHigh = mp.high ?? 0;
   const priceLabel = ((listing as unknown as { price_label?: string }).price_label)
     || (dealer.price_label as string) || "Our Price";

@@ -5,6 +5,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { toast } from "sonner";
+import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
+import { presentLegacyPosition } from "@/lib/market/presentation";
+
+// A car needs a price review when the shared presentation map calls its
+// position cautionary or worse — never from a hard-coded position string.
+const needsPriceReview = (position: unknown): boolean => {
+  const tone = presentLegacyPosition(typeof position === "string" ? position : null).tone;
+  return tone === "caution" || tone === "negative";
+};
+
+// One market subtraction for the whole app.
+const rowMarketDelta = (row: unknown): number | null => {
+  const view = legacyMarketView(row as LegacyListingFields, "dealer_inventory");
+  return view.difference != null ? -view.difference : null;
+};
 import {
   Car, Search, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert, Eye,
   Pencil, Printer, MoreVertical, Plus, Tag, FileSignature, CircleDollarSign,
@@ -169,12 +184,17 @@ const InventoryCommandCenterV2 = () => {
     const missingAddendum = rows.filter((r) => !sig(r).hasAddendum);
     const missingSticker = drafts;
     const vinIssues = rows.filter((r) => !r.ymm);
-    const priceReview = rows.filter((r) => r.market_position === "above_market" || r.price == null);
+    // "Needs a price review" is the same judgement the badge makes, so it comes
+    // from the same map rather than a second hard-coded string.
+    const priceReview = rows.filter((r) => needsPriceReview(r.market_position) || r.price == null);
     const blocked = drafts.filter((r) => { const s = sig(r); return !s.decoded || !s.hasAddendum || s.openRecall; });
     const readyToPublish = rows.filter((r) => sig(r).readyToPublish);
     const needsAttention = rows.filter((r) => { const s = sig(r); return (r.status !== "published") || s.openRecall || !s.hasAddendum; });
     const avgScore = rows.length ? Math.round((rows.reduce((a, r) => a + sig(r).score, 0) / rows.length) * 100) : 0;
-    const deltas = rows.map((r) => (r.market_value != null && r.price != null ? r.market_value - r.price : null)).filter((x): x is number => x != null);
+    const deltas = rows.map((r) => {
+      const mv = legacyMarketView(r as unknown as LegacyListingFields, "dealer_inventory");
+      return mv.difference != null ? -mv.difference : null;
+    }).filter((x): x is number => x != null);
     const avgDelta = deltas.length ? Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length) : null;
     return {
       total: rows.length,
@@ -200,7 +220,7 @@ const InventoryCommandCenterV2 = () => {
       if (tab === "draft" && r.status === "published") return false;
       if (tab === "needs_sticker" && r.status === "published") return false;
       if (tab === "missing_addendum" && sig(r).hasAddendum) return false;
-      if (tab === "price_review" && !(r.market_position === "above_market" || r.price == null)) return false;
+      if (tab === "price_review" && !(needsPriceReview(r.market_position) || r.price == null)) return false;
       if (q.trim()) {
         const hay = `${r.vin} ${r.stock_number || ""} ${r.ymm || ""} ${r.trim || ""}`.toLowerCase();
         if (!hay.includes(q.trim().toLowerCase())) return false;
@@ -405,7 +425,11 @@ const InventoryCommandCenterV2 = () => {
                   {/* Price */}
                   <div className="text-[13px] leading-tight">
                     <p className="font-bold">{fmt$(r.price)}</p>
-                    {r.market_position === "above_market" ? <p className="text-[11px] text-amber-600">Above market</p> : r.market_value != null && r.price != null ? <p className="text-[11px] text-emerald-600">{fmt$(r.market_value - r.price)} below</p> : <p className="text-[11px] text-muted-foreground">Not checked</p>}
+                    {r.market_position
+                      ? <p className={`text-[11px] ${presentLegacyPosition(r.market_position).classes.text}`}>{presentLegacyPosition(r.market_position).label}</p>
+                      : rowMarketDelta(r) != null
+                        ? <p className={`text-[11px] ${presentLegacyPosition("below_market").classes.text}`}>{fmt$(rowMarketDelta(r) as number)} below</p>
+                        : <p className="text-[11px] text-muted-foreground">Not checked</p>}
                   </div>
                   {/* Publishing */}
                   <div className="text-[12px]">

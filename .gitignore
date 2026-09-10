@@ -25,3 +25,12 @@ dist-ssr
 
 # Supabase CLI scratch state, written by any local supabase command.
 supabase/.temp/
+
+# Shadow fleet reports are generated from live inventory and carry production
+# VINs. They are regenerable (scripts/market-shadow-report.ts) and go stale the
+# moment the lot moves, so they are read locally and never committed.
+MARKET_V2_SHADOW_FLEET_REPORT*.md
+
+# Generated gate reports and shadow fleet runs stay out of the repository.
+GATE_*_REPORT.md
+MARKET_V2_SHADOW_FLEET_REPORT*.md

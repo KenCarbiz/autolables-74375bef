@@ -23,13 +23,14 @@ import {
 //
 // Called per vehicle as it lands in inventory (from marketcheck-sync) and
 // from Admin "re-enrich". For a (tenant_id, vin) it gathers, in parallel:
-//   • MarketCheck predict/car/price  → market value, low/high, position
+//   (the price prediction moved to market-valuation-write; see the
+//    SINGLE-WRITER BOUNDARY note below)
 //   • MarketCheck search/car/active  → comparables + price stats + market_meta
 //                                       (percentile, radius, similar_count, avg_dom)
 //   • MarketCheck recalls (VIN)      → recall status + campaigns
 //   • Black Book (blackbook-values)  → trade/retail/wholesale by condition
-// then writes market_payload, market_value, market_position, market_checked_at,
-// market_meta, comparables, recall_status/open_recall_count/recall_payload,
+// then writes market_meta, comparables,
+// recall_status/open_recall_count/recall_payload,
 // blackbook, enriched_at, and appends a vehicle_value_history snapshot.
 //
 // Everything is best-effort and isolated — a failing provider leaves the rest
@@ -86,26 +87,12 @@ async function mcFetch(url: string, timeoutMs: number): Promise<Response | null>
   return null;
 }
 
-// ── MarketCheck: predicted market value + range ────────────────
-async function fetchPredict(vin: string, miles: number | null, carType: string, zip: string | null) {
-  try {
-    // predict/car/price requires car_type and a location (zip, or city+state) —
-    // with only vin+miles MarketCheck returns 400. Supply both.
-    const p = new URLSearchParams({ api_key: MC_KEY, vin, car_type: carType === "new" ? "new" : "used" });
-    if (miles != null) p.set("miles", String(miles));
-    if (zip) p.set("zip", zip);
-    const res = await mcFetch(`${MC_BASE}/predict/car/price?${p.toString()}`, 10000);
-    if (!res || !res.ok) return null;
-    // deno-lint-ignore no-explicit-any
-    const b: any = await res.json().catch(() => ({}));
-    return {
-      market_value: num(b.predicted_price ?? b.price ?? b.market_price ?? b.mean_price ?? b.price_stats?.mean),
-      low: num(b.price_range?.lower_bound ?? b.price_range?.low ?? b.min_price ?? b.price_stats?.min),
-      high: num(b.price_range?.upper_bound ?? b.price_range?.high ?? b.max_price ?? b.price_stats?.max),
-      raw: b,
-    };
-  } catch { return null; }
-}
+// The price-prediction call used to live here. It has been removed, not merely
+// unhooked: it was a SECOND paid provider request per vehicle per night, sent
+// to the legacy endpoint, and it could only describe the car as new or used
+// because that endpoint had no certification parameter — which is exactly how
+// a certified QX50 was priced as an ordinary one. The valuation writer makes
+// that request once, correctly, under a budget reservation.
 
 // ── MarketCheck: comparable active listings + price stats + market context ──
 // Comparables are SIMILAR cars (same year/make/model in the tenant's market),
@@ -829,7 +816,6 @@ serve(async (req) => {
   // one-VIN-at-a-time loop means a single MarketCheck request in flight at any
   // moment, which can't trip the RPS limit. (fetchRecalls tries MarketCheck
   // then falls back to free NHTSA.) Skipped entirely on a Black-Book-only run.
-  const predict = wantMC ? await fetchPredict(vin, miles, condition, zip) : null;
   const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName, miles, subjectDrivetrain, likeRules) : null;
   const mds = wantMC && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
   const soldStats = wantMC ? await fetchSoldStats(ymm, condition, dealerState) : null;
@@ -839,30 +825,26 @@ serve(async (req) => {
 
   const patch: Record<string, unknown> = { enriched_at: new Date().toISOString() };
 
-  if (predict?.market_value != null) {
-    const mv = predict.market_value;
-    const belowMarket = price != null && mv != null ? Math.round(mv - price) : 0;
-    const position = price == null || mv == null ? "unknown" : price <= mv * 0.97 ? "below_market" : price >= mv * 1.03 ? "above_market" : "at_market";
-    patch.market_value = mv;
-    patch.market_position = position;
-    patch.market_checked_at = new Date().toISOString();
-    patch.market_payload = { marketValue: mv, low: predict.low, high: predict.high, belowMarket, position, checked_at: new Date().toISOString(), raw: predict.raw };
-  } else if (comps?.likeMedian != null && comps.likeMedian > 0 && (comps.likeCount ?? 0) >= 3) {
-    // Fallback: MarketCheck has no predicted price for this VIN (older/rarer
-    // car). Use the median of the LIKE-FOR-LIKE local comps — same trim and
-    // drivetrain where known, mileage inside the dealer's comp band, and at
-    // least 3 of them — never the model-wide median: judging a low-mileage
-    // top trim against high-mileage base cars reads "over market" when the
-    // car is priced right. Fewer than 3 true peers → no market value at all;
-    // the Passport shows its honest pending state instead of a wrong verdict.
-    const mv = comps.likeMedian;
-    const belowMarket = price != null ? Math.round(mv - price) : 0;
-    const position = price == null ? "unknown" : price <= mv * 0.97 ? "below_market" : price >= mv * 1.03 ? "above_market" : "at_market";
-    patch.market_value = mv;
-    patch.market_position = position;
-    patch.market_checked_at = new Date().toISOString();
-    patch.market_payload = { marketValue: mv, belowMarket, position, source: "comps_median_like", like_count: comps.likeCount, checked_at: new Date().toISOString() };
-  }
+  // ── SINGLE-WRITER BOUNDARY ────────────────────────────────────────────
+  //
+  // This function used to decide the market question itself: it took whichever
+  // number came back, subtracted the listing price from it, and wrote
+  // market_value, market_position, market_checked_at and market_payload on its
+  // own nightly schedule. That made it the second writer of a decision nobody
+  // owned, and its 0.97/1.03 thresholds were a third opinion about what
+  // "at market" means.
+  //
+  // It no longer writes any of them. `market-valuation-write` is the sole
+  // owner of a market decision: it resolves the price basis, sends the
+  // certification flag, excludes the dealer's own inventory, applies the
+  // concentration and confidence rules, and records an append-only audit row
+  // that can reconstruct the answer.
+  //
+  // Enrichment still does its real job below — it gathers the raw comparable
+  // evidence and non-market vehicle facts, which the valuation writer reads.
+  //
+  // See src/lib/market/writerBoundary.test.ts, which fails the suite if a
+  // second writer of these columns reappears anywhere in the codebase.
   if (comps) {
     // Only overwrite comparables when this pass actually returned listings, so a
     // transient empty result never clobbers a previously-good comp set.
@@ -923,12 +905,13 @@ serve(async (req) => {
 
   // Value-history snapshot for the price/market timeline — only when MarketCheck
   // ran (a Black-Book-only pass shouldn't append a price/market snapshot).
-  if (wantMC && (price != null || patch.market_value != null)) {
+  // The listing PRICE timeline is an inventory fact and stays here. The market
+  // value and position columns are a market VERDICT and belong to
+  // market-valuation-write, so this snapshot no longer carries them.
+  if (wantMC && price != null) {
     await admin.from("vehicle_value_history").insert({
       tenant_id: tenantId, vin, source: "vehicle_enrich",
-      listing_price: price, market_value: patch.market_value ?? null,
-      below_market: (patch.market_payload as { belowMarket?: number } | undefined)?.belowMarket ?? null,
-      position: (patch.market_payload as { position?: string } | undefined)?.position ?? null,
+      listing_price: price, market_value: null, below_market: null, position: null,
       captured_at: new Date().toISOString(),
     }).then(() => undefined, () => undefined);
   }
@@ -936,7 +919,6 @@ serve(async (req) => {
   return json(200, {
     ok: true, vin,
     pulled: {
-      predict: !!predict,
       comparables: comps?.comparables.length ?? 0,
       // Raw MarketCheck comps response, to diagnose empty Comparables: if
       // num_found > 0 but listings_returned == 0, the plan is withholding the
