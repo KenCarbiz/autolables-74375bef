@@ -96,7 +96,15 @@ Deno.test("a wrong or malformed secret is rejected", async () => {
 Deno.test("a publishable key never authenticates as a service caller", async () => {
   // In either header slot. This is the one that would hand every browser
   // visitor a service credential.
-  for (const headers of [{ apikey: PUBLISHABLE }, { Authorization: `Bearer ${PUBLISHABLE}` }]) {
+  //
+  // Annotated, not asserted: two object literals with different keys infer a
+  // union whose members carry `undefined` for the key they lack, which is not
+  // assignable to Record<string, string>.
+  const slots: Record<string, string>[] = [
+    { apikey: PUBLISHABLE },
+    { Authorization: `Bearer ${PUBLISHABLE}` },
+  ];
+  for (const headers of slots) {
     const { data, error } = await verify(post(headers), { current: SECRET });
     assert(error !== null, "publishable key must not be accepted");
     assertEquals(data, null);
