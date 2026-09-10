@@ -391,16 +391,25 @@ Deno.serve(async (req) => {
   }
 
   // ── 23. Audit evidence.
-  await admin.from("audit_log").insert({
+  //
+  // The column is `details`, as it is for every other function that writes
+  // here. This said `metadata` until Gate 14D: PostgREST rejected the unknown
+  // column, the rejection was discarded by the empty error handler below, and
+  // the audit row this function believed it was writing was never written.
+  // The failure is now surfaced, because an audit trail that fails silently is
+  // worse than none: it reads as evidence of absence.
+  const { error: auditError } = await admin.from("audit_log").insert({
     action: "market_valuation_written",
     entity_type: "vehicle_listing",
     entity_id: listing.id,
-    metadata: {
+    store_id: tenantId,
+    details: {
       vin, valuation_id: valuationId, status: view.status, confidence: view.confidence,
       verdict: view.verdict, provider_attempt: attemptOutcome,
       reservation: reservationOutcome, compatibility_updated: compatibilityUpdated,
     },
-  }).then(() => undefined, () => undefined);
+  });
+  if (auditError) console.error("audit_log insert failed", auditError.message);
 
   // ── 24. One canonical MarketView.
   return json(200, { valuation_id: valuationId, view, compatibility_updated: compatibilityUpdated });

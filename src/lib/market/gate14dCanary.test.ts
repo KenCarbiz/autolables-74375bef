@@ -386,3 +386,45 @@ describe("Gate 14D — writer wiring", () => {
     expect(updateAt).toBeGreaterThan(flagAt);
   });
 });
+
+// ── The audit trail actually lands ─────────────────────────────────────────
+
+describe("Gate 14D — audit evidence is written, not merely attempted", () => {
+  it("writes audit_log.details, the column that exists, and never metadata", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("supabase/functions/market-valuation-write/index.ts", "utf8");
+    const insert = src.slice(src.indexOf('from("audit_log").insert('));
+    const block = insert.slice(0, insert.indexOf("});") + 3);
+    expect(block).toContain("details:");
+    expect(block).not.toContain("metadata:");
+  });
+
+  it("surfaces an audit failure instead of discarding it", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("supabase/functions/market-valuation-write/index.ts", "utf8");
+    // The empty-handler idiom is what hid the wrong column name for a whole
+    // project. It must not come back on the audit write.
+    const insert = src.slice(src.indexOf('from("audit_log").insert('));
+    expect(insert.slice(0, 600)).not.toMatch(/\.then\(\s*\(\)\s*=>\s*undefined\s*,\s*\(\)\s*=>\s*undefined\s*\)/);
+    expect(src).toContain("audit_log insert failed");
+  });
+
+  it("no edge function inserts a metadata column into audit_log", async () => {
+    const fs = await import("node:fs/promises");
+    const dir = "supabase/functions";
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const offenders: string[] = [];
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const p = `${dir}/${e.name}/index.ts`;
+      const src = await fs.readFile(p, "utf8").catch(() => "");
+      let i = src.indexOf('from("audit_log").insert(');
+      while (i !== -1) {
+        const block = src.slice(i, i + 700);
+        if (/\bmetadata\s*:/.test(block.slice(0, block.indexOf("});") + 3 || 700))) offenders.push(e.name);
+        i = src.indexOf('from("audit_log").insert(', i + 1);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
