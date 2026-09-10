@@ -53,19 +53,8 @@ const REQUEST_TIMEOUT_MS = 10_000;
 // change, and the JWKS the project actually publishes so user tokens are
 // verified by signature rather than taken on trust.
 const SECRET_KEYS = buildSecretKeySet((n) => Deno.env.get(n));
-const JWKS_SOURCE = jwksSource((n) => Deno.env.get(n));
-const JWKS = JWKS_SOURCE
-  ? ("url" in JWKS_SOURCE ? new URL(JWKS_SOURCE.url) : safeJwks(JWKS_SOURCE.inline))
-  : null;
-
-function safeJwks(raw: string): { keys: unknown[] } | null {
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed?.keys) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
+const JWKS_URL = jwksSource((n) => Deno.env.get(n));
+const JWKS = JWKS_URL ? new URL(JWKS_URL) : null;
 
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 

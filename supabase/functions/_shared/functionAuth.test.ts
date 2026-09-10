@@ -139,14 +139,20 @@ describe("credential presentation", () => {
 describe("jwks source", () => {
   it("falls back to the project's published endpoint, which the platform does not set", () => {
     expect(jwksSource(envOf({ SUPABASE_URL: "https://onnbmmdbrsgytfozfozn.supabase.co" })))
-      .toEqual({ url: "https://onnbmmdbrsgytfozfozn.supabase.co/auth/v1/.well-known/jwks.json" });
+      .toBe("https://onnbmmdbrsgytfozfozn.supabase.co/auth/v1/.well-known/jwks.json");
   });
 
-  it("prefers an explicitly configured source", () => {
-    expect(jwksSource(envOf({ SUPABASE_JWKS: '{"keys":[]}', SUPABASE_URL: "https://x.supabase.co" })))
-      .toEqual({ inline: '{"keys":[]}' });
+  it("prefers an explicitly configured url", () => {
     expect(jwksSource(envOf({ SUPABASE_JWKS_URL: "https://x/jwks", SUPABASE_URL: "https://x.supabase.co" })))
-      .toEqual({ url: "https://x/jwks" });
+      .toBe("https://x/jwks");
+  });
+
+  it("returns a url and never an inline key set", () => {
+    // An inline SUPABASE_JWKS would have to be asserted into JSONWebKeySet —
+    // an unchecked claim about a security-critical value. The remote form
+    // needs no such claim.
+    const src = jwksSource(envOf({ SUPABASE_JWKS: '{"keys":[]}', SUPABASE_URL: "https://x.supabase.co" }));
+    expect(src).toBe("https://x.supabase.co/auth/v1/.well-known/jwks.json");
   });
 
   it("is null when there is nothing to verify against", () => {

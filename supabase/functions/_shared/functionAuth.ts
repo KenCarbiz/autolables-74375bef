@@ -115,20 +115,26 @@ export function buildSecretKeySet(env: EnvReader): Record<string, string> {
 }
 
 /**
- * Where user JWTs are verified against.
+ * The URL user JWTs are verified against.
  *
  * The platform does not set `SUPABASE_JWKS*`, so without a fallback the `user`
  * mode would be skipped as "not configured" and every signed-in caller would
  * be turned away. The project's published JWKS endpoint is the documented
  * source and needs no secret to read.
+ *
+ * A URL, deliberately, and never an inline key set. `SUPABASE_JWKS` would
+ * arrive as a JSON string, and turning that into the `JSONWebKeySet` the
+ * verifier expects means asserting that parsed JSON really is an array of
+ * `JWK` — an unchecked claim about a security-critical value. The remote form
+ * needs no such claim, and the library fetches and caches it itself. Nothing
+ * in this project sets the inline variable; supporting it halfway would be
+ * worse than not supporting it.
  */
-export function jwksSource(env: EnvReader): { inline: string } | { url: string } | null {
-  const inline = (env("SUPABASE_JWKS") || "").trim();
-  if (inline) return { inline };
-  const url = (env("SUPABASE_JWKS_URL") || "").trim();
-  if (url) return { url };
+export function jwksSource(env: EnvReader): string | null {
+  const explicit = (env("SUPABASE_JWKS_URL") || "").trim();
+  if (explicit) return explicit;
   const base = (env("SUPABASE_URL") || "").trim().replace(/\/+$/, "");
-  return base ? { url: `${base}/auth/v1/.well-known/jwks.json` } : null;
+  return base ? `${base}/auth/v1/.well-known/jwks.json` : null;
 }
 
 /**
