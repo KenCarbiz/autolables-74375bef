@@ -4053,6 +4053,12 @@
       "integrity": "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="
     }
   },
+  "redirects": {
+    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2.116.0"
+  },
+  "remote": {
+    "https://esm.sh/@supabase/supabase-js@2.116.0": "a38014743786a06c7dbf095a99e9ef3b38c0ec16bff076fc7cd403991192b34e"
+  },
   "workspace": {
     "packageJson": {
       "dependencies": [
