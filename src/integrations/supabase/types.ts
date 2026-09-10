@@ -4834,6 +4834,129 @@ export type Database = {
           },
         ]
       }
+      market_provider_budgets: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          monthly_budget_usd: number
+          per_call_cost_usd: number
+          provider: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          monthly_budget_usd?: number
+          per_call_cost_usd?: number
+          provider?: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          monthly_budget_usd?: number
+          per_call_cost_usd?: number
+          provider?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_provider_budgets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_provider_budgets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_value_model_metrics: {
+        Row: {
+          bias: number | null
+          cohort: Json
+          created_at: string
+          evaluated_from: string
+          evaluated_to: string
+          false_positive_rate: number | null
+          id: string
+          interval_coverage: number | null
+          mae: number | null
+          mape: number | null
+          median_absolute_error: number | null
+          model_key: string
+          model_version: string
+          notes: string | null
+          sample_size: number
+          stability: number | null
+          tenant_id: string | null
+        }
+        Insert: {
+          bias?: number | null
+          cohort?: Json
+          created_at?: string
+          evaluated_from: string
+          evaluated_to: string
+          false_positive_rate?: number | null
+          id?: string
+          interval_coverage?: number | null
+          mae?: number | null
+          mape?: number | null
+          median_absolute_error?: number | null
+          model_key: string
+          model_version: string
+          notes?: string | null
+          sample_size?: number
+          stability?: number | null
+          tenant_id?: string | null
+        }
+        Update: {
+          bias?: number | null
+          cohort?: Json
+          created_at?: string
+          evaluated_from?: string
+          evaluated_to?: string
+          false_positive_rate?: number | null
+          id?: string
+          interval_coverage?: number | null
+          mae?: number | null
+          mape?: number | null
+          median_absolute_error?: number | null
+          model_key?: string
+          model_version?: string
+          notes?: string | null
+          sample_size?: number
+          stability?: number | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_value_model_metrics_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_value_model_metrics_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketcheck_sync_config: {
         Row: {
           allowed: boolean
@@ -6401,6 +6524,66 @@ export type Database = {
           shape_hash?: string
         }
         Relationships: []
+      }
+      provider_request_reservations: {
+        Row: {
+          actual_cost_usd: number | null
+          attempt_id: string
+          completed_at: string | null
+          estimated_cost_usd: number
+          expires_at: string
+          failure_reason: string | null
+          id: string
+          provider: string
+          request_fingerprint: string
+          reserved_at: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          actual_cost_usd?: number | null
+          attempt_id?: string
+          completed_at?: string | null
+          estimated_cost_usd?: number
+          expires_at: string
+          failure_reason?: string | null
+          id?: string
+          provider: string
+          request_fingerprint: string
+          reserved_at?: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          actual_cost_usd?: number | null
+          attempt_id?: string
+          completed_at?: string | null
+          estimated_cost_usd?: number
+          expires_at?: string
+          failure_reason?: string | null
+          id?: string
+          provider?: string
+          request_fingerprint?: string
+          reserved_at?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_request_reservations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_request_reservations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       qr_codes: {
         Row: {
@@ -9340,6 +9523,379 @@ export type Database = {
           },
         ]
       }
+      vehicle_market_comparables: {
+        Row: {
+          adjusted_price: number | null
+          advertised_price: number | null
+          capped_weight: number
+          certification_program: string | null
+          certified: boolean | null
+          comparable_vin: string | null
+          condition_status: string
+          created_at: string
+          days_on_market: number | null
+          dealer_domain: string | null
+          dealer_group_id: string | null
+          dealer_group_name: string | null
+          dealer_id: string | null
+          dealer_name: string | null
+          distance_miles: number | null
+          drivetrain: string | null
+          evidence_ref: string
+          exclusion_reasons: string[]
+          history_status: string
+          id: string
+          inclusion_status: string
+          is_duplicate: boolean
+          listing_observed_at: string | null
+          make: string | null
+          mileage: number | null
+          model: string | null
+          normalized_vehicle_price: number | null
+          price_basis_status: string | null
+          raw_attributes: Json
+          raw_weight: number
+          rooftop_id: string | null
+          similarity_components: Json
+          source_observed_at: string | null
+          subject_vin: string
+          tenant_id: string
+          tier: string | null
+          trim: string | null
+          valuation_id: string
+          year: number | null
+        }
+        Insert: {
+          adjusted_price?: number | null
+          advertised_price?: number | null
+          capped_weight?: number
+          certification_program?: string | null
+          certified?: boolean | null
+          comparable_vin?: string | null
+          condition_status?: string
+          created_at?: string
+          days_on_market?: number | null
+          dealer_domain?: string | null
+          dealer_group_id?: string | null
+          dealer_group_name?: string | null
+          dealer_id?: string | null
+          dealer_name?: string | null
+          distance_miles?: number | null
+          drivetrain?: string | null
+          evidence_ref: string
+          exclusion_reasons?: string[]
+          history_status?: string
+          id?: string
+          inclusion_status: string
+          is_duplicate?: boolean
+          listing_observed_at?: string | null
+          make?: string | null
+          mileage?: number | null
+          model?: string | null
+          normalized_vehicle_price?: number | null
+          price_basis_status?: string | null
+          raw_attributes?: Json
+          raw_weight?: number
+          rooftop_id?: string | null
+          similarity_components?: Json
+          source_observed_at?: string | null
+          subject_vin: string
+          tenant_id: string
+          tier?: string | null
+          trim?: string | null
+          valuation_id: string
+          year?: number | null
+        }
+        Update: {
+          adjusted_price?: number | null
+          advertised_price?: number | null
+          capped_weight?: number
+          certification_program?: string | null
+          certified?: boolean | null
+          comparable_vin?: string | null
+          condition_status?: string
+          created_at?: string
+          days_on_market?: number | null
+          dealer_domain?: string | null
+          dealer_group_id?: string | null
+          dealer_group_name?: string | null
+          dealer_id?: string | null
+          dealer_name?: string | null
+          distance_miles?: number | null
+          drivetrain?: string | null
+          evidence_ref?: string
+          exclusion_reasons?: string[]
+          history_status?: string
+          id?: string
+          inclusion_status?: string
+          is_duplicate?: boolean
+          listing_observed_at?: string | null
+          make?: string | null
+          mileage?: number | null
+          model?: string | null
+          normalized_vehicle_price?: number | null
+          price_basis_status?: string | null
+          raw_attributes?: Json
+          raw_weight?: number
+          rooftop_id?: string | null
+          similarity_components?: Json
+          source_observed_at?: string | null
+          subject_vin?: string
+          tenant_id?: string
+          tier?: string | null
+          trim?: string | null
+          valuation_id?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_market_comparables_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_market_comparables_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vmc_valuation_tenant_fk"
+            columns: ["valuation_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_market_valuations"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
+      vehicle_market_valuations: {
+        Row: {
+          algorithm_version: string
+          certification_match: boolean | null
+          checked_at: string | null
+          comparable_p10: number | null
+          comparable_p25: number | null
+          comparable_p50: number | null
+          comparable_p75: number | null
+          comparable_p90: number | null
+          conditional_discounts: number | null
+          confidence_reasons: string[]
+          confidence_tier: string
+          created_at: string
+          data_provenance: Json
+          difference: number | null
+          difference_percent: number | null
+          displayed_total_price: number | null
+          doc_fee: number | null
+          effective_group_cap: number | null
+          effective_rooftop_cap: number | null
+          effective_sample_size: number
+          eligible_primary_count: number
+          expires_at: string | null
+          fee_decomposition: Json
+          id: string
+          independent_group_count: number
+          independent_rooftop_count: number
+          insufficient_market_diversity: boolean
+          listing_id: string | null
+          mandatory_add_on_source: string | null
+          mandatory_add_ons_included_in_displayed_price: boolean | null
+          mandatory_dealer_add_ons: number | null
+          market_floor: number | null
+          model_versions: Json
+          price_basis_reasons: string[]
+          price_basis_status: string
+          price_to_market_percent: number | null
+          pricing_position_shadow: Json | null
+          provider: string | null
+          provider_answered_at: string | null
+          provider_attempt_status: string | null
+          provider_endpoint: string | null
+          provider_prediction: number | null
+          provider_range_high: number | null
+          provider_range_low: number | null
+          provider_request_fingerprint: string | null
+          provider_request_params: Json
+          provider_response_hash: string | null
+          provider_selected_field: string | null
+          provider_validation: Json
+          raw_candidate_count: number
+          relaxation_steps: string[]
+          shadow_composite: Json | null
+          stale_at: string | null
+          status: string
+          strict_concentration_satisfied: boolean | null
+          subject_inputs: Json
+          tenant_id: string
+          top_group_share: number | null
+          top_rooftop_share: number | null
+          total_with_mandatory_add_ons: number | null
+          valuation_input_fingerprint: string | null
+          vehicle_comparison_price: number | null
+          vehicle_file_id: string | null
+          verdict: string
+          verdict_tone: string
+          vin: string
+          winning_tier: string | null
+        }
+        Insert: {
+          algorithm_version: string
+          certification_match?: boolean | null
+          checked_at?: string | null
+          comparable_p10?: number | null
+          comparable_p25?: number | null
+          comparable_p50?: number | null
+          comparable_p75?: number | null
+          comparable_p90?: number | null
+          conditional_discounts?: number | null
+          confidence_reasons?: string[]
+          confidence_tier: string
+          created_at?: string
+          data_provenance?: Json
+          difference?: number | null
+          difference_percent?: number | null
+          displayed_total_price?: number | null
+          doc_fee?: number | null
+          effective_group_cap?: number | null
+          effective_rooftop_cap?: number | null
+          effective_sample_size?: number
+          eligible_primary_count?: number
+          expires_at?: string | null
+          fee_decomposition?: Json
+          id?: string
+          independent_group_count?: number
+          independent_rooftop_count?: number
+          insufficient_market_diversity?: boolean
+          listing_id?: string | null
+          mandatory_add_on_source?: string | null
+          mandatory_add_ons_included_in_displayed_price?: boolean | null
+          mandatory_dealer_add_ons?: number | null
+          market_floor?: number | null
+          model_versions?: Json
+          price_basis_reasons?: string[]
+          price_basis_status: string
+          price_to_market_percent?: number | null
+          pricing_position_shadow?: Json | null
+          provider?: string | null
+          provider_answered_at?: string | null
+          provider_attempt_status?: string | null
+          provider_endpoint?: string | null
+          provider_prediction?: number | null
+          provider_range_high?: number | null
+          provider_range_low?: number | null
+          provider_request_fingerprint?: string | null
+          provider_request_params?: Json
+          provider_response_hash?: string | null
+          provider_selected_field?: string | null
+          provider_validation?: Json
+          raw_candidate_count?: number
+          relaxation_steps?: string[]
+          shadow_composite?: Json | null
+          stale_at?: string | null
+          status: string
+          strict_concentration_satisfied?: boolean | null
+          subject_inputs?: Json
+          tenant_id: string
+          top_group_share?: number | null
+          top_rooftop_share?: number | null
+          total_with_mandatory_add_ons?: number | null
+          valuation_input_fingerprint?: string | null
+          vehicle_comparison_price?: number | null
+          vehicle_file_id?: string | null
+          verdict: string
+          verdict_tone: string
+          vin: string
+          winning_tier?: string | null
+        }
+        Update: {
+          algorithm_version?: string
+          certification_match?: boolean | null
+          checked_at?: string | null
+          comparable_p10?: number | null
+          comparable_p25?: number | null
+          comparable_p50?: number | null
+          comparable_p75?: number | null
+          comparable_p90?: number | null
+          conditional_discounts?: number | null
+          confidence_reasons?: string[]
+          confidence_tier?: string
+          created_at?: string
+          data_provenance?: Json
+          difference?: number | null
+          difference_percent?: number | null
+          displayed_total_price?: number | null
+          doc_fee?: number | null
+          effective_group_cap?: number | null
+          effective_rooftop_cap?: number | null
+          effective_sample_size?: number
+          eligible_primary_count?: number
+          expires_at?: string | null
+          fee_decomposition?: Json
+          id?: string
+          independent_group_count?: number
+          independent_rooftop_count?: number
+          insufficient_market_diversity?: boolean
+          listing_id?: string | null
+          mandatory_add_on_source?: string | null
+          mandatory_add_ons_included_in_displayed_price?: boolean | null
+          mandatory_dealer_add_ons?: number | null
+          market_floor?: number | null
+          model_versions?: Json
+          price_basis_reasons?: string[]
+          price_basis_status?: string
+          price_to_market_percent?: number | null
+          pricing_position_shadow?: Json | null
+          provider?: string | null
+          provider_answered_at?: string | null
+          provider_attempt_status?: string | null
+          provider_endpoint?: string | null
+          provider_prediction?: number | null
+          provider_range_high?: number | null
+          provider_range_low?: number | null
+          provider_request_fingerprint?: string | null
+          provider_request_params?: Json
+          provider_response_hash?: string | null
+          provider_selected_field?: string | null
+          provider_validation?: Json
+          raw_candidate_count?: number
+          relaxation_steps?: string[]
+          shadow_composite?: Json | null
+          stale_at?: string | null
+          status?: string
+          strict_concentration_satisfied?: boolean | null
+          subject_inputs?: Json
+          tenant_id?: string
+          top_group_share?: number | null
+          top_rooftop_share?: number | null
+          total_with_mandatory_add_ons?: number | null
+          valuation_input_fingerprint?: string | null
+          vehicle_comparison_price?: number | null
+          vehicle_file_id?: string | null
+          verdict?: string
+          verdict_tone?: string
+          vin?: string
+          winning_tier?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_market_valuations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_market_valuations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_snapshots: {
         Row: {
           affected_families: string[]
@@ -10185,6 +10741,13 @@ export type Database = {
         }
         Returns: string
       }
+      admin_purge_tenant_market_evidence: {
+        Args: { p_reason: string; p_tenant_id: string }
+        Returns: {
+          comparables_deleted: number
+          valuations_deleted: number
+        }[]
+      }
       admin_set_member_role: {
         Args: { _member_id: string; _role: string }
         Returns: boolean
@@ -10959,6 +11522,34 @@ export type Database = {
       mark_vehicle_retail_ready: {
         Args: { p_note?: string; p_vehicle_id: string }
         Returns: Json
+      }
+      market_complete_provider_call: {
+        Args: {
+          p_actual_cost?: number
+          p_attempt_id: string
+          p_failure_reason?: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      market_reserve_provider_call: {
+        Args: {
+          p_fingerprint: string
+          p_provider: string
+          p_tenant_id: string
+          p_ttl_seconds?: number
+        }
+        Returns: {
+          attempt_id: string
+          estimated_cost_usd: number
+          month_budget_usd: number
+          month_spent_usd: number
+          outcome: string
+        }[]
+      }
+      market_valuation_commit: {
+        Args: { p_comparables: Json; p_valuation: Json }
+        Returns: string
       }
       marketcheck_clear_scope: {
         Args: { _tenant_id: string }
