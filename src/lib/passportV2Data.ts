@@ -3,6 +3,7 @@ import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView
 import { resolveDisplayPrice, getPriceDisplayMode, buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
 import { DEFAULT_APR_PERCENT, getPaymentDisplay, buildPaymentAssumptions } from "@/lib/affordability";
 import type { OemFactoryWarranty } from "@/lib/oemWarranty";
+import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
 
 // The OEM coverage breakdown public-listing-view attaches to a new/CPO listing.
 export type OemWarrantyView = Partial<OemFactoryWarranty> & { owner?: "original" | "subsequent" };
@@ -227,6 +228,13 @@ export interface PassportData {
   marketLow: number | null;
   marketHigh: number | null;
   belowMarket: number | null;
+  /**
+   * The other side of the same subtraction, exposed so the Passport page does
+   * not perform its own. Ungated: the two places that render it apply their
+   * own `marketBasisWeak` rule, and moving that rule here would change what
+   * the locked page shows.
+   */
+  aboveMarket: number | null;
   // True when marketAvg came from the legacy model-wide comps median —
   // mileage- and trim-blind, so no customer-facing over/under-market claim
   // may render from it. The VIN-level predict and the like-for-like comps
@@ -546,9 +554,23 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // On a weak basis there is no belowMarket at all — every downstream claim
   // ("$X Below Market" chip, why-buy line, Great Price badge, card scoring)
   // flows from this one value, so nulling it here gates them all.
+  // The subtraction is in src/lib/market/surfaceCompat.ts, which is now the
+  // only place in the app that compares a price to a market value. The number
+  // is unchanged: this surface still compares its own resolved `price`, which
+  // on a default-mode tenant is the fee-EXCLUDED figure while the inventory
+  // grid uses the fee-included one. That divergence is recorded, not fixed
+  // here — the shadow report counts it and Gate 14 decides.
+  const passportMarketView = legacyMarketView(
+    listing as unknown as LegacyListingFields,
+    "passport",
+    { comparePrice: price },
+  );
   const belowMarket = marketBasisWeak ? null : marketAvg != null
-    ? (price != null && price < marketAvg ? marketAvg - price : null)
+    ? (passportMarketView.difference != null && passportMarketView.difference < 0
+        ? -passportMarketView.difference : null)
     : (mp.belowMarket as number) ?? null;
+  const aboveMarket = passportMarketView.difference != null && passportMarketView.difference > 250
+    ? passportMarketView.difference : null;
   // Server-resolved price label (public-listing-view resolves the dealer's
   // price_label setting + dealership name into a string). Legacy snapshots may
   // carry it on dealer_snapshot; default is "Our Price".
@@ -808,7 +830,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     docFee, websiteSalePrice, priceMode, priceIncludesDoc, priceBreakdown,
     dealerDiscount: lp.dealer_discount ?? null, retailCash: lp.retail_cash ?? null,
     recon: (listing as unknown as { recon?: PassportData["recon"] }).recon ?? null,
-    marketAvg, marketLow, marketHigh, belowMarket, marketBasisWeak,
+    marketAvg, marketLow, marketHigh, belowMarket, aboveMarket, marketBasisWeak,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
     ownerCount, accidentCount, cleanTitle, titleStatus, titleVerifiedAt, titleVerifiedSource, titlePolicyAttested, titlePolicyAttestedBy, serviceCount, recall, recallClear, openRecalls, hasRecallCheck,

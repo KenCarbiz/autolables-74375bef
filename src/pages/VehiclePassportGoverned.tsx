@@ -917,7 +917,7 @@ export default function VehiclePassportGoverned() {
               <div className={`${CARD} mt-3 p-4`}>
                 <div className="grid grid-cols-3 gap-3">
                   <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Analyzed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "nearby"}</div></div>
-                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>vs market</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : d.marketAvg != null && price != null && price - d.marketAvg > 250 ? fmt$(price - d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below value" : "vs value"}</div></div>
+                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>vs market</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : d.aboveMarket != null ? fmt$(d.aboveMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below value" : "vs value"}</div></div>
                   <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Days listed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.dom != null ? d.dom : d.marketMeta.avgDom != null ? d.marketMeta.avgDom : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.dom != null ? "this car" : "market avg"}</div></div>
                 </div>
                 <div className="mt-4">
@@ -1251,7 +1251,9 @@ export default function VehiclePassportGoverned() {
         // rounding tolerance), used by the Market Comparison module. Null when at
         // or below market — and always null on a weak (mileage/trim-blind) basis,
         // which may never assert the car is priced above its market.
-        const aboveMarket = !d.marketBasisWeak && price != null && d.marketAvg != null && price - d.marketAvg > 250 ? price - d.marketAvg : null;
+        // Same number, same weak-basis gate; the subtraction now comes from
+        // the shared market view instead of being repeated here.
+        const aboveMarket = !d.marketBasisWeak ? d.aboveMarket : null;
         // ── Phase E view models (governed, presentation-only) ──
         const mc = resolveMarketComparison({
           valueHistory: d.valueHistory, advertisedPrice: price, normalizedMarketValue: d.marketBasisWeak ? null : d.marketAvg,

@@ -22,6 +22,7 @@ import {
   AlertCircle, ShieldAlert, TrendingUp, Gauge, Rocket,
 } from "lucide-react";
 import SharedEmptyState from "@/components/ui/empty-state";
+import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
 
 // ──────────────────────────────────────────────────────────────
@@ -417,7 +418,9 @@ const InventoryModern = () => {
       openRecallsTotal += rv.vin.openCount ?? rv.model?.campaignCount ?? (openR ? 1 : 0);
       if (openR) openRecallVehicles++;
       if (!s.hasAddendum || s.needsPriceVerify || openR) needsAttention++;
-      if (r.market_value && r.price) { marketSum += (Number(r.market_value) - r.price); marketCount++; }
+      // One market subtraction for the whole app: src/lib/market/surfaceCompat.
+      const mv = legacyMarketView(r as LegacyListingFields, "dealer_inventory");
+      if (mv.marketP50 != null && mv.difference != null) { marketSum += -mv.difference; marketCount++; }
       readinessSum += rowReadiness(r);
     }
     const total = rows.length;

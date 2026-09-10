@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveMarketDaysDisplay, type MarketDaysMetrics } from "./daysMetrics";
+import { resolveMarketDaysDisplay, type MarketDaysMetrics } from "./daysMetrics.ts";
 
 const base: MarketDaysMetrics = {
   subjectVehicle: { firstSeenAt: "2026-07-02", dealerInventoryStartAt: "2026-07-02", currentListingAgeDays: 17, source: "dealer_feed" },

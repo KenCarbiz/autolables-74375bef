@@ -1,5 +1,6 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
+import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
 
 // ──────────────────────────────────────────────────────────────────────
 // Shopper-facing vehicle insights — turns the MarketCheck enrichment and
@@ -34,10 +35,16 @@ export function vehicleInsights(l: VehicleListing): VehicleInsight[] {
   const out: VehicleInsight[] = [];
 
   // Below market — the strongest shopper signal we have.
-  const mv = l.market_value != null ? Number(l.market_value) : null;
-  const price = l.price != null ? Number(l.price) : null;
-  if (mv != null && price != null && mv - price >= 250) {
-    const delta = Math.round(mv - price);
+  //
+  // The subtraction itself lives in src/lib/market/surfaceCompat.ts. This file
+  // used to do its own, against `l.price`, which is a third answer to the same
+  // question the inventory grid and the Passport were each answering
+  // differently. The arithmetic is unchanged; it just has one home now.
+  const marketView = legacyMarketView(l as LegacyListingFields, "trust_badge");
+  const mv = marketView.marketP50;
+  const belowBy = marketView.difference != null ? -marketView.difference : null;
+  if (mv != null && belowBy != null && belowBy >= 250) {
+    const delta = Math.round(belowBy);
     out.push({
       id: "below-market",
       label: `$${delta.toLocaleString()} below market`,
