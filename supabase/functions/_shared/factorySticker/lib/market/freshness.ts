@@ -33,14 +33,37 @@ export type ProviderAttemptOutcome =
   | "rate_limited"
   | "server_error"
   | "network_error"
+  /** 401. The credential is wrong or expired. */
+  | "auth_failed"
+  /** 403. The credential is fine; the plan does not include this endpoint. */
+  | "not_entitled"
+  /** 400/422. The request itself is malformed or refused on its merits. */
+  | "request_rejected"
   | "not_attempted";
 
 export const TRANSIENT_OUTCOMES: ProviderAttemptOutcome[] = [
   "timeout", "rate_limited", "server_error", "network_error",
 ];
 
+/**
+ * Failures that repeating the identical request cannot fix.
+ *
+ * These are separated from the transient set so a retry scheduler can tell
+ * "the provider fell over" from "we are not allowed to ask this question".
+ * Retrying the second kind spends money to receive the same refusal.
+ */
+export const PERMANENT_OUTCOMES: ProviderAttemptOutcome[] = [
+  "auth_failed", "not_entitled", "request_rejected",
+];
+
 export const isTransientFailure = (o: ProviderAttemptOutcome): boolean =>
   TRANSIENT_OUTCOMES.includes(o);
+
+export const isPermanentFailure = (o: ProviderAttemptOutcome): boolean =>
+  PERMANENT_OUTCOMES.includes(o);
+
+export const isFailedAttempt = (o: ProviderAttemptOutcome): boolean =>
+  isTransientFailure(o) || isPermanentFailure(o);
 
 export interface FreshnessInput {
   /** Age of the stored provider answer, in days. Null when there is none. */
@@ -69,10 +92,15 @@ export interface FreshnessDecision {
 export function resolveProviderFreshness(input: FreshnessInput): FreshnessDecision {
   const reasons: string[] = [];
 
-  // Every attempt is auditable, including the ones that failed.
-  if (isTransientFailure(input.attemptOutcome)) {
+  // Every attempt is auditable, including the ones that failed. A failed
+  // attempt of either kind leaves the stored answer standing; the difference
+  // is only whether waiting will help.
+  if (isFailedAttempt(input.attemptOutcome)) {
     reasons.push(`provider_attempt_${input.attemptOutcome}`);
     reasons.push("failed_attempt_did_not_replace_last_good");
+    if (isPermanentFailure(input.attemptOutcome)) {
+      reasons.push("provider_failure_will_not_self_resolve");
+    }
   }
 
   // Hard overrides first. These are not staleness; the stored answer is about

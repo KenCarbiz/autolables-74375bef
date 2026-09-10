@@ -32,6 +32,9 @@ import { resolveProviderFreshness, type ProviderAttemptOutcome } from "../_share
 import { decideReuse } from "../_shared/factorySticker/lib/market/fingerprints.ts";
 import { legacyComparableToCandidate } from "../_shared/factorySticker/lib/market/legacyAdapter.ts";
 import { readMarketFlag } from "../_shared/factorySticker/lib/market/flags.ts";
+import {
+  callProviderOnce, failureReason, type ProviderFetch,
+} from "../_shared/factorySticker/lib/market/providerTransport.ts";
 import { PROVIDER_FRESH_DAYS, PROVIDER_HARD_EXPIRY_DAYS } from "../_shared/factorySticker/lib/market/freshness.ts";
 import type { ProviderValuation } from "../_shared/factorySticker/lib/market/types.ts";
 
@@ -51,26 +54,10 @@ const num = (v: any): number | null => {
 /**
  * One provider call, classified.
  *
- * The distinction between a transient failure and a real answer is the whole
- * point: a timeout must leave yesterday's valid prediction standing, and must
- * still be written down as an attempt that happened.
+ * The transport itself lives in the shared engine so it can be exercised by
+ * unit tests with an injected fetch. This wrapper only supplies the real one.
  */
-async function callProvider(url: string): Promise<{
-  outcome: ProviderAttemptOutcome;
-  status: number | null;
-  body: unknown;
-}> {
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-    if (res.status === 429) return { outcome: "rate_limited", status: 429, body: null };
-    if (res.status >= 500) return { outcome: "server_error", status: res.status, body: null };
-    if (!res.ok) return { outcome: "server_error", status: res.status, body: null };
-    return { outcome: "succeeded", status: res.status, body: await res.json().catch(() => null) };
-  } catch (e) {
-    const message = String((e as Error)?.name || e);
-    return { outcome: message.includes("Timeout") ? "timeout" : "network_error", status: null, body: null };
-  }
-}
+const callProvider = (url: string) => callProviderOnce(url, fetch as unknown as ProviderFetch, REQUEST_TIMEOUT_MS);
 
 Deno.serve(async (req) => {
   const pf = preflight(req);
@@ -214,7 +201,7 @@ Deno.serve(async (req) => {
         p_attempt_id: attemptId,
         p_status: result.outcome === "succeeded" ? "succeeded" : "failed",
         p_actual_cost: null,
-        p_failure_reason: result.outcome === "succeeded" ? null : result.outcome,
+        p_failure_reason: result.outcome === "succeeded" ? null : failureReason(result.outcome, result.status),
       });
     } else {
       // Budget exhausted, provider disabled, or another caller already holds
