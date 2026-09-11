@@ -22,7 +22,12 @@ import { readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 
 const MIGRATIONS = "supabase/migrations";
-const REPAIR = `${MIGRATIONS}/20260911020000_market_reserve_qualify_out_param_collision.sql`;
+// The runner-generated name is the record of truth: Lovable's managed
+// migration runner assigned it when the migration was applied, and it is what
+// supabase_migrations.schema_migrations holds. The file this repair was
+// authored under (20260911020000_...) was never applied under that name and
+// is gone, forward-only.
+const REPAIR = `${MIGRATIONS}/20260911024610_5e46c53a-e086-4c0e-8efd-2ce800297a38.sql`;
 const WRITER = "supabase/functions/market-valuation-write/index.ts";
 
 const read = (p: string) => readFileSync(p, "utf8");
@@ -149,7 +154,7 @@ describe("the historical migrations are untouched", () => {
     // The original definition, and this repair. Nothing else.
     expect(mentions.sort()).toEqual([
       "20260910140209_d9884db9-8fc7-4d63-bd50-b5e2ba5e5002.sql",
-      "20260911020000_market_reserve_qualify_out_param_collision.sql",
+      "20260911024610_5e46c53a-e086-4c0e-8efd-2ce800297a38.sql",
     ]);
   });
 });
