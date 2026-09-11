@@ -541,6 +541,9 @@ describe("edge function gateway configuration", () => {
       "packet-backfill": true,
       "oem-document-store": true,
       "market-valuation-write": false,
+      // Signal House mints no Supabase JWT; the function authenticates the
+      // delivery itself against SIGNALHOUSE_WEBHOOK_SECRET.
+      "signalhouse-webhook": false,
     });
   });
 

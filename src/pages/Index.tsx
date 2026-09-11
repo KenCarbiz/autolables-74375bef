@@ -1211,8 +1211,8 @@ const Index = () => {
     toast.success(`Signing link emailed to ${toEmail}`);
   };
 
-  // Text the guided-review link via Twilio (falls back to a local queue
-  // until Twilio is configured).
+  // Text the guided-review link via Signal House (falls back to a local queue
+  // until Signal House is configured).
   const sendSigningSms = async (phone: string) => {
     const res = await sendSigningLink(phone, signingUrl, vehicle.ymm || "your vehicle");
     if (res.success) toast.success(res.message);

@@ -146,7 +146,7 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
       "Deal jacket + email distribution",
       "DMS webhooks (vAuto / VinSolutions / CDK / Reynolds)",
       "Black Book + OEM factory build sheet",
-      "SMS delivery (Twilio)",
+      "SMS delivery (Signal House)",
       "Dedicated success manager",
     ],
   },

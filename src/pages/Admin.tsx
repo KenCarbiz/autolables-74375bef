@@ -1620,7 +1620,7 @@ const Admin = () => {
               <div className="space-y-2 text-xs">
                 <IntegrationRow label="AI Descriptions (Claude)" secretKey="ANTHROPIC_API_KEY" feature={settings.feature_ai_descriptions} />
                 <IntegrationRow label="Email Distribution" secretKey="RESEND_API_KEY or SENDGRID_API_KEY" feature={settings.feature_sms} />
-                <IntegrationRow label="SMS (Twilio)" secretKey="TWILIO_API_KEY" feature={settings.feature_sms} />
+                <IntegrationRow label="SMS (Signal House)" secretKey="SIGNALHOUSE_API_KEY" feature={settings.feature_sms} />
                 <IntegrationRow label="OEM Build Sheet (DataOne)" secretKey="DATAONE_API_KEY" feature={false} />
                 <IntegrationRow label="Black Book Market Data" secretKey="BLACKBOOK_API_KEY" feature={settings.feature_blackbook} />
                 <IntegrationRow label="Zebra CloudPrint" secretKey="ZEBRA_API_KEY" feature={false} />

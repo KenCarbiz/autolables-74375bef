@@ -10,6 +10,16 @@ verify_jwt = false
 [functions.vehicle-lookup]
 verify_jwt = false
 
+# signalhouse-webhook receives inbound texts and delivery receipts from Signal
+# House, which mints no Supabase JWT, so the gateway default would 401 every
+# delivery before the handler ran. The function is not public: it fails closed
+# without SIGNALHOUSE_WEBHOOK_SECRET and compares the X-Api-Key header before
+# reading the body. That secret is the only control available — Signal House
+# does not sign webhook payloads — so the handler treats every event as a claim
+# to be recorded, never as authority to change anything irreversible.
+[functions.signalhouse-webhook]
+verify_jwt = false
+
 # autofilm-feed is the sister-app inventory feed, authenticated by the same
 # shared secret header vehicle-lookup uses (x-lookup-secret, or x-autofilm-key).
 # AutoFilm sends no Authorization header and mints no Supabase JWT, so leaving

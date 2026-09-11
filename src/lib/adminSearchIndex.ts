@@ -70,7 +70,7 @@ export const ADMIN_SETTINGS_INDEX: SettingEntry[] = [
   e("Require Install Verification", "settings", ["install proof", "install verification", "photo signature gate"], "feed-automation"),
   e("Detail Dispatch", "settings", ["detail shop", "detail email", "get ready dispatch", "recon dispatch"], "feed-automation"),
   e("Installer Notifications", "settings", ["third party installers", "auto notify", "preinstall"], "feed-automation"),
-  e("Integration Status", "settings", ["integrations", "twilio", "sms", "resend", "sendgrid", "anthropic", "black book", "zebra", "dataone", "removebg"], "integrations"),
+  e("Integration Status", "settings", ["integrations", "signal house", "signalhouse", "sms", "resend", "sendgrid", "anthropic", "black book", "zebra", "dataone", "removebg"], "integrations"),
 
   // Pricing controls (Pricing & Incentives tab)
   e("Doc Fee", "incentives", ["doc fee", "documentation fee", "dealer fee", "conveyance fee", "state fee cap"], "doc-fee"),
@@ -98,7 +98,7 @@ export const ADMIN_SETTINGS_INDEX: SettingEntry[] = [
   toggle("Installer Invoicing", ["invoices", "installations"]),
   toggle("Warranty Tracking", ["warranty registrations"]),
   toggle("Analytics Dashboard", ["acceptance rates", "revenue metrics"]),
-  toggle("SMS Delivery", ["text message", "twilio"]),
+  toggle("SMS Delivery", ["text message", "signal house", "signalhouse"]),
   toggle("Black Book Data", ["factory equipment", "market data"]),
 ];
 

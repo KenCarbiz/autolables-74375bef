@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { sendSignalHouseSms } from "../_shared/signalhouse.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,29 +20,14 @@ const hashCode = (requestId: string, phone: string, code: string) => sha256(`${r
 const newCode = () => `${Math.floor(100000 + Math.random() * 900000)}`;
 
 const sendSms = async (to: string, body: string) => {
-  const provider = Deno.env.get("PASSPORT_SMS_PROVIDER") || "twilio";
+  const provider = Deno.env.get("PASSPORT_SMS_PROVIDER") || "signalhouse";
 
   if (provider === "disabled") {
-    return { provider, skipped: true };
+    return { provider, messageId: null, skipped: true };
   }
 
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const from = Deno.env.get("TWILIO_FROM_NUMBER");
-  if (!accountSid || !authToken || !from) throw new Error("Twilio SMS credentials are not configured");
-
-  const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-    },
-    body: new URLSearchParams({ To: to, From: from, Body: body }),
-  });
-
-  const json = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`Twilio failed: ${response.status} ${JSON.stringify(json)}`);
-  return { provider, messageId: json.sid || null };
+  const sent = await sendSignalHouseSms(to, body);
+  return { provider: sent.provider, messageId: sent.messageId };
 };
 
 serve(async (req) => {

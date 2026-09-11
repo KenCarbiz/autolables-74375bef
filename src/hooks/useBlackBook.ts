@@ -45,7 +45,7 @@ export const useBlackBook = () => {
 
       const result: BlackBookData = {
         standardEquipment: [
-          "Connect Twilio & Black Book API keys in Admin > Integrations to activate live data.",
+          "Connect Signal House & Black Book API keys in Admin > Integrations to activate live data.",
           "Standard equipment, optional equipment, and live market values will auto-populate from Black Book.",
         ],
         optionalEquipment: [],

@@ -7,8 +7,8 @@ interface SmsResult {
   message: string;
 }
 
-// Twilio-ready SMS hook. In production, this calls a Supabase Edge Function
-// that forwards to Twilio. For now, it logs the intent and stores for later.
+// SMS hook. In production this calls a Supabase Edge Function that forwards to
+// Signal House. Until that is configured, it queues the intent locally.
 export const useSmsDelivery = () => {
   const [sending, setSending] = useState(false);
   const [lastResult, setLastResult] = useState<SmsResult | null>(null);
@@ -28,8 +28,8 @@ export const useSmsDelivery = () => {
 
     const message = `Review & sign your ${vehicleInfo} addendum: ${signingUrl}`;
 
-    // Try the live Twilio path first. Fall back to the local queue if the
-    // function isn't deployed or Twilio isn't configured yet.
+    // Try the live Signal House path first. Fall back to the local queue if
+    // the function isn't deployed or Signal House isn't configured yet.
     try {
       const { data, error } = await supabase.functions.invoke("send-sms", {
         body: { to: cleaned, body: message },
@@ -57,7 +57,7 @@ export const useSmsDelivery = () => {
     localStorage.setItem(queueKey, JSON.stringify(smsQueue));
 
     setSending(false);
-    const result = { success: true, message: `Queued for ${formatPhone(cleaned)}. Connect Twilio to send live.` };
+    const result = { success: true, message: `Queued for ${formatPhone(cleaned)}. Connect Signal House to send live.` };
     setLastResult(result);
     return result;
   };
