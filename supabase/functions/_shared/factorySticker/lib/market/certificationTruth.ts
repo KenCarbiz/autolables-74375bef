@@ -200,3 +200,130 @@ export function isCertificationRegression(
 ): boolean {
   return before === "certified" && after !== "certified";
 }
+
+// ── Reading and writing the stored certification record ────────────────────
+//
+// `vehicle_listings.certification` is the column that already holds this:
+//
+//   { certified: true, source: "dealer_vdp", verified_at: "..." }
+//
+// written today by `crawl-advertised-prices` when it reads a CPO badge off
+// the dealer's own VDP, and deliberately gap-fill only — it never overwrites a
+// record that already has a source.
+//
+// `vehicle_listings.condition` is NOT a peer of that record. `marketcheck-sync`
+// derives it with `classifyCondition({ inventoryType, certified: is_certified })`,
+// so `condition === "cpo"` is MarketCheck's answer wearing our column name.
+// Treating it as authoritative would let the provider corroborate itself, and
+// then a provider `false` would be arguing with its own earlier `true`.
+
+export interface StoredCertification {
+  certified?: unknown;
+  source?: unknown;
+  program_name?: unknown;
+  verified_at?: unknown;
+  provider_echo?: unknown;
+  provider_conflict?: unknown;
+  provider_quarantined?: unknown;
+  resolved_at?: unknown;
+  [key: string]: unknown;
+}
+
+/** What a stored `certification.source` is worth. */
+export function authorityForStoredSource(source: unknown): CertificationAuthority {
+  const s = typeof source === "string" ? source.trim().toLowerCase() : "";
+  if (s === "manufacturer" || s === "oem") return "manufacturer";
+  if (s === "dealer_vdp" || s === "dealer" || s === "dealer_confirmed") return "dealer_confirmed";
+  if (s === "marketcheck" || s === "feed" || s === "provider") return "provider_derived";
+  return "none";
+}
+
+/**
+ * Build the internal record from the columns a listing row actually carries.
+ *
+ * The stored record wins when it has one. Otherwise `condition` supplies a
+ * state with `provider_derived` authority, which `resolveCertification` will
+ * decline to promote — an honest "unknown" rather than a laundered feed value.
+ */
+export function internalCertificationFromRow(row: {
+  certification?: StoredCertification | null;
+  condition?: unknown;
+}): InternalCertificationRecord {
+  const stored = row.certification ?? null;
+  const storedFlag = stored ? readProviderCertification(stored.certified) : { value: null, malformed: false };
+  if (stored && storedFlag.value !== null) {
+    return {
+      state: storedFlag.value ? "certified" : "not_certified",
+      authority: authorityForStoredSource(stored.source),
+      program: typeof stored.program_name === "string" ? stored.program_name : null,
+    };
+  }
+
+  const condition = typeof row.condition === "string" ? row.condition.trim().toLowerCase() : "";
+  if (condition === "cpo") return { state: "certified", authority: "provider_derived", program: null };
+  if (condition === "new" || condition === "used") {
+    return { state: "not_certified", authority: "provider_derived", program: null };
+  }
+  return { state: "unknown", authority: "none", program: null };
+}
+
+const sameValue = (a: unknown, b: unknown): boolean => (a ?? null) === (b ?? null);
+
+/**
+ * The record to store, or null when nothing should be written.
+ *
+ * Three rules, in order:
+ *
+ *   1. NEVER DOWNGRADE. A sweep that would move a stored `certified: true` to
+ *      false or unknown writes nothing at all. This is the nightly regression
+ *      the QX50 suffered, refused at the last place it could be.
+ *   2. NEVER INVENT. With no stored record and nothing authoritative to say,
+ *      there is no row to write — an empty record asserting "unknown" is still
+ *      a claim that someone looked and decided.
+ *   3. NEVER CHURN. An unchanged answer returns null, so a nightly sweep does
+ *      not rewrite the same row 365 times and bury the day it did change.
+ *
+ * The provider's raw answer is recorded beside the resolved one, never in
+ * place of it, so `certified` and `provider_echo` can disagree on the row and
+ * an operator can see that they do.
+ */
+export function mergeResolvedCertification(
+  prior: StoredCertification | null | undefined,
+  resolution: CertificationResolution,
+  now: string,
+): StoredCertification | null {
+  const before = prior ?? null;
+  const priorFlag = before ? readProviderCertification(before.certified) : { value: null, malformed: false };
+  const priorState: CertificationState = priorFlag.value === null
+    ? "unknown"
+    : priorFlag.value ? "certified" : "not_certified";
+
+  // Rule 1.
+  if (isCertificationRegression(priorState, resolution.certified)) return null;
+
+  // Rule 2.
+  if (!before && resolution.certified === "unknown" && resolution.providerEcho === null) return null;
+
+  const next: StoredCertification = {
+    ...(before ?? {}),
+    certified: resolution.certified === "unknown" ? (before?.certified ?? null) : resolution.certified === "certified",
+    provider_echo: resolution.providerEcho,
+    provider_conflict: resolution.conflict,
+    provider_quarantined: resolution.quarantineProviderAttribute,
+    resolved_at: now,
+  };
+
+  // An authoritative record keeps its own provenance. Resolution does not
+  // reattribute who said the car was certified.
+  if (before?.source) next.source = before.source;
+  else if (resolution.authority !== "none") next.source = resolution.authority;
+  if (resolution.program && !before?.program_name) next.program_name = resolution.program;
+
+  // Rule 3: compare everything except the timestamp.
+  if (before && ["certified", "provider_echo", "provider_conflict", "provider_quarantined", "source", "program_name"]
+    .every((k) => sameValue(before[k], next[k]))) {
+    return null;
+  }
+
+  return next;
+}

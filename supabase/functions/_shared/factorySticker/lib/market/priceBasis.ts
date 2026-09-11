@@ -594,8 +594,13 @@ export function resolveDocFeeTreatment(settings: unknown): DocFeeTreatment {
 //   $42,981  internal fee-exclusive comparison basis. Apples-to-apples against
 //            a provider that prices the vehicle and not the fee.
 //
-// Two ways to get this wrong, both of which produce a real number that looks
-// plausible on a page:
+// Neither number is a TRANSACTION TOTAL. Both sit before sales tax, title,
+// registration and every other government charge, so neither can be called a
+// drive-out price, an out-the-door price or a total due. Every dealer fee is
+// inside the advertised one; nothing governmental is.
+//
+// Two ways to get the arithmetic wrong, both of which produce a real number
+// that looks plausible on a page:
 //
 //   $44,771 = $43,876 + $895   the fee counted twice
 //   $42,981 shown as the price  the internal basis leaked to a customer
@@ -618,8 +623,23 @@ export interface AdvertisedPriceSplit {
    * a total, a payment basis or a discount anchor.
    */
   internalComparisonPrice: number | null;
-  /** Equals `customerAdvertisedPrice`, always. Present so the identity is assertable. */
-  customerTotalDue: number | null;
+  /**
+   * The advertised price with every DEALER fee already inside it. Equals
+   * `customerAdvertisedPrice`, always — present so the identity is assertable.
+   *
+   * NOT a transaction total. It excludes sales tax, title, registration and
+   * every other government charge, so it cannot answer "what do I write the
+   * cheque for". This field was called `customerTotalDue`, which said exactly
+   * that and was wrong: a name that overstates what a number covers is the
+   * same class of error as the arithmetic this module exists to prevent.
+   */
+  advertisedPriceIncludingDealerFees: number | null;
+  /**
+   * Always true here. Stated as a field rather than left to a comment so a
+   * surface rendering this number cannot claim it is a drive-out price without
+   * contradicting the data it rendered from.
+   */
+  excludesGovernmentCharges: boolean;
   reasons: string[];
 }
 
@@ -641,11 +661,14 @@ export function splitAdvertisedPrice(basis: MarketPriceBasis): AdvertisedPriceSp
   // `resolvePriceBasis` already folded the fee into `displayedTotalPrice` on
   // both branches, so the customer's total is that number on both branches
   // too. Writing it as a second addition is the double count.
+  reasons.push("advertised_price_excludes_government_charges");
+
   return {
     customerAdvertisedPrice: advertisedToCustomer,
     documentationFeeInsideAdvertisedPrice: feeInside,
     internalComparisonPrice: basis.vehicleComparisonPrice,
-    customerTotalDue: advertisedToCustomer,
+    advertisedPriceIncludingDealerFees: advertisedToCustomer,
+    excludesGovernmentCharges: true,
     reasons,
   };
 }

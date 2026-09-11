@@ -160,8 +160,19 @@ describe("the Harte QX50 price identity", () => {
 
   it("keeps the customer-advertised price at $43,876", () => {
     expect(split.customerAdvertisedPrice).toBe(ADVERTISED);
-    expect(split.customerTotalDue).toBe(ADVERTISED);
+    expect(split.advertisedPriceIncludingDealerFees).toBe(ADVERTISED);
     expect(basis.displayedTotalPrice).toBe(ADVERTISED);
+  });
+
+  it("does not claim $43,876 is a transaction total", () => {
+    // Every DEALER fee is inside it; no government charge is. Sales tax, title
+    // and registration all sit outside, so this is not a drive-out price and
+    // must not be named as one.
+    expect(split.excludesGovernmentCharges).toBe(true);
+    expect(split.reasons).toContain("advertised_price_excludes_government_charges");
+    expect(Object.keys(split)).not.toContain("customerTotalDue");
+    expect(Object.keys(split)).not.toContain("totalDue");
+    expect(Object.keys(split)).not.toContain("outTheDoorPrice");
   });
 
   it("itemizes the $895 fee INSIDE that price", () => {
@@ -188,7 +199,7 @@ describe("the Harte QX50 price identity", () => {
     const everyNumber = [
       basis.displayedTotalPrice, basis.vehicleComparisonPrice, basis.advertisedPriceBeforeDoc,
       basis.totalWithMandatoryAddOns, basis.docFee, basis.mandatoryDealerAddOns,
-      split.customerAdvertisedPrice, split.customerTotalDue,
+      split.customerAdvertisedPrice, split.advertisedPriceIncludingDealerFees,
       split.internalComparisonPrice, split.documentationFeeInsideAdvertisedPrice,
     ];
     for (const n of everyNumber) expect(n).not.toBe(DOUBLE_COUNTED);
@@ -253,8 +264,8 @@ describe("the polarity tamper guards", () => {
     const split = splitAdvertisedPrice(excludesDealer);
     expect(split.documentationFeeInsideAdvertisedPrice).toBeNull();
     expect(split.reasons).toContain("documentation_fee_outside_advertised_price");
-    // And still no second addition: the total is the displayed total, once.
-    expect(split.customerTotalDue).toBe(split.customerAdvertisedPrice);
+    // And still no second addition: the fee is counted once.
+    expect(split.advertisedPriceIncludingDealerFees).toBe(split.customerAdvertisedPrice);
     expect(split.customerAdvertisedPrice).toBe(ADVERTISED);
   });
 

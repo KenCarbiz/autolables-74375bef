@@ -17,6 +17,10 @@ import {
   resolveNhtsaModelRecall,
   vinRecallColumns,
 } from "../_shared/recallState.ts";
+import {
+  internalCertificationFromRow, mergeResolvedCertification, resolveCertification,
+  type StoredCertification,
+} from "../_shared/factorySticker/lib/market/certificationTruth.ts";
 
 // ──────────────────────────────────────────────────────────────
 // vehicle-enrich — pull EVERYTHING for one VIN at ingest and persist it.
@@ -757,7 +761,7 @@ serve(async (req) => {
   }
 
   const { data: row } = await admin.from("vehicle_listings")
-    .select("id, vin, ymm, trim, condition, price, mileage, dealer_snapshot, market_meta, recall_status, mc_attributes, mc_raw, drivetrain:mc_attributes->>drivetrain")
+    .select("id, vin, ymm, trim, condition, certification, price, mileage, dealer_snapshot, market_meta, recall_status, mc_attributes, mc_raw, drivetrain:mc_attributes->>drivetrain")
     .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!row) return json(404, { error: "listing_not_found" });
   // What is already stored, so a pass that returns only part of the picture
@@ -899,6 +903,40 @@ serve(async (req) => {
     if (recalls.model) Object.assign(patch, modelRecallColumns(recalls.model));
   }
   if (blackbook) patch.blackbook = blackbook;
+
+  // ── CERTIFICATION SOURCE PRECEDENCE ───────────────────────────────────
+  //
+  // The QX50 is a CPO INFINITI whose customer-visible payload said
+  // `"is_certified": false`, regenerated nightly. This is the sweep that runs
+  // nightly, so this is where the regression has to be refused.
+  //
+  // Three states, not two. A provider that omits the field has said nothing,
+  // and a provider that says `false` is not overruling the dealer who
+  // certified the car. The rule is symmetric: a provider cannot confer
+  // certification either, because "certified" is a warranty claim with a
+  // manufacturer program behind it.
+  //
+  // The decision itself is in the pure, tested module — this is the call site,
+  // nothing more. It is ADDITIVE: it touches `certification` only, never the
+  // four market-verdict columns, and `mergeResolvedCertification` returns null
+  // (write nothing) rather than downgrade, invent or rewrite an unchanged row.
+  //
+  // Note what is deliberately NOT changed here: `carType` above still collapses
+  // cpo to `used` for the comparable search. Sending `is_certified` to the
+  // provider would change which comparables come back, which is a change to
+  // enrichment behaviour and a separate, priced decision.
+  const priorCertification = (row.certification ?? null) as StoredCertification | null;
+  const certification = resolveCertification({
+    internal: internalCertificationFromRow({
+      certification: priorCertification,
+      condition: row.condition,
+    }),
+    providerValue: (row.mc_raw as Record<string, unknown> | null)?.is_certified,
+  });
+  const certificationPatch = mergeResolvedCertification(
+    priorCertification, certification, new Date().toISOString(),
+  );
+  if (certificationPatch) patch.certification = certificationPatch;
 
   // Persist (each column already migrated; isolate so a missing column can't 500).
   try { await admin.from("vehicle_listings").update(patch).eq("id", row.id); } catch { /* column not migrated yet */ }
