@@ -4834,6 +4834,136 @@ export type Database = {
           },
         ]
       }
+      market_cohort_snapshots: {
+        Row: {
+          algorithm_version: string
+          certified_share: number | null
+          cohort_body_type: string | null
+          cohort_certified_class: string | null
+          cohort_drivetrain: string | null
+          cohort_hash: string
+          cohort_make: string | null
+          cohort_model: string | null
+          cohort_powertrain: string | null
+          cohort_radius_miles: number | null
+          cohort_rules_version: string
+          cohort_trim: string | null
+          cohort_vehicle_class: string | null
+          cohort_year: number | null
+          cohort_zip: string | null
+          created_at: string
+          eligible_observation_count: number
+          evidence_sufficiency: string
+          id: string
+          independent_rooftop_count: number
+          observation_p25: number | null
+          observation_p50: number | null
+          observation_p75: number | null
+          observations: Json
+          observed_at: string
+          own_rooftop_excluded_count: number
+          query_dimensions: Json
+          snapshot_fingerprint: string
+          snapshot_rules_version: string
+          source_endpoint_category: string
+          source_function: string
+          superseded_by: string | null
+          tenant_id: string
+        }
+        Insert: {
+          algorithm_version: string
+          certified_share?: number | null
+          cohort_body_type?: string | null
+          cohort_certified_class?: string | null
+          cohort_drivetrain?: string | null
+          cohort_hash: string
+          cohort_make?: string | null
+          cohort_model?: string | null
+          cohort_powertrain?: string | null
+          cohort_radius_miles?: number | null
+          cohort_rules_version: string
+          cohort_trim?: string | null
+          cohort_vehicle_class?: string | null
+          cohort_year?: number | null
+          cohort_zip?: string | null
+          created_at?: string
+          eligible_observation_count?: number
+          evidence_sufficiency: string
+          id?: string
+          independent_rooftop_count?: number
+          observation_p25?: number | null
+          observation_p50?: number | null
+          observation_p75?: number | null
+          observations?: Json
+          observed_at?: string
+          own_rooftop_excluded_count?: number
+          query_dimensions?: Json
+          snapshot_fingerprint: string
+          snapshot_rules_version: string
+          source_endpoint_category: string
+          source_function: string
+          superseded_by?: string | null
+          tenant_id: string
+        }
+        Update: {
+          algorithm_version?: string
+          certified_share?: number | null
+          cohort_body_type?: string | null
+          cohort_certified_class?: string | null
+          cohort_drivetrain?: string | null
+          cohort_hash?: string
+          cohort_make?: string | null
+          cohort_model?: string | null
+          cohort_powertrain?: string | null
+          cohort_radius_miles?: number | null
+          cohort_rules_version?: string
+          cohort_trim?: string | null
+          cohort_vehicle_class?: string | null
+          cohort_year?: number | null
+          cohort_zip?: string | null
+          created_at?: string
+          eligible_observation_count?: number
+          evidence_sufficiency?: string
+          id?: string
+          independent_rooftop_count?: number
+          observation_p25?: number | null
+          observation_p50?: number | null
+          observation_p75?: number | null
+          observations?: Json
+          observed_at?: string
+          own_rooftop_excluded_count?: number
+          query_dimensions?: Json
+          snapshot_fingerprint?: string
+          snapshot_rules_version?: string
+          source_endpoint_category?: string
+          source_function?: string
+          superseded_by?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_cohort_snapshots_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "market_cohort_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_cohort_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_cohort_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       market_provider_budgets: {
         Row: {
           created_at: string
@@ -9705,6 +9835,7 @@ export type Database = {
           mandatory_add_ons_included_in_displayed_price: boolean | null
           mandatory_dealer_add_ons: number | null
           market_floor: number | null
+          market_snapshot_id: string | null
           model_versions: Json
           price_basis_reasons: string[]
           price_basis_status: string
@@ -9774,6 +9905,7 @@ export type Database = {
           mandatory_add_ons_included_in_displayed_price?: boolean | null
           mandatory_dealer_add_ons?: number | null
           market_floor?: number | null
+          market_snapshot_id?: string | null
           model_versions?: Json
           price_basis_reasons?: string[]
           price_basis_status: string
@@ -9843,6 +9975,7 @@ export type Database = {
           mandatory_add_ons_included_in_displayed_price?: boolean | null
           mandatory_dealer_add_ons?: number | null
           market_floor?: number | null
+          market_snapshot_id?: string | null
           model_versions?: Json
           price_basis_reasons?: string[]
           price_basis_status?: string
@@ -9880,6 +10013,13 @@ export type Database = {
           winning_tier?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "vehicle_market_valuations_market_snapshot_id_fkey"
+            columns: ["market_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "market_cohort_snapshots"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vehicle_market_valuations_tenant_id_fkey"
             columns: ["tenant_id"]
