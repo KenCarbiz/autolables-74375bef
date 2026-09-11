@@ -186,3 +186,110 @@ export const SHADOW_REVIEW_FORBIDDEN_FIELDS = [
   "api_key",
   "raw",
 ] as const;
+
+// ── Propagation, as an operator sees it ────────────────────────────────────
+//
+// A snapshot changed, some cars were reevaluated and others were not. The
+// interesting half is usually the rejections: "wrong drivetrain" and "equipment
+// unknown" are how you find out the cohort rules are doing their job, or that
+// a feed stopped decoding trims.
+//
+// Two numbers are constants rather than measurements, and they are shown
+// anyway: propagation causes ZERO provider calls and ZERO cost, by
+// construction. Displaying a constant beside real numbers is what makes it
+// checkable — an operator who ever sees a non-zero there knows immediately
+// that something is wrong, instead of having to trust that it cannot happen.
+
+export interface PropagationReviewRow {
+  cohortHash: string;
+  cohortLabel: string;
+  snapshotFingerprint: string;
+  observedAt: string | null;
+  /** How many vehicles the change was planned for. */
+  affectedCount: number;
+  materialChangeReasons: string[];
+  priorSufficiency: string | null;
+  currentSufficiency: string;
+  priorP50: number | null;
+  currentP50: number | null;
+  percentileMovement: number | null;
+  priorEligibleCount: number | null;
+  currentEligibleCount: number;
+  priorRooftopCount: number | null;
+  currentRooftopCount: number;
+  ownRooftopExcluded: number;
+  reevaluatedVins: string[];
+  rejected: Array<{ vin: string; reasons: string[] }>;
+  usedSharedEvidence: boolean;
+  /** Always 0. Shown so a non-zero is visible rather than impossible-in-theory. */
+  providerCallsCaused: number;
+  providerCostCaused: number;
+  audience: "internal_only";
+}
+
+export interface PropagationReviewInput {
+  cohort: {
+    hash: string;
+    year?: number | null;
+    make?: string | null;
+    model?: string | null;
+    trim?: string | null;
+    drivetrain?: string | null;
+    vehicleClass?: string | null;
+  };
+  snapshot: {
+    fingerprint: string;
+    observedAt?: string | null;
+    eligibleCount: number;
+    independentRooftopCount: number;
+    ownRooftopExcluded: number;
+    p50: number | null;
+  };
+  prior?: {
+    eligibleCount: number;
+    independentRooftopCount: number;
+    p50: number | null;
+    sufficiency: string;
+  } | null;
+  change: { reasons: string[]; currentSufficiency: string; percentileMovement: number | null };
+  plan: {
+    planned: Array<{ vin: string }>;
+    rejected: Array<{ vin: string; reasons: string[] }>;
+    providerCallsCaused: number;
+    providerCostCaused: number;
+    usedSharedEvidence: boolean;
+  };
+}
+
+/** A readable cohort label. No VIN, no price — the same discipline as the key. */
+export const cohortLabel = (c: PropagationReviewInput["cohort"]): string =>
+  [c.year, c.make, c.model, c.trim, c.drivetrain?.toUpperCase(), c.vehicleClass?.toUpperCase()]
+    .filter((p) => p != null && p !== "")
+    .join(" ") || "unknown cohort";
+
+export function buildPropagationReviewRow(input: PropagationReviewInput): PropagationReviewRow {
+  return {
+    cohortHash: input.cohort.hash,
+    cohortLabel: cohortLabel(input.cohort),
+    snapshotFingerprint: input.snapshot.fingerprint,
+    observedAt: input.snapshot.observedAt ?? null,
+    affectedCount: input.plan.planned.length,
+    materialChangeReasons: input.change.reasons,
+    priorSufficiency: input.prior?.sufficiency ?? null,
+    currentSufficiency: input.change.currentSufficiency,
+    priorP50: input.prior?.p50 ?? null,
+    currentP50: input.snapshot.p50,
+    percentileMovement: input.change.percentileMovement,
+    priorEligibleCount: input.prior?.eligibleCount ?? null,
+    currentEligibleCount: input.snapshot.eligibleCount,
+    priorRooftopCount: input.prior?.independentRooftopCount ?? null,
+    currentRooftopCount: input.snapshot.independentRooftopCount,
+    ownRooftopExcluded: input.snapshot.ownRooftopExcluded,
+    reevaluatedVins: input.plan.planned.map((p) => p.vin),
+    rejected: input.plan.rejected,
+    usedSharedEvidence: input.plan.usedSharedEvidence,
+    providerCallsCaused: input.plan.providerCallsCaused,
+    providerCostCaused: input.plan.providerCostCaused,
+    audience: "internal_only",
+  };
+}
