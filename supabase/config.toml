@@ -53,3 +53,27 @@ verify_jwt = true
 # Service role only; there is no user-facing path to storing a byte.
 [functions.oem-document-store]
 verify_jwt = true
+
+# market-valuation-write is the sole writer of market valuation decisions and
+# the only function that can spend MarketCheck money. Gateway JWT verification
+# is OFF because trusted service callers present a Supabase secret in the
+# `apikey` header, and the platform gate rejects an apikey-only request before
+# the function can ever see it — which is precisely what happened: an
+# apikey-only dry run returned 401 with no function log, because the handler
+# never ran.
+#
+# This does NOT make the function public. Every POST is authenticated inside
+# the handler by `authenticateCaller`, which:
+#   • matches the canonical legacy service-role credential in constant time
+#     against the runtime's own SUPABASE_SERVICE_ROLE_KEY (no claim is read,
+#     so a forged role=service_role payload buys nothing);
+#   • verifies modern sb_secret_* keys through @supabase/server's secret mode;
+#   • verifies signed user JWTs against the project JWKS, then applies tenant
+#     membership / platform-admin authorization.
+#
+# Authentication completes BEFORE the budget reservation, before any provider
+# fetch, and before any valuation, comparable, audit or compatibility write.
+# An unauthenticated caller reaches none of them. See
+# src/lib/market/... guards and supabase/functions/_shared/functionAuth.ts.
+[functions.market-valuation-write]
+verify_jwt = false

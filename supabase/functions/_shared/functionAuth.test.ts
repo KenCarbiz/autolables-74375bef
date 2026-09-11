@@ -435,3 +435,135 @@ describe("the removed defect stays removed", () => {
     expect(block).not.toMatch(/\b(apikey|token|credential)_length\b/);
   });
 });
+
+// ── Gateway configuration ──────────────────────────────────────────────────
+//
+// Turning off the platform's JWT gate is the kind of change that is safe
+// exactly once and dangerous forever after, so it is pinned here rather than
+// left to a reviewer's memory. The gate is off because a trusted caller
+// presents a secret in `apikey`, which the gate rejects before the handler can
+// see it; the handler is what actually authenticates, and these guards assert
+// it still does, in the right order.
+
+const CONFIG = "supabase/config.toml";
+const configSrc = () => readFileSync(CONFIG, "utf8");
+
+/** Every function block and its verify_jwt value, parsed from the real file. */
+function verifyJwtByFunction(): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  let current: string | null = null;
+  for (const raw of configSrc().split("\n")) {
+    const line = raw.trim();
+    if (line.startsWith("#")) continue;
+    const header = line.match(/^\[functions\.([A-Za-z0-9_-]+)\]$/);
+    if (header) { current = header[1]; continue; }
+    const setting = line.match(/^verify_jwt\s*=\s*(true|false)$/);
+    if (setting && current) { out[current] = setting[1] === "true"; current = null; }
+  }
+  return out;
+}
+
+describe("edge function gateway configuration", () => {
+  it("gives market-valuation-write an explicit configuration block", () => {
+    expect(configSrc()).toContain("[functions.market-valuation-write]");
+    expect(verifyJwtByFunction()).toHaveProperty("market-valuation-write");
+  });
+
+  it("disables the gateway JWT check for it, so an apikey secret reaches the handler", () => {
+    expect(verifyJwtByFunction()["market-valuation-write"]).toBe(false);
+  });
+
+  it("changes no other function's gate", () => {
+    // Pinned in full. A future edit that flips any of these fails here rather
+    // than in production, and `oem-*` / `packet-backfill` are deliberately
+    // `true` because they spend money on an anonymous caller's behalf.
+    expect(verifyJwtByFunction()).toEqual({
+      "record-engagement": false,
+      "vehicle-lookup": false,
+      "autofilm-feed": false,
+      "public-document-asset": false,
+      "oem-brochure": true,
+      "oem-owners-manual": true,
+      "packet-backfill": true,
+      "oem-document-store": true,
+      "market-valuation-write": false,
+    });
+  });
+
+  it("states why the gate is off, next to the switch that turns it off", () => {
+    const block = configSrc().slice(0, configSrc().indexOf("[functions.market-valuation-write]"));
+    const preamble = block.slice(block.lastIndexOf("\n#", block.length));
+    const whole = configSrc();
+    const idx = whole.indexOf("[functions.market-valuation-write]");
+    const comment = whole.slice(Math.max(0, idx - 1400), idx);
+    expect(comment).toMatch(/does NOT make the function public/i);
+    expect(comment).toContain("authenticateCaller");
+    expect(comment).toMatch(/apikey/);
+    expect(preamble.length).toBeGreaterThan(0);
+  });
+});
+
+describe("no unauthenticated path reaches money or evidence", () => {
+  const src = () => writerSrc();
+
+  it("authenticates before the reservation, the provider call and every write", () => {
+    const s = src();
+    const authAt = s.indexOf("const caller = await authenticateCaller(");
+    expect(authAt).toBeGreaterThan(-1);
+    for (const guarded of [
+      "market_reserve_provider_call",
+      "callProvider(",
+      "market_valuation_commit",
+      'from("audit_log").insert(',
+      'from("vehicle_listings").update(',
+    ]) {
+      expect(s.indexOf(guarded)).toBeGreaterThan(authAt);
+    }
+  });
+
+  it("returns immediately when the caller is not authorized", () => {
+    const s = src();
+    const authAt = s.indexOf("const caller = await authenticateCaller(");
+    const after = s.slice(authAt, authAt + 300);
+    expect(after).toMatch(/if\s*\(\s*!caller\.ok\s*\)\s*return json\(caller\.status/);
+  });
+
+  it("has exactly one authentication call site and no bypass flag", () => {
+    const s = src();
+    expect(s.match(/authenticateCaller\(/g)?.length).toBe(2); // definition + call
+    expect(s).not.toMatch(/skip_auth|bypass|allow_unauthenticated|x-internal-secret/i);
+  });
+
+  it("still verifies user JWTs against the project JWKS", () => {
+    const s = src();
+    expect(s).toContain('auth: ["secret:*", "user"]');
+    expect(s).toMatch(/jwks:\s*JWKS/);
+    expect(s).toContain("jwksSource(");
+  });
+
+  it("still requires constant-time equality for the legacy credential", () => {
+    const mod = readFileSync("supabase/functions/_shared/functionAuth.ts", "utf8");
+    const fn = mod.slice(mod.indexOf("export async function matchesLegacyServiceRole"));
+    const body = fn.slice(0, fn.indexOf("\n}"));
+    expect(body).toContain("constantTimeEquals");
+    expect(body).not.toMatch(/[!=]==\s*configured/);
+    expect(mod).toContain("crypto.subtle.importKey");
+  });
+});
+
+describe("the budget cannot arm itself", () => {
+  it("defaults to disabled in the schema", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260910140209_d9884db9-8fc7-4d63-bd50-b5e2ba5e5002.sql", "utf8",
+    );
+    const table = migration.slice(migration.indexOf("CREATE TABLE IF NOT EXISTS public.market_provider_budgets"));
+    const body = table.slice(0, table.indexOf(");"));
+    expect(body).toMatch(/enabled\s+boolean\s+NOT NULL\s+DEFAULT\s+false/i);
+  });
+
+  it("is never enabled from function code", () => {
+    const s = writerSrc();
+    expect(s).not.toMatch(/market_provider_budgets/);
+    expect(s).not.toMatch(/enabled\s*:\s*true/);
+  });
+});
