@@ -144,7 +144,7 @@ export interface ListingRow {
   vin: string | null;
   ymm: string | null;
   slug: string | null;
-  stock_number: string | null;
+  stock_number?: string | null;
 }
 
 export interface AgentRow {

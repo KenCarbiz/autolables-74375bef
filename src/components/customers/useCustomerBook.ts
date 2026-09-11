@@ -84,7 +84,10 @@ export function useCustomerBook(): Result {
         : none;
 
       const listingsQuery = tenantId
-        ? db.from("vehicle_listings").select("id, vin, ymm, slug, stock_number").eq("tenant_id", tenantId).limit(1000)
+        // vehicle_listings has no stock_number column — selecting it makes
+        // PostgREST reject the whole query (42703) and the vehicle lookup
+        // silently comes back empty. Stock numbers come from vehicle_files.
+        ? db.from("vehicle_listings").select("id, vin, ymm, slug").eq("tenant_id", tenantId).limit(1000)
         : none;
 
       const [leadsRes, eventsRes, dwellRes, docsRes, dealsRes, signingsRes, listingsRes] = await Promise.all([

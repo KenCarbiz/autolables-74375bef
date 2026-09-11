@@ -104,7 +104,7 @@ const renderSummaryCards = (packet: AuditPacket): string => {
     { label: "Signed prep sign-offs", value: s.signed_prep_count, note: `${s.prep_signoff_count} total` },
     { label: "Signed deal jackets", value: s.signed_deal_count, note: `${s.deal_token_count} total` },
     { label: "Install photos", value: s.install_photo_count ?? 0, note: `${s.install_signature_count ?? 0} installer signatures` },
-    { label: "Advertised snapshots", value: s.advertised_price_snapshot_count ?? 0, note: s.latest_advertised_price != null ? `Latest $${s.latest_advertised_price.toLocaleString()} · ${s.latest_advertised_source || "manual"}` : "no snapshots" },
+    { label: "Advertised snapshots", value: s.advertised_price_snapshot_count ?? 0, note: s.latest_advertised_price != null ? `Latest $${s.latest_advertised_price.toLocaleString()} · ${s.latest_advertised_source || "manual"}` : ((s.advertised_price_snapshot_count ?? 0) > 0 ? "provenance not recorded" : "no snapshots") },
     { label: "Audit events", value: s.audit_event_count },
     {
       label: "Open recalls",
