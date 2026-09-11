@@ -1,73 +1,181 @@
 {
  "market-valuation-write": {
-  "commit": "946abeaf",
-  "files": 25,
-  "tree_sha256": "e44914f528b02367b81c0c2102ba6749211322a9bd0d14d5d2dc1d85aaa3e73a",
+  "base": "946abeaf",
   "entrypoint_sha256": "4237d03377cd743e12c7dc06bc55320b0a2aa908975f808880bf424cafde4403",
-  "entrypoint_bytes": 25816,
-  "crlf": false,
-  "bom": false,
-  "credential_literals": [],
-  "package_dir": "/tmp/claude-0/-home-user-autolables-74375bef/4bd5b04c-fe84-5e26-8567-dd019c94e8b0/scratchpad/recovery-packages/market-valuation-write",
-  "shared_deps": [
-   "supabase/functions/_shared/factorySticker/lib/market/adjustments.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/comparables.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/composite.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/concentration.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/confidence.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/dealerIdentity.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/fingerprints.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/flags.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/freshness.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/hash.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/legacyAdapter.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/marketView.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/outliers.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/priceBasis.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/providerAdapter.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/providerTransport.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/similarity.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/statistics.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/types.ts",
-   "supabase/functions/_shared/factorySticker/lib/market/verdict.ts",
-   "supabase/functions/_shared/factorySticker/lib/ymm.ts",
-   "supabase/functions/_shared/functionAuth.ts",
-   "supabase/functions/_shared/http.ts",
-   "supabase/functions/_shared/supabase.ts"
+  "tree_sha256": "e44914f528b02367b81c0c2102ba6749211322a9bd0d14d5d2dc1d85aaa3e73a",
+  "files": 25,
+  "shared_deps": 24,
+  "manifest": [
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/adjustments.ts",
+    "sha256": "e6a44eaf49fbb3823013855323e0f0a51aefb301eee17f6370033cfccb9ade4c"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/comparables.ts",
+    "sha256": "5e91662aeec9bdf2508442abe55c2b30d084b844d4b9eab72b9e1b465887cd94"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/composite.ts",
+    "sha256": "580498789178ec7fed480f08ca5679e5e937ddf79a860408b24e949f220af625"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/concentration.ts",
+    "sha256": "7bd055106c56d38eed1d3f1b9eee10207d5ea530f54d645094f8ec4b99e4a2cb"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/confidence.ts",
+    "sha256": "7090c06caaf3d6fd925d1c242a4531e6ec95b680906a53e1d6223601ef30b81c"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/dealerIdentity.ts",
+    "sha256": "b0077c2b3c6a4debd5daae8f4615c567d9e0209b0d6f7460a57b4a411cb68c48"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/fingerprints.ts",
+    "sha256": "c97868fd3dc2b80dcef1e2a8884f598b828db37f130c9e48f79faa59b962205e"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/flags.ts",
+    "sha256": "a87bd2507c4c249b2c2d2d388bc89a1fd4282c407900103681bf04442b20847a"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/freshness.ts",
+    "sha256": "09cfa878a5612cdb9d39f06a7eccd1e256b905d3af5a7c1860ce181fc639775e"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/hash.ts",
+    "sha256": "236c188d51aee99569d018d92b6ef0f6b4127a9a444d7059b5046c6d9634a976"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/legacyAdapter.ts",
+    "sha256": "a529f54c353078d4ab4001776a0804785bce058e33344de150c4085b32e51178"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/marketView.ts",
+    "sha256": "0726fc64f609bcdd72171f41253b80209b79d79cda9fcd20176cc6ba3f61aee0"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/outliers.ts",
+    "sha256": "2dc7d9f7a85676771fbf3851c29e9c78dc9fecda6f52867861b2692bec5cb102"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/priceBasis.ts",
+    "sha256": "2a5079fcf3496a33552359e56c69b85c195b3646a78e505f450063de6b7d8d23"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/providerAdapter.ts",
+    "sha256": "6791b3b8e5b3751a5fc2f028d2f8a71bd6b360f25e1397c79efdb1a867b4d469"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/providerTransport.ts",
+    "sha256": "305ec6ce109ae5f80696a5eb60f4d2ac574bd5cffb8e93b4085228e0b96443e5"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/similarity.ts",
+    "sha256": "6b38593b369bcddbd6262b4d02e270ed326010d22fbcb3c756712c552f2f392c"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/statistics.ts",
+    "sha256": "0b372bb5988a1595a6cba41509e16757a092fe02baf1b24da5b3cdbee5cd944b"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/types.ts",
+    "sha256": "0af8691d4fa158d2855bb6c3164e4ed991b7551d188af9ec830167b36940a513"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/verdict.ts",
+    "sha256": "c27aeabc92b1023ea40c5a45e238faed3daaf2891853ef4b2d80acf9b2d67e9a"
+   },
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/ymm.ts",
+    "sha256": "187ca8fd7c229fb2cb985230f5762b19f9b3be37d6537bae2a42239f8a8bf054"
+   },
+   {
+    "path": "supabase/functions/_shared/functionAuth.ts",
+    "sha256": "b13b7ec14a4d5b0f0f9ce3b8dce715f87b232d44b45c9055f4f639ea7397dbc8"
+   },
+   {
+    "path": "supabase/functions/_shared/http.ts",
+    "sha256": "9bd754aa82e58efb19f552d636f5964221846f9a820229ebc54f30c6a5d451a5"
+   },
+   {
+    "path": "supabase/functions/_shared/supabase.ts",
+    "sha256": "267176b0d6760dfff445c7179950a63a18c68ec5b2b336dc693da8b1b793137f"
+   },
+   {
+    "path": "supabase/functions/market-valuation-write/index.ts",
+    "sha256": "4237d03377cd743e12c7dc06bc55320b0a2aa908975f808880bf424cafde4403"
+   }
   ]
  },
  "public-listing-view": {
-  "commit": "c7d6a30a",
-  "files": 6,
-  "tree_sha256": "94ba9b96221e02d5e346eb36288c0e5eba94dd0276e6a22e2c719893d4588504",
+  "base": "c7d6a30a",
   "entrypoint_sha256": "9fd8853467ddc75a84f3056ad3b67e0fff91cdb75ac1a02140e4618948fe2c71",
-  "entrypoint_bytes": 54367,
-  "crlf": false,
-  "bom": false,
-  "credential_literals": [],
-  "package_dir": "/tmp/claude-0/-home-user-autolables-74375bef/4bd5b04c-fe84-5e26-8567-dd019c94e8b0/scratchpad/recovery-packages/public-listing-view",
-  "shared_deps": [
-   "supabase/functions/_shared/factorySticker/lib/vehicleTruth/recallView.ts",
-   "supabase/functions/_shared/iihs-awards.ts",
-   "supabase/functions/_shared/lotFeedRow.ts",
-   "supabase/functions/_shared/passport-routing.ts",
-   "supabase/functions/_shared/passport-version.ts"
+  "tree_sha256": "94ba9b96221e02d5e346eb36288c0e5eba94dd0276e6a22e2c719893d4588504",
+  "files": 6,
+  "shared_deps": 5,
+  "manifest": [
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/vehicleTruth/recallView.ts",
+    "sha256": "3c4ed5e63021ed41bea0a9a77df53ba828fad9479be41519f15e42e7f2e76ed8"
+   },
+   {
+    "path": "supabase/functions/_shared/iihs-awards.ts",
+    "sha256": "b9f942ba011010793a9b6cc2e4cc74561ef0758cc002e03c095d3804214638df"
+   },
+   {
+    "path": "supabase/functions/_shared/lotFeedRow.ts",
+    "sha256": "4e84537bf346f14b4787459adc0484f7e868d6c2dee017ec5721175f0e92acba"
+   },
+   {
+    "path": "supabase/functions/_shared/passport-routing.ts",
+    "sha256": "1da0c3223999b86e0eb177f5e3ef87ae8e83a40b955b90a43310086db4c48162"
+   },
+   {
+    "path": "supabase/functions/_shared/passport-version.ts",
+    "sha256": "dce72d30aadb9606b4bbe737d670ee0152afea57d64ad85b2864f51bb5f28713"
+   },
+   {
+    "path": "supabase/functions/public-listing-view/index.ts",
+    "sha256": "9fd8853467ddc75a84f3056ad3b67e0fff91cdb75ac1a02140e4618948fe2c71"
+   }
   ]
  },
  "vehicle-enrich": {
-  "commit": "c7d6a30a",
-  "files": 4,
-  "tree_sha256": "289fcea47d6518d22ff6e2ef26a08b5cd3059d0cd4cf62e080f42443beb4e463",
-  "entrypoint_sha256": "c81bc312554ddac9d2cba0ff79a6332986480f35ad34589eeb6e86185b83b99d",
-  "entrypoint_bytes": 55470,
-  "crlf": false,
-  "bom": false,
-  "credential_literals": [],
-  "package_dir": "/tmp/claude-0/-home-user-autolables-74375bef/4bd5b04c-fe84-5e26-8567-dd019c94e8b0/scratchpad/recovery-packages/vehicle-enrich",
-  "shared_deps": [
-   "supabase/functions/_shared/factorySticker/lib/market/certificationTruth.ts",
-   "supabase/functions/_shared/recallState.ts",
-   "supabase/functions/_shared/ymm.ts"
+  "base": "7a8b2278 + vehicle-enrich-recovery.patch",
+  "entrypoint_sha256": "2116d9364381d03880fc017799f8b869547aec61ab6ac1d06b7e6e7d89e0a0ea",
+  "tree_sha256": "0307a35faeca224b8bc7aea052baca446ddd1c59009cb6aeb21a7307368510ca",
+  "files": 5,
+  "shared_deps": 4,
+  "manifest": [
+   {
+    "path": "supabase/functions/_shared/factorySticker/lib/market/certificationTruth.ts",
+    "sha256": "886a7e80c2da649d61a306bbe787062bed1da108c01d326dcb4b0fbce2fe31e9"
+   },
+   {
+    "path": "supabase/functions/_shared/functionAuth.ts",
+    "sha256": "b13b7ec14a4d5b0f0f9ce3b8dce715f87b232d44b45c9055f4f639ea7397dbc8"
+   },
+   {
+    "path": "supabase/functions/_shared/recallState.ts",
+    "sha256": "51c3ca4e13d396011516540210357db6d82345bd6a121ae9842bfda46e299928"
+   },
+   {
+    "path": "supabase/functions/_shared/ymm.ts",
+    "sha256": "09955c03de43a6c6e9cb2e8a202a37f2465eaddff8f9171902afbf75c2bcf567"
+   },
+   {
+    "path": "supabase/functions/vehicle-enrich/index.ts",
+    "sha256": "2116d9364381d03880fc017799f8b869547aec61ab6ac1d06b7e6e7d89e0a0ea"
+   }
   ]
+ },
+ "_withdrawn": {
+  "vehicle-enrich @ c7d6a30a": {
+   "entrypoint_sha256": "c81bc312554ddac9d2cba0ff79a6332986480f35ad34589eeb6e86185b83b99d",
+   "tree_sha256": "289fcea47d6518d22ff6e2ef26a08b5cd3059d0cd4cf62e080f42443beb4e463",
+   "status": "PERMANENTLY WITHDRAWN \u2014 NOT an approved recovery artifact",
+   "reason": "variable-time secret comparison; reintroduces a defect corrected at 7a8b2278"
+  }
  }
 }
