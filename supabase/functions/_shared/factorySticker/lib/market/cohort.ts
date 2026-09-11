@@ -35,6 +35,7 @@
 // The VIN stays where it belongs: in the vehicle's own valuation fingerprint.
 
 import { digest } from "./hash.ts";
+import { classifyEquipment } from "./equipmentClass.ts";
 
 /** Bump when the MEANING of a cohort changes, so old keys cannot silently match new ones. */
 export const COHORT_RULES_VERSION = "cohort-v1.0.0";
@@ -131,17 +132,48 @@ export function normalizeTrim(v: unknown): string | null {
 }
 
 /**
- * The equipment signature.
+ * The equipment signature — COHORT-DEFINING items only.
  *
- * An empty or absent set is `equipment_unknown`, a sentinel that never equals
- * another cohort's signature — including another `equipment_unknown`, which
- * `cohortsMatch` refuses explicitly. Order and case are normalized away so a
- * re-sorted option list is not a different car.
+ * This used to hash every entry in the list, which meant a set of floor mats
+ * fractured two otherwise identical cars. It now runs the list through
+ * `classifyEquipment`, so port-installed accessories, paint and trim-level
+ * cosmetics fall out and only factory codes and material packages remain.
+ *
+ * An absent or unreadable list is `equipment_unknown`, a sentinel that never
+ * equals another signature — including another `equipment_unknown`. A list
+ * that DECODED to no material options is not unknown: "this car has no
+ * material factory options" is an answer, and it hashes like one.
  */
 export function equipmentSignature(v: unknown): string {
-  if (!Array.isArray(v)) return EQUIPMENT_UNKNOWN;
-  const items = [...new Set(v.map(text).filter((s): s is string => !!s))].sort();
-  return items.length ? digest({ kind: "equipment", items }) : EQUIPMENT_UNKNOWN;
+  const classified = classifyEquipment(v);
+  if (classified.unknown) return EQUIPMENT_UNKNOWN;
+  return digest({ kind: "equipment", items: classified.cohortDefining });
+}
+
+/**
+ * What actually differs between two equipment sets.
+ *
+ * Only cohort-defining items are compared, so the answer names packages and
+ * option codes rather than accessories. Used to explain an
+ * `adjustment_required` relationship without inventing a dollar figure.
+ */
+export function equipmentDifference(a: unknown, b: unknown): {
+  known: boolean;
+  onlyInA: string[];
+  onlyInB: string[];
+  shared: string[];
+} {
+  const ca = classifyEquipment(a);
+  const cb = classifyEquipment(b);
+  if (ca.unknown || cb.unknown) return { known: false, onlyInA: [], onlyInB: [], shared: [] };
+  const setA = new Set(ca.cohortDefining);
+  const setB = new Set(cb.cohortDefining);
+  return {
+    known: true,
+    onlyInA: ca.cohortDefining.filter((i) => !setB.has(i)),
+    onlyInB: cb.cohortDefining.filter((i) => !setA.has(i)),
+    shared: ca.cohortDefining.filter((i) => setB.has(i)),
+  };
 }
 
 const vehicleClass = (condition: unknown, certified: unknown): VehicleClass | null => {
@@ -199,7 +231,33 @@ export function buildCohortKey(subject: CohortSubject): MarketCohortKey {
   };
 }
 
-/** The stable identifier. Contains no VIN, no price, no tenant secret. */
+/**
+ * The MARKET's identifier — equipment deliberately excluded.
+ *
+ * This is what a shared snapshot is keyed on, and the exclusion is the whole
+ * reason sharing works. Equipment decides a car's position WITHIN a market, not
+ * which market it is in; keying the snapshot on it would give Ken's two QX60s
+ * two separate snapshots of one market, and they would never share anything.
+ *
+ * Contains no VIN, no price and no tenant secret.
+ */
+export function marketCohortHash(key: MarketCohortKey): string {
+  return digest({
+    kind: "market_cohort",
+    rules: key.cohortRulesVersion,
+    year: key.year, make: key.make, model: key.model, trim: key.trim,
+    drivetrain: key.drivetrain, powertrain: key.powertrain, body: key.bodyType,
+    class: key.vehicleClass, certified: key.certifiedClass,
+    zip: key.zip, radius: key.radiusMiles,
+  });
+}
+
+/**
+ * The market identifier PLUS equipment — a build, not a market.
+ *
+ * Used where an exact configuration matters: comparable-level identity and the
+ * valuation fingerprint. Never used to key a shared snapshot.
+ */
 export function cohortKeyHash(key: MarketCohortKey): string {
   return digest({
     kind: "market_cohort",

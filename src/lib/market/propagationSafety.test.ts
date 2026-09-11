@@ -141,7 +141,11 @@ describe("tamper: the boundaries that must hold", () => {
     // prediction in, asserted against the entry's own key set.
     const p = plan();
     for (const entry of p.planned) {
-      expect(Object.keys(entry).sort()).toEqual(["providerPolicy", "reasons", "vin"]);
+      // The entry names the VIN, what its evidence may be used for, and why.
+      // There is still nowhere to put a prediction, a value or a verdict.
+      expect(Object.keys(entry).sort()).toEqual([
+        "evidenceContextOnly", "providerPolicy", "reasons", "valuationCompatibility", "vin",
+      ]);
     }
     // Comments stripped, and the forbidden LIST excised: the module header
     // names these fields in order to rule them out, and the list declares them.
@@ -182,12 +186,28 @@ describe("tamper: the boundaries that must hold", () => {
     expect(p.providerCostCaused).toBe(0);
   });
 
-  it("incompatible equipment is never accepted", () => {
+  it("different equipment shares a market but is never an unadjusted comparable", () => {
+    // Gate 14G.1: equipment no longer decides which MARKET a car is in. It
+    // decides what the car's evidence may be USED for, and a differently
+    // equipped car is planned as context-only rather than refused.
     const other = buildCohortKey({ ...COHORT, equipment: ["Sensory Package"] });
     const rows = inventoryOf(2).map((c) => ({ ...c, cohortKey: other }));
     const p = plan({ inventory: rows, pilotVins: rows.map((c) => c.vin) });
+    expect(p.planned.length).toBe(2);
+    for (const entry of p.planned) {
+      expect(entry.valuationCompatibility).toBe("adjustment_required");
+      expect(entry.evidenceContextOnly).toBe(true);
+      expect(entry.reasons).toContain("comparable_material_equipment_differs");
+      expect(entry.reasons).toContain("comparable_adjustment_method_not_approved");
+    }
+  });
+
+  it("a market-defining difference is still refused outright", () => {
+    const fwd = buildCohortKey({ ...COHORT, drivetrain: "FWD" });
+    const rows = inventoryOf(2).map((c) => ({ ...c, cohortKey: fwd }));
+    const p = plan({ inventory: rows, pilotVins: rows.map((c) => c.vin) });
     expect(p.planned).toEqual([]);
-    expect(p.rejected[0].reasons).toContain("cohort_equipment_differs");
+    expect(p.rejected[0].reasons).toContain("market_drivetrain_differs");
   });
 
   it("own inventory cannot become independent scarcity evidence", () => {
@@ -263,6 +283,15 @@ describe("the authored migration is additive and guarded", () => {
   const sql = readFileSync(FILE, "utf8");
   const code = sql.replace(/^\s*--.*$/gm, "");
 
+  /**
+   * SQL with every string LITERAL removed, so a guard reads schema rather than
+   * prose. Stripping `COMMENT ON ... ;` looked equivalent and is not: a
+   * semicolon inside the comment text ends the match early and leaves the tail
+   * behind, which is exactly how "verdict" survived a strip that appeared to
+   * work. Identifiers are unquoted, so they are untouched.
+   */
+  const schemaOnly = code.replace(/'(?:[^']|'')*'/g, "''");
+
   it("creates the table additively and drops nothing", () => {
     expect(code).toContain("CREATE TABLE IF NOT EXISTS public.market_cohort_snapshots");
     expect(code).toContain("ADD COLUMN IF NOT EXISTS market_snapshot_id uuid");
@@ -303,12 +332,38 @@ describe("the authored migration is additive and guarded", () => {
     expect(code).toContain("superseded_by uuid REFERENCES public.market_cohort_snapshots(id)");
   });
 
+  it("keys the snapshot on the MARKET, with no equipment signature", () => {
+    // A snapshot keyed on equipment would give two same-market, differently
+    // packaged vehicles two snapshots of one market — and they would share
+    // nothing, which is the whole reason the table exists.
+    expect(code).not.toContain("cohort_equipment_signature");
+    for (const marketDimension of [
+      "cohort_year", "cohort_make", "cohort_model", "cohort_trim",
+      "cohort_drivetrain", "cohort_powertrain", "cohort_body_type",
+      "cohort_vehicle_class", "cohort_certified_class", "cohort_zip",
+      "cohort_radius_miles",
+    ]) {
+      expect(code, marketDimension).toContain(marketDimension);
+    }
+  });
+
+  it("lets one snapshot inform many valuations without copying a conclusion", () => {
+    // Many-to-one by construction: the FK lives on the valuation, so N
+    // valuations may point at one snapshot, and the snapshot holds no verdict,
+    // value, prediction or position to be copied from.
+    expect(code).toContain("ADD COLUMN IF NOT EXISTS market_snapshot_id uuid");
+    expect(code).toContain("REFERENCES public.market_cohort_snapshots(id)");
+    expect(code).not.toMatch(/UNIQUE[^;]*market_snapshot_id/i);
+    // Schema only: the table comment states that a valuation never copies
+    // another vehicle's verdict, which is the sentence this guard keeps true.
+    for (const conclusion of ["verdict", "confidence", "market_position", "provider_prediction", "difference"]) {
+      expect(schemaOnly, conclusion).not.toContain(conclusion);
+    }
+  });
+
   it("stores no credential, image, description or subject VIN", () => {
-    // `--` comments AND `COMMENT ON ... ;` documentation stripped: the table
-    // comment states what the table does not store, by name.
-    const columns = code
-      .replace(/COMMENT ON[\s\S]*?;/gi, "")
-      .toLowerCase();
+    // Schema only: the table comment names what the table does not store.
+    const columns = schemaOnly.toLowerCase();
     for (const forbidden of ["api_key", "apikey", "image", "photo", "description", "vdp_url", "subject_vin"]) {
       expect(columns, forbidden).not.toContain(forbidden);
     }

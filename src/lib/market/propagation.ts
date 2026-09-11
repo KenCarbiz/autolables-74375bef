@@ -17,10 +17,12 @@
 // gets the same EVIDENCE and computes its own answer, which may legitimately
 // be a different answer — or no answer at all.
 
+import type { MarketCohortKey } from "./cohort.ts";
 import {
-  cohortsMatch, mayShareMarketEvidence, needsEnrichmentToDecide,
-  type MarketCohortKey,
-} from "./cohort.ts";
+  marketAwarenessRelationship, mayReceiveMarketAwareness, valuationCompatibility,
+  mayServeAsPrimaryComparable, isContextOnlyEvidence,
+  type ValuationCompatibility,
+} from "./relationship.ts";
 import type { MarketAwarenessState } from "./awareness.ts";
 import { MAX_SHADOW_COHORT } from "./shadowPipeline.ts";
 
@@ -56,6 +58,17 @@ export interface PlannedReevaluation {
   vin: string;
   /** Literal type: propagation can never be granted provider access. */
   providerPolicy: "disabled";
+  /**
+   * How this vehicle relates to the triggering one AS A COMPARABLE.
+   *
+   * Carried on the plan because the two answers are different: a vehicle is
+   * planned because it shares a MARKET, and what its evidence may then be
+   * used for depends on this. `adjustment_required` is planned and is
+   * context-only — it gets a fresh look and cannot produce a value.
+   */
+  valuationCompatibility: ValuationCompatibility;
+  /** True unless this vehicle is an exact, unadjusted comparable. */
+  evidenceContextOnly: boolean;
   reasons: string[];
 }
 
@@ -168,8 +181,8 @@ export function planImpactedInventory(input: {
       continue;
     }
 
-    // Awareness before comparison. A conflicted identity makes the cohort key
-    // untrustworthy, and comparing an untrustworthy key produces a confident
+    // Identity conflicts first. A conflicted cohort key is built from a value
+    // we have reason to disbelieve, and comparing it produces a confident
     // wrong answer rather than an honest refusal.
     if (candidate.awareness && !candidate.awareness.safeToCompare) {
       rejected.push({
@@ -179,17 +192,23 @@ export function planImpactedInventory(input: {
       continue;
     }
 
-    const match = cohortsMatch(input.cohortKey, candidate.cohortKey);
-    if (needsEnrichmentToDecide(match)) {
-      // Not a comparable, and not a proven mismatch. A work item.
-      indeterminate.push({ vin, reasons: match.reasons });
+    // LAYER A — did this car's market move? Equipment has no vote here. A
+    // Vision Package does not put a QX60 in a different market; it moves its
+    // position within one.
+    const market = marketAwarenessRelationship(input.cohortKey, candidate.cohortKey);
+    if (market.relationship === "indeterminate") {
+      indeterminate.push({ vin, reasons: market.reasons });
       continue;
     }
-    if (!mayShareMarketEvidence(match)) {
-      rejected.push({ vin, reasons: match.reasons });
+    if (!mayReceiveMarketAwareness(market)) {
+      rejected.push({ vin, reasons: market.reasons });
       continue;
     }
-    why.push(...match.reasons);
+
+    // LAYER B — what may its evidence then be USED for? Planned either way;
+    // only `exact` may later serve as an unadjusted primary comparable.
+    const compatibility = valuationCompatibility(input.cohortKey, candidate.cohortKey);
+    why.push(...market.reasons, ...compatibility.reasons);
 
     // The same answer already exists. Recomputing it would add a duplicate row
     // and bury the day something changed.
@@ -211,13 +230,22 @@ export function planImpactedInventory(input: {
       break;
     }
 
-    planned.push({ vin, providerPolicy: "disabled", reasons: why });
+    planned.push({
+      vin,
+      providerPolicy: "disabled",
+      valuationCompatibility: compatibility.compatibility,
+      evidenceContextOnly: !mayServeAsPrimaryComparable(compatibility)
+        || isContextOnlyEvidence(compatibility),
+      reasons: why,
+    });
   }
 
   reasons.push(
     `propagation_planned_${planned.length}`,
     `propagation_rejected_${rejected.length}`,
     `propagation_indeterminate_${indeterminate.length}`,
+    `propagation_exact_comparables_${planned.filter((p) => p.valuationCompatibility === "exact").length}`,
+    `propagation_adjustment_required_${planned.filter((p) => p.valuationCompatibility === "adjustment_required").length}`,
   );
 
   return {

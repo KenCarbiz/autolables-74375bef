@@ -190,7 +190,9 @@ describe("11-22. sharing evidence without sharing conclusions", () => {
       pilotVins: [A], depth: 0, now: NOW,
     });
     expect(JSON.stringify(plan)).not.toContain("prediction");
-    expect(Object.keys(plan.planned[0]).sort()).toEqual(["providerPolicy", "reasons", "vin"]);
+    expect(Object.keys(plan.planned[0]).sort()).toEqual([
+      "evidenceContextOnly", "providerPolicy", "reasons", "valuationCompatibility", "vin",
+    ]);
   });
 
   it("15. market movement moves each valuation independently", () => {

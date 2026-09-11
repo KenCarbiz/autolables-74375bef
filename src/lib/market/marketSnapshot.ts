@@ -28,7 +28,7 @@
 // it is scoped to one tenant and expires on the freshness window below.
 
 import { digest } from "./hash.ts";
-import { cohortKeyHash, type MarketCohortKey } from "./cohort.ts";
+import { marketCohortHash, type MarketCohortKey } from "./cohort.ts";
 
 /** Bump when the MEANING of a stored snapshot changes. */
 export const SNAPSHOT_RULES_VERSION = "snapshot-v1.0.0";
@@ -166,7 +166,9 @@ export function buildMarketSnapshot(input: SnapshotInput): MarketSnapshot {
     kind: "market_snapshot",
     rules: SNAPSHOT_RULES_VERSION,
     algorithm: input.algorithmVersion,
-    cohort: cohortKeyHash(input.cohortKey),
+    // The MARKET, not the build. Equipment is excluded so one snapshot
+    // serves every same-market vehicle whatever is bolted to it.
+    cohort: marketCohortHash(input.cohortKey),
     query: {
       zip: input.query?.zip ?? null,
       radius: input.query?.radiusMiles ?? null,
@@ -183,7 +185,7 @@ export function buildMarketSnapshot(input: SnapshotInput): MarketSnapshot {
 
   return {
     fingerprint,
-    cohortHash: cohortKeyHash(input.cohortKey),
+    cohortHash: marketCohortHash(input.cohortKey),
     observations,
     eligibleCount: priced.length,
     independentRooftopCount: rooftops.size,

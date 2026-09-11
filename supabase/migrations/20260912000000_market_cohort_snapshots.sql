@@ -20,6 +20,14 @@
 -- any API key, any provider URL, any image or description. The snapshot is a
 -- description of a market, not a copy of a provider's catalogue.
 --
+-- AND NOT AN EQUIPMENT SIGNATURE. A snapshot belongs to a MARKET, and equipment
+-- decides a car's position within one rather than which one it is in. Keying a
+-- snapshot on equipment would give two identically-marketed QX60s with
+-- different packages two separate snapshots of the same market, and they would
+-- never share anything — which is the entire point of storing it once. The
+-- equipment a particular vehicle carries lives on that vehicle's valuation,
+-- where it belongs.
+--
 -- PROVIDER LICENSING AND RETENTION. These observations derive from
 -- MarketCheck active-listing responses. They are retained as normalized
 -- evidence supporting a valuation we made for one tenant, scoped to that
@@ -43,9 +51,12 @@ CREATE TABLE IF NOT EXISTS public.market_cohort_snapshots (
   cohort_model text,
   cohort_trim text,
   cohort_drivetrain text,
+  cohort_powertrain text,
+  cohort_body_type text,
   cohort_vehicle_class text,
   cohort_certified_class text,
-  cohort_equipment_signature text NOT NULL,
+  cohort_zip text,
+  cohort_radius_miles integer,
 
   -- The evidence.
   snapshot_fingerprint text NOT NULL,
@@ -131,10 +142,15 @@ CREATE POLICY "market_cohort_snapshots_tenant_read"
   );
 
 COMMENT ON TABLE public.market_cohort_snapshots IS
-  'Shared, append-only market evidence for one tenant and one exact vehicle cohort. '
-  'Carries no subject VIN, no asking price, no credential and no provider image or '
-  'description. One snapshot may inform many valuations; a valuation never copies '
-  'another vehicle''s prediction, verdict or market position.';
+  'Shared, append-only market evidence for one tenant and one MARKET cohort — '
+  'year, make, model, trim, drivetrain, powertrain, body, class, certification '
+  'class and geography. Equipment is deliberately excluded: it decides a '
+  'vehicle''s position within a market, not which market it is in, so one '
+  'snapshot serves differently-equipped vehicles that compete against the same '
+  'cars. Carries no subject VIN, no asking price, no credential and no provider '
+  'image or description. One snapshot may inform many valuations; a valuation '
+  'never copies another vehicle''s prediction, verdict or market position, and '
+  'only an exact-equipment match may serve as an unadjusted primary comparable.';
 
 COMMENT ON COLUMN public.vehicle_market_valuations.market_snapshot_id IS
   'The shared market snapshot this valuation was judged against. Nullable: a '

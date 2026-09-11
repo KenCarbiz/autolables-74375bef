@@ -93,28 +93,45 @@ const WEEK_TWO = buildMarketSnapshot({
 });
 
 describe("1-2. compatibility is decided, not assumed", () => {
-  it("identifies the three compatible QX60s and rejects the rest", () => {
+  it("plans everyone in the same market and refuses everyone outside it", () => {
+    // Gate 14G.1: the differently-packaged QX60 is in the SAME market and is
+    // planned; it simply cannot serve as an unadjusted comparable. The FWD car
+    // and the non-CPO car are different markets and are refused.
     const plan = planImpactedInventory({
       tenantId: TENANT, cohortKey, subjectVin: SUBJECT, subjectAlreadyEvaluated: true,
       inventory: INVENTORY, pilotVins: PILOT, depth: 0,
     });
-    expect(plan.planned.map((p) => p.vin)).toEqual([SIBLING_A, SIBLING_B]);
+    expect(plan.planned.map((p) => p.vin)).toEqual([SIBLING_A, SIBLING_B, WRONG_PKG]);
     const rejectedVins = plan.rejected.map((r) => r.vin);
     expect(rejectedVins).toContain(SUBJECT);
     expect(rejectedVins).toContain(SIBLING_C);
-    expect(rejectedVins).toContain(WRONG_PKG);
     expect(rejectedVins).toContain(WRONG_DT);
   });
 
-  it("names why each incompatible vehicle was rejected", () => {
+  it("separates exact comparables from same-market-but-differently-equipped", () => {
+    const plan = planImpactedInventory({
+      tenantId: TENANT, cohortKey, subjectVin: SUBJECT, subjectAlreadyEvaluated: true,
+      inventory: INVENTORY, pilotVins: PILOT, depth: 0,
+    });
+    const byVin = Object.fromEntries(plan.planned.map((p) => [p.vin, p]));
+    for (const vin of [SIBLING_A, SIBLING_B]) {
+      expect(byVin[vin].valuationCompatibility, vin).toBe("exact");
+      expect(byVin[vin].evidenceContextOnly, vin).toBe(false);
+    }
+    expect(byVin[WRONG_PKG].valuationCompatibility).toBe("adjustment_required");
+    expect(byVin[WRONG_PKG].evidenceContextOnly).toBe(true);
+    expect(plan.reasons).toContain("propagation_exact_comparables_2");
+    expect(plan.reasons).toContain("propagation_adjustment_required_1");
+  });
+
+  it("names why each refused vehicle was refused", () => {
     const plan = planImpactedInventory({
       tenantId: TENANT, cohortKey, subjectVin: SUBJECT, subjectAlreadyEvaluated: true,
       inventory: INVENTORY, pilotVins: PILOT, depth: 0,
     });
     const reasonFor = (vin: string) => plan.rejected.find((r) => r.vin === vin)?.reasons ?? [];
-    expect(reasonFor(WRONG_DT)).toContain("cohort_drivetrain_differs");
-    expect(reasonFor(WRONG_PKG)).toContain("cohort_equipment_differs");
-    expect(reasonFor(SIBLING_C).join(" ")).toMatch(/class_differs|certification_differs/);
+    expect(reasonFor(WRONG_DT)).toContain("market_drivetrain_differs");
+    expect(reasonFor(SIBLING_C).join(" ")).toMatch(/market_class_differs|market_certification_differs/);
     expect(reasonFor(SUBJECT)).toContain("propagation_subject_already_evaluated");
   });
 
@@ -249,9 +266,12 @@ describe("8-11. nothing customer-facing, nothing paid for, nothing copied", () =
     for (const field of NEVER_PROPAGATED_FIELDS) {
       expect(serialized, field).not.toContain(field);
     }
-    // A plan entry is a VIN and a reason. Nothing else.
+    // A plan entry names the VIN, what its evidence may be used for, and why.
+    // Still nowhere to put a prediction, a value or a verdict.
     for (const entry of plan.planned) {
-      expect(Object.keys(entry).sort()).toEqual(["providerPolicy", "reasons", "vin"]);
+      expect(Object.keys(entry).sort()).toEqual([
+        "evidenceContextOnly", "providerPolicy", "reasons", "valuationCompatibility", "vin",
+      ]);
     }
   });
 

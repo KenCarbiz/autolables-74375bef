@@ -60,7 +60,10 @@ describe("indeterminate cannot become compatible", () => {
     }
   });
 
-  it("the planner files it separately and plans nothing for it", () => {
+  it("an undecoded sibling shares the market but can never be a comparable", () => {
+    // It is in the same market, so a changed market reaches it — that is the
+    // point of the two layers. Its own evidence is indeterminate, so it may
+    // not contribute a value, and decoding it would resolve that.
     const plan = planImpactedInventory({
       tenantId: "t", cohortKey: key(), subjectVin: "5N1DL1FS0PC900001",
       subjectAlreadyEvaluated: true,
@@ -70,9 +73,27 @@ describe("indeterminate cannot become compatible", () => {
       }],
       pilotVins: ["5N1DL1FS0PC900002"], depth: 0, now: NOW,
     });
+    expect(plan.planned).toHaveLength(1);
+    expect(plan.planned[0].valuationCompatibility).toBe("indeterminate");
+    expect(plan.planned[0].evidenceContextOnly).toBe(true);
+    expect(plan.planned[0].reasons).toContain("comparable_equipment_enrichment_would_resolve");
+    expect(plan.rejected).toHaveLength(0);
+  });
+
+  it("awareness indeterminacy — an incomplete identity — is filed separately", () => {
+    const incomplete = key({ trim: null });
+    const plan = planImpactedInventory({
+      tenantId: "t", cohortKey: key(), subjectVin: "5N1DL1FS0PC900001",
+      subjectAlreadyEvaluated: true,
+      inventory: [{
+        vin: "5N1DL1FS0PC900002", tenantId: "t",
+        cohortKey: incomplete, nextValuationFingerprint: "fp",
+      }],
+      pilotVins: ["5N1DL1FS0PC900002"], depth: 0, now: NOW,
+    });
     expect(plan.planned).toEqual([]);
     expect(plan.indeterminate).toHaveLength(1);
-    expect(plan.rejected).toHaveLength(0);
+    expect(plan.indeterminate[0].reasons).toContain("market_identity_incomplete");
   });
 
   it("only `exact` is ever shareable — asserted on the predicate itself", () => {
