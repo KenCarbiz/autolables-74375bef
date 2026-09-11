@@ -96,6 +96,10 @@ export const buildCaptureRow = (args: CaptureArgs, storeId: string) => ({
   store_id: storeId,
   vin: args.vin.toUpperCase().trim(),
   source_channel: args.source_label || "manual",
+  // A staff member typing the price they see on the dealer's page IS an
+  // observation; without this stamp the row is indistinguishable from a
+  // legacy row and the audit packet refuses to quote it.
+  captured_method: "manual_dealer_confirmation",
   source_url: args.source_url || "",
   advertised_price: args.advertised_price,
   notes: args.notes || "",
