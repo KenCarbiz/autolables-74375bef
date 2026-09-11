@@ -8,11 +8,14 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import {
   SECRET_KEY_ENV_NAMES, FORBIDDEN_SECRET_ENV_NAMES,
   buildSecretKeySet, credentialCarrier, decideUserAuthorization,
   denyForVerifierStatus, jwksSource, readCredentials, redactCredentials,
-  constantTimeEquals, matchesLegacyServiceRole,
+  constantTimeEquals, matchesLegacyServiceRole, matchesDedicatedInvocationKey,
+  WRITER_AUTH_HEADER, WRITER_AUTH_ENV_NAME, CLIENT_VISIBLE_ENV_PREFIXES,
+  isClientVisibleEnvName,
   DENY_UNAUTHENTICATED, DENY_NOT_A_MEMBER, DENY_MISCONFIGURED,
 } from "./functionAuth.ts";
 
@@ -565,5 +568,162 @@ describe("the budget cannot arm itself", () => {
     const s = writerSrc();
     expect(s).not.toMatch(/market_provider_budgets/);
     expect(s).not.toMatch(/enabled\s*:\s*true/);
+  });
+});
+
+// ── Dedicated, function-scoped invocation secret ───────────────────────────
+//
+// Authorises exactly one function, grants no database access, and travels in
+// its own header so it cannot be confused with — or forwarded as — an apikey
+// or Authorization credential.
+
+const WRITER_KEY = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+const reqWith = (headers: Record<string, string>, url = "https://x/functions/v1/market-valuation-write") =>
+  new Request(url, { method: "POST", headers });
+
+describe("dedicated invocation secret", () => {
+  it("uses its own header and env name, not apikey or Authorization", () => {
+    expect(WRITER_AUTH_HEADER).toBe("x-market-valuation-writer-key");
+    expect(WRITER_AUTH_ENV_NAME).toBe("MARKET_VALUATION_WRITER_AUTH_KEY");
+  });
+
+  it("accepts the correct secret", async () => {
+    expect(await matchesDedicatedInvocationKey(
+      reqWith({ [WRITER_AUTH_HEADER]: WRITER_KEY }), WRITER_KEY,
+    )).toBe(true);
+  });
+
+  it("rejects an incorrect secret", async () => {
+    expect(await matchesDedicatedInvocationKey(
+      reqWith({ [WRITER_AUTH_HEADER]: "a".repeat(WRITER_KEY.length) }), WRITER_KEY,
+    )).toBe(false);
+  });
+
+  it("rejects an altered final character", async () => {
+    const altered = WRITER_KEY.slice(0, -1) + (WRITER_KEY.endsWith("5") ? "6" : "5");
+    expect(altered).not.toBe(WRITER_KEY);
+    expect(await matchesDedicatedInvocationKey(reqWith({ [WRITER_AUTH_HEADER]: altered }), WRITER_KEY)).toBe(false);
+  });
+
+  it("rejects truncated and empty secrets", async () => {
+    for (const bad of [WRITER_KEY.slice(0, -1), WRITER_KEY.slice(0, 8), ""]) {
+      expect(await matchesDedicatedInvocationKey(reqWith({ [WRITER_AUTH_HEADER]: bad }), WRITER_KEY)).toBe(false);
+    }
+    expect(await matchesDedicatedInvocationKey(reqWith({}), WRITER_KEY)).toBe(false);
+  });
+
+  it("is unavailable, not permissive, when the runtime secret is missing", async () => {
+    for (const configured of [undefined, null, "", "   "]) {
+      expect(await matchesDedicatedInvocationKey(
+        reqWith({ [WRITER_AUTH_HEADER]: WRITER_KEY }), configured,
+      )).toBe(false);
+    }
+  });
+
+  it("reads the secret only from its own header", async () => {
+    // Presented in the wrong slot, it must not authenticate.
+    expect(await matchesDedicatedInvocationKey(reqWith({ apikey: WRITER_KEY }), WRITER_KEY)).toBe(false);
+    expect(await matchesDedicatedInvocationKey(
+      reqWith({ Authorization: `Bearer ${WRITER_KEY}` }), WRITER_KEY,
+    )).toBe(false);
+  });
+
+  it("compares in constant time over a fixed-width digest, never with ===", () => {
+    const mod = readFileSync("supabase/functions/_shared/functionAuth.ts", "utf8");
+    const fn = mod.slice(mod.indexOf("export async function matchesDedicatedInvocationKey"));
+    const body = fn.slice(0, fn.indexOf("\n}"));
+    expect(body).toContain("constantTimeEquals");
+    expect(body).not.toMatch(/[!=]==\s*configured/);
+    expect(body).not.toMatch(/presented\s*[!=]==\s*/);
+  });
+});
+
+describe("the invocation secret cannot leak", () => {
+  it("names every client-visible prefix as forbidden", () => {
+    for (const prefix of ["VITE_", "PUBLIC_", "NEXT_PUBLIC_", "REACT_APP_"]) {
+      expect(CLIENT_VISIBLE_ENV_PREFIXES as readonly string[]).toContain(prefix);
+      expect(isClientVisibleEnvName(`${prefix}MARKET_VALUATION_WRITER_AUTH_KEY`)).toBe(true);
+    }
+    expect(isClientVisibleEnvName(WRITER_AUTH_ENV_NAME)).toBe(false);
+  });
+
+  it("is never read from a client-visible environment name", () => {
+    const src = writerSrc() + readFileSync("supabase/functions/_shared/functionAuth.ts", "utf8");
+    for (const prefix of CLIENT_VISIBLE_ENV_PREFIXES) {
+      expect(src).not.toContain(`${prefix}MARKET_VALUATION`);
+    }
+  });
+
+  it("never appears in the browser bundle's source tree", () => {
+    // Nothing under src/ may reference the name; that tree is what ships.
+    const hits = execSync(
+      "grep -rl 'MARKET_VALUATION_WRITER_AUTH_KEY' src/ 2>/dev/null || true",
+      { encoding: "utf8" },
+    ).trim();
+    expect(hits).toBe("");
+  });
+
+  it("is not exposed through the CORS allow-list", () => {
+    // Only server callers send it. A browser that cannot send the header
+    // cannot be tricked into spending a dealer's money with it.
+    const http = readFileSync("supabase/functions/_shared/http.ts", "utf8");
+    expect(http).not.toContain(WRITER_AUTH_HEADER);
+  });
+
+  it("is not logged, returned or written to evidence", () => {
+    const src = writerSrc();
+    // The diagnostic may record PRESENCE of the header, never its value.
+    expect(src).not.toMatch(/console\.\w+\([^)]*headers\.get\(["']x-market-valuation-writer-key["']\)\s*[,)]\s*$/m);
+    const log = src.slice(src.indexOf('console.error("writer_auth_denied"'));
+    const block = log.slice(0, log.indexOf("});") + 3);
+    expect(block).toContain("writer_key_header_present");
+    expect(block).toMatch(/writer_key_header_present:\s*req\.headers\.get\([^)]*\)\s*!==\s*null/);
+    // audit details and the response carry nothing of it
+    const audit = src.slice(src.indexOf('from("audit_log").insert('));
+    expect(audit.slice(0, audit.indexOf("});") + 3)).not.toContain("writer");
+  });
+
+  it("is absent from every committed file", () => {
+    // The value lives only in managed secret storage. Nothing in the repo may
+    // contain the env name paired with an assignment.
+    const hits = execSync(
+      "grep -rnE 'MARKET_VALUATION_WRITER_AUTH_KEY\\\\s*=\\\\s*[\"'\\''][A-Za-z0-9+/=_-]{16,}' " +
+      "--include='*.ts' --include='*.tsx' --include='*.sql' --include='*.toml' --include='*.json' . " +
+      "2>/dev/null | grep -v node_modules || true",
+      { encoding: "utf8" },
+    ).trim();
+    expect(hits).toBe("");
+  });
+});
+
+describe("the dedicated key is tried first and changes nothing else", () => {
+  it("runs before the legacy and modern paths", () => {
+    const src = writerSrc();
+    const dedicated = src.indexOf("matchesDedicatedInvocationKey(");
+    const legacy = src.indexOf("matchesLegacyServiceRole(");
+    const modern = src.indexOf("createSupabaseContext(credentialCarrier(req)");
+    expect(dedicated).toBeGreaterThan(-1);
+    expect(dedicated).toBeLessThan(legacy);
+    expect(legacy).toBeLessThan(modern);
+  });
+
+  it("still runs before any reservation, provider call or write", () => {
+    const src = writerSrc();
+    const authAt = src.indexOf("const caller = await authenticateCaller(");
+    for (const guarded of [
+      "market_reserve_provider_call", "callProvider(", "market_valuation_commit",
+      'from("audit_log").insert(', 'from("vehicle_listings").update(',
+    ]) {
+      expect(src.indexOf(guarded)).toBeGreaterThan(authAt);
+    }
+  });
+
+  it("leaves the legacy, modern and user paths intact", () => {
+    const src = writerSrc();
+    expect(src).toContain("matchesLegacyServiceRole(");
+    expect(src).toContain('auth: ["secret:*", "user"]');
+    expect(src).toMatch(/jwks:\s*JWKS/);
+    expect(src).toContain("decideUserAuthorization(");
   });
 });

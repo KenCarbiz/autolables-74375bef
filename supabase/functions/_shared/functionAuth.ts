@@ -99,6 +99,57 @@ export async function constantTimeEquals(a: string, b: string): Promise<boolean>
   return difference === 0;
 }
 
+// ── Dedicated, function-scoped invocation secret ───────────────────────────
+//
+// The canonical service-role key is the wrong instrument for this job twice
+// over: it is a database credential handed to a caller that needs only to ask
+// one function a question, and the value held by the Edge runtime turned out
+// not to be the value held by the calling environment — a mismatch that is
+// invisible until something 401s.
+//
+// This secret authorises exactly one function and grants nothing else. It is
+// not a Supabase key, opens no database connection, and is read from its own
+// header so it can never be confused with — or accidentally forwarded as — an
+// `apikey` or `Authorization` credential.
+//
+// It is deliberately NOT in the CORS allow-list. Only server-side callers use
+// it, and a browser that cannot send the header cannot be tricked into
+// spending a dealer's money with it.
+
+export const WRITER_AUTH_HEADER = "x-market-valuation-writer-key";
+export const WRITER_AUTH_ENV_NAME = "MARKET_VALUATION_WRITER_AUTH_KEY";
+
+/**
+ * Environment prefixes that a bundler publishes to the browser. A secret under
+ * any of these is not a secret; it ships to every visitor. Asserted by test
+ * rather than merely documented.
+ */
+export const CLIENT_VISIBLE_ENV_PREFIXES = [
+  "VITE_", "PUBLIC_", "NEXT_PUBLIC_", "REACT_APP_", "NUXT_PUBLIC_", "EXPO_PUBLIC_",
+] as const;
+
+export const isClientVisibleEnvName = (name: string): boolean =>
+  CLIENT_VISIBLE_ENV_PREFIXES.some((prefix) => name.startsWith(prefix));
+
+/**
+ * Does the request carry the dedicated invocation secret?
+ *
+ * Read from its own header only. Same constant-time comparison as every other
+ * credential here, and the same rule when unconfigured: the path is
+ * UNAVAILABLE, never permissive — a deployment that has no secret bound must
+ * fall through to the other modes rather than wave the caller past.
+ */
+export async function matchesDedicatedInvocationKey(
+  req: Request,
+  configuredKey: string | null | undefined,
+): Promise<boolean> {
+  const configured = (configuredKey ?? "").trim();
+  if (!configured) return false;
+  const presented = req.headers.get(WRITER_AUTH_HEADER);
+  if (!presented) return false;
+  return await constantTimeEquals(presented, configured);
+}
+
 /**
  * Does a presented credential match the runtime's canonical service-role key?
  *

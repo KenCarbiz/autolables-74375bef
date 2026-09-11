@@ -26,6 +26,7 @@ import { createSupabaseContext } from "https://esm.sh/@supabase/server@1.6.0";
 import {
   buildSecretKeySet, credentialCarrier, decideUserAuthorization,
   denyForVerifierStatus, jwksSource, matchesLegacyServiceRole, readCredentials,
+  matchesDedicatedInvocationKey, WRITER_AUTH_ENV_NAME,
   DENY_UNAUTHENTICATED, type CallerDecision,
 } from "../_shared/functionAuth.ts";
 
@@ -94,7 +95,16 @@ async function authenticateCaller(
   tenantId: string,
   admin: ReturnType<typeof adminClient>,
 ): Promise<CallerDecision> {
-  // ── Legacy service-role compatibility, first ────────────────────────
+  // ── Dedicated, function-scoped invocation secret, first ─────────────
+  // Purpose-built for this one function: it is not a Supabase key, grants no
+  // database access, and arrives in its own header so it cannot be confused
+  // with an apikey or Authorization credential. Constant-time, exact match
+  // only; unconfigured means unavailable, not permissive.
+  if (await matchesDedicatedInvocationKey(req, Deno.env.get(WRITER_AUTH_ENV_NAME))) {
+    return { ok: true, mode: "secret", userId: null };
+  }
+
+  // ── Legacy service-role compatibility, next ─────────────────────────
   // The modern verifier answers INVALID_API_KEY for a legacy JWT-shaped
   // service_role key, and that legacy key is this project's canonical
   // credential. Compared in constant time against the configured value and
@@ -114,6 +124,8 @@ async function authenticateCaller(
     // derived from a credential belongs in a log line.
     const presented = readCredentials(req);
     console.error("writer_auth_denied", error.code, {
+      writer_key_header_present: req.headers.get("x-market-valuation-writer-key") !== null,
+      writer_key_configured: !!Deno.env.get(WRITER_AUTH_ENV_NAME),
       apikey_present: presented.apikey !== null,
       bearer_present: presented.token !== null,
       legacy_path_configured: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
