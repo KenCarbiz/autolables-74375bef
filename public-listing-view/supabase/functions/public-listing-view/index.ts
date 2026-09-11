@@ -1,0 +1,929 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
+import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
+import { resolvePassportVersion } from "../_shared/passport-version.ts";
+import { PUBLIC_VIEW_DENY, scrubTitleVerification, applyRecallProjection } from "../_shared/lotFeedRow.ts";
+
+// ──────────────────────────────────────────────────────────────
+// public-listing-view
+//
+// Rate-limited proxy in front of the anon /v/:slug shopper portal.
+// Shoppers still load the public page, but the page calls this
+// function to fetch the listing data instead of hitting the DB
+// directly. That keeps RLS simple and lets us throttle abusive
+// clients (competitor scrapers, credential stuffing bots).
+//
+// Contract:
+//   POST /functions/v1/public-listing-view
+//   Body: { slug: string }
+//   Returns: { listing } on success,
+//            { error: "rate_limited", retry_after } with 429, or
+//            { error: "not_found" } with 404.
+//
+// Rate limits (anonymous callers only, per client IP):
+//   - 60 listing_viewed events per 5 minutes, OR
+//   - 300 events per hour.
+// Enforced via a simple SQL COUNT against public.audit_log.
+// A request carrying a valid user JWT is dealer staff and is never throttled.
+//
+// Every successful view is:
+//   1. Inserted into audit_log as "listing_viewed" so it counts
+//      toward the next request's rate check.
+//   2. Passed through increment_listing_view so dealer sees the
+//      view_count tick.
+// ──────────────────────────────────────────────────────────────
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const json = (status: number, body: unknown, extraHeaders: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
+  });
+
+const clientIp = (req: Request) =>
+  req.headers.get("cf-connecting-ip") ||
+  (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
+  req.headers.get("x-real-ip") ||
+  "unknown";
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json(405, { error: "method not allowed" });
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey) return json(500, { error: "supabase not configured" });
+
+    const { slug, session } = await req.json().catch(() => ({}));
+    if (!slug || typeof slug !== "string") return json(400, { error: "slug required" });
+    const sessionId = typeof session === "string" ? session.slice(0, 80) : "";
+
+    const ip = clientIp(req);
+    const ua = req.headers.get("user-agent") || "";
+    const admin = createClient(supabaseUrl, serviceKey);
+
+    // A signed-in user is dealer staff working their own inventory, not a
+    // scraper. They open passports far faster than any shopper, and throttling
+    // them made their own cars read as "sold or unpublished".
+    const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    let isAuthenticated = false;
+    if (bearer && bearer !== anonKey) {
+      const { data: who } = await admin.auth.getUser(bearer).catch(() => ({ data: null }));
+      isAuthenticated = !!who?.user;
+    }
+
+    // ── Rate limit (anon only): 60 views / 5min, 300 views / hour per IP.
+    // Sized so a shopper walking a whole lot never trips it, while a scraper
+    // pulling an entire feed still does. Shared NAT (dealership wifi, carrier
+    // CGNAT) puts many real shoppers behind one IP, so the floor cannot be low.
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+    const oneHrAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+
+    const [fiveMinRes, oneHrRes] = isAuthenticated ? [{ count: 0 }, { count: 0 }] : await Promise.all([
+      admin
+        .from("audit_log")
+        .select("id", { head: true, count: "exact" })
+        .eq("action", "listing_viewed")
+        .eq("ip_address", ip)
+        .gte("created_at", fiveMinAgo),
+      admin
+        .from("audit_log")
+        .select("id", { head: true, count: "exact" })
+        .eq("action", "listing_viewed")
+        .eq("ip_address", ip)
+        .gte("created_at", oneHrAgo),
+    ]);
+    const fiveMinCount = fiveMinRes.count ?? 0;
+    const oneHrCount = oneHrRes.count ?? 0;
+
+    if (!isAuthenticated && (fiveMinCount >= 60 || oneHrCount >= 300)) {
+      return json(429, { error: "rate_limited", retry_after: 60 }, { "Retry-After": "60" });
+    }
+
+    // ── Fetch the listing
+    let lookupSlug = slug;
+    const { data, error } = await admin.rpc("get_vehicle_listing_by_slug", { _slug: slug });
+    if (error) return json(500, { error: error.message });
+    let row = Array.isArray(data) ? data[0] : data;
+
+    // Canonical Passport URLs are /v/{VIN}. Newer listings store the VIN as
+    // their slug so the RPC matches directly; older listings carry a legacy
+    // slug. When the direct match misses, treat the slug as a VIN: resolve it
+    // to the listing's stored slug and retry — keeping the RPC as the single
+    // source of the returned shape.
+    if (!row) {
+      const { data: byVin } = await admin
+        .from("vehicle_listings")
+        .select("slug")
+        .eq("vin", slug.toUpperCase())
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .limit(1);
+      const alt = Array.isArray(byVin) ? byVin[0] : byVin;
+      if (alt?.slug && alt.slug !== slug) {
+        lookupSlug = alt.slug;
+        const retry = await admin.rpc("get_vehicle_listing_by_slug", { _slug: alt.slug });
+        row = Array.isArray(retry.data) ? retry.data[0] : retry.data;
+      }
+    }
+    if (!row) return json(404, { error: "not_found" });
+
+    // Dealer's price_label setting ({ preset, custom? }), captured here and
+    // resolved to a display string after the dealer name is known below.
+    let priceLabelSetting: Record<string, unknown> | null = null;
+
+    // ── Attach the dealer's passport sticky-button config (service role reads
+    // dealer_profiles past RLS) so the anonymous passport can render it.
+    try {
+      if (row.tenant_id) {
+        const { data: prof } = await admin
+          .from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
+        const s = (prof?.settings ?? {}) as Record<string, unknown>;
+        if (s.sticky_bottom_buttons) row.sticky_bottom_buttons = s.sticky_bottom_buttons;
+        // Price-drop watch opt-in is on unless the dealer turned it off.
+        row.price_drop_watch = s.price_drop_watch_enabled !== false;
+        // Customer-facing price display mode (advertised_before_doc default vs
+        // website_sale_price). Lets the passport show the dealer's chosen price.
+        if (s.price_display_mode) row.price_display_mode = s.price_display_mode;
+        // Whether the tenant's advertised price EXCLUDES the doc fee (additive).
+        // Default (inclusive) means website_sale_price mode shows the advertised
+        // price unchanged and never double-adds the fee.
+        if (s.advertised_includes_doc_fee != null) row.advertised_excludes_doc_fee = String(s.advertised_includes_doc_fee) !== "true";
+        // Dealer payment-estimate display toggles (payment / down / term / APR).
+        if (s.passport_payment_display && typeof s.passport_payment_display === "object") row.payment_display = s.passport_payment_display;
+        if (s.price_label && typeof s.price_label === "object") priceLabelSetting = s.price_label as Record<string, unknown>;
+        // Franchise title policy. A store that never retails branded-title cars
+        // may say so, and the passport prints it as the DEALER'S statement —
+        // never as a verified title-record check, and never over a reported
+        // brand. See the title check in verificationSummary.ts.
+        if (s.title_policy_no_branded === true) row.title_policy_no_branded = true;
+        // Today's Price page wording mode + custom copy (compliance-safe
+        // defaults resolve client-side when absent).
+        if (s.todays_price_mode) row.todays_price_mode = s.todays_price_mode;
+        if (s.todays_price_custom) row.todays_price_custom = s.todays_price_custom;
+        // Store-wide packet module template; per-vehicle packet_modules
+        // overrides it (see the curation enforcement before the response).
+        if (s.packet_module_defaults && typeof s.packet_module_defaults === "object") {
+          row.packet_defaults = s.packet_module_defaults;
+        }
+        // Passport experience version — resolved once, server-side, through
+        // the shared pure resolver (supabase/functions/_shared/passport-version.ts)
+        // so the client just reads effective_passport_version +
+        // passport_resolution_reason. Also expose the tenant's governed-routing
+        // gate so the /v/:slug wrapper can decide in-place without a second
+        // request. The kill switch always forces the existing passport.
+        {
+          const resolved = resolvePassportVersion({
+            vehicleOverride: (row as { passport_version?: unknown }).passport_version,
+            tenantDefault: s.passport_version,
+            tenantKillSwitch: s.passport_kill_switch,
+          });
+          (row as Record<string, unknown>).effective_passport_version = resolved.effective;
+          (row as Record<string, unknown>).passport_resolution_reason = resolved.reason;
+          (row as Record<string, unknown>).governed_routing_enabled = s.governed_routing_enabled === true;
+        }
+        // Dealer-branded warranty programs (lifetime powertrain, dealer CPO)
+        // flagged for the passport warranty panel, filtered to this vehicle's
+        // condition. Included vs available mode rides along for the badge.
+        try {
+          const progs = Array.isArray(s.dealer_programs) ? s.dealer_programs as Record<string, unknown>[] : [];
+          const cond = String((row.condition as string) || "").toLowerCase();
+          // Mirrors matchesCondition in src/lib/dealerPrograms.ts: missing
+          // appliesTo = all, and "used" subsumes "cpo".
+          const applies = (a: unknown) => {
+            const v = String(a || "all").toLowerCase();
+            if (v === "all") return true;
+            if (v === "used") return cond === "used" || cond === "cpo";
+            return v === cond;
+          };
+          const suppressed = new Set((Array.isArray(row.suppressed_programs) ? row.suppressed_programs as unknown[] : []).map(String));
+          const cov = progs
+            .filter((p) => p && p.enabled !== false && p.isWarranty === true && p.showOnWarrantyPanel === true &&
+              !suppressed.has(String(p.id || "")) &&
+              (String(p.title || "").trim() || String(p.offer || "").trim()) && applies(p.appliesTo))
+            .map((p) => ({
+              title: String(p.title || ""),
+              coverage: String(p.coverage || ""),
+              term_years: typeof p.termYears === "number" ? p.termYears : null,
+              term_miles: typeof p.termMiles === "number" ? p.termMiles : null,
+              lifetime: p.lifetime === true,
+              mode: p.mode === "available" ? "available" : "included",
+              offer: String(p.offer || ""),
+              disclosure: String(p.disclosure || ""),
+            }));
+          if (cov.length) row.dealer_coverage = cov;
+        } catch { /* dealer coverage optional */ }
+        // Dealer-entered passport trust content (badges + multi-source reviews).
+        const trust = {
+          years_in_business: (s.dealer_years_in_business as string) || "",
+          satisfaction: (s.dealer_satisfaction as string) || "",
+          bbb_rating: (s.dealer_bbb_rating as string) || "",
+          google_rating: (s.dealer_google_rating as string) || "",
+          google_count: (s.dealer_google_count as string) || "",
+          certifications: (s.dealer_certifications as string) || "",
+          storefront_url: (s.dealer_storefront_url as string) || "",
+          review_sources: (s.dealer_review_sources as string) || "",
+          advisor_name: (s.dealer_advisor_name as string) || "",
+          advisor_title: (s.dealer_advisor_title as string) || "",
+          advisor_photo: (s.dealer_advisor_photo as string) || "",
+          advisor_response: (s.dealer_advisor_response as string) || "",
+          family_owned: (s.dealer_family_owned as string) || "",
+          service_location: (s.dealer_service_location as string) || "",
+          service_address: (s.dealer_service_address as string) || "",
+          delivery: (s.dealer_delivery as string) || "",
+          financing: (s.dealer_financing as string) || "",
+          amenities: (s.dealer_amenities as string) || "",
+          services: (s.dealer_services as string) || "",
+          hours: (s.dealer_hours as string) || "",
+          mobile_cta_variant: (s.mobile_slideout_cta_variant as string) || "",
+        };
+        if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
+
+        // ── Vehicle history report link (CARFAX / AutoCheck). Used/CPO only,
+        // and the dealer kill switch hides every link at once. The dealer's own
+        // link (harvested from their VDP or entered manually) is preferred; when
+        // there is none, fall back to the official CARFAX per-VIN record so the
+        // report reaches every eligible vehicle MarketCheck confirms a CARFAX
+        // for — not only the few whose VDP exposed a scrapeable link. The source
+        // marker lets the surfaces drop the "no cost" wording on the fallback.
+        try {
+          const hCond = String((row.condition as string) || "").toLowerCase();
+          if (["used", "cpo", "demo"].includes(hCond) && s.history_report_links_enabled !== false) {
+            const url = String((row.history_report_url as string) || "").trim();
+            if (/^https:\/\/(www\.)?(carfax\.com|cfx\.link|autocheck\.com)\//i.test(url)) {
+              row.history_report = { url, provider: /autocheck\.com/i.test(url) ? "autocheck" : "carfax", source: "dealer" };
+            } else {
+              const mc = (row.mc_attributes ?? {}) as Record<string, unknown>;
+              const carfaxKnown = mc.carfax_1_owner != null || mc.carfax_clean_title != null;
+              const vin = String((row.vin as string) || "").trim().toUpperCase();
+              if (carfaxKnown && /^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+                row.history_report = { url: `https://www.carfax.com/vehicle/${vin}`, provider: "carfax", source: "vin" };
+              }
+            }
+          }
+        } catch { /* history link must never break the payload */ }
+
+        // ── IIHS Top Safety Pick — permission-gated (the dealer flips the
+        // enable flag only after IIHS grants written permission) and
+        // dealer-verified per model. Text-only statement, never a logo.
+        try {
+          if (s.iihs_awards_enabled === true || String(s.iihs_awards_enabled) === "true") {
+            const award = matchIihsAward((s.iihs_awards ?? null) as IihsAward[] | null, (row.ymm as string) || "");
+            if (award) row.iihs_award = award;
+          }
+        } catch { /* award must never break the payload */ }
+
+        // ── Contact routing: resolve WHO this shopper reaches (agent / BDC /
+        // store) server-side and attach only the result. The roster, priority
+        // ladder, and rotation memory never reach the anonymous client.
+        try {
+          const agents = (Array.isArray(s.passport_agents) ? s.passport_agents : []) as PassportAgent[];
+          const assignments = (s.vehicle_agent_assignments ?? {}) as Record<string, string>;
+          const assignedAgentId =
+            (row.assigned_agent_id as string) || assignments[String(row.vin || "").toUpperCase()] || assignments[String(row.vin || "")] || null;
+          const routing = resolveCustomerPassportRouting(
+            { ...(s.passport_contact_routing ?? {}), dealershipDefaultContact: {
+              salesPhone: ((s.passport_contact_routing as Record<string, Record<string, string>> | undefined)?.dealershipDefaultContact?.salesPhone) || (s.dealer_phone as string) || "",
+              salesEmail: ((s.passport_contact_routing as Record<string, Record<string, string>> | undefined)?.dealershipDefaultContact?.salesEmail) || (s.view_notify_email as string) || "",
+            } },
+            {
+              agents,
+              assignedAgentId,
+              rotationState: (s.passport_rotation_state ?? {}) as Record<string, string>,
+              now: new Date(),
+            },
+          );
+          // Strip internal email before it ships to an anonymous page.
+          row.contact_routing = { ...routing, email: undefined };
+        } catch { /* routing must never break the listing payload */ }
+
+        // ── Factory warranty for new / CPO cars. The dealer verifies OEM
+        // warranty terms per brand in admin; here we match the listing's make
+        // and, when the listing itself carries no warranty_info, synthesize it
+        // so the passport shows the factory coverage. New cars have no prior
+        // in-service date — the clock starts at delivery, so today stands in.
+        // Used/CPO must use the vehicle's REAL in-service date (vehicle-enrich
+        // derives it from listing history); when none exists the date is
+        // omitted so the client never counts down from a fabricated start.
+        // Only VERIFIED terms are used.
+        const ymm = String((row.ymm as string) || "").toUpperCase();
+        const cond = String((row.condition as string) || "").toLowerCase();
+        const hasWarranty = row.warranty_info && Object.keys(row.warranty_info as object).length > 0;
+        if (ymm && (cond === "new" || cond === "cpo") && !hasWarranty) {
+          // deno-lint-ignore no-explicit-any
+          const warranties: any[] = Array.isArray(s.oem_factory_warranties) ? s.oem_factory_warranties as any[] : [];
+          const w = warranties.find((x) => {
+            const b = String(x?.brand || "").trim().toUpperCase();
+            return b.length > 1 && x?.verified === true && ymm.includes(b);
+          });
+          if (w) {
+            const realInService = ((row.history_payload as { inServiceDate?: string | null } | null)?.inServiceDate as string | null)
+              || ((row.in_service_date as string) || null);
+            const start = cond === "new" ? new Date().toISOString() : realInService;
+            // Unlimited (sentinel -1) or unset miles → omit the cap so the
+            // passport renders a time-only term and never does negative-mile math.
+            const finiteMiles = (n: unknown) => { const v = Number(n); return v > 0 ? v : undefined; };
+            // A CPO buyer is a subsequent owner, so use the transferred terms
+            // where the make reduces them (e.g. Hyundai/Kia 10/100 → 5/60).
+            const subsequent = cond === "cpo";
+            const bMonths = subsequent && w.basic_transfer_months ? w.basic_transfer_months : w.basic_months;
+            const bMiles = subsequent && w.basic_transfer_miles ? w.basic_transfer_miles : w.basic_miles;
+            const ptMonths = subsequent && w.powertrain_transfer_months ? w.powertrain_transfer_months : w.powertrain_months;
+            const ptMiles = subsequent && w.powertrain_transfer_miles ? w.powertrain_transfer_miles : w.powertrain_miles;
+            row.warranty_info = {
+              factory_months: Number(bMonths) || undefined,
+              factory_miles: finiteMiles(bMiles),
+              powertrain_months: Number(ptMonths) || undefined,
+              powertrain_miles: finiteMiles(ptMiles),
+              ...(start ? { in_service_date: String(start).slice(0, 10) } : {}),
+            };
+            // Full coverage breakdown for the passport's factory-warranty
+            // slide-out (bumper-to-bumper, powertrain, corrosion, roadside,
+            // hybrid/EV battery, maintenance). Owner-resolved powertrain/basic;
+            // other lines pass through. Miles use the -1 unlimited sentinel.
+            const numOrU = (n: unknown) => { const v = Number(n); return v === -1 ? -1 : v > 0 ? v : undefined; };
+            row.oem_warranty = {
+              brand: w.brand,
+              verified: true,
+              owner: subsequent ? "subsequent" : "original",
+              basic_months: Number(bMonths) || undefined,
+              basic_miles: numOrU(bMiles),
+              powertrain_months: Number(ptMonths) || undefined,
+              powertrain_miles: numOrU(ptMiles),
+              corrosion_months: Number(w.corrosion_months) || undefined,
+              corrosion_miles: numOrU(w.corrosion_miles),
+              roadside_months: Number(w.roadside_months) || undefined,
+              roadside_miles: numOrU(w.roadside_miles),
+              ev_battery_months: Number(w.ev_battery_months) || undefined,
+              ev_battery_miles: numOrU(w.ev_battery_miles),
+              maintenance_months: Number(w.maintenance_months) || undefined,
+              maintenance_miles: numOrU(w.maintenance_miles),
+              notes: w.notes || undefined,
+            };
+          }
+        }
+
+        // ── CPO program details for CPO listings (matched OEM-by-brand, plus
+        // any dealer-certified program). Surfaced on the passport CPO block.
+        if (cond === "cpo") {
+          // deno-lint-ignore no-explicit-any
+          const programs: any[] = Array.isArray(s.cpo_programs) ? s.cpo_programs as any[] : [];
+          const matched = programs.filter((p) => {
+            if (!p?.enabled || p?.show_on_passport === false) return false;
+            if (p?.kind === "dealer") return true;
+            const b = String(p?.brand || "").trim().toUpperCase();
+            return b.length > 1 && ymm.includes(b);
+          });
+          if (matched.length) row.cpo_programs = matched;
+        }
+      }
+    } catch { /* config optional — passport falls back to its default bar */ }
+
+    // ── Dealer identity for the passport header/footer. dealer_snapshot is only
+    // written at publish time and is usually empty; fill name/logo/phone/website/
+    // address from the dealer's onboarding profile so the page shows the real
+    // dealership instead of "the dealership". Only real values — fields the
+    // dealer hasn't entered stay blank (no placeholders).
+    try {
+      const snap = (row.dealer_snapshot ?? {}) as Record<string, unknown>;
+      if (row.tenant_id && Object.keys(snap).length === 0) {
+        const { data: ob } = await admin
+          .from("onboarding_profiles")
+          .select("display_name, phone, website, logo_url, stores")
+          .eq("tenant_id", row.tenant_id).maybeSingle();
+        if (ob) {
+          const store = (Array.isArray(ob.stores) && ob.stores.length ? ob.stores[0] : {}) as Record<string, unknown>;
+          row.dealer_snapshot = {
+            name: ob.display_name || null,
+            phone: ob.phone || store.phone || null,
+            logo_url: ob.logo_url || null,
+            website: ob.website || null,
+            address: store.address || store.street || null,
+            city: store.city || null, state: store.state || null, zip: store.zip || store.postal_code || null,
+          };
+        }
+      }
+    } catch { /* dealer identity optional */ }
+
+    // ── Resolve the dealer's customer-facing price LABEL to a display string.
+    // Display text only — it never changes the price value or the doc-fee mode.
+    // Mirrors resolvePriceLabel in src/lib/priceModel.ts (edge functions can't
+    // import from src). "dealer" substitutes the dealership name; "website"
+    // mirrors the term the dealer's own VDP uses (website_price_term).
+    try {
+      const preset = String((priceLabelSetting?.preset ?? "our_price") as string);
+      const dealerName = String(((row.dealer_snapshot as Record<string, unknown> | null)?.name as string) || "").trim();
+      const custom = String((priceLabelSetting?.custom ?? "") as string).trim();
+      const websiteTerm = String((row.website_price_term as string) || "").trim();
+      const resolved =
+        preset === "advertised" ? "Advertised Price"
+        : preset === "best" ? "Best Price"
+        : preset === "one_price" ? "One Price"
+        : preset === "sale" ? "Sale Price"
+        : preset === "dealer" ? (dealerName ? `${dealerName} Price` : "Our Price")
+        : preset === "website" ? (websiteTerm || "Our Price")
+        : preset === "custom" ? (custom || "Our Price")
+        : "Our Price";
+      row.price_label = resolved;
+    } catch { /* label optional — passport defaults to "Our Price" */ }
+
+    // ── Attach real captured price/market history for this VIN (Passport V2
+    // Price History). Read-only, service role; the MOST RECENT 60 snapshots
+    // (an ascending fetch freezes long-listed cars in their oldest window),
+    // re-sorted oldest→newest for the client.
+    try {
+      if (row.vin) {
+        const { data: hist } = await admin
+          .from("vehicle_value_history")
+          .select("captured_at, market_value, listing_price, below_market, position")
+          .eq("vin", String(row.vin).toUpperCase())
+          .order("captured_at", { ascending: false })
+          .limit(60);
+        if (Array.isArray(hist) && hist.length) row.value_history = hist.reverse();
+      }
+    } catch { /* history optional — Passport shows a pending state */ }
+
+    // ── Customer-safe reconditioning & inspection summary (iPacket parity).
+    // The service/prep/detail/install sign-offs are tenant-scoped; expose only
+    // shopper-appropriate facts (what was done, dates, photos) — never names,
+    // notes, signatures, or IPs. service-docs is a public bucket, so the photo
+    // URLs load for anonymous shoppers.
+    try {
+      if (row.vin && row.tenant_id) {
+        const vinU = String(row.vin).toUpperCase();
+        const pubUrl = (p: unknown): string | null => {
+          const s = typeof p === "string" ? p : (p && typeof p === "object" ? (p as { url?: string }).url : null);
+          if (!s) return null;
+          if (/^https?:\/\//i.test(s)) return s;
+          return `${supabaseUrl}/storage/v1/object/public/service-docs/${String(s).replace(/^\/+/, "")}`;
+        };
+        const [insp, prep, detail, installs] = await Promise.all([
+          admin.from("safety_inspections").select("form_type, result, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(1),
+          admin.from("prep_sign_offs").select("install_photos, accessories_installed, signed_at, inspection_passed").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("listing_unlocked", true).order("signed_at", { ascending: false }).limit(1),
+          // Every signed detail/install sign-off — many parties (detail, parts,
+          // service, outside vendors) can each sign off their own work.
+          admin.from("detail_signoffs").select("detail_types, installs, photos, is_third_party, provider_company, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(50),
+          // Tenant-scoped (same-VIN cars at other dealers must not leak) and
+          // is_verified only — an install isn't "proven" to the shopper without
+          // both a photo and the installer's signature.
+          admin.from("install_proofs").select("product_name, installer_company, photo_path, installed_at").eq("vehicle_vin", vinU).eq("tenant_id", row.tenant_id).eq("is_verified", true).order("installed_at", { ascending: false }).limit(20),
+        ]);
+        const inspRow = (insp.data || [])[0] as { form_type?: string; result?: string; signed_at?: string } | undefined;
+        const prepRow = (prep.data || [])[0] as { install_photos?: unknown[]; accessories_installed?: unknown[]; signed_at?: string; inspection_passed?: boolean } | undefined;
+        const detailRows = (detail.data || []) as { detail_types?: unknown[]; installs?: unknown[]; photos?: unknown[]; is_third_party?: boolean; provider_company?: string; signed_at?: string }[];
+        const installRows = (installs.data || []) as { product_name?: string; installer_company?: string; photo_path?: string; installed_at?: string }[];
+
+        const labelOf = (v: unknown): string | null =>
+          typeof v === "string" ? v : (v && typeof v === "object" ? ((v as { label?: string; name?: string }).label || (v as { name?: string }).name || null) : null);
+
+        const items: string[] = [];
+        const detailThirdParty: { product: string; company: string }[] = [];
+        for (const dr of detailRows) {
+          (Array.isArray(dr.detail_types) ? dr.detail_types : []).forEach((t) => { const l = labelOf(t); if (l) items.push(l); });
+          (Array.isArray(dr.installs) ? dr.installs : []).forEach((i) => { const l = labelOf(i); if (l) { items.push(l); if (dr.is_third_party && dr.provider_company) detailThirdParty.push({ product: l, company: dr.provider_company }); } });
+        }
+        (Array.isArray(prepRow?.accessories_installed) ? prepRow!.accessories_installed : []).forEach((a) => {
+          const name = labelOf(a);
+          if (name) items.push(name);
+        });
+        installRows.forEach((i) => { if (i.product_name) items.push(i.product_name); });
+
+        const photos = [
+          ...(Array.isArray(prepRow?.install_photos) ? prepRow!.install_photos : []),
+          ...detailRows.flatMap((dr) => Array.isArray(dr.photos) ? dr.photos : []),
+          ...installRows.map((i) => i.photo_path),
+        ].map(pubUrl).filter((u): u is string => !!u).slice(0, 12);
+
+        const inspectionType = inspRow
+          ? (/k.?208/i.test(inspRow.form_type || "") ? "Connecticut K-208 safety inspection"
+             : /pdi|pre.?delivery/i.test(inspRow.form_type || "") ? "Pre-delivery inspection"
+             : "Multi-point inspection")
+          : null;
+
+        const recon = {
+          inspection: inspRow ? { type: inspectionType, passed: (inspRow.result || "").toLowerCase() !== "fail", date: inspRow.signed_at || null } : null,
+          detailed: detailRows.length > 0,
+          detailDate: detailRows[0]?.signed_at || null,
+          workItems: Array.from(new Set(items)).slice(0, 24),
+          thirdParty: [
+            ...detailThirdParty,
+            ...installRows.filter((i) => i.installer_company).map((i) => ({ product: i.product_name || "Accessory", company: i.installer_company as string })),
+          ],
+          photos,
+        };
+        if (recon.inspection || recon.detailed || recon.workItems.length || recon.photos.length) row.recon = recon;
+      }
+    } catch { /* recon optional — module shows a pending state */ }
+
+    // ── Same-rooftop alternatives ─────────────────────────────────────────
+    // The passport never merchandises other dealers' cars, so every "similar
+    // vehicles" module shows the tenant's OWN published stock, tiered:
+    //   1. same model — ANY condition (a new car's pre-owned twin, and vice
+    //      versa, is the strongest cross-shop we can offer);
+    //   2. same make;
+    //   3. competitive set — same body type or price band from the rest of the
+    //      lot, when nothing closer exists.
+    // Package data from each sibling's build_sheet lets the client position
+    // alternatives as higher/lower-equipped.
+    try {
+      if (row.tenant_id) {
+        const { data: sibs } = await admin
+          .from("vehicle_listings")
+          .select("slug, ymm, trim, price, mileage, condition, hero_image_url, mc_attributes, key_specs")
+          .eq("tenant_id", row.tenant_id)
+          .eq("status", "published")
+          .neq("id", row.id)
+          .limit(80);
+        if (sibs?.length) {
+          const words = (ymm: unknown) => String(ymm || "").toLowerCase().replace(/^\s*(19|20)\d{2}\s+/, "").split(/\s+/).filter(Boolean);
+          const cur = words(row.ymm);
+          const overlap = (a: string[], b: string[]) => a.filter((w) => b.includes(w)).length;
+          // deno-lint-ignore no-explicit-any
+          const bodyOf = (s: any) => String(s?.mc_attributes?.body_type ?? s?.key_specs?.body_style ?? s?.key_specs?.body ?? "").toLowerCase().trim();
+          // deno-lint-ignore no-explicit-any
+          const summarize = (mc: any) => {
+            const sh = mc && typeof mc === "object" ? mc.build_sheet : null;
+            if (!sh || typeof sh !== "object") return { package_count: null, option_value: null, top_packages: [] as string[] };
+            const pkgs = Array.isArray(sh.packages) ? sh.packages : [];
+            const opts = Array.isArray(sh.options) ? sh.options : [];
+            const msrps = [...pkgs, ...opts].map((p: { msrp?: unknown }) => Number(p?.msrp)).filter((n: number) => Number.isFinite(n) && n > 0);
+            return {
+              package_count: pkgs.length,
+              option_value: msrps.length ? msrps.reduce((a: number, b: number) => a + b, 0) : null,
+              top_packages: pkgs.slice(0, 3).map((p: { name?: unknown }) => String(p?.name || "")).filter(Boolean),
+            };
+          };
+          const price = Number(row.price) || null;
+          const curBody = bodyOf(row);
+          const scored = (sibs as Record<string, unknown>[]).map((s) => {
+            const ov = overlap(cur, words(s.ymm));
+            const sPrice = Number(s.price) || null;
+            const priceGap = price != null && sPrice != null ? Math.abs(sPrice - price) : Number.MAX_SAFE_INTEGER;
+            const inBand = price != null && sPrice != null && priceGap <= price * 0.25;
+            const sameBody = !!curBody && bodyOf(s) === curBody;
+            const tier = ov >= 2 ? 1 : ov >= 1 ? 2 : (sameBody || inBand) ? 3 : 0;
+            return { s, tier, priceGap };
+          }).filter((x) => x.tier > 0);
+          // Prefer closer tiers; only reach into the competitive set when the
+          // closer tiers are thin.
+          const ranked = scored
+            .sort((a, b) => a.tier - b.tier || a.priceGap - b.priceGap)
+            .slice(0, 6)
+            .map(({ s, tier }) => ({
+              slug: s.slug, ymm: s.ymm, trim: s.trim, price: s.price, mileage: s.mileage,
+              condition: s.condition, image: s.hero_image_url || null,
+              same_model: tier === 1, tier,
+              ...summarize(s.mc_attributes),
+            }));
+          if (ranked.length) row.dealer_similar = ranked;
+        }
+      }
+    } catch { /* alternatives optional — module hides when absent */ }
+
+    // ── Bump view count + record audit event
+    await Promise.all([
+      admin.rpc("increment_listing_view", { _slug: lookupSlug }),
+      admin.from("audit_log").insert({
+        action: "listing_viewed",
+        entity_type: "vehicle_listing",
+        entity_id: row.id,
+        store_id: row.store_id || null,
+        ip_address: ip,
+        user_agent: ua,
+        details: { slug: lookupSlug, requested: slug },
+      }),
+    ]);
+
+    // ── #2 "Your packet was viewed" notification ────────────────────────────
+    // When the dealer has opted in, email the configured recipient that a
+    // shopper opened this vehicle's packet. Deduped to once per shopper session
+    // (or, with no session, once per VIN / 6h) so the salesperson gets a real
+    // heads-up without being buried by repeat opens, refreshes, or scrapers.
+    try {
+      if (row.tenant_id) {
+        const { data: prof } = await admin
+          .from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
+        const s = (prof?.settings ?? {}) as Record<string, unknown>;
+        const enabled = s.view_notify_enabled === true || String(s.view_notify_enabled) === "true";
+        const recipients = String(s.view_notify_email || "")
+          .split(/[\n,;]+/).map((e) => e.trim().toLowerCase()).filter((e) => e.includes("@"));
+        if (enabled && recipients.length && row.vin) {
+          const vinU = String(row.vin).toUpperCase();
+          const sinceIso = new Date(Date.now() - 6 * 60 * 60_000).toISOString();
+          let dq = admin.from("audit_log").select("id", { head: true, count: "exact" })
+            .eq("action", "packet_view_notified").eq("entity_id", row.id).gte("created_at", sinceIso);
+          if (sessionId) dq = admin.from("audit_log").select("id", { head: true, count: "exact" })
+            .eq("action", "packet_view_notified").eq("entity_id", row.id)
+            .contains("details", { session: sessionId });
+          const { count: already } = await dq;
+          if (!already) {
+            const title = [row.year, row.make, row.model, row.trim].filter(Boolean).join(" ").trim() || "your vehicle";
+            const priceNum = typeof row.price === "number" ? row.price : Number(row.price);
+            const priceStr = Number.isFinite(priceNum) && priceNum > 0
+              ? `$${Math.round(priceNum).toLocaleString("en-US")}` : "";
+            const origin = (req.headers.get("origin") || "").replace(/\/$/, "");
+            const packetUrl = `${origin || "https://autolabels.io"}/v/${encodeURIComponent(row.slug || vinU)}`;
+            const stockStr = (row.mc_attributes && (row.mc_attributes as Record<string, unknown>).stock_no) || row.stock_number || "";
+            const html = `
+              <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;color:#0F172A">
+                <p style="font-size:15px;margin:0 0 4px">A shopper just opened the digital packet for:</p>
+                <h2 style="font-size:20px;margin:8px 0 2px">${title}</h2>
+                ${priceStr ? `<p style="font-size:15px;color:#2563EB;font-weight:700;margin:0 0 2px">${priceStr}</p>` : ""}
+                <p style="font-size:13px;color:#475569;margin:0 0 16px">VIN ${vinU}${stockStr ? ` &middot; Stock ${stockStr}` : ""}</p>
+                <a href="${packetUrl}" style="display:inline-block;background:#2563EB;color:#fff;text-decoration:none;padding:11px 18px;border-radius:12px;font-weight:600;font-size:14px">View the packet</a>
+                <p style="font-size:12px;color:#94A3B8;margin:18px 0 0">You're receiving this because packet-view alerts are on for this dealership. Turn them off in AutoLabels &rarr; Admin.</p>
+              </div>`;
+            await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+              body: JSON.stringify({ to: recipients, subject: `Packet viewed: ${title}`, html }),
+            }).catch(() => {});
+            await admin.from("audit_log").insert({
+              action: "packet_view_notified", entity_type: "vehicle_listing", entity_id: row.id,
+              store_id: row.store_id || null, details: { vin: vinU, session: sessionId || null, recipients: recipients.length },
+            });
+          }
+        }
+      }
+    } catch { /* notification is best-effort; never block the shopper view */ }
+
+    // The harvested OEM links the packet hands the shopper. We store the
+    // LINK and nothing else — the brochure and the owner's manual stay on the
+    // manufacturer's site, and no PDF of either is ever downloaded here.
+    interface LinkRow { id: string; url: string; title: string | null; year: number | null }
+
+    // A franchised dealer's own copy, when they hold one. Serving it is what
+    // makes the passport survive the manufacturer reorganising their site --
+    // a link is a promise somebody else keeps, and this record is meant to
+    // outlive the sale by years.
+    //
+    // Entitlement comes from oem_distribution_for_vehicle, which answers "was
+    // this vehicle EVER distributed under a host decision", not "may this
+    // dealer host today". A dealer who later drops the franchise stops NEW
+    // hosting; it does not reach into a passport somebody already owns.
+    const hostedDoc = async (
+      kind: "owners_manual" | "brochure", brand: string, model: string, yr: number | null,
+    ): Promise<{ url: string; hosted: true } | null> => {
+      try {
+        if (!row.tenant_id || !row.vin || !brand) return null;
+        const { data: entitled } = await admin.rpc("oem_distribution_for_vehicle", {
+          _tenant_id: row.tenant_id, _vin: row.vin, _document_kind: kind,
+        });
+        if (entitled !== "host") return null;
+        const { data: held } = await admin
+          .from("oem_hosted_documents")
+          .select("storage_path")
+          .eq("tenant_id", row.tenant_id)
+          .ilike("brand", brand).ilike("model", model)
+          .eq("document_kind", kind)
+          .order("model_year", { ascending: false, nullsFirst: false })
+          .limit(6);
+        const rows = (held || []) as { storage_path: string; model_year?: number | null }[];
+        const pick = (yr ? rows.find((r) => r.model_year === yr) : rows[0]) || rows[0];
+        if (!pick?.storage_path) return null;
+        // Signed per request, never stored: a signed URL kept on the row is
+        // what made published cars serve dead links once it aged out.
+        const { data: signed } = await admin.storage
+          .from("oem-documents").createSignedUrl(pick.storage_path, 6 * 60 * 60);
+        return signed?.signedUrl ? { url: signed.signedUrl, hosted: true } : null;
+      } catch {
+        // Never let the hosted lookup cost the shopper the manufacturer link.
+        return null;
+      }
+    };
+
+    // ── Official OEM brochure link from the global harvest cache: exact
+    // model year first, otherwise the nearest within two model years.
+    try {
+      const parts = String((row.ymm as string) || "").trim().split(/\s+/);
+      const yr = Number.parseInt(parts[0] || "", 10) || null;
+      const mk = parts[1] || "";
+      const md = parts.slice(2).join(" ");
+      if (mk && md) {
+        const { data: bl } = await admin
+          .from("oem_brochure_links")
+          .select("id, url, title, year")
+          .ilike("make", mk).ilike("model", md)
+          .order("year", { ascending: false, nullsFirst: false })
+          .limit(6);
+        const rows = (bl || []) as LinkRow[];
+        // Exact year, then within two model years, then a year-less row. That
+        // last step matters: the harvest falls back to the make's "Manuals &
+        // Guides" portal, which carries no year, and the old chain dropped
+        // those rows for any vehicle that had a year -- so a harvest that
+        // succeeded still showed nothing on the passport.
+        const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
+          rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
+          rows.find((r) => r.year == null);
+        if (pick) {
+          const held = await hostedDoc("brochure", mk, md, yr);
+          row.oem_brochure = {
+            url: held?.url ?? pick.url, title: pick.title, year: pick.year,
+            hosted: !!held, manufacturer_url: pick.url,
+          };
+        }
+      }
+    } catch { /* brochure link optional */ }
+
+    // ── Official OEM owner's-manual link from its harvest cache (same
+    // nearest-year rule). Link only; a stored copy, when one exists, comes
+    // through row.documents when a dealer attached one by hand.
+    try {
+      const parts = String((row.ymm as string) || "").trim().split(/\s+/);
+      const yr = Number.parseInt(parts[0] || "", 10) || null;
+      const mk = parts[1] || "";
+      const md = parts.slice(2).join(" ");
+      if (mk && md) {
+        const { data: ml } = await admin
+          .from("oem_owners_manual_links")
+          .select("id, url, title, year")
+          .ilike("make", mk).ilike("model", md)
+          .order("year", { ascending: false, nullsFirst: false })
+          .limit(6);
+        const rows = (ml || []) as LinkRow[];
+        // Exact year, then within two model years, then a year-less row. That
+        // last step matters: the harvest falls back to the make's "Manuals &
+        // Guides" portal, which carries no year, and the old chain dropped
+        // those rows for any vehicle that had a year -- so a harvest that
+        // succeeded still showed nothing on the passport.
+        const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
+          rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
+          rows.find((r) => r.year == null);
+        if (pick) {
+          const held = await hostedDoc("owners_manual", mk, md, yr);
+          row.oem_owners_manual = {
+            url: held?.url ?? pick.url, title: pick.title, year: pick.year,
+            hosted: !!held, manufacturer_url: pick.url,
+          };
+        }
+      }
+    } catch { /* owner's-manual link optional */ }
+
+    // ── Packet curation enforcement. A module the dealer excluded must not
+    // ship in the public payload at all — client gating alone would still
+    // leak the data to anyone reading the response. Per-vehicle override
+    // wins, then the store template, then visible.
+    try {
+      const perVehicle = (row.packet_modules ?? null) as Record<string, boolean> | null;
+      const storeDefaults = (row.packet_defaults ?? null) as Record<string, boolean> | null;
+      const vis = (id: string): boolean => {
+        const v = perVehicle?.[id];
+        if (typeof v === "boolean") return v;
+        const d = storeDefaults?.[id];
+        if (typeof d === "boolean") return d;
+        return true;
+      };
+      if (!vis("historyReport")) { delete row.history_report; delete row.history_report_url; }
+      if (!vis("brochure")) delete row.oem_brochure;
+      if (!vis("ownersManual")) delete row.oem_owners_manual;
+      if (!vis("recon")) delete row.recon;
+      if (!vis("videos")) delete row.videos;
+      if (!vis("description")) delete row.description;
+      if (!vis("marketValue")) delete row.value_history;
+      if (!vis("warranty")) {
+        delete row.warranty_info; delete row.oem_warranty; delete row.cpo_programs;
+        delete row.service_records; delete row.available_accessories; delete row.dealer_coverage;
+      }
+      const docs = Array.isArray(row.documents) ? row.documents as { type?: string }[] : [];
+      if (!vis("documents")) {
+        row.documents = vis("oemSticker") ? docs.filter((d) => d?.type === "window_sticker") : [];
+      } else if (!vis("oemSticker")) {
+        row.documents = docs.filter((d) => d?.type !== "window_sticker");
+      }
+      // Photos off = no gallery; the single lead photo stays so the packet
+      // header is never an empty frame.
+      if (!vis("photos") && Array.isArray(row.photos)) {
+        row.photos = (row.photos as unknown[]).slice(0, 1);
+      }
+    } catch { /* curation is best-effort shaping; never block the shopper view */ }
+
+    // ── Anonymous payload whitelist. The RPC returns the raw row; before it
+    // ships to a shopper, drop anything that identifies competitors or helps
+    // find a cheaper car (below-price comps, cheaper counts, wholesale/trade
+    // values, other dealers' names/VINs/URLs).
+    try {
+      const ourPrice = (() => { const n = Number(row.price); return Number.isFinite(n) && n > 0 ? n : null; })();
+      if (Array.isArray(row.comparables)) {
+        row.comparables = (row.comparables as Record<string, unknown>[])
+          .filter((c) => {
+            const p = Number(c?.price);
+            if (!Number.isFinite(p) || p <= 0) return false;
+            return ourPrice == null || p >= ourPrice;
+          })
+          .map((c) => ({
+            price: c.price ?? null, miles: c.miles ?? null, ymm: c.ymm ?? null,
+            trim: c.trim ?? null, dist: c.dist ?? null, dom: c.dom ?? null, image: c.image ?? null,
+          }));
+      }
+      // The OFFER. Same shaping as comparables, but no price floor: these are
+      // the dealer's own cars, and a cheaper one of theirs is a sale, not a
+      // leak. Cannibalisation is already excluded upstream.
+      if (Array.isArray(row.group_similar)) {
+        row.group_similar = (row.group_similar as Record<string, unknown>[])
+          .filter((c) => { const p = Number(c?.price); return Number.isFinite(p) && p > 0; })
+          .map((c) => ({
+            price: c.price ?? null, miles: c.miles ?? null, ymm: c.ymm ?? null,
+            trim: c.trim ?? null, dist: c.dist ?? null, dom: c.dom ?? null, image: c.image ?? null,
+          }));
+      }
+      if (row.market_meta && typeof row.market_meta === "object") {
+        const mm = row.market_meta as Record<string, unknown>;
+        delete mm.cheaper_count;
+        delete mm.rank_basis;
+      }
+      if (row.market_payload && typeof row.market_payload === "object") {
+        const mp = row.market_payload as Record<string, unknown>;
+        row.market_payload = {
+          marketValue: mp.marketValue ?? null, low: mp.low ?? null, high: mp.high ?? null,
+          belowMarket: mp.belowMarket ?? null, position: mp.position ?? null,
+          source: mp.source ?? null, checked_at: mp.checked_at ?? null,
+        };
+      }
+      if (row.blackbook && typeof row.blackbook === "object") {
+        const bb = row.blackbook as Record<string, unknown>;
+        // tradein ships as an independent-guide value row; wholesale (and the
+        // raw provider payload) stays stripped from the anonymous view.
+        row.blackbook = { available: bb.available === true, retail: bb.retail ?? null, tradein: bb.tradein ?? null, checked_at: bb.checked_at ?? null };
+      }
+      if (row.history_payload && typeof row.history_payload === "object") {
+        const hp = row.history_payload as Record<string, unknown>;
+        row.history_payload = {
+          available: hp.available === true,
+          entries: (Array.isArray(hp.entries) ? hp.entries as Record<string, unknown>[] : []).map((e) => ({
+            miles: e.miles ?? null,
+            seller_type: e.seller_type ?? null,
+            inventory_type: e.inventory_type ?? null,
+            first_seen: e.first_seen ?? null,
+            last_seen: e.last_seen ?? null,
+          })),
+          owners: hp.owners ?? null,
+          inServiceDate: hp.inServiceDate ?? null,
+          firstSeen: hp.firstSeen ?? null,
+          checked_at: hp.checked_at ?? null,
+          source: hp.source ?? null,
+        };
+      }
+    } catch {
+      // Fail CLOSED: if sanitation breaks, the raw payloads must not ship.
+      delete row.comparables; delete row.market_meta; delete row.market_payload;
+      delete row.blackbook; delete row.history_payload;
+    }
+
+    // ── Final deny sweep. The last thing that touches the payload. ─────────
+    //
+    // get_vehicle_listing_by_slug is `SELECT * FROM vehicle_listings`, so every
+    // column that table has ever grown arrives here and ships unless something
+    // names it. The named deletes above could not hold that line: install_token
+    // was never among them, and it is not merchandising data — it is the sole
+    // credential for the anon `install_proofs_upload` storage policy and for
+    // record_install_proof(), both of which are EXECUTE/INSERT-granted to anon
+    // and keyed on the token alone. Every published and archived listing was
+    // therefore handing a working capability to anyone who opened its passport,
+    // and install_proofs rows written with it come back out through the recon
+    // block above as verified installed equipment.
+    //
+    // The denylist is shared with the sister-app feeds (autofilm-feed,
+    // vehicle-lookup) so there is one place to add a field and no second list
+    // to remember. What it drops here: the credential (install_token), the
+    // internal actors (created_by, assigned_agent_id), the recall-override
+    // audit trail incl. free-text notes (recall_override_by / _at / _notes),
+    // the price-scraper diagnostics (price_parse_notes), and the raw
+    // MarketCheck dump (mc_raw — verbatim, incl. the competitor-facing `dealer`
+    // block; the passport reads the curated mc_attributes and never this).
+    //
+    // What it deliberately does NOT drop: blackbook, market_payload and
+    // comparables. They are on the feed denylist as a licensing question, not
+    // as a secret, and the locked passport's Market Intelligence and Market
+    // Comparison modules render all three. They ship as the shopper-safe
+    // projections built directly above — competitor identity, wholesale values
+    // and cheaper-car counts already stripped. See PUBLIC_VIEW_SANITIZED in
+    // _shared/lotFeedRow.ts, which is where that exemption is spelled out and
+    // the only reason a denied field can fall out of scope.
+    for (const k of PUBLIC_VIEW_DENY) delete (row as Record<string, unknown>)[k];
+
+    // The title attestation is shown to the shopper, but the employee who
+    // signed it is not. The deny sweep above works on whole columns and this
+    // one has to survive with its inside changed, so it is scrubbed rather
+    // than dropped -- the same treatment history_payload gets.
+    if ((row as Record<string, unknown>).title_verification) {
+      (row as Record<string, unknown>).title_verification =
+        scrubTitleVerification((row as Record<string, unknown>).title_verification);
+    }
+
+    // Recall last, on the finished row: the shopper's copy carries a clear
+    // status and a zero count only where a VIN-level check produced them, and
+    // the model line's campaign context ships labelled as model-level.
+    applyRecallProjection(row as Record<string, unknown>);
+
+    return json(200, { listing: row });
+  } catch (err) {
+    return json(500, { error: err instanceof Error ? err.message : "unknown error" });
+  }
+});

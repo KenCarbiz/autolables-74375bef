@@ -1,0 +1,73 @@
+{
+ "market-valuation-write": {
+  "commit": "946abeaf",
+  "files": 25,
+  "tree_sha256": "e44914f528b02367b81c0c2102ba6749211322a9bd0d14d5d2dc1d85aaa3e73a",
+  "entrypoint_sha256": "4237d03377cd743e12c7dc06bc55320b0a2aa908975f808880bf424cafde4403",
+  "entrypoint_bytes": 25816,
+  "crlf": false,
+  "bom": false,
+  "credential_literals": [],
+  "package_dir": "/tmp/claude-0/-home-user-autolables-74375bef/4bd5b04c-fe84-5e26-8567-dd019c94e8b0/scratchpad/recovery-packages/market-valuation-write",
+  "shared_deps": [
+   "supabase/functions/_shared/factorySticker/lib/market/adjustments.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/comparables.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/composite.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/concentration.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/confidence.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/dealerIdentity.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/fingerprints.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/flags.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/freshness.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/hash.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/legacyAdapter.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/marketView.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/outliers.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/priceBasis.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/providerAdapter.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/providerTransport.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/similarity.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/statistics.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/types.ts",
+   "supabase/functions/_shared/factorySticker/lib/market/verdict.ts",
+   "supabase/functions/_shared/factorySticker/lib/ymm.ts",
+   "supabase/functions/_shared/functionAuth.ts",
+   "supabase/functions/_shared/http.ts",
+   "supabase/functions/_shared/supabase.ts"
+  ]
+ },
+ "public-listing-view": {
+  "commit": "c7d6a30a",
+  "files": 6,
+  "tree_sha256": "94ba9b96221e02d5e346eb36288c0e5eba94dd0276e6a22e2c719893d4588504",
+  "entrypoint_sha256": "9fd8853467ddc75a84f3056ad3b67e0fff91cdb75ac1a02140e4618948fe2c71",
+  "entrypoint_bytes": 54367,
+  "crlf": false,
+  "bom": false,
+  "credential_literals": [],
+  "package_dir": "/tmp/claude-0/-home-user-autolables-74375bef/4bd5b04c-fe84-5e26-8567-dd019c94e8b0/scratchpad/recovery-packages/public-listing-view",
+  "shared_deps": [
+   "supabase/functions/_shared/factorySticker/lib/vehicleTruth/recallView.ts",
+   "supabase/functions/_shared/iihs-awards.ts",
+   "supabase/functions/_shared/lotFeedRow.ts",
+   "supabase/functions/_shared/passport-routing.ts",
+   "supabase/functions/_shared/passport-version.ts"
+  ]
+ },
+ "vehicle-enrich": {
+  "commit": "c7d6a30a",
+  "files": 4,
+  "tree_sha256": "289fcea47d6518d22ff6e2ef26a08b5cd3059d0cd4cf62e080f42443beb4e463",
+  "entrypoint_sha256": "c81bc312554ddac9d2cba0ff79a6332986480f35ad34589eeb6e86185b83b99d",
+  "entrypoint_bytes": 55470,
+  "crlf": false,
+  "bom": false,
+  "credential_literals": [],
+  "package_dir": "/tmp/claude-0/-home-user-autolables-74375bef/4bd5b04c-fe84-5e26-8567-dd019c94e8b0/scratchpad/recovery-packages/vehicle-enrich",
+  "shared_deps": [
+   "supabase/functions/_shared/factorySticker/lib/market/certificationTruth.ts",
+   "supabase/functions/_shared/recallState.ts",
+   "supabase/functions/_shared/ymm.ts"
+  ]
+ }
+}

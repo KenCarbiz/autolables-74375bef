@@ -1,0 +1,27 @@
+{
+ "base_commit": "7a8b2278",
+ "entrypoint_sha256": "2116d9364381d03880fc017799f8b869547aec61ab6ac1d06b7e6e7d89e0a0ea",
+ "tree_sha256": "0307a35faeca224b8bc7aea052baca446ddd1c59009cb6aeb21a7307368510ca",
+ "files": [
+  [
+   "supabase/functions/_shared/factorySticker/lib/market/certificationTruth.ts",
+   "886a7e80c2da649d61a306bbe787062bed1da108c01d326dcb4b0fbce2fe31e9"
+  ],
+  [
+   "supabase/functions/_shared/functionAuth.ts",
+   "b13b7ec14a4d5b0f0f9ce3b8dce715f87b232d44b45c9055f4f639ea7397dbc8"
+  ],
+  [
+   "supabase/functions/_shared/recallState.ts",
+   "51c3ca4e13d396011516540210357db6d82345bd6a121ae9842bfda46e299928"
+  ],
+  [
+   "supabase/functions/_shared/ymm.ts",
+   "09955c03de43a6c6e9cb2e8a202a37f2465eaddff8f9171902afbf75c2bcf567"
+  ],
+  [
+   "supabase/functions/vehicle-enrich/index.ts",
+   "2116d9364381d03880fc017799f8b869547aec61ab6ac1d06b7e6e7d89e0a0ea"
+  ]
+ ]
+}
