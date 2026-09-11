@@ -12,8 +12,13 @@ import {
   SECRET_KEY_ENV_NAMES, FORBIDDEN_SECRET_ENV_NAMES,
   buildSecretKeySet, credentialCarrier, decideUserAuthorization,
   denyForVerifierStatus, jwksSource, readCredentials, redactCredentials,
+  constantTimeEquals, matchesLegacyServiceRole,
   DENY_UNAUTHENTICATED, DENY_NOT_A_MEMBER, DENY_MISCONFIGURED,
 } from "./functionAuth.ts";
+
+/** Source with comments removed, so a guard cannot fire on documentation. */
+const stripComments = (src: string): string =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 const WRITER = "supabase/functions/market-valuation-write/index.ts";
 const writerSrc = () => readFileSync(WRITER, "utf8");
@@ -219,12 +224,17 @@ describe("credential redaction", () => {
 describe("writer authentication wiring", () => {
   it("no longer decides trust by comparing against one environment variable", () => {
     const code = writerCode();
+    // The env var is READ again by the legacy compatibility path, which is
+    // fine and necessary. What must never come back is deciding trust with a
+    // string comparison against it.
     expect(code).not.toMatch(/auth\s*!==\s*SERVICE_KEY/);
     expect(code).not.toMatch(/===\s*SERVICE_KEY/);
-    expect(code).not.toContain("SERVICE_KEY");
-    expect(code).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
-    // and the old fallback is gone with it
+    expect(code).not.toMatch(/[!=]==\s*Deno\.env\.get\(/);
+    expect(code).not.toContain("SERVICE_KEY ||");
+    // and the old unverified fallback is gone with it
     expect(code).not.toContain("auth.getUser(");
+    // the only use of the canonical key is the constant-time matcher
+    expect(code).toContain("matchesLegacyServiceRole(");
   });
 
   it("delegates verification to the documented Supabase mechanism", () => {
@@ -256,12 +266,15 @@ describe("writer authentication wiring", () => {
     expect(src).toMatch(/if \(!caller\.ok\) return json\(caller\.status/);
   });
 
-  it("logs only the failure code, never a credential or the error's details", () => {
+  it("logs only the failure code and non-secret shape, never a credential", () => {
     const code = writerCode();
-    expect(code).toContain('console.error("writer_auth_denied", error.code)');
+    expect(code).toContain('console.error("writer_auth_denied", error.code,');
     expect(code).not.toMatch(/console\.(log|error|warn)\([^)]*\berror\.toJSON\(\)/);
-    expect(code).not.toMatch(/console\.(log|error|warn)\([^)]*apikey/i);
-    expect(code).not.toMatch(/console\.(log|error|warn)\([^)]*Authorization/i);
+    // Presence booleans are fine and are why this diagnostic exists; the
+    // credential VALUES are what must never reach a log.
+    expect(code).not.toMatch(/presented\.apikey\s*[,}]/);
+    expect(code).not.toMatch(/presented\.token\s*[,}]/);
+    expect(code).not.toMatch(/(apikey|token)(\.slice|\.substring|\.length)/);
   });
 
   it("keeps CORS preflight ahead of authentication", () => {
@@ -273,5 +286,152 @@ describe("writer authentication wiring", () => {
     const code = writerCode();
     expect(code).not.toMatch(/sb_secret_[A-Za-z0-9_-]{8,}/);
     expect(code).not.toMatch(/eyJ[A-Za-z0-9_-]{20,}\./);
+  });
+});
+
+// ── Legacy service-role compatibility ──────────────────────────────────────
+//
+// The modern verifier answers INVALID_API_KEY for a legacy JWT-shaped
+// service_role key, which is this project's canonical credential. The
+// compatibility path accepts that ONE value and nothing that merely resembles
+// it. These tests are the difference between "a narrow compatibility shim" and
+// "a second way in".
+
+const CANONICAL =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJzZXJ2aWNlX3JvbGUifQ.canonical-fixture-signature";
+
+const creds = (h: Record<string, string>) => readCredentials(new Request("https://x/f", { headers: h }));
+
+describe("constant-time comparison", () => {
+  it("is true only for identical strings", async () => {
+    expect(await constantTimeEquals(CANONICAL, CANONICAL)).toBe(true);
+    expect(await constantTimeEquals(CANONICAL, CANONICAL + "x")).toBe(false);
+    expect(await constantTimeEquals("a", "b")).toBe(false);
+  });
+
+  it("absorbs a length difference instead of exiting early on it", async () => {
+    // Both operands are digested to 32 bytes before anything is compared, so
+    // "wrong length" and "wrong content" are indistinguishable to a caller.
+    expect(await constantTimeEquals("short", "a-much-longer-value-entirely")).toBe(false);
+    expect(await constantTimeEquals(CANONICAL, CANONICAL.slice(0, 10))).toBe(false);
+  });
+
+  it("treats an absent operand as no match, never as a match", async () => {
+    expect(await constantTimeEquals("", "")).toBe(false);
+    expect(await constantTimeEquals("", CANONICAL)).toBe(false);
+    expect(await constantTimeEquals(CANONICAL, "")).toBe(false);
+  });
+});
+
+describe("legacy service-role compatibility", () => {
+  it("accepts the canonical key in the apikey header", async () => {
+    expect(await matchesLegacyServiceRole(creds({ apikey: CANONICAL }), CANONICAL)).toBe(true);
+  });
+
+  it("accepts the canonical key as Authorization-only, preserving the proxy contract", async () => {
+    // marketcheck-market-pricing sends no apikey header and must keep working.
+    expect(await matchesLegacyServiceRole(
+      creds({ Authorization: `Bearer ${CANONICAL}` }), CANONICAL,
+    )).toBe(true);
+  });
+
+  it("rejects a different project's legacy service-role JWT", async () => {
+    const otherProject =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJzZXJ2aWNlX3JvbGUifQ.a-different-projects-signature";
+    expect(await matchesLegacyServiceRole(creds({ apikey: otherProject }), CANONICAL)).toBe(false);
+  });
+
+  it("rejects a legacy anon JWT", async () => {
+    const anon =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIn0.anon-fixture-signature";
+    expect(await matchesLegacyServiceRole(creds({ apikey: anon }), CANONICAL)).toBe(false);
+    expect(await matchesLegacyServiceRole(creds({ Authorization: `Bearer ${anon}` }), CANONICAL)).toBe(false);
+  });
+
+  it("rejects the canonical key with its final character altered", async () => {
+    const altered = CANONICAL.slice(0, -1) + (CANONICAL.endsWith("e") ? "f" : "e");
+    expect(altered).not.toBe(CANONICAL);
+    expect(await matchesLegacyServiceRole(creds({ apikey: altered }), CANONICAL)).toBe(false);
+  });
+
+  it("rejects a truncated key", async () => {
+    expect(await matchesLegacyServiceRole(creds({ apikey: CANONICAL.slice(0, -1) }), CANONICAL)).toBe(false);
+    expect(await matchesLegacyServiceRole(creds({ apikey: CANONICAL.slice(0, 20) }), CANONICAL)).toBe(false);
+  });
+
+  it("rejects an empty credential", async () => {
+    expect(await matchesLegacyServiceRole(creds({ apikey: "" }), CANONICAL)).toBe(false);
+    expect(await matchesLegacyServiceRole(creds({}), CANONICAL)).toBe(false);
+  });
+
+  it("is unavailable, not permissive, when the runtime has no service-role key", async () => {
+    for (const configured of [undefined, null, "", "   "]) {
+      expect(await matchesLegacyServiceRole(creds({ apikey: CANONICAL }), configured)).toBe(false);
+    }
+  });
+
+  it("does not accept a forged privileged claim", async () => {
+    // The payload says service_role. Nothing reads it, so it buys nothing.
+    const forged = [
+      "eyJhbGciOiJub25lIn0",
+      btoa(JSON.stringify({ iss: "supabase", role: "service_role", admin: true })),
+      "forged",
+    ].join(".");
+    expect(await matchesLegacyServiceRole(creds({ apikey: forged }), CANONICAL)).toBe(false);
+    expect(await matchesLegacyServiceRole(creds({ Authorization: `Bearer ${forged}` }), CANONICAL)).toBe(false);
+  });
+
+  it("never returns true for a credential that is merely shaped like the real one", async () => {
+    const sameLength = "x".repeat(CANONICAL.length);
+    expect(sameLength.length).toBe(CANONICAL.length);
+    expect(await matchesLegacyServiceRole(creds({ apikey: sameLength }), CANONICAL)).toBe(false);
+  });
+});
+
+describe("the removed defect stays removed", () => {
+  it("no direct equality against the service-role key returns an authorization", () => {
+    // Comments are stripped first. Both files DOCUMENT the deleted line, and a
+    // guard that fires on its own documentation teaches people to delete the
+    // documentation.
+    const src = stripComments(
+      writerSrc() + "\n" + readFileSync("supabase/functions/_shared/functionAuth.ts", "utf8"),
+    );
+    expect(src).not.toMatch(/auth\s*!==\s*SERVICE_KEY/);
+    expect(src).not.toMatch(/auth\s*===\s*SERVICE_KEY/);
+    expect(src).not.toMatch(/[!=]==\s*Deno\.env\.get\(\s*["']SUPABASE_SERVICE_ROLE_KEY["']\s*\)/);
+    expect(src).not.toMatch(/SERVICE_ROLE_KEY["']\s*\)\s*[!=]==/);
+  });
+
+  it("the legacy comparison is the keyed-digest one, not a string compare", () => {
+    const mod = readFileSync("supabase/functions/_shared/functionAuth.ts", "utf8");
+    const fn = mod.slice(mod.indexOf("export async function matchesLegacyServiceRole"));
+    const body = fn.slice(0, fn.indexOf("\n}"));
+    expect(body).toContain("constantTimeEquals");
+    expect(body).not.toMatch(/[!=]==\s*configured/);
+  });
+
+  it("authentication is resolved before any spend, reservation or commit", () => {
+    const src = writerSrc();
+    const auth = src.indexOf("const caller = await authenticateCaller(");
+    for (const later of [
+      "market_reserve_provider_call", "callProvider(", "market_valuation_commit",
+      'from("vehicle_listings").update(',
+    ]) {
+      expect(src.indexOf(later)).toBeGreaterThan(auth);
+    }
+  });
+
+  it("logs no credential, only presence and configuration shape", () => {
+    const src = writerSrc();
+    const log = src.slice(src.indexOf('console.error("writer_auth_denied"'));
+    const block = log.slice(0, log.indexOf("});") + 3);
+    expect(block).toContain("apikey_present");
+    expect(block).not.toMatch(/presented\.(apikey|token)\s*[,})]/);
+    expect(block).not.toContain("SECRET_KEYS[");
+    expect(block).not.toMatch(/\.slice\(/);
+    // A COUNT of configured keys is fine; the LENGTH of a presented credential
+    // is not — it narrows the search space for whoever reads the logs.
+    expect(block).not.toMatch(/presented\.(apikey|token)\s*\.\s*length/);
+    expect(block).not.toMatch(/\b(apikey|token|credential)_length\b/);
   });
 });

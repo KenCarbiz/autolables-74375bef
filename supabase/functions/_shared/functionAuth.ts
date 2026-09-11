@@ -38,6 +38,91 @@
 // `sub` claim — which is why an anon token cannot masquerade as a service
 // caller no matter which header it arrives in.
 
+// ── Legacy service-role compatibility ──────────────────────────────────────
+//
+// `@supabase/server` expects a modern `sb_secret_*` key in `secret` mode and
+// answers INVALID_API_KEY when a legacy JWT-shaped service_role key arrives
+// where that format is expected. This project's canonical credential is the
+// legacy one, the platform injects it, and rotating it is out of scope — so a
+// deployment holding a perfectly valid key was being turned away.
+//
+// The compatibility path below accepts exactly one thing: a credential that is
+// cryptographically identical to the runtime's configured
+// SUPABASE_SERVICE_ROLE_KEY. It is not a JWT verifier and deliberately not a
+// claims reader. `role=service_role` in an unverified payload is a string an
+// attacker can type; it proves nothing, and nothing here consults it.
+//
+// The comparison must not be `===`. That is the defect this whole repair
+// exists to remove, and reintroducing it for the legacy case would restore it
+// with a comment attached. Instead both operands are HMAC'd with a key
+// generated once per process and the 32-byte digests are compared in full:
+//
+//   * the digest is fixed-width, so a length difference cannot be observed as
+//     an early exit — unequal lengths are absorbed before any comparison;
+//   * the loop always runs all 32 bytes and accumulates with OR, so it takes
+//     the same time whether the first byte differs or none do;
+//   * the HMAC key is random per process, so the digests are not precomputable
+//     and cannot be correlated across restarts.
+
+const COMPARISON_KEY: Uint8Array = crypto.getRandomValues(new Uint8Array(32));
+
+const DIGEST_BYTES = 32;
+
+async function keyedDigest(value: string): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    COMPARISON_KEY,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return new Uint8Array(signature);
+}
+
+/**
+ * Constant-time string equality.
+ *
+ * The empty-operand guard is about PRESENCE, not content: it cannot leak
+ * anything about a secret, because "no credential was sent" is already visible
+ * to whoever sent nothing.
+ */
+export async function constantTimeEquals(a: string, b: string): Promise<boolean> {
+  if (!a || !b) return false;
+  const [left, right] = await Promise.all([keyedDigest(a), keyedDigest(b)]);
+  let difference = 0;
+  for (let i = 0; i < DIGEST_BYTES; i++) difference |= left[i] ^ right[i];
+  return difference === 0;
+}
+
+/**
+ * Does a presented credential match the runtime's canonical service-role key?
+ *
+ * Checked in both slots: `apikey`, where Supabase's SDK puts a key, and the
+ * bearer token, which is what this repo's own `marketcheck-market-pricing`
+ * proxy sends and which must keep working.
+ *
+ * Returns false — never throws, never 500s — when the runtime has no service
+ * role key configured. An unconfigured deployment must find this path
+ * UNAVAILABLE rather than permissive, and the other modes are still free to
+ * authenticate the caller on their own terms.
+ */
+export async function matchesLegacyServiceRole(
+  presented: PresentedCredentials,
+  serviceRoleKey: string | null | undefined,
+): Promise<boolean> {
+  const configured = (serviceRoleKey ?? "").trim();
+  if (!configured) return false;
+
+  // Both slots are always examined; no early return on the first match, so the
+  // work done does not depend on which slot carried the credential.
+  let matched = false;
+  for (const candidate of [presented.apikey, presented.token]) {
+    if (candidate && await constantTimeEquals(candidate, configured)) matched = true;
+  }
+  return matched;
+}
+
 /** A credential presented by a caller. Never logged, never serialised. */
 export interface PresentedCredentials {
   token: string | null;

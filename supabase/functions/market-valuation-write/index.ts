@@ -25,7 +25,7 @@ import { adminClient } from "../_shared/supabase.ts";
 import { createSupabaseContext } from "https://esm.sh/@supabase/server@1.6.0";
 import {
   buildSecretKeySet, credentialCarrier, decideUserAuthorization,
-  denyForVerifierStatus, jwksSource,
+  denyForVerifierStatus, jwksSource, matchesLegacyServiceRole, readCredentials,
   DENY_UNAUTHENTICATED, type CallerDecision,
 } from "../_shared/functionAuth.ts";
 
@@ -94,6 +94,16 @@ async function authenticateCaller(
   tenantId: string,
   admin: ReturnType<typeof adminClient>,
 ): Promise<CallerDecision> {
+  // ── Legacy service-role compatibility, first ────────────────────────
+  // The modern verifier answers INVALID_API_KEY for a legacy JWT-shaped
+  // service_role key, and that legacy key is this project's canonical
+  // credential. Compared in constant time against the configured value and
+  // nothing else: no claim is read, and `role=service_role` in an unverified
+  // payload buys a caller exactly nothing.
+  if (await matchesLegacyServiceRole(readCredentials(req), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))) {
+    return { ok: true, mode: "secret", userId: null };
+  }
+
   const { data: ctx, error } = await createSupabaseContext(credentialCarrier(req), {
     auth: ["secret:*", "user"],
     env: { secretKeys: SECRET_KEYS, ...(JWKS ? { jwks: JWKS } : {}) },
@@ -102,7 +112,14 @@ async function authenticateCaller(
   if (error) {
     // The CODE only. `error.toJSON()` carries hints and details, and nothing
     // derived from a credential belongs in a log line.
-    console.error("writer_auth_denied", error.code);
+    const presented = readCredentials(req);
+    console.error("writer_auth_denied", error.code, {
+      apikey_present: presented.apikey !== null,
+      bearer_present: presented.token !== null,
+      legacy_path_configured: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+      modern_secret_keys_configured: Object.keys(SECRET_KEYS).length,
+      jwks_configured: JWKS !== null,
+    });
     return denyForVerifierStatus(error.status);
   }
 
