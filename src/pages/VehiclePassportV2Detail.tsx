@@ -14,7 +14,8 @@ import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
+import { fmt$, type PassportData } from "@/lib/passportV2Data";
+import { governedPassportData } from "@/lib/passport/publicSurface";
 import { resolvePassportBack, passportForwardPath } from "@/lib/passportReturn";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
@@ -1478,7 +1479,7 @@ const VehiclePassportV2Detail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shimPanel, vehicleSlug]);
 
-  const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
+  const d = useMemo(() => governedPassportData(listing), [listing]);
   const def = section && !shimPanel ? SECTIONS[section] : undefined;
 
   // Honors a validated returnTo (a V3-originated visit returns to /v3/:slug);

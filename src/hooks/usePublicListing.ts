@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { passportSessionId } from "@/lib/passportEngagement";
+import { governPublicListing } from "@/lib/passport/publicSurface";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 
 // Shared, cached fetch for the public Vehicle Passport (`public-listing-view`).
@@ -60,12 +62,24 @@ export function usePublicListing(
     },
   });
 
+  // ── The one public market-claim boundary ──────────────────────────────
+  //
+  // Every `/v/:slug…` surface reads the vehicle through this hook, so
+  // governing it here governs them all — including the sibling sections that
+  // derive their own passport data and the nested panels that read
+  // `listing.market_meta` and `listing.market_payload` directly, neither of
+  // which a page-level suppression would have reached. Preview fixtures go
+  // through it too: a preview that renders a claim the live page suppresses
+  // is a preview of the wrong product.
+  const fetched = opts?.preview ? (opts.previewData ?? null) : (query.data?.listing ?? null);
+  const listing = useMemo(() => governPublicListing(fetched).listing, [fetched]);
+
   if (opts?.preview) {
-    return { listing: opts.previewData ?? null, loading: false, notFound: !opts.previewData, rateLimited: false };
+    return { listing, loading: false, notFound: !opts.previewData, rateLimited: false };
   }
   const rateLimited = !!query.data?.rateLimited;
   return {
-    listing: query.data?.listing ?? null,
+    listing,
     loading: query.isLoading,
     notFound: !query.isLoading && !rateLimited && (query.isError || query.data?.listing == null),
     rateLimited,

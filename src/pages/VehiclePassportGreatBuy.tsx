@@ -11,7 +11,8 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, deriveRating, ratingTier, fmt$, listingEquipment, deriveSoldClaims, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
+import { deriveRating, ratingTier, fmt$, listingEquipment, deriveSoldClaims, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
+import { governedPassportData } from "@/lib/passport/publicSurface";
 import { deriveVerificationReport } from "@/lib/passport/verificationSummary";
 import { savingsAgainst, MARKET_METRIC_LABEL, type MarketMetricKey } from "@/lib/passport/vehicleTruth";
 import { readDealerAlternatives } from "@/lib/dealerAlternatives";
@@ -221,7 +222,7 @@ const VehiclePassportGreatBuy = () => {
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
-  const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
+  const d = useMemo(() => governedPassportData(listing), [listing]);
 
   // The floating dock duplicates the final CTA block; hide it once the
   // final CTA scrolls into view so the two never compete.

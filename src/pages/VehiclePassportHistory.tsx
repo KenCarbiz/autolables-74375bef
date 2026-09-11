@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, historyReportName, ratingTier } from "@/lib/passportV2Data";
+import { historyReportName, ratingTier } from "@/lib/passportV2Data";
+import { governedPassportData } from "@/lib/passport/publicSurface";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { MOCK_LISTING } from "./VehiclePassportV3";
@@ -236,7 +237,7 @@ const VehiclePassportHistory = () => {
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
-  const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
+  const d = useMemo(() => governedPassportData(listing), [listing]);
   const lh = useMemo(() => buildListingHistory(d?.history?.available ? d.history.entries : null), [d]);
 
   if (loading) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
