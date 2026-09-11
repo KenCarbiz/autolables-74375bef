@@ -7,8 +7,10 @@
 // writer still cannot reach money before any of it has run.
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFileSync, execSync } from "node:child_process";
 import {
   SECRET_KEY_ENV_NAMES, FORBIDDEN_SECRET_ENV_NAMES,
   buildSecretKeySet, credentialCarrier, decideUserAuthorization,
@@ -22,6 +24,55 @@ import {
 /** Source with comments removed, so a guard cannot fire on documentation. */
 const stripComments = (src: string): string =>
   src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+/**
+ * Trees outside the committed-source boundary. `grep -r` walks every directory
+ * it is not told to skip, so these are excluded at traversal time rather than
+ * filtered out of the results afterwards: node_modules alone is ~480 MB, and
+ * walking it pushed this scan past vitest's default timeout whenever the rest
+ * of the suite competed for I/O. None of them hold tracked files, so the
+ * scanned set is exactly the committed source either way.
+ */
+const UNSCANNED_DIRS = [
+  "node_modules", ".git", "dist", "dist-ssr",
+  "coverage", ".turbo", ".vite", ".cache", ".temp",
+] as const;
+
+/** Committed-source file types the secret scan covers. */
+const SCANNED_GLOBS = ["*.ts", "*.tsx", "*.sql", "*.toml", "*.json"] as const;
+
+/**
+ * The forbidden shape: the env name bound to a literal value. The single
+ * backslash matters. `\\s` in an ERE is an escaped backslash, so the earlier
+ * spelling demanded a literal `\` before the `=` and could not match any real
+ * assignment — the guard passed because it found nothing it was able to find.
+ */
+const secretAssignment = () =>
+  `${WRITER_AUTH_ENV_NAME}\\s*=\\s*["'][A-Za-z0-9+/=_-]{16,}`;
+
+/**
+ * Scan one tree for a committed secret assignment; returns matching lines.
+ *
+ * Argv, not a shell command line. The pattern carries a `'` inside its `["']`
+ * character class, and quoting that into a shell string is what the previous
+ * spelling got wrong. Passing argv directly removes the quoting layer, and with
+ * it the whole class of bug that left this guard matching nothing.
+ */
+const scanForCommittedSecret = (root: string): string => {
+  try {
+    return execFileSync("grep", [
+      "-rnE", secretAssignment(),
+      ...UNSCANNED_DIRS.map((d) => `--exclude-dir=${d}`),
+      ...SCANNED_GLOBS.map((g) => `--include=${g}`),
+      root,
+    ], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch (err) {
+    // grep exits 1 for "no matches". Any other status is a real failure and
+    // must not be swallowed into a passing guard.
+    if ((err as { status?: number }).status === 1) return "";
+    throw err;
+  }
+};
 
 const WRITER = "supabase/functions/market-valuation-write/index.ts";
 const writerSrc = () => readFileSync(WRITER, "utf8");
@@ -687,13 +738,46 @@ describe("the invocation secret cannot leak", () => {
   it("is absent from every committed file", () => {
     // The value lives only in managed secret storage. Nothing in the repo may
     // contain the env name paired with an assignment.
-    const hits = execSync(
-      "grep -rnE 'MARKET_VALUATION_WRITER_AUTH_KEY\\\\s*=\\\\s*[\"'\\''][A-Za-z0-9+/=_-]{16,}' " +
-      "--include='*.ts' --include='*.tsx' --include='*.sql' --include='*.toml' --include='*.json' . " +
-      "2>/dev/null | grep -v node_modules || true",
-      { encoding: "utf8" },
-    ).trim();
-    expect(hits).toBe("");
+    expect(scanForCommittedSecret(".")).toBe("");
+  });
+});
+
+describe("the committed-secret scan can actually catch a leak", () => {
+  /** A throwaway tree holding the same planted secret in a scanned and an
+   *  excluded location, so one scan answers both questions. */
+  const plantSecret = (): string => {
+    const root = mkdtempSync(join(tmpdir(), "committed-secret-scan-"));
+    mkdirSync(join(root, "src"), { recursive: true });
+    mkdirSync(join(root, "node_modules", "vendor"), { recursive: true });
+    const planted = `const ${WRITER_AUTH_ENV_NAME} = "A1b2C3d4E5f6G7h8J9k0";\n`;
+    writeFileSync(join(root, "src", "planted.ts"), planted);
+    writeFileSync(join(root, "node_modules", "vendor", "planted.ts"), planted);
+    return root;
+  };
+
+  const withPlantedSecret = (assert: (hits: string) => void): void => {
+    const root = plantSecret();
+    try {
+      assert(scanForCommittedSecret(root));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  it("detects a forbidden assignment in a scanned source path", () => {
+    withPlantedSecret((hits) => expect(hits).toContain(join("src", "planted.ts")));
+  });
+
+  it("does not traverse the same secret inside an excluded dependency tree", () => {
+    withPlantedSecret((hits) => expect(hits).not.toContain("node_modules"));
+  });
+
+  it("finishes the repository scan well inside the default timeout", () => {
+    const started = Date.now();
+    scanForCommittedSecret(".");
+    // Excluding the dependency tree takes this from ~12s to ~0.02s. The bound
+    // is deliberately loose: it proves the traversal fix, not a benchmark.
+    expect(Date.now() - started).toBeLessThan(3000);
   });
 });
 
