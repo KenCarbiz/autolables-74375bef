@@ -21,6 +21,11 @@ import {
   internalCertificationFromRow, mergeResolvedCertification, resolveCertification,
   type StoredCertification,
 } from "../_shared/factorySticker/lib/market/certificationTruth.ts";
+import {
+  compareMaterialInputs, decideShadowRequest,
+} from "../_shared/factorySticker/lib/market/shadowPipeline.ts";
+import { MARKET_ENGINE_VERSION } from "../_shared/factorySticker/lib/market/types.ts";
+import { WRITER_AUTH_ENV_NAME, WRITER_AUTH_HEADER } from "../_shared/functionAuth.ts";
 
 // ──────────────────────────────────────────────────────────────
 // vehicle-enrich — pull EVERYTHING for one VIN at ingest and persist it.
@@ -56,6 +61,9 @@ const MC_BASE = "https://api.marketcheck.com/v2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
+// Server-only. Read from the environment, never from a request, never logged,
+// and deliberately absent from the CORS allow-list so no browser can send it.
+const WRITER_AUTH_KEY = Deno.env.get(WRITER_AUTH_ENV_NAME) || "";
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -761,7 +769,7 @@ serve(async (req) => {
   }
 
   const { data: row } = await admin.from("vehicle_listings")
-    .select("id, vin, ymm, trim, condition, certification, price, mileage, dealer_snapshot, market_meta, recall_status, mc_attributes, mc_raw, drivetrain:mc_attributes->>drivetrain")
+    .select("id, vin, ymm, trim, condition, certification, price, advertised_price_before_doc, website_sale_price, mileage, dealer_snapshot, market_meta, recall_status, mc_attributes, mc_raw, drivetrain:mc_attributes->>drivetrain")
     .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!row) return json(404, { error: "listing_not_found" });
   // What is already stored, so a pass that returns only part of the picture
@@ -939,7 +947,101 @@ serve(async (req) => {
   if (certificationPatch) patch.certification = certificationPatch;
 
   // Persist (each column already migrated; isolate so a missing column can't 500).
-  try { await admin.from("vehicle_listings").update(patch).eq("id", row.id); } catch { /* column not migrated yet */ }
+  let persisted = false;
+  try {
+    const { error } = await admin.from("vehicle_listings").update(patch).eq("id", row.id);
+    persisted = !error;
+  } catch { /* column not migrated yet */ }
+
+  // ── AUTOMATIC SHADOW EVALUATION ───────────────────────────────────────
+  //
+  // Only after the row is actually written, and only when every one of the
+  // seven conditions in `decideShadowRequest` holds: the tenant flag is a
+  // literal true, this invocation came from an approved SERVER path (the
+  // browser's "Re-pull market data" button is refused by name), the VIN is in
+  // an explicitly configured cohort of at most 50, the listing belongs to this
+  // tenant, a MATERIAL valuation input moved, and no completed evaluation
+  // already exists for the same material inputs and algorithm version.
+  //
+  // Everything the decision needs is read here and decided there; no tenant id
+  // and no VIN lives in code.
+  //
+  // The call is evidence-only by construction: `provider_policy: "disabled"`
+  // makes the writer skip the branch that reserves and spends, so no budget is
+  // consulted and no MarketCheck request is possible from this path.
+  if (persisted && WRITER_AUTH_KEY) {
+    const shadowSource = hasCronSecret ? "enrichment_sweep" : isServiceRole ? "ingestion" : "browser";
+    const materialAfter = {
+      price: patch.price ?? row.price,
+      advertisedPriceBeforeDoc: row.advertised_price_before_doc,
+      websiteSalePrice: row.website_sale_price,
+      mileage: row.mileage,
+      condition: row.condition,
+      certified: certification.certified,
+      trim: row.trim,
+      ymm: row.ymm,
+      drivetrain: row.drivetrain,
+      dealerIdentity: pset.dealer_identity ?? null,
+      docFee: pset.doc_fee_amount ?? null,
+      advertisedIncludesDocFee: pset.advertised_includes_doc_fee ?? null,
+      mandatoryAddOnsUsd: pset.mandatory_add_ons_usd ?? null,
+      mandatoryAddOnsIncludedInDisplayedPrice: pset.mandatory_add_ons_included_in_displayed_price ?? null,
+    };
+
+    // The most recent evaluation's material fingerprint, out of the jsonb
+    // column the writer already stores. Repeated enrichment with identical
+    // inputs finds a match here and asks for nothing.
+    const { data: priorEval } = await admin.from("vehicle_market_valuations")
+      .select("status, algorithm_version, data_provenance")
+      .eq("tenant_id", tenantId).eq("vin", vin)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+    const decision = decideShadowRequest({
+      settings: pset,
+      tenantId,
+      listingTenantId: tenantId,
+      vin,
+      source: shadowSource,
+      materialChange: compareMaterialInputs(null, materialAfter),
+      algorithmVersion: MARKET_ENGINE_VERSION,
+      existing: priorEval
+        ? {
+          status: priorEval.status as string | null,
+          algorithmVersion: priorEval.algorithm_version as string | null,
+          materialInputFingerprint:
+            ((priorEval.data_provenance ?? {}) as Record<string, unknown>)
+              .material_input_fingerprint as string | null ?? null,
+        }
+        : null,
+    });
+
+    if (decision.invoke) {
+      // Fire-and-report. A shadow evaluation is an observation; it may never
+      // decide whether an inventory ingestion succeeded, so every failure is
+      // caught, logged WITHOUT the credential, and dropped.
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/market-valuation-write`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            [WRITER_AUTH_HEADER]: WRITER_AUTH_KEY,
+          },
+          body: JSON.stringify({
+            vin,
+            tenant_id: tenantId,
+            shadow: true,
+            provider_policy: decision.providerPolicy,
+            invocation_source: decision.source,
+            material_input_fingerprint: decision.materialInputFingerprint,
+          }),
+          signal: AbortSignal.timeout(25_000),
+        });
+        if (!res.ok) console.warn("shadow_evaluation_failed", res.status, decision.source);
+      } catch {
+        console.warn("shadow_evaluation_unreachable", decision.source);
+      }
+    }
+  }
 
   // Value-history snapshot for the price/market timeline — only when MarketCheck
   // ran (a Black-Book-only pass shouldn't append a price/market snapshot).

@@ -2,6 +2,7 @@ import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { TrendingDown } from "lucide-react";
 import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
 import { presentLegacyPosition } from "@/lib/market/presentation";
+import { publicMarketClaimForListing } from "@/lib/market/publicClaim";
 
 // Shopper-facing market-value report — the transparency module that turns
 // "below market" into a picture. Shows the local market range with the
@@ -12,6 +13,11 @@ export default function MarketValueReport({ listing }: { listing: VehicleListing
   const pay = listing.market_payload || {};
   const low = pay.low != null ? Number(pay.low) : null;
   const high = pay.high != null ? Number(pay.high) : null;
+
+  // One shared decision for every public surface. With
+  // `market_invalid_claim_suppression` off — today — this is always `show`,
+  // so the module renders exactly as it does now.
+  if (!publicMarketClaimForListing(listing as never).show) return null;
 
   if (price == null || (mv == null && (low == null || high == null))) return null;
 

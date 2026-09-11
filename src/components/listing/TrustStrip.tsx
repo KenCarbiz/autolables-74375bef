@@ -6,6 +6,7 @@ import { resolveHistoryFacts, isBadgeworthy, badgeAttribution } from "@/lib/vehi
 import type { Confidence } from "@/lib/vehicleTruth/precedence";
 import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { presentLegacyPosition } from "@/lib/market/presentation";
+import { publicMarketClaimForListing } from "@/lib/market/publicClaim";
 
 // Trust Badge Strip — the signature confidence bar on the Vehicle Passport.
 // Renders ONLY the badges we have real data for (no greyed placeholders), and
@@ -128,7 +129,10 @@ export default function TrustStrip({ listing }: { listing: any }) {
   // presentation map. This block used to carry its own list of position
   // strings, which is a third vocabulary for the same question.
   const marketPresentation = presentLegacyPosition(listing.market_position);
-  if (marketPresentation.tone !== "neutral" || marketPresentation.code === "within") {
+  // The badge is a market CLAIM, so it goes through the shared safeguard. With
+  // the flag off this is always `show` and the badge appears exactly as today.
+  const marketClaim = publicMarketClaimForListing(listing);
+  if (marketClaim.show && (marketPresentation.tone !== "neutral" || marketPresentation.code === "within")) {
     const below = listing.market_payload?.belowMarket;
     badges.push({
       icon: TrendingDown,

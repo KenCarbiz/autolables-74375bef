@@ -24,6 +24,7 @@ import {
 import SharedEmptyState from "@/components/ui/empty-state";
 import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
 import { presentLegacyPosition } from "@/lib/market/presentation";
+import { MARKET_BATCH_NOTICE } from "@/lib/market/batchTransition";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
 
 // ──────────────────────────────────────────────────────────────
@@ -176,18 +177,25 @@ const InventoryModern = () => {
     } catch { toast.error("Recall batch failed"); }
   };
 
-  const runMarketBatch = async () => {
-    if (!tenant?.id) { toast.error("No active dealership"); return; }
-    toast.info("Checking market pricing across inventory…");
-    try {
-      const { data, error } = await supabase.functions.invoke("marketcheck-market-pricing", { body: { tenant_id: tenant.id, batch: true } });
-      if (error) throw error;
-      const d = (data || {}) as { checked?: number; greatDeals?: number; error?: string };
-      if (d.error === "not_configured") { toast.error("Market pricing isn't configured (MarketCheck key)."); return; }
-      toast.success(`Market pricing: ${d.checked ?? 0} checked · ${d.greatDeals ?? 0} great deals`);
-      await load();
-      broadcastSynced("market", { checked: d.checked, greatDeals: d.greatDeals });
-    } catch { toast.error("Market pricing batch failed"); }
+  // ── Inventory-wide market check: withdrawn, not broken ────────────────
+  //
+  // This sent `{ batch: true }` to marketcheck-market-pricing and rendered
+  // `${d.checked} checked · ${d.greatDeals} great deals` from the reply. The
+  // endpoint no longer accepts a batch — it answers 400 `batch_retired`,
+  // because a batch from a browser is a browser deciding how much of a
+  // dealer's money to spend. `checked` and `greatDeals` are fields nothing
+  // returns any more, so every count it showed would have been `0 checked ·
+  // 0 great deals` presented as a success.
+  //
+  // Withdrawn rather than fixed: the replacement is server-side automation
+  // that reserves and budgets each call, which is not a frontend change. The
+  // per-VIN action on the Vehicle File is untouched and still works.
+  //
+  // No request is made here. Not to the proxy, not to the writer, not to a
+  // provider — there is deliberately no `supabase.functions.invoke` in this
+  // handler, and a test asserts it stays that way.
+  const runMarketBatch = () => {
+    toast.info(MARKET_BATCH_NOTICE);
   };
 
   const quickRecall = async (vin: string) => {
@@ -707,7 +715,14 @@ const InventoryModern = () => {
               <QuickAction icon={Printer} label="OEM Window Sticker" onClick={() => navigate("/window-sticker-studio")} />
               <QuickAction icon={FileSignature} label="New Addendum" onClick={() => navigate("/addendum")} />
               <QuickAction icon={ShieldCheck} label="Check Recalls" onClick={runRecallBatch} />
-              <QuickAction icon={CircleDollarSign} label="Check Market Prices" onClick={runMarketBatch} />
+              <QuickAction
+                icon={CircleDollarSign}
+                label="Check Market Prices"
+                onClick={runMarketBatch}
+                disabled
+                title={MARKET_BATCH_NOTICE}
+              />
+              <span id="market-batch-notice" className="sr-only">{MARKET_BATCH_NOTICE}</span>
               {settings.feature_price_verification && <QuickAction icon={RefreshCw} label={scraping ? "Verifying…" : "Verify Prices"} onClick={runPriceScrape} />}
               <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
             </div>
@@ -861,10 +876,20 @@ const SideCard = ({ title, children }: { title: string; children: React.ReactNod
 
 // Premium navigation pill — matches the reference Quick Actions card exactly:
 // 58px full-pill rows, a 40px soft-blue icon circle, 16px label, right chevron.
-const QuickAction = ({ icon: Icon, label, onClick }: { icon: typeof Car; label: string; onClick: () => void }) => (
+const QuickAction = ({ icon: Icon, label, onClick, disabled, title }: {
+  icon: typeof Car; label: string; onClick: () => void; disabled?: boolean; title?: string;
+}) => (
   <button
     onClick={onClick}
-    className="w-full flex items-center gap-2.5 pl-2 pr-3.5 h-[46px] rounded-full border border-[#E8EDF4] bg-[#F8FAFC] hover:bg-white hover:border-blue-500 hover:shadow-sm transition-all duration-200 text-left"
+    disabled={disabled}
+    title={title}
+    aria-disabled={disabled ? true : undefined}
+    aria-describedby={disabled ? "market-batch-notice" : undefined}
+    className={`w-full flex items-center gap-2.5 pl-2 pr-3.5 h-[46px] rounded-full border border-[#E8EDF4] bg-[#F8FAFC] transition-all duration-200 text-left ${
+      disabled
+        ? "opacity-60 cursor-not-allowed"
+        : "hover:bg-white hover:border-blue-500 hover:shadow-sm"
+    }`}
   >
     <span className="w-8 h-8 rounded-full bg-[#EAF2FF] text-blue-600 flex items-center justify-center shrink-0">
       <Icon className="w-4 h-4" strokeWidth={2} />

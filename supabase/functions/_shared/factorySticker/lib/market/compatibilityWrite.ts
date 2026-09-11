@@ -89,6 +89,8 @@ const PUBLISHABLE_CONFIDENCE: MarketConfidence[] = ["high", "medium"];
 
 export function decideCompatibilityWrite(input: {
   flagEnabled: boolean;
+  /** A shadow evaluation. Evidence only — never a customer-facing column. */
+  shadow?: boolean;
   legacy: LegacyMarketColumns;
   candidate: CompatibilityCandidate;
   payload: Record<string, unknown>;
@@ -96,6 +98,13 @@ export function decideCompatibilityWrite(input: {
   const reasons: string[] = [];
   const { legacy, candidate } = input;
   const refuse = (): CompatibilityDecision => ({ update: false, patch: null, reasons });
+
+  // Checked before the flag so the evidence says "shadow", not "flag off" —
+  // a refusal that names the wrong reason is a refusal nobody can audit.
+  if (input.shadow === true) {
+    reasons.push("shadow_evaluation_never_writes_compatibility_columns");
+    return refuse();
+  }
 
   if (!input.flagEnabled) {
     reasons.push("compatibility_flag_off");

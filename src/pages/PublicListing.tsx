@@ -19,6 +19,7 @@ import { PublicLocaleProvider, usePublicLocale } from "@/lib/i18n/public";
 import Logo from "@/components/brand/Logo";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
+import { publicMarketClaimForListing } from "@/lib/market/publicClaim";
 
 // ──────────────────────────────────────────────────────────────
 // PublicListing — /v/:slug
@@ -323,13 +324,20 @@ const PublicListingBody = () => {
   const cond = conditionLabel(listing.condition);
 
   const price = listing.price ?? 0;
-  const marketAvg = listing.market_value ?? 0;
+  // Zeroed under suppression so the gauge, the "Market Avg" figure and the
+  // Fair/High level all disappear together. `price` is untouched.
+  const marketAvgRaw = listing.market_value ?? 0;
   // The comparison itself lives in src/lib/market/surfaceCompat.ts. Same
   // number, one home.
   const publicMarketView = legacyMarketView(listing as unknown as LegacyListingFields, "passport", { comparePrice: price });
-  const belowMarket = mp.belowMarket
-    ?? (publicMarketView.difference != null && publicMarketView.difference < 0 ? -publicMarketView.difference : 0);
-  const marketHigh = mp.high ?? 0;
+  // The shared safeguard. Suppression removes the market CLAIM — the
+  // comparison, the below-market figure and the range — and never the price:
+  // `price` above is the dealer's published number and is rendered either way.
+  const marketClaim = publicMarketClaimForListing(listing as never);
+  const marketAvg = marketClaim.show ? marketAvgRaw : 0;
+  const belowMarket = !marketClaim.show ? 0 : (mp.belowMarket
+    ?? (publicMarketView.difference != null && publicMarketView.difference < 0 ? -publicMarketView.difference : 0));
+  const marketHigh = marketClaim.show ? (mp.high ?? 0) : 0;
   const priceLabel = ((listing as unknown as { price_label?: string }).price_label)
     || (dealer.price_label as string) || "Our Price";
 

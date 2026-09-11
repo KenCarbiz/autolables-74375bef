@@ -44,6 +44,9 @@ import {
 } from "../_shared/factorySticker/lib/market/priceBasis.ts";
 import { decideCompatibilityWrite } from "../_shared/factorySticker/lib/market/compatibilityWrite.ts";
 import {
+  providerCallPermitted, readProviderPolicy, sanitizeInvocationSource,
+} from "../_shared/factorySticker/lib/market/shadowPipeline.ts";
+import {
   callProviderOnce, failureReason, type ProviderFetch,
 } from "../_shared/factorySticker/lib/market/providerTransport.ts";
 import { PROVIDER_FRESH_DAYS, PROVIDER_HARD_EXPIRY_DAYS } from "../_shared/factorySticker/lib/market/freshness.ts";
@@ -169,6 +172,14 @@ Deno.serve(async (req) => {
   const vin = String(body.vin || "").toUpperCase().trim();
   const tenantId: string | null = body.tenant_id || null;
   const dryRun = body.dry_run === true;
+  // ── Provider policy ───────────────────────────────────────────────
+  // "disabled" is the evidence-only mode the automatic shadow pilot uses. It
+  // is not a degree of caution: the branch that reserves and spends is not
+  // entered, so the budget is never read and an enabled budget cannot grant
+  // anything. The ordinary authorized path is unchanged and still reserved.
+  const providerPolicy = readProviderPolicy(body.provider_policy);
+  const shadow = body.shadow === true;
+  const invocationSource = sanitizeInvocationSource(body.invocation_source);
 
   if (!validVin(vin)) return json(400, { error: "invalid_vin" });
   if (!tenantId) return json(400, { error: "tenant_id required" });
@@ -257,6 +268,13 @@ Deno.serve(async (req) => {
 
   if (reuse.providerReusable && !body.force) {
     provider = (stored.provider_valuation as ProviderValuation) ?? null;
+  } else if (!providerCallPermitted(providerPolicy)) {
+    // Evidence only. No reservation is attempted, so `market_reserve_provider_call`
+    // is never called, the budget row is never read, and MC_KEY is never used
+    // in this request. This branch sits ABOVE the spending branch on purpose:
+    // a budget that someone enables by mistake cannot reach past it.
+    reservationOutcome = "provider_disabled";
+    attemptOutcome = "not_attempted";
   } else if (built.request && MC_KEY && !dryRun) {
     // ── 10-11. Reserve BEFORE spending. One live reservation per
     // fingerprint across every concurrent caller, and the monthly budget is
@@ -449,7 +467,17 @@ Deno.serve(async (req) => {
     price_to_market_percent: view.priceToMarketPercent,
     shadow_composite: explanation.shadowComposite,
     model_versions: { engine: explanation.engineVersion },
-    data_provenance: { comparable_snapshot: explanation.comparableSnapshotHash },
+    data_provenance: {
+      comparable_snapshot: explanation.comparableSnapshotHash,
+      provider_policy: providerPolicy,
+      // The idempotency key the automatic shadow caller dedupes on. An
+      // existing jsonb column, so detecting a repeat evaluation needs no
+      // migration.
+      ...(typeof body.material_input_fingerprint === "string"
+        ? { material_input_fingerprint: body.material_input_fingerprint }
+        : {}),
+      ...(shadow ? { shadow: true, invocation_source: invocationSource } : {}),
+    },
   };
 
   const comparableRows = explanation.comparables.map((c, i) => ({
@@ -503,6 +531,9 @@ Deno.serve(async (req) => {
   // separately, which it has not been, so `approvedPositionMapping` is null
   // and the decision is "no update".
   const compatibility = decideCompatibilityWrite({
+    // A shadow evaluation is evidence. It may not touch a column a customer
+    // reads, whatever the flag says — checked here AND inside the decision.
+    shadow,
     flagEnabled: readMarketFlag(settings, "market_value_v2_admin"),
     legacy: {
       market_value: num(listing.market_value),
@@ -561,10 +592,16 @@ Deno.serve(async (req) => {
       // read it cannot tell a deliberate guard from a silent failure.
       compatibility_reasons: compatibility.reasons,
       doc_fee_treatment: docFeeTreatment.source,
+      provider_policy: providerPolicy,
+      shadow,
+      invocation_source: invocationSource,
     },
   });
   if (auditError) console.error("audit_log insert failed", auditError.message);
 
   // ── 24. One canonical MarketView.
-  return json(200, { valuation_id: valuationId, view, compatibility_updated: compatibilityUpdated });
+  return json(200, {
+    valuation_id: valuationId, view, compatibility_updated: compatibilityUpdated,
+    shadow, provider_policy: providerPolicy, provider_attempt: attemptOutcome,
+  });
 });
