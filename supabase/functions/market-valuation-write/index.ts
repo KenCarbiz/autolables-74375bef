@@ -252,14 +252,32 @@ Deno.serve(async (req) => {
     // fingerprint across every concurrent caller, and the monthly budget is
     // checked under the same row lock, so two functions cannot both decide
     // there is room for one more call.
-    const { data: reservation } = await admin.rpc("market_reserve_provider_call", {
-      p_tenant_id: tenantId,
-      p_provider: PROVIDER,
-      p_fingerprint: built.requestFingerprint,
-      p_ttl_seconds: 120,
-    });
+    const { data: reservation, error: reservationError } = await admin.rpc(
+      "market_reserve_provider_call",
+      {
+        p_tenant_id: tenantId,
+        p_provider: PROVIDER,
+        p_fingerprint: built.requestFingerprint,
+        p_ttl_seconds: 120,
+      },
+    );
     const slot = Array.isArray(reservation) ? reservation[0] : reservation;
-    reservationOutcome = slot?.outcome ?? "unavailable";
+
+    if (reservationError) {
+      // An RPC that FAILED is not a budget that said no, and the difference
+      // matters: `disabled`, `existing` and `budget_exceeded` are answers, and
+      // this is the absence of one. Discarding it is how a 42702 in
+      // market_reserve_provider_call survived four gates looking like an
+      // ordinary "unavailable" — the reservation could never be granted and
+      // nothing said why.
+      //
+      // The CODE only. The full error carries the failing SQL, which quotes
+      // request parameters, and none of that belongs in a log line.
+      reservationOutcome = `rpc_error_${reservationError.code ?? "unknown"}`;
+      console.error("reservation_rpc_failed", reservationError.code ?? "unknown");
+    } else {
+      reservationOutcome = slot?.outcome ?? "unavailable";
+    }
 
     if (reservationOutcome === "reserved") {
       attemptId = slot.attempt_id;
