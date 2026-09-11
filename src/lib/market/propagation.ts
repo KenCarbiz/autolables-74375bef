@@ -17,7 +17,11 @@
 // gets the same EVIDENCE and computes its own answer, which may legitimately
 // be a different answer — or no answer at all.
 
-import { cohortsMatch, mayShareMarketEvidence, type MarketCohortKey } from "./cohort.ts";
+import {
+  cohortsMatch, mayShareMarketEvidence, needsEnrichmentToDecide,
+  type MarketCohortKey,
+} from "./cohort.ts";
+import type { MarketAwarenessState } from "./awareness.ts";
 import { MAX_SHADOW_COHORT } from "./shadowPipeline.ts";
 
 /** One hop. A propagated evaluation may never originate another snapshot. */
@@ -37,6 +41,15 @@ export interface InventoryCandidate {
   nextValuationFingerprint: string;
   /** When this vehicle was last evaluated, for the nightly cap. */
   lastEvaluatedAt?: string | null;
+  /**
+   * The sibling's own awareness state.
+   *
+   * A car whose drivetrain or certification is CONFLICTED cannot be placed in
+   * a cohort at all — the key would be built from a value we have reason to
+   * disbelieve. Checked before the cohort comparison, because comparing two
+   * keys when one of them is unreliable produces a confident wrong answer.
+   */
+  awareness?: MarketAwarenessState | null;
 }
 
 export interface PlannedReevaluation {
@@ -54,6 +67,13 @@ export interface RejectedCandidate {
 export interface PropagationPlan {
   planned: PlannedReevaluation[];
   rejected: RejectedCandidate[];
+  /**
+   * Neither compatible nor proven different — the evidence is missing.
+   *
+   * Separate from `rejected` on purpose: this is the enrichment work list, and
+   * collapsing it into rejections is how a fixable gap becomes invisible.
+   */
+  indeterminate: RejectedCandidate[];
   /** More candidates remain; hand this back to continue. Null when complete. */
   continuationCursor: string | null;
   usedSharedEvidence: true;
@@ -93,7 +113,7 @@ export function planImpactedInventory(input: {
   const reasons: string[] = [];
   const now = input.now ?? Date.now();
   const empty = (reason: string): PropagationPlan => ({
-    planned: [], rejected: [], continuationCursor: null,
+    planned: [], rejected: [], indeterminate: [], continuationCursor: null,
     usedSharedEvidence: true, providerCallsCaused: 0, providerCostCaused: 0,
     reasons: [...reasons, reason],
   });
@@ -112,6 +132,7 @@ export function planImpactedInventory(input: {
   const subject = input.subjectVin.trim().toUpperCase();
   const planned: PlannedReevaluation[] = [];
   const rejected: RejectedCandidate[] = [];
+  const indeterminate: RejectedCandidate[] = [];
   const seen = new Set<string>();
 
   // Deterministic order, so the same inputs always produce the same plan and
@@ -147,7 +168,23 @@ export function planImpactedInventory(input: {
       continue;
     }
 
+    // Awareness before comparison. A conflicted identity makes the cohort key
+    // untrustworthy, and comparing an untrustworthy key produces a confident
+    // wrong answer rather than an honest refusal.
+    if (candidate.awareness && !candidate.awareness.safeToCompare) {
+      rejected.push({
+        vin,
+        reasons: ["propagation_identity_conflicted", ...candidate.awareness.conflicts.map((d) => `${d}_conflict`)],
+      });
+      continue;
+    }
+
     const match = cohortsMatch(input.cohortKey, candidate.cohortKey);
+    if (needsEnrichmentToDecide(match)) {
+      // Not a comparable, and not a proven mismatch. A work item.
+      indeterminate.push({ vin, reasons: match.reasons });
+      continue;
+    }
     if (!mayShareMarketEvidence(match)) {
       rejected.push({ vin, reasons: match.reasons });
       continue;
@@ -180,10 +217,11 @@ export function planImpactedInventory(input: {
   reasons.push(
     `propagation_planned_${planned.length}`,
     `propagation_rejected_${rejected.length}`,
+    `propagation_indeterminate_${indeterminate.length}`,
   );
 
   return {
-    planned, rejected,
+    planned, rejected, indeterminate,
     continuationCursor: cursor,
     usedSharedEvidence: true,
     providerCallsCaused: 0,

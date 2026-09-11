@@ -3,6 +3,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildCohortKey, cohortKeyHash, cohortsMatch, mayShareMarketEvidence,
+  needsEnrichmentToDecide, isContextOnly,
   normalizeDrivetrain, normalizeTrim, equipmentSignature,
   EQUIPMENT_UNKNOWN, COHORT_RULES_VERSION,
 } from "./cohort.ts";
@@ -142,16 +143,53 @@ describe("cohortsMatch", () => {
   });
 
   it("NEVER matches two unknown equipment sets to each other", () => {
-    // Two cars nobody has decoded are two cars nobody has decoded.
+    // Two cars nobody has decoded are two cars nobody has decoded. The answer
+    // is `indeterminate` rather than `incompatible`, because nobody has proven
+    // they differ either — but the SAFETY property is identical: it may not
+    // share market evidence.
     const unknown = key({ equipment: null });
     const m = cohortsMatch(unknown, key({ equipment: undefined }));
-    expect(m.relation).toBe("incompatible");
-    expect(m.reasons).toContain("cohort_equipment_unknown_never_matches");
+    expect(m.relation).toBe("indeterminate");
+    expect(mayShareMarketEvidence(m)).toBe(false);
+    expect(m.reasons).toContain("cohort_equipment_indeterminate");
+    expect(m.reasons).toContain("cohort_equipment_unknown_both");
   });
 
   it("never treats unknown equipment as matching a known signature", () => {
-    expect(cohortsMatch(key(), key({ equipment: null })).relation).toBe("incompatible");
-    expect(cohortsMatch(key({ equipment: null }), key()).relation).toBe("incompatible");
+    for (const [a, b, which] of [
+      [key(), key({ equipment: null }), "cohort_equipment_unknown_candidate"],
+      [key({ equipment: null }), key(), "cohort_equipment_unknown_subject"],
+    ] as const) {
+      const m = cohortsMatch(a, b);
+      expect(m.relation).toBe("indeterminate");
+      expect(mayShareMarketEvidence(m)).toBe(false);
+      expect(m.reasons).toContain(which);
+    }
+  });
+
+  it("separates indeterminate from incompatible, because one is fixable", () => {
+    // A FWD car will never become AWD. An undecoded car can be decoded — so it
+    // is a work item, and `needsEnrichmentToDecide` is the list to work from.
+    const undecoded = cohortsMatch(key(), key({ equipment: null }));
+    const wrongDrivetrain = cohortsMatch(key(), key({ drivetrain: "FWD" }));
+    expect(needsEnrichmentToDecide(undecoded)).toBe(true);
+    expect(needsEnrichmentToDecide(wrongDrivetrain)).toBe(false);
+    expect(undecoded.reasons).toContain("cohort_equipment_enrichment_would_resolve");
+    // Both may be shown as context; neither may be market evidence.
+    expect(isContextOnly(undecoded)).toBe(true);
+    expect(isContextOnly(wrongDrivetrain)).toBe(false);
+  });
+
+  it("keeps exactly one relation that permits sharing", () => {
+    const relations = [
+      cohortsMatch(key(), key()),
+      cohortsMatch(key(), key({ year: 2024 })),
+      cohortsMatch(key(), key({ equipment: null })),
+      cohortsMatch(key(), key({ drivetrain: "FWD" })),
+    ];
+    expect(relations.map((r) => r.relation))
+      .toEqual(["exact", "context_only", "indeterminate", "incompatible"]);
+    expect(relations.filter(mayShareMarketEvidence)).toHaveLength(1);
   });
 
   it("records an adjacent model year as context only, never as the same market", () => {

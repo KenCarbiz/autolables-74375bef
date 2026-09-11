@@ -297,3 +297,103 @@ export function buildPropagationReviewRow(input: PropagationReviewInput): Propag
     audience: "internal_only",
   };
 }
+
+// ── One vehicle, and everything the engine knows about why ─────────────────
+//
+// The questions an operator actually asks, in the order they ask them: what
+// cohort am I in, why, what is verified, what is unknown, what conflicts, who
+// are my siblings, which were refused and for what, which snapshot, how old,
+// how much evidence, did it change, did that cost anything, and may any of it
+// be said to a customer.
+//
+// Authenticated and internal. `Limited Market Evidence` and every refusal
+// reason belong here and nowhere else.
+
+import type { MarketAwarenessState, IdentityDimension } from "./awareness.ts";
+import type { MarketEvidenceState, MarketClaimReadiness } from "./evidenceState.ts";
+
+export interface VehicleAwarenessReviewRow {
+  vin: string;
+  cohortLabel: string;
+  cohortHash: string | null;
+  /** Why this cohort: the dimensions and where each came from. */
+  identity: Array<{ dimension: IdentityDimension; value: string | null; source: string; status: string }>;
+  verified: IdentityDimension[];
+  unknown: IdentityDimension[];
+  conflicts: IdentityDimension[];
+  stale: IdentityDimension[];
+  safeToCompare: boolean;
+  compatibleSiblings: string[];
+  rejectedSiblings: Array<{ vin: string; reasons: string[] }>;
+  indeterminateSiblings: Array<{ vin: string; reasons: string[] }>;
+  snapshotFingerprint: string | null;
+  snapshotAgeDays: number | null;
+  eligibleComparableCount: number;
+  independentRooftopCount: number;
+  ownedRooftopCount: number;
+  evidenceStrength: string;
+  marketChanged: boolean;
+  materialChangeReasons: string[];
+  triggeredReevaluation: boolean;
+  /** Always 0 for propagation. Displayed so a non-zero is visible. */
+  propagationProviderCalls: number;
+  propagationCostUsd: number;
+  publicClaimReady: boolean;
+  claimReadiness: string;
+  claimReasons: string[];
+  audience: "internal_only";
+}
+
+export function buildVehicleAwarenessReviewRow(input: {
+  vin: string;
+  cohortLabel: string;
+  cohortHash?: string | null;
+  awareness: MarketAwarenessState;
+  evidence: MarketEvidenceState;
+  readiness: MarketClaimReadiness;
+  siblings?: {
+    compatible?: string[];
+    rejected?: Array<{ vin: string; reasons: string[] }>;
+    indeterminate?: Array<{ vin: string; reasons: string[] }>;
+  };
+  marketChanged?: boolean;
+  triggeredReevaluation?: boolean;
+}): VehicleAwarenessReviewRow {
+  const a = input.awareness;
+  const dimensions = Object.keys(a.fields) as IdentityDimension[];
+
+  return {
+    vin: input.vin,
+    cohortLabel: input.cohortLabel,
+    cohortHash: input.cohortHash ?? input.evidence.cohortHash,
+    identity: dimensions.map((d) => ({
+      dimension: d,
+      value: a.fields[d].normalized,
+      source: a.fields[d].source,
+      status: a.fields[d].status,
+    })),
+    verified: dimensions.filter((d) => a.fields[d].status === "verified"),
+    unknown: a.unknown,
+    conflicts: a.conflicts,
+    stale: a.stale,
+    safeToCompare: a.safeToCompare,
+    compatibleSiblings: input.siblings?.compatible ?? [],
+    rejectedSiblings: input.siblings?.rejected ?? [],
+    indeterminateSiblings: input.siblings?.indeterminate ?? [],
+    snapshotFingerprint: input.evidence.snapshotFingerprint,
+    snapshotAgeDays: input.evidence.comparableFreshnessDays,
+    eligibleComparableCount: input.evidence.eligibleComparableCount,
+    independentRooftopCount: input.evidence.independentRooftopCount,
+    ownedRooftopCount: input.evidence.ownedRooftopCount,
+    evidenceStrength: input.evidence.strength,
+    marketChanged: input.marketChanged ?? false,
+    materialChangeReasons: input.evidence.materialChangeReasons,
+    triggeredReevaluation: input.triggeredReevaluation ?? false,
+    propagationProviderCalls: 0,
+    propagationCostUsd: 0,
+    publicClaimReady: input.readiness.readiness === "eligible",
+    claimReadiness: input.readiness.readiness,
+    claimReasons: input.readiness.reasons,
+    audience: "internal_only",
+  };
+}

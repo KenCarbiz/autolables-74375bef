@@ -208,7 +208,24 @@ export function cohortKeyHash(key: MarketCohortKey): string {
   });
 }
 
-export type CohortRelation = "exact" | "context_only" | "incompatible";
+/**
+ * Four relations, because "not compatible" hides two different situations.
+ *
+ *   exact          proven compatible; may share market evidence
+ *   context_only   a real but weaker relationship (adjacent model year)
+ *   indeterminate  NOT ENOUGH EVIDENCE to prove either way
+ *   incompatible   proven to differ on a cohort-defining dimension
+ *
+ * The distinction that matters is the middle one. Gate 14F-C collapsed
+ * "unknown equipment" into `incompatible`, which was safe but dishonest: it
+ * told an operator two cars were proven different when nobody had decoded
+ * either. `indeterminate` says what is true — the evidence is missing — and it
+ * is a WORK ITEM, because a car can be enriched out of it. `incompatible`
+ * cannot; a FWD car will never become AWD.
+ *
+ * Only `exact` may share market evidence. That has not changed.
+ */
+export type CohortRelation = "exact" | "context_only" | "indeterminate" | "incompatible";
 
 export interface CohortMatch {
   relation: CohortRelation;
@@ -269,12 +286,24 @@ export function cohortsMatch(a: MarketCohortKey, b: MarketCohortKey): CohortMatc
     }
   }
 
-  // Equipment last, because its refusal has the subtlest reason.
-  if (a.equipmentSignature === EQUIPMENT_UNKNOWN || b.equipmentSignature === EQUIPMENT_UNKNOWN) {
-    // Two cars nobody has decoded are not a match. They are two cars nobody
-    // has decoded, and treating them as equal is how a base car joins a
-    // loaded car's market.
-    return { relation: "incompatible", reasons: ["cohort_equipment_unknown_never_matches"] };
+  // Equipment last, because its answer is the subtle one.
+  //
+  // Missing equipment truth is not proof of difference and not proof of
+  // sameness. `equipment_unknown === equipment_unknown` must never become a
+  // match — two cars nobody has decoded are two cars nobody has decoded — and
+  // it must not masquerade as a proven mismatch either.
+  const aUnknown = a.equipmentSignature === EQUIPMENT_UNKNOWN;
+  const bUnknown = b.equipmentSignature === EQUIPMENT_UNKNOWN;
+  if (aUnknown || bUnknown) {
+    return {
+      relation: "indeterminate",
+      reasons: [
+        "cohort_equipment_indeterminate",
+        aUnknown && bUnknown ? "cohort_equipment_unknown_both"
+          : aUnknown ? "cohort_equipment_unknown_subject" : "cohort_equipment_unknown_candidate",
+        "cohort_equipment_enrichment_would_resolve",
+      ],
+    };
   }
   if (a.equipmentSignature !== b.equipmentSignature) {
     return { relation: "incompatible", reasons: ["cohort_equipment_differs"] };
@@ -283,5 +312,18 @@ export function cohortsMatch(a: MarketCohortKey, b: MarketCohortKey): CohortMatc
   return { relation: "exact", reasons: ["cohort_exact_match"] };
 }
 
-/** Only an exact relation may share evidence. Stated as its own predicate. */
+/** Only an exact relation may share evidence. Unchanged, and the whole point. */
 export const mayShareMarketEvidence = (m: CohortMatch): boolean => m.relation === "exact";
+
+/**
+ * A vehicle that could join the cohort if someone decoded it.
+ *
+ * Not a comparable. A work item — the list an operator uses to decide what to
+ * enrich next, and the reason `indeterminate` is worth distinguishing from
+ * `incompatible` at all.
+ */
+export const needsEnrichmentToDecide = (m: CohortMatch): boolean => m.relation === "indeterminate";
+
+/** May be shown as context or diagnostics. Never as market evidence. */
+export const isContextOnly = (m: CohortMatch): boolean =>
+  m.relation === "context_only" || m.relation === "indeterminate";
