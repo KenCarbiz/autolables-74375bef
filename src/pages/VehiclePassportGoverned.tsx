@@ -10,7 +10,7 @@ import {
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { usePublicListing } from "@/hooks/usePublicListing";
-import { derivePassport, fmt$, historyReportName } from "@/lib/passportV2Data";
+import { derivePassport, fmt$, historyReportName, suppressPassportMarketClaim } from "@/lib/passportV2Data";
 import { listingGallery } from "@/lib/photos";
 import { packetVisible } from "@/lib/packetModules";
 import { buildPassportActionPath } from "@/lib/passportReturn";
@@ -44,6 +44,7 @@ import { resolveFuelEconomy, FUEL_MODULE_HEADING } from "@/lib/passport/fuelEcon
 import { trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
 import { presentLegacyPosition } from "@/lib/market/presentation";
+import { publicMarketClaimForListing } from "@/lib/market/publicClaim";
 
 // One shared sticky offset for the desktop header + action center so they can
 // never disagree (header height 64 + 24 gap).
@@ -228,7 +229,19 @@ export default function VehiclePassportGoverned() {
     : MOCK_LISTING) as unknown as VehicleListing;
   const { listing, loading, notFound, rateLimited } = usePublicListing(rawSlug, { preview: isPreview, previewData });
 
-  const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
+  // The shared public-claim safeguard — the same decision PublicListing,
+  // TrustStrip and MarketValueReport reach. Data wiring only: with
+  // `market_invalid_claim_suppression` false, `show` is true, `d` is the
+  // derived object untouched, and this page renders exactly as before.
+  const marketClaim = useMemo(
+    () => publicMarketClaimForListing((listing ?? {}) as never),
+    [listing],
+  );
+  const d = useMemo(() => {
+    if (!listing) return null;
+    const derived = derivePassport(listing);
+    return marketClaim.show ? derived : suppressPassportMarketClaim(derived);
+  }, [listing, marketClaim.show]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : []), [listing]);
   // Whether this car reads as a good price is decided in one place for the
   // whole app; this page keeps its own palette and only asks which tone

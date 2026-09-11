@@ -215,6 +215,9 @@ export interface PublicListingLike {
   market_position?: unknown;
   market_checked_at?: unknown;
   price?: unknown;
+  /** The server-side allow-listed flag projection. Preferred. */
+  public_market_flags?: unknown;
+  /** Dealer identity. Retained only as a fallback; it never carries flags. */
   dealer_snapshot?: unknown;
   certification?: unknown;
   price_basis_status?: unknown;
@@ -233,7 +236,7 @@ export function publicMarketClaimForListing(
   now?: number,
 ): PublicClaimDecision {
   return decidePublicMarketClaimForTenant(
-    listing.dealer_snapshot,
+    readPublicMarketFlags(listing),
     {
       marketValue: typeof listing.market_value === "string"
         ? Number(listing.market_value)
@@ -247,4 +250,67 @@ export function publicMarketClaimForListing(
     },
     now,
   );
+}
+
+// ── The public flag projection ─────────────────────────────────────────────
+//
+// `dealer_snapshot` never carried `market_flags`, and it was never going to:
+// it is a dealer IDENTITY object — name, phone, logo, website, address — and
+// `public-listing-view` backfills exactly those eight fields from the
+// onboarding profile. A settings blob has no business in it, and putting one
+// there would make the next person's "just add one more field" a leak.
+//
+// So the flag travels as its own projection, computed server-side per request
+// from `dealer_profiles.settings.market_flags` and narrowed to an ALLOW-LIST of
+// one key. Three consequences worth stating:
+//
+//   • no stored snapshot has to be rewritten to activate suppression — the
+//     projection is computed at read time, so there is no bulk backfill and no
+//     window where half the fleet has the flag and half does not;
+//   • a browser never queries dealer settings; it receives one boolean;
+//   • adding a second key is a deliberate edit to `PUBLIC_MARKET_FLAG_ALLOWLIST`
+//     with a test that enumerates it, not a side effect of a wider select.
+
+/** The only market flags a public payload may carry. */
+export const PUBLIC_MARKET_FLAG_ALLOWLIST = ["market_invalid_claim_suppression"] as const;
+
+export type PublicMarketFlag = (typeof PUBLIC_MARKET_FLAG_ALLOWLIST)[number];
+
+export const PUBLIC_MARKET_FLAGS_FIELD = "public_market_flags";
+
+/**
+ * Narrow a tenant settings blob to the flags a shopper's page may see.
+ *
+ * Only literal `true` survives, and only for an allow-listed name. Everything
+ * else — an unknown flag, a truthy string, a missing blob — is false, which is
+ * today's behaviour.
+ */
+export function projectPublicMarketFlags(settings: unknown): Record<PublicMarketFlag, boolean> {
+  const out = {} as Record<PublicMarketFlag, boolean>;
+  for (const flag of PUBLIC_MARKET_FLAG_ALLOWLIST) {
+    out[flag] = readMarketFlag(settings, flag);
+  }
+  return out;
+}
+
+/**
+ * Where a public surface reads its flags from.
+ *
+ * The projection first. `dealer_snapshot` remains a fallback only so a payload
+ * built before the projection existed behaves identically rather than
+ * differently — and since no snapshot has ever carried `market_flags`, that
+ * fallback resolves to off, which is the correct answer for a payload that
+ * cannot tell us.
+ */
+export function readPublicMarketFlags(listing: {
+  public_market_flags?: unknown;
+  dealer_snapshot?: unknown;
+}): unknown {
+  const projected = listing.public_market_flags;
+  if (projected != null && typeof projected === "object" && !Array.isArray(projected)) {
+    // The projection is already narrowed; wrap it in the shape readMarketFlag
+    // expects so one reader serves both sources.
+    return { market_flags: projected };
+  }
+  return listing.dealer_snapshot;
 }

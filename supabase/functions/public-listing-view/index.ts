@@ -4,6 +4,9 @@ import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/p
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
 import { PUBLIC_VIEW_DENY, scrubTitleVerification, applyRecallProjection } from "../_shared/lotFeedRow.ts";
+import {
+  PUBLIC_MARKET_FLAGS_FIELD, projectPublicMarketFlags,
+} from "../_shared/factorySticker/lib/market/publicClaim.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
@@ -164,6 +167,18 @@ serve(async (req) => {
         // never as a verified title-record check, and never over a reported
         // brand. See the title check in verificationSummary.ts.
         if (s.title_policy_no_branded === true) row.title_policy_no_branded = true;
+        // ── Public market-flag projection ──────────────────────────────
+        //
+        // The ONLY market flags a shopper's payload may carry, narrowed to an
+        // allow-list of one and computed here rather than stored, so
+        // activating suppression needs no snapshot backfill and no bulk
+        // rewrite. A browser never queries dealer settings; it receives one
+        // boolean. Only a literal true survives.
+        //
+        // Deliberately NOT merged into dealer_snapshot: that object is dealer
+        // identity, and mixing a settings blob into it is how the next field
+        // leaks.
+        row[PUBLIC_MARKET_FLAGS_FIELD] = projectPublicMarketFlags(s);
         // Today's Price page wording mode + custom copy (compliance-safe
         // defaults resolve client-side when absent).
         if (s.todays_price_mode) row.todays_price_mode = s.todays_price_mode;

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import ShadowEvidenceTable from "@/components/admin/ShadowEvidenceTable";
+import { useShadowEvidence } from "@/hooks/useShadowEvidence";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
@@ -107,6 +109,7 @@ const StatusBadge = ({ status }: { status: RunStatus }) => {
 export default function InventorySyncCenter() {
   const { tenant } = useTenant();
   const { isAdmin } = useAuth();
+  const shadowEvidence = useShadowEvidence(tenant?.id);
   const tenantId = tenant?.id || null;
 
   const [cfg, setCfg] = useState<Cfg | null>(null);
@@ -461,6 +464,13 @@ export default function InventorySyncCenter() {
           </div>
         </div>
       )}
+
+      {/* Shadow evidence. Read-only, tenant-scoped, and labelled in the
+          component itself as not customer-facing. No invoke, refresh-fleet,
+          budget or provider control — observing a pilot is not running one. */}
+      <div className="mt-8">
+        <ShadowEvidenceTable rows={shadowEvidence.data ?? []} />
+      </div>
     </div>
   );
 }

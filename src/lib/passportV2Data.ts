@@ -1158,3 +1158,42 @@ export const deriveSoldClaims = (d: PassportData, mileage: number | null, condit
     : null;
   return { velocity, soldPrice, sellTime, milesAdv };
 };
+
+/**
+ * The Passport's market claim, removed — and nothing else touched.
+ *
+ * The Passport renders a market claim from seven derived fields and a price
+ * series, across five sites (the Below Market chip, the market scale, the
+ * Market Intelligence module, the Market Comparison module and its fallback
+ * scale). Editing five call sites would be five chances to miss one, and the
+ * fifth would be the one a customer sees.
+ *
+ * So suppression happens once, here, on the derived data: every claim field
+ * goes null and the market line is stripped from the price series. Each render
+ * site already has a null path — it is the same path a vehicle with no market
+ * data has always taken — so no layout, spacing, copy or CTA changes, and
+ * `resolveMarketComparison` falls into its existing "unavailable" mode with
+ * the wording the design already approved.
+ *
+ * What is deliberately KEPT: the advertised price, and the dealer's own
+ * listing-price history. Neither is a market claim — the first is what the
+ * customer is asked to pay and the second is the dealer's own published
+ * record of it.
+ *
+ * Identity when the claim is publishable: the caller passes the derived object
+ * straight through, so the flag-off path allocates nothing and changes nothing.
+ */
+export const suppressPassportMarketClaim = (d: PassportData): PassportData => ({
+  ...d,
+  marketAvg: null,
+  marketLow: null,
+  marketHigh: null,
+  belowMarket: null,
+  aboveMarket: null,
+  marketCheckedAt: null,
+  // Not "weak" — absent. A weak basis is a claim we hold and distrust; this is
+  // a claim we are not making.
+  marketBasisWeak: false,
+  marketMeta: { ...d.marketMeta, checkedAt: null },
+  valueHistory: d.valueHistory.map((p) => ({ ...p, market_value: null, below_market: null })),
+});

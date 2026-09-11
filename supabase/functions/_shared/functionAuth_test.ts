@@ -17,7 +17,7 @@
 
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { createSupabaseContext } from "https://esm.sh/@supabase/server@1.6.0";
-import { buildSecretKeySet, credentialCarrier } from "./functionAuth.ts";
+import { buildSecretKeySet, constantTimeEquals, credentialCarrier } from "./functionAuth.ts";
 
 const URL_ = "https://project.supabase.co";
 const SECRET = "sb_secret_gate14d_offline_fixture";
@@ -128,4 +128,43 @@ Deno.test("no credential is echoed in the failure it produces", async () => {
   const serialized = JSON.stringify(error?.toJSON?.() ?? String(error));
   assert(!serialized.includes(SECRET), "the presented key must not appear in the error");
   assert(!serialized.includes("sb_secret_other"), "the configured key must not appear in the error");
+});
+
+// ── The comparison vehicle-enrich now uses, executed ───────────────────────
+//
+// `vehicle-enrich` authenticates two secrets — the service-role bearer and the
+// cron secret — through `constantTimeEquals`. The boundary test next door
+// asserts the CALL exists; these assert the function it calls behaves.
+
+Deno.test("constantTimeEquals accepts only an exact match", async () => {
+  const secret = "cron-secret-offline-fixture-0123456789";
+  assert(await constantTimeEquals(secret, secret));
+  for (const wrong of [
+    "",
+    " ",
+    secret.slice(0, -1),
+    secret + "x",
+    secret.toUpperCase(),
+    "cron-secret-offline-fixture-012345678",
+    "completely-different",
+  ]) {
+    assert(!(await constantTimeEquals(wrong, secret)), `must reject ${JSON.stringify(wrong)}`);
+  }
+});
+
+Deno.test("constantTimeEquals compares a fixed-width digest, not the inputs", async () => {
+  // Unequal lengths are absorbed by the digest rather than short-circuiting.
+  assert(!(await constantTimeEquals("a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
+  assert(!(await constantTimeEquals("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "a")));
+});
+
+Deno.test("an empty operand never matches, even against another empty one", async () => {
+  // An unconfigured secret and an absent credential are both "". The function
+  // refuses BEFORE digesting, so an unconfigured deployment fails closed on
+  // its own rather than relying on its callers to check first. The callers
+  // check anyway — defence in depth — but this is the layer that guarantees
+  // it, and asserting it keeps that guarantee from being refactored away.
+  assert(!(await constantTimeEquals("", "")));
+  assert(!(await constantTimeEquals("", "a-real-secret")));
+  assert(!(await constantTimeEquals("a-real-secret", "")));
 });

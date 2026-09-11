@@ -25,7 +25,9 @@ import {
   compareMaterialInputs, decideShadowRequest,
 } from "../_shared/factorySticker/lib/market/shadowPipeline.ts";
 import { MARKET_ENGINE_VERSION } from "../_shared/factorySticker/lib/market/types.ts";
-import { WRITER_AUTH_ENV_NAME, WRITER_AUTH_HEADER } from "../_shared/functionAuth.ts";
+import {
+  constantTimeEquals, WRITER_AUTH_ENV_NAME, WRITER_AUTH_HEADER,
+} from "../_shared/functionAuth.ts";
 
 // ──────────────────────────────────────────────────────────────
 // vehicle-enrich — pull EVERYTHING for one VIN at ingest and persist it.
@@ -750,10 +752,20 @@ serve(async (req) => {
   //   - x-cron-secret header (pg_cron)
   //   - a real user JWT for a platform admin OR a member of this tenant
   //     (the per-VIN "Re-pull market data" button calls this from the browser)
+  // Both comparisons are against SECRETS, and JavaScript string equality
+  // returns at the first differing byte — so how long it takes tells an
+  // attacker how much of a guess was right. Gate 14D removed this shape from
+  // the writer and 14F-B removed it from the proxy; this was the last one.
+  //
+  // The credential SLOTS are unchanged: still the Authorization bearer and
+  // still `x-cron-secret`. Widening what may carry a service credential is not
+  // a timing fix, and every caller that works today works unchanged.
   const authToken = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const secret = req.headers.get("x-cron-secret") || "";
-  const isServiceRole = !!SERVICE_KEY && authToken === SERVICE_KEY;
-  const hasCronSecret = !!CRON_SECRET && secret === CRON_SECRET;
+  const isServiceRole = !!SERVICE_KEY && !!authToken
+    && await constantTimeEquals(authToken, SERVICE_KEY);
+  const hasCronSecret = !!CRON_SECRET && !!secret
+    && await constantTimeEquals(secret, CRON_SECRET);
   if (!isServiceRole && !hasCronSecret) {
     const { data: ures, error: uerr } = await admin.auth.getUser(authToken);
     const userId = ures?.user?.id;
