@@ -64,7 +64,11 @@
 //   * the HMAC key is random per process, so the digests are not precomputable
 //     and cannot be correlated across restarts.
 
-const COMPARISON_KEY: Uint8Array = crypto.getRandomValues(new Uint8Array(32));
+// Backed by an explicit ArrayBuffer. A bare `new Uint8Array(32)` annotated as
+// `Uint8Array` widens to `Uint8Array<ArrayBufferLike>`, and TypeScript 5.7+
+// narrowed `BufferSource` to `ArrayBufferView<ArrayBuffer>` — so the annotation
+// itself, not the value, is what `crypto.subtle.importKey` rejects.
+const COMPARISON_KEY = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(32)));
 
 const DIGEST_BYTES = 32;
 
