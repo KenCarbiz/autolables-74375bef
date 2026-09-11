@@ -279,7 +279,10 @@ describe("the shadow flag remains the kill switch", () => {
 });
 
 describe("the authored migration is additive and guarded", () => {
-  const FILE = "supabase/migrations/20260912000000_market_cohort_snapshots.sql";
+  // The runner-landed file, not the hand-named one it was submitted as. The
+  // managed runner re-timestamps what it applies, and its copy is what the
+  // database actually executed, so it is the record of truth.
+  const FILE = "supabase/migrations/20260911193211_6f9eb83c-fd58-4adc-8e8d-25cc19f92164.sql";
   const sql = readFileSync(FILE, "utf8");
   const code = sql.replace(/^\s*--.*$/gm, "");
 
@@ -374,11 +377,57 @@ describe("the authored migration is additive and guarded", () => {
     expect(sql).toMatch(/retention sweep|fresh_days|superseded/i);
   });
 
-  it("is the only migration that mentions the snapshot table", () => {
+  it("is mentioned only by the two runner-landed migrations", () => {
     const mentions = readdirSync("supabase/migrations")
       .filter((f) => f.endsWith(".sql"))
-      .filter((f) => readFileSync(`supabase/migrations/${f}`, "utf8").includes("market_cohort_snapshots"));
-    expect(mentions).toEqual(["20260912000000_market_cohort_snapshots.sql"]);
+      .filter((f) => readFileSync(`supabase/migrations/${f}`, "utf8").includes("market_cohort_snapshots"))
+      .sort();
+    expect(mentions).toEqual([
+      "20260911193211_6f9eb83c-fd58-4adc-8e8d-25cc19f92164.sql",
+      "20260911213911_7fe1cf98-66f3-4e04-afb6-83e4b6bda6e4.sql",
+    ]);
+  });
+});
+
+// ── Default privileges are not narrowed by granting ────────────────────────
+//
+// The table was created with REVOKE FROM PUBLIC and anon, then GRANT SELECT to
+// authenticated and GRANT SELECT, INSERT to service_role. That looked like the
+// append-only contract and was not: Supabase's default privileges had already
+// granted ALL on new `public` tables to both roles, and a GRANT adds to what is
+// there. UPDATE and DELETE stayed available — proven by role, with service_role
+// carrying rolbypassrls = true, so RLS was no backstop either.
+//
+// Reading the migration could not catch it. Only REVOKE narrows, so a table
+// that means to be append-only has to say so explicitly for every role it
+// grants to.
+describe("an append-only table revokes before it grants", () => {
+  const all = readdirSync("supabase/migrations")
+    .filter((f) => f.endsWith(".sql"))
+    .map((f) => readFileSync(`supabase/migrations/${f}`, "utf8"))
+    .join("\n");
+
+  it.each(["authenticated", "service_role"])(
+    "revokes every privilege from %s rather than relying on the grant",
+    (role) => {
+      expect(all).toMatch(
+        new RegExp(`REVOKE\\s+ALL\\s+PRIVILEGES\\s+ON\\s+TABLE\\s+public\\.market_cohort_snapshots\\s+FROM\\s+${role}`),
+      );
+    },
+  );
+
+  it("still revokes from PUBLIC and anon", () => {
+    for (const role of ["PUBLIC", "anon"]) {
+      expect(all).toMatch(
+        new RegExp(`REVOKE\\s+ALL(\\s+PRIVILEGES)?\\s+ON\\s+(TABLE\\s+)?public\\.market_cohort_snapshots\\s+FROM\\s+${role}`),
+      );
+    }
+  });
+
+  it("re-grants only the append-only subset after revoking", () => {
+    expect(all).toMatch(/GRANT\s+SELECT\s+ON\s+(TABLE\s+)?public\.market_cohort_snapshots\s+TO\s+authenticated/);
+    expect(all).toMatch(/GRANT\s+SELECT,\s*INSERT\s+ON\s+(TABLE\s+)?public\.market_cohort_snapshots\s+TO\s+service_role/);
+    expect(all).not.toMatch(/GRANT[^;]*\b(UPDATE|DELETE|TRUNCATE)\b[^;]*market_cohort_snapshots/);
   });
 
   it("leaves every previously applied Market V2 migration byte-identical", () => {
