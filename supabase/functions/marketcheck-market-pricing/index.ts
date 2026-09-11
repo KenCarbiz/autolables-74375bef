@@ -24,6 +24,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
+import { constantTimeEquals } from "../_shared/functionAuth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
@@ -49,10 +50,23 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const tenantId: string | null = body.tenant_id || null;
 
-  // Auth gate unchanged: service role passes, otherwise tenant membership or
-  // platform admin is required.
+  // Auth gate unchanged in CONTRACT: service role passes, otherwise tenant
+  // membership or platform admin is required. What changed is how the service
+  // credential is compared.
+  //
+  // `auth !== SERVICE_KEY` is a variable-time comparison against a secret:
+  // JavaScript string equality returns at the first differing byte, so the
+  // time it takes leaks how much of a guess was correct. Gate 14D removed this
+  // exact shape from the writer and left it standing here. Same secret, same
+  // exposure, so it gets the same reviewed comparison: both operands are
+  // digested under a per-process random key and compared over the full
+  // fixed-width digest.
+  //
+  // Deliberately still Authorization-only. `readCredentials` would also accept
+  // an `apikey` header as a service credential, and widening which header can
+  // carry a service credential is not a timing fix.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!SERVICE_KEY || auth !== SERVICE_KEY) {
+  if (!SERVICE_KEY || !auth || !(await constantTimeEquals(auth, SERVICE_KEY))) {
     const { data: ures } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (!userId) return json(401, { error: "authentication required" });

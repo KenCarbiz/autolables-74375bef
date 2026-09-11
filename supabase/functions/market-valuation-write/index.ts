@@ -40,6 +40,10 @@ import { decideReuse } from "../_shared/factorySticker/lib/market/fingerprints.t
 import { legacyComparableToCandidate } from "../_shared/factorySticker/lib/market/legacyAdapter.ts";
 import { readMarketFlag } from "../_shared/factorySticker/lib/market/flags.ts";
 import {
+  parseConfiguredBoolean, resolveDocFeeTreatment,
+} from "../_shared/factorySticker/lib/market/priceBasis.ts";
+import { decideCompatibilityWrite } from "../_shared/factorySticker/lib/market/compatibilityWrite.ts";
+import {
   callProviderOnce, failureReason, type ProviderFetch,
 } from "../_shared/factorySticker/lib/market/providerTransport.ts";
 import { PROVIDER_FRESH_DAYS, PROVIDER_HARD_EXPIRY_DAYS } from "../_shared/factorySticker/lib/market/freshness.ts";
@@ -196,6 +200,10 @@ Deno.serve(async (req) => {
   const dealerType = resolveDealerType(settings);
   const zip = (settings.dealer_zip as string) || null;
   const identity = (settings.dealer_identity ?? {}) as Record<string, string[]>;
+  // Canonical `advertised_includes_doc_fee`, legacy `advertised_excludes_doc_fee`
+  // only where it genuinely exists, both spellings of a configured boolean, and
+  // ambiguous rather than a guess when the two disagree.
+  const docFeeTreatment = resolveDocFeeTreatment(settings);
   // The tenant setting is a DEFAULT for every car on the lot, so it is used
   // only when someone has explicitly confirmed it. An unconfirmed number — and
   // an absent one — resolves to unknown, which makes the basis ambiguous and
@@ -206,11 +214,13 @@ Deno.serve(async (req) => {
   // Vehicle File surface uses when a listing carries its own answer.
   const tenantMandatoryAddOns = {
     amountUsd: num(settings.mandatory_add_ons_usd),
-    verified: settings.mandatory_add_ons_verified === true,
-    includedInDisplayedPrice:
-      typeof settings.mandatory_add_ons_included_in_displayed_price === "boolean"
-        ? settings.mandatory_add_ons_included_in_displayed_price
-        : null,
+    // `=== true` rejected the string "true", which is how this tenant's
+    // neighbouring boolean is actually stored. Only an explicit true still
+    // verifies; the change is which spellings of true are legible.
+    verified: parseConfiguredBoolean(settings.mandatory_add_ons_verified) === true,
+    includedInDisplayedPrice: parseConfiguredBoolean(
+      settings.mandatory_add_ons_included_in_displayed_price,
+    ),
   };
   const condition = listing.condition === "new" || listing.condition === "used" || listing.condition === "cpo"
     ? listing.condition : null;
@@ -343,7 +353,12 @@ Deno.serve(async (req) => {
       advertisedPriceBeforeDoc: listing.advertised_price_before_doc,
       websiteSalePrice: listing.website_sale_price,
       docFee: listing.doc_fee,
-      advertisedExcludesDocFee: (settings.advertised_excludes_doc_fee as boolean) ?? null,
+      // Canonical key is `advertised_includes_doc_fee`; the excludes shape this
+      // contract wants is its DERIVED inverse. Reading the excludes key off
+      // settings directly found nothing on every tenant — Harte stores the
+      // includes key, as the string "true" — and the basis silently fell back to
+      // inferring the treatment from stored prices.
+      advertisedExcludesDocFee: docFeeTreatment.advertisedExcludesDocFee,
       tenantMandatoryAddOns,
       dealerType,
       zip,
@@ -472,25 +487,55 @@ Deno.serve(async (req) => {
   });
   if (commitError) return json(500, { error: "commit_failed", detail: commitError.message });
 
-  // ── 22. Compatibility columns, ONLY under the tenant's admin flag. With the
-  // flag off this function is pure evidence: it records what V2 concluded and
-  // changes nothing a dealer or customer can see.
+  // ── 22. Compatibility columns, and the rule that they are the CUSTOMER'S.
+  //
+  // `market_value` and `market_position` are read by PublicListing, TrustStrip
+  // and the Passport. This block used to write `view.marketP50` and a literal
+  // `null` position under `market_value_v2_admin`. On the only vehicle we have
+  // valued, `marketP50` is null — zero of seven comparables were eligible — so
+  // flipping that flag would have blanked $39,158 / above_market on a
+  // published car, under a flag whose name says "admin".
+  //
+  // The decision now lives in a pure, tested module. A null never overwrites a
+  // non-null legacy claim; value and position move together or not at all; a
+  // provider prediction alone is not a market value; and the flag on its own
+  // is not authorization — a legacy position mapping has to be approved
+  // separately, which it has not been, so `approvedPositionMapping` is null
+  // and the decision is "no update".
+  const compatibility = decideCompatibilityWrite({
+    flagEnabled: readMarketFlag(settings, "market_value_v2_admin"),
+    legacy: {
+      market_value: num(listing.market_value),
+      market_position: typeof listing.market_position === "string" ? listing.market_position : null,
+    },
+    candidate: {
+      marketP50: view.marketP50,
+      status: view.status,
+      confidence: view.confidence,
+      checkedAt: view.checkedAt,
+      verdict: view.verdict,
+      effectiveComparableCount: view.effectiveComparableCount,
+      providerPrediction: provider?.predictedValue ?? null,
+      // Awaiting a separate, explicit sign-off. Until then there is no
+      // approved way to say a V2 verdict in the legacy vocabulary, and a
+      // blank is not a translation.
+      approvedPositionMapping: null,
+    },
+    payload: {
+      source: PROVIDER,
+      rawProvider: PROVIDER,
+      provider_valuation: provider,
+      provider_request_fingerprint: explanation.providerRequestFingerprint,
+      valuation_id: valuationId,
+      verdict: view.verdict,
+      confidence: view.confidence,
+    },
+  });
+
   let compatibilityUpdated = false;
-  if (readMarketFlag(settings, "market_value_v2_admin")) {
-    await admin.from("vehicle_listings").update({
-      market_value: view.marketP50,
-      market_position: null,          // the legacy vocabulary is retired here
-      market_checked_at: view.checkedAt,
-      market_payload: {
-        source: PROVIDER,
-        rawProvider: PROVIDER,
-        provider_valuation: provider,
-        provider_request_fingerprint: explanation.providerRequestFingerprint,
-        valuation_id: valuationId,
-        verdict: view.verdict,
-        confidence: view.confidence,
-      },
-    }).eq("tenant_id", tenantId).eq("vin", vin);
+  if (compatibility.update && compatibility.patch) {
+    await admin.from("vehicle_listings").update(compatibility.patch)
+      .eq("tenant_id", tenantId).eq("vin", vin);
     compatibilityUpdated = true;
   }
 
@@ -511,6 +556,11 @@ Deno.serve(async (req) => {
       vin, valuation_id: valuationId, status: view.status, confidence: view.confidence,
       verdict: view.verdict, provider_attempt: attemptOutcome,
       reservation: reservationOutcome, compatibility_updated: compatibilityUpdated,
+      // WHY the compatibility columns did or did not move. Without this the
+      // audit records a refusal and not its reason, and the next person to
+      // read it cannot tell a deliberate guard from a silent failure.
+      compatibility_reasons: compatibility.reasons,
+      doc_fee_treatment: docFeeTreatment.source,
     },
   });
   if (auditError) console.error("audit_log insert failed", auditError.message);

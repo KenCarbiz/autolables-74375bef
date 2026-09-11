@@ -426,3 +426,252 @@ export function resolveComparableBasePrice(input: ComparablePriceInput): Compara
     reasons,
   };
 }
+
+// ── Doc-fee treatment, read from tenant configuration ──────────────────────
+//
+// `resolvePriceBasis` takes `advertisedExcludesDocFee`. Harte's tenant row
+// stores `advertised_includes_doc_fee: "true"` — a different key, the INVERSE
+// meaning, and a JSON string rather than a boolean. The writer read the
+// excludes key, found nothing, and fell through to inferring the treatment
+// from `price − advertised − doc_fee`. The inference happens to be right for
+// the pilot lot, which is precisely why nobody noticed: it is right by
+// arithmetic accident, on the 283 of 288 listings that carry an advertised
+// price, and silent everywhere else.
+//
+// Two failure modes this exists to make impossible:
+//
+//   1. Reading one key and meaning the other. The names are inverses. A rename
+//      that does not also invert the sense flips the doc-fee treatment of an
+//      entire lot with no test failing.
+//   2. `"false"` is a truthy string. Any code that tests the raw setting for
+//      truthiness reads a configured FALSE as TRUE.
+//
+// Ken's authoritative decision for Harte (2026-09-11): the advertised website
+// sale price INCLUDES the mandatory $895 documentation fee. The fee may be
+// itemized for transparency; it may never be added on top. The canonical
+// stored meaning is `advertised_includes_doc_fee = true`, and any
+// excludes-shaped value internal logic needs is DERIVED as its inverse.
+//
+// FTC guidance requires an advertised vehicle price to contain every mandatory
+// fee the consumer must pay, which is what makes the includes form canonical
+// rather than merely conventional.
+
+export const DOC_FEE_INCLUDES_SETTING = "advertised_includes_doc_fee";
+export const DOC_FEE_EXCLUDES_SETTING = "advertised_excludes_doc_fee";
+
+/**
+ * A configured boolean, in the two spellings configuration actually arrives in.
+ *
+ * `true`/`false` and the strings `"true"`/`"false"` (case-insensitive, trimmed)
+ * are answers. Everything else — numbers, `"yes"`, `"1"`, `""`, arrays,
+ * objects, null, undefined — is UNKNOWN, never a default. A pricing basis that
+ * guesses is worse than one that admits it does not know: unknown costs
+ * confidence, a wrong guess restates a published price.
+ */
+export function parseConfiguredBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const s = value.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  return null;
+}
+
+export type DocFeeTreatmentSource =
+  | "includes_setting"
+  | "excludes_setting"
+  | "both_settings_agree"
+  | "conflict"
+  | "unknown";
+
+export interface DocFeeTreatment {
+  /** CANONICAL. True when the advertised price already contains the doc fee. */
+  advertisedIncludesDocFee: boolean | null;
+  /** DERIVED inverse, for the internal callers whose contract is shaped that way. */
+  advertisedExcludesDocFee: boolean | null;
+  source: DocFeeTreatmentSource;
+  /** The two settings are both present and disagree. Neither is trusted. */
+  conflict: boolean;
+  reasons: string[];
+}
+
+const UNKNOWN_TREATMENT = (reasons: string[]): DocFeeTreatment => ({
+  advertisedIncludesDocFee: null,
+  advertisedExcludesDocFee: null,
+  source: "unknown",
+  conflict: false,
+  reasons,
+});
+
+const plainObject = (v: unknown): Record<string, unknown> | null =>
+  v != null && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+
+/**
+ * Resolve the doc-fee treatment from a tenant settings blob.
+ *
+ * `advertised_includes_doc_fee` is preferred and canonical. The legacy
+ * `advertised_excludes_doc_fee` is honoured only when it GENUINELY EXISTS as a
+ * key — an absent key is not a configured false, and `?? null` on a missing
+ * property cannot tell the two apart.
+ *
+ * Note what is deliberately NOT consulted: `vehicle_listings` has no
+ * `advertised_excludes_doc_fee` column. `LegacyListingFields` declares one, so
+ * every surface reading it gets `undefined` forever. A column that does not
+ * exist is not evidence, and this resolver will not manufacture it.
+ */
+export function resolveDocFeeTreatment(settings: unknown): DocFeeTreatment {
+  const bag = plainObject(settings);
+  if (!bag) return UNKNOWN_TREATMENT(["doc_fee_treatment_unconfigured"]);
+
+  const reasons: string[] = [];
+  const hasIncludes = Object.prototype.hasOwnProperty.call(bag, DOC_FEE_INCLUDES_SETTING);
+  const hasExcludes = Object.prototype.hasOwnProperty.call(bag, DOC_FEE_EXCLUDES_SETTING);
+
+  const includes = hasIncludes ? parseConfiguredBoolean(bag[DOC_FEE_INCLUDES_SETTING]) : null;
+  const excludes = hasExcludes ? parseConfiguredBoolean(bag[DOC_FEE_EXCLUDES_SETTING]) : null;
+
+  if (hasIncludes && includes == null) reasons.push(`${DOC_FEE_INCLUDES_SETTING}_unreadable`);
+  if (hasExcludes && excludes == null) reasons.push(`${DOC_FEE_EXCLUDES_SETTING}_unreadable`);
+
+  if (includes != null && excludes != null) {
+    if (includes === !excludes) {
+      reasons.push("doc_fee_treatment_both_settings_agree");
+      return {
+        advertisedIncludesDocFee: includes,
+        advertisedExcludesDocFee: !includes,
+        source: "both_settings_agree",
+        conflict: false,
+        reasons,
+      };
+    }
+    // Both configured, and they contradict each other. Picking a winner here
+    // would be a coin toss over which side of the fee a published advertised
+    // price sits on. Ambiguous is the honest answer.
+    reasons.push("doc_fee_treatment_conflict");
+    return {
+      advertisedIncludesDocFee: null,
+      advertisedExcludesDocFee: null,
+      source: "conflict",
+      conflict: true,
+      reasons,
+    };
+  }
+
+  if (includes != null) {
+    reasons.push(`doc_fee_treatment_from_${DOC_FEE_INCLUDES_SETTING}`);
+    return {
+      advertisedIncludesDocFee: includes,
+      advertisedExcludesDocFee: !includes,
+      source: "includes_setting",
+      conflict: false,
+      reasons,
+    };
+  }
+
+  if (excludes != null) {
+    reasons.push(`doc_fee_treatment_from_${DOC_FEE_EXCLUDES_SETTING}`);
+    return {
+      advertisedIncludesDocFee: !excludes,
+      advertisedExcludesDocFee: excludes,
+      source: "excludes_setting",
+      conflict: false,
+      reasons,
+    };
+  }
+
+  reasons.push("doc_fee_treatment_unconfigured");
+  return UNKNOWN_TREATMENT(reasons);
+}
+
+// ── Two prices, named so they cannot be swapped ────────────────────────────
+//
+// The QX50 carries two legitimate numbers and exactly one of them is the
+// customer's:
+//
+//   $43,876  customer-advertised price — quoted, published, paid. Contains the
+//            $895 documentation fee, which may be ITEMIZED inside it.
+//   $42,981  internal fee-exclusive comparison basis. Apples-to-apples against
+//            a provider that prices the vehicle and not the fee.
+//
+// Two ways to get this wrong, both of which produce a real number that looks
+// plausible on a page:
+//
+//   $44,771 = $43,876 + $895   the fee counted twice
+//   $42,981 shown as the price  the internal basis leaked to a customer
+//
+// Neither is a rounding question. The first overstates what a customer owes by
+// a mandatory fee they were already quoted; the second understates a published
+// advertised price. This split gives each number a name no one can mistake for
+// the other, and two predicates that make the mistakes assertable.
+
+export interface AdvertisedPriceSplit {
+  /**
+   * What the customer is quoted and asked to pay. The documentation fee is
+   * never added to this — when the fee sits inside, it is already here.
+   */
+  customerAdvertisedPrice: number | null;
+  /** The fee itemized WITHIN the advertised price. Null when it sits outside, or is unknown. */
+  documentationFeeInsideAdvertisedPrice: number | null;
+  /**
+   * INTERNAL ONLY. The market-comparison basis. Never render this as a price,
+   * a total, a payment basis or a discount anchor.
+   */
+  internalComparisonPrice: number | null;
+  /** Equals `customerAdvertisedPrice`, always. Present so the identity is assertable. */
+  customerTotalDue: number | null;
+  reasons: string[];
+}
+
+export function splitAdvertisedPrice(basis: MarketPriceBasis): AdvertisedPriceSplit {
+  const reasons: string[] = [];
+  const advertisedToCustomer = basis.displayedTotalPrice;
+  const fee = basis.docFee;
+
+  let feeInside: number | null = null;
+  if (basis.advertisedIncludesDocFee === true && fee != null) {
+    feeInside = fee;
+    reasons.push(`documentation_fee_itemized_inside_advertised_price_${fee}`);
+  } else if (basis.advertisedIncludesDocFee === false) {
+    reasons.push("documentation_fee_outside_advertised_price");
+  } else {
+    reasons.push("documentation_fee_placement_unknown");
+  }
+
+  // `resolvePriceBasis` already folded the fee into `displayedTotalPrice` on
+  // both branches, so the customer's total is that number on both branches
+  // too. Writing it as a second addition is the double count.
+  return {
+    customerAdvertisedPrice: advertisedToCustomer,
+    documentationFeeInsideAdvertisedPrice: feeInside,
+    internalComparisonPrice: basis.vehicleComparisonPrice,
+    customerTotalDue: advertisedToCustomer,
+    reasons,
+  };
+}
+
+/**
+ * Would this number have been produced by adding the fee to a price that
+ * already contains it?
+ *
+ * The tamper guard for `$43,876 + $895 = $44,771`.
+ */
+export function isDoubleCountedTotal(split: AdvertisedPriceSplit, candidate: number): boolean {
+  const base = split.customerAdvertisedPrice;
+  const fee = split.documentationFeeInsideAdvertisedPrice;
+  if (base == null || fee == null || fee <= 0) return false;
+  return Math.abs(candidate - (base + fee)) <= PRICE_BASIS_TOLERANCE;
+}
+
+/**
+ * Is this number the internal comparison basis rather than a customer price?
+ *
+ * The tamper guard for `$42,981` reaching a customer-facing field.
+ */
+export function isInternalComparisonPrice(split: AdvertisedPriceSplit, candidate: number): boolean {
+  const internal = split.internalComparisonPrice;
+  const customer = split.customerAdvertisedPrice;
+  if (internal == null) return false;
+  if (customer != null && Math.abs(customer - internal) <= PRICE_BASIS_TOLERANCE) return false;
+  return Math.abs(candidate - internal) <= PRICE_BASIS_TOLERANCE;
+}
