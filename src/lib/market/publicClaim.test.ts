@@ -17,6 +17,9 @@ const HEALTHY = {
   marketPosition: "above_market",
   marketCheckedAt: daysAgo(1),
   comparePrice: 43_876,
+  // The dealer's published price. Without one there is no comparison to make
+  // and `no_subject_price` suppresses on its own — see noSubjectPrice.test.ts.
+  subjectPrice: 43_876,
 };
 
 const on = (input: Record<string, unknown> = {}) =>
@@ -172,7 +175,7 @@ describe("what suppression does and does not remove", () => {
     // The decision has no opinion about the price at all — it returns show and
     // reasons, and the price is the surface's own field.
     const d = on({ marketValue: null });
-    expect(Object.keys(d)).toEqual(["show", "suppressed", "customerMessage", "reasons"]);
+    expect(Object.keys(d)).toEqual(["show", "suppressed", "customerMessage", "subjectPriceMissing", "reasons"]);
     expect(Object.keys(d)).not.toContain("price");
   });
 });

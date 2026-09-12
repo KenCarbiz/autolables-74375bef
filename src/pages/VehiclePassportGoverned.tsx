@@ -44,7 +44,7 @@ import { resolveFuelEconomy, FUEL_MODULE_HEADING } from "@/lib/passport/fuelEcon
 import { trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
 import { presentLegacyPosition } from "@/lib/market/presentation";
-import { publicMarketClaimForListing } from "@/lib/market/publicClaim";
+import { publicMarketClaimForListing, MARKET_CLAIM_NO_SUBJECT_PRICE_MESSAGE } from "@/lib/market/publicClaim";
 
 // One shared sticky offset for the desktop header + action center so they can
 // never disagree (header height 64 + 24 gap).
@@ -237,6 +237,12 @@ export default function VehiclePassportGoverned() {
     () => publicMarketClaimForListing((listing ?? {}) as never),
     [listing],
   );
+  // The neutral sentence, chosen once. A vehicle with no advertised price of
+  // its own must not be told that dealer pricing remains available — for this
+  // vehicle there is none to remain.
+  const marketUnavailableCopy = marketClaim.subjectPriceMissing
+    ? MARKET_CLAIM_NO_SUBJECT_PRICE_MESSAGE
+    : "Market comparison temporarily unavailable. Vehicle information and dealer pricing remain available.";
   const d = useMemo(() => {
     if (!listing) return null;
     const derived = derivePassport(listing);
@@ -1403,7 +1409,7 @@ export default function VehiclePassportGoverned() {
                       <div><div className={label3} style={{ color: SUB }}>Normalized market value</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketAvg != null ? fmt$(d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketCheckedAt ? "VIN-level predicted value" : "—"}</div></div>
                     </div>
                   ) : (
-                    <p className="mt-3 text-[13px]" style={{ color: SUB }}>Market comparison temporarily unavailable. Vehicle information and dealer pricing remain available.</p>
+                    <p className="mt-3 text-[13px]" style={{ color: SUB }}>{marketUnavailableCopy}</p>
                   )}
                 </section>
 
@@ -1466,7 +1472,7 @@ export default function VehiclePassportGoverned() {
                       {mc.mode !== "unavailable" && <button onClick={() => { firePhaseE("market_methodology_opened"); openPanel("price-history"); }} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View Market Details <ChevronRight className="w-4 h-4" /></button>}
                     </div>
                     {mc.mode === "unavailable" ? (
-                      <p className="mt-3 text-[13px]" style={{ color: SUB }}>Market comparison temporarily unavailable. Vehicle information and dealer pricing remain available.</p>
+                      <p className="mt-3 text-[13px]" style={{ color: SUB }}>{marketUnavailableCopy}</p>
                     ) : (
                       <>
                         <div className="mt-3 flex items-end justify-between gap-4">

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { passportSessionId } from "@/lib/passportEngagement";
 import { governPublicListing } from "@/lib/passport/publicSurface";
+import type { PublicClaimDecision } from "@/lib/market/publicClaim";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 
 // Shared, cached fetch for the public Vehicle Passport (`public-listing-view`).
@@ -27,6 +28,15 @@ export interface UsePublicListingResult {
    * was sold loses the sale.
    */
   rateLimited: boolean;
+  /**
+   * The claim decision this listing was governed by.
+   *
+   * Surfaces need it for one thing only: choosing the neutral sentence. A
+   * vehicle with no advertised price must not be told "dealer pricing remains
+   * available", and the page cannot know that from the suppressed listing —
+   * every field that would have said so is already null by then.
+   */
+  marketClaim: PublicClaimDecision;
 }
 
 interface Fetched {
@@ -72,10 +82,11 @@ export function usePublicListing(
   // through it too: a preview that renders a claim the live page suppresses
   // is a preview of the wrong product.
   const fetched = opts?.preview ? (opts.previewData ?? null) : (query.data?.listing ?? null);
-  const listing = useMemo(() => governPublicListing(fetched).listing, [fetched]);
+  const governed = useMemo(() => governPublicListing(fetched), [fetched]);
+  const listing = governed.listing;
 
   if (opts?.preview) {
-    return { listing, loading: false, notFound: !opts.previewData, rateLimited: false };
+    return { listing, loading: false, notFound: !opts.previewData, rateLimited: false, marketClaim: governed.claim };
   }
   const rateLimited = !!query.data?.rateLimited;
   return {
@@ -83,5 +94,6 @@ export function usePublicListing(
     loading: query.isLoading,
     notFound: !query.isLoading && !rateLimited && (query.isError || query.data?.listing == null),
     rateLimited,
+    marketClaim: governed.claim,
   };
 }

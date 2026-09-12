@@ -37,12 +37,26 @@
 
 import { readMarketFlag } from "./flags.ts";
 import { isLegacyPosition } from "./surfaceCompat.ts";
+import { resolvePriceBasis } from "./priceBasis.ts";
 
 /** The approved public freshness window. Older than this is not a current claim. */
 export const PUBLIC_MARKET_FRESHNESS_DAYS = 7;
 
 /** The only sentence a customer is shown in place of a claim. */
 export const MARKET_CLAIM_UNAVAILABLE_MESSAGE = "Market comparison currently unavailable.";
+
+/**
+ * The sentence for a vehicle with no advertised price of its own.
+ *
+ * It may NOT promise that "dealer pricing remains available", because for this
+ * vehicle it does not: there is no approved advertised/dealer price to show.
+ * Copy that sends the shopper to the dealer is the only honest ending.
+ */
+export const MARKET_CLAIM_NO_SUBJECT_PRICE_MESSAGE =
+  "Market comparison temporarily unavailable. Contact the dealer for current pricing.";
+
+/** Internal reason code for a vehicle with no approved advertised/dealer price. */
+export const NO_SUBJECT_PRICE_REASON = "no_subject_price";
 
 /** Verdict-side states that cannot support a public claim. */
 export const NON_PUBLISHABLE_V2_STATUSES = ["limited", "unavailable", "abstained", "invalid", "conflicting"] as const;
@@ -64,6 +78,23 @@ export interface PublicClaimInput {
   compatibilityIncomplete?: unknown;
   /** An operator or an earlier gate marked this claim invalid outright. */
   explicitlyInvalid?: unknown;
+  /**
+   * THE VEHICLE'S OWN ADVERTISED PRICE, resolved by `resolvePriceBasis` and
+   * nothing else.
+   *
+   * A market value describes a market; it does not price this car. When the
+   * dealer has published no price, the comparison has one side, and a lone
+   * "Normalized market value" becomes the only dollar figure on the page — a
+   * number a shopper reads as the asking price because there is nothing else
+   * it could be. Correct labelling does not save it: the page still answers
+   * "what does this cost" with a number that is not the answer.
+   *
+   * Pass the resolver's `displayedTotalPrice`. Never `market_value`, a provider
+   * prediction, a comparable median, a value-history point, MSRP, or another
+   * vehicle's price — the resolver takes none of those as inputs, which is what
+   * makes the substitution impossible rather than merely discouraged.
+   */
+  subjectPrice?: unknown;
 }
 
 export interface PublicClaimDecision {
@@ -72,6 +103,13 @@ export interface PublicClaimDecision {
   suppressed: boolean;
   /** Null when nothing should be said. Never a diagnostic. */
   customerMessage: string | null;
+  /**
+   * This vehicle has no approved advertised/dealer price.
+   *
+   * Surfaces branch on this to pick neutral copy, so no page has to read a
+   * `reasons` string to do it — the reasons array stays internal-only.
+   */
+  subjectPriceMissing: boolean;
   /** INTERNAL ONLY. Never render these. */
   reasons: string[];
 }
@@ -125,7 +163,14 @@ export function decidePublicMarketClaim(
   // OFF means byte-identical to today. Checked first and returning
   // immediately, so no condition below can leak into the flag-off path.
   if (!options.suppressionEnabled) {
-    return { show: true, suppressed: false, customerMessage: null, reasons: ["suppression_disabled"] };
+    return {
+      show: true, suppressed: false, customerMessage: null,
+      // Flag-off is identical to the page before this module existed, and that
+      // includes the copy: a surface that branched on this would change a
+      // sentence on a flag-false page.
+      subjectPriceMissing: false,
+      reasons: ["suppression_disabled"],
+    };
   }
 
   const now = options.now ?? Date.now();
@@ -136,6 +181,13 @@ export function decidePublicMarketClaim(
 
   if (!finitePositive(input.marketValue)) reasons.push("market_value_invalid");
   if (truthy(input.certificationConflict)) reasons.push("certification_conflict");
+
+  // No price of its own, no comparison. Recorded before the other checks so a
+  // price-less vehicle carries this reason even when its evidence is fresh and
+  // everything else about the claim is publishable — which is exactly the case
+  // that put a standalone market value on a public page.
+  const subjectPriceMissing = !finitePositive(input.subjectPrice);
+  if (subjectPriceMissing) reasons.push(NO_SUBJECT_PRICE_REASON);
 
   const basis = typeof input.priceBasisStatus === "string" ? input.priceBasisStatus : null;
   if (basis && basis !== "verified") reasons.push(`price_basis_${basis}`);
@@ -158,9 +210,20 @@ export function decidePublicMarketClaim(
   }
 
   if (reasons.length === 0) {
-    return { show: true, suppressed: false, customerMessage: null, reasons: ["claim_publishable"] };
+    return {
+      show: true, suppressed: false, customerMessage: null,
+      subjectPriceMissing: false, reasons: ["claim_publishable"],
+    };
   }
-  return { show: false, suppressed: true, customerMessage: MARKET_CLAIM_UNAVAILABLE_MESSAGE, reasons };
+  return {
+    show: false,
+    suppressed: true,
+    customerMessage: subjectPriceMissing
+      ? MARKET_CLAIM_NO_SUBJECT_PRICE_MESSAGE
+      : MARKET_CLAIM_UNAVAILABLE_MESSAGE,
+    subjectPriceMissing,
+    reasons,
+  };
 }
 
 /** Read the flag and decide, in one call, for a surface that holds tenant settings. */
@@ -215,6 +278,11 @@ export interface PublicListingLike {
   market_position?: unknown;
   market_checked_at?: unknown;
   price?: unknown;
+  /** Approved advertised/dealer-price sources. The ONLY inputs to subject price. */
+  website_sale_price?: unknown;
+  advertised_price_before_doc?: unknown;
+  doc_fee?: unknown;
+  advertised_excludes_doc_fee?: unknown;
   /** The server-side allow-listed flag projection. Preferred. */
   public_market_flags?: unknown;
   /** Dealer identity. Retained only as a fallback; it never carries flags. */
@@ -231,6 +299,52 @@ export function listingCertificationConflict(listing: PublicListingLike): boolea
   return (cert as Record<string, unknown>).provider_conflict === true;
 }
 
+const asMoney = (v: unknown): number | null => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v.replace(/[$,\s]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+};
+
+/**
+ * The vehicle's own advertised price, through the canonical resolver.
+ *
+ * Routed through `resolvePriceBasis` rather than read off a column so the
+ * approved sources are the resolver's inputs and nothing else CAN become a
+ * subject price — `market_value`, a provider prediction, a comparable median,
+ * a value-history point and MSRP are not parameters here, so no future edit
+ * can quietly promote one.
+ *
+ * The question asked here is narrow on purpose: HAS this dealer published a
+ * price for this car. It is not "does the fee arithmetic reconcile" — a lot
+ * whose doc fee is unconfigured yields an `ambiguous` or even `invalid` basis
+ * on every car while still advertising a real price on each, and suppressing
+ * that whole lot would be the opposite of the defect this fixes. Basis quality
+ * is already answered by the `price_basis_*` reasons. So the test is the
+ * resolver's displayed total: present and plausible, or there is no price.
+ */
+export function resolveSubjectPrice(listing: PublicListingLike): number | null {
+  const basis = resolvePriceBasis({
+    price: asMoney(listing.price),
+    websiteSalePrice: asMoney(listing.website_sale_price),
+    advertisedPriceBeforeDoc: asMoney(listing.advertised_price_before_doc),
+    docFee: asMoney(listing.doc_fee),
+    advertisedExcludesDocFee:
+      typeof listing.advertised_excludes_doc_fee === "boolean"
+        ? listing.advertised_excludes_doc_fee
+        : null,
+  });
+  const displayed = basis.displayedTotalPrice;
+  // The resolver's own plausibility floor, so a 0, a negative and a $12 typo
+  // are all "no price" rather than a price a page would render.
+  return typeof displayed === "number" && Number.isFinite(displayed)
+    && displayed >= 500 && displayed <= 5_000_000
+    ? displayed
+    : null;
+}
+
 export function publicMarketClaimForListing(
   listing: PublicListingLike,
   now?: number,
@@ -238,6 +352,7 @@ export function publicMarketClaimForListing(
   return decidePublicMarketClaimForTenant(
     readPublicMarketFlags(listing),
     {
+      subjectPrice: resolveSubjectPrice(listing),
       marketValue: typeof listing.market_value === "string"
         ? Number(listing.market_value)
         : listing.market_value,
