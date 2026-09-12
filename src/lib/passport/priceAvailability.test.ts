@@ -157,6 +157,103 @@ describe("the affected public surfaces are wired to the contract", () => {
   });
 });
 
+describe("the financing estimate abstains as ONE unit", () => {
+  const tp = () => read("src/components/passport/TodaysPriceExperience.tsx");
+
+  // The first fix gated only the monthly figure. That left "Est. Amount
+  // Financed $0", "Down Payment -$0", a 72-month term and an APR standing
+  // beside an em-dash — a financing estimate for a car with no price. Every
+  // component of the estimate must live behind the same guard.
+  const ESTIMATE_COMPONENTS = [
+    "Est. Amount Financed",
+    "Estimated cash due at signing",
+    "Known subtotal",
+    "fmt$(financed)",
+    "fmt$(safeDown)",
+    "${term} months",
+    "aprPresentation.value",
+  ];
+
+  const guardedRegion = (src: string) => {
+    const start = src.indexOf("{paymentAvailable && (\n                <>");
+    const end = src.indexOf("              {/* Continue-to-dealer-review transition splits calculation from");
+    expect(start, "estimate guard not found").toBeGreaterThan(-1);
+    expect(end, "guard end marker not found").toBeGreaterThan(start);
+    return src.slice(start, end);
+  };
+
+  it("keeps every estimate component inside the paymentAvailable guard", () => {
+    const guarded = guardedRegion(tp());
+    for (const c of ESTIMATE_COMPONENTS) expect(guarded, c).toContain(c);
+  });
+
+  it("leaves no amount financed, due-at-signing or term render outside the guard", () => {
+    const src = tp();
+    const guarded = guardedRegion(src);
+    const outside = src.split(guarded).join("");
+    // `fmt$(financed)` is the amount financed and must exist nowhere else.
+    expect(outside).not.toContain("fmt$(financed)");
+    // Any surviving monthly/due render outside must itself be guarded.
+    for (const m of outside.matchAll(/fmt\$\((?:monthly|dueAtSigning\.known)\)/g)) {
+      const before = outside.slice(Math.max(0, m.index! - 400), m.index!);
+      expect(before, `unguarded at ${m[0]}`).toMatch(/paymentAvailable/);
+    }
+  });
+
+  it("never prints a finance term or APR without an available estimate", () => {
+    const src = tp();
+    const guarded = guardedRegion(src);
+    const outside = src.split(guarded).join("");
+    for (const m of outside.matchAll(/\$\{term\} (?:mo|months)/g)) {
+      const before = outside.slice(Math.max(0, m.index! - 300), m.index!);
+      expect(before, "unguarded finance term").toMatch(/paymentAvailable/);
+    }
+    for (const m of outside.matchAll(/apr\.toFixed\(2\)/g)) {
+      const before = outside.slice(Math.max(0, m.index! - 400), m.index!);
+      expect(before, "unguarded APR").toMatch(/paymentAvailable/);
+    }
+  });
+
+  it("says the approved sentence once, in the header, not twice", () => {
+    const src = tp();
+    // Two call sites total: the estimate header, and the post-submit
+    // confirmation panel - which is a different view state, never on screen
+    // at the same time as the header.
+    const uses = [...src.matchAll(/PAYMENT_UNAVAILABLE_MESSAGE/g)].length;
+    expect(uses).toBeLessThanOrEqual(3); // import + header + confirmation
+    // The "Your estimate" summary must NOT restate it.
+    expect(src).not.toMatch(/Your estimate[\s\S]{0,400}PAYMENT_UNAVAILABLE_MESSAGE/);
+  });
+
+  it("keeps the customer CTA outside the guard", () => {
+    const src = tp();
+    const guarded = guardedRegion(src);
+    // The continue-to-dealer CTA must survive when no estimate exists.
+    expect(guarded).not.toContain("Continue to dealer review");
+    expect(src).toContain("Continue to dealer review");
+  });
+
+  it("does not send an invented payment to the dealer in the lead", () => {
+    const src = tp();
+    expect(src).toMatch(/copy\.showCalculator && paymentAvailable/);
+    expect(src).toMatch(/const dueLine = paymentAvailable \?/);
+  });
+
+  it("still renders the estimate for a priced vehicle", () => {
+    // paymentAvailable is true exactly when the subject price resolves, so the
+    // priced path is unchanged by construction.
+    expect(canEstimatePayment(resolvePriceAvailability(priced() as never))).toBe(true);
+    expect(canEstimatePayment(resolvePriceAvailability(priceless() as never))).toBe(false);
+  });
+
+  it("derives the guard from the shared contract, not a local price test", () => {
+    const src = tp();
+    expect(src).toMatch(/priceAvailabilityFromAmount\(d\.price\)/);
+    expect(src).toMatch(/canEstimatePayment\(priceAvailability\)/);
+    expect(src).not.toMatch(/const price = d\.price \?\? 0;/);
+  });
+});
+
 describe("the market safeguard stays separate and still works", () => {
   it("still suppresses the standalone market value for a price-less vehicle", () => {
     const claim = publicMarketClaimForListing(priceless() as never, NOW);

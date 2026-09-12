@@ -300,8 +300,11 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
         if (sessionStorage.getItem("al_visit_src") === "qr") src = "qr_scan";
         zip = sessionStorage.getItem("al_zip") || "";
       } catch { /* storage unavailable */ }
-      const terms = copy.showCalculator ? `Payment goal ${fmt$(monthly)}/mo · ${term} mo · Example APR ${apr.toFixed(2)}% · ${fmt$(safeDown)} down${profile ? ` · Credit profile ${profile}` : ""}` : "";
-      const extras = [`Mode ${copy.mode}`, terms, method ? `Prefers ${method}` : "", zip ? `ZIP ${zip}` : "", `Due at signing (est.) ${fmt$(dueAtSigning.known)} (excl. tax/title/reg)`, "via vehicle_passport_todays_price_page"].filter(Boolean).join(" · ");
+      const terms = copy.showCalculator && paymentAvailable
+        ? `Payment goal ${fmt$(monthly)}/mo · ${term} mo · Example APR ${apr.toFixed(2)}% · ${fmt$(safeDown)} down${profile ? ` · Credit profile ${profile}` : ""}`
+        : "";
+      const dueLine = paymentAvailable ? `Due at signing (est.) ${fmt$(dueAtSigning.known)} (excl. tax/title/reg)` : "";
+      const extras = [`Mode ${copy.mode}`, terms, method ? `Prefers ${method}` : "", zip ? `ZIP ${zip}` : "", dueLine, "via vehicle_passport_todays_price_page"].filter(Boolean).join(" · ");
       const routing = (listing as unknown as { contact_routing?: Record<string, unknown> }).contact_routing || null;
       const basePayload = {
         store_id: listing.store_id, name: name.trim(), email: email.trim() || "", phone: phone.trim() || "",
@@ -342,8 +345,12 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
           {copy.showCalculator && (
             <>
               <p className="font-bold text-[#0D1B2A]">{paymentAvailable ? `${fmt$(monthly)}/mo · ${term} months` : PAYMENT_UNAVAILABLE_MESSAGE}</p>
-              <p className="mt-1 text-[12px]">Example APR {apr.toFixed(2)}% · {fmt$(safeDown)} down · Est. due at signing {fmt$(dueAtSigning.known)}</p>
-              <p className="mt-1 text-[11px] text-[#94A3B8]">Excludes tax, title, registration, dealer fees, add-ons, and trade equity.</p>
+              {paymentAvailable && (
+                <>
+                  <p className="mt-1 text-[12px]">Example APR {apr.toFixed(2)}% · {fmt$(safeDown)} down · Est. due at signing {fmt$(dueAtSigning.known)}</p>
+                  <p className="mt-1 text-[11px] text-[#94A3B8]">Excludes tax, title, registration, dealer fees, add-ons, and trade equity.</p>
+                </>
+              )}
             </>
           )}
           <p className="mt-1">{name}{phone ? ` · ${phone}` : ""}{email ? ` · ${email}` : ""}</p>
@@ -396,6 +403,14 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                 </div>
               </div>
 
+              {/* THE WHOLE ESTIMATE, OR NONE OF IT.
+                  Gating only the monthly figure left "Est. Amount Financed $0",
+                  "Down Payment -$0", a 72-month term and an APR standing beside
+                  an em-dash — a financing estimate for a car with no price. The
+                  excluded-charges notice goes too: it describes what an estimate
+                  leaves out, and there is no estimate to qualify. */}
+              {paymentAvailable && (
+                <>
               {/* Excluded charges shown BEFORE interaction — the estimate is
                   materially incomplete without this context (16 CFR 226, TILA
                   Reg Z illustrative advertising guidance). */}
@@ -475,12 +490,22 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                 </div>
               </div>
 
+                </>
+              )}
+
               {/* Continue-to-dealer-review transition splits calculation from
                   lead submission so abandonment between the two is measurable. */}
               <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3 pt-4 border-t border-[#F1F5F9]">
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Your estimate</p>
-                  <p className="text-[13px] font-bold text-[#0D1B2A] mt-0.5 truncate">{paymentAvailable ? `${fmt$(monthly)}/mo · ${term} mo · ${aprPresentation.label} ${aprPresentation.value} · ${fmt$(safeDown)} down` : PAYMENT_UNAVAILABLE_MESSAGE}</p>
+                  {/* No estimate, no summary of one. The neutral sentence is said
+                      once, in the header above; repeating it here would state the
+                      same absence twice. The CTA beside this stays either way. */}
+                  {paymentAvailable && (
+                    <>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Your estimate</p>
+                      <p className="text-[13px] font-bold text-[#0D1B2A] mt-0.5 truncate">{`${fmt$(monthly)}/mo · ${term} mo · ${aprPresentation.label} ${aprPresentation.value} · ${fmt$(safeDown)} down`}</p>
+                    </>
+                  )}
                 </div>
                 <a href="#tp-form" onClick={() => emit("continue_to_dealer_review_clicked")} className="h-11 px-5 rounded-xl bg-[#0B6FEA] hover:bg-[#0958bd] text-white text-sm font-bold inline-flex items-center justify-center gap-2">Continue to dealer review</a>
               </div>
