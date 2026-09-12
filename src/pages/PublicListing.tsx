@@ -20,6 +20,7 @@ import Logo from "@/components/brand/Logo";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
 import { publicMarketClaimForListing } from "@/lib/market/publicClaim";
+import { resolvePriceAvailability, CONTACT_DEALER_FOR_PRICE } from "@/lib/passport/priceAvailability";
 
 // ──────────────────────────────────────────────────────────────
 // PublicListing — /v/:slug
@@ -323,7 +324,11 @@ const PublicListingBody = () => {
   const viewUrl = publicUrl(listing.slug);
   const cond = conditionLabel(listing.condition);
 
-  const price = listing.price ?? 0;
+  // Zero is not a price. `?? 0` printed "Our Price $0" on every vehicle the
+  // dealer had not priced. The amount comes from the canonical resolver; the
+  // unavailable case stays a state, never a number.
+  const priceAvailability = resolvePriceAvailability(listing as never);
+  const price = priceAvailability.available ? priceAvailability.amount : 0;
   // Zeroed under suppression so the gauge, the "Market Avg" figure and the
   // Fair/High level all disappear together. `price` is untouched.
   const marketAvgRaw = listing.market_value ?? 0;
@@ -469,7 +474,7 @@ const PublicListingBody = () => {
     <div className="min-h-screen bg-[#f4f5f7] text-[#1a1d21]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet>
         <title>{`${ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${dealerName}`}</title>
-        <meta name="description" content={`${ymm} · ${fmt$(price)} · ${(dealer.city as string) || ""}`} />
+        <meta name="description" content={`${ymm} · ${priceAvailability.available ? fmt$(price) : CONTACT_DEALER_FOR_PRICE} · ${(dealer.city as string) || ""}`} />
       </Helmet>
 
       <div className="mx-auto bg-white" style={{ maxWidth: 1024 }}>
@@ -535,7 +540,9 @@ const PublicListingBody = () => {
             </div>
             <div className="text-right">
               <div className="flex items-center justify-end gap-1.5 text-sm font-semibold text-[#3a4048]">{priceLabel}<Info className="w-[15px] h-[15px] text-[#9aa0a8]" /></div>
-              <div className="text-[42px] font-extrabold tracking-tight mt-0.5">{fmt$(price)}</div>
+              {priceAvailability.available
+                ? <div className="text-[42px] font-extrabold tracking-tight mt-0.5">{fmt$(price)}</div>
+                : <div className="text-[26px] font-extrabold tracking-tight mt-0.5">{CONTACT_DEALER_FOR_PRICE}</div>}
             </div>
           </div>
 
@@ -606,7 +613,7 @@ const PublicListingBody = () => {
             <div className="border border-[#eceef0] rounded-xl p-5">
               <div className="text-base font-bold">Market Price Analysis</div>
               <div className="text-[11px] text-[#9aa0a8] mt-0.5">Powered by live market data</div>
-              {marketAvg > 0 ? (
+              {marketAvg > 0 && priceAvailability.available ? (
                 <>
                   <div className="flex justify-between items-end mt-[14px]">
                     <div>
@@ -623,7 +630,7 @@ const PublicListingBody = () => {
                 </>
               ) : (
                 <div className="mt-[14px]">
-                  <div className="text-[26px] font-extrabold">{fmt$(price)}</div>
+                  <div className="text-[26px] font-extrabold">{priceAvailability.available ? fmt$(price) : CONTACT_DEALER_FOR_PRICE}</div>
                   <p className="text-xs text-[#6b727a] mt-1">Market comparison appears here once live market data is available for this vehicle.</p>
                 </div>
               )}
@@ -649,7 +656,7 @@ const PublicListingBody = () => {
                 if (ownerCount === 1) points.push("Single owner");
                 if (warrantyStr) points.push("Factory warranty remaining");
                 if (serviceCount > 0) points.push(`${serviceCount} service record${serviceCount > 1 ? "s" : ""} on file`);
-                const level = belowMarket > 0 ? "High" : marketAvg > 0 ? "Fair" : null;
+                const level = !priceAvailability.available ? null : belowMarket > 0 ? "High" : marketAvg > 0 ? "Fair" : null;
                 if (!level && points.length === 0) {
                   return <div className="text-[13px] text-[#6b727a] mt-3">Pricing and condition signals appear here as they are confirmed for this vehicle.</div>;
                 }

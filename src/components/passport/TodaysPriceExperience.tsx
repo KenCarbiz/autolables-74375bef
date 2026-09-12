@@ -13,6 +13,7 @@ import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/cu
 import { estimateAffordability, DEFAULT_APR_PERCENT } from "@/lib/affordability";
 import { savePaymentPrefs } from "@/lib/passport/paymentPrefs";
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
+import { priceAvailabilityFromAmount, canEstimatePayment, PAYMENT_UNAVAILABLE_MESSAGE } from "@/lib/passport/priceAvailability";
 import { resolvePassportBack, passportForwardPath } from "@/lib/passportReturn";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { listingGallery, listingHero } from "@/lib/photos";
@@ -231,7 +232,14 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
   useEffect(() => { if (!isPreview) track(listing, "todays_price_page_viewed", { mode: copy.mode }); }, [listing, isPreview, copy.mode]);
 
-  const price = d.price ?? 0;
+  // A payment is a claim about what the shopper will owe every month. Without
+  // a price there is no amount financed, so there is no honest estimate — and
+  // "$0/mo · For 72 months" is the least honest form of one, because the term
+  // makes the missing number look deliberate. The hooks below stay
+  // unconditional (rules of hooks); only the PRESENTATION abstains.
+  const priceAvailability = priceAvailabilityFromAmount(d.price);
+  const paymentAvailable = canEstimatePayment(priceAvailability);
+  const price = priceAvailability.available ? priceAvailability.amount : 0;
   const [down, setDown] = useState(() => Math.min(price, Math.round((price * 0.1) / 500) * 500));
   const [term, setTerm] = useState<(typeof TERMS)[number]>(72);
   const [apr, setApr] = useState(DEFAULT_APR_PERCENT);
@@ -333,7 +341,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
         <div className="mt-4 mx-auto max-w-sm rounded-xl border border-[#DDE5EE] bg-[#F5F7FA] p-4 text-left text-[13px] text-[#334155]">
           {copy.showCalculator && (
             <>
-              <p className="font-bold text-[#0D1B2A]">{fmt$(monthly)}/mo · {term} months</p>
+              <p className="font-bold text-[#0D1B2A]">{paymentAvailable ? `${fmt$(monthly)}/mo · ${term} months` : PAYMENT_UNAVAILABLE_MESSAGE}</p>
               <p className="mt-1 text-[12px]">Example APR {apr.toFixed(2)}% · {fmt$(safeDown)} down · Est. due at signing {fmt$(dueAtSigning.known)}</p>
               <p className="mt-1 text-[11px] text-[#94A3B8]">Excludes tax, title, registration, dealer fees, add-ons, and trade equity.</p>
             </>
@@ -377,8 +385,14 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">Estimated Payment</p>
-                  <p className="text-[28px] font-extrabold tracking-tight text-[#0B6FEA] leading-none mt-0.5">{fmt$(monthly)}<span className="text-[14px] font-semibold text-[#64748B]">/mo</span></p>
-                  <p className="text-[11px] text-[#64748B] mt-1">For {term} months at {aprPresentation.label} {aprPresentation.value}</p>
+                  {paymentAvailable ? (
+                    <>
+                      <p className="text-[28px] font-extrabold tracking-tight text-[#0B6FEA] leading-none mt-0.5">{fmt$(monthly)}<span className="text-[14px] font-semibold text-[#64748B]">/mo</span></p>
+                      <p className="text-[11px] text-[#64748B] mt-1">For {term} months at {aprPresentation.label} {aprPresentation.value}</p>
+                    </>
+                  ) : (
+                    <p className="text-[12px] font-semibold text-[#64748B] mt-0.5 max-w-[260px]">{PAYMENT_UNAVAILABLE_MESSAGE}</p>
+                  )}
                 </div>
               </div>
 
@@ -443,7 +457,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                   ))}
                   <div className="flex items-center justify-between gap-3 pt-2.5 mt-1.5 border-t border-[#DDE5EE]">
                     <span className="text-[12.5px] font-bold text-[#0D1B2A]">Est. Monthly Payment</span>
-                    <span className="text-[16px] font-extrabold text-[#0B6FEA] tabular-nums">{fmt$(monthly)}<span className="text-[11px] font-semibold text-[#64748B]">/mo</span></span>
+                    <span className="text-[16px] font-extrabold text-[#0B6FEA] tabular-nums">{paymentAvailable ? <>{fmt$(monthly)}<span className="text-[11px] font-semibold text-[#64748B]">/mo</span></> : "—"}</span>
                   </div>
                   <div className="mt-3 pt-3 border-t border-[#DDE5EE]">
                     <p className="text-[11px] font-bold text-[#0D1B2A]">Estimated cash due at signing</p>
@@ -466,7 +480,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
               <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3 pt-4 border-t border-[#F1F5F9]">
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Your estimate</p>
-                  <p className="text-[13px] font-bold text-[#0D1B2A] mt-0.5 truncate">{fmt$(monthly)}/mo · {term} mo · {aprPresentation.label} {aprPresentation.value} · {fmt$(safeDown)} down</p>
+                  <p className="text-[13px] font-bold text-[#0D1B2A] mt-0.5 truncate">{paymentAvailable ? `${fmt$(monthly)}/mo · ${term} mo · ${aprPresentation.label} ${aprPresentation.value} · ${fmt$(safeDown)} down` : PAYMENT_UNAVAILABLE_MESSAGE}</p>
                 </div>
                 <a href="#tp-form" onClick={() => emit("continue_to_dealer_review_clicked")} className="h-11 px-5 rounded-xl bg-[#0B6FEA] hover:bg-[#0958bd] text-white text-sm font-bold inline-flex items-center justify-center gap-2">Continue to dealer review</a>
               </div>
