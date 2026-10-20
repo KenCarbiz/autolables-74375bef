@@ -1,70 +1,51 @@
-# Gate 14D — Read-only auth forensics for the 20:10:30.568Z canary
+# AutoLabels internal audit — findings and proposed minimal fixes
 
-All items below come from read-only reads. No edit, commit, deploy, invocation, budget change or write SQL occurred.
+Analysis only. Nothing was edited, deployed, written or run. Evidence comes from source at local HEAD `e9bf1e7d` (a "Work in progress" commit at 2026-10-20 21:10 UTC) and read-only database queries. **Deployment uncertainty:** no tool here shows which commit www.autolabels.io is serving. Earlier crawls only showed bundle hashes, so whether the live site matches this source is **unverified**.
 
-## 1. The denial log line
+## Confirmed defects (with evidence)
 
-Function `market-valuation-write` logs for that request:
+### 1. Opening Admin rewrites every vehicle's price (high severity)
+- Trigger: `src/pages/Admin.tsx`, the `useEffect` keyed on `docFeeSig` (lines ~197-216). It records a baseline the first time `settingsLoading` is false. But `DealerSettingsProvider.load()` (`src/contexts/DealerSettingsContext.tsx` 612-676) runs several times: first anon/no-tenant (cache or defaults, `loading=false`), then again once the user and tenant name/logo resolve (key at line 681). The baseline gets taken from the cached/default fee, then the real DB fee arrives, the signature "changes", and the RPC fires with no edit. A cold cache (new device, cleared storage) is enough to trigger it.
+- RPC `recalc_tenant_doc_fee` (migration `20260627050000`): SECURITY DEFINER, EXECUTE granted to `authenticated` (ACL confirmed: postgres/authenticated/service_role, no anon/PUBLIC). Any tenant member of any role can run it, not only admins. Its `UPDATE` has no "value actually differs" filter, so it is not idempotent. It touches every row with `advertised_price_before_doc`, sets `price_parse_status='ok'` and sets `price_last_verified_at=now()`.
+- DB evidence: the Harte tenant has 325 listings with `parse=ok`, and the sampled one was "verified" at 2026-10-20 21:09:02, matching the reported toast. That stamp falsely refreshes the price freshness date.
 
-```
-2026-09-10T20:10:31.497Z  Boot   booted (time: 40ms)
-2026-09-10T20:10:31.512Z  error  writer_auth_denied INVALID_API_KEY
-```
+### 2. "All reconciled" is a side effect of defect 1 (high)
+- `src/components/admin/PriceAuditPanel.tsx`: the badge counts only `price_parse_status === 'warning'`. Defect 1 just reset all 325 rows to `ok`, so every crawl mismatch was wiped. The panel does no comparison of its own (advertised + doc fee vs stored sale price vs live page). It drops the query `error`, so a failed read shows "All reconciled". It is capped at 500 rows, and rows with a null status (5 here) are never flagged. `configuredDocFee` is read but not compared against each row's `doc_fee`.
 
-`INVALID_API_KEY` is the verifier's error CODE only; the writer logs `error.code` and never `error.toJSON()`, so no header, token or detail text was emitted. The 401 body `{"error":"authentication required"}` is `DENY_UNAUTHENTICATED`, produced by `denyForVerifierStatus` for any verifier status below 500.
+### 3. Vehicle ...358190 price/MSRP disagreement (medium)
+- `vehicle_listings`: advertised-before-doc 60,665 + doc 895 = 61,560 (inventory/public, internally consistent).
+- `vehicle_facts`: `advertised_price` = 58,560 (`dealer_confirmed`), `total_msrp` = 62,040 and `base_msrp` = 58,800 (`neovin`). All dated 2026-07-29, so nearly 3 months stale. Internal Truth reads the old facts. The listing has moved on since then.
+- `vehicle_files.msrp` = 0 and `market_value` = 0 for this vehicle (also stale).
+- Public MSRP 62,665: the source wasn't found in this pass, so it is **unverified**. 62,665 − 62,040 = 625, which looks like a changed destination charge or option, but that is unconfirmed.
+- Defect: Truth shows no freshness marker and lets an old `dealer_confirmed` fact outrank a newer feed price.
 
-Material consequence: the request reached and executed function code. Authentication failed inside the function, not at the gateway.
+### 4. Sync Center "no success" (confirmed data, intentional UI)
+- `inventory_sync_runs` for Harte: the latest 6 runs are all `skipped` with 0 seen. `InventorySyncCenter.tsx` 185-235 correctly refuses to count a skip as healthy. "No successful run recorded" is true for the rows it fetches.
+- Gap: the MarketCheck header "Connected" (`MarketcheckSyncCard`) reads `marketcheck_sync_config`, not run outcomes. So "connected" and "skipped every hour" can both show at once. The skip reason is probably the source-identity hold, but that is unverified. The stale-sync warning only fires when a success exists, so a tenant that has never succeeded gets no red alert.
 
-## 2. Gateway `verify_jwt`
+### 5. Description Operations counts (confirmed data)
+- `description_cases`: 101 `FAILED_BLOCKED`, 224 `ARCHIVED`. Open exceptions: 284 length-exceeded, 103 validation, 92 channel-generation, 47 blocked, 29 budget-exhausted, 16 equipment conflict, 14 CPO conflict.
+- `DescriptionOperations.tsx` 241-290 marks a row `failed` from the case status, but "8/8 variants live" comes from `channelsPresent` (stored channel versions). It does not check whether those versions are current or allowed to publish. That is how "failed" and "8/8 live" end up on the same row: older versions still exist after a blocked re-run. The headline number counts vehicles while the exception totals count events, which is intentional (see comment line 239). Budget exhaustion (29) is labelled as a failure rather than "waiting".
 
-- `supabase/config.toml` contains 8 `[functions.*]` blocks (`record-engagement`, `vehicle-lookup`, `autofilm-feed`, `public-document-asset` false; `oem-brochure`, `oem-owners-manual`, `packet-backfill`, `oem-document-store` true). There is **no** `[functions.market-valuation-write]` block, so the repository asserts nothing.
-- The deployed gateway flag itself: **UNAVAILABLE** — no read-only platform tool exposes per-function `verify_jwt` state, and no gateway edge-log row for this request is present in `function_edge_logs` (only the 20:10:03/20:05:04 cron rows appear in that window).
-- What is provable instead: the function booted and ran its own auth, so whatever the effective gateway value is, it did **not** reject this request. The 401 is entirely the function's own decision.
+## Not traced in this pass (unverified, stated honestly)
+- (4) Publishing gates for listings, documents, retail-ready and new/used/CPO: the DB trigger names exist (`enforce_prep_gate`, `enforce_price_verified_before_sign`, `description_publish_allowed`, `factory_sticker_transition_guard`), but which one actually blocks each publish path wasn't mapped.
+- (7) Role preview vs real enforcement: `RoleHome.tsx`, `adminTabAccess.ts`, `RouteCapabilityGuard`, `useFeatureGate` (it lets everything through while loading or on error, by design) and lead-routing scheduler/fallback aren't checked against RLS yet. One concrete finding already: the doc-fee RPC trusts any tenant member, whatever their role.
+- (8) `src/data/docFees.ts` static state caps: only Admin consumes them in the files searched. No server-side cap enforcement was found, but this is unconfirmed.
+- (9) Settings: confirmed that save prefers `merge_dealer_settings` (patch-only, safe under concurrency). The fallback full-snapshot upsert can overwrite other editors. The local cache is layered under DB values (DB wins). When a read fails, it silently falls back to the cache with no message to the dealer.
 
-## 3. Which auth mode was attempted, and why it refused
+## Good safeguards to keep
+- Merge RPC for settings, tenant-scoped cache key, the "house" tenant guard.
+- Sync Center refusing to treat a skip as healthy.
+- Doc-fee RPC membership check, `(SELECT auth.uid())` wrapping, and no anon execute.
+- Locked Passport and its price arithmetic are untouched by every fix below.
 
-`authenticateCaller` calls:
+## Proposed minimal corrections (each with a regression test)
+1. Admin doc-fee effect: only take the baseline from the settled DB load (expose a `loadedFromServer` flag or a per-tenant load generation), or better, call the recalc only from the doc-fee field's save handler. Test: mount Admin with a cache fee that differs from the DB fee, and assert the RPC is never called.
+2. `recalc_tenant_doc_fee`: add `AND (doc_fee IS DISTINCT FROM v_fee OR website_sale_price IS DISTINCT FROM advertised_price_before_doc + v_fee)`. Stop resetting `price_parse_status` and `price_last_verified_at` on rows it didn't change. Restrict it to admin/owner/manager roles. Test (SQL): calling it twice returns 0 the second time, and a salesperson gets an error.
+3. PriceAuditPanel: compute the mismatch client-side (stored sale price ≠ advertised + doc fee, and row doc fee ≠ configured fee), surface query errors, and count null status as "unverified" rather than reconciled. Tests: one per rule.
+4. Truth view: show each fact's `updated_at`, and when a listing price is newer than the `dealer_confirmed` fact, show the fact as stale. Test: the fact from 2026-07-29 vs a listing price from 2026-10-20 is marked stale.
+5. Sync header: show the latest run's outcome and skip reason next to "Connected". Add a red alert when no successful run has ever been recorded. Test.
+6. Description Ops: count channels present only if they are current and allowed to publish. Show budget-exhausted as "waiting". Test.
+7. Follow-up read-only pass for the untraced items (4, 7, 8), before any UI approval.
 
-```
-createSupabaseContext(credentialCarrier(req), {
-  auth: ["secret:*", "user"],
-  env: { secretKeys: SECRET_KEYS, jwks: JWKS },
-})
-```
-
-- `credentialCarrier` copied the presented `apikey` header into the verification request unchanged (the canary sent `apikey` and no `Authorization`, so no bearer mirroring applied).
-- Mode order is `secret:*` first, then `user`. The returned code `INVALID_API_KEY` is the `secret` mode classification: the presented opaque key did not match any entry in the constructed key set. `user` mode produces JWT-class codes, not `INVALID_API_KEY`, so the chain terminated in `secret`.
-- Status mapped below 500, so the outcome was 401 `authentication required` rather than 500 `authentication misconfigured` — meaning the key set was **non-empty** (at least `service_role` was populated); the presented credential simply was not a member of it.
-
-Two candidate causes, neither yet confirmed: (a) the value the sandbox holds is not the value the runtime holds, or (b) `@supabase/server`'s `secret:*` mode only accepts modern opaque `sb_secret_*` keys and structurally refuses a legacy JWT-shaped service-role key. Item 4 is the discriminator.
-
-## 4. Sandbox key vs Edge runtime key
-
-**UNAVAILABLE.** Reading the Edge Function runtime's `SUPABASE_SERVICE_ROLE_KEY` — even to hash it — requires code running inside that runtime, which means creating or invoking a function. Both are forbidden here and neither was done. No equality or SHA-256 comparison was computed, and no value or partial value was read or printed. The sandbox-side name is present (length recorded previously, value never printed).
-
-## 5. `SUPABASE_SECRET_KEYS` / `SUPABASE_SECRET_KEY`
-
-Project-configured Edge Function secret names (values never displayed), 13 total:
-
-`AUTOCURB_API_BASE`, `AUTOCURB_API_TOKEN`, `AUTOFILM_FEED_SECRET`, `AUTOLABELS_LOOKUP_SECRET`, `CRON_SHARED_SECRET`, `ENRICH_SWEEP_HOUR_UTC`, `FIRECRAWL_API_KEY`, `FIRECRAWL_API_KEY_1`, `GOOGLE_SEARCH_CONSOLE_API_KEY`, `LOVABLE_API_KEY`, `MARKETCHECK_API_KEY_1`, `MARKETCHECK_CRON_SECRET`, `OPENAI_API_KEY`.
-
-- `SUPABASE_SECRET_KEYS` configured: **false**
-- `SUPABASE_SECRET_KEY` configured: **false**
-
-So `buildSecretKeySet` could only have produced the single `service_role` entry from the platform-injected variable. Whether that platform-injected variable is present in the runtime is **UNAVAILABLE** by the same limit as item 4 — but the 401 (not 500) implies the set was not empty.
-
-## 6. Deployed source and containment state
-
-- Writer bytes: `sha256 355ed5c7d0b17125265ec9e9a54b045cb25c990d80aa6a620c761f30fa807403`, identical at `ca7cb02b` and at current HEAD `1269c342` (that commit adds a test file only). The 20:04:56Z deploy was made from `ca7cb02b` with that exact hash. Platform deployment metadata naming the commit is **UNAVAILABLE**; byte identity is the evidence.
-- `market_provider_budgets`: exactly 1 row — tenant `3f0f97f5-4151-4e32-88ef-e2d6fc5a3142`, provider `marketcheck`, `enabled = false`, monthly `0.07`, per-call `0.0700`, `updated_at 2026-09-10 20:10:35.412883+00`.
-- `provider_request_reservations` = 0, `vehicle_market_valuations` = 0, `vehicle_market_comparables` = 0, `market_value_model_metrics` = 0, `audit_log` = 11741 (unchanged from baseline).
-
-## Proposed next step (no work performed yet)
-
-The only remaining unknown is item 4/5's runtime side, and it cannot be closed without executing something inside the Edge runtime. Options, in ascending intrusiveness:
-
-1. **Static resolution first, no execution.** Read `@supabase/server@1.6.0`'s `classify-credentials` / `verify-auth` modules from the already-downloaded esm.sh sources and determine whether `secret:*` accepts a legacy JWT-shaped key at all. If it does not, the cause is proven without touching the runtime and the fix is a code change to the writer's trusted-secret handling.
-2. **Only if step 1 is inconclusive:** a one-request, no-cost, no-provider probe of an existing service-role-authenticated function to compare acceptance behaviour — requires explicit authorization.
-3. Configuring `SUPABASE_SECRET_KEYS` with a modern `sb_secret_*` key — requires the owner to mint and paste it, and is a secret change, out of scope here.
-
-Recommend step 1. It is read-only, costs nothing, and either names the cause or rules it out.
+One data note: the 325 overwritten parse statuses can't be restored from the database. The next nightly crawl re-flags real mismatches, so fix 1 and fix 2 should land before that crawl.
