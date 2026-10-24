@@ -203,7 +203,10 @@ const Admin = () => {
   const docFeeSig = `${!!settings.doc_fee_enabled}:${settings.doc_fee_amount}`;
   const lastDocFee = useRef<{ tenant: string; sig: string } | null>(null);
   useEffect(() => {
-    if (settingsLoading || !tenant?.id) return;
+    // Settings load in several passes (cache/defaults, then the server row);
+    // re-baseline after every load so only a real edit triggers a recalc.
+    if (settingsLoading) { lastDocFee.current = null; return; }
+    if (!tenant?.id) return;
     const prev = lastDocFee.current;
     if (!prev || prev.tenant !== tenant.id) { lastDocFee.current = { tenant: tenant.id, sig: docFeeSig }; return; }
     if (prev.sig === docFeeSig) return;
