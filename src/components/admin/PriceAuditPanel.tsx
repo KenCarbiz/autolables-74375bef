@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { CheckCircle2, AlertTriangle, ExternalLink } from "lucide-react";
+import { isPriceAuditMismatch } from "@/lib/priceAudit";
 
 // ──────────────────────────────────────────────────────────────────────
 // PriceAuditPanel — per-vehicle price/doc-fee traceability.
@@ -39,13 +40,14 @@ export const PriceAuditPanel = () => {
   const configuredDocFee = settings.doc_fee_enabled ? (settings.doc_fee_amount || 0) : 0;
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let active = true;
     (async () => {
       if (!tenant?.id) return;
       setLoading(true);
-      const { data } = await (supabase as never as { from: (t: string) => any })
+      const { data, error } = await (supabase as never as { from: (t: string) => any })
         .from("vehicle_listings")
         .select(
           "vin, advertised_price_before_doc, doc_fee, website_sale_price, price_source_url, price_last_verified_at, price_parse_status, price_parse_notes, source_url",
@@ -55,6 +57,7 @@ export const PriceAuditPanel = () => {
         .order("price_last_verified_at", { ascending: false })
         .limit(500);
       if (active) {
+        setLoadError(!!error);
         setRows((data as Row[]) || []);
         setLoading(false);
       }
@@ -64,7 +67,7 @@ export const PriceAuditPanel = () => {
     };
   }, [tenant?.id]);
 
-  const mismatchCount = rows.filter((r) => r.price_parse_status === "warning").length;
+  const mismatchCount = rows.filter((r) => isPriceAuditMismatch(r, configuredDocFee)).length;
 
   return (
     <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-5">
@@ -78,7 +81,7 @@ export const PriceAuditPanel = () => {
               : " No doc fee configured — set one in Settings to reconcile."}
           </p>
         </div>
-        {mismatchCount > 0 ? (
+        {loading || loadError ? null : mismatchCount > 0 ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full bg-red-100 text-red-700">
             <AlertTriangle className="w-3.5 h-3.5" />
             {mismatchCount} mismatch{mismatchCount === 1 ? "" : "es"}
@@ -93,6 +96,8 @@ export const PriceAuditPanel = () => {
 
       {loading ? (
         <p className="text-xs text-muted-foreground py-6 text-center">Loading price audit…</p>
+      ) : loadError ? (
+        <p className="text-xs text-destructive py-6 text-center">Couldn't load the price audit. Prices were not checked.</p>
       ) : rows.length === 0 ? (
         <p className="text-xs text-muted-foreground py-6 text-center">No priced vehicles yet.</p>
       ) : (
@@ -116,7 +121,7 @@ export const PriceAuditPanel = () => {
                   r.advertised_price_before_doc != null
                     ? Number(r.advertised_price_before_doc) + Number(r.doc_fee || 0)
                     : null;
-                const mismatch = r.price_parse_status === "warning";
+                const mismatch = isPriceAuditMismatch(r, configuredDocFee);
                 const url = r.price_source_url || r.source_url;
                 return (
                   <tr key={r.vin} className="border-b border-border/60 align-top">
