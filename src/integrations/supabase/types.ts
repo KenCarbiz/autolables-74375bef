@@ -4964,6 +4964,39 @@ export type Database = {
           },
         ]
       }
+      market_pricing_legacy_payloads: {
+        Row: {
+          id: string
+          listing_id: string
+          moved_at: string
+          moved_from: string
+          payload: Json
+          source_writer: string
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          id?: string
+          listing_id: string
+          moved_at?: string
+          moved_from?: string
+          payload: Json
+          source_writer?: string
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          id?: string
+          listing_id?: string
+          moved_at?: string
+          moved_from?: string
+          payload?: Json
+          source_writer?: string
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: []
+      }
       market_provider_budgets: {
         Row: {
           created_at: string
