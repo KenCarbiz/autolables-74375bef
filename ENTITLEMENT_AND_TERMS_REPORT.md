@@ -9,7 +9,7 @@ at `621466b`.
 
 | Product | Last answered | Last refused | Reading |
 |---|---|---|---|
-| Dealer Inventory Syndication | 2026-10-03 (128 units, HTTP 200) | every night since 2026-10-04 (HTTP 429 on the pinned rooftop) | Product-scoped refusal. The same key still answers `/search/car/active`, so this is not an account-wide block. A monthly call cap on the syndication product, a plan change on or about Oct 3, or a per-product rate limit are the candidate causes; only the MarketCheck portal can say which. |
+| Dealer Inventory Syndication | 2026-10-03 (128 units, HTTP 200) | every night since 2026-10-04 (HTTP 429 on the pinned rooftop) | Plan quota, confirmed 2026-10-27. The portal's account-level usage alerts show 5,000 calls a month, crossed on Jul 29, Sep 11 and Oct 4; the run history matches exactly (refused Jul 29-31, back Aug 1; no run rows Sep 12-30, back Oct 1; refused since Oct 4). The quota resets on the 1st. `/search/car/active` and MDS keep answering past 100%, so the cap is enforced per product; which products is on the Subscriptions page. |
 | Active inventory search | 2026-10-27 | none observed | Entitled and answering. |
 | NeoVIN | 2026-10-03 (last decode needed) | none observed | Entitled; nothing new to decode since. |
 | VIN history | 2026-10-03 | 0 refreshes in 7 days despite 2 enrich passes a day | Refused or failing since Oct 3 (the function returns null on any non-2xx and keeps the old payload, so the status is not recorded). |
@@ -23,9 +23,11 @@ at `621466b`.
 | Sold Vehicles Summary, FSBO, auction, MarketMatch, webhooks, NeoVIN batch, listing details, incentives by make/ZIP | never called | n/a | Unknown. |
 | Black Book | never | n/a | Not configured (no base URL or credential in the environment). |
 
-The refusal cluster (syndication, history, recents/sales) started on the same
-day. Until the portal is checked, nothing in this program that depends on a
-fresh feed, fresh history or sold statistics can be proven live.
+The refusal cluster (syndication, history, recents/sales) starts the day the
+quota is exhausted and ends on the 1st. On the current plan the feed answers
+again on Nov 1 and stays live only as long as the enrich sweep does not
+spend the quota first (PROVIDER_COST_AND_CACHE_REPORT.md §2,
+`20261027203000_enrich_batch_recall_retry_window.sql`).
 
 ## 2. Terms that constrain storage and display
 
@@ -74,8 +76,9 @@ The sandbox egress policy returns HTTP 403 (CONNECT refused) for
 
 ## 5. Decisions only the owner can make
 
-1. MarketCheck account state: why syndication, history and sold statistics
-   have been refused since 2026-10-03 (portal / plan / quota).
+1. MarketCheck plan quota: raise the 5,000-call monthly quota on the
+   Subscriptions page, or keep it and hold the sweep inside it (the cursor
+   amendment); and read there which products the cap is enforced on.
 2. Whether to run one authorized Premium Plus call for a used VIN and one
    Premium call, to learn entitlement, cost and response shape.
 3. Whether AutoRecalls is to be licensed (portal terms) so the current VIN path

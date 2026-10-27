@@ -92,9 +92,12 @@ the used policy.
 
 Premium, Premium Plus, Sold Vehicles Summary (and its dealership-group view),
 AutoRecalls on the documented path, OEM incentives by make/ZIP, webhooks (not
-configured), Black Book (no credential). Also product-scoped refusals since
-2026-10-03 on syndication, VIN history, recents and Sales Stats, which only
-the MarketCheck portal can explain.
+configured), Black Book (no credential). Also the refusals since 2026-10-04 on
+syndication, VIN history, recents and Sales Stats: confirmed the same evening
+as the account's 5,000-call monthly plan quota, exhausted on Jul 29, Sep 11
+and Oct 4 with the feed refused from each date until the 1st of the next
+month. The enrich sweep is what spends it (PROVIDER_COST_AND_CACHE_REPORT.md
+§2).
 
 ## 6. Features intentionally reserved for AutoCurb
 
@@ -157,6 +160,13 @@ Performed, with authorization, 2026-10-27:
   VINs, so already-decoded listings gain the keys only when a sweep or an
   operator re-pulls them.
 
+Authored the same evening, not applied (owner authorization pending):
+`20261027203000_enrich_batch_recall_retry_window.sql`, which re-asks an
+attempted, unanswered VIN recall every 30 days instead of daily. Measured
+before: 92 active vehicles offered every day, 91 on the recall clause alone.
+Expected after: about 3 a day. Reversible: re-applying 20261027200000
+restores the daily clause.
+
 Not yet authored: `provider_call_events` (observability store) and the Sold
 Summary / Available Options / dealership-group evidence tables, which wait on
 the contract read.
@@ -192,4 +202,6 @@ contamination migrates safely (existing); title listing claims stay
 low-authority (existing precedence tests); 429 never becomes a scope
 mismatch, NOT_FOUND, CLEAN or zero (pinned feed classifier); NeoVIN is cached,
 not repurchased (`shouldDecodeVin`, existing); New and Used cadence rules
-remain separate (registry policy tests); every new flag is declared and inert.
+remain separate (registry policy tests); every new flag is declared and inert;
+the cursor's recall retry window and its signature change are held by the
+migration-text test.

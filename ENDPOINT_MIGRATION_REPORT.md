@@ -10,7 +10,7 @@ the OpenAPI 3.1 document is vendored into `contracts/marketcheck/`.
 
 | Legacy / current path in code | Documented current path | Caller | Change | Verification |
 |---|---|---|---|---|
-| `/v2/dealerships/inventory` | same | marketcheck-sync | none; refusal handling corrected (this tranche) | documented, not verified; answered 2xx until 2026-10-03 |
+| `/v2/dealerships/inventory` | same | marketcheck-sync | none; refusal handling corrected (this tranche) | documented, not verified; answered 2xx until 2026-10-03, refused since Oct 4 by the 5,000-call monthly plan quota (resets on the 1st) |
 | `/v2/dealerships/car`, `/v2/dealers/car`, `/v2/dealer/car` | `/v2/dealerships/car` is the canonical directory; the other two are the legacy id space | marketcheck-sync | keep as operator-only fallbacks; registry marks them `legacy` | documented, not verified |
 | `/v2/search/car/active` | same | vehicle-enrich, marketcheck-comps | add `fees` / `price_includes_fees` reads (registry + normalizer landed; vehicle-enrich wiring next tranche) | documented, not verified; answering 2xx today |
 | `/v2/decode/car/neovin/{vin}/specs` | same; batch endpoint to evaluate | marketcheck-specs | promoted fields (this tranche) | documented, not verified; answers |
@@ -35,6 +35,9 @@ the OpenAPI 3.1 document is vendored into `contracts/marketcheck/`.
   refusal classified as `provider_refused_<status>`, run row written, pin kept.
 - `supabase/migrations/20261027200000_enrich_batch_once_per_day_active_only.sql`:
   cursor floor and archived filter (apply on authorization).
+- `supabase/migrations/20261027203000_enrich_batch_recall_retry_window.sql`:
+  unanswered VIN recall re-asked every 30 days, not daily (apply on
+  authorization).
 - `supabase/migrations/20261027201000_mc_raw_boundary_repair.sql`: legacy
   pricing payloads moved to `market_pricing_legacy_payloads` (apply on
   authorization).

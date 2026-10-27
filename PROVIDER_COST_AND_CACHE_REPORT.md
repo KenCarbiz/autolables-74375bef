@@ -42,6 +42,26 @@ call at 0.07 if a refused call is billed.
 After the cursor fix (applied 2026-10-27): at most 131 visits a day, none
 archived, a 60 percent cut before any policy change.
 
+Measured the same evening, after the fix: 92 active vehicles still qualify
+every day, 91 of them only because the VIN recall question is unanswered
+(all 91 already hold comparables and a build sheet; the product is not
+entitled). Against the account's plan quota that is the whole problem:
+
+| | Value |
+|---|---|
+| Plan quota (portal usage alerts, account-level, "System") | 5,000 calls a month, resets on the 1st |
+| Exhausted on | Jul 29, Sep 11, Oct 4; the feed was refused from each date until the next 1st |
+| Visits a day after the cursor fix | 92 |
+| Provider calls per visit | 6-12 |
+| Calls a day | 550-1,100 |
+| Days until the sweep alone exhausts the quota | 5-9 |
+| Calls the nightly syndication needs a month | about 31 |
+
+`20261027203000_enrich_batch_recall_retry_window.sql` (authored, apply on
+authorization) re-asks an attempted, unanswered recall every 30 days
+instead of daily: about 3 visits a day, 20-36 calls, under 1,100 a month,
+with no operator action needed when the product is entitled.
+
 Under the registry defaults (USED_VEHICLE_PROVIDER_POLICY.md,
 NEW_VEHICLE_PROVIDER_POLICY.md) the recurring cost of a used vehicle is about
 $0.09 a week and a new vehicle about $0.02 a week (daily price-integrity
@@ -117,6 +137,7 @@ needs a migration and deploys.
 - Whether a refused (429) syndication call is billed.
 - Whether a 404 on the legacy recall path is billed.
 - Premium, Premium Plus and Sold Vehicles Summary unit prices on this account.
-- The provider's monthly quota per product, the most likely explanation for
-  the Oct 3 refusal cluster.
+- Which products the 5,000-call monthly quota is enforced on (syndication,
+  history, recents and sales stats are refused at 100%; search and MDS
+  keep answering) and whether overage can be bought instead of a hard stop.
 - The Available Options Packages and dealership-groups endpoint paths.

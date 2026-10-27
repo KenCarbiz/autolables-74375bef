@@ -21,6 +21,13 @@ AUTOCURB-RESERVED.
      <street>"), writes no `inventory_sync_runs` row, and the hourly runs
      skip. Prune protection held (inventory untouched), but the operator
      surface says the rooftop pin broke when the provider said no. 24 nights.
+     Cause, confirmed on the evening of 2026-10-27 from the portal's usage
+     alerts and the run history: the account's plan quota is 5,000 calls a
+     month, account-wide, and it resets on the 1st. It was exhausted on
+     Jul 29 (feed refused Jul 29-31, back Aug 1), Sep 11 (no run rows Sep
+     12-30, back Oct 1) and Oct 4 (refused since). Search and MDS keep
+     answering past 100%, so the cap is enforced per product. The key is
+     not the problem; the enrich sweep's call volume is.
    - **VIN history and sold-stats stopped the same day.** `history_payload`
      and `market_meta.sold_stats` were last refreshed 2026-10-03; zero
      refreshes in the last 7 days. `/v2/search/car/active` still answers
