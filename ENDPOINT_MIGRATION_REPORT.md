@@ -50,8 +50,10 @@ the OpenAPI 3.1 document is vendored into `contracts/marketcheck/`.
 
 ## Not changed, deliberately
 
-- No edge function was deployed and no migration applied; both need
-  authorization and the second needs a maintenance window.
+- Applied and deployed later the same day, each on explicit authorization:
+  the enrich cursor migration, the `mc_raw` boundary repair (with the
+  `sandbox_exec` narrowing), `marketcheck-sync` and `marketcheck-specs`.
+  Before/after counts are in MARKETCHECK_RECONCILIATION_2026_10.md §9.
 - No live provider call was made; the entitlement tests for Premium, Premium
   Plus, AutoRecalls and Sold Summary need one authorized call each.
 - `vehicle-enrich`'s MDS and Sales Stats cohorts are unchanged until the

@@ -133,17 +133,33 @@ move most of it. See PROVIDER_COST_AND_CACHE_REPORT.md.
 
 ## 9. Production migrations performed or still required
 
-Performed, with authorization, 2026-10-27: `next_enrich_batch` replaced
-(archived filter, 20-hour floor, no `market_value` trigger) and recorded in
-the migration ledger; `marketcheck-sync` deployed from `d54927c` (byte-identical
-source verified by the deploy agent).
+Performed, with authorization, 2026-10-27:
 
-Authored, not applied: `20261027201000_mc_raw_boundary_repair.sql` (moves the
-81 legacy pricing payloads out of `mc_raw`; reversible, before/after counts
-come from the copy table). Not yet deployed: `marketcheck-specs` with the
-NeoVIN promotion. Not yet authored: `provider_call_events` (observability
-store) and the Sold Summary / Available Options / dealership-group evidence
-tables, which wait on the contract read.
+- `next_enrich_batch` replaced (archived filter, 20-hour floor, no
+  `market_value` trigger), verified, recorded in the migration ledger
+  (`20261027200000`).
+- `marketcheck-sync` deployed from `d54927c` (source byte-identical, verified
+  by the deploy agent, ~20:55Z).
+- `20261027201000_mc_raw_boundary_repair.sql` applied at 21:19Z. Before: 328
+  non-null `mc_raw` rows, 247 syndication and 81 legacy pricing payloads (all
+  81 on the pilot tenant, all on archived listings). After: 247 non-null, all
+  syndication, 0 legacy; 81 payloads preserved intact in
+  `market_pricing_legacy_payloads` (81 distinct listings, every one's
+  `mc_raw` now null), RLS on, tenant read policy, append-only grants, ledger
+  row written. Reversible: the payloads are unchanged in the copy table.
+- `20261027202000` applied in the same window: `sandbox_exec` narrowed to
+  SELECT on the legacy store, matching the Market V2 evidence-table
+  hardening.
+- `marketcheck-specs` deployed at 21:21:50Z; `index.ts` and
+  `neovinSheet.ts` blob hashes matched `d54927c`. The NeoVIN promotion
+  (warranty, options MSRP, MSRP variants, confidence, dimensions, country, EV
+  range, taxonomy) now lands on the next decode; nothing re-decodes existing
+  VINs, so already-decoded listings gain the keys only when a sweep or an
+  operator re-pulls them.
+
+Not yet authored: `provider_call_events` (observability store) and the Sold
+Summary / Available Options / dealership-group evidence tables, which wait on
+the contract read.
 
 ## 10. Master-prompt items superseded by this add-on
 
