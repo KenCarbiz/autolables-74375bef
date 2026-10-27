@@ -11,6 +11,8 @@ import {
 import { classifyCondition } from "../_shared/vehicleCondition.ts";
 import { isDue, overdueBy, skipReason, hoursSinceSlot, CATCH_UP_HOURS } from "../_shared/syncSchedule.ts";
 import { describeShape, shapeHash, type JsonType } from "../_shared/payloadShape.ts";
+import { classifyPinnedFeed, type PinnedFeedOutcome } from "../_shared/pinnedFeedOutcome.ts";
+import { resolveListingFeeBasis } from "../_shared/factorySticker/lib/market/listingFeeBasis.ts";
 
 /**
  * What we want the search feed to answer for us, and cannot answer from stored
@@ -95,6 +97,11 @@ const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHEC
 const DECODE_OWNED_KEYS = [
   "build_sheet",
   "base_msrp", "delivery_charges", "total_msrp",
+  // Lifted by marketcheck-specs from the NeoVIN payload (warranty, options
+  // subtotal, MSRP variants, confidence, dimensions, country, EV range,
+  // taxonomy). The feed never carries them, so they survive only by name.
+  "installed_options_msrp", "factory_warranty", "msrp_variants", "msrp_label",
+  "neovin_confidence", "dimensions_raw", "country", "electric_range", "taxonomy",
   "specs_source", "specs_strict_attempted", "specs_decoded_at",
   "specs_attempts", "specs_attempted_at", "specs_no_build_sheet",
 ] as const;
@@ -316,6 +323,10 @@ interface MCListing {
   vin?: string; price?: number | string; msrp?: number | string;
   stock_no?: string; miles?: number; source?: string;
   inventory_type?: string; is_certified?: boolean; vdp_url?: string;
+  // Availability and the listing's own fee statement. The feed has carried
+  // these on most rows all along; the price basis read a tenant setting
+  // instead, and nothing read the availability state at all.
+  vehicle_status?: string; fees?: unknown; price_includes_fees?: unknown;
   exterior_color?: string; interior_color?: string; base_ext_color?: string; base_int_color?: string;
   // Market & history signals MarketCheck carries on each active listing that
   // we previously ignored — days-on-market, price-change, listing age, and
@@ -862,10 +873,18 @@ serve(async (req) => {
       const pinnedValue = (cfg.mc_scope_value || "").trim();
       let sample = { listings: [] as MCListing[], numFound: 0, http: 0 };
       let pinBroken = false;
+      let pinnedOutcome: PinnedFeedOutcome | null = null;
 
       if (pinnedParam && pinnedValue) {
         const r = await syndPage(pinnedParam, pinnedValue, synRows, 0);
         recordHit(pinnedParam, pinnedValue, r, "syndication(pinned)");
+        // recordHit already decided match and purity for this page; read them
+        // back off the attempt it just recorded rather than deciding twice.
+        const a = attempts[attempts.length - 1] ?? {};
+        pinnedOutcome = classifyPinnedFeed({
+          refused: r.refused === true, http: r.http, got: r.listings.length,
+          match: Number(a.match ?? 0), purity: Number(a.purity ?? 0), minPurity,
+        }, { param: pinnedParam, value: pinnedValue }, { street: rooftop.street, zip: rooftop.zip });
         if (hits.length === 0) pinBroken = true;
       } else {
         // Nothing pinned yet — probe, highest-confidence first, then pin the winner.
@@ -889,16 +908,32 @@ serve(async (req) => {
       }
 
       // A pinned feed that no longer proves out is an alert, not a fallback.
+      // Which alert matters: for 24 nights in October 2026 the provider
+      // answered 429 and this block told the operator the rooftop pin had
+      // broken, and wrote no run row, so the refusals were invisible in the
+      // sync history. The classifier names the refusal, keeps the pin, and the
+      // run row makes the failure show up where a failure belongs.
       if (pinBroken) {
+        const outcome = pinnedOutcome ?? classifyPinnedFeed(
+          { refused: false, http: 0, got: 0, match: 0, purity: 0, minPurity },
+          { param: pinnedParam, value: pinnedValue }, { street: rooftop.street, zip: rooftop.zip },
+        );
+        const pinnedHttp = Number(attempts[attempts.length - 1]?.http ?? 0);
         await admin.from("marketcheck_sync_config").update({
           ...scheduleClock(),
           last_status: {
-            ran_at: now.toISOString(), seen: 0, error: "pinned_scope_failed_validation",
-            note: `Pinned feed ${pinnedParam}=${pinnedValue} no longer matches ${rooftop.street} ${rooftop.zip}. Inventory left untouched. Clear the pin to re-resolve.`,
+            ran_at: now.toISOString(), seen: 0, error: outcome.error,
+            note: outcome.note,
             mc_param: pinnedParam, mc_value: pinnedValue, attempts: attempts.slice(0, 8),
           },
         }).eq("tenant_id", cfg.tenant_id);
-        diagnostics.push({ tenant_id: cfg.tenant_id, source, error: "pinned_scope_failed_validation", mc_param: pinnedParam, mc_value: pinnedValue });
+        diagnostics.push({ tenant_id: cfg.tenant_id, source, error: outcome.error, kind: outcome.kind, mc_param: pinnedParam, mc_value: pinnedValue });
+        await logSyncRun({
+          tenant_id: cfg.tenant_id, started_at: runStartedAt, status: "failed",
+          http_status: pinnedHttp, error_summary: outcome.note,
+          raw: { error: outcome.error, kind: outcome.kind, mc_param: pinnedParam, mc_value: pinnedValue, attempts, source },
+          errors: [{ code: outcome.error ?? outcome.kind, message: outcome.note ?? outcome.kind }],
+        });
         continue;
       }
 
@@ -1153,6 +1188,13 @@ serve(async (req) => {
             carfax_1_owner: l.carfax_1_owner ?? null, carfax_clean_title: l.carfax_clean_title ?? null,
             seller_type: l.seller_type || null, in_transit: l.in_transit ?? null,
             vdp_url: l.vdp_url || null,
+            // Availability and the listing's own fee statement, promoted so a
+            // reader exists for them. fee_basis is the resolved form: unknown
+            // stays unknown and an excluded-but-unstated fee is never zero.
+            vehicle_status: l.vehicle_status || null,
+            fees: l.fees ?? null,
+            price_includes_fees: l.price_includes_fees ?? null,
+            fee_basis: resolveListingFeeBasis({ price: l.price, fees: l.fees, price_includes_fees: l.price_includes_fees }),
             // Survives the rebuild only because it is named here.
             mc_listing_id: l.id ?? priorMc.mc_listing_id ?? null,
             // OEM equipment / options & packages when present in the feed.

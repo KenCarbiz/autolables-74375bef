@@ -304,10 +304,25 @@ Deno.serve(async (req) => {
         // build_sheet.pricing filed the numbers where nothing looks and the
         // sticker rendered with no MSRP.
         const sheetPricing = (sheet?.pricing ?? {}) as Record<string, number>;
-        const liftedPricing: Record<string, number> = {};
+        const liftedPricing: Record<string, unknown> = {};
         if (sheetPricing.base_msrp) liftedPricing.base_msrp = sheetPricing.base_msrp;
         if (sheetPricing.destination_charge) liftedPricing.delivery_charges = sheetPricing.destination_charge;
         if (sheetPricing.total_msrp) liftedPricing.total_msrp = sheetPricing.total_msrp;
+        // The fields NeoVIN has always sent and nothing read (warranty, the
+        // options subtotal, labelled MSRP variants, provider confidence,
+        // dimensions, country, EV range, taxonomy). Lifted beside the pricing
+        // so the same consumers find them; every key here must also be in
+        // marketcheck-sync's DECODE_OWNED_KEYS or the nightly rebuild deletes it.
+        const extras = (sheet ?? {}) as Record<string, unknown>;
+        if (extras.installed_options_msrp != null) liftedPricing.installed_options_msrp = extras.installed_options_msrp;
+        if (extras.warranty) liftedPricing.factory_warranty = extras.warranty;
+        if (extras.msrp_variants) liftedPricing.msrp_variants = extras.msrp_variants;
+        if (extras.msrp_label) liftedPricing.msrp_label = extras.msrp_label;
+        if (extras.confidence) liftedPricing.neovin_confidence = extras.confidence;
+        if (extras.dimensions_raw) liftedPricing.dimensions_raw = extras.dimensions_raw;
+        if (extras.country) liftedPricing.country = extras.country;
+        if (extras.electric_range != null) liftedPricing.electric_range = extras.electric_range;
+        if (extras.taxonomy) liftedPricing.taxonomy = extras.taxonomy;
 
         const merged = {
           ...prev,

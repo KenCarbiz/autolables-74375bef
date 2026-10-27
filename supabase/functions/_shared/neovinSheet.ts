@@ -15,6 +15,142 @@ export const flat = (x: any): string =>
   : x && typeof x === "object" ? String(x.name ?? x.label ?? x.item ?? x.description ?? x.value ?? x.code ?? "").trim()
   : "";
 
+// ── Fields NeoVIN sends that nothing read ────────────────────────────────────
+//
+// 391 of 393 stored decodes carry `warranty`, `installed_options_msrp`, five
+// further MSRP variants, dimensions, weight, `country`, five provider
+// confidence figures and a taxonomy identity, and every one of them stopped at
+// neovin_snapshots. This lifts them, additively and without interpretation:
+//
+//   * warranty terms are the ORIGINAL factory terms. "Remaining" needs an
+//     in-service date and a mileage the decoder does not have, so no remaining
+//     figure is derived here and the basis says so.
+//   * provider confidence is recorded as the provider sent it (number or
+//     label). It feeds Data Confidence and exact-match eligibility, never a
+//     vehicle-quality score.
+//   * dimensions carry no unit claim, because the contract that states the
+//     unit cannot be read from this environment; they are raw numbers under a
+//     key that says so.
+//   * MSRP variants stay labelled by the provider's own names so a consumer
+//     chooses one on purpose instead of receiving a merged "msrp".
+
+export interface NeovinWarrantyTerm {
+  type: string;
+  months?: number;
+  miles?: number;
+  text?: string;
+}
+
+export interface NeovinPromotion {
+  warranty?: { basis: "original_factory"; source: "neovin"; terms: NeovinWarrantyTerm[] };
+  installed_options_msrp?: number;
+  msrp_variants?: Record<string, number>;
+  msrp_label?: string;
+  confidence?: Record<string, number | string>;
+  dimensions_raw?: Record<string, number>;
+  country?: string;
+  electric_range?: number;
+  taxonomy?: Record<string, string>;
+}
+
+const MSRP_VARIANT_KEYS = ["mc_msrp", "original_msrp", "build_specs_msrp", "oem_msrp"] as const;
+const CONFIDENCE_KEYS = ["record_confidence", "listing_confidence", "trim_confidence", "version_confidence", "transmission_confidence"] as const;
+const DIMENSION_KEYS = ["height", "length", "width", "weight"] as const;
+const TAXONOMY_KEYS = ["squish_vin", "manufacturer_code", "decode_version", "record_source"] as const;
+
+const numOrUndefined = (v: unknown): number | undefined => {
+  const n = typeof v === "string" && v.trim() !== "" ? Number(v.replace(/[,$\s]/g, "")) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
+const strOrUndefined = (v: unknown): string | undefined => {
+  const s = typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "";
+  return s || undefined;
+};
+
+// A warranty term as either {months|years, miles|mileage, description|text}
+// or a bare "4 yr/60,000 mi" string. Years are folded into months; a string
+// is kept verbatim as text because parsing it would be a guess.
+// deno-lint-ignore no-explicit-any
+const warrantyTerm = (type: string, raw: any): NeovinWarrantyTerm | null => {
+  if (raw == null) return null;
+  if (typeof raw === "string" || typeof raw === "number") {
+    const text = strOrUndefined(raw);
+    return text ? { type, text } : null;
+  }
+  if (typeof raw !== "object") return null;
+  const months = numOrUndefined(raw.months) ?? (numOrUndefined(raw.years) != null ? numOrUndefined(raw.years)! * 12 : undefined);
+  const miles = numOrUndefined(raw.miles ?? raw.mileage);
+  const text = strOrUndefined(raw.description ?? raw.text ?? raw.term ?? raw.coverage);
+  if (months == null && miles == null && !text) return null;
+  return { type, ...(months != null ? { months } : {}), ...(miles != null ? { miles } : {}), ...(text ? { text } : {}) };
+};
+
+// deno-lint-ignore no-explicit-any
+export function promoteNeovinExtras(payload: any): NeovinPromotion {
+  const src = payload || {};
+  const out: NeovinPromotion = {};
+
+  const terms: NeovinWarrantyTerm[] = [];
+  const w = src.warranty;
+  if (Array.isArray(w)) {
+    for (const item of w) {
+      const type = strOrUndefined(item?.type ?? item?.name ?? item?.category ?? item?.kind) ?? "warranty";
+      const t = warrantyTerm(type, item);
+      if (t) terms.push(t);
+    }
+  } else if (w && typeof w === "object") {
+    for (const [k, v] of Object.entries(w)) {
+      const t = warrantyTerm(k, v);
+      if (t) terms.push(t);
+    }
+  } else if (typeof w === "string" && w.trim()) {
+    terms.push({ type: "warranty", text: w.trim() });
+  }
+  if (terms.length) out.warranty = { basis: "original_factory", source: "neovin", terms };
+
+  const optionsMsrp = numOrUndefined(src.installed_options_msrp);
+  if (optionsMsrp != null) out.installed_options_msrp = optionsMsrp;
+
+  const variants: Record<string, number> = {};
+  for (const k of MSRP_VARIANT_KEYS) {
+    const n = numOrUndefined(src[k]);
+    if (n != null) variants[k] = n;
+  }
+  if (Object.keys(variants).length) out.msrp_variants = variants;
+  const label = strOrUndefined(src.msrp_label);
+  if (label) out.msrp_label = label;
+
+  const confidence: Record<string, number | string> = {};
+  for (const k of CONFIDENCE_KEYS) {
+    const v = src[k];
+    if (typeof v === "number" && Number.isFinite(v)) confidence[k] = v;
+    else if (typeof v === "string" && v.trim()) confidence[k] = v.trim();
+  }
+  if (Object.keys(confidence).length) out.confidence = confidence;
+
+  const dims: Record<string, number> = {};
+  for (const k of DIMENSION_KEYS) {
+    const n = numOrUndefined(src[k]);
+    if (n != null) dims[k] = n;
+  }
+  if (Object.keys(dims).length) out.dimensions_raw = dims;
+
+  const country = strOrUndefined(src.country);
+  if (country) out.country = country;
+  const range = numOrUndefined(src.electric_range);
+  if (range != null) out.electric_range = range;
+
+  const taxonomy: Record<string, string> = {};
+  for (const k of TAXONOMY_KEYS) {
+    const s = strOrUndefined(src[k]);
+    if (s) taxonomy[k] = s;
+  }
+  if (Object.keys(taxonomy).length) out.taxonomy = taxonomy;
+
+  return out;
+}
+
 // ── Structured build sheet ───────────────────────────────────────────────────
 // NeoVIN returns five distinct layers (packages / installed options / high-value
 // features / standard features / granular installed_equipment). The flat
@@ -159,6 +295,7 @@ export function structuredSheet(payload: any): Record<string, unknown> | null {
     ...(Object.keys(pricing).length ? { pricing } : {}),
     ...(colors ? { colors } : {}),
     ...(assembly ? { assembly } : {}),
+    ...promoteNeovinExtras(src),
     decoded_at: new Date().toISOString(), source: "neovin",
   };
 }

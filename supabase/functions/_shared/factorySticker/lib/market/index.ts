@@ -35,4 +35,10 @@ export { buildMarketView, COMPARABLE_RANGE_LABEL } from "./marketView.ts";
 export { shadowComposite } from "./composite.ts";
 export { recommendPricingPosition } from "./pricingPosition.ts";
 export { MARKET_FLAGS, MARKET_FLAG_NAMES, readMarketFlag, readMarketFlags, type MarketFlag } from "./flags.ts";
+export {
+  PROVIDER_CAPABILITIES, PROVIDER_CAPABILITY_KEYS, capability, capabilityForPath, effectiveCost,
+  policyFor, publicBrowseMayTrigger, routineCapabilities,
+  type ProviderCapability, type CapabilityPolicy, type CapabilityStatus, type CapabilityTrigger,
+} from "./providerRegistry.ts";
+export { resolveListingFeeBasis, type ListingFeeBasis, type ListingFeeInput } from "./listingFeeBasis.ts";
 export { digest, stableStringify } from "./hash.ts";
