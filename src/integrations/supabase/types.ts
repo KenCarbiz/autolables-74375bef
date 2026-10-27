@@ -11792,6 +11792,7 @@ export type Database = {
         Args: {
           p_limit: number
           p_min_age_hours?: number
+          p_recall_retry_days?: number
           p_sweep_start: string
         }
         Returns: {
