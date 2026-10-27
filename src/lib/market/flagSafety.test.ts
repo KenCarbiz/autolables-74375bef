@@ -72,6 +72,23 @@ const AUDITED_READERS: Record<string, number> = {
   premium_plus_used_intake: 0,
   premium_used_refresh: 0,
   autorecalls_vin: 0,
+  // Master build section 38, declared 2026-10-27 ahead of the intelligence
+  // layer that will read them; shadow first, public only after evidence.
+  market_intelligence_v3_shadow: 0,
+  premium_plus_new_intake: 0,
+  fee_normalized_comps: 0,
+  nmvtis_auto_verify: 0,
+  oem_incentives_v2: 0,
+  provider_webhooks: 0,
+  blackbook_live: 0,
+  market_value_v3_shadow: 0,
+  market_value_v3_public: 0,
+  vehicle_score_shadow: 0,
+  vehicle_score_public: 0,
+  data_confidence: 0,
+  buyer_recommendation: 0,
+  passport_2_new: 0,
+  passport_2_used: 0,
 };
 
 describe("the flag reader audit", () => {
@@ -104,16 +121,31 @@ describe("the flag reader audit", () => {
     expect(inert.sort()).toEqual([
       "autorecalls_vin",
       "available_options_packages",
+      "blackbook_live",
+      "buyer_recommendation",
       "current_sales_stats",
+      "data_confidence",
       "exact_mds",
+      "fee_normalized_comps",
       "generic_vin_fallback",
+      "market_intelligence_v3_shadow",
       "market_value_v2_public",
+      "market_value_v3_public",
+      "market_value_v3_shadow",
       "marketcheck_current_endpoint",
       "marketcheck_premium_comparables",
+      "nmvtis_auto_verify",
+      "oem_incentives_v2",
+      "passport_2_new",
+      "passport_2_used",
+      "premium_plus_new_intake",
       "premium_plus_used_intake",
       "premium_used_refresh",
       "pricing_position_v2_shadow",
+      "provider_webhooks",
       "sold_summary",
+      "vehicle_score_public",
+      "vehicle_score_shadow",
     ]);
     // No longer inert, and the record says so rather than the prose.
     expect(inert).not.toContain("market_value_v2_shadow");

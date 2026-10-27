@@ -50,6 +50,40 @@ export const MARKET_FLAGS = {
   premium_used_refresh: false,
   /** Use the documented /v2/car/autorecalls/{vin} path. */
   autorecalls_vin: false,
+  // ── Master build section 38: Vehicle Intelligence and Passport 2.0 ──────
+  // Declared ahead of their readers. Each stays inert until a server surface
+  // reads it; the public ones are only ever turned on after the shadow one
+  // has produced evidence on a canary tenant.
+  /** Compute the V3 intelligence record beside production; nothing a customer sees. */
+  market_intelligence_v3_shadow: false,
+  /** Premium Plus as the new-vehicle first-seen decode bundle. */
+  premium_plus_new_intake: false,
+  /** Fee-normalized comparable basis in the V3 engine. */
+  fee_normalized_comps: false,
+  /** Exception-based NMVTIS verification for used vehicles; spend and terms decision. */
+  nmvtis_auto_verify: false,
+  /** OEM incentives for new vehicles under the program and market cache. */
+  oem_incentives_v2: false,
+  /** Signed provider webhook intake as an invalidation signal. */
+  provider_webhooks: false,
+  /** Black Book as a live valuation signal once credentials exist. */
+  blackbook_live: false,
+  /** AutoLabels Market Value V3, shadow evidence only. */
+  market_value_v3_shadow: false,
+  /** AutoLabels Market Value V3 on a customer surface. */
+  market_value_v3_public: false,
+  /** Used Vehicle Score, shadow evidence only. */
+  vehicle_score_shadow: false,
+  /** Used Vehicle Score on a customer surface. */
+  vehicle_score_public: false,
+  /** Data Confidence beside the score. */
+  data_confidence: false,
+  /** Buyer Recommendation with its hard gates. */
+  buyer_recommendation: false,
+  /** Passport 2.0 new-vehicle experience. */
+  passport_2_new: false,
+  /** Passport 2.0 used-vehicle experience. */
+  passport_2_used: false,
 } as const;
 
 export type MarketFlag = keyof typeof MARKET_FLAGS;
