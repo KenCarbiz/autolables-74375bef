@@ -10,6 +10,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 import { flat, structuredSheet } from "../_shared/neovinSheet.ts";
 import { describeShape, detectDrift, shapeHash } from "../_shared/payloadShape.ts";
 
@@ -144,13 +145,19 @@ Deno.serve(async (req) => {
   // sweeps then burn one of only MAX_SPEC_ATTEMPTS on it. Three quota days in
   // a row would retire a decodable VIN permanently.
   let providerRefused: number | null = null;
+  // The month's budget said no: retryable, never an attempt spent on the VIN.
+  let budgetDenied = false;
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];
     const isNeovin = url.includes("/neovin/");
     try {
       // Both NeoVIN calls are the slow, heavy ones; only the basic decoder
       // fallbacks get the short timeout.
-      const res = await fetch(url, { signal: AbortSignal.timeout(isNeovin ? 30000 : 12000) });
+      const gate = await admitProviderCall(admin, { url, caller: "marketcheck-specs", tenantId, vin });
+      if (!gate.admitted) { budgetDenied = true; break; }
+      const res = await fetch(url, { signal: AbortSignal.timeout(isNeovin ? 30000 : 12000) })
+        .catch(async (e) => { await recordProviderCall(admin, gate.eventId, null); throw e; });
+      await recordProviderCall(admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
       tried.push({ url: redact(url), status: res.status });
       if (i === 0) strictAttempted = true;
       if (res.status === 401 || res.status === 403 || res.status === 429) {
@@ -169,6 +176,7 @@ Deno.serve(async (req) => {
   }
 
   if (!payload) {
+    if (budgetDenied) return json(200, { ok: false, error: "budget_denied", retryable: true, tried });
     // Retryable: the caller must NOT spend a decode attempt on this, and must
     // not finalize the vehicle as having no equipment.
     if (providerRefused !== null) {

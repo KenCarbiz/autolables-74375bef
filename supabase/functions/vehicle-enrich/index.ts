@@ -58,6 +58,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
+
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -82,14 +84,29 @@ const INCLUDE_MDS = (Deno.env.get("ENRICH_INCLUDE_MDS") || "true").toLowerCase()
 // days-supply) and marks the car incomplete. Retry a couple of times with
 // growing delay so a transient rate-limit doesn't cost us the data. Returns
 // null only on transport error or a persistent throttle.
+// Which request this isolate is serving, for the budget ledger. One VIN per
+// request, and the sweep runs them one at a time, so the label is right in
+// practice; the admission decision itself is made in the database.
+// deno-lint-ignore no-explicit-any
+let budgetCtx: { admin: any; tenantId: string | null; vin: string | null } | null = null;
+
 async function mcFetch(url: string, timeoutMs: number): Promise<Response | null> {
   const backoff = [1200, 2500];
   for (let attempt = 0; attempt <= backoff.length; attempt++) {
+    // Every attempt is a provider call: admitted against the month's budget
+    // and recorded with the answer. A denied call is a null, which every
+    // caller already treats as "no answer, keep what is stored".
+    const gate = budgetCtx
+      ? await admitProviderCall(budgetCtx.admin, { url, caller: "vehicle-enrich", tenantId: budgetCtx.tenantId, vin: budgetCtx.vin })
+      : null;
+    if (gate && !gate.admitted) return null;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
       if (res.status === 429 && attempt < backoff.length) { await new Promise((r) => setTimeout(r, backoff[attempt])); continue; }
       return res;
     } catch {
+      if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, null);
       // A timeout or transient network error: retry with backoff instead of
       // giving up. This is what left Days Supply (the slowest call) randomly
       // grey on a few cars during a big bulk run — the call timed out once and
@@ -745,6 +762,7 @@ serve(async (req) => {
   if (!tenantId || !/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) return json(400, { error: "tenant_id and valid vin required" });
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  budgetCtx = { admin, tenantId: tenantId ?? null, vin };
 
   // ── Auth gate ───────────────────────────────────────────────
   // Accepted credentials, matching marketcheck-sync:

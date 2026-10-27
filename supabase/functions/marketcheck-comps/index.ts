@@ -12,6 +12,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
@@ -125,15 +126,21 @@ Deno.serve(async (req) => {
       });
 
     const fetchPass = async (useTrim: boolean) => {
-      const res = await fetch(`${MC_BASE}/search/car/active?${buildParams(useTrim).toString()}`, { signal: AbortSignal.timeout(10000) });
-      if (!res.ok) return { ok: false as const, status: res.status, b: {} as Record<string, unknown> };
+      const url = `${MC_BASE}/search/car/active?${buildParams(useTrim).toString()}`;
+      // A public page may not spend the month's reserve: a denied call reads
+      // as the provider declining, and the page shows its honest pending state.
+      const gate = await admitProviderCall(admin, { url, caller: "marketcheck-comps", tenantId: row.tenant_id ?? null, vin: subjectVin || null });
+      if (!gate.admitted) return { ok: false as const, status: 0, b: {} as Record<string, unknown>, budgetDenied: true as const };
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      await recordProviderCall(admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
+      if (!res.ok) return { ok: false as const, status: res.status, b: {} as Record<string, unknown>, budgetDenied: false as const };
       // deno-lint-ignore no-explicit-any
       const b: any = await res.json().catch(() => ({}));
       return { ok: true as const, status: res.status, b };
     };
 
     let pass = await fetchPass(true);
-    if (!pass.ok) return json(200, { available: false, reason: `provider_${pass.status}` });
+    if (!pass.ok) return json(200, { available: false, reason: pass.budgetDenied ? "budget_denied" : `provider_${pass.status}` });
     let filtered = usable(pass.b);
     if (filtered.length === 0 && trim) { pass = await fetchPass(false); filtered = pass.ok ? usable(pass.b) : filtered; }
     const b = pass.b;

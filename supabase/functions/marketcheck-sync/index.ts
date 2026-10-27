@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { artifactPostsIdle, autoPreload, ensureComplianceDrafts, ensureReadyToken, queueDescriptionRefresh } from "../_shared/intake-autoprovision.ts";
 import { newCallMeter, recordCall, estimateCost } from "../_shared/mcCost.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 import {
   classifyListing, isStrictRooftop, normStreet, normZip, prunePreflight,
   segmentOf, segmentPrunePreflight, probeCoverageSatisfied, sufficientCoverage,
@@ -173,8 +174,13 @@ async function resolveDealerId(
 // Per-run call meter. Operator-facing only: these are public list prices, not a
 // bill, and the figures never reach a dealer-visible surface.
 let callMeter = newCallMeter();
+// The run's database client and the tenant whose feed is being pulled, for
+// the budget ledger. Every sync call is essential: the feed and its rooftop
+// validation are what the reserve exists for.
+// deno-lint-ignore no-explicit-any
+let budgetCtx: { admin: any; tenantId: string | null } | null = null;
 
-async function mcFetch(base: string, query: string): Promise<{ listings: MCListing[]; numFound: number; http: number; refused?: boolean; endpoint: string }> {
+async function mcFetch(base: string, query: string): Promise<{ listings: MCListing[]; numFound: number; http: number; refused?: boolean; budgetDenied?: boolean; endpoint: string }> {
   const url = `${base}?api_key=${encodeURIComponent(MC_KEY)}&${query}`;
   // A provider refusal is not an answer. Returning an empty page for a 429 or a
   // quota block makes it indistinguishable from "this dealer has no more cars",
@@ -188,8 +194,15 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
   const BACKOFF_MS = [1200, 2500];
   for (let attempt = 0; ; attempt++) {
     recordCall(callMeter, base);
+    // The month's cap, hard. A denied feed call is a refusal, never an empty
+    // lot: the pin and the inventory stay as they are.
+    const gate = budgetCtx
+      ? await admitProviderCall(budgetCtx.admin, { url, caller: "marketcheck-sync", essential: true, tenantId: budgetCtx.tenantId })
+      : null;
+    if (gate && !gate.admitted) return { listings: [], numFound: 0, http: 429, refused: true, budgetDenied: true, endpoint: base };
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
       if (res.status === 429 || res.status === 401 || res.status === 403 || res.status >= 500) {
         if (attempt < BACKOFF_MS.length) {
           await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
@@ -205,6 +218,7 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
       const numFound = Number.isFinite(nf) ? nf : listings.length;
       return { listings, numFound, http: res.status, endpoint: base };
     } catch {
+      if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, null);
       if (attempt < BACKOFF_MS.length) {
         await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
         continue;
@@ -435,6 +449,7 @@ serve(async (req) => {
   if (!MC_KEY) return json(200, { error: "not_configured", note: "Set MARKETCHECK_API_KEY_1" });
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  budgetCtx = { admin, tenantId: null };
 
   // ── Inventory sync instrumentation ────────────────────────────────
   // Persist one inventory_sync_runs row per tenant-run (with error rows)
@@ -645,6 +660,7 @@ serve(async (req) => {
   for (const cfg of due as SyncConfig[]) {
     // Meter each tenant's run independently — the loop can cover many tenants.
     callMeter = newCallMeter();
+    if (budgetCtx) budgetCtx.tenantId = cfg.tenant_id;
     const source = toSourceHost(cfg.source);
     const manualDealerId = (cfg.dealer_id || "").trim();
     // A domain OR a chosen dealer_id is enough — the finder gives an id even

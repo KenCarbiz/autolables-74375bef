@@ -114,23 +114,32 @@ entitlement state, response-shape version, outcome and its economic class
 request_rejected), HTTP status, sample size, and whether the provider's
 applied filters diverged from the request.
 
-The proposed store is an append-only `provider_call_events` table keyed by
-tenant, VIN, capability, vehicle type and intake-vs-refresh, from which the
-dashboard answers: calls, spend, useful-result rate, cache-hit rate,
-duplicate-call suppression, freshness, latency, provider disagreements,
-fallback and generic-fallback usage, cost per used Passport, cost per new
-Passport, monthly cost per rooftop — and, per VIN, what was spent, what useful
-intelligence came back, and whether it changed the Passport. Authoring that
-table and wiring the writers into the edge functions is the next tranche; it
-needs a migration and deploys.
+The store is `provider_call_events` (migration `20261027205000`, authored
+2026-10-27 evening): an append-only ledger of every call the gate admitted
+and every refusal it issued, keyed by provider, product, caller, tenant and
+VIN, with HTTP status, outcome (ok, no_result, refused_quota, refused_rate,
+refused_auth, provider_error, transport_error, budget_denied) and the list
+cost. `provider_call_month` answers calls, denials and refusals per product
+for the month. Useful-result rate, freshness, cost per Passport and the
+per-VIN story build on it in a later tranche. Applying the migration and
+deploying the four wired callers is the owner's call.
 
 ## 6. Controls that exist, and the gaps that remain
 
-- Reservation + monthly budget: prediction only. The sweep and the comps
-  route spend without a reservation; the registry now states the policy and
-  the callers do not consult it yet.
-- Metering: syndication only. `vehicle-enrich` does not call `recordCall`;
-  most calls are unmetered until the envelope writer lands.
+- Monthly call cap (authored 2026-10-27, apply on authorization):
+  `provider_call_budgets` holds the plan's 5,000 calls a month with a reserve
+  of 250 for essential calls; `provider_call_admit` decides every call and
+  writes the ledger; `_shared/providerBudget.ts` is the client, wired into
+  `vehicle-enrich` (every call), `marketcheck-sync` (every call, essential),
+  `marketcheck-comps` and `marketcheck-specs`. A denied call is a null answer
+  for enrichment, a refusal that keeps the pin and the inventory for the
+  feed, an honest pending state for the public comps page, and a retryable
+  no-attempt for the decoder. The gate fails open, and says so, when the
+  migration has not been applied.
+- Reservation + USD budget: prediction only (`market_provider_budgets`);
+  unchanged.
+- Metering: the per-run `callMeter` stays on syndication; the ledger above
+  is the account-wide count.
 - Cost configuration: `effectiveCost` reads overrides first; the override
   store (`dealer_profiles.settings.provider_policy.*.cost_overrides_usd`) has
   no reader yet.
