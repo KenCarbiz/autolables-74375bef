@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { classifyCrawlOutcome } from "../_shared/crawlOutcome.ts";
+import {
+  classifyRenderedPage, discoverVdpUrls as discoverVdpUrlsShared, preferCrawlUrl, sameUrl,
+  shouldBackoffMismatch, vinFromUrl as vinFromUrlShared,
+  type CrawlUrlSource, type RenderedPageVerdictDetail,
+} from "../_shared/crawlUrlPolicy.ts";
 import { fetchCreditUsage, pickRenderKey, selectRenderKey, type RenderKeyCandidate } from "../_shared/renderKey.ts";
 import {
   createRenderPacer, deriveRenderBudget, parseRetryAfter, resolveRendersPerMinute,
@@ -70,6 +75,10 @@ interface LatestRow {
   // A seed row has no prior snapshot (advertised_price 0): it comes from a
   // synced vehicle_listing whose VDP url we crawl to capture a FIRST price.
   seed?: boolean;
+  // Where the address came from: discovery on the live site, the feed, or
+  // the last snapshot. Carried into the ledger so a dead url can be told
+  // from a dead page.
+  url_source?: CrawlUrlSource;
 }
 
 // A feed row names the dealer's inventory system as its channel. The crawler
@@ -773,6 +782,13 @@ const MAX_CHAIN_DEPTH = 12;
 // this long before it is visited again; the fix for the refusal itself is
 // the new-car price labels, not more visits.
 const REJECTED_BACKOFF_MS = 7 * 24 * 60 * 60 * 1000;
+// A url that has answered with another vehicle, or no vehicle, this many
+// times in the window above is dead; it rests until the window passes or the
+// address changes. One vehicle had been rendered 66 times on a dead url.
+const MISMATCH_BACKOFF_ATTEMPTS = 3;
+// Listing pages and the sitemap rendered per run when the plain fetch is
+// refused, so discovery can still learn the live VDP addresses.
+const DISCOVERY_RENDER_CAP_DEFAULT = 3;
 
 type RenderFormat = string | { type: string; fullPage?: boolean };
 const HTML_ONLY_FORMATS: RenderFormat[] = ["html"];
@@ -787,6 +803,10 @@ interface RenderResult {
   status: number | null;
   error: string | null;
   retryAfterHeader?: string | null;
+  // The provider follows redirects; this is where it ended up and what that
+  // page answered, so a landing page is not mistaken for the vehicle.
+  finalUrl: string | null;
+  pageStatus: number | null;
 }
 
 async function firecrawlRender(url: string, formats: RenderFormat[] = HTML_ONLY_FORMATS): Promise<RenderResult | null> {
@@ -807,7 +827,7 @@ async function firecrawlRender(url: string, formats: RenderFormat[] = HTML_ONLY_
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       return {
-        html: "", screenshotUrl: null, jsonPrice: null, jsonVin: null, ok: false, status: res.status,
+        html: "", screenshotUrl: null, jsonPrice: null, jsonVin: null, ok: false, status: res.status, finalUrl: null, pageStatus: null,
         error: body.slice(0, 300) || res.statusText, retryAfterHeader: res.headers.get("retry-after"),
       };
     }
@@ -822,10 +842,12 @@ async function firecrawlRender(url: string, formats: RenderFormat[] = HTML_ONLY_
       ok: true,
       status: res.status,
       error: null,
+      finalUrl: (typeof d?.metadata?.url === "string" && d.metadata.url) || (typeof d?.metadata?.sourceURL === "string" && d.metadata.sourceURL) || null,
+      pageStatus: Number(d?.metadata?.statusCode) || null,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { html: "", screenshotUrl: null, jsonPrice: null, jsonVin: null, ok: false, status: null, error: msg.slice(0, 300) };
+    return { html: "", screenshotUrl: null, jsonPrice: null, jsonVin: null, ok: false, status: null, error: msg.slice(0, 300), finalUrl: null, pageStatus: null };
   }
 }
 
@@ -900,29 +922,10 @@ async function captureScreenshot(admin: any, screenshotUrl: string | null, tenan
 }
 
 const originOf = (u: string): string | null => { try { return new URL(u).origin; } catch { return null; } };
-const vinFromUrl = (u: string): string | null => {
-  const m = u.toUpperCase().match(/[A-HJ-NPR-Z0-9]{17}/);
-  return m ? m[0] : null;
-};
-
-// Collect candidate VDP URLs from a listing page or sitemap body: any URL
-// (absolute or root-relative) that embeds a 17-char VIN — the reliable VDP
-// signature on DealerOn/Apollo/DealerInspire templates.
-const discoverVdpUrls = (docBody: string, origin: string): string[] => {
-  const found = new Set<string>();
-  let m: RegExpExecArray | null;
-  const absRe = /https?:\/\/[^\s"'<>]*[A-HJ-NPR-Z0-9]{17}[^\s"'<>]*/gi;
-  while ((m = absRe.exec(docBody))) {
-    const u = m[0].replace(/&amp;/g, "&").split("?")[0].split("#")[0];
-    if (isUrlSafe(u)) found.add(u);
-  }
-  const relRe = /["'](\/[a-z0-9/_.\-]*[A-HJ-NPR-Z0-9]{17}[a-z0-9/_.\-]*)["']/gi;
-  while ((m = relRe.exec(docBody))) {
-    const u = origin + m[1].split("?")[0].split("#")[0];
-    if (isUrlSafe(u)) found.add(u);
-  }
-  return [...found];
-};
+const vinFromUrl = (u: string): string | null => vinFromUrlShared(u);
+// Candidate VDP URLs on a listing page or sitemap: any absolute or
+// root-relative url that embeds a 17-character VIN (crawlUrlPolicy.ts).
+const discoverVdpUrls = (docBody: string, origin: string): string[] => discoverVdpUrlsShared(docBody, origin, isUrlSafe);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -950,7 +953,10 @@ serve(async (req) => {
 
   let body: {
     limit?: number; tenant_id?: string; discover?: boolean; vin?: string; test_url?: string;
-    force_screenshot?: boolean; credit_check?: boolean;
+    force_screenshot?: boolean; credit_check?: boolean; depth?: number;
+    // Platform callers only: run discovery alone (no pricing pass), seed it
+    // from explicit urls, and cap its renders.
+    discover_only?: boolean; discover_seed_urls?: string[]; discover_render_cap?: number;
   } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
   const targetVin = body.vin ? normVin(body.vin) : null;
@@ -1125,6 +1131,8 @@ serve(async (req) => {
       : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
     let pacedWaitMs = 0;
     let rateLimitRetries = 0;
+    let testPage: RenderedPageVerdictDetail | null = null;
+    let finalUrl: string | null = null;
     if (result.price == null && renderBudget > 0) {
       renderBudget--;
       const pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt);
@@ -1133,10 +1141,18 @@ serve(async (req) => {
       rateLimitRetries = pr.rateLimitRetries;
       renderStatus = fr?.status ?? null;
       renderError = fr?.error ?? null;
+      finalUrl = fr?.finalUrl ?? null;
       if (fr?.ok) {
         rendered = true;
         if (fr.html) {
-          result = extractAdvertised(fr.html, fetchUrl, "", cfg.labels);
+          testPage = classifyRenderedPage({
+            html: fr.html, requestedUrl: fetchUrl, finalUrl: fr.finalUrl, pageStatus: fr.pageStatus,
+            targetVin: body.vin ? normVin(body.vin) : null,
+            isChallenge: (h, s) => looksLikeChallenge(h, new Headers(), s),
+          });
+          result = testPage.verdict === "challenge"
+            ? { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null }
+            : extractAdvertised(fr.html, fetchUrl, "", cfg.labels);
         }
       }
     }
@@ -1161,6 +1177,8 @@ serve(async (req) => {
         configured_labels: cfg.labels,
         strip_finance_params: cfg.stripFinance,
         fetch_url: fetchUrl,
+        final_url: finalUrl,
+        page: testPage,
       },
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
@@ -1220,6 +1238,50 @@ serve(async (req) => {
     }
   } catch { /* an unreadable archive list must not stop the run; it only widens it */ }
 
+  // The freshest address per vehicle. The queue hands out the url captured
+  // with the last snapshot, which on 2026-10-27 was months old on every row
+  // while the dealer's site had been rebuilt. The listing carries the feed's
+  // current VDP url and scrape_source_url the one discovery last saw live.
+  const listingUrls = new Map<string, { source_url: string | null; scrape_source_url: string | null }>();
+  try {
+    let urlQuery = admin.from("vehicle_listings")
+      .select("tenant_id, vin, source_url, scrape_source_url")
+      .is("archived_at", null).limit(5000);
+    if (body.tenant_id) urlQuery = urlQuery.eq("tenant_id", body.tenant_id);
+    const { data: urlRows } = await urlQuery;
+    for (const l of (urlRows || []) as Array<{ tenant_id: string; vin: string | null; source_url: string | null; scrape_source_url: string | null }>) {
+      listingUrls.set(l.tenant_id + "|" + (l.vin || "").toUpperCase(), { source_url: l.source_url, scrape_source_url: l.scrape_source_url });
+    }
+  } catch { /* without it the snapshot url is used, as before */ }
+
+  // Recent "another vehicle / no vehicle" answers per VIN, with the url that
+  // produced them. shouldBackoffMismatch rests a url only when it is the same
+  // one; a refreshed address is tried at once.
+  const mismatchLedger = new Map<string, { attempts: number; source_url: string | null; last_attempt_at: string | null }>();
+  let mismatchBackoffSkipped = 0;
+  try {
+    let mq = admin.from("advertised_price_crawl_attempts")
+      .select("tenant_id, vin, attempts, source_url, last_attempt_at")
+      .eq("outcome", "vin_mismatch")
+      .gte("last_attempt_at", new Date(Date.now() - REJECTED_BACKOFF_MS).toISOString())
+      .limit(5000);
+    if (body.tenant_id) mq = mq.eq("tenant_id", body.tenant_id);
+    const { data: mrows } = await mq;
+    for (const r of (mrows || []) as Array<{ tenant_id: string; vin: string | null; attempts: number | null; source_url: string | null; last_attempt_at: string | null }>) {
+      mismatchLedger.set(r.tenant_id + "|" + (r.vin || "").toUpperCase(), { attempts: Number(r.attempts || 0), source_url: r.source_url, last_attempt_at: r.last_attempt_at });
+    }
+  } catch { /* an unreadable ledger widens the run; it never stops it */ }
+  const restingOnDeadUrl = async (tenantId: string, vin: string, url: string): Promise<boolean> => {
+    if (targetVin || !url) return false;
+    const led = mismatchLedger.get(tenantId + "|" + normVin(vin));
+    if (!led) return false;
+    const cfg = await getTenantScrapeSettings(tenantId);
+    return shouldBackoffMismatch({
+      attempts: led.attempts, ledgerUrl: led.source_url, candidateUrl: maybeNormalize(url, cfg.stripFinance),
+      lastAttemptAt: led.last_attempt_at, now: Date.now(), windowMs: REJECTED_BACKOFF_MS, threshold: MISMATCH_BACKOFF_ATTEMPTS,
+    });
+  };
+
   const rejectedKeys = new Set<string>();
   let backoffSkipped = 0;
   try {
@@ -1244,11 +1306,18 @@ serve(async (req) => {
     // Single-VIN re-scrape (Ready-for-Signatures verify) only touches that VIN.
     if (targetVin && (q.vin || "").toUpperCase() !== targetVin) continue;
     if (seen.has(key) || rows.length >= limit) continue;
+    // Website rows take the freshest known address; a marketplace row keeps
+    // its own, since the listing's url is the dealer's page, not that site's.
+    const channel = observationChannel(q.source_channel);
+    const known = channel === "website" ? listingUrls.get(key) : undefined;
+    const pref = preferCrawlUrl({ snapshotUrl: q.source_url, listingUrl: known?.source_url, scrapeUrl: known?.scrape_source_url });
+    const crawlUrl = pref.url || q.source_url || "";
+    if (await restingOnDeadUrl(q.tenant_id, q.vin, crawlUrl)) { mismatchBackoffSkipped++; continue; }
     seen.add(key);
     rows.push({
       id: q.id, tenant_id: q.tenant_id, store_id: q.store_id || "", vin: q.vin,
-      source_url: q.source_url || "", source_label: observationChannel(q.source_channel),
-      advertised_price: q.advertised_price ?? 0, snapshot_at: q.captured_at,
+      source_url: crawlUrl, source_label: observationChannel(q.source_channel),
+      advertised_price: q.advertised_price ?? 0, snapshot_at: q.captured_at, url_source: pref.source,
     });
   }
 
@@ -1264,7 +1333,7 @@ serve(async (req) => {
   {
     let seedQuery = admin
       .from("vehicle_listings")
-      .select("tenant_id, store_id, vin, source_url")
+      .select("tenant_id, store_id, vin, source_url, scrape_source_url")
       .neq("source_url", "")
       .not("source_url", "is", null)
       .is("archived_at", null)
@@ -1273,22 +1342,26 @@ serve(async (req) => {
     if (body.tenant_id) seedQuery = seedQuery.eq("tenant_id", body.tenant_id);
     const { data: seedRows } = await seedQuery;
     const seeds: LatestRow[] = [];
-    for (const s of (seedRows || []) as Array<{ tenant_id: string; store_id: string | null; vin: string; source_url: string }>) {
+    for (const s of (seedRows || []) as Array<{ tenant_id: string; store_id: string | null; vin: string; source_url: string; scrape_source_url?: string | null }>) {
       const vin = (s.vin || "").toUpperCase();
       if (!vin || !s.source_url) continue;
       if (targetVin && vin !== targetVin) continue;
       const k = s.tenant_id + "|" + vin;
       if (pricedKeys.has(k) || seen.has(k)) continue;
       if (!targetVin && rejectedKeys.has(k)) { backoffSkipped++; continue; }
+      const pref = preferCrawlUrl({ snapshotUrl: null, listingUrl: s.source_url, scrapeUrl: s.scrape_source_url });
+      if (await restingOnDeadUrl(s.tenant_id, vin, pref.url)) { mismatchBackoffSkipped++; continue; }
       seen.add(k);
       seeds.push({
         id: "", tenant_id: s.tenant_id, store_id: s.store_id || "", vin: s.vin,
-        source_url: s.source_url, source_label: "website", advertised_price: 0,
-        snapshot_at: null, seed: true,
+        source_url: pref.url, source_label: "website", advertised_price: 0,
+        snapshot_at: null, seed: true, url_source: pref.source,
       });
     }
     rows.unshift(...seeds);
     if (rows.length > limit) rows.length = limit;
+    // Discovery alone: learn the live addresses, price nothing this run.
+    if (body.discover_only === true && !targetVin) rows.length = 0;
   }
 
   // A single-VIN re-scrape that matched nothing means the vehicle has no
@@ -1313,6 +1386,12 @@ serve(async (req) => {
   let failed = 0;
   let skipped = 0;
   let discovered = 0;
+  // Discovery's own account of each seed page it read, and the live
+  // addresses it recorded or confirmed on vehicle_listings.
+  const discoveryReport: Array<Record<string, unknown>> = [];
+  let discoveryRenders = 0;
+  let urlsRecorded = 0;
+  let urlsConfirmed = 0;
   let processed = 0;
   let ranOutOfTime = false;
   let evidenceRenders = 0;
@@ -1393,6 +1472,7 @@ serve(async (req) => {
       // taken from a plain html retry instead. The second stage then does not
       // spend another render asking for the same refused picture.
       let evidenceRefused: { status: number | null; error: string | null } | null = null;
+      let page: RenderedPageVerdictDetail | null = null;
       const cheapFailed = result.price == null && result.reason !== "vin_mismatch" && !result.gated;
       if (cheapFailed && renderBudget > 0) {
         renderBudget--;
@@ -1426,8 +1506,21 @@ serve(async (req) => {
             if (screenshot) evidenceRenders++;
           }
           if (r.html) {
-            html = r.html;
-            result = extractAdvertised(priceEvidenceHtml(r.html), fetchUrl, row.vin, cfg.labels);
+            // What came back: the vehicle, a challenge page, another vehicle,
+            // or a landing page with no vehicle on it. The last two mean the
+            // url is dead, and the price must not be read off them.
+            page = classifyRenderedPage({
+              html: r.html, requestedUrl: fetchUrl, finalUrl: r.finalUrl, pageStatus: r.pageStatus, targetVin: row.vin,
+              isChallenge: (h, s) => looksLikeChallenge(h, new Headers(), s),
+            });
+            if (page.verdict === "challenge") {
+              result = { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
+            } else if (page.verdict === "other_vehicle" || page.verdict === "no_vehicle") {
+              result = { price: null, source: "none", gated: false, reason: "vin_mismatch", msrp: null, candidates: [], matched_label: null };
+            } else {
+              html = r.html;
+              result = extractAdvertised(priceEvidenceHtml(r.html), fetchUrl, row.vin, cfg.labels);
+            }
           }
         }
       }
@@ -1457,6 +1550,9 @@ serve(async (req) => {
         });
         // The pacer's decision rides on the ledger detail so a canary run can
         // prove the renderer was paced, not just that it answered.
+        const pageNote = page
+          ? `page=${page.verdict}${page.redirected ? " redirected" : ""}${page.title ? ` title="${page.title.slice(0, 60)}"` : ""} url_source=${row.url_source || "snapshot"}`
+          : (row.url_source ? `url_source=${row.url_source}` : null);
         const pacingNote = renderFormats
           ? `[paced_wait_ms=${pacedWaitMs} rate_limit_retries=${rateLimitRetries} formats=${renderFormats.map((f) => typeof f === "string" ? f : f.type).join("+")}${evidenceRefused ? ` evidence_refused=${evidenceRefused.status ?? "err"}` : ""}]`
           : null;
@@ -1468,7 +1564,7 @@ serve(async (req) => {
           _outcome: cls.outcome,
           _http_status: cheapStatus,
           _render_status: renderStatus,
-          _detail: [pacingNote, cls.detail].filter(Boolean).join(" ") || null,
+          _detail: [pacingNote, cls.detail, pageNote].filter(Boolean).join(" ") || null,
         });
       } catch { /* never fail a price run over telemetry */ }
 
@@ -1587,6 +1683,16 @@ serve(async (req) => {
       // record the reason but DO NOT write — preserve the prior good snapshot.
       if (result.reason === "vin_mismatch" || result.gated) {
         skipped++;
+        // A discovered address that keeps answering with the wrong page is
+        // dropped, so the queue falls back to the feed's url for this VIN.
+        if (result.reason === "vin_mismatch" && row.url_source === "scrape") {
+          const led = mismatchLedger.get(row.tenant_id + "|" + normVin(row.vin));
+          const prior = led && sameUrl(led.source_url, fetchUrl) ? led.attempts : 0;
+          if (prior + 1 >= MISMATCH_BACKOFF_ATTEMPTS) {
+            await admin.from("vehicle_listings").update({ scrape_source_url: null })
+              .eq("tenant_id", row.tenant_id).eq("vin", row.vin).then(() => undefined, () => undefined);
+          }
+        }
         await admin.from("audit_log").insert({
           action: "advertised_price_crawl_skipped",
           entity_type: "advertised_price",
@@ -1816,6 +1922,14 @@ serve(async (req) => {
   // Best-effort and bounded; JS-rendered/bot-walled sites yield little here
   // and need the rendering-service fetcher (future) or a feed.
   if (body.discover !== false) {
+    const platformCaller = auth === serviceKey || isCron;
+    const seedOverride = platformCaller && Array.isArray(body.discover_seed_urls)
+      ? body.discover_seed_urls.filter((u): u is string => typeof u === "string" && isUrlSafe(u)).slice(0, 8)
+      : [];
+    const capAsked = Number(body.discover_render_cap);
+    const discoveryRenderCap = platformCaller && Number.isFinite(capAsked)
+      ? Math.max(0, Math.min(6, Math.floor(capAsked)))
+      : DISCOVERY_RENDER_CAP_DEFAULT;
     // deno-lint-ignore no-explicit-any
     let pq: any = admin.from("dealer_profiles").select("tenant_id, settings");
     if (body.tenant_id) pq = pq.eq("tenant_id", body.tenant_id);
@@ -1842,11 +1956,23 @@ serve(async (req) => {
       addSrc("cars_com", s.cars_com_url);
       addSrc("autotrader", s.autotrader_url);
       addSrc("capital_one", s.capital_one_url);
+      // Platform callers may point discovery at explicit pages of the
+      // dealer's site (a diagnostic, or a site whose inventory pages moved).
+      if (seedOverride.length && body.tenant_id === tenantId) {
+        channelSources.length = 0;
+        for (const u of seedOverride) addSrc("website", u, false);
+      }
       if (channelSources.length === 0) continue;
 
-      const { data: listings } = await admin.from("vehicle_listings").select("vin").eq("tenant_id", tenantId);
+      const { data: listings } = await admin.from("vehicle_listings")
+        .select("vin, source_url, scrape_source_url").eq("tenant_id", tenantId);
       const knownVins = new Set((listings || []).map((l: { vin: string | null }) => (l.vin || "").toUpperCase()));
+      const knownUrls = new Map<string, { source_url: string | null; scrape_source_url: string | null }>();
+      for (const l of (listings || []) as Array<{ vin: string | null; source_url: string | null; scrape_source_url: string | null }>) {
+        knownUrls.set((l.vin || "").toUpperCase(), { source_url: l.source_url, scrape_source_url: l.scrape_source_url });
+      }
       if (knownVins.size === 0) continue;
+      const seedSeen = new Set<string>();
 
       // Latest price per (VIN, channel) — only write a new snapshot when a
       // site's price actually changes, so we keep one current entry per site.
@@ -1869,14 +1995,62 @@ serve(async (req) => {
         const vdpUrls = new Set<string>();
         for (const src of seeds) {
           if (vdpUrls.size > 400) break;
+          if (seedSeen.has(src)) continue;
+          seedSeen.add(src);
+          const seedReport: Record<string, unknown> = {
+            channel, url: src, direct_status: null, rendered: false, render_status: null, final_url: null, challenge: false, urls_found: 0,
+          };
+          let txt = "";
           try {
             const r = await fetch(src, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
-            if (!r.ok) continue;
-            const txt = await r.text();
-            if (looksLikeChallenge(txt, r.headers, r.status)) continue;
+            seedReport.direct_status = r.status;
+            const raw = r.ok ? await r.text() : "";
+            if (r.ok && !looksLikeChallenge(raw, r.headers, r.status)) txt = raw;
+            else if (r.ok) seedReport.challenge = true;
+          } catch { /* the render below is the fallback */ }
+          // The dealer's site has refused the plain fetch since 2026-10-11.
+          // Its listing pages and sitemap are rendered instead, a few per run,
+          // so discovery can still learn the live VDP addresses.
+          if (!txt && channel === "website" && discoveryRenders < discoveryRenderCap && renderBudget > 0
+              && Date.now() + RENDER_HEADROOM_MS < deadlineAt) {
+            discoveryRenders++;
+            renderBudget--;
+            const pr = await pacedRender(src, HTML_ONLY_FORMATS, deadlineAt);
+            const fr = pr.render;
+            seedReport.rendered = !!fr?.ok;
+            seedReport.render_status = fr?.status ?? null;
+            seedReport.final_url = fr?.finalUrl ?? null;
+            if (fr?.ok && fr.html) {
+              if (looksLikeChallenge(fr.html, new Headers(), fr.pageStatus ?? 200)) seedReport.challenge = true;
+              else txt = fr.html;
+            }
+          }
+          if (txt) {
+            const before = vdpUrls.size;
             discoverVdpUrls(txt, originOf(src) || "").forEach((u) => vdpUrls.add(u));
-          } catch { /* skip source */ }
+            seedReport.urls_found = vdpUrls.size - before;
+          }
+          discoveryReport.push(seedReport);
         }
+
+        // Record the live address of every known vehicle before any pricing
+        // attempt, so the nightly crawl, which can render, stops visiting the
+        // snapshot's stale url. Website channel only: a marketplace url is
+        // that marketplace's page, not the dealer's.
+        if (channel === "website") {
+          for (const vdp of vdpUrls) {
+            const vin = vinFromUrl(vdp);
+            if (!vin || !knownVins.has(vin)) continue;
+            const cur = knownUrls.get(vin);
+            if (cur && (sameUrl(cur.scrape_source_url, vdp) || sameUrl(cur.source_url, vdp))) { urlsConfirmed++; continue; }
+            try {
+              const { error } = await admin.from("vehicle_listings").update({ scrape_source_url: vdp })
+                .eq("tenant_id", tenantId).eq("vin", vin);
+              if (!error) { urlsRecorded++; knownUrls.set(vin, { source_url: cur?.source_url ?? null, scrape_source_url: vdp }); }
+            } catch { /* best-effort */ }
+          }
+        }
+        if (body.discover_only === true) continue;
 
         for (const vdp of vdpUrls) {
           if (crawledThisTenant >= 300) break;
@@ -1953,7 +2127,8 @@ serve(async (req) => {
     details: {
       depth, picked: rows.length, processed, queue_depth: queueDepth, unvisited: Math.max(queueDepth - processed, 0),
       ran_out_of_time: ranOutOfTime, updated, unchanged, failed, skipped, discovered,
-      backoff_skipped: backoffSkipped,
+      backoff_skipped: backoffSkipped, mismatch_backoff_skipped: mismatchBackoffSkipped,
+      urls_recorded: urlsRecorded, urls_confirmed: urlsConfirmed, discovery_renders: discoveryRenders, discovery: discoveryReport,
       elapsed_ms: Date.now() - startedAt, render_pacing: renderPacing, next_link: nextLink,
     },
   }).then(() => undefined, () => undefined);
@@ -1977,6 +2152,15 @@ serve(async (req) => {
     // Vehicles left alone because the guard refused their page price inside
     // the backoff window.
     backoff_skipped: backoffSkipped,
+    // Vehicles whose url keeps answering with another page, resting until
+    // the window passes or discovery records a new address.
+    mismatch_backoff_skipped: mismatchBackoffSkipped,
+    // Discovery: live addresses written to vehicle_listings.scrape_source_url,
+    // addresses already current, renders spent, and each seed page's outcome.
+    urls_recorded: urlsRecorded,
+    urls_confirmed: urlsConfirmed,
+    discovery_renders: discoveryRenders,
+    discovery: discoveryReport,
     // What the renderer was allowed to do and how it was held back, so a
     // canary run can prove pacing from the response alone.
     render_pacing: renderPacing,

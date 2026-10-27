@@ -183,7 +183,8 @@ describe("the renderer is paced", () => {
 
   it("writes the pacing decision where a canary can read it", () => {
     expect(SRC).toContain("paced_wait_ms");
-    expect(SRC).toMatch(/_detail: \[pacingNote, cls\.detail\]/);
+    // The page verdict rides behind the pacing note; the pacing note stays first.
+    expect(SRC).toMatch(/_detail: \[pacingNote, cls\.detail, pageNote\]/);
     expect(SRC).toMatch(/render_pacing: renderPacing/);
   });
 });
