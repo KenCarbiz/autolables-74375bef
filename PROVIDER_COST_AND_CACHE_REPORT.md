@@ -57,10 +57,13 @@ entitled). Against the account's plan quota that is the whole problem:
 | Days until the sweep alone exhausts the quota | 5-9 |
 | Calls the nightly syndication needs a month | about 31 |
 
-`20261027203000_enrich_batch_recall_retry_window.sql` (authored, apply on
-authorization) re-asks an attempted, unanswered recall every 30 days
-instead of daily: about 3 visits a day, 20-36 calls, under 1,100 a month,
-with no operator action needed when the product is entitled.
+`20261027203000_enrich_batch_recall_retry_window.sql` (applied the same
+evening) re-asks an attempted, unanswered recall every 30 days instead of
+daily: 1 vehicle offered the day it was applied against 92 before, about 3
+a day on average, 20-36 calls, under 1,100 a month, with no operator
+action needed when the product is entitled. The nightly sweep job was also
+paused (`20261027204000`) until the quota is settled, so the sweep spends
+nothing until it is un-paused.
 
 Under the registry defaults (USED_VEHICLE_PROVIDER_POLICY.md,
 NEW_VEHICLE_PROVIDER_POLICY.md) the recurring cost of a used vehicle is about

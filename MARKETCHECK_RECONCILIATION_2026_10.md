@@ -160,12 +160,18 @@ Performed, with authorization, 2026-10-27:
   VINs, so already-decoded listings gain the keys only when a sweep or an
   operator re-pulls them.
 
-Authored the same evening, not applied (owner authorization pending):
-`20261027203000_enrich_batch_recall_retry_window.sql`, which re-asks an
-attempted, unanswered VIN recall every 30 days instead of daily. Measured
-before: 92 active vehicles offered every day, 91 on the recall clause alone.
-Expected after: about 3 a day. Reversible: re-applying 20261027200000
-restores the daily clause.
+- `20261027203000_enrich_batch_recall_retry_window.sql` applied at about
+  21:55Z on the owner's authorization: an attempted, unanswered VIN recall
+  is re-asked every 30 days instead of daily. Measured under the cursor's
+  own rule with the age floor off: 92 active vehicles offered before, 1
+  after (91 were on the recall clause alone). Signature now four
+  parameters; ledger row written. Reversible: re-applying 20261027200000
+  restores the daily clause.
+- `20261027204000_pause_enrich_sweep_nightly.sql` applied in the same
+  window: the cron job `enrich-sweep-nightly` (03:15 UTC) set inactive;
+  `marketcheck-sync` (hourly, the feed) left active. The 08:00 UTC kick
+  from the sync is silenced by the operator setting `ENRICH_SWEEP_HOUR_UTC`
+  to 25. Ledger row written. Un-pause is one `cron.alter_job` call.
 
 Not yet authored: `provider_call_events` (observability store) and the Sold
 Summary / Available Options / dealership-group evidence tables, which wait on
@@ -205,3 +211,66 @@ not repurchased (`shouldDecodeVin`, existing); New and Used cadence rules
 remain separate (registry policy tests); every new flag is declared and inert;
 the cursor's recall retry window and its signature change are held by the
 migration-text test.
+
+## 11. Provider contract read from the MarketCheck MCP schemas (2026-10-27)
+
+The owner connected the MarketCheck MCP server (1.9.3) in the evening. Its
+tool schemas and server info are the provider's own parameter contract and
+cost nothing to read; no call was made. What they settle:
+
+- Inventory Search (`/v2/search/car/active`): 80+ filters including `vins`
+  (up to 10), `taxonomy_vins`, `ymmt`, `match`, `dos_active` and `dom_active`
+  ranges (days on site at the current dealer vs cumulative days on market),
+  `options_packages` and `high_value_features` with facets, `price_change`,
+  `in_transit`, `seller_type` dealer | fsbo | auction, and
+  `include_mc_dealership_object` carrying `mc_dealership_group_id`,
+  `mc_dealership_group_name`, `mc_sub_dealership_group_id/name`,
+  `mc_category` and `mc_rooftop_id`. Any dealer identifier routes the call to
+  Dealer Inventory Syndication (`/dealerships/inventory`, rows up to 1,500).
+  CARFAX fields are "incomplete ... not supported as filters, facets or
+  stats", which matches the low-authority treatment here.
+- Past Inventory Search (`/v2/search/car/recents`): expired or sold listings
+  only, last 90 days; requires a city, state, zip, geo radius (max 100),
+  source or dealer_id; facets, stats and range facets cannot be combined;
+  "charged at higher rates than active search"; `expired` is VIN-level and
+  `sold=true` is the sold filter.
+- Sold Vehicles Summary (`/v2/sold-vehicles/summary`; the server also lists
+  it as `/v2/sold/summary`; enterprise-gated): `inventory_type` required;
+  month-aligned `date_from`/`date_to` at most a year apart; `summary_by`
+  national | state | city_state; `dealership_group_name` exact from the
+  directory; `source` is a rooftop inventory_url, comma lists allowed;
+  ranking dimensions, measure, order, `top_n`, `limit`, measure filters and
+  `rank_after_filters`; the response carries `result_count`, `truncated`,
+  `warnings` and `applied` (the defaults and window actually used), with
+  price, miles, dom_active, dos_active, msrp and mc_msrp statistics. The
+  provider's own wording: sales are inferred and prices are advertised
+  asking prices, not transaction prices. The service scales to zero and the
+  first call after idle can take about nine seconds, so the client timeout
+  must allow it. History starts January 2021.
+- Premium (`/v2/predict/car/us/marketcheck_price/comparables`): `vin`
+  required; `miles` defaults to 50,000, `zip` to 50501, `dealer_type` to
+  franchise, `is_certified` to false. Those defaults would silently price a
+  car in Iowa at 50,000 miles, so every call must send and the envelope must
+  record all four.
+- VIN history (`/v2/history/car/{vin}`): `fields`, `page`, `sort_order`.
+- NeoVIN (`/v2/decode/car/neovin/{vin}/specs`): the generic switch is named
+  `include_generic`, which is exactly what marketcheck-specs already sends;
+  the registry's `generic_vin_fallback` flag governs policy, not the
+  parameter.
+- Dealership Directory (`/v2/dealerships/car`): group-aware, with facets on
+  the group and sub-group ids and names. This is the dealership-groups
+  reference the registry had marked unlocated. `/v2/dealers/car` is "being
+  phased out".
+- OEM incentives: an all-brands search (country required, MSA code, at most
+  10 rows) and an OEM-plus-ZIP search that converts the ZIP to an MSA.
+
+Not exposed by the MCP, so still documented and unverified: Market Days
+Supply, AutoRecalls, VINData, Price Base, Premium Plus, Available Options
+Packages, cached images, listing details, MarketMatch, webhooks.
+
+Discrepancies to resolve in the registry next: FSBO and auction are a
+`seller_type` on the active search in the MCP, where the registry carries
+them as separate paths; the sold-summary path is spelled two ways by the
+server itself. Updating
+the registry entries, the capability matrix paths and the edge mirror is the
+next tranche; nothing here changes a request the code sends today.

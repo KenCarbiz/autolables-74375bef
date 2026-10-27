@@ -36,8 +36,11 @@ the OpenAPI 3.1 document is vendored into `contracts/marketcheck/`.
 - `supabase/migrations/20261027200000_enrich_batch_once_per_day_active_only.sql`:
   cursor floor and archived filter (apply on authorization).
 - `supabase/migrations/20261027203000_enrich_batch_recall_retry_window.sql`:
-  unanswered VIN recall re-asked every 30 days, not daily (apply on
-  authorization).
+  unanswered VIN recall re-asked every 30 days, not daily (applied
+  2026-10-27, 92 vehicles offered a day before, 1 after).
+- `supabase/migrations/20261027204000_pause_enrich_sweep_nightly.sql`: the
+  nightly sweep cron job paused until the plan quota is settled (applied
+  2026-10-27).
 - `supabase/migrations/20261027201000_mc_raw_boundary_repair.sql`: legacy
   pricing payloads moved to `market_pricing_legacy_payloads` (apply on
   authorization).
@@ -69,3 +72,19 @@ Once `contracts/marketcheck/openapi.json` exists in the repo: a test that
 asserts every `PROVIDER_CAPABILITIES[].path` resolves to an operation in the
 document and that every query parameter the functions send is declared for
 that operation. The registry is the list; the document is the authority.
+
+## Contract read from the MarketCheck MCP schemas, 2026-10-27
+
+The owner connected the provider's MCP server (1.9.3). Its tool schemas
+confirm, without a call: the syndication path and its routing from any
+dealer identifier; the recents constraints (geography or dealer required,
+radius 100, higher rate); the Sold Vehicles Summary parameters and response
+envelope (`applied`, `warnings`, `truncated`), path `/v2/sold-vehicles/summary`;
+the Premium path and its defaults (miles 50,000, zip 50501, franchise,
+not certified); `/v2/dealerships/car` as the group-aware directory with group
+facets; `/v2/dealers/car` being phased out; `include_generic` as the NeoVIN
+generic switch, which the decoder already sends; `seller_type` dealer | fsbo | auction on the active search.
+MDS, AutoRecalls, VINData, Base, Premium Plus and Available Options Packages
+are not in the MCP and stay unverified. Details in
+MARKETCHECK_RECONCILIATION_2026_10.md §11. Registry and matrix updates follow
+in the next tranche.
