@@ -6643,6 +6643,81 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_call_budgets: {
+        Row: {
+          enabled: boolean
+          monthly_call_cap: number
+          notes: string | null
+          provider: string
+          reserve_for_essential: number
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          monthly_call_cap: number
+          notes?: string | null
+          provider: string
+          reserve_for_essential?: number
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          monthly_call_cap?: number
+          notes?: string | null
+          provider?: string
+          reserve_for_essential?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      provider_call_events: {
+        Row: {
+          at: string
+          caller: string
+          essential: boolean
+          estimated_cost_usd: number | null
+          http_status: number | null
+          id: number
+          month_calls_before: number | null
+          note: string | null
+          outcome: string
+          product: string
+          provider: string
+          tenant_id: string | null
+          vin: string | null
+        }
+        Insert: {
+          at?: string
+          caller: string
+          essential?: boolean
+          estimated_cost_usd?: number | null
+          http_status?: number | null
+          id?: never
+          month_calls_before?: number | null
+          note?: string | null
+          outcome?: string
+          product: string
+          provider: string
+          tenant_id?: string | null
+          vin?: string | null
+        }
+        Update: {
+          at?: string
+          caller?: string
+          essential?: boolean
+          estimated_cost_usd?: number | null
+          http_status?: number | null
+          id?: never
+          month_calls_before?: number | null
+          note?: string | null
+          outcome?: string
+          product?: string
+          provider?: string
+          tenant_id?: string | null
+          vin?: string | null
+        }
+        Relationships: []
+      }
       provider_payload_shapes: {
         Row: {
           dependency_types: Json
@@ -11815,6 +11890,44 @@ export type Database = {
       oem_franchise_min_new_units: { Args: never; Returns: number }
       oem_make_from_ymm: { Args: { _ymm: string }; Returns: string }
       operating_metrics: { Args: { p_tenant_id: string }; Returns: Json }
+      provider_call_admit: {
+        Args: {
+          p_caller: string
+          p_essential?: boolean
+          p_estimated_cost_usd?: number
+          p_product: string
+          p_provider: string
+          p_tenant_id?: string
+          p_vin?: string
+        }
+        Returns: {
+          admitted: boolean
+          event_id: number
+          month_calls: number
+          monthly_call_cap: number
+          reason: string
+          reserve_for_essential: number
+        }[]
+      }
+      provider_call_month: {
+        Args: { p_provider?: string }
+        Returns: {
+          calls: number
+          denied: number
+          last_call: string
+          product: string
+          refused: number
+        }[]
+      }
+      provider_call_record: {
+        Args: {
+          p_event_id: number
+          p_http_status: number
+          p_note?: string
+          p_outcome: string
+        }
+        Returns: undefined
+      }
       publish_description_internal: {
         Args: {
           p_case_id: string
