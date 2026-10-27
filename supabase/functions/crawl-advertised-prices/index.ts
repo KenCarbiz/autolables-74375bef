@@ -6,6 +6,7 @@ import {
   shouldBackoffMismatch, vinFromUrl as vinFromUrlShared,
   type CrawlUrlSource, type RenderedPageVerdictDetail,
 } from "../_shared/crawlUrlPolicy.ts";
+import { judgeAboveFeed, parseFeedTimestamp } from "../_shared/priceGuard.ts";
 import { fetchCreditUsage, pickRenderKey, selectRenderKey, type RenderKeyCandidate } from "../_shared/renderKey.ts";
 import {
   createRenderPacer, deriveRenderBudget, parseRetryAfter, resolveRendersPerMinute,
@@ -789,6 +790,9 @@ const MISMATCH_BACKOFF_ATTEMPTS = 3;
 // Listing pages and the sitemap rendered per run when the plain fetch is
 // refused, so discovery can still learn the live VDP addresses.
 const DISCOVERY_RENDER_CAP_DEFAULT = 3;
+// A feed price older than this is a stale baseline for the above-feed guard;
+// see priceGuard.ts.
+const FEED_FRESH_MS = 3 * 24 * 60 * 60 * 1000;
 
 type RenderFormat = string | { type: string; fullPage?: boolean };
 const HTML_ONLY_FORMATS: RenderFormat[] = ["html"];
@@ -957,6 +961,9 @@ serve(async (req) => {
     // Platform callers only: run discovery alone (no pricing pass), seed it
     // from explicit urls, and cap its renders.
     discover_only?: boolean; discover_seed_urls?: string[]; discover_render_cap?: number;
+    // Platform callers only: lift the week's rest on vehicles whose page
+    // price the guard refused, e.g. once after the guard itself changes.
+    ignore_rejected_backoff?: boolean;
   } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
   const targetVin = body.vin ? normVin(body.vin) : null;
@@ -1022,6 +1029,8 @@ serve(async (req) => {
     body.tenant_id = tenantId;
     body.limit = Math.min(body.limit ?? 300, 500);
   }
+
+  const platformCaller = auth === serviceKey || isCron;
 
   // ── Credit check ───────────────────────────────────────────
   // Reports the renderer account's balance as the provider states it, for
@@ -1096,6 +1105,24 @@ serve(async (req) => {
     return out;
   };
   const maybeNormalize = (url: string, stripFinance: boolean) => stripFinance ? normalizeVdpUrl(url) : url;
+
+  // When the feed last answered for a tenant, for the above-feed guard: a
+  // listing that carries no provider timestamp borrows the tenant's last
+  // successful syndication run.
+  const feedRunCache = new Map<string, number | null>();
+  const lastFeedSuccessAt = async (tenantId: string): Promise<number | null> => {
+    if (feedRunCache.has(tenantId)) return feedRunCache.get(tenantId) ?? null;
+    let at: number | null = null;
+    try {
+      const { data } = await admin.from("inventory_sync_runs").select("started_at")
+        .eq("tenant_id", tenantId).eq("status", "success")
+        .order("started_at", { ascending: false }).limit(1).maybeSingle();
+      const parsed = data?.started_at ? Date.parse(String(data.started_at)) : NaN;
+      at = Number.isFinite(parsed) ? parsed : null;
+    } catch { at = null; }
+    feedRunCache.set(tenantId, at);
+    return at;
+  };
 
   // ── "Test" mode ─────────────────────────────────────────────
   // Dealer admin clicked "Test" next to the price-labels setting. Run the
@@ -1284,17 +1311,20 @@ serve(async (req) => {
 
   const rejectedKeys = new Set<string>();
   let backoffSkipped = 0;
+  const liftRejectedBackoff = platformCaller && body.ignore_rejected_backoff === true;
   try {
-    let rejectedQuery = admin
-      .from("advertised_price_crawl_attempts")
-      .select("tenant_id, vin")
-      .eq("outcome", "price_rejected")
-      .gte("last_attempt_at", new Date(Date.now() - REJECTED_BACKOFF_MS).toISOString())
-      .limit(5000);
-    if (body.tenant_id) rejectedQuery = rejectedQuery.eq("tenant_id", body.tenant_id);
-    const { data: rejectedRows } = await rejectedQuery;
-    for (const r of (rejectedRows || []) as Array<{ tenant_id: string; vin: string | null }>) {
-      rejectedKeys.add(r.tenant_id + "|" + (r.vin || "").toUpperCase());
+    if (!liftRejectedBackoff) {
+      let rejectedQuery = admin
+        .from("advertised_price_crawl_attempts")
+        .select("tenant_id, vin")
+        .eq("outcome", "price_rejected")
+        .gte("last_attempt_at", new Date(Date.now() - REJECTED_BACKOFF_MS).toISOString())
+        .limit(5000);
+      if (body.tenant_id) rejectedQuery = rejectedQuery.eq("tenant_id", body.tenant_id);
+      const { data: rejectedRows } = await rejectedQuery;
+      for (const r of (rejectedRows || []) as Array<{ tenant_id: string; vin: string | null }>) {
+        rejectedKeys.add(r.tenant_id + "|" + (r.vin || "").toUpperCase());
+      }
     }
   } catch { /* an unreadable ledger widens the run; it never stops it */ }
 
@@ -1765,15 +1795,26 @@ serve(async (req) => {
         // below the feed and is still written. On a mis-parse we record a
         // warning and leave the good price untouched rather than corrupt the
         // advertised-price evidence.
+        // How old the feed baseline is decides how strict the guard can be:
+        // the provider's own last-seen stamp on the listing, else the tenant's
+        // last successful feed run (priceGuard.ts).
         const { data: lrow } = await admin.from("vehicle_listings")
-          .select("price").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
+          .select("price, feed_msrp:mc_raw->>msrp, feed_last_seen:mc_raw->>last_seen_at, feed_scraped:mc_raw->>scraped_at")
+          .eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
         const feedPrice = Number(lrow?.price) || null;
-        const misparse = bd.advertised_price_before_doc != null && feedPrice != null
-          && bd.advertised_price_before_doc > feedPrice * 1.02;
+        const feedMsrp = Number((lrow as { feed_msrp?: unknown } | null)?.feed_msrp) || null;
+        const feedSeenAt = parseFeedTimestamp((lrow as { feed_last_seen?: unknown } | null)?.feed_last_seen)
+          ?? parseFeedTimestamp((lrow as { feed_scraped?: unknown } | null)?.feed_scraped)
+          ?? await lastFeedSuccessAt(row.tenant_id);
+        const guard = judgeAboveFeed({
+          scraped: bd.advertised_price_before_doc, feedPrice, feedMsrp,
+          feedAgeMs: feedSeenAt != null ? Date.now() - feedSeenAt : null, freshMs: FEED_FRESH_MS,
+        });
+        const misparse = guard.misparse;
         if (misparse) {
           await admin.from("vehicle_listings").update({
             price_parse_status: "warning",
-            price_parse_notes: `Scraped advertised ${bd.advertised_price_before_doc} exceeds feed price ${feedPrice} by >2% — likely a sticker/MSRP or lease mis-parse; advertised price left unchanged.`,
+            price_parse_notes: guard.note,
             price_last_verified_at: new Date().toISOString(),
           }).eq("tenant_id", row.tenant_id).eq("vin", row.vin);
           await admin.from("audit_log").insert({
@@ -1781,6 +1822,8 @@ serve(async (req) => {
             entity_id: row.vin, store_id: row.tenant_id,
             details: {
               vin: row.vin, reason: "advertised_above_feed", scraped: bd.advertised_price_before_doc, feed: feedPrice, url: fetchUrl,
+              guard_reason: guard.reason, feed_msrp: feedMsrp, feed_stale: guard.feedStale,
+              feed_age_days: feedSeenAt != null ? Math.round((Date.now() - feedSeenAt) / 86_400_000) : null,
               // The evidence render may already have run; name the picture so
               // it is not an orphan in the bucket.
               screenshot_path: screenshot?.path ?? null,
@@ -1797,7 +1840,7 @@ serve(async (req) => {
               _outcome: "price_rejected",
               _http_status: cheapStatus,
               _render_status: renderStatus,
-              _detail: `advertised_above_feed scraped=${bd.advertised_price_before_doc} feed=${feedPrice}`,
+              _detail: `advertised_above_feed scraped=${bd.advertised_price_before_doc} feed=${feedPrice} reason=${guard.reason}${guard.feedStale ? " feed_stale" : ""}`,
             });
           } catch { /* never fail a price run over telemetry */ }
         } else if (bd.advertised_price_before_doc != null) {
@@ -1813,7 +1856,7 @@ serve(async (req) => {
             dealer_discount: bd.dealer_discount,
             price_source_url: fetchUrl,
             price_parse_status: bd.price_parse_status,
-            price_parse_notes: bd.price_parse_notes,
+            price_parse_notes: guard.feedStale ? `${bd.price_parse_notes} ${guard.note}` : bd.price_parse_notes,
             price_last_verified_at: new Date().toISOString(),
           };
           if (websiteTerm) cleanUpdate.website_price_term = websiteTerm;
@@ -1922,7 +1965,6 @@ serve(async (req) => {
   // Best-effort and bounded; JS-rendered/bot-walled sites yield little here
   // and need the rendering-service fetcher (future) or a feed.
   if (body.discover !== false) {
-    const platformCaller = auth === serviceKey || isCron;
     const seedOverride = platformCaller && Array.isArray(body.discover_seed_urls)
       ? body.discover_seed_urls.filter((u): u is string => typeof u === "string" && isUrlSafe(u)).slice(0, 8)
       : [];
@@ -2155,6 +2197,7 @@ serve(async (req) => {
     // Vehicles whose url keeps answering with another page, resting until
     // the window passes or discovery records a new address.
     mismatch_backoff_skipped: mismatchBackoffSkipped,
+    rejected_backoff_lifted: liftRejectedBackoff,
     // Discovery: live addresses written to vehicle_listings.scrape_source_url,
     // addresses already current, renders spent, and each seed page's outcome.
     urls_recorded: urlsRecorded,

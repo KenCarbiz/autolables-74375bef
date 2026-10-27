@@ -323,7 +323,8 @@ describe("a rejected price is not a captured one", () => {
 
   it("re-records the ledger with price_rejected after the guard refuses", () => {
     expect(misparse).toContain('_outcome: "price_rejected"');
-    expect(misparse).toMatch(/_detail: `advertised_above_feed scraped=\$\{bd\.advertised_price_before_doc\} feed=\$\{feedPrice\}`/);
+    // The guard's reason and the stale-feed flag ride behind the two figures.
+    expect(misparse).toMatch(/_detail: `advertised_above_feed scraped=\$\{bd\.advertised_price_before_doc\} feed=\$\{feedPrice\} reason=\$\{guard\.reason\}/);
     expect(misparse).toContain("_source_label: observationChannel(row.source_label)");
   });
 
