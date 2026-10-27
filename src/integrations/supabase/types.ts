@@ -11756,7 +11756,11 @@ export type Database = {
         }[]
       }
       next_enrich_batch: {
-        Args: { p_limit: number; p_sweep_start: string }
+        Args: {
+          p_limit: number
+          p_min_age_hours?: number
+          p_sweep_start: string
+        }
         Returns: {
           tenant_id: string
           vin: string
