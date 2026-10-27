@@ -1138,23 +1138,26 @@ export const deriveSoldClaims = (d: PassportData, mileage: number | null, condit
   if (!m.soldDisplayable || m.soldCount == null || !m.soldState) return none;
   const isNewCar = String(condition || "").toLowerCase() === "new";
   const noun = isNewCar ? "same-model vehicles" : "similar vehicles";
-  const velocity = `${m.soldCount.toLocaleString()} ${noun} sold in ${m.soldState} in the last 90 days`;
+  // Inferred-sold vocabulary (change order §5): a listing that left the market
+  // is an inferred sale and its figure is the last ADVERTISED price, never a
+  // transaction price. soldLanguage.test.ts scans this file for the wording.
+  const velocity = `${m.soldCount.toLocaleString()} ${noun} inferred sold in ${m.soldState} in the last 90 days`;
   const aboveMarket = d.marketAvg != null && d.price != null && d.price > d.marketAvg;
   const soldPrice = m.soldCount >= 10 && m.soldScope === "model_year_state" && m.soldPriceMedian != null
     && d.price != null && d.price <= m.soldPriceMedian * 0.97
     && (mileage == null || m.soldMilesMedian == null || mileage <= m.soldMilesMedian * 1.25)
     && !aboveMarket
     ? {
-        headline: `Priced ${fmt$(m.soldPriceMedian - d.price)} below the typical sold price`,
-        sub: `Median of ${m.soldCount.toLocaleString()} recently sold in ${m.soldState}, last 90 days`,
+        headline: `Priced ${fmt$(m.soldPriceMedian - d.price)} below the typical last advertised price before sale`,
+        sub: `Median last advertised price of ${m.soldCount.toLocaleString()} inferred sold listings in ${m.soldState}, last 90 days`,
         amount: m.soldPriceMedian - d.price,
       }
     : null;
   const sellTime = m.soldDomMedian != null && m.soldDomMedian >= 1 && m.soldDomMedian <= 60
-    ? `Similar vehicles typically sell within ~${Math.round(m.soldDomMedian)} days here`
+    ? `Similar vehicles typically leave the market within ~${Math.round(m.soldDomMedian)} days here`
     : null;
   const milesAdv = mileage != null && m.soldMilesMedian != null && m.soldMilesMedian >= mileage * 1.15
-    ? `${mileage.toLocaleString()} miles — under the ${Math.round(m.soldMilesMedian).toLocaleString()}-mile median of recently sold vehicles`
+    ? `${mileage.toLocaleString()} miles — under the ${Math.round(m.soldMilesMedian).toLocaleString()}-mile median of recently inferred sold listings`
     : null;
   return { velocity, soldPrice, sellTime, milesAdv };
 };

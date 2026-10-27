@@ -39,17 +39,23 @@ reappearance after removal, a dealer-confirmed condition change.
 | Active search ladder (first tier that answers) | 1-5 | 0.002 | 0.002-0.01 |
 | Rank and trim counts | 2-3 | 0.002 | 0.004-0.006 |
 | VIN history | 1 | 0.006 | 0.006 |
-| MDS ladder | 1-3 | 0.006 | 0.006-0.018 |
-| Sales Stats (monthly, shared by cohort) | 0-1 | 0.006 | 0-0.006 |
+| MDS ladder | 1-3 | 0.002 | 0.002-0.006 |
+| Sales Stats (monthly, shared by cohort) | 0-1 | 0.002 | 0-0.002 |
 | MarketCheck Price Base (reserved) | 1 | 0.07 | 0.07 |
 | AutoRecalls (when entitled) | 1 | 0.07 | 0.07 |
-| **Intake total** | | | **about $0.24-0.34** |
+| **Intake total** | | | **about $0.23-0.33** |
+
+Unit costs are the 2026-10-27 list (MDS and Sales Stats 0.002, recents
+0.0025) resolved through the registry; a tenant override replaces any of
+them without a code change.
 
 Recurring, per used vehicle per week after intake: one Premium or Base
-refresh (0.07), one MDS (0.006), one active-search integrity pass a day
-(7 x 0.002), and a monthly Sales Stats share: about $0.10 a week, against
-roughly $0.70 a week that the current twice-daily sweep spends on the same
-car.
+refresh (0.07), one MDS (0.002), one active-search integrity pass a day
+(7 x 0.002), and a monthly Sales Stats share: about $0.09 a week, against
+roughly $0.70 a week that the twice-daily sweep spent on the same car before
+the cursor fix. The cheaper MDS and Sales Stats do not shorten their TTLs:
+both follow the provider's regeneration (7 d and monthly), because buying an
+unchanged number sooner buys nothing.
 
 ## Outputs the Used Passport read model draws from
 

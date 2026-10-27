@@ -61,6 +61,17 @@ const AUDITED_READERS: Record<string, number> = {
   marketcheck_premium_comparables: 0,
   pricing_position_v2_shadow: 0,
   market_invalid_claim_suppression: 1,
+  // 2026-10-27 change order: declared ahead of their readers, deliberately.
+  // Each guards a request shape or a capability whose contract has not been
+  // read from the live docs; a reader is wired only after the contract check.
+  exact_mds: 0,
+  current_sales_stats: 0,
+  sold_summary: 0,
+  generic_vin_fallback: 0,
+  available_options_packages: 0,
+  premium_plus_used_intake: 0,
+  premium_used_refresh: 0,
+  autorecalls_vin: 0,
 };
 
 describe("the flag reader audit", () => {
@@ -91,10 +102,18 @@ describe("the flag reader audit", () => {
   it("states plainly which flags are still inert", () => {
     const inert = MARKET_FLAG_NAMES.filter((f) => isInertWithoutReader(readersOf(f).length));
     expect(inert.sort()).toEqual([
+      "autorecalls_vin",
+      "available_options_packages",
+      "current_sales_stats",
+      "exact_mds",
+      "generic_vin_fallback",
       "market_value_v2_public",
       "marketcheck_current_endpoint",
       "marketcheck_premium_comparables",
+      "premium_plus_used_intake",
+      "premium_used_refresh",
       "pricing_position_v2_shadow",
+      "sold_summary",
     ]);
     // No longer inert, and the record says so rather than the prose.
     expect(inert).not.toContain("market_value_v2_shadow");
@@ -112,7 +131,7 @@ describe("the flag reader audit", () => {
 });
 
 describe("every flag still defaults off", () => {
-  it("declares false for all seven", () => {
+  it("declares false for every flag", () => {
     for (const flag of MARKET_FLAG_NAMES) expect(MARKET_FLAGS[flag]).toBe(false);
   });
 

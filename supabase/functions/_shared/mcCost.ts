@@ -1,9 +1,15 @@
 // MarketCheck call metering.
 //
-// These are PUBLIC LIST PRICES captured 2026-08-01 from marketcheck.com/apis.
-// A customer's negotiated contract, plan minimums, and entitlements govern
-// actual billing, so everything here is an ESTIMATE for operator visibility —
-// never a bill, and never shown to a dealer.
+// These are PUBLIC LIST PRICES. The table was first captured 2026-08-01 from
+// marketcheck.com/apis and revised 2026-10-27 from the owner's change order,
+// which carried the then-current pricing page values (the build environment
+// cannot reach marketcheck.com, so the revision is recorded as owner-supplied
+// rather than read from the page). A customer's negotiated contract, plan
+// minimums and entitlements govern actual billing, so everything here is an
+// ESTIMATE for operator visibility — never a bill, never shown to a dealer,
+// and never a constant a business rule may read directly: consumers go
+// through the provider registry's `effectiveCost`, which lets tenant
+// configuration override any value here.
 
 /** Per-call list price in USD, keyed by the product each endpoint bills under. */
 export const MC_CALL_PRICE_USD: Record<string, number> = {
@@ -11,19 +17,29 @@ export const MC_CALL_PRICE_USD: Record<string, number> = {
   inventory_search: 0.002,
   dealer_api: 0.0025,
   vin_history: 0.006,
-  market_days_supply: 0.006,
-  recent_inventory: 0.006,
-  sales_stats: 0.006,
+  // 2026-10-27: Market Days Supply and Inferred Sales Stats were 0.006 in the
+  // 2026-08-01 capture; both are now listed at 0.002. Past Inventory Search
+  // (recents) moved from 0.006 to 0.0025.
+  market_days_supply: 0.002,
+  recent_inventory: 0.0025,
+  sales_stats: 0.002,
   price_prediction: 0.07,
   neovin: 0.08,
   basic_vin_decode: 0.0015,
   auto_recalls: 0.07,
   cached_images: 0.001,
   oem_incentive: 0.2,
+  // 2026-10-27: newly priced products.
+  marketmatch: 0.35,
+  auction: 0.008,
+  fsbo: 0.01,
+  vindata_generate: 0.49,
+  available_options_packages: 0.002,
   unknown: 0,
 };
 
-export const MC_PRICE_SOURCE = "marketcheck.com/apis public list, 2026-08-01";
+export const MC_PRICE_SOURCE =
+  "marketcheck.com/apis public list, captured 2026-08-01, revised 2026-10-27 from the owner change order (unverified against the live page from this environment)";
 
 /**
  * Map a MarketCheck URL to the product it bills under. Path order matters:
@@ -36,7 +52,11 @@ export function billingProductForUrl(url: string): string {
   if (path.includes("/history/car/")) return "vin_history";
   if (path.includes("/mds/car")) return "market_days_supply";
   if (path.includes("/search/car/recents")) return "recent_inventory";
-  if (path.includes("/sales/car")) return "sales_stats";
+  if (path.includes("/search/car/auction/")) return "auction";
+  if (path.includes("/search/car/fsbo/")) return "fsbo";
+  if (path.includes("/sales/car") || path.includes("/sold/car")) return "sales_stats";
+  if (path.includes("/marketmatch/")) return "marketmatch";
+  if (path.includes("/vindata/generate-report")) return "vindata_generate";
   if (path.includes("/predict/car/")) return "price_prediction";
   if (path.includes("/decode/car/neovin/")) return "neovin";
   if (path.includes("/decode/car/")) return "basic_vin_decode";
@@ -80,13 +100,18 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 /**
  * Turn a run's meter into an estimate.
  * `runsPerMonth` projects a straight line — 30 for a nightly sync.
+ * `prices` lets a caller substitute configured unit costs for the list table.
  */
-export function estimateCost(meter: CallMeter, runsPerMonth = 30): CostEstimate {
+export function estimateCost(
+  meter: CallMeter,
+  runsPerMonth = 30,
+  prices: Record<string, number> = MC_CALL_PRICE_USD,
+): CostEstimate {
   const breakdown = Object.entries(meter.calls)
     .map(([product, calls]) => ({
       product,
       calls,
-      usd: round2(calls * (MC_CALL_PRICE_USD[product] ?? 0)),
+      usd: round2(calls * (prices[product] ?? 0)),
     }))
     .sort((a, b) => b.usd - a.usd || b.calls - a.calls);
 
@@ -98,6 +123,6 @@ export function estimateCost(meter: CallMeter, runsPerMonth = 30): CostEstimate 
     breakdown,
     projectedMonthlyUsd: round2(estimatedUsd * runsPerMonth),
     priceSource: MC_PRICE_SOURCE,
-    hasUnpricedCalls: (meter.calls.unknown || 0) > 0,
+    hasUnpricedCalls: Object.keys(meter.calls).some((p) => p === "unknown" || prices[p] === undefined),
   };
 }

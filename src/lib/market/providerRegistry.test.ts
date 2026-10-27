@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  PROVIDER_CAPABILITIES, PROVIDER_CAPABILITY_KEYS, capability, capabilityForPath, effectiveCost,
-  policyFor, publicBrowseMayTrigger, routineCapabilities,
+  NON_SCORE_AUTHORITIES, PROVIDER_CAPABILITIES, PROVIDER_CAPABILITY_KEYS, capability, capabilityForPath,
+  effectiveCost, mayInfluenceVehicleScore, policyFor, publicBrowseMayTrigger, routineCapabilities,
 } from "./providerRegistry.ts";
-import { MC_CALL_PRICE_USD } from "../../../supabase/functions/_shared/mcCost";
+import { MC_CALL_PRICE_USD, MC_PRICE_SOURCE } from "../../../supabase/functions/_shared/mcCost";
 
 const MATRIX = readFileSync("MARKETCHECK_CAPABILITY_MATRIX.md", "utf8");
 
@@ -31,11 +31,26 @@ describe("coverage", () => {
     }
   });
 
-  it("leaves no capability without a status, a trigger list, an authority and a note", () => {
+  it("lists every capability the change order requires", () => {
+    for (const k of [
+      "syndication", "dealership_directory", "active_search", "recents", "neovin", "basic_decode", "vin_history",
+      "mds", "sales_stats", "sold_summary", "sold_summary_dealership_groups", "price_base", "price_premium",
+      "price_premium_plus", "autorecalls", "vindata_access", "vindata_generate", "incentives_oem",
+      "available_options_packages", "marketmatch", "auction", "fsbo", "webhooks", "cached_images",
+      "dealership_groups_reference",
+    ]) {
+      expect(capability(k), k).not.toBeNull();
+    }
+  });
+
+  it("leaves no capability without a status, a trigger list, an authority, an ownership, a cadence and a note", () => {
     for (const c of PROVIDER_CAPABILITIES) {
       expect(c.status).toBeTruthy();
       expect(c.triggers.length).toBeGreaterThan(0);
       expect(c.authority).toBeTruthy();
+      expect(c.ownership).toBeTruthy();
+      expect(typeof c.cadence.intake).toBe("boolean");
+      expect(typeof c.cadence.refresh).toBe("boolean");
       expect(c.notes.length).toBeGreaterThan(10);
     }
   });
@@ -53,9 +68,16 @@ describe("contract status is honest", () => {
     expect(PROVIDER_CAPABILITIES.some((c) => c.contract === "verified")).toBe(false);
   });
 
-  it("retires the legacy recall path and never triggers it", () => {
+  it("labels change-order capabilities whose path has not been read as unlocated", () => {
+    for (const k of ["available_options_packages", "sold_summary_dealership_groups", "dealership_groups_reference"]) {
+      expect(capability(k)?.contract, k).toBe("unlocated");
+      expect(capability(k)?.status, k).toBe("not_active");
+    }
+  });
+
+  it("marks the legacy recall path deprecated/replaced and never triggers it", () => {
     const legacy = capability("autorecalls_legacy");
-    expect(legacy?.status).toBe("retired");
+    expect(legacy?.status).toBe("deprecated_replaced");
     expect(legacy?.triggers).toEqual(["never"]);
     expect(capability("autorecalls")?.path).toBe("/v2/car/autorecalls/{vin}");
   });
@@ -80,8 +102,8 @@ describe("path resolution", () => {
   });
 });
 
-describe("cost resolution", () => {
-  it("prefers a configured override to the public default", () => {
+describe("cost resolution uses configurable pricing", () => {
+  it("prefers a configured override to the list default", () => {
     expect(effectiveCost("syndication")).toBe(1.0);
     expect(effectiveCost("syndication", { syndication: 0.8 })).toBe(0.8);
   });
@@ -91,12 +113,27 @@ describe("cost resolution", () => {
     expect(effectiveCost("neovin", { neovin: Number.NaN })).toBe(0.08);
   });
 
-  it("matches the meter's default for every priced capability", () => {
+  it("matches the meter's list default for every priced capability", () => {
     for (const c of PROVIDER_CAPABILITIES) {
       const listed = MC_CALL_PRICE_USD[c.billingProduct];
       if (listed === undefined || c.billingProduct === "price_prediction") continue;
       expect(c.defaultCostUsd, c.key).toBe(listed);
     }
+  });
+
+  it("carries the 2026-10-27 revisions and drops the old MDS / Sales Stats / recents assumptions", () => {
+    expect(MC_CALL_PRICE_USD.market_days_supply).toBe(0.002);
+    expect(MC_CALL_PRICE_USD.sales_stats).toBe(0.002);
+    expect(MC_CALL_PRICE_USD.recent_inventory).toBe(0.0025);
+    expect(MC_CALL_PRICE_USD.marketmatch).toBe(0.35);
+    expect(MC_CALL_PRICE_USD.auction).toBe(0.008);
+    expect(MC_CALL_PRICE_USD.fsbo).toBe(0.01);
+    expect(MC_CALL_PRICE_USD.vindata_generate).toBe(0.49);
+    expect(MC_CALL_PRICE_USD.available_options_packages).toBe(0.002);
+    expect(capability("mds")?.defaultCostUsd).toBe(0.002);
+    expect(capability("sales_stats")?.defaultCostUsd).toBe(0.002);
+    expect(capability("recents")?.defaultCostUsd).toBe(0.0025);
+    expect(MC_PRICE_SOURCE).toMatch(/2026-10-27/);
   });
 
   it("is null for an unknown capability", () => {
@@ -107,7 +144,7 @@ describe("cost resolution", () => {
 describe("new and used policies are different", () => {
   it("keeps NMVTIS, VIN history, FSBO, auction and MarketMatch off the routine new-vehicle path", () => {
     const routineNew = routineCapabilities("new");
-    for (const k of ["vindata_access", "vindata_generate", "vin_history", "fsbo", "auction", "marketmatch"]) {
+    for (const k of ["vindata_access", "vindata_generate", "vin_history", "fsbo", "auction", "marketmatch", "marketmatch_dealers"]) {
       expect(routineNew, k).not.toContain(k);
     }
   });
@@ -131,20 +168,65 @@ describe("new and used policies are different", () => {
     expect(policyFor("mds", "new").requiresTenantOptIn).toBe(true);
   });
 
-  it("never allows an autocurb-reserved or retired capability for either", () => {
-    for (const k of ["fsbo", "auction", "marketmatch", "autorecalls_legacy"]) {
+  it("never allows an autocurb-reserved or deprecated capability for either", () => {
+    for (const k of ["fsbo", "auction", "marketmatch", "marketmatch_dealers", "autorecalls_legacy"]) {
       expect(policyFor(k, "new").allowed, k).toBe(false);
       expect(policyFor(k, "used").allowed, k).toBe(false);
     }
   });
 
-  it("treats first-seen decode as immutable (no TTL)", () => {
+  it("treats first-seen decode as immutable (no TTL) and Available Options Packages as opt-in for new", () => {
     expect(policyFor("neovin", "used").ttlHours).toBeNull();
+    expect(policyFor("available_options_packages", "new").requiresTenantOptIn).toBe(true);
   });
 
   it("reports an entitlement block without pretending the capability is forbidden", () => {
     const p = policyFor("autorecalls", "used");
     expect(p.allowed).toBe(true);
     expect(p.reasons).toContain("entitlement_blocked");
+  });
+});
+
+describe("the scoring rule is executable", () => {
+  it("no market-evidence, acquisition, offer-context or inventory-state capability may reach Vehicle Score", () => {
+    for (const c of PROVIDER_CAPABILITIES) {
+      if (NON_SCORE_AUTHORITIES.includes(c.authority)) {
+        expect(c.influences.vehicleScore, c.key).toBe(false);
+        expect(mayInfluenceVehicleScore(c.key), c.key).toBe(false);
+      }
+    }
+  });
+
+  it("dealership-group and sold-summary intelligence are context only", () => {
+    for (const k of ["sold_summary", "sold_summary_dealership_groups", "dealership_groups_reference", "mds", "sales_stats", "recents"]) {
+      const c = capability(k)!;
+      expect(c.influences.vehicleScore, k).toBe(false);
+      expect(c.influences.marketContext, k).toBe(true);
+    }
+  });
+
+  it("available options packages never verify identity or equipment on the subject VIN", () => {
+    const c = capability("available_options_packages")!;
+    expect(c.influences.identity).toBe(false);
+    expect(c.influences.vehicleScore).toBe(false);
+    expect(c.influences.dataConfidence).toBe(false);
+  });
+
+  it("factory build, title history and VIN safety may reach the score", () => {
+    for (const k of ["neovin", "vindata_generate", "autorecalls", "vin_history"]) {
+      expect(mayInfluenceVehicleScore(k), k).toBe(true);
+    }
+  });
+});
+
+describe("premium strategy is recorded, not assumed", () => {
+  it("keeps Premium Plus as the intake tier and Premium as the refresh tier", () => {
+    expect(capability("price_premium_plus")?.cadence).toEqual({ intake: true, refresh: false });
+    expect(capability("price_premium")?.cadence).toEqual({ intake: false, refresh: true });
+    expect(capability("neovin")?.cadence).toEqual({ intake: true, refresh: false });
+  });
+
+  it("treats generic fallback as a distinct request", () => {
+    expect(capability("price_base")?.cacheKey).toContain("fallback_to_generic");
   });
 });

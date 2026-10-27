@@ -168,3 +168,93 @@ export const isMarketingCopy = (v: unknown): boolean => {
   const s = normalize(v);
   return !!s && MARKETING_PHRASES.some((p) => s.includes(p));
 };
+
+// ── Available is not installed ─────────────────────────────────────────────
+//
+// MarketCheck's Available Options Packages describes what a trim COULD be
+// ordered with. NeoVIN's installed options describe what THIS VIN was built
+// with. A dealer accessory is neither. The change order (§7) keeps the five
+// categories apart by name, and the merge below is the only place they meet:
+// an available package may explain or compare, and it may never be filed as
+// equipment the subject vehicle contains.
+
+export const EQUIPMENT_CATEGORIES = [
+  "factory_standard_equipment",
+  "factory_available_options",
+  "vin_installed_options",
+  "dealer_installed_accessories",
+  "unknown_unverified",
+] as const;
+
+export type EquipmentCategory = (typeof EQUIPMENT_CATEGORIES)[number];
+
+/** Categories that may be presented as equipment the subject vehicle has. */
+export const INSTALLED_CATEGORIES: EquipmentCategory[] = [
+  "factory_standard_equipment",
+  "vin_installed_options",
+  "dealer_installed_accessories",
+];
+
+export const isInstalledCategory = (c: EquipmentCategory): boolean => INSTALLED_CATEGORIES.includes(c);
+
+export interface CategorizedEquipmentItem {
+  name: string;
+  category: EquipmentCategory;
+  /** Where the item was read from, for provenance on a sticker or a Passport. */
+  source: "neovin" | "available_options_packages" | "feed" | "dealer" | "unknown";
+  code?: string;
+  msrp?: number;
+}
+
+export interface EquipmentLedger {
+  factory_standard_equipment: CategorizedEquipmentItem[];
+  factory_available_options: CategorizedEquipmentItem[];
+  vin_installed_options: CategorizedEquipmentItem[];
+  dealer_installed_accessories: CategorizedEquipmentItem[];
+  unknown_unverified: CategorizedEquipmentItem[];
+}
+
+export const emptyEquipmentLedger = (): EquipmentLedger => ({
+  factory_standard_equipment: [],
+  factory_available_options: [],
+  vin_installed_options: [],
+  dealer_installed_accessories: [],
+  unknown_unverified: [],
+});
+
+/**
+ * File an item under its category. The only rule with teeth: an item from the
+ * available-options source is always `factory_available_options`, whatever
+ * category the caller claims, because the source cannot know what a VIN has.
+ */
+export function fileEquipment(ledger: EquipmentLedger, item: CategorizedEquipmentItem): EquipmentLedger {
+  const category: EquipmentCategory = item.source === "available_options_packages"
+    ? "factory_available_options"
+    : item.category;
+  const filed = { ...item, category };
+  return { ...ledger, [category]: [...ledger[category], filed] };
+}
+
+/** Everything the subject vehicle may be said to contain. Never includes available options. */
+export function installedEquipment(ledger: EquipmentLedger): CategorizedEquipmentItem[] {
+  return INSTALLED_CATEGORIES.flatMap((c) => ledger[c]);
+}
+
+/**
+ * Compare a VIN's installed options with what the trim offers. Available but
+ * not installed is a merchandising and investigation fact; it is never
+ * promoted into the installed list by this comparison.
+ */
+export function compareConfiguration(ledger: EquipmentLedger): {
+  installedNames: string[];
+  availableNotInstalled: string[];
+  installedNotInCatalog: string[];
+} {
+  const installed = new Set(installedEquipment(ledger).map((i) => i.name.trim().toLowerCase()));
+  const available = new Set(ledger.factory_available_options.map((i) => i.name.trim().toLowerCase()));
+  return {
+    installedNames: [...installed].sort(),
+    availableNotInstalled: [...available].filter((n) => !installed.has(n)).sort(),
+    installedNotInCatalog: [...installed].filter((n) => !available.has(n) && available.size > 0).sort(),
+  };
+}

@@ -26,6 +26,26 @@ export const MARKET_FLAGS = {
    * change, not a refactor side effect.
    */
   market_invalid_claim_suppression: false,
+  // ── Change order 2026-10-27 ──────────────────────────────────────────────
+  // Each of these guards a request shape or a capability whose contract has
+  // not been read from the live docs. OFF means the current behaviour; ON is
+  // an operator decision taken after the contract check, never a default.
+  /** Send the VIN exact=true MDS ladder instead of the YMM-first ladder. */
+  exact_mds: false,
+  /** Ask Inferred Sales Stats by VIN / YMMT cohorts instead of make+state. */
+  current_sales_stats: false,
+  /** Buy Sold Vehicles Summary trend evidence on the monthly cadence. */
+  sold_summary: false,
+  /** Allow a second, generic-fallback price request when exact pricing fails. */
+  generic_vin_fallback: false,
+  /** Buy Available Options Packages for configuration comparison. Never installed equipment. */
+  available_options_packages: false,
+  /** Premium Plus as the used-intake bundle, after the entitlement call. */
+  premium_plus_used_intake: false,
+  /** Premium as the used-refresh tier, after the entitlement call. */
+  premium_used_refresh: false,
+  /** Use the documented /v2/car/autorecalls/{vin} path. */
+  autorecalls_vin: false,
 } as const;
 
 export type MarketFlag = keyof typeof MARKET_FLAGS;

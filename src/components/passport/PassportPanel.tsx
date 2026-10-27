@@ -706,7 +706,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 <p className="text-[18px] font-extrabold inline-flex items-center gap-2"><CheckCircle2 className="w-6 h-6" /> Excellent Time To Purchase</p>
                 <ul className="mt-2.5 space-y-1.5">
                   {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below market average</li>}
-                  {sold.soldPrice && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below what similar vehicles recently sold for</li>}
+                  {sold.soldPrice && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below the typical last advertised price before sale of similar vehicles</li>}
                   {total != null && total < 0 && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Recent price reductions</li>}
                   <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Strong value at today's price</li>
                   {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Competitive market pricing</li>}
@@ -781,7 +781,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <ul className="mt-2 space-y-1.5">
                 {lowest != null && price != null && price <= lowest && <Check>At its lowest recorded asking price</Check>}
                 {isGreat && <Check>Priced below the market average</Check>}
-                {sold.soldPrice && <Check>Below what similar vehicles recently sold for</Check>}
+                {sold.soldPrice && <Check>Below the typical last advertised price before sale of similar vehicles</Check>}
                 {total != null && total < 0 && <Check>Price has trended down since first tracked</Check>}
                 {total != null && total > 0 && <Check>Priced to today's market</Check>}
                 {(total == null || total === 0) && <Check>Price has been stable — likely to hold</Check>}

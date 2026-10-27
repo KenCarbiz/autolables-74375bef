@@ -7,7 +7,8 @@
 // One place that says, for every MarketCheck capability this product touches:
 // which endpoint, what it bills under, which vehicles it applies to, what may
 // trigger it, how long an answer is good for, what the call may cost, what the
-// account must be entitled to, and whether a customer page may ever cause it.
+// account must be entitled to, which conclusions it may influence, and whether
+// a customer page may ever cause it.
 //
 // Until now every edge function decided those things for itself. The sweep
 // re-bought the lot twice a day because nothing said "once a day"; the comps
@@ -16,16 +17,26 @@
 // because nothing said "off". This module is the statement. It is pure and
 // performs no I/O: an edge function consults it, it does not call anything.
 //
-// Costs here are DEFAULTS, copied from the public list in mcCost.ts, and every
+// Costs here are DEFAULTS, mirrored from the list in mcCost.ts, and every
 // consumer resolves them through `effectiveCost` with the tenant's configured
 // overrides first. A business rule that reads the literal is the defect §23
-// names; the test suite forbids it.
+// names; the test suite forbids it. The 2026-10-27 change order revised
+// several of them (MDS, Sales Stats, recents down; MarketMatch, auction, FSBO,
+// VINData generate and Available Options Packages newly priced).
 //
 // Contract status is explicit. `documented` means the path is what the
-// 2026-10-21 handoff reference documents; `verified` is reserved for a path
-// that has been checked against the live OpenAPI document, which this
-// environment cannot reach (ENTITLEMENT_AND_TERMS_REPORT.md §4). Nothing in
-// this file is verified yet, and the registry says so rather than implying it.
+// 2026-10-21 handoff reference documents; `unlocated` means the capability is
+// named by the owner's change order but its path has not been read from the
+// docs; `legacy` is a path the code still calls that the current contract has
+// replaced; `verified` is reserved for a path checked against the live
+// OpenAPI document, which this environment cannot reach. Nothing in this file
+// is verified yet, and the registry says so rather than implying it.
+//
+// Influence is declared per capability so the scoring rule (§13 of the change
+// order) is executable: market strength, dealer-group behaviour and demand
+// may inform Market Context and Market Value, and may never move Vehicle
+// Score. The test suite holds every market-evidence, acquisition and
+// offer-context capability to `vehicleScore: false`.
 
 export type ProviderName = "marketcheck" | "blackbook";
 
@@ -37,7 +48,8 @@ export type CapabilityStatus =
   | "entitlement_blocked"
   | "autocurb_reserved"
   | "not_active"
-  | "retired";
+  | "not_useful"
+  | "deprecated_replaced";
 
 export type CapabilityTrigger =
   | "scheduled"
@@ -57,7 +69,21 @@ export type AuthorityClass =
   | "offer_context"
   | "acquisition";
 
-export type ContractStatus = "documented" | "verified" | "legacy";
+export type ContractStatus = "documented" | "verified" | "legacy" | "unlocated";
+
+export type CapabilityOwnership = "autolabels" | "autocurb" | "shared";
+
+/** Which server-side conclusions a capability's evidence may reach. */
+export interface CapabilityInfluence {
+  identity: boolean;
+  vehicleScore: boolean;
+  dataConfidence: boolean;
+  marketValue: boolean;
+  marketValueConfidence: boolean;
+  dealRating: boolean;
+  buyerRecommendation: boolean;
+  marketContext: boolean;
+}
 
 export interface ProviderCapability {
   /** Stable key; matches the capability matrix row. */
@@ -73,14 +99,17 @@ export interface ProviderCapability {
   /** Where the current contract is documented. */
   reference: string | null;
   appliesTo: { new: VehicleApplicability; used: VehicleApplicability; autocurb: VehicleApplicability };
+  ownership: CapabilityOwnership;
   status: CapabilityStatus;
   /** What is allowed to cause a paid call. `never` means the registry forbids it. */
   triggers: CapabilityTrigger[];
+  /** Whether the capability belongs to intake, to refresh, or to both. */
+  cadence: { intake: boolean; refresh: boolean };
   /** Target freshness in hours; null when the answer is immutable or not cached. */
   ttlHours: number | null;
   /** Dimensions that make two requests the same request. */
   cacheKey: string[];
-  /** Default unit cost in USD from the public list; overridable per tenant. */
+  /** Default unit cost in USD from the list table; overridable per tenant. */
   defaultCostUsd: number;
   /** What the account must hold for the call to answer. */
   entitlement: string;
@@ -91,12 +120,24 @@ export interface ProviderCapability {
   rawStore: string | null;
   normalizedDestinations: string[];
   authority: AuthorityClass;
+  influences: CapabilityInfluence;
   /** May an anonymous Passport load ever cause this call. Always false when paid. */
   publicBrowseMayTrigger: false;
   notes: string;
 }
 
 const MC_DOCS = "https://docs.marketcheck.com/docs/api/cars";
+
+const NONE: CapabilityInfluence = {
+  identity: false, vehicleScore: false, dataConfidence: false, marketValue: false,
+  marketValueConfidence: false, dealRating: false, buyerRecommendation: false, marketContext: false,
+};
+const influence = (over: Partial<CapabilityInfluence>): CapabilityInfluence => ({ ...NONE, ...over });
+
+/** Market evidence reaches value, its confidence, the deal rating and context. Never the score. */
+const MARKET: CapabilityInfluence = influence({ marketValue: true, marketValueConfidence: true, dealRating: true, buyerRecommendation: true, marketContext: true });
+/** Liquidity, velocity and trend are context and a confidence input. Never the score. */
+const CONTEXT: CapabilityInfluence = influence({ marketValueConfidence: true, marketContext: true });
 
 export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
   {
@@ -108,8 +149,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "yes", used: "yes", autocurb: "optional" },
+    ownership: "shared",
     status: "active",
     triggers: ["scheduled", "operator"],
+    cadence: { intake: true, refresh: true },
     ttlHours: 24,
     cacheKey: ["tenant", "mc_scope_param", "mc_scope_value", "owned"],
     defaultCostUsd: 1.0,
@@ -120,8 +163,9 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "vehicle_listings.mc_raw",
     normalizedDestinations: ["vehicle_listings", "vehicle_files", "mc_attributes", "advertised_prices", "vehicle_value_history"],
     authority: "inventory_state",
+    influences: influence({ identity: true, dataConfidence: true }),
     publicBrowseMayTrigger: false,
-    notes: "A refusal must be reported as a refusal and may never retire inventory.",
+    notes: "A refusal must be reported as a refusal and may never retire inventory. Carries fees, price_includes_fees, vehicle_status and the dealership-group ids.",
   },
   {
     key: "dealership_directory",
@@ -132,8 +176,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "yes", used: "yes", autocurb: "optional" },
+    ownership: "shared",
     status: "active",
     triggers: ["operator"],
+    cadence: { intake: true, refresh: false },
     ttlHours: null,
     cacheKey: ["inventory_url"],
     defaultCostUsd: 0.0025,
@@ -144,8 +190,36 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "marketcheck_sync_config.last_status",
     normalizedDestinations: ["marketcheck_sync_config"],
     authority: "inventory_state",
+    influences: influence({ marketContext: true }),
     publicBrowseMayTrigger: false,
-    notes: "Resolves a rooftop once; the pin is re-validated from the feed, not re-resolved.",
+    notes: "Resolves a rooftop once to its canonical mc_* ids; the pin is re-validated from the feed, not re-resolved.",
+  },
+  {
+    key: "dealership_groups_reference",
+    provider: "marketcheck",
+    product: "Dealership Groups reference",
+    path: "/v2/dealerships/groups",
+    billingProduct: "dealer_api",
+    contract: "unlocated",
+    reference: `${MC_DOCS}/inventory/introduction`,
+    appliesTo: { new: "optional", used: "optional", autocurb: "yes" },
+    ownership: "shared",
+    status: "not_active",
+    triggers: ["operator", "scheduled"],
+    cadence: { intake: false, refresh: true },
+    ttlHours: 24 * 30,
+    cacheKey: ["mc_dealership_group_id"],
+    defaultCostUsd: 0.0025,
+    entitlement: "dealer_api",
+    maxRetries: 0,
+    rateLimitStrategy: "none",
+    fallback: "syndication mc_dealership.* ids",
+    rawStore: "dealership_groups",
+    normalizedDestinations: ["dealership_groups"],
+    authority: "inventory_state",
+    influences: influence({ marketContext: true }),
+    publicBrowseMayTrigger: false,
+    notes: "Named by the 2026-10-27 change order; path not yet read from the docs. The feed's mc_dealership_group_id / _name already give an authoritative identity per listing.",
   },
   {
     key: "dealers_search_legacy",
@@ -156,8 +230,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "legacy",
     reference: null,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
+    ownership: "shared",
     status: "active",
     triggers: ["operator"],
+    cadence: { intake: true, refresh: false },
     ttlHours: null,
     cacheKey: ["zip", "state"],
     defaultCostUsd: 0.0025,
@@ -168,6 +244,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "marketcheck_sync_config.last_status",
     normalizedDestinations: ["marketcheck_sync_config.dealer_id"],
     authority: "inventory_state",
+    influences: NONE,
     publicBrowseMayTrigger: false,
     notes: "Geography-only search whose ids collide with other rooftops in the syndication id space; kept for the manual dealer_id override only.",
   },
@@ -180,8 +257,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "legacy",
     reference: null,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
+    ownership: "shared",
     status: "active",
     triggers: ["operator"],
+    cadence: { intake: true, refresh: false },
     ttlHours: null,
     cacheKey: ["dealer_id"],
     defaultCostUsd: 0.0025,
@@ -192,6 +271,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "marketcheck_sync_config.last_status",
     normalizedDestinations: ["marketcheck_sync_config"],
     authority: "inventory_state",
+    influences: NONE,
     publicBrowseMayTrigger: false,
     notes: "Name and state of a legacy dealer id; used only to label a manual override.",
   },
@@ -204,8 +284,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "yes", used: "yes", autocurb: "optional" },
+    ownership: "shared",
     status: "active",
     triggers: ["intake", "scheduled", "material_event", "operator"],
+    cadence: { intake: true, refresh: true },
     ttlHours: 24,
     cacheKey: ["cohort_hash", "zip", "radius", "car_type"],
     defaultCostUsd: 0.002,
@@ -216,8 +298,36 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "market_cohort_snapshots",
     normalizedDestinations: ["vehicle_listings.comparables", "vehicle_listings.group_similar", "vehicle_listings.market_meta"],
     authority: "market_evidence",
+    influences: MARKET,
     publicBrowseMayTrigger: false,
-    notes: "fees and price_includes_fees on each row feed the comparable basis. One cohort informs many vehicles.",
+    notes: "Active-market comparables and cross-channel listing intelligence. fees and price_includes_fees on each row feed the comparable basis. One cohort informs many vehicles.",
+  },
+  {
+    key: "recents",
+    provider: "marketcheck",
+    product: "Past Inventory Search (recents)",
+    path: "/v2/search/car/recents",
+    billingProduct: "recent_inventory",
+    contract: "documented",
+    reference: `${MC_DOCS}/inventory/introduction`,
+    appliesTo: { new: "optional", used: "yes", autocurb: "yes" },
+    ownership: "shared",
+    status: "active",
+    triggers: ["scheduled", "operator"],
+    cadence: { intake: false, refresh: true },
+    ttlHours: 24 * 30,
+    cacheKey: ["cohort", "state", "window"],
+    defaultCostUsd: 0.0025,
+    entitlement: "recent_inventory",
+    maxRetries: 2,
+    rateLimitStrategy: "serial",
+    fallback: null,
+    rawStore: null,
+    normalizedDestinations: ["market_meta.sold_stats"],
+    authority: "market_evidence",
+    influences: CONTEXT,
+    publicBrowseMayTrigger: false,
+    notes: "Listing-level recent market exits and supporting evidence (expired, inferred sold, owned, date windows, stats, facets where supported). Not the primary aggregate: that is Sales Stats; trend is Sold Vehicles Summary. Medians only leave the function.",
   },
   {
     key: "neovin",
@@ -228,8 +338,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/vehicle-specs/neovin`,
     appliesTo: { new: "first_seen", used: "first_seen", autocurb: "optional" },
+    ownership: "shared",
     status: "active",
     triggers: ["intake", "operator"],
+    cadence: { intake: true, refresh: false },
     ttlHours: null,
     cacheKey: ["vin"],
     defaultCostUsd: 0.08,
@@ -238,10 +350,11 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rateLimitStrategy: "serial",
     fallback: "basic_decode",
     rawStore: "neovin_snapshots",
-    normalizedDestinations: ["mc_attributes.build_sheet", "mc_attributes.base_msrp", "vehicle_facts"],
+    normalizedDestinations: ["mc_attributes.build_sheet", "mc_attributes.base_msrp", "mc_attributes.factory_warranty", "mc_attributes.neovin_confidence", "vehicle_facts"],
     authority: "factory_build",
+    influences: influence({ identity: true, vehicleScore: true, dataConfidence: true, marketValue: true }),
     publicBrowseMayTrigger: false,
-    notes: "Immutable; never rebought once a real sheet exists. Three attempts, strict first, refusals uncounted.",
+    notes: "Immutable; never rebought once a real sheet exists. Three attempts, strict first, refusals uncounted. The preferred source for installed equipment.",
   },
   {
     key: "basic_decode",
@@ -252,8 +365,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/vehicle-specs/neovin`,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
+    ownership: "shared",
     status: "active",
     triggers: ["intake"],
+    cadence: { intake: true, refresh: false },
     ttlHours: null,
     cacheKey: ["vin"],
     defaultCostUsd: 0.0015,
@@ -264,6 +379,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "neovin_snapshots",
     normalizedDestinations: ["mc_attributes"],
     authority: "factory_build",
+    influences: influence({ identity: true, dataConfidence: true }),
     publicBrowseMayTrigger: false,
     notes: "Specs only, no equipment; leaves options null so NeoVIN is retried.",
   },
@@ -276,8 +392,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/vehicle-specs/neovin`,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
+    ownership: "shared",
     status: "active",
     triggers: ["intake"],
+    cadence: { intake: true, refresh: false },
     ttlHours: null,
     cacheKey: ["vin"],
     defaultCostUsd: 0.0015,
@@ -288,8 +406,36 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "neovin_snapshots",
     normalizedDestinations: ["mc_attributes"],
     authority: "factory_build",
+    influences: influence({ identity: true, dataConfidence: true }),
     publicBrowseMayTrigger: false,
     notes: "Last decode fallback; core specs only.",
+  },
+  {
+    key: "available_options_packages",
+    provider: "marketcheck",
+    product: "Available Options Packages",
+    path: "/v2/options/packages",
+    billingProduct: "available_options_packages",
+    contract: "unlocated",
+    reference: `${MC_DOCS}/vehicle-specs/neovin`,
+    appliesTo: { new: "optional", used: "optional", autocurb: "no" },
+    ownership: "autolabels",
+    status: "not_active",
+    triggers: ["intake", "operator"],
+    cadence: { intake: true, refresh: false },
+    ttlHours: 24 * 90,
+    cacheKey: ["year", "make", "model", "trim"],
+    defaultCostUsd: 0.002,
+    entitlement: "available_options_packages",
+    maxRetries: 0,
+    rateLimitStrategy: "none",
+    fallback: null,
+    rawStore: "available_options_catalog",
+    normalizedDestinations: ["equipment.factory_available_options"],
+    authority: "factory_build",
+    influences: influence({ marketContext: true }),
+    publicBrowseMayTrigger: false,
+    notes: "Named by the 2026-10-27 change order; path not yet read from the docs. AVAILABLE is never INSTALLED: this feeds configuration comparison, package explanation and missing-build investigation, and may never verify equipment on the subject VIN.",
   },
   {
     key: "price_base",
@@ -300,10 +446,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/market-insights/marketcheck-price`,
     appliesTo: { new: "optional", used: "yes", autocurb: "optional" },
+    ownership: "shared",
     status: "shadow",
     triggers: ["valuation_writer"],
+    cadence: { intake: true, refresh: true },
     ttlHours: 24 * 7,
-    cacheKey: ["vin", "miles", "dealer_type", "is_certified", "zip"],
+    cacheKey: ["vin", "miles", "dealer_type", "is_certified", "zip", "fallback_to_generic"],
     defaultCostUsd: 0.07,
     entitlement: "price_prediction",
     maxRetries: 0,
@@ -312,20 +460,23 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "vehicle_market_valuations",
     normalizedDestinations: ["vehicle_market_valuations.provider_prediction", "market_payload.provider_valuation"],
     authority: "market_evidence",
+    influences: MARKET,
     publicBrowseMayTrigger: false,
-    notes: "Reserved under the tenant budget; one live reservation per request fingerprint; is_certified always sent.",
+    notes: "Reserved under the tenant budget; one live reservation per request fingerprint; is_certified always sent. fallback_to_generic is a separate request (different fingerprint) and its answer is a GENERIC_CANDIDATE identity, never exact.",
   },
   {
     key: "price_premium",
     provider: "marketcheck",
-    product: "MarketCheck Price (Premium)",
+    product: "MarketCheck Price (Premium, comparables)",
     path: "/v2/predict/car/us/marketcheck_price/comparables",
     billingProduct: "price_prediction",
     contract: "documented",
     reference: `${MC_DOCS}/market-insights/marketcheck-price`,
     appliesTo: { new: "optional", used: "yes", autocurb: "optional" },
+    ownership: "shared",
     status: "entitlement_blocked",
     triggers: ["valuation_writer"],
+    cadence: { intake: false, refresh: true },
     ttlHours: 24 * 7,
     cacheKey: ["vin", "miles", "dealer_type", "is_certified", "zip"],
     defaultCostUsd: 0.07,
@@ -336,8 +487,9 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "vehicle_market_valuations",
     normalizedDestinations: ["vehicle_market_valuations", "market_cohort_snapshots"],
     authority: "market_evidence",
+    influences: MARKET,
     publicBrowseMayTrigger: false,
-    notes: "Untested on this account. Cost is a placeholder until one authorized call reports it.",
+    notes: "The Premium Comparables tier: prediction plus the comparable set. Untested on this account; cost is the Base placeholder until one authorized call reports it. The used REFRESH tier once the build is cached.",
   },
   {
     key: "price_premium_plus",
@@ -348,8 +500,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/market-insights/marketcheck-price`,
     appliesTo: { new: "test", used: "yes", autocurb: "optional" },
+    ownership: "shared",
     status: "entitlement_blocked",
     triggers: ["intake"],
+    cadence: { intake: true, refresh: false },
     ttlHours: 24 * 7,
     cacheKey: ["vin", "miles", "dealer_type", "is_certified", "zip"],
     defaultCostUsd: 0.07,
@@ -360,8 +514,9 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "vehicle_market_valuations",
     normalizedDestinations: ["vehicle_market_valuations", "market_cohort_snapshots", "neovin_snapshots"],
     authority: "market_evidence",
+    influences: influence({ ...MARKET, identity: true, dataConfidence: true }),
     publicBrowseMayTrigger: false,
-    notes: "Used-intake candidate: prediction + comparables + NeoVIN in one call. The decode half is immutable; the market half expires.",
+    notes: "Used-intake candidate: prediction + comparables + NeoVIN in one call. The decode half is immutable and cached; the market half expires. Records provider tier, match tier, comp count, decode source and both checked_at stamps.",
   },
   {
     key: "vin_history",
@@ -372,8 +527,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "no", used: "yes", autocurb: "yes" },
+    ownership: "shared",
     status: "active",
     triggers: ["intake", "material_event", "operator"],
+    cadence: { intake: true, refresh: true },
     ttlHours: 24 * 30,
     cacheKey: ["vin"],
     defaultCostUsd: 0.006,
@@ -384,8 +541,9 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: null,
     normalizedDestinations: ["vehicle_listings.history_payload", "vehicle_listings.in_service_date"],
     authority: "listing_history",
+    influences: influence({ vehicleScore: true, dataConfidence: true, buyerRecommendation: true, marketContext: true }),
     publicBrowseMayTrigger: false,
-    notes: "Never an owner count, never an accident history. Not routine for new vehicles.",
+    notes: "Mileage chronology and prior exposure feed Vehicle Integrity and the odometer hard gate. Never an owner count, never an accident history. Not routine for new vehicles.",
   },
   {
     key: "mds",
@@ -396,20 +554,23 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/market-insights/market-days-supply`,
     appliesTo: { new: "optional", used: "yes", autocurb: "yes" },
+    ownership: "shared",
     status: "active",
-    triggers: ["intake", "scheduled", "operator"],
+    triggers: ["intake", "scheduled", "material_event", "operator"],
+    cadence: { intake: true, refresh: true },
     ttlHours: 24 * 7,
-    cacheKey: ["vin_exact_or_ymmt", "zip", "radius", "car_type"],
-    defaultCostUsd: 0.006,
+    cacheKey: ["match_level", "vin_or_ymmt", "zip", "radius", "car_type"],
+    defaultCostUsd: 0.002,
     entitlement: "market_days_supply",
     maxRetries: 2,
     rateLimitStrategy: "serial",
-    fallback: "ymmt_then_ymm_then_national",
+    fallback: "ymmt_then_ymm_then_model_then_national",
     rawStore: null,
-    normalizedDestinations: ["market_meta.market_days_supply", "market_meta.inventory_count"],
+    normalizedDestinations: ["market_meta.market_days_supply", "market_meta.mds_match_level", "market_meta.inventory_count"],
     authority: "market_evidence",
+    influences: CONTEXT,
     publicBrowseMayTrigger: false,
-    notes: "Cohort order: vin exact=true, YMMT local, YMM local, model local, national. Liquidity, not quality.",
+    notes: "Cohort order: vin exact=true, YMMT local, YMM local, model local, national; match_level, geography, sample size and checked_at recorded. Liquidity and holding-risk context, never quality. Refresh aligns to the provider's regeneration, not to the lower price.",
   },
   {
     key: "sales_stats",
@@ -420,11 +581,13 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/market-insights/inferred-sales-stats`,
     appliesTo: { new: "optional", used: "yes", autocurb: "yes" },
+    ownership: "shared",
     status: "active",
-    triggers: ["scheduled", "operator"],
+    triggers: ["intake", "scheduled", "operator"],
+    cadence: { intake: true, refresh: true },
     ttlHours: 24 * 30,
-    cacheKey: ["cohort", "state"],
-    defaultCostUsd: 0.006,
+    cacheKey: ["match_level", "cohort", "geography", "period"],
+    defaultCostUsd: 0.002,
     entitlement: "sales_stats",
     maxRetries: 2,
     rateLimitStrategy: "serial",
@@ -432,32 +595,9 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: null,
     normalizedDestinations: ["market_meta.sold_stats"],
     authority: "market_evidence",
+    influences: CONTEXT,
     publicBrowseMayTrigger: false,
-    notes: "Provider regenerates monthly; buying it nightly buys the same number. Sold is inferred, never a transaction price.",
-  },
-  {
-    key: "recents",
-    provider: "marketcheck",
-    product: "Recent (delisted) listings",
-    path: "/v2/search/car/recents",
-    billingProduct: "recent_inventory",
-    contract: "documented",
-    reference: `${MC_DOCS}/inventory/introduction`,
-    appliesTo: { new: "optional", used: "yes", autocurb: "yes" },
-    status: "active",
-    triggers: ["scheduled", "operator"],
-    ttlHours: 24 * 30,
-    cacheKey: ["cohort", "state"],
-    defaultCostUsd: 0.006,
-    entitlement: "recent_inventory",
-    maxRetries: 2,
-    rateLimitStrategy: "serial",
-    fallback: null,
-    rawStore: null,
-    normalizedDestinations: ["market_meta.sold_stats"],
-    authority: "market_evidence",
-    publicBrowseMayTrigger: false,
-    notes: "Listing-level recent evidence; medians only leave the function.",
+    notes: "The primary velocity source: inferred sold count, price, mileage, DOM/DOS statistics, CPO split, match tier, geography, period. Provider regenerates monthly; buying it nightly buys the same number. Sold is inferred from inventory disappearance, never a transaction price.",
   },
   {
     key: "sold_summary",
@@ -468,11 +608,13 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/market-insights/sold-vehicles-summary`,
     appliesTo: { new: "optional", used: "yes", autocurb: "yes" },
+    ownership: "shared",
     status: "entitlement_blocked",
     triggers: ["scheduled"],
+    cadence: { intake: false, refresh: true },
     ttlHours: 24 * 30,
-    cacheKey: ["cohort", "geography", "month"],
-    defaultCostUsd: 0.006,
+    cacheKey: ["cohort", "geography", "period_start", "period_end"],
+    defaultCostUsd: 0.002,
     entitlement: "sold_vehicles_summary",
     maxRetries: 2,
     rateLimitStrategy: "serial",
@@ -480,8 +622,36 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "market_trend_evidence",
     normalizedDestinations: ["market_meta.trend"],
     authority: "market_evidence",
+    influences: CONTEXT,
     publicBrowseMayTrigger: false,
-    notes: "Path and cost are placeholders until the contract is read; stored with cohort, geography, window and inferred-sold semantics.",
+    notes: "Market trend and direction over 3 / 6 / 12 months: inferred sold volume, price, mileage, DOM/DOS statistics and percentiles, CPO segmentation, drivetrain, powertrain, colours, make/model/trim/version, geography, MSRP dimensions where the contract supports them. Requested filters, provider-applied filters, warnings, notices and population size are stored verbatim. Path is a placeholder until the contract is read.",
+  },
+  {
+    key: "sold_summary_dealership_groups",
+    provider: "marketcheck",
+    product: "Sold Vehicles Summary by dealership group",
+    path: "/v2/sold/car/summary/dealership_groups",
+    billingProduct: "sales_stats",
+    contract: "unlocated",
+    reference: `${MC_DOCS}/market-insights/sold-vehicles-summary`,
+    appliesTo: { new: "optional", used: "optional", autocurb: "yes" },
+    ownership: "shared",
+    status: "not_active",
+    triggers: ["scheduled"],
+    cadence: { intake: false, refresh: true },
+    ttlHours: 24 * 30,
+    cacheKey: ["mc_dealership_group_id", "geography", "period_start", "period_end"],
+    defaultCostUsd: 0.002,
+    entitlement: "sold_vehicles_summary",
+    maxRetries: 2,
+    rateLimitStrategy: "serial",
+    fallback: null,
+    rawStore: "market_trend_evidence",
+    normalizedDestinations: ["dealership_group_context"],
+    authority: "market_evidence",
+    influences: CONTEXT,
+    publicBrowseMayTrigger: false,
+    notes: "Dealer-group velocity and stocking comparison for management analytics and future AutoCurb fit. Named by the change order; path not yet read from the docs. May never inflate or reduce Vehicle Score.",
   },
   {
     key: "vindata_access",
@@ -492,8 +662,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/third-party/vindata`,
     appliesTo: { new: "no", used: "yes", autocurb: "yes" },
+    ownership: "shared",
     status: "active",
     triggers: ["operator", "material_event"],
+    cadence: { intake: true, refresh: true },
     ttlHours: 24 * 90,
     cacheKey: ["vin"],
     defaultCostUsd: 0,
@@ -504,8 +676,9 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: null,
     normalizedDestinations: ["session_only"],
     authority: "title_history",
+    influences: influence({ vehicleScore: true, dataConfidence: true, buyerRecommendation: true }),
     publicBrowseMayTrigger: false,
-    notes: "Access first; the provider keeps a generated report 90 days. Terms: no persistence beyond a session.",
+    notes: "Access first; the provider keeps a generated report 90 days. Terms: no persistence beyond a session. Not priced separately in the change order; recorded as unpriced.",
   },
   {
     key: "vindata_generate",
@@ -516,8 +689,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/third-party/vindata`,
     appliesTo: { new: "no", used: "yes", autocurb: "yes" },
+    ownership: "shared",
     status: "active",
     triggers: ["operator"],
+    cadence: { intake: true, refresh: false },
     ttlHours: 24 * 90,
     cacheKey: ["vin"],
     defaultCostUsd: 0.49,
@@ -528,6 +703,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: null,
     normalizedDestinations: ["session_only", "title_report_pulls"],
     authority: "title_history",
+    influences: influence({ vehicleScore: true, dataConfidence: true, buyerRecommendation: true }),
     publicBrowseMayTrigger: false,
     notes: "Capped at 50 per dealer per month server-side. Exception-based automation is an owner decision.",
   },
@@ -540,8 +716,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/third-party/autorecalls`,
     appliesTo: { new: "yes", used: "yes", autocurb: "yes" },
+    ownership: "shared",
     status: "entitlement_blocked",
     triggers: ["intake", "scheduled", "material_event", "operator"],
+    cadence: { intake: true, refresh: true },
     ttlHours: 24 * 30,
     cacheKey: ["vin"],
     defaultCostUsd: 0.07,
@@ -552,8 +730,9 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "vehicle_listings.recall_check",
     normalizedDestinations: ["recall_status", "open_recall_count", "closed_recall_count"],
     authority: "safety",
+    influences: influence({ vehicleScore: true, dataConfidence: true, buyerRecommendation: true }),
     publicBrowseMayTrigger: false,
-    notes: "Only a VIN answer can clear a VIN. The legacy /v2/recall/car/{vin} family is retired by this entry.",
+    notes: "Only a VIN answer can clear a VIN. The legacy /v2/recall/car/{vin} family is replaced by this entry.",
   },
   {
     key: "autorecalls_legacy",
@@ -564,8 +743,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "legacy",
     reference: null,
     appliesTo: { new: "no", used: "no", autocurb: "no" },
-    status: "retired",
+    ownership: "shared",
+    status: "deprecated_replaced",
     triggers: ["never"],
+    cadence: { intake: false, refresh: false },
     ttlHours: null,
     cacheKey: ["vin"],
     defaultCostUsd: 0.07,
@@ -576,8 +757,9 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: null,
     normalizedDestinations: [],
     authority: "safety",
+    influences: NONE,
     publicBrowseMayTrigger: false,
-    notes: "Still called by marketcheck-recalls and vehicle-enrich; answered 404 or empty on every variant.",
+    notes: "Still called by marketcheck-recalls and vehicle-enrich; answered 404 or empty on every variant. Replaced by /v2/car/autorecalls/{vin}.",
   },
   {
     key: "incentives_oem",
@@ -588,8 +770,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/incentives/incentive-search-api`,
     appliesTo: { new: "yes", used: "no", autocurb: "no" },
+    ownership: "autolabels",
     status: "not_active",
     triggers: ["scheduled"],
+    cadence: { intake: false, refresh: true },
     ttlHours: 24,
     cacheKey: ["make", "model", "year", "zip_or_msa", "offer_type"],
     defaultCostUsd: 0.2,
@@ -600,8 +784,9 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "marketcheck_vehicle_cache",
     normalizedDestinations: ["incentive_programs"],
     authority: "offer_context",
+    influences: NONE,
     publicBrowseMayTrigger: false,
-    notes: "Owner-disabled 2026-07-28. Cache by program and market, never per VIN. Never a Vehicle Score input.",
+    notes: "Owner-disabled 2026-07-28. Cache by program and market, never per VIN. Offer context for the New Passport, never a Vehicle Score input.",
   },
   {
     key: "incentives_make_zip",
@@ -612,8 +797,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/incentives/incentive-search-api`,
     appliesTo: { new: "yes", used: "no", autocurb: "no" },
+    ownership: "autolabels",
     status: "entitlement_blocked",
     triggers: ["scheduled"],
+    cadence: { intake: false, refresh: true },
     ttlHours: 24,
     cacheKey: ["make", "zip"],
     defaultCostUsd: 0.2,
@@ -624,6 +811,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "marketcheck_vehicle_cache",
     normalizedDestinations: ["incentive_programs"],
     authority: "offer_context",
+    influences: NONE,
     publicBrowseMayTrigger: false,
     notes: "Preferred cache dimension once incentives return.",
   },
@@ -636,8 +824,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "optional", used: "optional", autocurb: "no" },
+    ownership: "autolabels",
     status: "active",
     triggers: ["never"],
+    cadence: { intake: false, refresh: false },
     ttlHours: null,
     cacheKey: ["url"],
     defaultCostUsd: 0.001,
@@ -648,6 +838,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: "vehicle_listings.mc_raw.media",
     normalizedDestinations: ["vehicle_listings.photos"],
     authority: "inventory_state",
+    influences: NONE,
     publicBrowseMayTrigger: false,
     notes: "Links arrive on the feed; the product never requests them itself.",
   },
@@ -660,8 +851,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "documented",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
+    ownership: "shared",
     status: "not_active",
     triggers: ["operator"],
+    cadence: { intake: true, refresh: false },
     ttlHours: 24,
     cacheKey: ["mc_listing_id"],
     defaultCostUsd: 0.002,
@@ -672,6 +865,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: null,
     normalizedDestinations: [],
     authority: "inventory_state",
+    influences: influence({ identity: true, dataConfidence: true }),
     publicBrowseMayTrigger: false,
     notes: "mc_listing_id is captured for it; the only source of per-listing options and seller comments when the feed omits them.",
   },
@@ -680,22 +874,25 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     provider: "marketcheck",
     product: "Private-party active inventory",
     path: "/v2/search/car/fsbo/active",
-    billingProduct: "inventory_search",
+    billingProduct: "fsbo",
     contract: "documented",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "no", used: "no", autocurb: "yes" },
+    ownership: "autocurb",
     status: "autocurb_reserved",
     triggers: ["never"],
+    cadence: { intake: false, refresh: false },
     ttlHours: 24,
     cacheKey: ["cohort", "zip"],
-    defaultCostUsd: 0.002,
-    entitlement: "inventory_search",
+    defaultCostUsd: 0.01,
+    entitlement: "fsbo",
     maxRetries: 0,
     rateLimitStrategy: "none",
     fallback: null,
     rawStore: null,
     normalizedDestinations: [],
     authority: "acquisition",
+    influences: NONE,
     publicBrowseMayTrigger: false,
     notes: "Acquisition context only; never a Vehicle Score input.",
   },
@@ -704,22 +901,25 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     provider: "marketcheck",
     product: "Auction active inventory",
     path: "/v2/search/car/auction/active",
-    billingProduct: "inventory_search",
+    billingProduct: "auction",
     contract: "documented",
     reference: `${MC_DOCS}/inventory/auction-search`,
     appliesTo: { new: "no", used: "no", autocurb: "yes" },
+    ownership: "autocurb",
     status: "autocurb_reserved",
     triggers: ["never"],
+    cadence: { intake: false, refresh: false },
     ttlHours: 24,
     cacheKey: ["cohort", "zip"],
-    defaultCostUsd: 0.002,
-    entitlement: "inventory_search",
+    defaultCostUsd: 0.008,
+    entitlement: "auction",
     maxRetries: 0,
     rateLimitStrategy: "none",
     fallback: null,
     rawStore: null,
     normalizedDestinations: [],
     authority: "acquisition",
+    influences: NONE,
     publicBrowseMayTrigger: false,
     notes: "Wholesale context only.",
   },
@@ -728,15 +928,17 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     provider: "marketcheck",
     product: "MarketMatch dealer rank",
     path: "/v2/marketmatch/dealers/rank",
-    billingProduct: "unknown",
+    billingProduct: "marketmatch",
     contract: "documented",
     reference: `${MC_DOCS}/market-insights/marketmatch`,
     appliesTo: { new: "no", used: "no", autocurb: "yes" },
+    ownership: "autocurb",
     status: "autocurb_reserved",
     triggers: ["never"],
+    cadence: { intake: false, refresh: false },
     ttlHours: 24,
     cacheKey: ["vin", "geography"],
-    defaultCostUsd: 0,
+    defaultCostUsd: 0.35,
     entitlement: "marketmatch",
     maxRetries: 0,
     rateLimitStrategy: "none",
@@ -744,23 +946,26 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: null,
     normalizedDestinations: [],
     authority: "acquisition",
+    influences: NONE,
     publicBrowseMayTrigger: false,
-    notes: "Which dealers a vehicle fits; acquisition placement, never quality. Unpriced.",
+    notes: "Which dealers a vehicle fits; acquisition placement, never quality.",
   },
   {
     key: "marketmatch",
     provider: "marketcheck",
     product: "MarketMatch VIN rank",
     path: "/v2/marketmatch/vins/rank",
-    billingProduct: "unknown",
+    billingProduct: "marketmatch",
     contract: "documented",
     reference: `${MC_DOCS}/market-insights/marketmatch`,
     appliesTo: { new: "no", used: "no", autocurb: "yes" },
+    ownership: "autocurb",
     status: "autocurb_reserved",
     triggers: ["never"],
+    cadence: { intake: false, refresh: false },
     ttlHours: 24,
     cacheKey: ["dealer", "vins"],
-    defaultCostUsd: 0,
+    defaultCostUsd: 0.35,
     entitlement: "marketmatch",
     maxRetries: 0,
     rateLimitStrategy: "none",
@@ -768,8 +973,36 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: null,
     normalizedDestinations: [],
     authority: "acquisition",
+    influences: NONE,
     publicBrowseMayTrigger: false,
-    notes: "Dealer/vehicle fit, not vehicle quality. Unpriced.",
+    notes: "Dealer/vehicle fit, not vehicle quality. 1-20 VIN candidates per dealer per synchronous request per the current docs.",
+  },
+  {
+    key: "webhooks",
+    provider: "marketcheck",
+    product: "Refresh webhooks",
+    path: "/webhooks/marketcheck",
+    billingProduct: "unknown",
+    contract: "documented",
+    reference: "https://docs.marketcheck.com/docs/get-started/api/webhook-integration",
+    appliesTo: { new: "yes", used: "yes", autocurb: "optional" },
+    ownership: "shared",
+    status: "entitlement_blocked",
+    triggers: ["never"],
+    cadence: { intake: false, refresh: true },
+    ttlHours: null,
+    cacheKey: ["delivery_id"],
+    defaultCostUsd: 0,
+    entitlement: "webhook_portal_configuration",
+    maxRetries: 0,
+    rateLimitStrategy: "none",
+    fallback: null,
+    rawStore: "provider_webhook_events",
+    normalizedDestinations: ["stale_marks"],
+    authority: "inventory_state",
+    influences: influence({ dataConfidence: true }),
+    publicBrowseMayTrigger: false,
+    notes: "Inbound, not a paid call: HMAC-SHA256 signature, timestamp replay window, delivery-id dedup; an invalidation signal that never authorises spend. Needs portal configuration by the owner.",
   },
   {
     key: "blackbook_used_vin",
@@ -780,8 +1013,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     contract: "legacy",
     reference: null,
     appliesTo: { new: "no", used: "yes", autocurb: "yes" },
+    ownership: "shared",
     status: "entitlement_blocked",
     triggers: ["intake", "scheduled"],
+    cadence: { intake: true, refresh: true },
     ttlHours: 24 * 7,
     cacheKey: ["vin", "mileage", "zip"],
     defaultCostUsd: 0,
@@ -792,6 +1027,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     rawStore: null,
     normalizedDestinations: ["vehicle_listings.blackbook"],
     authority: "market_evidence",
+    influences: influence({ marketValue: true, marketValueConfidence: true }),
     publicBrowseMayTrigger: false,
     notes: "Never configured on this project. Not a live valuation signal until rows populate.",
   },
@@ -861,9 +1097,10 @@ export function policyFor(key: string, vehicleType: VehicleType): CapabilityPoli
   if (!c) return { key, allowed: false, requiresTenantOptIn: false, triggers: [], ttlHours: null, reasons: ["unknown_capability"] };
   const reasons: string[] = [];
   const applies = c.appliesTo[vehicleType];
-  if (c.status === "retired") reasons.push("retired");
+  if (c.status === "deprecated_replaced") reasons.push("deprecated_replaced");
   if (c.status === "autocurb_reserved") reasons.push("autocurb_reserved");
   if (c.status === "not_active") reasons.push("not_active");
+  if (c.status === "not_useful") reasons.push("not_useful");
   if (c.status === "entitlement_blocked") reasons.push("entitlement_blocked");
   if (applies === "no") reasons.push(`not_for_${vehicleType}`);
   if (c.triggers.includes("never")) reasons.push("never_triggered");
@@ -890,3 +1127,12 @@ export function routineCapabilities(vehicleType: VehicleType): string[] {
     })
     .map((c) => c.key);
 }
+
+/** Authorities whose evidence describes a market or a buyer, never the vehicle's own quality. */
+export const NON_SCORE_AUTHORITIES: AuthorityClass[] = ["market_evidence", "acquisition", "offer_context", "inventory_state"];
+
+/** The executable form of the scoring rule: can this capability reach Vehicle Score. */
+export const mayInfluenceVehicleScore = (key: string): boolean => {
+  const c = BY_KEY.get(key);
+  return !!c && c.influences.vehicleScore && !NON_SCORE_AUTHORITIES.includes(c.authority);
+};

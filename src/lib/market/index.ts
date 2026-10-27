@@ -37,4 +37,26 @@ export {
   type ProviderCapability, type CapabilityPolicy, type CapabilityStatus, type CapabilityTrigger,
 } from "./providerRegistry.ts";
 export { resolveListingFeeBasis, type ListingFeeBasis, type ListingFeeInput } from "./listingFeeBasis.ts";
+export {
+  IDENTITY_MATCH_LEVELS, EXACT_ONLY_CLAIMS, identityConfidenceCeiling, isExactIdentity, mayClaim,
+  mergeByIdentity, readIdentityResolution, type IdentityMatchLevel, type IdentityResolution,
+} from "./identityMatch.ts";
+export {
+  APPROVED_SOLD_PHRASES, FORBIDDEN_SOLD_PHRASES, INFERRED_SOLD_PRICE_LABEL, assertInferredSoldWording,
+  checkInferredSoldWording, isAcceptableSoldColumnName,
+} from "./soldLanguage.ts";
+export {
+  buildProviderEnvelope, classifyOutcome, envelopeFresh, filtersDiverged,
+  type ProviderResultEnvelope, type EnvelopeInput, type ProviderOutcomeClass,
+} from "./providerEnvelope.ts";
+export { resolveDealershipGroup, sameDealershipGroup, dealerGroupMayInfluence, type DealershipGroupIdentity } from "./dealerGroup.ts";
+export {
+  COHORT_MATCH_LEVELS, COHORT_REFRESH_DAYS, buildCohortLadder, cohortAnswerDue, recordCohortAnswer,
+  type CohortMatchLevel, type LadderRung, type RecordedCohortAnswer,
+} from "./cohortLadder.ts";
+export {
+  EQUIPMENT_CATEGORIES, INSTALLED_CATEGORIES, compareConfiguration, emptyEquipmentLedger, fileEquipment,
+  installedEquipment, isInstalledCategory, type EquipmentCategory, type EquipmentLedger,
+} from "./equipmentClass.ts";
+export { classifyRawPayload, LEGACY_PRICING_SQL_PREDICATE, type RawPayloadKind } from "./rawPayloadBoundary.ts";
 export { digest, stableStringify } from "./hash.ts";
