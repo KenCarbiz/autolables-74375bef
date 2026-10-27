@@ -173,7 +173,8 @@ Performed, with authorization, 2026-10-27:
   from the sync is silenced by the operator setting `ENRICH_SWEEP_HOUR_UTC`
   to 25. Ledger row written. Un-pause is one `cron.alter_job` call.
 
-Authored the same evening, not applied (owner authorization pending):
+Applied at about 22:53Z, with the four callers deployed from `2b03c4e` at
+22:56Z (blob hashes verified by the deploy agent):
 `20261027205000_provider_call_budget.sql`, the hard monthly call cap. The
 plan is 5,000 calls a month and the Sep 9 release had the sweep spending
 2,000-4,000 a day, which is the whole reason the feed has been refused from
@@ -182,8 +183,10 @@ feed, its rooftop validation) while the month is under the cap and any other
 call only under cap minus a 250-call reserve; `provider_call_events` is the
 ledger; `_shared/providerBudget.ts` is wired into vehicle-enrich,
 marketcheck-sync, marketcheck-comps and marketcheck-specs, failing open when
-the migration is absent. Applying it and deploying the four functions
-before the Nov 1 reset is what keeps the feed alive in November.
+the migration is absent. In place before the Nov 1 reset, which is what
+keeps the feed alive in November; `authenticated` holds SELECT only on the
+ledger (TRUNCATE, REFERENCES and TRIGGER revoked as well, since RLS does
+not govern TRUNCATE). Ledger row written.
 
 Not yet authored: the Sold Summary / Available Options / dealership-group
 evidence tables, which wait on the contract read.

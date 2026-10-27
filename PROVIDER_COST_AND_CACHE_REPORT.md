@@ -121,12 +121,12 @@ VIN, with HTTP status, outcome (ok, no_result, refused_quota, refused_rate,
 refused_auth, provider_error, transport_error, budget_denied) and the list
 cost. `provider_call_month` answers calls, denials and refusals per product
 for the month. Useful-result rate, freshness, cost per Passport and the
-per-VIN story build on it in a later tranche. Applying the migration and
-deploying the four wired callers is the owner's call.
+per-VIN story build on it in a later tranche. Applied and deployed the
+same evening.
 
 ## 6. Controls that exist, and the gaps that remain
 
-- Monthly call cap (authored 2026-10-27, apply on authorization):
+- Monthly call cap (applied 2026-10-27 22:53Z; callers deployed 22:56Z):
   `provider_call_budgets` holds the plan's 5,000 calls a month with a reserve
   of 250 for essential calls; `provider_call_admit` decides every call and
   writes the ledger; `_shared/providerBudget.ts` is the client, wired into

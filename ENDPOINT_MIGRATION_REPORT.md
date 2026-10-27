@@ -43,8 +43,7 @@ the OpenAPI 3.1 document is vendored into `contracts/marketcheck/`.
   2026-10-27).
 - `supabase/migrations/20261027205000_provider_call_budget.sql` +
   `_shared/providerBudget.ts`: the monthly call cap and ledger, wired into
-  the four MarketCheck callers (authored 2026-10-27; apply and deploy on
-  authorization).
+  the four MarketCheck callers (applied and deployed 2026-10-27 evening).
 - `supabase/migrations/20261027201000_mc_raw_boundary_repair.sql`: legacy
   pricing payloads moved to `market_pricing_legacy_payloads` (apply on
   authorization).
