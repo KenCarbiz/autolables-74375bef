@@ -470,7 +470,7 @@ export default function RoutingView() {
         </div>
       </div>
 
-      <div className="mt-5 sticky bottom-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 bg-adm-surface border-t border-adm-border flex items-center justify-between gap-4 flex-wrap">
+      <div className="mt-5 sticky bottom-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 xl:pt-2 xl:pb-[31px] bg-adm-surface border-t border-adm-border flex items-center justify-between gap-4 flex-wrap">
         <div className="min-w-0 flex items-baseline gap-x-5 gap-y-0 flex-wrap">
           <p className="text-[16px] leading-[22px] font-semibold text-adm-ink">Draft configuration</p>
           <p className={cn("text-[12px] leading-[18px]", statusDanger ? "text-adm-danger" : "text-adm-muted")} role="status">{status}</p>

@@ -21,6 +21,7 @@ import { applyFeeChange, loadPolicyVersion, parseFeeReviewParams, tenantIdOf, us
 import { AdminInput, AdminSelect, Field } from "@/pages/admin/views/pricing/ui";
 import PriceRulesView from "@/pages/admin/views/pricing/PriceRulesView";
 import { cn } from "@/lib/utils";
+import vehiclePlaceholder from "@/assets/admin-v2/artwork/vehicle-placeholder.svg";
 
 // Fee Change Review: Edit, Review, Apply. The dialog sits over the Price rules
 // page it came from and dims only the workspace, as the reference draws it.
@@ -105,7 +106,11 @@ const Tile = ({ icon: Icon, tone, value, label, hint, filled = false }: { icon: 
   </div>
 );
 
-const Thumb = () => <span aria-hidden="true" className="w-[65px] h-10 rounded-md bg-adm-workspace flex-shrink-0 inline-block" />;
+const Thumb = () => (
+  <span aria-hidden="true" className="w-[65px] h-10 rounded-md bg-adm-workspace flex-shrink-0 inline-flex items-center justify-center">
+    <img src={vehiclePlaceholder} alt="" className="w-[62%] h-auto" />
+  </span>
+);
 
 const DeltaMark = ({ down = false }: { down?: boolean }) => (
   <svg viewBox="0 0 14 9" className={cn("w-[14px] h-[9px] fill-current flex-shrink-0", down && "rotate-180")} aria-hidden="true">

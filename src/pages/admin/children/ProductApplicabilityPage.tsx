@@ -10,7 +10,7 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useProductRules, type ProductRule } from "@/hooks/useProductRules";
 import { getDealerDocumentRules } from "@/lib/documentRules";
 import { useAdminNow, useViewFixture } from "@/lib/admin/dataSource";
-import { ADMIN_SECTIONS, adminTabHref } from "@/lib/admin/sections";
+import { adminTabHref } from "@/lib/admin/sections";
 import { canApply, initialReviewApply, isUnchanged, newIdempotencyKey, reviewApplyReducer, type ReviewApplyEvent, type ReviewApplyState } from "@/lib/admin/reviewApply";
 import {
   draftFromRule,
@@ -248,7 +248,6 @@ export default function ProductApplicabilityPage() {
     { id: "evidence", label: "Installation evidence", href: editorHref("document") },
     { id: "disclosures", label: "Disclosures", href: editorHref("disclosures") },
   ];
-  const pricingSection = ADMIN_SECTIONS.find((s) => s.id === "pricing");
 
   if (live && (productQuery.isLoading || !productId)) {
     return (
@@ -272,7 +271,6 @@ export default function ProductApplicabilityPage() {
       crumbs={crumbs}
       title={product.name}
       badge={badge}
-      subtitle={pricingSection?.description}
       backHref={adminTabHref("applicability")}
       backLabel="Back to applicability"
       tabs={
