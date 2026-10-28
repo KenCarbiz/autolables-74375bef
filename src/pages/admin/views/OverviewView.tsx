@@ -346,9 +346,9 @@ export default function OverviewView() {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline gap-2">
                       <span className="min-w-0 flex-1 text-[11px] leading-[16px] font-semibold text-adm-ink truncate">{a.action}</span>
-                      <span className="text-[10px] leading-[16px] text-adm-muted whitespace-nowrap">{compactAge(a.at, now)}</span>
+                      <span className="text-[11px] leading-[16px] text-adm-muted whitespace-nowrap">{compactAge(a.at, now)}</span>
                     </span>
-                    <span data-parity="activity-detail" className="block text-[10px] leading-[14px] text-adm-muted truncate">{a.detail}</span>
+                    <span data-parity="activity-detail" className="block text-[11px] leading-[14px] text-adm-muted truncate">{a.detail}</span>
                   </span>
                 </li>
               ))}
