@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "example_only": true,
+    "vehicle_type": "new",
+    "passport_version": "2.0"
+  },
+  "vehicle": {
+    "vin": "EXAMPLEVIN0000002",
+    "year": 2027,
+    "make": "INFINITI",
+    "model": "QX60",
+    "trim": "AUTOGRAPH",
+    "drivetrain": "AWD",
+    "vehicle_status": "available",
+    "in_transit": false
+  },
+  "factory_verified": {
+    "status": "verified",
+    "decode_source": "NeoVIN"
+  },
+  "configuration": {
+    "base_msrp": 66150,
+    "installed_options_msrp": 3420,
+    "destination": 1395,
+    "configured_msrp": 70965,
+    "packages": [
+      {
+        "name": "Vision Package",
+        "msrp": 1500
+      },
+      {
+        "name": "Premium Paint",
+        "msrp": 995
+      }
+    ]
+  },
+  "dealer_offer": {
+    "advertised_price": 68995,
+    "fees": 895,
+    "price_includes_fees": false,
+    "price_integrity": "consistent"
+  },
+  "incentives": {
+    "enabled": true,
+    "offers": [
+      {
+        "title": "Retail Customer Cash",
+        "amount": 1500,
+        "expires": "2026-11-02"
+      }
+    ]
+  },
+  "warranty": {
+    "factory_terms": "Original factory warranty terms available",
+    "remaining_coverage": "not_calculated_without_in_service_date"
+  },
+  "recall": {
+    "vin_state": "verified_no_open",
+    "checked_at": "2026-10-21T14:00:00Z"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "example_only": true,
+    "vehicle_type": "used",
+    "passport_version": "2.0"
+  },
+  "vehicle": {
+    "vin": "EXAMPLEVIN0000001",
+    "year": 2025,
+    "make": "INFINITI",
+    "model": "QX60",
+    "trim": "AUTOGRAPH",
+    "drivetrain": "AWD",
+    "mileage": 41287
+  },
+  "vehicle_score": {
+    "score": 94,
+    "label": "Outstanding",
+    "data_confidence": {
+      "level": "high",
+      "coverage_pct": 97
+    },
+    "domains": [
+      {
+        "key": "integrity",
+        "score": 96
+      },
+      {
+        "key": "condition",
+        "score": 92
+      },
+      {
+        "key": "provenance",
+        "score": 95
+      },
+      {
+        "key": "documentation_safety",
+        "score": 90
+      }
+    ]
+  },
+  "title_odometer": {
+    "status": "verified_no_adverse_reported",
+    "title_brands_reported": [],
+    "junk_salvage_total_loss_reported": [],
+    "odometer_status": "consistent",
+    "checked_at": "2026-10-21T14:00:00Z"
+  },
+  "dealer_provenance": {
+    "designation": "known_since_new",
+    "facts": [
+      "Originally sold here",
+      "12 dealer service visits",
+      "10 AutoFilm inspections",
+      "Direct customer trade"
+    ]
+  },
+  "condition": {
+    "status": "verified",
+    "inspection_date": "2026-10-18",
+    "tires": [
+      "8/32",
+      "8/32",
+      "7/32",
+      "7/32"
+    ],
+    "brakes": [
+      "7mm",
+      "6mm"
+    ],
+    "open_items": 0
+  },
+  "market_value": {
+    "amount": 41900,
+    "range_low": 41100,
+    "range_high": 42700,
+    "confidence": "high",
+    "qualified_comps": 63,
+    "checked_at": "2026-10-21T14:00:00Z"
+  },
+  "asking_price": 40995,
+  "deal_rating": {
+    "label": "great_value",
+    "delta_dollars": -905,
+    "delta_pct": -2.16
+  },
+  "buyer_recommendation": {
+    "state": "highly_recommended",
+    "reasons": [
+      "Strong documented condition",
+      "No adverse NMVTIS title brands reported",
+      "Dealer known vehicle",
+      "Price below estimated market value"
+    ],
+    "hard_gates": []
+  },
+  "market_context": {
+    "mds_days": 38,
+    "mds_scope": "exact_build_local",
+    "sales_velocity": "strong",
+    "trend": "stable"
+  }
+}
