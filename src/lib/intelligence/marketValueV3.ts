@@ -379,7 +379,9 @@ export function buildMarketValueV3(input: MarketValueV3Input, options: MarketVal
     identityLevel: input.identityLevel,
     geography: {
       zip: input.geography.zip,
-      radiusMiles: (comps?.winningTier != null ? TIER_RADIUS[comps.winningTier] ?? null : null) ?? input.geography.radiusMiles,
+      radiusMiles: comps?.winningTier != null
+        ? TIER_RADIUS[comps.winningTier] ?? input.geography.radiusMiles
+        : input.geography.radiusMiles,
       scope: geographyScope(comps?.winningTier ?? null, input.geography.radiusMiles),
     },
     signals: SIGNAL_KEYS.map((k) => signals.find((s) => s.key === k) as ValuationSignal),
