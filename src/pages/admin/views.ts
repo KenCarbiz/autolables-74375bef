@@ -10,4 +10,7 @@ export const ADMIN_VIEWS: Readonly<Record<string, LazyExoticComponent<ComponentT
   roles: lazy(() => import("./views/people/RolesView")),
   invitations: lazy(() => import("./views/people/InvitationsView")),
   "access-activity": lazy(() => import("./views/people/AccessActivityView")),
+  "effective-policy": lazy(() => import("./views/publishing/EffectivePolicyView")),
+  approvals: lazy(() => import("./views/publishing/ApprovalsView")),
+  "change-history": lazy(() => import("./views/publishing/ChangeHistoryView")),
 };
