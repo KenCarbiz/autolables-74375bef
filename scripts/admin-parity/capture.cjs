@@ -45,8 +45,9 @@ async function startDevServer({ cwd, port }) {
   return { child, log: () => log, stop: () => { if (child.exitCode === null) child.kill("SIGTERM"); } };
 }
 
-async function openFixture(page, baseUrl, screen) {
-  await page.goto(`${baseUrl}/admin/design-fixture/${screen}`, { waitUntil: "networkidle", timeout: 120_000 });
+async function openFixture(page, baseUrl, screen, rail) {
+  const query = rail ? `?rail=${encodeURIComponent(rail)}` : "";
+  await page.goto(`${baseUrl}/admin/design-fixture/${screen}${query}`, { waitUntil: "networkidle", timeout: 120_000 });
   await page.waitForSelector(`[data-admin-fixture="${screen}"]`, { timeout: 60_000 });
   await page.waitForFunction(() => !document.body.innerText.includes("Loading fixture"), null, { timeout: 60_000 });
   await page.waitForSelector("[data-admin-v2] h1", { timeout: 60_000 });
@@ -97,9 +98,9 @@ const readDom = ({ maskSpecs, landmarkSpecs }) => {
   return { masks, landmarks };
 };
 
-async function captureScreen(page, { baseUrl, screen, viewport, outPng, maskSpec, landmarkSpec, anchorSelector = null }) {
+async function captureScreen(page, { baseUrl, screen, viewport, outPng, maskSpec, landmarkSpec, anchorSelector = null, rail = null }) {
   await page.setViewportSize(viewport);
-  await openFixture(page, baseUrl, screen);
+  await openFixture(page, baseUrl, screen, rail);
   const fonts = await page.evaluate(() => ({
     inter: document.fonts.check("600 14px Inter"),
     loaded: Array.from(new Set(Array.from(document.fonts).filter((f) => f.status === "loaded").map((f) => f.family))),
@@ -118,11 +119,11 @@ async function captureScreen(page, { baseUrl, screen, viewport, outPng, maskSpec
   return { fonts, masks: [...dom.masks, ...(maskSpec.rects || [])], landmarks: dom.landmarks, anchors };
 }
 
-async function responsiveCheck(page, { baseUrl, screen, viewports, outDir }) {
+async function responsiveCheck(page, { baseUrl, screen, viewports, outDir, rail = null }) {
   const rows = [];
   for (const vp of viewports) {
     await page.setViewportSize(vp);
-    await openFixture(page, baseUrl, screen);
+    await openFixture(page, baseUrl, screen, rail);
     const m = await page.evaluate(() => {
       const root = document.querySelector("[data-admin-v2]") || document.body;
       const scrollable = (el) => {

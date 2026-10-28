@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { AdminFixtureProvider } from "@/lib/admin/dataSource";
 import { ADMIN_SECTIONS, resolveAdminTab } from "@/lib/admin/sections";
 import { AdminShell } from "@/components/admin/v2/AdminShell";
@@ -13,6 +13,10 @@ import { ADMIN_CHILD_ROUTE_ELEMENTS } from "@/pages/admin/childRoutes";
 
 export default function AdminDesignFixture() {
   const { screen } = useParams<{ screen: string }>();
+  const [search] = useSearchParams();
+  // The mocks draw their rail between 217 and 264px wide; the harness passes each
+  // mock's width so the content origin lines up. Default: the Overview mock.
+  const railWidth = Math.min(320, Math.max(160, Number(search.get("rail")) || 229));
   const entry = screen ? ADMIN_FIXTURES[screen] : undefined;
   if (!entry) {
     return (
@@ -47,7 +51,7 @@ export default function AdminDesignFixture() {
   return (
     <AdminFixtureProvider fixture={entry.fixture}>
       <div data-admin-fixture={screen} className="min-h-screen bg-adm-workspace flex">
-        <div className="hidden lg:block w-[224px] flex-shrink-0 bg-adm-sidebar" aria-hidden="true" />
+        <div className="hidden lg:block flex-shrink-0 bg-adm-sidebar" style={{ width: railWidth }} aria-hidden="true" />
         <div className="flex-1 min-w-0">
           <div className="h-16 border-b border-adm-border bg-adm-surface" aria-hidden="true" />
           <Suspense fallback={<div className="p-8 text-sm text-adm-muted">Loading fixture…</div>}>{content}</Suspense>

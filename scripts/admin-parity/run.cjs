@@ -38,7 +38,12 @@ const RESPONSIVE = [
 // The fixture page draws the product rail 224px wide and the product header
 // 64px tall; the references draw them at about 229 and 68. The content region
 // starts just past the larger of each so neither shell edge is scored.
-const CONTENT_REGION = (w, h) => ({ x: 232, y: 70, w: w - 232, h: h - 70 });
+// The mocks draw their rail between 217 and 264px wide (the live AppShell rail
+// is 256px); each screen's `_rail` in landmarks.json sizes the fixture's rail
+// stand-in to its mock so the content origin lines up, and the content region
+// starts just past it.
+const DEFAULT_RAIL = 229;
+const CONTENT_REGION = (w, h, rail = DEFAULT_RAIL) => ({ x: rail + 3, y: 70, w: w - rail - 3, h: h - 70 });
 
 function parseArgs(argv) {
   const out = { screens: null, baseUrl: null, port: 5181, reportOnly: false };
@@ -104,6 +109,8 @@ async function main() {
       const { screen } = entry;
       const maskSpec = masksAll[screen] || { selectors: [], rects: [] };
       const landmarkSpec = landmarksAll[screen] || null;
+      const rail = landmarkSpec && typeof landmarkSpec._rail === "number" ? landmarkSpec._rail : DEFAULT_RAIL;
+      entry.rail = rail;
       const refPath = referenceFor(screen);
       entry.reference = refPath ? path.relative(ROOT, refPath) : null;
       const reference = refPath ? decodePng(fs.readFileSync(refPath)) : null;
@@ -113,15 +120,16 @@ async function main() {
         // A screen may pin its own alignment anchor in landmarks.json: `_anchor: { reference: <y of the row the body starts on>, selector: "<element whose bottom is that row in the capture>" }`.
         // Child screens use it because their mocks have no section row under the title, or carry a chip the underline detector would pick.
         const anchorSpec = landmarkSpec && landmarkSpec._anchor ? landmarkSpec._anchor : null;
-        const cap = await captureScreen(page, { baseUrl, screen, viewport: frame, outPng, maskSpec, landmarkSpec, anchorSelector: anchorSpec ? anchorSpec.selector : null });
+        const cap = await captureScreen(page, { baseUrl, screen, viewport: frame, outPng, maskSpec, landmarkSpec, anchorSelector: anchorSpec ? anchorSpec.selector : null, rail });
         entry.fonts = cap.fonts;
         const frameResult = { file: path.relative(ROOT, outPng), masks: cap.masks.length };
         if (label === "reference") {
           entry.masks = cap.masks;
           entry.anchors = anchorSpec
             ? { referenceTop: typeof anchorSpec.reference === "number" ? anchorSpec.reference : null, captureTop: cap.anchors ? cap.anchors.custom : null, h1Bottom: cap.anchors ? cap.anchors.h1Bottom : null, pinned: true }
-            : { referenceTop: reference ? findReferenceSectionRowBottom(reference, CONTENT_REGION(frame.width, frame.height)) : null, captureTop: cap.anchors ? cap.anchors.sectionNavBottom : null, h1Bottom: cap.anchors ? cap.anchors.h1Bottom : null, pinned: false };
-          entry.landmarks = landmarkSpec ? checkLandmarks(Object.fromEntries(Object.entries(landmarkSpec).filter(([k]) => !k.startsWith("_") && k !== "tolerance")), cap.landmarks, landmarksAll.tolerance ?? 16, entry.anchors) : null;
+            : { referenceTop: reference ? findReferenceSectionRowBottom(reference, CONTENT_REGION(frame.width, frame.height, rail)) : null, captureTop: cap.anchors ? cap.anchors.sectionNavBottom : null, h1Bottom: cap.anchors ? cap.anchors.h1Bottom : null, pinned: false };
+          const declared = landmarkSpec ? Object.fromEntries(Object.entries(landmarkSpec).filter(([k]) => !k.startsWith("_") && k !== "tolerance")) : {};
+          entry.landmarks = Object.keys(declared).length ? checkLandmarks(declared, cap.landmarks, landmarksAll.tolerance ?? 16, entry.anchors) : null;
           entry.measuredLandmarks = cap.landmarks;
         }
         if (reference) {
@@ -130,7 +138,7 @@ async function main() {
           const sx = frame.width / REFERENCE_FRAME.width;
           const sy = frame.height / REFERENCE_FRAME.height;
           const rects = label === "reference" ? cap.masks : scaleRects(cap.masks, 1, 1);
-          const cmp = compareFrames({ reference: ref, capture, masks: rects, contentRegion: CONTENT_REGION(frame.width, frame.height) });
+          const cmp = compareFrames({ reference: ref, capture, masks: rects, contentRegion: CONTENT_REGION(frame.width, frame.height, rail) });
           const diffPath = path.join(OUT, `${screen}-${frame.width}x${frame.height}-diff.png`);
           fs.writeFileSync(diffPath, encodePng(cmp.diff));
           frameResult.diff = path.relative(ROOT, diffPath);
@@ -139,7 +147,7 @@ async function main() {
           frameResult.content = cmp.content;
           frameResult.referenceResampled = sx !== 1 || sy !== 1;
           if (label === "reference") {
-            frameResult.body = compareBody({ reference: ref, capture, masks: rects, contentRegion: CONTENT_REGION(frame.width, frame.height), referenceTop: entry.anchors.referenceTop, captureTop: entry.anchors.captureTop });
+            frameResult.body = compareBody({ reference: ref, capture, masks: rects, contentRegion: CONTENT_REGION(frame.width, frame.height, rail), referenceTop: entry.anchors.referenceTop, captureTop: entry.anchors.captureTop });
             fs.copyFileSync(outPng, path.join(EVIDENCE, `${screen}-${frame.width}x${frame.height}.png`));
             fs.copyFileSync(diffPath, path.join(EVIDENCE, `${screen}-${frame.width}x${frame.height}-diff.png`));
           }
@@ -148,7 +156,7 @@ async function main() {
         }
         entry.frames[label] = frameResult;
       }
-      entry.responsive = await responsiveCheck(page, { baseUrl, screen, viewports: RESPONSIVE, outDir: OUT });
+      entry.responsive = await responsiveCheck(page, { baseUrl, screen, viewports: RESPONSIVE, outDir: OUT, rail });
       const r = entry.frames.reference;
       const gate = {
         landmarks: entry.landmarks ? entry.landmarks.every((l) => l.ok) : null,

@@ -42,7 +42,7 @@ function writeReport(results, outPath) {
   lines.push("- Pixel parity: a pixel differs when any channel moves by more than 32 of 255 after masks. Parity is 100 minus the differing share of compared pixels. No anti-aliasing allowance is applied.");
   lines.push("- Structure: mean SSIM over 8x8 luminance blocks after masks.");
   lines.push("- Masks: only dynamic data (counts, relative times, fixture names) listed in `scripts/admin-parity/masks.json`, read from the rendered DOM so the same boxes mask both images. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.");
-  lines.push("- Content region: x >= 232 and y >= 70, which excludes the product rail and product header. Those belong to the global application shell (`AppShell`), which this refresh does not restyle; the full-frame score includes them for completeness.");
+  lines.push("- Content region: y >= 70 and x past the mock's rail (each screen's `_rail` in `scripts/admin-parity/landmarks.json`, 217 to 264px across the set; the fixture sizes its rail stand-in to the same number so the content origin lines up). The rail and the product header belong to the global application shell (`AppShell`, whose live rail is 256px), which this refresh does not restyle; the full-frame score includes them for completeness.");
   lines.push("- Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes. A `yBody` landmark is measured from the section-row bottom on both sides.");
   lines.push("- Body parity (aligned): the handoff's information architecture fixes one h1, \"Administration\", with a breadcrumb above it, while the mocks title their pages four different ways (section name as title, no breadcrumb, no description, a chip above the title). That title block is a documented exception: the body score shifts the reference so both section rows end on the same pixel row and scores everything below it in the content region, with the same masks. The offset is printed with the score and the raw content score stays the protocol number.");
   lines.push("- Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.");
@@ -59,6 +59,7 @@ function writeReport(results, outPath) {
     lines.push(frameRow(`${results.referenceFrame.width}x${results.referenceFrame.height}`, s.frames.reference));
     lines.push(frameRow(`${results.protocolFrame.width}x${results.protocolFrame.height}`, s.frames.protocol));
     lines.push("");
+    if (typeof s.rail === "number") lines.push(`Rail stand-in: ${s.rail}px (the mock's rail width); content region starts at x=${s.rail + 3}.`);
     if (s.anchors) {
       const a = s.anchors;
       lines.push(`${a.pinned ? "Body anchor (pinned in landmarks.json)" : "Section row bottom"}: reference y=${a.referenceTop === null ? "not found" : a.referenceTop}, capture y=${a.captureTop === null ? "not found" : a.captureTop}${typeof a.referenceTop === "number" && typeof a.captureTop === "number" ? ` (title block offset ${a.captureTop - a.referenceTop >= 0 ? "+" : ""}${a.captureTop - a.referenceTop}px)` : ""}.`);

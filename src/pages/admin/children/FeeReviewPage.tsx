@@ -304,6 +304,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         )}
       </div>
       <div className="absolute inset-0 z-40 bg-[#626A75]/[0.64]" onClick={close} aria-hidden="true" />
+      {/* The reference draws the review 18px left of the content column centre on desktop; narrow widths centre it. */}
       <div aria-hidden="true" data-landmark="fee-review-top" className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: DIALOG_TOP }} />
       <div
         ref={dialogRef}
@@ -313,7 +314,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         tabIndex={-1}
         onKeyDown={onKeyDown}
         style={{ top: DIALOG_TOP }}
-        className="absolute z-50 left-1/2 -translate-x-1/2 w-[min(907px,calc(100%-32px))] rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none px-7 pt-6 pb-6 text-adm-ink"
+        className="absolute z-50 left-1/2 -translate-x-1/2 lg:left-[calc(50%-18px)] w-[min(907px,calc(100%-32px))] rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none px-7 pt-6 pb-6 text-adm-ink"
       >
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">

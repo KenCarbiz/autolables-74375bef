@@ -1,7 +1,7 @@
 {
-  "_comment": "Hard landmarks per screen in the reference frame (1586x992, the originals' native size). Expected edges were measured by hand from screens/original; tolerance 16px. Each landmark names the DOM element the capture measures (selector with an optional index, or selector plus `heading`, the text of the element's first h1-h3) and the edges it must land on. A screen may add `_anchor: {reference, selector}` to pin the body alignment row (see run.cjs); `yBody` on a landmark is measured from that row on both sides.",
-  "tolerance": 16,
+  "_comment": "Hard landmarks per screen in the reference frame (1586x992, the originals' native size). Expected edges were measured by hand from screens/original; tolerance 16px. Each landmark names the DOM element the capture measures (selector with an optional index, or selector plus `heading`, the text of the element's first h1-h3) and the edges it must land on. A screen may add `_anchor: {reference, selector}` to pin the body alignment row (see run.cjs); `yBody` on a landmark is measured from that row on both sides. `_rail` is the width of the mock's product rail, measured on its navy edge at y=600; the fixture page draws its rail stand-in at that width.",
   "01": {
+    "_rail": 229,
     "breadcrumb": {
       "selector": "nav[aria-label=\"Breadcrumb\"]",
       "x": 249,
@@ -72,7 +72,17 @@
       "w": 276
     }
   },
+  "02": {
+    "_rail": 252
+  },
+  "03": {
+    "_rail": 238
+  },
+  "04": {
+    "_rail": 239
+  },
   "05": {
+    "_rail": 228,
     "_comment": "Section row bottom 158 (bluerows: underline y 155-156); yBody is measured from it. Card edges from edges.cjs at x 270/600/905/1300/1555 and hedges rows 230/300/535/585/737; text origins from bbox.cjs.",
     "sectionNav": {
       "selector": "nav[aria-label=\"Administration sections\"]",
@@ -134,8 +144,12 @@
     }
   },
   "06": {
+    "_rail": 243,
     "_comment": "The mock dims the workspace and draws the dialog at x 443-1350, y 187-962 (edges.cjs at x 460/560/1200, hedges at y 200/296/395/660/895). The body row is pinned to the dialog top, which the view marks with a zero-height element whose bottom is that row; yBody is measured from 187.",
-    "_anchor": { "reference": 187, "selector": "[data-landmark=\"fee-review-top\"]" },
+    "_anchor": {
+      "reference": 187,
+      "selector": "[data-landmark=\"fee-review-top\"]"
+    },
     "dialog": {
       "selector": "[role=\"dialog\"]",
       "x": 443,
@@ -217,8 +231,12 @@
     }
   },
   "07": {
+    "_rail": 242,
     "_comment": "Child page: no section row. The body row is pinned to the child tab row bottom, 228 in the mock (bluerows: underline y 226-227, border 227). Card and box edges from edges.cjs at x 280/300/700/1100/1500 and hedges at y 260/384/475/583/720/954; text origins from bbox.cjs.",
-    "_anchor": { "reference": 228, "selector": "nav[aria-label=\"Product views\"]" },
+    "_anchor": {
+      "reference": 228,
+      "selector": "nav[aria-label=\"Product views\"]"
+    },
     "childTabs": {
       "selector": "nav[aria-label=\"Product views\"]",
       "x": 267,
@@ -285,5 +303,24 @@
       "w": 155,
       "h": 42
     }
-  }
+  },
+  "08": {
+    "_rail": 237
+  },
+  "09": {
+    "_rail": 217
+  },
+  "10": {
+    "_rail": 257
+  },
+  "11": {
+    "_rail": 264
+  },
+  "12": {
+    "_rail": 242
+  },
+  "13": {
+    "_rail": 233
+  },
+  "tolerance": 16
 }
