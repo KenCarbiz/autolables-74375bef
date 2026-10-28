@@ -160,7 +160,7 @@ export const ChildPageFrame = ({
           {actions}
           {backHref && (
             <Link to={backHref} className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-adm-primary hover:underline whitespace-nowrap">
-              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
               {backLabel ?? "Back"}
             </Link>
           )}
