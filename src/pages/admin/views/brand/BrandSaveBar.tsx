@@ -57,15 +57,15 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
           </dl>
         </div>
       )}
-      <div role="status" aria-live="polite" className="flex items-center justify-between gap-4 px-4 sm:pl-[26px] sm:pr-[26px] pt-[11px] pb-[9px]">
-        <div className="flex items-start gap-3 min-w-0 self-start -mt-px">
+      <div role="status" aria-live="polite" className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:pl-[26px] sm:pr-[26px] pt-[11px] pb-[9px]">
+        <div className="flex items-start gap-3 min-w-0 flex-1 basis-[220px] self-start -mt-px">
           <Icon className={cn("mt-px w-[29px] h-[29px] flex-shrink-0", iconClass, status === "saving" && "animate-spin")} aria-hidden="true" />
           <div className="min-w-0">
             <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{view.title}</p>
             <p className="text-[12px] leading-[18px] text-adm-muted break-words">{view.detail}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 max-sm:w-full max-sm:[&>*]:flex-1">
           {dirty && status !== "saving" && (
             <AdminButton variant="secondary" className={button} onClick={() => { setReviewing(false); form.discard(); }}>Discard</AdminButton>
           )}
