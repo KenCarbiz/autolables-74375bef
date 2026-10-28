@@ -151,3 +151,11 @@ LANGUAGE sql AS $$
   SELECT stage, area, count(*), count(*) FILTER (WHERE pass), count(*) FILTER (WHERE NOT pass)
   FROM t.results GROUP BY stage, area ORDER BY min(seq)
 $$;
+
+-- A case may switch principal partway with `SELECT t.become('name')`, and run
+-- setup as the superuser after `RESET ROLE` (the session user is a superuser,
+-- so both are allowed from any role). Used where one person acts and another
+-- then relies on the result, all inside the same rolled-back case.
+GRANT USAGE ON SCHEMA t TO anon, authenticated, service_role;
+GRANT SELECT ON t.users TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION t.become(text), t.u(text) TO anon, authenticated, service_role;
