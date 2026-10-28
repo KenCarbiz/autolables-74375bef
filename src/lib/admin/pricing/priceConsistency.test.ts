@@ -97,20 +97,57 @@ describe("price consistency on the fee-inclusive display basis", () => {
     expect(a.status).toBe("mismatch");
     expect(a.delta).toBe(895);
     expect(a.websiteBasis).toBe("as_shown");
-    expect(a.detail).toBe("Website differs from the label by +$895 on the advertised total including the document fee.");
+    expect(a.breakdownDelta).toBe(895);
+    expect(a.detail).toBe("Website differs from the label by +$895 on the advertised total including the document fee. Stored breakdown ($39,525 before fee + $895 fee = $40,420) differs from the advertised total by +$895.");
   });
 
+  // A coherent fee-inclusive listing: the inventory price is the total, the stored breakdown is price before fee + fee.
+  const inclusive = (over: Partial<ConsistencyListing> = {}) => listing({ price: 30_895, advertisedBeforeDoc: 30_000, websiteSalePrice: 30_895, ...over });
+
   it("is consistent when the website shows the same advertised total", () => {
-    const a = assessConsistency(listing(), obs(30_000), 895, "website_sale_price");
+    const a = assessConsistency(inclusive(), obs(30_895), 895, "website_sale_price");
     expect(a.status).toBe("consistent");
     expect(a.websiteBasis).toBe("as_shown");
     expect(a.detail).toBe("Website, label and Passport agree on the advertised total including the document fee.");
   });
 
   it("lifts a website price shown before the fee onto the total and says so", () => {
-    const a = assessConsistency(listing(), obs(29_105), 895, "website_sale_price");
+    const a = assessConsistency(inclusive(), obs(30_000), 895, "website_sale_price");
     expect(a.status).toBe("consistent");
     expect(a.websiteBasis).toBe("fee_added");
+  });
+});
+
+describe("stored breakdown against the fee-inclusive total", () => {
+  const inclusive = (over: Partial<ConsistencyListing> = {}) => listing({ price: 30_895, advertisedBeforeDoc: 30_000, websiteSalePrice: 30_895, ...over });
+
+  it("agrees when price before fee plus the fee equals the advertised total", () => {
+    expect(assessConsistency(inclusive(), obs(30_895), 895, "website_sale_price").breakdownDelta).toBe(0);
+  });
+
+  it("keeps a breakdown that does not add up visible even when website and Passport agree", () => {
+    const a = assessConsistency(inclusive({ advertisedBeforeDoc: 30_200 }), obs(30_895), 895, "website_sale_price");
+    expect(a.delta).toBe(0);
+    expect(a.passportDelta).toBe(0);
+    expect(a.breakdownDelta).toBe(200);
+    expect(a.status).toBe("mismatch");
+    expect(a.detail).toBe("Stored breakdown ($30,200 before fee + $895 fee = $31,095) differs from the advertised total by +$200.");
+  });
+
+  it("reports a breakdown mismatch without a website observation instead of Not checked", () => {
+    const a = assessConsistency(listing({ price: 39_525, advertisedBeforeDoc: 39_525 }), null, 895, "website_sale_price");
+    expect(a.status).toBe("mismatch");
+    expect(a.detail).toMatch(/^No website observation for this vehicle yet\. Stored breakdown/);
+  });
+
+  it("with a zero fee, a total equal to the price before fee is consistent", () => {
+    const a = assessConsistency(listing({ price: 30_000, advertisedBeforeDoc: 30_000, docFee: 0 }), obs(30_000), 0, "website_sale_price");
+    expect(a.breakdownDelta).toBe(0);
+    expect(a.status).toBe("consistent");
+  });
+
+  it("does not apply the fee-inclusive breakdown rule on the before-fee basis", () => {
+    expect(assessConsistency(listing(), obs(30_000), 895, "advertised_before_doc").breakdownDelta).toBe(0);
   });
 });
 

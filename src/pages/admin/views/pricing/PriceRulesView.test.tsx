@@ -69,6 +69,13 @@ describe("PriceRulesView with the 05 fixture", () => {
     expect(screen.getByText("Customer price preview")).toBeInTheDocument();
     expect(screen.getByText("Advertised total")).toBeInTheDocument();
     expect(screen.getByText("Taxes and registration are separate.")).toBeInTheDocument();
+    // Fee-inclusive basis: the preview anchors on the inventory total the label and Passport show
+    // ($39,525) and splits the $895 fee out of it once; it never adds the fee on top.
+    const preview = screen.getByText("Advertised total").closest("dl") as HTMLElement;
+    expect(within(preview).getByText("Selling price").nextElementSibling).toHaveTextContent("$38,630");
+    expect(within(preview).getByText("Conveyance Fee").nextElementSibling).toHaveTextContent("$895");
+    expect(within(preview).getByText("Advertised total").nextElementSibling).toHaveTextContent("$39,525");
+    expect(within(preview).queryByText("$40,420")).toBeNull();
 
     // The display basis is fee-inclusive, so the first row's $40,420 website
     // total disagrees with the $39,525 total the label and Passport advertise.
@@ -79,17 +86,20 @@ describe("PriceRulesView with the 05 fixture", () => {
     expect(within(first).getByText("Mismatch")).toBeInTheDocument();
     expect(within(first).getByText(/Website differs from the label by \+\$895 on the advertised total including the document fee\./)).toBeInTheDocument();
     expect(within(table).queryByText("Consistent")).toBeNull();
-    expect(within(table).getAllByText("Mismatch")).toHaveLength(2);
-    expect(within(table).getAllByText("Not checked")).toHaveLength(1);
+    // Every fixture row stores a before-fee price equal to its total, so the breakdown
+    // (price before fee + fee) does not add up on the fee-inclusive basis; that stays visible.
+    expect(within(first).getByText(/Stored breakdown \(\$39,525 before fee \+ \$895 fee = \$40,420\) differs from the advertised total by \+\$895\./)).toBeInTheDocument();
+    expect(within(table).getAllByText("Mismatch")).toHaveLength(3);
+    expect(within(table).queryByText("Not checked")).toBeNull();
     expect(within(table).getAllByText("Older version")).toHaveLength(1);
     expect(within(table).getAllByText("Awaiting evidence")).toHaveLength(1);
     expect(screen.getByText(/^Compared on the advertised total including the document fee \(the display basis\)/)).toBeInTheDocument();
     expect(screen.getByText("Conveyance Fee is what Connecticut calls the document fee; customers see that term.")).toBeInTheDocument();
     const stacked = screen.getByRole("list", { name: "Price consistency by vehicle" });
     expect(within(stacked).getAllByRole("listitem")).toHaveLength(3);
-    expect(within(stacked).getAllByText("Mismatch")).toHaveLength(2);
+    expect(within(stacked).getAllByText("Mismatch")).toHaveLength(3);
     expect(screen.getByText("3 vehicles shown")).toBeInTheDocument();
-    expect(screen.getByText("2 mismatches need review.")).toBeInTheDocument();
+    expect(screen.getByText("3 mismatches need review.")).toBeInTheDocument();
     expect(writeCalls()).toEqual([]);
   });
 

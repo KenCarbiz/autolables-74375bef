@@ -54,7 +54,7 @@ export const CONSISTENCY_ROWS: ConsistencyAssessment[] = [
 export const PRICE_RULES_FIXTURE: PriceRulesFixture = {
   policy: { stateCode: "CT", feeEnabled: true, feeAmount: 895, mode: "website_sale_price" },
   counts: { eligible: knownCount(48), archived: knownCount(12) },
-  preview: { title: "2024 Example Crossover", trim: "Premium", stock: "EX-1041", imageUrl: null, sellingPrice: 18_000 + 41 * 525, vehicleType: "used" },
+  preview: { title: "2024 Example Crossover", trim: "Premium", stock: "EX-1041", imageUrl: null, stored: { price: CONSISTENCY_ROWS[0].listing.price, advertisedBeforeDoc: CONSISTENCY_ROWS[0].listing.advertisedBeforeDoc, websiteSalePrice: CONSISTENCY_ROWS[0].listing.websiteSalePrice }, vehicleType: "used" },
   consistency: { rows: CONSISTENCY_ROWS, truncated: false },
   websiteTerm: "Sale Price",
   // Review and Close stay inside the design fixtures, so the round trip can be exercised.

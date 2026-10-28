@@ -62,6 +62,11 @@ export interface ConsistencyAssessment {
   delta: number | null;
   /** Passport minus label; both are on the display basis. */
   passportDelta: number | null;
+  /**
+   * On the fee-inclusive basis: stored before-fee price plus the fee, minus the
+   * advertised total. Non-zero means the stored breakdown and the total disagree.
+   */
+  breakdownDelta: number | null;
   reviewHref: string | null;
   sourceUrl: string | null;
 }
@@ -83,6 +88,7 @@ const TOLERANCE = 1;
 export const priceBasisOf = (mode: PriceDisplayMode): PriceBasis => (mode === "website_sale_price" ? "includes_fee" : "before_fee");
 
 const signedMoney = (n: number): string => `${n > 0 ? "+" : "-"}$${Math.abs(Math.round(n)).toLocaleString()}`;
+const money = (n: number): string => `$${Math.round(n).toLocaleString()}`;
 
 export const conditionOfListing = (condition: string | null | undefined): "new" | "used" | "cpo" => {
   const c = (condition ?? "").toLowerCase();
@@ -117,11 +123,20 @@ export function assessConsistency(
     evidence = verified == null || captured >= verified ? "same_version" : "older_version";
   }
 
+  const breakdownDifference = basis === "includes_fee" && label != null && listing.advertisedBeforeDoc != null
+    ? listing.advertisedBeforeDoc + docFee - label
+    : 0;
+  const breakdownAgrees = Math.abs(breakdownDifference) < TOLERANCE;
+  const breakdownText = breakdownAgrees || listing.advertisedBeforeDoc == null
+    ? null
+    : `Stored breakdown (${money(listing.advertisedBeforeDoc)} before fee + ${money(docFee)} fee = ${money(listing.advertisedBeforeDoc + docFee)}) differs from the advertised total by ${signedMoney(breakdownDifference)}.`;
+
   if (website == null || label == null) {
+    const base = website == null ? "No website observation for this vehicle yet." : "No stored label price to compare.";
     return {
       listing, vehicle: vehicleTitle(listing), sellingPrice: listing.advertisedBeforeDoc, docFee, website, label, passport, basis, websiteBasis: "as_shown",
-      evidence: "awaiting", status: "not_checked", detail: website == null ? "No website observation for this vehicle yet." : "No stored label price to compare.",
-      delta: null, passportDelta: null, reviewHref, sourceUrl: observation?.sourceUrl ?? null,
+      evidence: "awaiting", status: breakdownText ? "mismatch" : "not_checked", detail: breakdownText ? `${base} ${breakdownText}` : base,
+      delta: null, passportDelta: null, breakdownDelta: breakdownAgrees ? 0 : breakdownDifference, reviewHref, sourceUrl: observation?.sourceUrl ?? null,
     };
   }
 
@@ -139,11 +154,12 @@ export function assessConsistency(
   const websiteAgrees = Math.abs(difference) < TOLERANCE;
   const passportAgrees = Math.abs(passportDifference) < TOLERANCE;
   const parserWarning = listing.parseStatus === "warning";
-  const status: ConsistencyStatus = websiteAgrees && passportAgrees && !parserWarning ? "consistent" : "mismatch";
+  const status: ConsistencyStatus = websiteAgrees && passportAgrees && breakdownAgrees && !parserWarning ? "consistent" : "mismatch";
   const basisText = basis === "includes_fee" ? "advertised total including the document fee" : "price before the document fee";
   const disagreements = [
     websiteAgrees ? null : `Website differs from the label by ${signedMoney(difference)} on the ${basisText}.`,
     passportAgrees ? null : `Passport differs from the label by ${signedMoney(passportDifference)}.`,
+    breakdownText,
   ].filter((x): x is string => !!x);
   const detail = parserWarning
     ? "The price parser flagged this vehicle; the flag is preserved until the source is reviewed."
@@ -153,7 +169,7 @@ export function assessConsistency(
 
   return {
     listing, vehicle: vehicleTitle(listing), sellingPrice: listing.advertisedBeforeDoc, docFee, website, label, passport, basis, websiteBasis,
-    evidence, status, detail, delta: websiteAgrees ? 0 : difference, passportDelta: passportAgrees ? 0 : passportDifference, reviewHref,
+    evidence, status, detail, delta: websiteAgrees ? 0 : difference, passportDelta: passportAgrees ? 0 : passportDifference, breakdownDelta: breakdownAgrees ? 0 : breakdownDifference, reviewHref,
     sourceUrl: observation?.sourceUrl ?? null,
   };
 }

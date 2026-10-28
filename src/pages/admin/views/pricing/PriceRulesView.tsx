@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { customerPrice, type StoredListingPrice } from "@/lib/admin/pricing/previewPricing";
 import vehiclePlaceholder from "@/assets/admin-v2/artwork/vehicle-placeholder.svg";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, FileText, Globe, Info, Pencil, Tag } from "lucide-react";
@@ -42,7 +43,8 @@ export interface PreviewVehicle {
   trim: string | null;
   stock: string | null;
   imageUrl: string | null;
-  sellingPrice: number;
+  /** The stored listing prices; the preview derives the customer price from them. */
+  stored: StoredListingPrice;
   vehicleType: PricingVehicleType;
 }
 
@@ -87,14 +89,14 @@ const WebsiteValue = ({ row }: { row: ConsistencyAssessment }) =>
   );
 
 const previewFromRows = (rows: ConsistencyAssessment[]): PreviewVehicle | null => {
-  const row = rows.find((r) => r.sellingPrice != null && r.sellingPrice > 0) ?? null;
-  if (!row || row.sellingPrice == null) return null;
+  const row = rows.find((r) => (r.listing.price ?? r.listing.advertisedBeforeDoc ?? 0) > 0) ?? null;
+  if (!row) return null;
   return {
     title: row.vehicle,
     trim: row.listing.trim,
     stock: row.listing.stock,
     imageUrl: row.listing.heroImageUrl,
-    sellingPrice: row.sellingPrice,
+    stored: { price: row.listing.price, advertisedBeforeDoc: row.listing.advertisedBeforeDoc, websiteSalePrice: row.listing.websiteSalePrice },
     vehicleType: conditionOfListing(row.listing.condition),
   };
 };
@@ -222,12 +224,13 @@ export default function PriceRulesView() {
 
   const preview = fixture ? fixture.preview : consistencyRows ? previewFromRows(consistencyRows) : null;
   const previewFee = effectiveFee(editing ? draft : stored);
-  const previewCard = preview
+  const previewPrice = preview ? customerPrice(preview.stored, previewFee, policy.mode) : null;
+  const previewCard = preview && previewPrice
     ? buildSalePriceCard({
         vehicleType: preview.vehicleType,
-        vehicleSellingPrice: preview.sellingPrice,
-        totalAdvertisedPrice: preview.sellingPrice + previewFee,
-        docFee: previewFee,
+        vehicleSellingPrice: previewPrice.sellingPrice,
+        totalAdvertisedPrice: previewPrice.total,
+        docFee: previewPrice.docFee,
         docFeeLabel: feeReference((editing ? draft : stored).stateCode)?.terminology ?? null,
       })
     : null;
