@@ -365,10 +365,18 @@ text makes (price columns writable by every `can_edit_inventory` holder;
 `dealer_programs` as an add-on claim) are live; narrowing either is a
 follow-up migration.
 
-**Edge function (not deployed).** `supabase/functions/passport-lead-escalation`
-is rewritten on `supabase/functions/_shared/escalation.ts`. Deploying changes
-the sweep's audit rows (readable by dealers) and stops advancing a lead on a
-failed send. Deploy through Lovable on the owner's word.
+**Edge function (deployed).** `supabase/functions/passport-lead-escalation`,
+rewritten on `supabase/functions/_shared/escalation.ts`, was deployed by the
+owner through Lovable on 2026-10-28 at 11:46 UTC. The five source files
+(`index.ts`, `_shared/escalation.ts`, `passport-routing.ts`, `http.ts`,
+`supabase.ts`) match `main` at `6746a95` blob for blob (verified from the
+repository); the platform reports one hash for the whole upload and does
+not expose the live files for a file-by-file read-back. The schedule (every
+five minutes) and the secrets were not changed. The first sweep after the
+deploy ran at 11:50 UTC and wrote nothing because no lead was eligible (no
+lead rows in the previous seven days), so the new audit-row shape
+(`store_id` equal to the tenant id, no address in the details) is observed
+on the first real lead that goes unanswered past the first tier.
 
 **Canary.** None is available at the route level without a flag; the safe
 staged approach is the one taken: the UI first (no server change), then
@@ -387,14 +395,14 @@ migration 1 (additive: columns, ledger, functions), then migration 2
   `admin_policy_applications` first if the ledger matters; anon privileges
   are recommended to stay revoked).
 - Edge function: redeploy the previous `passport-lead-escalation` from
-  `763b524`.
+  `763b524` (the version live until 2026-10-28 11:46 UTC).
 
 ## I. Unresolved dependencies
 
 | Item | Owner | Blocker | Safe current behaviour |
 |---|---|---|---|
 | Observe the first writes under migration 2 (a manager refused on a pricing key, a salesperson's workspace key accepted, the next feed and crawl runs) | Owner and this session, on 2026-10-29 after the 07:20 UTC crawl | Nothing had been written by 11:30 UTC on apply day | Rollback SQL for migration 2 is section 5.1 of the server authority document |
-| Deploy `passport-lead-escalation` | Owner, through Lovable | Authorization | The live sweep keeps its pre-existing behaviour (advances on any send attempt); the Administration child shows legacy rows as Attempted, never Accepted |
+| Observe the first escalation rows from the deployed sweep | This session's check-ins and the Administration escalation child | No eligible lead since the deploy | The sweep runs every five minutes; the child shows legacy rows as Attempted, never Accepted |
 | Visual parity below 97 on screens listed in F | Owner | The title-block exception and glyph rendering (F) | The screens pass their landmark and overflow gates where listed; the parity report itemises hotspots |
 | Price-column guard roles (`can_edit_inventory` holders, not only the four pricing roles) | Owner | Decision, `ADMIN_V2_SERVER_AUTHORITY.md` section 9.1; live as written | Inventory surfaces keep working; narrowing is a follow-up migration |
 | `dealer_programs` written by Sticker Studio for any document role | Owner | Decision, section 9.2; live as written | Salespeople can no longer add a dealer program from Sticker Studio; moving the key to the member list is a follow-up migration |
