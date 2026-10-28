@@ -5,10 +5,12 @@ const path = require("node:path");
 const pct = (n) => (typeof n === "number" ? `${n.toFixed(2)}%` : "n/a");
 
 function frameRow(label, f) {
-  if (!f || !f.full) return `| ${label} | ${f ? f.file : "n/a"} | ${f && f.note ? f.note : "no comparison"} | | | | | | |`;
+  if (!f || !f.full) return `| ${label} | ${f ? f.file : "n/a"} | ${f && f.note ? f.note : "no comparison"} | | | | | | | | |`;
   const body = f.body ? `${pct(f.body.parityPercent)} (${f.body.offset >= 0 ? "+" : ""}${f.body.offset}px)` : "n/a";
   const bodyStructure = f.body ? pct(f.body.structuralPercent) : "n/a";
-  return `| ${label} | \`${f.file}\` | ${pct(f.full.parityPercent)} | ${pct(f.full.structuralPercent)} | ${pct(f.content.parityPercent)} | ${pct(f.content.structuralPercent)} | ${body} | ${bodyStructure} | ${pct(f.maskedPercent)} |`;
+  const layout = f.body && f.body.nonText ? pct(f.body.nonText.parityPercent) : "n/a";
+  const text = f.body && f.body.text ? pct(f.body.text.parityPercent) : "n/a";
+  return `| ${label} | \`${f.file}\` | ${pct(f.full.parityPercent)} | ${pct(f.full.structuralPercent)} | ${pct(f.content.parityPercent)} | ${pct(f.content.structuralPercent)} | ${body} | ${bodyStructure} | ${layout} | ${text} | ${pct(f.maskedPercent)} |`;
 }
 
 function readNotes() {
@@ -44,6 +46,8 @@ function writeReport(results, outPath) {
   lines.push("- Masks: only dynamic data (counts, relative times, fixture names) listed in `scripts/admin-parity/masks.json`, read from the rendered DOM so the same boxes mask both images. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.");
   lines.push("- Content region: y >= 70 and x past the mock's rail (each screen's `_rail` in `scripts/admin-parity/landmarks.json`, 217 to 264px across the set; the fixture sizes its rail stand-in to the same number so the content origin lines up). The rail and the product header belong to the global application shell (`AppShell`, whose live rail is 256px), which this refresh does not restyle; the full-frame score includes them for completeness.");
   lines.push("- Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes. A `yBody` landmark is measured from the section-row bottom on both sides.");
+  lines.push("- Layout parity (text masked) and text-box parity: the body region split by the implementation's text boxes (every rendered line of text, padded 2px, and the content box of every form control). Layout parity scores everything outside them: fills, borders, spacing, component sizes and icons. Text-box parity scores the glyphs inside them, where Chromium's Inter and the mock renderer differ even when the box sits exactly where the mock's text sits. Mock text that falls outside every implementation text box counts against layout, so misplaced or missing copy is not hidden by the split. The layout diff image (`*-structure.png`) marks layout differences red and text-box differences amber.");
+  lines.push("- Mock-only annotations: the handoff mocks print captions on the image itself (the Proposed design footer, the DESIGN CONCEPT label, a sample-policy caption, a recovery-flow caption). They are not product UI; `masks.json` covers them on both images with the reason recorded.");
   lines.push("- Body parity (aligned): the handoff's information architecture fixes one h1, \"Administration\", with a breadcrumb above it, while the mocks title their pages four different ways (section name as title, no breadcrumb, no description, a chip above the title). That title block is a documented exception: the body score shifts the reference so both section rows end on the same pixel row and scores everything below it in the content region, with the same masks. The offset is printed with the score and the raw content score stays the protocol number.");
   lines.push("- Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.");
   lines.push("");
@@ -54,8 +58,8 @@ function writeReport(results, outPath) {
     lines.push("");
     lines.push(`Reference: ${s.reference ? `\`${s.reference}\`` : "not present"}. Fonts: Inter ${s.fonts && s.fonts.inter ? "loaded" : "not loaded"}${s.fonts && s.fonts.loaded.length ? ` (${s.fonts.loaded.join(", ")})` : ""}. ${gateLine(s)}`);
     lines.push("");
-    lines.push("| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |");
-    lines.push("|---|---|---|---|---|---|---|---|---|");
+    lines.push("| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |");
+    lines.push("|---|---|---|---|---|---|---|---|---|---|---|");
     lines.push(frameRow(`${results.referenceFrame.width}x${results.referenceFrame.height}`, s.frames.reference));
     lines.push(frameRow(`${results.protocolFrame.width}x${results.protocolFrame.height}`, s.frames.protocol));
     lines.push("");

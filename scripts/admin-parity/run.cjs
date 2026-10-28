@@ -147,7 +147,15 @@ async function main() {
           frameResult.content = cmp.content;
           frameResult.referenceResampled = sx !== 1 || sy !== 1;
           if (label === "reference") {
-            frameResult.body = compareBody({ reference: ref, capture, masks: rects, contentRegion: CONTENT_REGION(frame.width, frame.height, rail), referenceTop: entry.anchors.referenceTop, captureTop: entry.anchors.captureTop });
+            const body = compareBody({ reference: ref, capture, masks: rects, contentRegion: CONTENT_REGION(frame.width, frame.height, rail), referenceTop: entry.anchors.referenceTop, captureTop: entry.anchors.captureTop, textBoxes: cap.textBoxes });
+            if (body && body.structureDiff) {
+              const structurePath = path.join(OUT, `${screen}-${frame.width}x${frame.height}-structure.png`);
+              fs.writeFileSync(structurePath, encodePng(body.structureDiff));
+              fs.copyFileSync(structurePath, path.join(EVIDENCE, `${screen}-${frame.width}x${frame.height}-structure.png`));
+              body.structureDiffFile = path.relative(ROOT, structurePath);
+              delete body.structureDiff;
+            }
+            frameResult.body = body;
             fs.copyFileSync(outPng, path.join(EVIDENCE, `${screen}-${frame.width}x${frame.height}.png`));
             fs.copyFileSync(diffPath, path.join(EVIDENCE, `${screen}-${frame.width}x${frame.height}-diff.png`));
           }
@@ -169,7 +177,8 @@ async function main() {
       gate.passWithTitleException = gate.landmarks !== false && gate.responsive && (gate.bodyParity === null ? gate.pass : gate.bodyParity >= 97);
       entry.gate = gate;
       results.screens.push(entry);
-      const summary = r && r.full ? `full ${r.full.parityPercent.toFixed(2)}% · content ${r.content.parityPercent.toFixed(2)}% · structure ${r.content.structuralPercent.toFixed(2)}%${r.body ? ` · body ${r.body.parityPercent.toFixed(2)}% (offset ${r.body.offset >= 0 ? "+" : ""}${r.body.offset}px)` : ""}` : "no reference";
+      const split = r && r.body && r.body.nonText ? ` · layout ${r.body.nonText.parityPercent.toFixed(2)}% · text ${r.body.text.parityPercent.toFixed(2)}% (text ${r.body.text.shareOfBodyDiffPercent.toFixed(2)}% / layout ${r.body.nonText.shareOfBodyDiffPercent.toFixed(2)}% of body pixels differ)` : "";
+      const summary = r && r.full ? `full ${r.full.parityPercent.toFixed(2)}% · content ${r.content.parityPercent.toFixed(2)}% · structure ${r.content.structuralPercent.toFixed(2)}%${r.body ? ` · body ${r.body.parityPercent.toFixed(2)}% (offset ${r.body.offset >= 0 ? "+" : ""}${r.body.offset}px)` : ""}${split}` : "no reference";
       process.stdout.write(`${screen}: ${summary}; landmarks ${gate.landmarks === null ? "n/a" : gate.landmarks ? "ok" : "FAIL"}; responsive ${gate.responsive ? "ok" : "OVERFLOW"}; gate ${gate.pass ? "PASS" : "FAIL"}\n`);
     }
   } finally {

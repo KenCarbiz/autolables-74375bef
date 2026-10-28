@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T08:45:19.426Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-28T14:21:39.417Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -11,6 +11,8 @@ Generated 2026-10-28T08:45:19.426Z by `bun run admin:parity` against the develop
 - Masks: only dynamic data (counts, relative times, fixture names) listed in `scripts/admin-parity/masks.json`, read from the rendered DOM so the same boxes mask both images. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.
 - Content region: y >= 70 and x past the mock's rail (each screen's `_rail` in `scripts/admin-parity/landmarks.json`, 217 to 264px across the set; the fixture sizes its rail stand-in to the same number so the content origin lines up). The rail and the product header belong to the global application shell (`AppShell`, whose live rail is 256px), which this refresh does not restyle; the full-frame score includes them for completeness.
 - Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes. A `yBody` landmark is measured from the section-row bottom on both sides.
+- Layout parity (text masked) and text-box parity: the body region split by the implementation's text boxes (every rendered line of text, padded 2px, and the content box of every form control). Layout parity scores everything outside them: fills, borders, spacing, component sizes and icons. Text-box parity scores the glyphs inside them, where Chromium's Inter and the mock renderer differ even when the box sits exactly where the mock's text sits. Mock text that falls outside every implementation text box counts against layout, so misplaced or missing copy is not hidden by the split. The layout diff image (`*-structure.png`) marks layout differences red and text-box differences amber.
+- Mock-only annotations: the handoff mocks print captions on the image itself (the Proposed design footer, the DESIGN CONCEPT label, a sample-policy caption, a recovery-flow caption). They are not product UI; `masks.json` covers them on both images with the reason recorded.
 - Body parity (aligned): the handoff's information architecture fixes one h1, "Administration", with a breadcrumb above it, while the mocks title their pages four different ways (section name as title, no breadcrumb, no description, a chip above the title). That title block is a documented exception: the body score shifts the reference so both section rows end on the same pixel row and scores everything below it in the content region, with the same masks. The offset is printed with the score and the raw content score stays the protocol number.
 - Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.
 
@@ -18,19 +20,19 @@ Registered fixtures: 10, 11, 12, 13, 01, 02, 03, 04, 05, 06, 07, 08, 09.
 
 ## Screen 01
 
-Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.36% is below 97%). With the title-block exception: FAIL (body parity 89.61%).
+Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.43% is below 97%). With the title-block exception: FAIL (body parity 89.68%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 90.91% | 70.82% | 90.36% | 67.97% | 89.61% (+0px) | 64.18% | 1.92% |
-| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.94% | 72.17% | 90.70% | 70.01% | n/a | n/a | 1.92% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 90.96% | 71.03% | 90.43% | 68.22% | 89.68% (+0px) | 64.46% | 94.85% | 63.66% | 2.33% |
+| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.96% | 72.32% | 90.73% | 70.19% | n/a | n/a | n/a | n/a | 2.33% |
 
 Rail stand-in: 229px (the mock's rail width); content region starts at x=232.
 Section row bottom: reference y=238, capture y=238 (title block offset +0px).
 Diff image: `scripts/admin-parity/out/01-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/01-1586x992.png` and `scripts/admin-parity/evidence/01-1586x992-diff.png`.
 
-Masks (8): summary tile counts; recent activity relative times.
+Masks (10): summary tile counts; recent activity relative times; mock-only annotation (handoff footer caption, not product UI).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -63,19 +65,19 @@ Masks (8): summary tile counts; recent activity relative times.
 
 ## Screen 02
 
-Reference: `scripts/admin-parity/reference/02-dealership-brand.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 87.51% is below 97%). With the title-block exception: FAIL (body parity 92.92%).
+Reference: `scripts/admin-parity/reference/02-dealership-brand.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 87.69% is below 97%). With the title-block exception: FAIL (body parity 92.92%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/02-1586x992.png` | 88.44% | 68.26% | 87.51% | 64.04% | 92.92% (+33px) | 75.26% | 0.76% |
-| 1600x1000 | `scripts/admin-parity/out/02-1600x1000.png` | 88.40% | 68.97% | 87.74% | 64.95% | n/a | n/a | 0.75% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/02-1586x992.png` | 88.58% | 68.48% | 87.69% | 64.29% | 92.92% (+33px) | 75.26% | 96.78% | 75.90% | 1.43% |
+| 1600x1000 | `scripts/admin-parity/out/02-1600x1000.png` | 88.57% | 69.06% | 87.96% | 65.04% | n/a | n/a | n/a | n/a | 1.41% |
 
 Rail stand-in: 252px (the mock's rail width); content region starts at x=255.
 Section row bottom: reference y=205, capture y=238 (title block offset +33px).
 Diff image: `scripts/admin-parity/out/02-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/02-1586x992.png` and `scripts/admin-parity/evidence/02-1586x992-diff.png`.
 
-Masks (3): dealership name, location and website address (fixture dealer).
+Masks (5): dealership name, location and website address (fixture dealer); mock-only annotation (handoff footer caption, not product UI); mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -108,19 +110,19 @@ Masks (3): dealership name, location and website address (fixture dealer).
 
 ## Screen 03
 
-Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 91.66% is below 97%). With the title-block exception: FAIL (body parity 93.83%).
+Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 91.81% is below 97%). With the title-block exception: FAIL (body parity 93.81%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 92.40% | 73.59% | 91.66% | 70.79% | 93.83% (+21px) | 79.46% | 2.46% |
-| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 92.16% | 72.85% | 91.66% | 70.87% | n/a | n/a | 2.42% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 92.52% | 73.91% | 91.81% | 71.18% | 93.81% (+21px) | 79.42% | 96.86% | 72.27% | 3.06% |
+| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 92.28% | 73.08% | 91.81% | 71.15% | n/a | n/a | n/a | n/a | 3.01% |
 
 Rail stand-in: 238px (the mock's rail width); content region starts at x=241.
 Section row bottom: reference y=217, capture y=238 (title block offset +21px).
 Diff image: `scripts/admin-parity/out/03-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/03-1586x992.png` and `scripts/admin-parity/evidence/03-1586x992-diff.png`.
 
-Masks (6): member names in the table and the rail (fixture addresses).
+Masks (8): member names in the table and the rail (fixture addresses); mock-only annotation (handoff footer caption, not product UI); mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -151,19 +153,19 @@ Masks (6): member names in the table and the rail (fixture addresses).
 
 ## Screen 04
 
-Reference: `scripts/admin-parity/reference/04-salesperson-role-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.55% is below 97%). With the title-block exception: FAIL (body parity 92.14%).
+Reference: `scripts/admin-parity/reference/04-salesperson-role-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.60% is below 97%). With the title-block exception: FAIL (body parity 92.10%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/04-1586x992.png` | 89.26% | 67.96% | 88.55% | 64.18% | 92.14% (-24px) | 72.23% | 0.32% |
-| 1600x1000 | `scripts/admin-parity/out/04-1600x1000.png` | 88.38% | 67.85% | 87.69% | 65.04% | n/a | n/a | 0.32% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/04-1586x992.png` | 89.30% | 68.15% | 88.60% | 64.40% | 92.10% (-24px) | 72.11% | 96.65% | 79.48% | 0.69% |
+| 1600x1000 | `scripts/admin-parity/out/04-1600x1000.png` | 88.41% | 67.89% | 87.71% | 65.08% | n/a | n/a | n/a | n/a | 0.68% |
 
 Rail stand-in: 239px (the mock's rail width); content region starts at x=242.
 Body anchor (pinned in landmarks.json): reference y=244, capture y=220 (title block offset -24px).
 Diff image: `scripts/admin-parity/out/04-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/04-1586x992.png` and `scripts/admin-parity/evidence/04-1586x992-diff.png`.
 
-Masks (1): member address in the capabilities description (fixture).
+Masks (2): member address in the capabilities description (fixture); mock-only annotation (handoff footer caption, not product UI).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -192,19 +194,19 @@ Masks (1): member address in the capabilities description (fixture).
 
 ## Screen 05
 
-Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.77% is below 97%). With the title-block exception: FAIL (body parity 90.41%).
+Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.94% is below 97%). With the title-block exception: FAIL (body parity 90.41%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 89.83% | 69.78% | 88.77% | 65.34% | 90.41% (+80px) | 69.94% | 9.88% |
-| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 89.34% | 69.81% | 88.48% | 65.70% | n/a | n/a | 10.16% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 89.97% | 69.93% | 88.94% | 65.52% | 90.41% (+80px) | 69.94% | 95.37% | 69.31% | 10.20% |
+| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 89.47% | 69.93% | 88.63% | 65.83% | n/a | n/a | n/a | n/a | 10.47% |
 
 Rail stand-in: 228px (the mock's rail width); content region starts at x=231.
 Section row bottom: reference y=158, capture y=238 (title block offset +80px).
 Diff image: `scripts/admin-parity/out/05-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/05-1586x992.png` and `scripts/admin-parity/evidence/05-1586x992-diff.png`.
 
-Masks (38): change impact counts (fixture inventory sizes); preview vehicle name, trim, stock and prices (fixture vehicle); vehicle names, stock numbers and prices (fixture vehicles); vehicles-shown count.
+Masks (39): change impact counts (fixture inventory sizes); preview vehicle name, trim, stock and prices (fixture vehicle); vehicle names, stock numbers and prices (fixture vehicles); vehicles-shown count; mock-only annotation (handoff footer caption, not product UI).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -234,19 +236,19 @@ Masks (38): change impact counts (fixture inventory sizes); preview vehicle name
 
 ## Screen 06
 
-Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 92.51% is below 97%). With the title-block exception: FAIL (body parity 92.32%).
+Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 92.61% is below 97%). With the title-block exception: FAIL (body parity 92.41%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 87.21% | 77.22% | 92.51% | 75.37% | 92.32% (+0px) | 74.92% | 3.82% |
-| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.58% | 73.80% | 90.58% | 71.32% | n/a | n/a | 3.75% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 87.26% | 77.50% | 92.61% | 75.73% | 92.41% (+0px) | 75.20% | 96.92% | 82.10% | 4.36% |
+| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.62% | 74.02% | 90.68% | 71.58% | n/a | n/a | n/a | n/a | 4.28% |
 
 Rail stand-in: 243px (the mock's rail width); content region starts at x=246.
 Body anchor (pinned in landmarks.json): reference y=187, capture y=187 (title block offset +0px).
 Diff image: `scripts/admin-parity/out/06-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/06-1586x992.png` and `scripts/admin-parity/evidence/06-1586x992-diff.png`.
 
-Masks (5): expected impact counts (fixture inventory sizes); example vehicle name, stock, VIN suffix, selling price and totals (fixture vehicle); the fee column is policy data and stays.
+Masks (7): expected impact counts (fixture inventory sizes); example vehicle name, stock, VIN suffix, selling price and totals (fixture vehicle); the fee column is policy data and stays; mock-only annotation (handoff footer caption, not product UI); mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -281,19 +283,19 @@ Masks (5): expected impact counts (fixture inventory sizes); example vehicle nam
 
 ## Screen 07
 
-Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.41% is below 97%). With the title-block exception: FAIL (body parity 90.13%).
+Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.68% is below 97%). With the title-block exception: FAIL (body parity 90.21%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 90.88% | 73.37% | 90.41% | 70.84% | 90.13% (-2px) | 67.31% | 2.60% |
-| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 90.84% | 73.85% | 90.64% | 71.56% | n/a | n/a | 2.56% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 91.10% | 73.70% | 90.68% | 71.24% | 90.21% (-2px) | 67.57% | 95.92% | 67.25% | 3.34% |
+| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 91.04% | 74.15% | 90.89% | 71.92% | n/a | n/a | n/a | n/a | 3.29% |
 
 Rail stand-in: 242px (the mock's rail width); content region starts at x=245.
 Body anchor (pinned in landmarks.json): reference y=228, capture y=226 (title block offset -2px).
 Diff image: `scripts/admin-parity/out/07-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/07-1586x992.png` and `scripts/admin-parity/evidence/07-1586x992-diff.png`.
 
-Masks (4): sample vehicle names and mileage (fixture vehicles); product price (fixture value).
+Masks (6): sample vehicle names and mileage (fixture vehicles); product price (fixture value); mock-only annotation (handoff footer caption, not product UI); mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -325,19 +327,19 @@ Masks (4): sample vehicle names and mileage (fixture vehicles); product price (f
 
 ## Screen 08
 
-Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 87.96% is below 97%). With the title-block exception: FAIL (body parity 91.76%).
+Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.07% is below 97%). With the title-block exception: FAIL (body parity 91.76%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/08-1586x992.png` | 89.43% | 67.30% | 87.96% | 63.31% | 91.76% (+66px) | 72.01% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/08-1600x1000.png` | 88.56% | 67.09% | 87.10% | 63.41% | n/a | n/a | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/08-1586x992.png` | 89.52% | 67.44% | 88.07% | 63.48% | 91.76% (+66px) | 72.01% | 96.92% | 67.35% | 0.27% |
+| 1600x1000 | `scripts/admin-parity/out/08-1600x1000.png` | 88.66% | 67.15% | 87.23% | 63.48% | n/a | n/a | n/a | n/a | 0.26% |
 
 Rail stand-in: 237px (the mock's rail width); content region starts at x=240.
 Section row bottom: reference y=172, capture y=238 (title block offset +66px).
 Diff image: `scripts/admin-parity/out/08-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/08-1586x992.png` and `scripts/admin-parity/evidence/08-1586x992-diff.png`.
 
-Masks (0): none.
+Masks (1): mock-only annotation (handoff footer caption, not product UI).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -371,19 +373,19 @@ Masks (0): none.
 
 ## Screen 09
 
-Reference: `scripts/admin-parity/reference/09-escalation-delivery-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 83.39% is below 97%). With the title-block exception: FAIL (body parity 91.55%).
+Reference: `scripts/admin-parity/reference/09-escalation-delivery-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 83.44% is below 97%). With the title-block exception: FAIL (body parity 91.52%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/09-1586x992.png` | 85.77% | 64.53% | 83.39% | 60.22% | 91.55% (-93px) | 72.36% | 1.96% |
-| 1600x1000 | `scripts/admin-parity/out/09-1600x1000.png` | 85.40% | 65.76% | 83.15% | 61.71% | n/a | n/a | 1.94% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/09-1586x992.png` | 85.82% | 64.72% | 83.44% | 60.43% | 91.52% (-93px) | 72.25% | 97.34% | 71.22% | 2.42% |
+| 1600x1000 | `scripts/admin-parity/out/09-1600x1000.png` | 85.43% | 65.85% | 83.19% | 61.80% | n/a | n/a | n/a | n/a | 2.39% |
 
 Rail stand-in: 217px (the mock's rail width); content region starts at x=220.
 Body anchor (pinned in landmarks.json): reference y=289, capture y=196 (title block offset -93px).
 Diff image: `scripts/admin-parity/out/09-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/09-1586x992.png` and `scripts/admin-parity/evidence/09-1586x992-diff.png`.
 
-Masks (8): request ids (fixture-generated activity text); rooftop names in the activity rows (the fixture's synthetic stores); notification timestamps; scope chips carry the fixture's synthetic rooftop names.
+Masks (10): request ids (fixture-generated activity text); rooftop names in the activity rows (the fixture's synthetic stores); notification timestamps; scope chips carry the fixture's synthetic rooftop names; mock-only annotation (handoff footer caption, not product UI); mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -418,19 +420,19 @@ Masks (8): request ids (fixture-generated activity text); rooftop names in the a
 
 ## Screen 10
 
-Reference: `scripts/admin-parity/reference/10-publishing-policy.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; content parity 87.57% is below 97%). With the title-block exception: FAIL (body parity 89.59%, landmarks).
+Reference: `scripts/admin-parity/reference/10-publishing-policy.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; content parity 87.66% is below 97%). With the title-block exception: FAIL (body parity 89.70%, landmarks).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/10-1586x992.png` | 88.62% | 65.82% | 87.57% | 61.22% | 89.59% (-7px) | 67.95% | 0.55% |
-| 1600x1000 | `scripts/admin-parity/out/10-1600x1000.png` | 87.01% | 65.92% | 85.80% | 60.95% | n/a | n/a | 0.54% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/10-1586x992.png` | 88.70% | 66.03% | 87.66% | 61.47% | 89.70% (-7px) | 68.13% | 95.37% | 67.89% | 0.91% |
+| 1600x1000 | `scripts/admin-parity/out/10-1600x1000.png` | 87.10% | 66.14% | 85.91% | 61.22% | n/a | n/a | n/a | n/a | 0.89% |
 
 Rail stand-in: 257px (the mock's rail width); content region starts at x=260.
 Section row bottom: reference y=245, capture y=238 (title block offset -7px).
 Diff image: `scripts/admin-parity/out/10-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/10-1586x992.png` and `scripts/admin-parity/evidence/10-1586x992-diff.png`.
 
-Masks (2): rooftop name in the policy description (the fixture is synthetic); active and published listing counts.
+Masks (3): rooftop name in the policy description (the fixture is synthetic); active and published listing counts; mock-only annotation (handoff footer caption, not product UI).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -464,19 +466,19 @@ Masks (2): rooftop name in the policy description (the fixture is synthetic); ac
 
 ## Screen 11
 
-Reference: `scripts/admin-parity/reference/11-documents-service.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; content parity 91.17% is below 97%). With the title-block exception: FAIL (body parity 91.37%, landmarks).
+Reference: `scripts/admin-parity/reference/11-documents-service.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; content parity 91.42% is below 97%). With the title-block exception: FAIL (body parity 91.75%, landmarks).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/11-1586x992.png` | 91.43% | 74.21% | 91.17% | 71.92% | 91.37% (+4px) | 72.20% | 1.58% |
-| 1600x1000 | `scripts/admin-parity/out/11-1600x1000.png` | 91.25% | 75.77% | 91.21% | 73.71% | n/a | n/a | 1.55% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/11-1586x992.png` | 91.63% | 74.68% | 91.42% | 72.52% | 91.75% (+4px) | 73.23% | 96.60% | 69.04% | 2.26% |
+| 1600x1000 | `scripts/admin-parity/out/11-1600x1000.png` | 91.49% | 76.09% | 91.52% | 74.12% | n/a | n/a | n/a | n/a | 2.22% |
 
 Rail stand-in: 264px (the mock's rail width); content region starts at x=267.
 Section row bottom: reference y=234, capture y=238 (title block offset +4px).
 Diff image: `scripts/admin-parity/out/11-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/11-1586x992.png` and `scripts/admin-parity/evidence/11-1586x992-diff.png`.
 
-Masks (4): policy change provenance (relative time and fixture name); readiness detail values (relative times and counts).
+Masks (6): policy change provenance (relative time and fixture name); readiness detail values (relative times and counts); mock-only annotation (handoff footer caption, not product UI).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -506,19 +508,19 @@ Masks (4): policy change provenance (relative time and fixture name); readiness 
 
 ## Screen 12
 
-Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; content parity 79.36% is below 97%). With the title-block exception: FAIL (body parity 92.49%, landmarks).
+Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; content parity 79.40% is below 97%). With the title-block exception: FAIL (body parity 92.49%, landmarks).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/12-1586x992.png` | 82.25% | 69.61% | 79.36% | 64.88% | 92.49% (+64px) | 75.81% | 2.40% |
-| 1600x1000 | `scripts/admin-parity/out/12-1600x1000.png` | 82.23% | 69.77% | 79.59% | 65.54% | n/a | n/a | 2.38% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/12-1586x992.png` | 82.30% | 69.80% | 79.40% | 65.11% | 92.49% (+64px) | 75.81% | 96.98% | 66.26% | 2.78% |
+| 1600x1000 | `scripts/admin-parity/out/12-1600x1000.png` | 82.26% | 69.85% | 79.61% | 65.63% | n/a | n/a | n/a | n/a | 2.75% |
 
 Rail stand-in: 243px (the mock's rail width); content region starts at x=246.
 Section row bottom: reference y=174, capture y=238 (title block offset +64px).
 Diff image: `scripts/admin-parity/out/12-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/12-1586x992.png` and `scripts/admin-parity/evidence/12-1586x992-diff.png`.
 
-Masks (8): run timestamps (tile values and attempt times); fixture provider domain; rooftop pin identifier; attempt count in the pager summary.
+Masks (9): run timestamps (tile values and attempt times); fixture provider domain; rooftop pin identifier; attempt count in the pager summary; mock-only annotation (handoff footer caption, not product UI).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -552,19 +554,19 @@ Masks (8): run timestamps (tile values and attempt times); fixture provider doma
 
 ## Screen 13
 
-Reference: `scripts/admin-parity/reference/13-sync-run-detail-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; content parity 89.33% is below 97%). With the title-block exception: FAIL (body parity 90.23%, landmarks).
+Reference: `scripts/admin-parity/reference/13-sync-run-detail-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; content parity 89.52% is below 97%). With the title-block exception: FAIL (body parity 90.19%, landmarks).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
-|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/13-1586x992.png` | 89.98% | 67.53% | 89.33% | 63.37% | 90.23% (-18px) | 68.31% | 6.50% |
-| 1600x1000 | `scripts/admin-parity/out/13-1600x1000.png` | 89.00% | 68.23% | 88.36% | 64.22% | n/a | n/a | 7.18% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/13-1586x992.png` | 90.13% | 67.98% | 89.52% | 63.91% | 90.19% (-18px) | 68.29% | 95.77% | 64.17% | 7.54% |
+| 1600x1000 | `scripts/admin-parity/out/13-1600x1000.png` | 89.13% | 68.52% | 88.51% | 64.54% | n/a | n/a | n/a | n/a | 8.18% |
 
 Rail stand-in: 233px (the mock's rail width); content region starts at x=236.
 Body anchor (pinned in landmarks.json): reference y=166, capture y=148 (title block offset -18px).
 Diff image: `scripts/admin-parity/out/13-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/13-1586x992.png` and `scripts/admin-parity/evidence/13-1586x992-diff.png`.
 
-Masks (9): run timestamp and run id under the title; event times and the last successful run time; fixture provider domain; technical evidence payload (run id, timestamps, domain).
+Masks (12): run timestamp and run id under the title; event times and the last successful run time; fixture provider domain; technical evidence payload (run id, timestamps, domain); mock-only annotation (handoff footer caption, not product UI); mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|

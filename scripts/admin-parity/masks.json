@@ -1,5 +1,5 @@
 {
-  "_comment": "Dynamic regions per screen. `selectors` are evaluated against the rendered fixture and their boxes mask both images; a selector may add `heading` (text of the picked element's first h1-h3) and `inner` (descendants to mask inside the picked elements). `rects` are fixed boxes in reference-frame coordinates. Only data that legitimately varies (counts, times, names, identifiers) may be listed. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.",
+  "_comment": "Dynamic regions per screen. `selectors` are evaluated against the rendered fixture and their boxes mask both images; a selector may add `heading` (text of the picked element's first h1-h3) and `inner` (descendants to mask inside the picked elements). `rects` are fixed boxes in reference-frame coordinates. Only data that legitimately varies (counts, times, names, identifiers) may be listed. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked. Rects marked mock-only annotation cover captions the handoff mocks print on the image itself (the Proposed design footer, the DESIGN CONCEPT label, sample-policy and recovery-flow captions); they are not product UI and are masked on both images.",
   "01": {
     "selectors": [
       {
@@ -19,7 +19,22 @@
         "reason": "recent activity detail lines (fixture names)"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 248,
+        "y": 965,
+        "w": 260,
+        "h": 18,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 1460,
+        "y": 964,
+        "w": 101,
+        "h": 18,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      }
+    ]
   },
   "02": {
     "selectors": [
@@ -28,7 +43,22 @@
         "reason": "dealership name, location and website address (fixture dealer)"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 1250,
+        "y": 964,
+        "w": 313,
+        "h": 20,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 609,
+        "y": 107,
+        "w": 128,
+        "h": 34,
+        "reason": "mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production)"
+      }
+    ]
   },
   "03": {
     "selectors": [
@@ -37,7 +67,22 @@
         "reason": "member names in the table and the rail (fixture addresses)"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 259,
+        "y": 959,
+        "w": 298,
+        "h": 20,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 262,
+        "y": 87,
+        "w": 121,
+        "h": 29,
+        "reason": "mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production)"
+      }
+    ]
   },
   "04": {
     "selectors": [
@@ -46,7 +91,15 @@
         "reason": "member address in the capabilities description (fixture)"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 1276,
+        "y": 959,
+        "w": 290,
+        "h": 20,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      }
+    ]
   },
   "05": {
     "selectors": [
@@ -73,7 +126,15 @@
         "reason": "vehicles-shown count"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 1287,
+        "y": 962,
+        "w": 277,
+        "h": 18,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      }
+    ]
   },
   "06": {
     "selectors": [
@@ -86,7 +147,22 @@
         "reason": "example vehicle name, stock, VIN suffix, selling price and totals (fixture vehicle); the fee column is policy data and stays"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 1282,
+        "y": 967,
+        "w": 282,
+        "h": 18,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 1443,
+        "y": 82,
+        "w": 121,
+        "h": 28,
+        "reason": "mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production)"
+      }
+    ]
   },
   "07": {
     "selectors": [
@@ -99,27 +175,91 @@
         "reason": "product price (fixture value)"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 264,
+        "y": 944,
+        "w": 340,
+        "h": 21,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 1433,
+        "y": 96,
+        "w": 133,
+        "h": 34,
+        "reason": "mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production)"
+      }
+    ]
   },
   "08": {
     "selectors": [],
-    "rects": []
+    "rects": [
+      {
+        "x": 1299,
+        "y": 969,
+        "w": 262,
+        "h": 16,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      }
+    ]
   },
   "09": {
     "selectors": [
-      { "selector": "[data-admin-v2] table tbody td:nth-child(1)", "reason": "request ids (fixture-generated activity text)" },
-      { "selector": "[data-admin-v2] table tbody td:nth-child(2)", "reason": "rooftop names in the activity rows (the fixture's synthetic stores)" },
-      { "selector": "[data-admin-v2] table tbody td:nth-child(6)", "reason": "notification timestamps" },
-      { "selector": "[data-admin-v2] [data-parity=\"store-name\"]", "reason": "scope chips carry the fixture's synthetic rooftop names" }
+      {
+        "selector": "[data-admin-v2] table tbody td:nth-child(1)",
+        "reason": "request ids (fixture-generated activity text)"
+      },
+      {
+        "selector": "[data-admin-v2] table tbody td:nth-child(2)",
+        "reason": "rooftop names in the activity rows (the fixture's synthetic stores)"
+      },
+      {
+        "selector": "[data-admin-v2] table tbody td:nth-child(6)",
+        "reason": "notification timestamps"
+      },
+      {
+        "selector": "[data-admin-v2] [data-parity=\"store-name\"]",
+        "reason": "scope chips carry the fixture's synthetic rooftop names"
+      }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 1315,
+        "y": 970,
+        "w": 251,
+        "h": 18,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 1467,
+        "y": 75,
+        "w": 102,
+        "h": 26,
+        "reason": "mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production)"
+      }
+    ]
   },
   "10": {
     "selectors": [
-      { "selector": "[data-admin-v2] [data-parity=\"rooftop-name\"]", "reason": "rooftop name in the policy description (the fixture is synthetic)" },
-      { "selector": "[data-admin-v2] [data-parity=\"class-counts\"]", "reason": "active and published listing counts" }
+      {
+        "selector": "[data-admin-v2] [data-parity=\"rooftop-name\"]",
+        "reason": "rooftop name in the policy description (the fixture is synthetic)"
+      },
+      {
+        "selector": "[data-admin-v2] [data-parity=\"class-counts\"]",
+        "reason": "active and published listing counts"
+      }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 285,
+        "y": 958,
+        "w": 295,
+        "h": 19,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      }
+    ]
   },
   "11": {
     "selectors": [
@@ -132,7 +272,22 @@
         "reason": "readiness detail values (relative times and counts)"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 288,
+        "y": 951,
+        "w": 311,
+        "h": 13,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 1047,
+        "y": 951,
+        "w": 515,
+        "h": 13,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      }
+    ]
   },
   "12": {
     "selectors": [
@@ -153,7 +308,15 @@
         "reason": "attempt count in the pager summary"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 270,
+        "y": 960,
+        "w": 298,
+        "h": 20,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      }
+    ]
   },
   "13": {
     "selectors": [
@@ -174,6 +337,28 @@
         "reason": "technical evidence payload (run id, timestamps, domain)"
       }
     ],
-    "rects": []
+    "rects": [
+      {
+        "x": 263,
+        "y": 966,
+        "w": 287,
+        "h": 20,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 1278,
+        "y": 966,
+        "w": 279,
+        "h": 19,
+        "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 1422,
+        "y": 85,
+        "w": 138,
+        "h": 39,
+        "reason": "mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production)"
+      }
+    ]
   }
 }

@@ -95,7 +95,41 @@ const readDom = ({ maskSpecs, landmarkSpecs }) => {
     const el = pick(spec)[spec.index ?? 0];
     if (el) landmarks[name] = box(el);
   }
-  return { masks, landmarks };
+  // Text boxes: every rendered line of text and the content box of every form
+  // control. The structure score masks these on both images so glyph rendering
+  // is measured apart from spacing, sizing, borders, fills and icons. A line of
+  // text the mock draws somewhere the capture does not still counts against
+  // structure, because no capture box covers it.
+  const textBoxes = [];
+  const visible = (el) => {
+    const cs = getComputedStyle(el);
+    return cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.05;
+  };
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.nodeValue && n.nodeValue.trim() && n.parentElement && visible(n.parentElement) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+  });
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    for (const r of Array.from(range.getClientRects())) {
+      if (r.width < 1 || r.height < 1) continue;
+      textBoxes.push({ x: Math.max(0, r.x - 2), y: Math.max(0, r.y - 2), w: r.width + 4, h: r.height + 4 });
+    }
+  }
+  for (const el of Array.from(document.querySelectorAll("input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea"))) {
+    if (!visible(el)) continue;
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    const px = (v) => parseFloat(v) || 0;
+    const left = px(cs.borderLeftWidth) + px(cs.paddingLeft);
+    const right = px(cs.borderRightWidth) + px(cs.paddingRight);
+    const top = px(cs.borderTopWidth) + Math.min(px(cs.paddingTop), 6);
+    const bottom = px(cs.borderBottomWidth) + Math.min(px(cs.paddingBottom), 6);
+    const w = r.width - left - right;
+    const h = r.height - top - bottom;
+    if (w > 2 && h > 2) textBoxes.push({ x: r.x + left - 1, y: r.y + top - 1, w: w + 2, h: h + 2 });
+  }
+  return { masks, landmarks, textBoxes };
 };
 
 async function captureScreen(page, { baseUrl, screen, viewport, outPng, maskSpec, landmarkSpec, anchorSelector = null, rail = null }) {
@@ -116,7 +150,7 @@ async function captureScreen(page, { baseUrl, screen, viewport, outPng, maskSpec
     return { sectionNavBottom: bottom('nav[aria-label="Administration sections"]'), h1Bottom: bottom("[data-admin-v2] h1"), custom: bottom(customSelector) };
   }, anchorSelector);
   await page.screenshot({ path: outPng, fullPage: false });
-  return { fonts, masks: [...dom.masks, ...(maskSpec.rects || [])], landmarks: dom.landmarks, anchors };
+  return { fonts, masks: [...dom.masks, ...(maskSpec.rects || [])], landmarks: dom.landmarks, anchors, textBoxes: dom.textBoxes };
 }
 
 async function responsiveCheck(page, { baseUrl, screen, viewports, outDir, rail = null }) {

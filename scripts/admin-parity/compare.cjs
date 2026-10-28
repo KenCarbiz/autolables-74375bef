@@ -174,7 +174,7 @@ function shiftRows(img, dy) {
 }
 
 /** Content-region score below the section row with the reference shifted to the capture's row bottom. */
-function compareBody({ reference, capture, masks = [], contentRegion, referenceTop, captureTop }) {
+function compareBody({ reference, capture, masks = [], contentRegion, referenceTop, captureTop, textBoxes = null }) {
   if (referenceTop === null || referenceTop === undefined || captureTop === null || captureTop === undefined) return null;
   const dy = captureTop - referenceTop;
   const shifted = shiftRows(reference, dy);
@@ -184,7 +184,54 @@ function compareBody({ reference, capture, masks = [], contentRegion, referenceT
   const mask = buildMask(reference.width, reference.height, masks);
   const pixel = pixelDifference(shifted, capture, mask, region);
   const structure = structuralScore(toGray(shifted), toGray(capture), reference.width, reference.height, mask, region);
-  return { referenceTop, captureTop, offset: dy, rows: region.h, pixelDiffPercent: pixel.percent, parityPercent: 100 - pixel.percent, compared: pixel.compared, structuralPercent: structure.percent, blocks: structure.blocks };
+  const out = { referenceTop, captureTop, offset: dy, rows: region.h, pixelDiffPercent: pixel.percent, parityPercent: 100 - pixel.percent, compared: pixel.compared, structuralPercent: structure.percent, blocks: structure.blocks };
+  if (textBoxes) {
+    const split = splitByText({ reference: shifted, capture, dynamicMask: mask, textBoxes, region });
+    out.nonText = split.nonText;
+    out.text = split.text;
+    out.structureDiff = split.diff;
+  }
+  return out;
+}
+
+/**
+ * Separates glyph rendering from everything else. Pixels inside the capture's
+ * text boxes (padded line boxes and form-control content boxes) form the text
+ * region; every other compared pixel is structure: fills, borders, spacing,
+ * component sizes and icons. Both use the same 32/255 threshold, so the two
+ * shares add up to the body score.
+ */
+function splitByText({ reference, capture, dynamicMask, textBoxes, region }) {
+  const textMask = buildMask(reference.width, reference.height, textBoxes);
+  let ntCompared = 0, ntDiff = 0, tCompared = 0, tDiff = 0;
+  const { width } = capture;
+  const diff = { width, height: capture.height, data: new Uint8Array(capture.data.length) };
+  for (let y = 0; y < capture.height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      const o = i * 4;
+      const g = Math.round(0.299 * capture.data[o] + 0.587 * capture.data[o + 1] + 0.114 * capture.data[o + 2]);
+      const faded = 235 + Math.round((g / 255) * 20);
+      diff.data[o] = faded; diff.data[o + 1] = faded; diff.data[o + 2] = faded; diff.data[o + 3] = 255;
+      if (!inRegion(region, x, y)) continue;
+      if (dynamicMask[i]) { diff.data[o] = 150; diff.data[o + 1] = 190; diff.data[o + 2] = 255; continue; }
+      const d = Math.max(Math.abs(reference.data[o] - capture.data[o]), Math.abs(reference.data[o + 1] - capture.data[o + 1]), Math.abs(reference.data[o + 2] - capture.data[o + 2]));
+      if (textMask[i]) {
+        tCompared++;
+        if (d > PIXEL_TOLERANCE) { tDiff++; diff.data[o] = 255; diff.data[o + 1] = 200; diff.data[o + 2] = 60; }
+      } else {
+        ntCompared++;
+        if (d > PIXEL_TOLERANCE) { ntDiff++; diff.data[o] = 220; diff.data[o + 1] = 20; diff.data[o + 2] = 20; }
+      }
+    }
+  }
+  const pct = (a, b) => (b ? (a / b) * 100 : 0);
+  const total = ntCompared + tCompared;
+  return {
+    nonText: { compared: ntCompared, different: ntDiff, parityPercent: 100 - pct(ntDiff, ntCompared), shareOfBodyDiffPercent: pct(ntDiff, total) },
+    text: { compared: tCompared, different: tDiff, parityPercent: 100 - pct(tDiff, tCompared), shareOfBodyDiffPercent: pct(tDiff, total), areaPercent: pct(tCompared, total) },
+    diff,
+  };
 }
 
 /**
@@ -225,4 +272,4 @@ function checkLandmarks(expected, measured, tolerance = 16, anchors = null) {
   return rows;
 }
 
-module.exports = { compareFrames, compareBody, findReferenceSectionRowBottom, checkLandmarks, buildMask, PIXEL_TOLERANCE };
+module.exports = { compareFrames, compareBody, splitByText, findReferenceSectionRowBottom, checkLandmarks, buildMask, PIXEL_TOLERANCE };
