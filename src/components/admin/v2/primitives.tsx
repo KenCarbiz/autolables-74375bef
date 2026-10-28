@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Info, XCircle, ChevronRight } from "lucide-react";
 import { HEALTH_META, type HealthState, type HealthTone, type HealthVerdict, needsAttention } from "@/lib/admin/health";
 import { cn } from "@/lib/utils";
+import { ScrollRegion } from "./ScrollRegion";
 
 // The Administration V2 surface vocabulary: cards, chips, tiles, tables and
 // notes drawn to the reference tokens (10px card radius, 1px #D6DFEA lines,
@@ -230,13 +231,13 @@ export const AdminLinkButton = ({ variant = "secondary", size = "md", className,
 );
 
 /** Table shell: 12px semibold headers on the workspace tint, 12px cells, 1px row lines. */
-export const AdminTable = ({ children, className, caption, dense = false, inset = false }: { children: ReactNode; className?: string; caption?: string; /** 7px cells for dashboard queues. */ dense?: boolean; /** Draw the table as a bordered box inside a flush card. */ inset?: boolean }) => (
-  <div className={cn("relative overflow-x-auto", inset && "mx-4 mb-4 rounded-md border border-adm-border", dense && "[&_table]:text-[11.5px] [&_table]:leading-[16px] [&_th]:py-2.5 [&_td]:py-[9px] [&_tbody_tr:last-child>td]:border-b-0", className)}>
-    <table className="w-full border-collapse text-left text-[14px] leading-[20px] text-adm-ink">
+export const AdminTable = ({ children, className, caption, dense = false, inset = false, minWidth }: { children: ReactNode; className?: string; caption?: string; /** 7px cells for dashboard queues. */ dense?: boolean; /** Draw the table as a bordered box inside a flush card. */ inset?: boolean; /** Narrow screens scroll the table sideways instead of squeezing columns below this width. */ minWidth?: number }) => (
+  <ScrollRegion label={caption ?? "Table"} className={cn(inset && "mx-4 mb-4 rounded-md border border-adm-border", dense && "[&_table]:text-[11.5px] [&_table]:leading-[16px] [&_th]:py-2.5 [&_td]:py-[9px] [&_tbody_tr:last-child>td]:border-b-0", className)}>
+    <table className="w-full border-collapse text-left text-[14px] leading-[20px] text-adm-ink" style={minWidth ? { minWidth } : undefined}>
       {caption && <caption className="sr-only">{caption}</caption>}
       {children}
     </table>
-  </div>
+  </ScrollRegion>
 );
 
 export const Th = ({ children, className, align = "left" }: { children?: ReactNode; className?: string; align?: "left" | "right" }) => (

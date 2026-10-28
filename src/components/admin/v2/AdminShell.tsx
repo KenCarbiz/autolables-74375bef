@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { AdminChildTab, AdminSection, AdminSectionId } from "@/lib/admin/sections";
 import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, visibleSections } from "@/lib/admin/sections";
 import { useAdminVisibility } from "./useAdminVisibility";
+import { ScrollRegion } from "./ScrollRegion";
 
 // One Administration page: one h1, one row of sections, an optional row of
 // child tabs, then content. The breadcrumb and description show only on the
@@ -13,7 +14,8 @@ import { useAdminVisibility } from "./useAdminVisibility";
 // two titles or two navigation systems.
 
 export const AdminSectionNav = ({ sections, activeId, tabFor, ariaLabel = "Administration sections" }: { sections: AdminSection[]; activeId: string | null; tabFor: (s: AdminSection) => AdminChildTab | null; ariaLabel?: string }) => (
-  <nav aria-label={ariaLabel} className="border-b border-adm-border overflow-x-auto">
+  <nav aria-label={ariaLabel} className="border-b border-adm-border">
+    <ScrollRegion label={ariaLabel} tone="workspace" revealSelector='[aria-current="page"]'>
     <ul className="flex items-stretch gap-9 min-w-max">
       {sections.map((s) => {
         const target = tabFor(s);
@@ -35,13 +37,15 @@ export const AdminSectionNav = ({ sections, activeId, tabFor, ariaLabel = "Admin
         );
       })}
     </ul>
+    </ScrollRegion>
   </nav>
 );
 
 export const AdminChildTabs = ({ tabs, activeId, ariaLabel }: { tabs: AdminChildTab[]; activeId: string; ariaLabel: string }) => {
   if (tabs.length <= 1) return null;
   return (
-    <nav aria-label={ariaLabel} className="border-b border-adm-border overflow-x-auto">
+    <nav aria-label={ariaLabel} className="border-b border-adm-border">
+      <ScrollRegion label={ariaLabel} tone="workspace" revealSelector='[aria-current="page"]'>
       <ul className="flex items-stretch gap-9 min-w-max">
         {tabs.map((t) => {
           const active = t.id === activeId;
@@ -61,6 +65,7 @@ export const AdminChildTabs = ({ tabs, activeId, ariaLabel }: { tabs: AdminChild
           );
         })}
       </ul>
+      </ScrollRegion>
     </nav>
   );
 };
