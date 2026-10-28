@@ -647,3 +647,72 @@ migration on request; items 3 to 5 stand.
    recommended to stay revoked.
 5. **Ledger retention on rollback.** The rollback drops
    `admin_policy_applications`; export first if the history matters.
+
+## 10. Proposed: pricing authority and delegation (not applied)
+
+Status 2026-10-28: prepared for the owner's review, verified only in the
+isolated replica. Nothing here is applied, and production permissions do
+not change until the matrix below is approved. Files:
+`supabase/proposed/20261030000000_pricing_authority_delegation.sql`,
+cases in `scripts/db-verify/20_proposed.sql` (96 cases, all pass with
+`scripts/db-verify/run.sh --proposed`).
+
+Correction to open question 1 above. A read of every client write path
+(2026-10-28) found no screen that changes a price column on an existing
+listing. The fee Review & Apply and its fallback are the only screen paths
+that do, and both are server functions already limited to the four pricing
+roles. So narrowing the column guard removes no workflow anyone uses in the
+app today. It closes direct API edits, and any price-edit screen added later
+inherits the narrower rule. Production has four members today, all owners,
+so no current user loses access.
+
+### 10.1 Role matrix
+
+| Action | Live today | Proposed |
+| --- | --- | --- |
+| Change a vehicle's price columns (price, doc fee, sale price, price before doc, dealer discount, retail cash) | owner, admin, GM, GSM, manager, used-car manager, inventory manager | owner, admin, GM, GSM; a used-car or inventory manager only with an open delegation covering the vehicle's condition |
+| Change dealer-wide pricing settings (doc fee and the other pricing keys) | owner, admin, GM, GSM | unchanged, not delegable |
+| Fee Review & Apply (`admin_doc_fee_change_apply`) | owner, admin, GM, GSM | unchanged, not delegable |
+| Fee recalculation (`recalc_tenant_doc_fee`) | owner, admin, GM, GSM by role, membership not required to be accepted | same roles, accepted membership required |
+| Grant or revoke a pricing delegation | n/a | owner, general manager |
+| Receive a pricing delegation | n/a | accepted used-car manager or inventory manager |
+| Override a recall hold | owner, admin, GM, GSM, manager, compliance, office, finance | unchanged |
+| Service jobs (feed, website price crawl), cron, server functions | not checked | unchanged |
+| Platform administrator | allowed | unchanged |
+
+### 10.2 How delegation works
+
+- The owner or general manager grants it from the team page to one named
+  person, with a scope (used, new or all), an end date no more than 90 days
+  out, and a reason. All are required.
+- One open delegation per person; a new grant replaces the old one and
+  records the replacement.
+- It ends at the end date, on revoke, or as soon as the person's role
+  changes away from used-car or inventory manager. Nothing has to be
+  cleaned up.
+- A used-scope delegate cannot reprice a new vehicle, including by
+  relabelling it used in the same write (both the old and the new condition
+  must be covered).
+- Every grant and revoke writes an audit row (`pricing_delegation_granted`,
+  `pricing_delegation_revoked`) with who, whom, scope, end date and reason.
+- The delegate, the pricing roles and platform administrators can see the
+  dealership's delegations; nobody writes the table except the two
+  functions.
+
+### 10.3 Decisions for the owner
+
+1. **Manager role.** The proposal removes price editing from `manager`
+   and does not let it receive a delegation, following "used-car or
+   inventory managers". Say if `manager` should be delegable too.
+2. **Who may grant.** Owner and general manager. Say if GSM or the dealer
+   `admin` role should also grant.
+3. **Prices on new listings.** The guard covers updates only. Any member who
+   can open the used-car sticker or the inventory add flow can create a
+   listing with a price they type (`useVehicleListing.ts:267-277`,
+   `InventoryModern.tsx:1363-1368`, `:1467`). Closing this at the database
+   would block salespeople from creating stickers until those flows read the
+   price from the inventory record instead. Recommendation: leave it open in
+   this change and close it in a follow-up that changes those flows first.
+4. **Screens.** Approving the matrix also needs two app changes, prepared
+   after approval: the team page's grant and revoke controls, and the price
+   fields reading `has_pricing_authority` instead of `can_edit_inventory`.

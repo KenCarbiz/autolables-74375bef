@@ -253,3 +253,51 @@ $function$;
 
 COMMENT ON FUNCTION public.vehicle_listings_guard_priced_columns() IS
   'Column-level authority on vehicle_listings for API callers: price columns need has_pricing_authority for the listing condition (pricing roles, or a delegated used-car or inventory manager), recall override columns a role that holds can_manage_compliance. Service jobs, cron and owner-run RPCs are not API callers and pass through.';
+
+-- ── Fee recalculation: accepted members only ────────────────────────────
+
+-- The hosted recalc_tenant_doc_fee checks the role but not that the
+-- membership was accepted, so an open invitation for a pricing role can run
+-- it. Only the role check changes; the body is the hosted one.
+CREATE OR REPLACE FUNCTION public.recalc_tenant_doc_fee(p_tenant_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_fee   numeric;
+  v_count integer;
+BEGIN
+  IF NOT (
+    public.tenant_role_in(p_tenant_id, ARRAY['owner','admin','general_manager','gsm'])
+    OR public.has_role((SELECT auth.uid()), 'admin'::public.app_role)
+  ) THEN
+    RAISE EXCEPTION 'not authorized for tenant %', p_tenant_id;
+  END IF;
+
+  SELECT CASE
+           WHEN (settings->>'doc_fee_enabled')::boolean
+           THEN COALESCE((settings->>'doc_fee_amount')::numeric, 0)
+           ELSE 0
+         END
+    INTO v_fee
+  FROM public.dealer_profiles
+  WHERE tenant_id = p_tenant_id;
+  v_fee := COALESCE(v_fee, 0);
+
+  UPDATE public.vehicle_listings
+  SET doc_fee                = v_fee,
+      website_sale_price     = advertised_price_before_doc + v_fee,
+      price_parse_status     = 'ok',
+      price_parse_notes      = 'Doc fee updated in admin; sale price = advertised + doc fee.',
+      price_last_verified_at = now()
+  WHERE tenant_id = p_tenant_id
+    AND advertised_price_before_doc IS NOT NULL
+    AND (doc_fee IS DISTINCT FROM v_fee
+         OR website_sale_price IS DISTINCT FROM advertised_price_before_doc + v_fee);
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$function$;

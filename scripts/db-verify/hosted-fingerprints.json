@@ -9,6 +9,7 @@
   {"kind": "function", "name": "has_role", "fp": "fd5998f0c0e49bb5d81754023ce27270"},
   {"kind": "function", "name": "merge_dealer_settings", "fp": "d10f008ed8da583f91d4d2b519e7b708"},
   {"kind": "function", "name": "tenant_role_in", "fp": "71b6e877dd1e504588e09722aa861856"},
+  {"kind": "function", "name": "recalc_tenant_doc_fee", "fp": "5bd0ef323bab43efcffcd924037aa4d2"},
   {"kind": "function", "name": "vehicle_listings_guard_priced_columns", "fp": "b86702fc1b71eab0dad2458f290bcd11"},
   {"kind": "policy", "name": "admin_policy_applications|admin_policy_applications tenant read", "fp": "a53320c9b087c53e05005f6adfea7485"},
   {"kind": "policy", "name": "audit_log|Anon can insert shopper audit events", "fp": "e9a4c06109c9241dd37376e79898d5f9"},

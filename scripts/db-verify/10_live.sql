@@ -287,3 +287,36 @@ SELECT t.check('health reads', 'anon cannot read job status', 'anon',
   $q$SELECT * FROM public.admin_job_status('b0000000-0000-4000-8000-000000000001')$q$, 'error 42501');
 SELECT t.check('health reads', 'the apply ledger is readable by members only', 'other_tenant_owner',
   $q$SELECT * FROM public.admin_policy_applications$q$, 'ok rows=0');
+
+-- ── 9. The fee recalculation behind the Review & Apply fallback ──────────
+SELECT t.check('fee recalculation', 'owner recalculates from the stored fee', 'owner',
+  $q$RESET ROLE;;
+     UPDATE public.dealer_profiles SET settings = settings || '{"doc_fee_amount": 900}' WHERE tenant_id = 'b0000000-0000-4000-8000-000000000001';;
+     SELECT t.become('owner');;
+     SELECT public.recalc_tenant_doc_fee('b0000000-0000-4000-8000-000000000001')$q$, 'ok',
+  $q$SELECT count(*)::text FROM public.vehicle_listings WHERE doc_fee = 900$q$, '4');
+DO $$
+DECLARE p text;
+BEGIN
+  FOREACH p IN ARRAY ARRAY['manager','used_car_manager','inventory_manager','sales_manager','salesperson','finance','readonly','other_tenant_owner'] LOOP
+    PERFORM t.check('fee recalculation', 'recalculation refused', p,
+      $q$SELECT public.recalc_tenant_doc_fee('b0000000-0000-4000-8000-000000000001')$q$, 'error P0001');
+  END LOOP;
+END $$;
+SELECT t.check('fee recalculation', 'anon cannot call it', 'anon',
+  $q$SELECT public.recalc_tenant_doc_fee('b0000000-0000-4000-8000-000000000001')$q$, 'error 42501');
+SELECT t.check('fee recalculation', 'known gap: an invitation not yet accepted, for a general manager, can recalculate', 'pending_manager',
+  $q$RESET ROLE;;
+     UPDATE public.tenant_members SET role = 'general_manager' WHERE user_id = t.u('pending_manager');;
+     UPDATE public.dealer_profiles SET settings = settings || '{"doc_fee_amount": 900}' WHERE tenant_id = 'b0000000-0000-4000-8000-000000000001';;
+     SELECT t.become('pending_manager');;
+     SELECT public.recalc_tenant_doc_fee('b0000000-0000-4000-8000-000000000001')$q$, 'ok',
+  $q$SELECT count(*)::text FROM public.vehicle_listings WHERE doc_fee = 900$q$, '4');
+SELECT t.check('fee recalculation', 'it reaches archived stock and restamps verification, unlike the reviewed apply', 'owner',
+  $q$RESET ROLE;;
+     UPDATE public.dealer_profiles SET settings = settings || '{"doc_fee_amount": 900}' WHERE tenant_id = 'b0000000-0000-4000-8000-000000000001';;
+     SELECT t.become('owner');;
+     SELECT public.recalc_tenant_doc_fee('b0000000-0000-4000-8000-000000000001')$q$, 'ok',
+  $q$SELECT concat_ws('|', (SELECT doc_fee FROM public.vehicle_listings WHERE id = 'c0000000-0000-4000-8000-000000000004'),
+       (SELECT count(*) FROM public.vehicle_listings WHERE price_last_verified_at > now() - interval '1 minute'),
+       (SELECT count(*) FROM public.vehicle_listings WHERE price_parse_status = 'warning'))$q$, '900|4|0');
