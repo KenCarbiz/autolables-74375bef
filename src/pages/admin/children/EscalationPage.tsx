@@ -1,14 +1,13 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, AlertTriangle, Bell, Building2, CheckCircle2, Mail, MessageSquare, PlayCircle, Send, Smartphone, Truck, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Bell, Check, Mail, MessageCircle, Monitor, PlayCircle, Send, Truck, type LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { cn } from "@/lib/utils";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
-import { AdminButton, AdminCard, AdminTable, EmptyState, InlineNote, KeyValueList, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminCard, AdminTable, EmptyState, ICON, InlineNote, KeyValueList, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
 import { adminTabHref } from "@/lib/admin/sections";
 import { useAdminNow, useViewFixture } from "@/lib/admin/dataSource";
-import { describeAge } from "@/lib/admin/health";
 import {
   AUDIT_ACTION_ESCALATED,
   AUDIT_ACTION_ESCALATION_FAILED,
@@ -21,6 +20,7 @@ import {
   withEmailMethod,
   type AuditRowLike,
   type DeliveryActivityRow,
+  type DeliveryResult,
   type NotificationMethodRow,
   type TierPlan,
 } from "@/lib/admin/routingDraft";
@@ -47,18 +47,23 @@ const TABS: Array<{ id: TabId; label: string }> = [
 ];
 
 const MINUTE_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120];
-const METHOD_ICON: Record<NotificationMethodRow["key"], LucideIcon> = { email: Mail, sms: MessageSquare, in_app: Bell, push: Smartphone };
+const METHOD_ICON: Record<NotificationMethodRow["key"], LucideIcon> = { email: Mail, sms: MessageCircle, in_app: Monitor, push: Bell };
 const METHOD_SHORT: Record<NotificationMethodRow["key"], string> = { email: "Email", sms: "SMS", in_app: "In-app", push: "Push" };
 
-const DELIVERY_STATES: Array<{ icon: LucideIcon; wrap: string; title: string; detail: string }> = [
-  { icon: Send, wrap: "bg-adm-selected text-adm-primary", title: "Attempted", detail: "The request to send was made to the sender." },
-  { icon: CheckCircle2, wrap: "bg-adm-success-bg text-adm-success", title: "Accepted", detail: "The sender accepted the notification for delivery." },
-  { icon: Truck, wrap: "bg-adm-selected text-adm-primary", title: "Delivered", detail: "The recipient received it. The current sender does not report delivery, so this state is never claimed." },
-  { icon: AlertCircle, wrap: "bg-adm-danger-bg text-adm-danger", title: "Failed", detail: "The sender refused or could not be reached. The lead stays where it was." },
+// The reference draws each state in a 36px circle: tinted with a 20px glyph
+// for the states the sender reports as requests, solid with a white mark for
+// the two outcomes.
+const DELIVERY_STATES: Array<{ title: string; detail: string; mark: ReactNode }> = [
+  { title: "Attempted", detail: "The request to send was made to the sender.", mark: <span className="w-9 h-9 rounded-full bg-adm-selected text-adm-primary flex items-center justify-center"><Send className="w-5 h-5" /></span> },
+  { title: "Accepted", detail: "The sender accepted the notification for delivery.", mark: <span className="w-9 h-9 rounded-full bg-adm-success text-white flex items-center justify-center"><Check className="w-5 h-5 stroke-[3]" /></span> },
+  { title: "Delivered", detail: "The recipient received it. The current sender does not report this, so it is never claimed.", mark: <span className="w-9 h-9 rounded-full bg-adm-selected text-adm-primary flex items-center justify-center"><Truck className="w-6 h-6" /></span> },
+  { title: "Failed", detail: "The sender refused or could not be reached. The lead stays where it was.", mark: <span className="w-9 h-9 rounded-full bg-adm-danger text-white flex items-center justify-center text-[22px] leading-none font-bold">!</span> },
 ];
 
 const humanize = (s: string) => s.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 const formatWhen = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+const formatDay = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
 async function loadActivity(tenantId: string, limit: number): Promise<AuditRowLike[]> {
   const db = supabase as unknown as { from: (t: string) => any };
@@ -76,47 +81,85 @@ async function loadActivity(tenantId: string, limit: number): Promise<AuditRowLi
 const MinutesSelect = ({ id, label, value, onChange, allowOff = false, disabled }: { id: string; label: string; value: number; onChange: (v: number) => void; allowOff?: boolean; disabled: boolean }) => {
   const options = Array.from(new Set([...(allowOff ? [0] : []), ...MINUTE_OPTIONS, value])).filter((m) => m >= 0).sort((a, b) => a - b);
   return (
-    <select id={id} aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} className={cn(selectCls, "mt-0 w-[190px]")}>
+    <select id={id} aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} className={cn(selectCls, "mt-0 h-8 w-full px-4")}>
       {options.map((m) => <option key={m} value={m}>{m === 0 ? (allowOff ? "Off" : "0 minutes") : `${m} minutes`}</option>)}
     </select>
   );
 };
 
 const Step = ({ n, title, hint, last = false, children }: { n: number; title: string; hint: string; last?: boolean; children: ReactNode }) => (
-  <li className={cn("relative pl-11", last ? "pb-1" : "pb-6")}>
-    {!last && <span aria-hidden="true" className="absolute left-[15px] top-9 bottom-0 w-px bg-adm-border" />}
-    <span className="absolute left-0 top-0 w-8 h-8 rounded-full bg-adm-selected text-adm-primary text-[13px] font-semibold flex items-center justify-center">{n}</span>
+  <li data-landmark="escalation-tier" className={cn("relative pl-[55px]", last ? "pb-3" : "pb-[15px]")}>
+    {!last && <span aria-hidden="true" className="absolute left-4 top-[38px] bottom-0 w-px bg-adm-border" />}
+    <span className="absolute left-0 top-0 w-[34px] h-[34px] rounded-full bg-adm-selected text-adm-primary text-[14px] font-semibold flex items-center justify-center">{n}</span>
     <p className="text-[14px] leading-[20px] font-semibold text-adm-ink pt-1">{title}</p>
     <p className="text-[12px] leading-[18px] text-adm-muted">{hint}</p>
-    <div className="mt-3">{children}</div>
+    {children}
   </li>
 );
 
-const Destination = ({ label, missing, children }: { label: string; missing: boolean; children?: ReactNode }) => (
-  <div className="min-w-[240px] flex-1 max-w-[320px]">
-    <div className={cn("h-9 px-3 rounded-[6px] border bg-adm-surface flex items-center text-[14px] font-semibold text-adm-ink", missing ? "border-adm-danger" : "border-adm-border")}>{label}</div>
-    {children}
-    {missing && (
-      <p className="mt-1 text-[12px] leading-[18px] text-adm-danger flex items-center gap-1" role="alert">
-        <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-        Destination required
-      </p>
-    )}
+/** One tier's controls: the time, then Send to and the destination, with its state on the line below. */
+const TierControls = ({ minutes, destination, note, extra }: { minutes: ReactNode; destination: ReactNode; note: ReactNode; extra?: ReactNode }) => (
+  <div className="mt-[7px] grid grid-cols-1 sm:grid-cols-[minmax(0,264px)_auto_minmax(0,230px)] gap-x-[21px] gap-y-2 items-center">
+    {minutes}
+    <span className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">Send to</span>
+    {destination}
+    <div className="sm:col-start-3 -mt-1">{note}</div>
+    {extra && <div className="sm:col-start-3">{extra}</div>}
   </div>
 );
 
-const ActivityBody = ({ state, rows, now }: { state: "loading" | "failed" | "ready"; rows: DeliveryActivityRow[]; now: number }) => {
-  if (state === "loading") {
-    return <div className="px-6 pb-4 space-y-2" aria-busy="true">{[0, 1, 2].map((i) => <SkeletonBlock key={i} className="h-9 w-full" />)}</div>;
-  }
-  if (state === "failed") {
-    return <p role="status" className="px-6 pb-4 text-[13px] text-adm-muted">Delivery activity could not be read for this rooftop. It shows as Unavailable rather than zero.</p>;
-  }
-  if (rows.length === 0) {
-    return <div className="px-6"><EmptyState compact title="No escalation notifications recorded." detail="Rows appear here after the escalation sweep attempts a notification." /></div>;
+const DestinationSelect = ({ label, tier, missing }: { label: string; tier: string; missing: boolean }) => (
+  <select aria-label={`${tier}: send to`} data-landmark="tier-destination" defaultValue={label} className={cn(selectCls, "mt-0 h-8 w-full px-4 font-semibold", missing ? "border-adm-danger" : "border-adm-border")}>
+    <option value={label}>{label}</option>
+  </select>
+);
+
+// The mark is a filled 19x14 triangle in the reference; drawn with a white
+// stroke it loses about 2px of fill per side, so it is rendered at 24px.
+const DestinationState = ({ label, email, editing, onEdit }: { label: string; email: string; editing: boolean; onEdit: () => void }) => {
+  const missing = email.trim().length === 0;
+  if (missing) {
+    return (
+      <p role="alert" className="h-4 flex items-center gap-1.5 text-[12px] leading-[16px] text-adm-danger">
+        <AlertTriangle className={cn(ICON.status, "fill-current stroke-white flex-shrink-0")} aria-hidden="true" />
+        <span>Destination required</span>
+        {!editing && <button type="button" aria-label={`Add ${label} email`} onClick={onEdit} className="ml-1 font-semibold text-adm-primary hover:underline">Add email</button>}
+      </p>
+    );
   }
   return (
-    <AdminTable caption="Escalation delivery activity">
+    <p className="h-4 flex items-center gap-2 text-[12px] leading-[16px] text-adm-muted min-w-0">
+      <span className="truncate" data-parity="destination-email">{email}</span>
+      {!editing && <button type="button" aria-label={`Change ${label} email`} onClick={onEdit} className="font-semibold text-adm-primary hover:underline">Change</button>}
+    </p>
+  );
+};
+
+const ResultMark = ({ result }: { result: DeliveryResult }) => {
+  if (result === "failed") return <span className="w-[22px] h-[22px] rounded-full bg-adm-danger text-white flex items-center justify-center flex-shrink-0 text-[14px] leading-none font-bold" aria-hidden="true">!</span>;
+  if (result === "accepted") return <span className="w-[22px] h-[22px] rounded-full bg-adm-success text-white flex items-center justify-center flex-shrink-0" aria-hidden="true"><Check className="w-3.5 h-3.5 stroke-[3]" /></span>;
+  return <span className="w-[22px] h-[22px] rounded-full bg-adm-workspace text-adm-muted flex items-center justify-center flex-shrink-0" aria-hidden="true"><Send className="w-3 h-3" /></span>;
+};
+
+// The reference's columns are 110/99/87/77/136/104 of 613; the Result column
+// is widened to keep "Provider rejected" beside its 22px mark on one line.
+const ACTIVITY_COLUMNS = ["14.7%", "13.2%", "14.2%", "12.6%", "28.4%", "16.9%"];
+const ACTIVITY_TABLE_CLS =
+  "mb-0 [&_table]:text-[12px] [&_table]:leading-[16px] [&_th]:py-[6px] [&_th]:px-3 [&_td]:py-1 [&_td]:px-3 [&_th+th]:border-l [&_td+td]:border-l [&_th+th]:border-adm-border [&_td+td]:border-adm-border [&_tbody_tr:last-child>td]:border-b-0";
+
+const ActivityBody = ({ state, rows }: { state: "loading" | "failed" | "ready"; rows: DeliveryActivityRow[] }) => {
+  if (state === "loading") {
+    return <div className="px-4 pb-2 space-y-2" aria-busy="true">{[0, 1, 2].map((i) => <SkeletonBlock key={i} className="h-9 w-full" />)}</div>;
+  }
+  if (state === "failed") {
+    return <p role="status" className="px-4 pb-2 text-[13px] text-adm-muted">Delivery activity could not be read for this rooftop. It shows as Unavailable rather than zero.</p>;
+  }
+  if (rows.length === 0) {
+    return <div className="px-4"><EmptyState compact title="No escalation notifications recorded." detail="Rows appear here after the escalation sweep attempts a notification." /></div>;
+  }
+  return (
+    <AdminTable inset caption="Escalation delivery activity" className={ACTIVITY_TABLE_CLS}>
+      <colgroup>{ACTIVITY_COLUMNS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
       <thead>
         <tr>
           <Th>Request</Th>
@@ -124,7 +167,7 @@ const ActivityBody = ({ state, rows, now }: { state: "loading" | "failed" | "rea
           <Th>Channel</Th>
           <Th>Attempt</Th>
           <Th>Result</Th>
-          <Th>Date and time</Th>
+          <Th>Date &amp; time</Th>
         </tr>
       </thead>
       <tbody>
@@ -136,10 +179,10 @@ const ActivityBody = ({ state, rows, now }: { state: "loading" | "failed" | "rea
               <Td>{r.rooftop}</Td>
               <Td>{r.channel}</Td>
               <Td>{r.attempt ?? "Unknown"}</Td>
-              <Td><StatusChip tone={meta.tone} icon={meta.tone !== "neutral"}>{meta.label}</StatusChip></Td>
+              <Td><span className="inline-flex items-center gap-2 text-[14px] leading-[20px]"><ResultMark result={r.result} />{meta.label}</span></Td>
               <Td className="text-adm-muted whitespace-nowrap">
-                <time dateTime={r.at}>{formatWhen(r.at)}</time>
-                <span className="block text-[11px]">{describeAge(r.at, now)}</span>
+                <time dateTime={r.at} className="block">{formatDay(r.at)}</time>
+                <span className="block">{formatTime(r.at)}</span>
               </Td>
             </tr>
           );
@@ -149,6 +192,8 @@ const ActivityBody = ({ state, rows, now }: { state: "loading" | "failed" | "rea
   );
 };
 
+const cardTitle = (text: string) => <span className="text-[18px] leading-[26px]">{text}</span>;
+
 export default function EscalationPage() {
   const api = useRoutingDraft();
   const now = useAdminNow();
@@ -156,6 +201,7 @@ export default function EscalationPage() {
   const fixture = useViewFixture<EscalationFixture>("escalation");
   const [tab, setTab] = useState<TabId>("rules");
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<{ bdc: boolean; manager: boolean }>({ bdc: false, manager: false });
   const [dry, setDry] = useState<{ result: PassportRoutingResult; plan: TierPlan; at: number } | null>(null);
 
   const { draft, dirty, canEdit, loading, state, stores, storeCount } = api;
@@ -188,6 +234,8 @@ export default function EscalationPage() {
   const mgrTier = plan.tiers.find((t) => t.key === "manager") ?? null;
   const bdcMissing = plan.enabled && !!bdcTier && bdcTier.to === null;
   const mgrMissing = plan.enabled && !!mgrTier && mgrTier.to === null;
+  const bdcEmail = cfg.bdcSettings?.bdcEmail || "";
+  const mgrEmail = cfg.managerFallback?.managerEmail || "";
   const ro = !canEdit;
   const inputsOff = ro || !rules.enabled;
   const patchRules = (p: Partial<typeof rules>) => api.patchRouting({ escalationRules: { ...rules, ...p } });
@@ -226,10 +274,18 @@ export default function EscalationPage() {
   );
 
   const activityCard = (full: boolean) => (
-    <AdminCard title={api.fixture ? "Example delivery activity" : "Delivery activity"} description="Recent escalation notifications for this rule. Accepted does not mean delivered." flush>
-      <ActivityBody state={activityState} rows={activity} now={now} />
-      <div className="px-6 pb-6 pt-4 space-y-2">
-        <InlineNote tone="info" title="Accepted does not mean delivered.">A notification can be accepted by the sender and still not reach the recipient.</InlineNote>
+    <AdminCard
+      inset="sm"
+      flush
+      title={cardTitle(api.fixture ? "Example delivery activity" : "Delivery activity")}
+      description="Recent escalation notifications for this rule. Accepted does not mean delivered."
+      headerClassName="pb-[9px]"
+    >
+      <ActivityBody state={activityState} rows={activity} />
+      <div className="px-4 pt-[10px] pb-[7px] space-y-2">
+        <InlineNote tone="info" className="py-[5px]" title={<span className="text-[13px] leading-[18px]">Accepted does not mean delivered.</span>}>
+          <span className="text-[12px] leading-[16px]">A notification can be accepted by the sender and still not reach the recipient.</span>
+        </InlineNote>
         {full && <InlineNote tone="neutral" title="Older rows read as Attempted.">Rows recorded before delivery outcomes were tracked carry no acceptance, so they are never promoted to Accepted.</InlineNote>}
       </div>
     </AdminCard>
@@ -247,73 +303,75 @@ export default function EscalationPage() {
       badge={dirty ? <StatusChip tone="warning">Draft</StatusChip> : undefined}
       backHref={adminTabHref("routing")}
       backLabel="Back to Contact & Routing"
+      actions={<div className="hidden sm:block"><ToggleRow compact id="escalation-on" label="Escalation" checked={rules.enabled} onChange={(v) => patchRules({ enabled: v })} disabled={ro} /></div>}
       tabs={tabs}
     >
       {ro && <InlineNote tone="info" title="View only." className="mb-4">Your role can see escalation rules but cannot change them.</InlineNote>}
 
       {tab === "rules" && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,660fr)_minmax(0,645fr)] gap-4 xl:gap-[13px] items-start">
           <AdminCard
-            title={<span className="inline-flex items-center gap-2 flex-wrap">Unanswered customer requests {dirty && <StatusChip tone="warning">Keep draft</StatusChip>}</span>}
-            description="Configure how and when to escalate unanswered customer requests."
-            action={<ToggleRow compact id="escalation-on" label="Escalation" checked={rules.enabled} onChange={(v) => patchRules({ enabled: v })} disabled={ro} />}
+            inset="sm"
+            title={<span className="inline-flex items-center gap-[18px] flex-wrap">{cardTitle("Unanswered customer requests")} {dirty && <StatusChip tone="warning" className="py-0">Keep draft</StatusChip>}</span>}
+            action={
+              <>
+                <p className="hidden sm:block max-w-[230px] text-[12px] leading-[18px] text-adm-muted">Configure how and when to escalate unanswered customer requests.</p>
+                <div className="sm:hidden"><ToggleRow compact id="escalation-on-sm" label="Escalation" checked={rules.enabled} onChange={(v) => patchRules({ enabled: v })} disabled={ro} /></div>
+              </>
+            }
+            bodyClassName="pt-1 pb-[10px]"
           >
+            <p className="sm:hidden mb-3 text-[12px] leading-[18px] text-adm-muted">Configure how and when to escalate unanswered customer requests.</p>
             {!rules.enabled && <p className="mb-4 text-[13px] text-adm-muted" role="status">Escalation is off. Unanswered requests are never escalated until it is on.</p>}
             <ol>
-              <Step n={1} title="First response" hint="If a customer request is not answered within the time below, the first-response target is missed and the escalation clock starts.">
-                <div className="flex flex-wrap items-start gap-3">
-                  <MinutesSelect id="sla-minutes" label="First response target" value={rules.firstResponseSlaMinutes} disabled={inputsOff} onChange={(v) => patchRules({ firstResponseSlaMinutes: v })} />
-                  <span className="text-[12px] text-adm-muted self-center">Send to</span>
-                  <Destination label="Target only" missing={false}>
-                    <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">No one is notified at this step. The tiers below count from the request.</p>
-                  </Destination>
-                </div>
+              <Step n={1} title="First response" hint="If a customer request is not answered within the time below, the escalation clock starts.">
+                <TierControls
+                  minutes={<MinutesSelect id="sla-minutes" label="First response target" value={rules.firstResponseSlaMinutes} disabled={inputsOff} onChange={(v) => patchRules({ firstResponseSlaMinutes: v })} />}
+                  destination={<DestinationSelect label="Target only" tier="First response" missing={false} />}
+                  note={<p className="h-4 flex items-center text-[12px] leading-[16px] text-adm-muted">No one is notified at this step.</p>}
+                />
               </Step>
               <Step n={2} title="BDC escalation" hint="If there is still no response, notify the BDC desk.">
-                <div className="flex flex-wrap items-start gap-3">
-                  <MinutesSelect id="bdc-after" label="Escalate to BDC after" value={rules.escalateToBdcAfterMinutes ?? rules.firstResponseSlaMinutes} allowOff disabled={inputsOff} onChange={(v) => patchRules({ escalateToBdcAfterMinutes: v })} />
-                  <span className="text-[12px] text-adm-muted self-center">Send to</span>
-                  <Destination label="BDC desk" missing={bdcMissing}>
-                    <Field label="BDC email" className="mt-2">
-                      <input type="email" value={cfg.bdcSettings?.bdcEmail || ""} disabled={ro} placeholder="bdc@yourdealership.com" onChange={(e) => api.patchRouting({ bdcSettings: { enabled: false, showBdcAsTeam: true, ...(cfg.bdcSettings || {}), bdcEmail: e.target.value } })} className={inputCls} />
+                <TierControls
+                  minutes={<MinutesSelect id="bdc-after" label="Escalate to BDC after" value={rules.escalateToBdcAfterMinutes ?? rules.firstResponseSlaMinutes} allowOff disabled={inputsOff} onChange={(v) => patchRules({ escalateToBdcAfterMinutes: v })} />}
+                  destination={<DestinationSelect label="BDC desk" tier="BDC escalation" missing={bdcMissing} />}
+                  note={<DestinationState label="BDC" email={bdcEmail} editing={editing.bdc} onEdit={() => setEditing((e) => ({ ...e, bdc: true }))} />}
+                  extra={editing.bdc && (
+                    <Field label="BDC email">
+                      <input type="email" value={bdcEmail} disabled={ro} placeholder="bdc@yourdealership.com" onChange={(e) => api.patchRouting({ bdcSettings: { enabled: false, showBdcAsTeam: true, ...(cfg.bdcSettings || {}), bdcEmail: e.target.value } })} className={inputCls} />
                     </Field>
-                  </Destination>
-                </div>
+                  )}
+                />
               </Step>
               <Step n={3} title="Manager escalation" hint="If there is still no response, send a final escalation to the sales manager." last>
-                <div className="flex flex-wrap items-start gap-3">
-                  <MinutesSelect id="manager-after" label="Escalate to manager after" value={rules.escalateToManagerAfterMinutes ?? 0} allowOff disabled={inputsOff} onChange={(v) => patchRules({ escalateToManagerAfterMinutes: v })} />
-                  <span className="text-[12px] text-adm-muted self-center">Send to</span>
-                  <Destination label="Sales manager" missing={mgrMissing}>
-                    <Field label="Sales manager email" className="mt-2">
-                      <input type="email" value={cfg.managerFallback?.managerEmail || ""} disabled={ro} placeholder="manager@yourdealership.com" onChange={(e) => api.patchRouting({ managerFallback: { enabled: false, ...(cfg.managerFallback || {}), managerEmail: e.target.value } })} className={inputCls} />
+                <TierControls
+                  minutes={<MinutesSelect id="manager-after" label="Escalate to manager after" value={rules.escalateToManagerAfterMinutes ?? 0} allowOff disabled={inputsOff} onChange={(v) => patchRules({ escalateToManagerAfterMinutes: v })} />}
+                  destination={<DestinationSelect label="Sales manager" tier="Manager escalation" missing={mgrMissing} />}
+                  note={<DestinationState label="Sales manager" email={mgrEmail} editing={editing.manager} onEdit={() => setEditing((e) => ({ ...e, manager: true }))} />}
+                  extra={editing.manager && (
+                    <Field label="Sales manager email">
+                      <input type="email" value={mgrEmail} disabled={ro} placeholder="manager@yourdealership.com" onChange={(e) => api.patchRouting({ managerFallback: { enabled: false, ...(cfg.managerFallback || {}), managerEmail: e.target.value } })} className={inputCls} />
                     </Field>
-                  </Destination>
-                </div>
+                  )}
+                />
               </Step>
             </ol>
 
-            <div className="mt-2 pt-5 border-t border-adm-border">
+            <div className="pt-3 border-t border-adm-border">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Scope</p>
-              <p className="text-[12px] leading-[18px] text-adm-muted">Which rooftops this rule applies to.</p>
-              <div className="mt-2 inline-flex items-center gap-2 h-9 px-3 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold text-adm-ink">
-                <Building2 className="w-4 h-4 text-adm-muted" aria-hidden="true" />
+              <p className="text-[12px] leading-[18px] text-adm-muted">Escalation rules are stored once per account and apply to every rooftop.</p>
+              <div className="mt-[6px] inline-flex items-center h-[30px] min-w-[232px] px-3 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold text-adm-ink">
                 {storeCount > 1 ? `All rooftops (${storeCount})` : "This rooftop"}
               </div>
-              {storeCount > 1 ? (
-                <>
-                  <div className="mt-2 flex flex-wrap gap-2">{stores.map((s) => <StatusChip key={s.id} tone="neutral">{s.name}</StatusChip>)}</div>
-                  <p className="mt-2 text-[12px] leading-[18px] text-adm-muted">Escalation rules are stored once per account and apply to every rooftop.</p>
-                </>
-              ) : (
-                <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">{api.currentStoreName}</p>
-              )}
+              <div className="mt-[6px] flex flex-wrap gap-2">
+                {storeCount > 1 ? stores.map((s) => <span key={s.id} data-parity="store-name"><StatusChip tone="info">{s.name}</StatusChip></span>) : <span data-parity="store-name"><StatusChip tone="info">{api.currentStoreName}</StatusChip></span>}
+              </div>
             </div>
 
-            <div className="mt-5">
+            <div className="mt-[13px]">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Notification methods</p>
               <p className="text-[12px] leading-[18px] text-adm-muted">Select how escalation notifications are sent.</p>
-              <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-label="Notification methods">
+              <div className="mt-[6px] grid grid-cols-2 sm:grid-cols-4 gap-[5px]" role="group" aria-label="Notification methods">
                 {methods.map((m) => {
                   const Icon = METHOD_ICON[m.key];
                   return (
@@ -325,12 +383,16 @@ export default function EscalationPage() {
                       disabled={!m.supported || ro}
                       onClick={() => api.patchRouting({ escalationRules: withEmailMethod(rules, !m.enabled) })}
                       className={cn(
-                        "rounded-[6px] border px-3 py-2.5 text-left flex items-start gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary",
+                        "rounded-[6px] border px-3 py-[7px] text-left flex items-center gap-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary",
                         m.enabled ? "border-adm-primary bg-adm-selected" : "border-adm-border bg-adm-surface",
                         !m.supported && "opacity-60 cursor-not-allowed",
                       )}
                     >
-                      <Icon className={cn("w-4 h-4 mt-0.5 flex-shrink-0", m.enabled ? "text-adm-primary" : "text-adm-muted")} aria-hidden="true" />
+                      {m.enabled ? (
+                        <span className="w-[22px] h-[22px] rounded-full bg-adm-primary text-white flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-3 h-3" /></span>
+                      ) : (
+                        <Icon className={cn(ICON.status, "text-adm-muted flex-shrink-0")} aria-hidden="true" />
+                      )}
                       <span className="min-w-0">
                         <span className="block text-[13px] leading-[18px] font-semibold text-adm-ink">{METHOD_SHORT[m.key]}</span>
                         <span className="block text-[11px] leading-[16px] text-adm-muted">{m.supported ? "Send by email" : "Not supported"}</span>
@@ -341,19 +403,19 @@ export default function EscalationPage() {
               </div>
             </div>
 
-            <div className="mt-5 flex items-center gap-3 flex-wrap">
-              <AdminButton variant="primary" disabled={!canReview} onClick={onReview}>Review changes</AdminButton>
-              {dirty && state.phase !== "applying" && <AdminButton variant="ghost" onClick={api.discard}>Discard</AdminButton>}
+            <div className="mt-[11px] flex items-center gap-[15px] flex-wrap">
+              <AdminButton variant="primary" data-parity="review-changes" className="min-h-[34px] w-[285px] max-w-full disabled:opacity-100 disabled:bg-adm-border disabled:border-adm-border disabled:text-adm-muted" disabled={!canReview} onClick={onReview}>Review changes</AdminButton>
+              {dirty && state.phase !== "applying" && <AdminButton variant="ghost" className="min-h-[34px]" onClick={api.discard}>Discard</AdminButton>}
               <p className={cn("text-[12px] leading-[18px]", state.validation.length ? "text-adm-danger" : "text-adm-muted")} role="status">{helper}</p>
             </div>
           </AdminCard>
 
-          <div className="space-y-4">
-            <AdminCard title="Delivery states" description="Possible states when sending an escalation notification.">
-              <ul className="divide-y divide-adm-border -my-1">
+          <div className="space-y-[9px]">
+            <AdminCard inset="sm" title={cardTitle("Delivery states")} description="Possible states when sending an escalation notification." bodyClassName="pt-2">
+              <ul data-landmark="delivery-states" className="rounded-[10px] border border-adm-border divide-y divide-adm-border">
                 {DELIVERY_STATES.map((s) => (
-                  <li key={s.title} className="flex items-center gap-3 py-3">
-                    <span className={cn("w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0", s.wrap)} aria-hidden="true"><s.icon className="w-4 h-4" /></span>
+                  <li key={s.title} className="flex items-center gap-6 px-[14px] py-[10px]">
+                    <span className="flex-shrink-0" aria-hidden="true">{s.mark}</span>
                     <span className="min-w-0">
                       <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{s.title}</span>
                       <span className="block text-[12px] leading-[18px] text-adm-muted">{s.detail}</span>
@@ -361,7 +423,9 @@ export default function EscalationPage() {
                   </li>
                 ))}
               </ul>
-              <InlineNote tone="warning" title="A failed notification stays eligible for retry." className="mt-4">If a notification fails, the lead keeps its level and the next sweep tries again.</InlineNote>
+              <div data-landmark="retry-note" className="mt-4">
+                <InlineNote tone="warning" title="A failed notification stays eligible for retry.">If a notification fails, the lead keeps its level and the next sweep tries again.</InlineNote>
+              </div>
             </AdminCard>
             {activityCard(false)}
           </div>
@@ -373,7 +437,7 @@ export default function EscalationPage() {
       {tab === "test" && (
         <AdminCard title="Test route" description="A dry run of the current draft against the routing resolver and the escalation plan. No message is sent and nothing is recorded.">
           <div className="flex items-center gap-3 flex-wrap">
-            <AdminButton variant="primary" onClick={runDry}><PlayCircle className="w-4 h-4" aria-hidden="true" />Run dry run</AdminButton>
+            <AdminButton variant="primary" onClick={runDry}><PlayCircle className={ICON.button} aria-hidden="true" />Run dry run</AdminButton>
             {dry && <AdminButton variant="ghost" onClick={() => setDry(null)}>Clear</AdminButton>}
           </div>
           {dry && (

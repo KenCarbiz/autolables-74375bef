@@ -8,10 +8,13 @@ const ROUTING_FIXTURE_09: RoutingFixture = {
   ...ROUTING_FIXTURE_08,
   stores: [
     { id: "example-store-1", name: "Example rooftop" },
-    { id: "example-store-2", name: "Second example rooftop" },
+    { id: "example-store-2", name: "Second rooftop" },
   ],
 };
 
+// Two example notifications, as the reference draws: one the sender refused,
+// one it accepted. Rows recorded before outcomes were tracked are covered by
+// the page test with its own row.
 const ESCALATION_FIXTURE_09: EscalationFixture = {
   activity: [
     {
@@ -27,13 +30,6 @@ const ESCALATION_FIXTURE_09: EscalationFixture = {
       entity_id: "1b2c3d4e-0000-4000-8000-00000000000b",
       created_at: "2026-10-28T14:03:00Z",
       details: { level: 2, to: "Sales manager", unanswered_minutes: 12, outcome: "accepted", method: "email", http_status: 202, store_id: "example-store-2" },
-    },
-    {
-      id: "example-audit-3",
-      action: "customer_passport_escalated",
-      entity_id: "2c3d4e5f-0000-4000-8000-00000000000c",
-      created_at: "2026-10-01T13:20:00Z",
-      details: { level: 1, to: "BDC" },
     },
   ],
 };

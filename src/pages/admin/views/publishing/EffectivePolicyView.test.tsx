@@ -92,8 +92,8 @@ describe("Publishing > Effective policy", () => {
   it("renders the rooftop matrix from the fixture without reading or writing anything", () => {
     renderView(true);
     expect(screen.getByText("This rooftop")).toBeInTheDocument();
-    expect(screen.getByText(`Policy applies to all vehicles at ${fixtureView.rooftopLabel}.`)).toBeInTheDocument();
-    expect(screen.getByText("Draft pending")).toBeInTheDocument();
+    expect(screen.getByText(fixtureView.rooftopLabel).closest("p")).toHaveTextContent(`Policy applies to all vehicles at ${fixtureView.rooftopLabel}.`);
+    expect(screen.getByText("Draft proposal")).toBeInTheDocument();
     expect(screen.getByText("Do-not-drive recall follows a separate blocking policy.")).toBeInTheDocument();
 
     const expected = derivePublishingMatrix({ settings: fixtureView.settings, description: fixtureView.description });

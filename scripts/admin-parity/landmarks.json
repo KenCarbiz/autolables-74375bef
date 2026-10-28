@@ -516,13 +516,283 @@
     }
   },
   "08": {
-    "_rail": 237
+    "_rail": 237,
+    "_comment": "Mock-native boxes from edges.cjs/bbox.cjs at threshold 745: content x 269 to 1560, section-row bottom 172 (bluerows.cjs, underline 169-170), cards at y 319 (left 269-891, right 907-1559), readiness box 369-585, Review escalation rules 593-628, response card 659-902, sticky bar 918 with its button at 925-961. The section row carries no y: the one-h1 title block puts it 66px lower than the mock's section-titled page, which the body offset documents. The primary action is viewport-anchored, so it carries y, not yBody.",
+    "sectionNav": {
+      "selector": "nav[aria-label=\"Administration sections\"]",
+      "x": 270,
+      "w": 1291,
+      "h": 38
+    },
+    "childTabs": {
+      "selector": "nav[aria-label=\"Customer Experience views\"]",
+      "x": 270,
+      "yBody": 13,
+      "w": 1291,
+      "h": 45
+    },
+    "sectionTitle": {
+      "selector": "[data-admin-v2] h2",
+      "x": 270,
+      "yBody": 71,
+      "h": 32
+    },
+    "scope": {
+      "selector": "[data-admin-v2] [data-parity=\"scope\"] > span:last-child",
+      "x": 1369,
+      "yBody": 74,
+      "w": 191,
+      "h": 42
+    },
+    "orderCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Routing order",
+      "x": 269,
+      "yBody": 147,
+      "w": 623,
+      "h": 584
+    },
+    "orderRow1": {
+      "selector": "[data-admin-v2] [data-landmark=\"order-row\"]",
+      "index": 0,
+      "x": 282,
+      "yBody": 201,
+      "w": 598,
+      "h": 68
+    },
+    "orderRow6": {
+      "selector": "[data-admin-v2] [data-landmark=\"order-row\"]",
+      "index": 5,
+      "x": 282,
+      "yBody": 578,
+      "w": 598,
+      "h": 68
+    },
+    "readinessCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Configuration readiness",
+      "x": 907,
+      "yBody": 147,
+      "w": 653,
+      "h": 325
+    },
+    "readinessList": {
+      "selector": "[data-admin-v2] [data-landmark=\"readiness-list\"]",
+      "x": 921,
+      "yBody": 197,
+      "w": 625,
+      "h": 217
+    },
+    "escalationLink": {
+      "selector": "[data-admin-v2] [data-parity=\"review-escalation\"]",
+      "x": 921,
+      "yBody": 421,
+      "w": 230,
+      "h": 36
+    },
+    "responseCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Response and escalation",
+      "x": 907,
+      "yBody": 487,
+      "w": 653,
+      "h": 244
+    },
+    "primaryAction": {
+      "selector": "[data-admin-v2] [data-parity=\"review-changes\"]",
+      "x": 1409,
+      "y": 925,
+      "w": 149,
+      "h": 36
+    }
   },
   "09": {
-    "_rail": 217
+    "_rail": 217,
+    "_comment": "Child page: the mock stacks a section-titled header, a breadcrumb, the h1 and the Rules / Delivery activity / Test route row, so the body is pinned to that row (Rules underline at y 287-288 by bluerows.cjs, row bottom 289). Boxes at threshold 745: left card 244-903 x 309-985, right cards 917-1561 at 309-711 and 721-967, tier selects 318-581 and 660-889 at 413-445, delivery-state box 933-1544 at 378-615, retry note 631-696, activity table 932-1545 at 789-900, tiles 261-885 at 882-931, Review changes 263-547 at 942-975.",
+    "_anchor": {
+      "reference": 289,
+      "selector": "[role=\"tablist\"][aria-label=\"Escalation views\"]"
+    },
+    "childTabs": {
+      "selector": "[role=\"tablist\"][aria-label=\"Escalation views\"]",
+      "x": 244,
+      "w": 1318,
+      "h": 40
+    },
+    "rulesCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Unanswered customer requests",
+      "x": 244,
+      "yBody": 20,
+      "w": 660,
+      "h": 677
+    },
+    "tier1": {
+      "selector": "[data-admin-v2] [data-landmark=\"escalation-tier\"]",
+      "index": 0,
+      "x": 262,
+      "yBody": 75,
+      "w": 627,
+      "h": 117
+    },
+    "minutesSelect1": {
+      "selector": "#sla-minutes",
+      "x": 318,
+      "yBody": 124,
+      "w": 264,
+      "h": 33
+    },
+    "destination1": {
+      "selector": "[data-admin-v2] [data-landmark=\"tier-destination\"]",
+      "index": 0,
+      "x": 660,
+      "yBody": 124,
+      "w": 230,
+      "h": 33
+    },
+    "tiles": {
+      "selector": "[role=\"group\"][aria-label=\"Notification methods\"]",
+      "x": 261,
+      "yBody": 593,
+      "w": 625,
+      "h": 50
+    },
+    "reviewButton": {
+      "selector": "[data-admin-v2] [data-parity=\"review-changes\"]",
+      "x": 263,
+      "yBody": 653,
+      "w": 285,
+      "h": 34
+    },
+    "statesCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Delivery states",
+      "x": 917,
+      "yBody": 20,
+      "w": 645,
+      "h": 403
+    },
+    "statesList": {
+      "selector": "[data-admin-v2] [data-landmark=\"delivery-states\"]",
+      "x": 933,
+      "yBody": 89,
+      "w": 612,
+      "h": 238
+    },
+    "retryNote": {
+      "selector": "[data-admin-v2] [data-landmark=\"retry-note\"]",
+      "x": 933,
+      "yBody": 342,
+      "w": 612,
+      "h": 66
+    },
+    "activityCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Example delivery activity",
+      "x": 917,
+      "yBody": 432,
+      "w": 645,
+      "h": 247
+    },
+    "activityTable": {
+      "selector": "[data-admin-v2] table",
+      "index": 0,
+      "x": 933,
+      "yBody": 501,
+      "w": 612,
+      "h": 110
+    }
   },
   "10": {
-    "_rail": 257
+    "_rail": 257,
+    "_comment": "Mock-native boxes at threshold 745: content x 286 to 1559, section-row bottom 245 (underline 243), card 286-1559 x 266-946, draft box 1397-1538 x 284-329, matrix 307-1538 x 408-587 with column lines at 476/734/1035/1280, detail section 604-864 with cards 328-606, 620-912, 926-1210 at 663-847 and the rule column from the 1232 divider, recall note 307-1211 x 875-924, buttons 1230-1380 and 1393-1538 at 876-923. The mock draws the child tabs inside the card under its header (y 350-392); the fixed IA draws them above the card, which the childTabs delta records.",
+    "sectionNav": {
+      "selector": "nav[aria-label=\"Administration sections\"]",
+      "x": 287,
+      "y": 207,
+      "w": 1273,
+      "h": 38
+    },
+    "childTabs": {
+      "selector": "nav[aria-label=\"Publishing views\"]",
+      "x": 308,
+      "yBody": 105,
+      "w": 1230,
+      "h": 42
+    },
+    "policyCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "This rooftop",
+      "x": 286,
+      "yBody": 21,
+      "w": 1274,
+      "h": 681
+    },
+    "draftStatus": {
+      "selector": "[data-admin-v2] [data-parity=\"draft-status\"]",
+      "x": 1397,
+      "yBody": 39,
+      "w": 142,
+      "h": 46
+    },
+    "policyTable": {
+      "selector": "[data-admin-v2] table",
+      "index": 0,
+      "x": 308,
+      "yBody": 164,
+      "w": 1230,
+      "h": 178
+    },
+    "detailSection": {
+      "selector": "[data-admin-v2] section[aria-labelledby=\"publishing-class-detail\"]",
+      "x": 307,
+      "yBody": 359,
+      "w": 1232,
+      "h": 261
+    },
+    "classCard1": {
+      "selector": "[data-admin-v2] [data-landmark=\"class-card\"]",
+      "index": 0,
+      "x": 328,
+      "yBody": 418,
+      "w": 279,
+      "h": 185
+    },
+    "classCard3": {
+      "selector": "[data-admin-v2] [data-landmark=\"class-card\"]",
+      "index": 2,
+      "x": 926,
+      "yBody": 418,
+      "w": 285,
+      "h": 185
+    },
+    "effectiveRule": {
+      "selector": "[data-admin-v2] aside",
+      "x": 1232,
+      "yBody": 418,
+      "w": 285
+    },
+    "recallNote": {
+      "selector": "[data-admin-v2] [data-parity=\"recall-note\"]",
+      "x": 307,
+      "yBody": 630,
+      "w": 905,
+      "h": 50
+    },
+    "primaryAction": {
+      "selector": "[data-admin-v2] [data-parity=\"review-changes\"]",
+      "x": 1230,
+      "yBody": 631,
+      "w": 151,
+      "h": 48
+    },
+    "previewButton": {
+      "selector": "[data-admin-v2] [data-parity=\"preview-impact\"]",
+      "x": 1393,
+      "yBody": 630,
+      "w": 146,
+      "h": 49
+    }
   },
   "11": {
     "_rail": 264,

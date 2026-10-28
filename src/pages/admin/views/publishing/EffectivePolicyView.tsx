@@ -14,7 +14,7 @@ import {
   type PublishingDraft,
   type VehicleClass,
 } from "@/lib/admin/publishingPolicy";
-import { AdminButton, AdminCard, AdminTable, InlineNote, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminCard, AdminTable, ICON, ICON_BOX, InlineNote, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
 import { usePublishingData } from "./usePublishingData";
 import PublishingReviewDialog from "./PublishingReviewDialog";
 
@@ -31,6 +31,10 @@ const CARD_TONE: Record<ClassDetailCard["tone"], { icon: string; box: string }> 
   danger: { icon: "bg-adm-danger-bg text-adm-danger", box: "bg-adm-danger-bg text-adm-danger" },
   success: { icon: "bg-adm-success-bg text-adm-success", box: "bg-adm-success-bg text-adm-success" },
 };
+
+// The reference's matrix columns: 169, 258, 301, 245 and 258px of 1231.
+const MATRIX_COLUMNS = ["13.7%", "21%", "24.5%", "19.9%", "20.9%"];
+const MATRIX_TABLE_CLS = "[&_th+th]:border-l [&_td+td]:border-l [&_th+th]:border-adm-border [&_td+td]:border-adm-border [&_tbody_tr:last-child>td]:border-b-0";
 
 const Cell = ({ cell }: { cell: PolicyCell }) => (
   <span title={cell.detail} className={cn(cell.state === "unknown" && "text-adm-muted")}>
@@ -66,13 +70,18 @@ export default function EffectivePolicyView() {
   return (
     <div className="space-y-4">
       <AdminCard
-        title="This rooftop"
-        description={`Policy applies to all vehicles at ${rooftopLabel}.`}
+        inset="sm"
+        title={<span className="text-[20px] leading-[28px]">This rooftop</span>}
+        description={<span className="text-[14px] leading-[20px]">Policy applies to all vehicles at <span data-parity="rooftop-name">{rooftopLabel}</span>.</span>}
+        bodyClassName="pt-[29px] pb-[22px]"
         action={
           draftPending ? (
-            <div className="rounded-[10px] bg-adm-warning-bg px-3 py-2 text-right">
-              <p className="text-[13px] font-semibold text-adm-warning inline-flex items-center gap-1.5"><FileText className="w-4 h-4" aria-hidden="true" /> Draft pending</p>
-              <p className="text-[11px] text-[#5F3F00]">Not yet applied</p>
+            <div data-parity="draft-status" className="rounded-[8px] bg-adm-warning-bg px-4 py-[7px] flex items-start gap-3">
+              <FileText className={cn(ICON.inline, "text-adm-warning flex-shrink-0 mt-px")} aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="block text-[13px] leading-[18px] font-semibold text-adm-warning">Draft proposal</span>
+                <span className="block text-[11px] leading-[16px] text-[#5F3F00]">Not yet applied</span>
+              </span>
             </div>
           ) : (
             <StatusChip tone="success" icon>Enforced policy · no pending changes</StatusChip>
@@ -84,15 +93,16 @@ export default function EffectivePolicyView() {
             Cells that depend on them read as unknown rather than as a default.
           </InlineNote>
         )}
-        <div className="rounded-[10px] border border-adm-border overflow-hidden">
-          <AdminTable caption="Effective publishing policy by vehicle type">
+        <div className="rounded-[8px] border border-adm-border overflow-hidden">
+          <AdminTable caption="Effective publishing policy by vehicle type" className={MATRIX_TABLE_CLS}>
+            <colgroup>{MATRIX_COLUMNS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
             <thead>
               <tr>
-                <Th>Vehicle type</Th>
-                <Th>Listing visibility</Th>
-                <Th>Document publication</Th>
-                <Th>Retail readiness</Th>
-                <Th>Overrides</Th>
+                <Th className="px-5 text-[14px] leading-[20px] text-adm-ink">Vehicle type</Th>
+                <Th className="px-5 text-[14px] leading-[20px] text-adm-ink">Listing visibility</Th>
+                <Th className="px-5 text-[14px] leading-[20px] text-adm-ink">Document publication</Th>
+                <Th className="px-5 text-[14px] leading-[20px] text-adm-ink">Retail readiness</Th>
+                <Th className="px-5 text-[14px] leading-[20px] text-adm-ink">Overrides</Th>
               </tr>
             </thead>
             <tbody>
@@ -105,15 +115,15 @@ export default function EffectivePolicyView() {
                     onClick={() => setSelected(r.vehicleClass)}
                     className={cn("cursor-pointer", active ? "bg-adm-selected" : "hover:bg-adm-workspace")}
                   >
-                    <Td className={cn("font-semibold", active ? "text-adm-primary border-l-[3px] border-l-adm-primary" : "text-adm-ink")}>
+                    <Td className={cn("px-5 font-semibold", active ? "text-adm-primary border-l-[3px] border-l-adm-primary pl-[17px]" : "text-adm-ink")}>
                       <button type="button" className="text-left font-semibold focus-visible:outline-2 focus-visible:outline-adm-primary" aria-pressed={active} onClick={() => setSelected(r.vehicleClass)}>
                         {r.label}
                       </button>
                     </Td>
-                    <Td><Cell cell={r.listingVisibility} /></Td>
-                    <Td><Cell cell={r.documentPublication} /></Td>
-                    <Td><Cell cell={r.retailReadiness} /></Td>
-                    <Td><Cell cell={r.overrides} /></Td>
+                    <Td className="px-5"><Cell cell={r.listingVisibility} /></Td>
+                    <Td className="px-5"><Cell cell={r.documentPublication} /></Td>
+                    <Td className="px-5"><Cell cell={r.retailReadiness} /></Td>
+                    <Td className="px-5"><Cell cell={r.overrides} /></Td>
                   </tr>
                 );
               })}
@@ -121,55 +131,54 @@ export default function EffectivePolicyView() {
           </AdminTable>
         </div>
 
-        <section className="mt-4 rounded-[10px] border border-adm-border" aria-labelledby="publishing-class-detail">
-          <header className="flex items-center justify-between gap-4 px-5 py-3 border-b border-adm-border">
-            <h3 id="publishing-class-detail" className="text-[18px] leading-[26px] font-semibold text-adm-primary">
-              {VEHICLE_CLASS_LABEL[selected]} <span className="ml-2 text-[14px] font-normal text-adm-muted">Policy details and example status</span>
+        <section className="mt-4 rounded-[8px] border border-adm-border" aria-labelledby="publishing-class-detail">
+          <header className="flex items-center justify-between gap-4 px-5 py-[10px] border-b border-adm-border">
+            <h3 id="publishing-class-detail" className="flex items-baseline gap-2 min-w-0 text-[20px] leading-[26px] font-semibold text-adm-primary">
+              <span>{VEHICLE_CLASS_LABEL[selected]}</span>
+              <span className="text-[14px] leading-[20px] font-normal text-adm-muted">Policy details and example status</span>
+              <span className="ml-2 text-[12px] leading-[18px] font-normal text-adm-muted whitespace-nowrap" data-parity="class-counts">Active {classCounts.active} · Published {classCounts.published}</span>
             </h3>
-            <button type="button" onClick={() => setExpanded((e) => !e)} className="inline-flex items-center gap-1 text-[13px] font-semibold text-adm-primary hover:underline" aria-expanded={expanded}>
-              {expanded ? "Collapse" : "Expand"} {expanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
+            <button type="button" onClick={() => setExpanded((e) => !e)} className="inline-flex items-center gap-1 text-[14px] font-semibold text-adm-primary hover:underline" aria-expanded={expanded}>
+              {expanded ? "Collapse" : "Expand"} {expanded ? <ChevronUp className={ICON.status} aria-hidden="true" /> : <ChevronDown className={ICON.status} aria-hidden="true" />}
             </button>
           </header>
           {expanded && (
-            <div className="p-5 grid grid-cols-1 lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(240px,1fr)] gap-4">
+            <div className="px-5 pt-[14px] pb-[17px] grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,293px)] gap-[14px]">
               {detail.cards.map((c) => {
                 const Icon = CARD_ICON[c.key];
                 const tone = CARD_TONE[c.tone];
                 return (
-                  <article key={c.key} className="rounded-[10px] border border-adm-border p-4 flex flex-col gap-3">
+                  <article key={c.key} data-landmark="class-card" className="rounded-[10px] border border-adm-border p-[10px] flex flex-col">
                     <div className="flex items-start gap-3">
-                      <span className={cn("w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0", tone.icon)} aria-hidden="true"><Icon className="w-5 h-5" /></span>
-                      <div className="min-w-0">
-                        <p className="text-[14px] font-semibold text-adm-ink">{c.title}</p>
-                        <p className="text-[12px] leading-[18px] text-adm-muted">{c.summary}</p>
+                      <span className={cn(ICON_BOX.avatarLg, "flex items-center justify-center flex-shrink-0", tone.icon)} aria-hidden="true"><Icon className={ICON.inCircle} /></span>
+                      <div className="min-w-0 pt-1.5">
+                        <p className="text-[14px] leading-[22px] font-semibold tracking-tight text-adm-ink">{c.title}</p>
+                        <p className="mt-0.5 min-h-[40px] text-[12px] leading-[20px] text-adm-muted">{c.summary}</p>
                       </div>
                     </div>
-                    <p className={cn("rounded-md px-3 py-2.5 text-[12px] leading-[18px]", tone.box)}>{c.explanation}</p>
+                    <p className={cn("mt-[10px] rounded-[8px] px-4 py-2 text-[12px] leading-[20px]", tone.box)}>{c.explanation}</p>
                   </article>
                 );
               })}
-              <aside className="text-[13px] leading-[19px]">
-                <p className="font-semibold text-adm-ink">Effective rule for {VEHICLE_CLASS_LABEL[selected]}</p>
-                <p className="mt-1 text-adm-ink">{detail.ruleText}</p>
-                <p className="mt-2 text-[12px] text-adm-muted">
-                  Active {classCounts.active} · Published {classCounts.published}
-                </p>
-                <Link to={detail.approvalRulesHref} className="mt-3 inline-flex items-center gap-1 font-semibold text-adm-primary hover:underline">
-                  Review approval rules <ArrowRight className="w-4 h-4" aria-hidden="true" />
+              <aside className="xl:ml-2 xl:border-l xl:border-adm-border xl:pl-6 pt-[3px] text-[13px] leading-[18px]">
+                <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Effective rule for {VEHICLE_CLASS_LABEL[selected]}</p>
+                <p className="mt-[7px] text-adm-ink">{detail.ruleText}</p>
+                <Link to={detail.approvalRulesHref} className="mt-4 inline-flex items-center gap-2 text-[14px] leading-[20px] font-semibold text-adm-primary hover:underline">
+                  Review approval rules <ArrowRight className={ICON.button} aria-hidden="true" />
                 </Link>
               </aside>
             </div>
           )}
         </section>
 
-        <div className="mt-4 flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="flex-1 rounded-[10px] border border-[#F1D58A] bg-adm-warning-bg px-4 py-3 text-[13px] font-semibold text-[#5F3F00] inline-flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-adm-warning" aria-hidden="true" />
+        <div className="mt-[11px] flex flex-col lg:flex-row lg:items-center gap-5">
+          <div data-parity="recall-note" className="flex-1 rounded-[10px] border border-[#F1D58A] bg-adm-warning-bg px-4 py-[10px] text-[13px] leading-[18px] font-semibold text-[#5F3F00] inline-flex items-center gap-3">
+            <AlertTriangle className={cn(ICON.panel, "text-adm-warning fill-current stroke-white flex-shrink-0")} aria-hidden="true" />
             Do-not-drive recall follows a separate blocking policy.
           </div>
-          <div className="flex items-center gap-2">
-            <AdminButton variant="primary" onClick={() => setDialog("edit")}>Review changes</AdminButton>
-            <AdminButton variant="secondary" onClick={() => setDialog("review")}>Preview impact</AdminButton>
+          <div className="flex items-center gap-[13px]">
+            <AdminButton variant="primary" data-parity="review-changes" className="min-h-[48px] sm:min-h-[48px] px-6" onClick={() => setDialog("edit")}>Review changes</AdminButton>
+            <AdminButton variant="outline" data-parity="preview-impact" className="min-h-[48px] sm:min-h-[48px] px-6" onClick={() => setDialog("review")}>Preview impact</AdminButton>
           </div>
         </div>
       </AdminCard>

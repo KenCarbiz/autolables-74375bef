@@ -101,6 +101,26 @@
     ],
     "rects": []
   },
+  "08": {
+    "selectors": [],
+    "rects": []
+  },
+  "09": {
+    "selectors": [
+      { "selector": "[data-admin-v2] table tbody td:nth-child(1)", "reason": "request ids (fixture-generated activity text)" },
+      { "selector": "[data-admin-v2] table tbody td:nth-child(2)", "reason": "rooftop names in the activity rows (the fixture's synthetic stores)" },
+      { "selector": "[data-admin-v2] table tbody td:nth-child(6)", "reason": "notification timestamps" },
+      { "selector": "[data-admin-v2] [data-parity=\"store-name\"]", "reason": "scope chips carry the fixture's synthetic rooftop names" }
+    ],
+    "rects": []
+  },
+  "10": {
+    "selectors": [
+      { "selector": "[data-admin-v2] [data-parity=\"rooftop-name\"]", "reason": "rooftop name in the policy description (the fixture is synthetic)" },
+      { "selector": "[data-admin-v2] [data-parity=\"class-counts\"]", "reason": "active and published listing counts" }
+    ],
+    "rects": []
+  },
   "11": {
     "selectors": [
       {
