@@ -50,20 +50,45 @@ A used-style predicted value is not presented on a new vehicle. A Vehicle
 Score is not computed for a new vehicle. No paid call is caused by a public
 Passport load (`publicBrowseMayTrigger` is `false` on every capability).
 
-## Configuration surface (proposed, not yet read by code)
+## Configuration surface (read by `src/lib/market/providerPolicy.ts`)
 
-`dealer_profiles.settings.provider_policy.new`:
+`dealer_profiles.settings.provider_policy.new`. The provider policy engine
+(`decideProviderCall` and `planVisit`, mirrored into the edge library and
+consulted by `vehicle-enrich` before every paid call) reads these keys. A key
+that is absent, or holds a value of the wrong shape, leaves the registry
+cadence in force. Nothing here can switch on a capability the registry
+forbids for a new vehicle.
 
 ```jsonc
 {
-  "mds": false,                 // management opt-in
-  "sales_stats": false,
-  "incentives": false,          // also gated by MARKETCHECK_INCENTIVES_ENABLED
-  "recall_cadence_days": 30,
-  "price_integrity_daily": true,
-  "cost_overrides_usd": {}      // registry key -> unit cost
+  "mds": false,                  // opt new vehicles into mds (management use)
+  "sales_stats": false,          // opt into sales_stats, recents and sold_summary
+  "incentives": false,           // opt into incentives_oem / incentives_make_zip;
+                                 // the oem_incentives_v2 flag and MARKETCHECK_INCENTIVES_ENABLED still gate them
+  "recall_cadence_days": 30,     // TTL for autorecalls
+  "price_integrity_daily": true, // false slows active_search from 24 hours to 7 days
+  "ttl_days": {},                // registry key -> days, for any capability
+  "opt_in": {},                  // registry key -> true, for any `optional` or `test` capability
+  "cost_overrides_usd": {}       // registry key -> unit cost used in plan estimates
 }
 ```
 
-Until a reader exists for these keys, the registry defaults apply and the
-keys are documentation of intent, not controls.
+`dealer_profiles.settings.provider_policy.entitlements` is shared with the
+used policy: registry key to `"entitled"`, `"not_entitled"` or `"unknown"`.
+AutoRecalls and the incentives endpoints stay skipped with reason
+`entitlement_blocked` until this map says `entitled` for them, and their
+flags (`autorecalls_vin`, `oem_incentives_v2`) must also be on.
+
+With nothing configured, a scheduled visit to a new vehicle buys the daily
+active search and nothing else. VIN history, NMVTIS, Black Book, MarketMatch,
+auction and FSBO are refused for a new vehicle whatever is configured
+(`not_for_new` or reserved). Premium Plus on a new vehicle is a `test`
+capability: it needs `opt_in.price_premium_plus`, the
+`premium_plus_used_intake` flag and the entitlement, all three. Public
+Passport loads never trigger a call.
+
+Stamps and the stored plan are the same as for used vehicles:
+`market_meta.search_checked_at`, `market_meta.mds_checked_at`,
+`market_meta.sold_stats.checked_at`, `recall_check.attempted_at`, and
+`market_meta.last_visit_plan`, also returned as `plan` in the function's
+response.

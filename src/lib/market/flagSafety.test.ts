@@ -66,21 +66,25 @@ const AUDITED_READERS: Record<string, number> = {
   // read from the live docs; a reader is wired only after the contract check.
   exact_mds: 0,
   current_sales_stats: 0,
-  sold_summary: 0,
   generic_vin_fallback: 0,
-  available_options_packages: 0,
-  premium_plus_used_intake: 0,
-  premium_used_refresh: 0,
-  autorecalls_vin: 0,
+  // 2026-10-28: the provider policy engine (providerPolicy.ts) reads the
+  // capability gates below before any paid call. Every one is still stored
+  // false; a reader is not an on switch, and the registry's entitlement
+  // status is checked ahead of the flag.
+  sold_summary: 1,
+  available_options_packages: 1,
+  premium_plus_used_intake: 1,
+  premium_used_refresh: 1,
+  autorecalls_vin: 1,
   // Master build section 38, declared 2026-10-27 ahead of the intelligence
   // layer that will read them; shadow first, public only after evidence.
   market_intelligence_v3_shadow: 0,
   premium_plus_new_intake: 0,
   fee_normalized_comps: 0,
-  nmvtis_auto_verify: 0,
-  oem_incentives_v2: 0,
-  provider_webhooks: 0,
-  blackbook_live: 0,
+  nmvtis_auto_verify: 1,
+  oem_incentives_v2: 1,
+  provider_webhooks: 1,
+  blackbook_live: 1,
   market_value_v3_shadow: 0,
   market_value_v3_public: 0,
   vehicle_score_shadow: 0,
@@ -110,6 +114,12 @@ describe("the flag reader audit", () => {
       .toEqual(["src/lib/market/shadowPipeline.ts"]);
     expect(readersOf("market_invalid_claim_suppression"))
       .toEqual(["src/lib/market/publicClaim.ts"]);
+    for (const gate of [
+      "sold_summary", "available_options_packages", "premium_plus_used_intake", "premium_used_refresh",
+      "autorecalls_vin", "nmvtis_auto_verify", "oem_incentives_v2", "provider_webhooks", "blackbook_live",
+    ]) {
+      expect(readersOf(gate), gate).toEqual(["src/lib/market/providerPolicy.ts"]);
+    }
   });
 
   it("keeps the audit covering every declared flag", () => {
@@ -119,9 +129,6 @@ describe("the flag reader audit", () => {
   it("states plainly which flags are still inert", () => {
     const inert = MARKET_FLAG_NAMES.filter((f) => isInertWithoutReader(readersOf(f).length));
     expect(inert.sort()).toEqual([
-      "autorecalls_vin",
-      "available_options_packages",
-      "blackbook_live",
       "buyer_recommendation",
       "current_sales_stats",
       "data_confidence",
@@ -134,22 +141,19 @@ describe("the flag reader audit", () => {
       "market_value_v3_shadow",
       "marketcheck_current_endpoint",
       "marketcheck_premium_comparables",
-      "nmvtis_auto_verify",
-      "oem_incentives_v2",
       "passport_2_new",
       "passport_2_used",
       "premium_plus_new_intake",
-      "premium_plus_used_intake",
-      "premium_used_refresh",
       "pricing_position_v2_shadow",
-      "provider_webhooks",
-      "sold_summary",
       "vehicle_score_public",
       "vehicle_score_shadow",
     ]);
     // No longer inert, and the record says so rather than the prose.
     expect(inert).not.toContain("market_value_v2_shadow");
     expect(inert).not.toContain("market_invalid_claim_suppression");
+    // The capability gates became controls with the provider policy engine.
+    expect(inert).not.toContain("sold_summary");
+    expect(inert).not.toContain("autorecalls_vin");
   });
 
   it("having a reader is not the same as being on", () => {

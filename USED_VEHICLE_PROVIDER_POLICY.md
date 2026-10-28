@@ -67,19 +67,66 @@ confidence; Deal Rating; Buyer Recommendation with hard gates; exact MDS and
 tier; sales velocity; trend; VIN history; recall state; evidence timeline;
 source and freshness detail.
 
-## Configuration surface (proposed, not yet read by code)
+## Configuration surface (read by `src/lib/market/providerPolicy.ts`)
 
-`dealer_profiles.settings.provider_policy.used`:
+`dealer_profiles.settings.provider_policy.used`. The provider policy engine
+(`decideProviderCall` and `planVisit`, mirrored into the edge library and
+consulted by `vehicle-enrich` before every paid call) reads these keys. A key
+that is absent, or holds a value of the wrong shape, leaves the registry
+cadence in force. Nothing here can switch on a capability the registry
+forbids, a trigger the registry does not list, or an entitlement the account
+does not hold.
 
 ```jsonc
 {
-  "intake_bundle": "neovin+base",   // or "premium_plus" once proven
-  "refresh_days": 7,
-  "mds_days": 7,
-  "history_days": 30,
-  "sales_stats_days": 30,
-  "nmvtis_auto_verify": false,      // owner decision; cap stays 50/month
-  "recall_cadence_days": 30,
-  "cost_overrides_usd": {}
+  "refresh_days": 7,               // TTL for price_base and price_premium
+  "mds_days": 7,                   // TTL for mds
+  "history_days": 30,              // TTL for vin_history
+  "sales_stats_days": 30,          // TTL for sales_stats, recents, sold_summary
+  "recall_cadence_days": 30,       // TTL for autorecalls
+  "nmvtis_auto_verify": false,     // allow vindata on a non-operator trigger; cap stays 50/month
+  "ttl_days": {},                  // registry key -> days, for any capability
+  "opt_in": {},                    // registry key -> true, for `optional` capabilities
+  "cost_overrides_usd": {},        // registry key -> unit cost used in plan estimates
+  "intake_bundle": "neovin+base"   // documented intent; not read until Premium Plus is entitled
 }
 ```
+
+`dealer_profiles.settings.provider_policy.entitlements` is shared by both
+vehicle types: registry key to `"entitled"`, `"not_entitled"` or `"unknown"`.
+A capability the registry marks `entitlement_blocked` is skipped with reason
+`entitlement_blocked` until this map says `entitled` for it, and its market
+flag must also be on (`sold_summary`, `autorecalls_vin`,
+`premium_used_refresh`, `premium_plus_used_intake`, `blackbook_live`,
+`available_options_packages`, `oem_incentives_v2`).
+
+Defaults come from the registry: active search 24 hours; MDS 7 days; sales
+stats, recents, sold summary, VIN history and AutoRecalls 30 days; the price
+predictions 7 days; NMVTIS 90 days; NeoVIN bought once on first sight and
+never refreshed.
+
+The decision, in order: a public Passport load buys nothing; the registry's
+vetoes apply (`never_triggered`, `autocurb_reserved`, `deprecated_replaced`,
+`not_active`, `not_for_used`); an `optional` capability needs an opt-in; the
+entitlement and the flag must both be on; then the trigger decides. Intake
+and scheduled visits buy a capability when it was never checked or its TTL
+has elapsed. An operator request buys it regardless of age. A material event
+brings forward only the capabilities listed for it, and only where the
+registry lists `material_event` among that capability's triggers:
+`price_change` the active search; `mileage_change` the active search, MDS and
+VIN history; `certification_change` the active search and MDS;
+`neovin_correction` the active search and MDS; `feed_reappearance` the active
+search, VIN history and AutoRecalls; `condition_change` nothing. No event
+re-buys a decode or a price prediction; a price change is re-compared against
+the cached prediction.
+
+Stamps `vehicle-enrich` reads and writes per vehicle: `market_meta.search_checked_at`
+(falling back to the shared `checked_at`), `market_meta.mds_checked_at`,
+`market_meta.sold_stats.checked_at`, `history_payload.checked_at` and
+`recall_check.attempted_at` or `recall_checked_at`. A stamp is written only
+when the call answered, so a missing stamp means the evidence was never
+bought. The plan for each visit is stored as `market_meta.last_visit_plan`
+(due keys, skipped keys with their reason, estimated calls and cost as
+ceilings) and returned as `plan` in the function's response. The call budget
+gate in `_shared/providerBudget.ts` still admits every request the plan
+allows.

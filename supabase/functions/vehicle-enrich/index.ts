@@ -59,6 +59,9 @@ const corsHeaders = {
 };
 
 import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
+import {
+  planVisit, summarizePlan, type MaterialEvent, type PolicyTrigger, type PolicyVehicleType,
+} from "../_shared/factorySticker/lib/market/providerPolicy.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
@@ -670,14 +673,22 @@ async function fetchSoldStats(ymm: string | null, condition: string, stateRaw: s
 // open_recall_count or recall_check — the types make that impossible, and
 // the CHECK constraints on those columns make it impossible in the database
 // too.
+//
+// The paid VIN call is made only when the visit plan says the AutoRecalls
+// evidence is due; a skipped visit returns `vin: null` and stamps nothing, so
+// the stored attempt time keeps meaning "a call was made".
 async function fetchRecalls(
   vin: string,
   identitySource: IdentitySource,
-): Promise<{ vin: VinRecallAnswer; model: ModelRecallAnswer | null; identity: ResolvedIdentity }> {
-  const at = new Date().toISOString();
-  const prov = { vin, source: "marketcheck_autorecalls", checkedAt: at };
-  const mcOutcome = await mcRecallOutcome(vin);
-  const vinAnswer = classifyMarketcheckVinRecall(mcOutcome, prov);
+  buyVin: boolean,
+): Promise<{ vin: VinRecallAnswer | null; model: ModelRecallAnswer | null; identity: ResolvedIdentity }> {
+  let vinAnswer: VinRecallAnswer | null = null;
+  if (buyVin) {
+    const at = new Date().toISOString();
+    const prov = { vin, source: "marketcheck_autorecalls", checkedAt: at };
+    const mcOutcome = await mcRecallOutcome(vin);
+    vinAnswer = classifyMarketcheckVinRecall(mcOutcome, prov);
+  }
 
   const identity = resolveNhtsaIdentity(identitySource);
   const model = await fetchNhtsaRecalls(identity);
@@ -751,7 +762,10 @@ serve(async (req) => {
   // missing key used to drain the sweep queue without pulling any data.
   if (!MC_KEY) return json(503, { ok: false, reason: "marketcheck_not_configured" });
 
-  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; zip?: string; sources?: "all" | "marketcheck" | "blackbook" };
+  const body = await req.json().catch(() => ({})) as {
+    tenant_id?: string; vin?: string; zip?: string; sources?: "all" | "marketcheck" | "blackbook";
+    trigger?: string; material_events?: unknown;
+  };
   // Which providers to run: "all" (default), "marketcheck" (skip Black Book),
   // or "blackbook" (skip the MarketCheck chain — fills only Black Book values).
   const sources = body.sources === "marketcheck" || body.sources === "blackbook" ? body.sources : "all";
@@ -799,7 +813,7 @@ serve(async (req) => {
   }
 
   const { data: row } = await admin.from("vehicle_listings")
-    .select("id, vin, ymm, trim, condition, certification, price, advertised_price_before_doc, website_sale_price, mileage, dealer_snapshot, market_meta, recall_status, mc_attributes, mc_raw, drivetrain:mc_attributes->>drivetrain")
+    .select("id, vin, ymm, trim, condition, certification, price, advertised_price_before_doc, website_sale_price, mileage, dealer_snapshot, market_meta, recall_status, recall_checked_at, recall_check, history_payload, mc_attributes, mc_raw, drivetrain:mc_attributes->>drivetrain")
     .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!row) return json(404, { error: "listing_not_found" });
   // What is already stored, so a pass that returns only part of the picture
@@ -847,6 +861,52 @@ serve(async (req) => {
   const dealerName = ((row.dealer_snapshot as any)?.name as string | null)
     || ((row.dealer_snapshot as any)?.display_name as string | null) || null;
 
+  // ── The visit plan ────────────────────────────────────────────────────
+  //
+  // Which paid calls this visit may make is decided once, up front, by the
+  // provider policy engine from the registry cadence, the tenant's
+  // provider_policy settings and when each piece of evidence was last bought
+  // for this vehicle. Before this, every visit bought every endpoint, which
+  // is how a 5,000-call month ran out on the fourth day.
+  //
+  // Who is asking decides the trigger: the sweep is `scheduled`, the sync's
+  // service-role call is `intake`, a signed-in user's re-pull is `operator`.
+  // Any caller may declare a `material_event` with the events it observed.
+  const materialEvents = (Array.isArray(body.material_events) ? body.material_events : [])
+    .filter((e): e is MaterialEvent =>
+      e === "price_change" || e === "mileage_change" || e === "certification_change"
+      || e === "neovin_correction" || e === "feed_reappearance" || e === "condition_change");
+  const visitTrigger: PolicyTrigger = body.trigger === "material_event" && materialEvents.length
+    ? "material_event"
+    : hasCronSecret ? "scheduled" : isServiceRole ? "intake" : "operator";
+  const policyVehicleType: PolicyVehicleType = condition.toLowerCase() === "new"
+    ? "new"
+    : /cpo|certified/i.test(condition) || !!row.certification ? "cpo" : "used";
+  const stampOf = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+  const priorSoldStats = (priorMarketMeta.sold_stats || {}) as Record<string, unknown>;
+  const priorHistory = (row.history_payload || {}) as Record<string, unknown>;
+  const priorRecallCheck = (row.recall_check || {}) as Record<string, unknown>;
+  const plan = planVisit({
+    vehicleType: policyVehicleType,
+    trigger: visitTrigger,
+    materialEvents,
+    settings: pset,
+    candidates: ["active_search", "mds", "sales_stats", "vin_history", "autorecalls"],
+    lastChecked: {
+      active_search: stampOf(priorMarketMeta.search_checked_at) ?? stampOf(priorMarketMeta.checked_at),
+      mds: stampOf(priorMarketMeta.mds_checked_at),
+      sales_stats: stampOf(priorSoldStats.checked_at),
+      vin_history: stampOf(priorHistory.checked_at),
+      autorecalls: stampOf(priorRecallCheck.attempted_at) ?? stampOf(row.recall_checked_at),
+    },
+    subject: { vin, zip, car_type: condition, radius: 100 },
+    // Ceilings: the comps search ladders up to four requests, sold stats two.
+    callsPerCapability: { active_search: 4, sales_stats: 2 },
+    nowMs: Date.now(),
+  });
+  const planSummary = summarizePlan(plan);
+  const buy = (key: string) => wantMC && plan.order.includes(key);
+
   // Black Book is a separate provider with its own rate limit, so it runs
   // alongside the MarketCheck chain rather than competing with it.
   const blackbookP = wantBB ? fetchBlackBook(vin, miles, zip) : Promise.resolve(null);
@@ -857,12 +917,13 @@ serve(async (req) => {
   // land comps on one VIN and not the next. Serialized + the browser's
   // one-VIN-at-a-time loop means a single MarketCheck request in flight at any
   // moment, which can't trip the RPS limit. (fetchRecalls tries MarketCheck
-  // then falls back to free NHTSA.) Skipped entirely on a Black-Book-only run.
-  const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName, miles, subjectDrivetrain, likeRules) : null;
-  const mds = wantMC && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
-  const soldStats = wantMC ? await fetchSoldStats(ymm, condition, dealerState) : null;
-  const history = wantMC ? await fetchHistory(vin) : null;
-  const recalls = wantMC ? await fetchRecalls(vin, { ymm, mc_attributes: row.mc_attributes, mc_raw: row.mc_raw }) : null;
+  // then falls back to free NHTSA.) Skipped entirely on a Black-Book-only run,
+  // and each call is made only when the visit plan says it is due.
+  const comps = buy("active_search") ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName, miles, subjectDrivetrain, likeRules) : null;
+  const mds = buy("mds") && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
+  const soldStats = buy("sales_stats") ? await fetchSoldStats(ymm, condition, dealerState) : null;
+  const history = buy("vin_history") ? await fetchHistory(vin) : null;
+  const recalls = wantMC ? await fetchRecalls(vin, { ymm, mc_attributes: row.mc_attributes, mc_raw: row.mc_raw }, buy("autorecalls")) : null;
   const blackbook = await blackbookP;
 
   const patch: Record<string, unknown> = { enriched_at: new Date().toISOString() };
@@ -912,7 +973,7 @@ serve(async (req) => {
     patch.market_meta = { ...priorMarketMeta, market_days_supply: mds.mds, inventory_count: mds.count, checked_at: mds.checked_at };
   }
   if (soldStats) {
-    patch.market_meta = { ...((patch.market_meta as Record<string, unknown> | undefined) ?? {}), sold_stats: soldStats };
+    patch.market_meta = { ...((patch.market_meta as Record<string, unknown> | undefined) ?? priorMarketMeta), sold_stats: soldStats };
   }
   if (patch.market_meta) {
     // MDS = active inventory ÷ 45-day sales rate, so units sold in the last
@@ -926,6 +987,17 @@ serve(async (req) => {
       mm.sold_45d_estimate = Math.round((mds.count * 45) / mds.mds);
     }
   }
+  // One stamp per paid capability, written only when that call answered, so
+  // the next visit's plan can tell a fresh answer from a missing one. The
+  // shared `checked_at` stays for its existing readers. The plan itself is
+  // kept so a visit can be audited without the function logs.
+  {
+    const mm = { ...((patch.market_meta as Record<string, unknown> | undefined) ?? priorMarketMeta) };
+    if (comps) mm.search_checked_at = comps.meta.checked_at;
+    if (mds) mm.mds_checked_at = mds.checked_at;
+    mm.last_visit_plan = planSummary;
+    patch.market_meta = mm;
+  }
   if (history) {
     patch.history_payload = history;
     if (history.inServiceDate) patch.in_service_date = history.inServiceDate;
@@ -935,7 +1007,7 @@ serve(async (req) => {
     // UNKNOWN must never replace a stored OPEN, and it must never overwrite a
     // real clearance either. The model answer goes to recall_payload, which is
     // the model-scope store and is never read as VIN clearance.
-    if (isVinAnswered(recalls.vin) || mayOverwriteVinWithUnanswered(row.recall_status as string | null)) {
+    if (recalls.vin && (isVinAnswered(recalls.vin) || mayOverwriteVinWithUnanswered(row.recall_status as string | null))) {
       Object.assign(patch, vinRecallColumns(recalls.vin));
     }
     if (recalls.model) Object.assign(patch, modelRecallColumns(recalls.model));
@@ -1102,12 +1174,13 @@ serve(async (req) => {
       history: history?.available ? (history.entries?.length ?? 0) : 0,
       owners: history?.owners ?? null,
       in_service_date: history?.inServiceDate ?? null,
-      recall_vin_state: recalls?.vin.state ?? null,
-      recall_vin_open_count: recalls?.vin.openCount ?? null,
+      recall_vin_state: recalls?.vin?.state ?? null,
+      recall_vin_open_count: recalls?.vin?.openCount ?? null,
       recall_model_state: recalls?.model?.state ?? null,
       recall_model_campaign_count: recalls?.model?.campaignCount ?? null,
       recall_identity_origin: recalls?.identity.origin ?? null,
       blackbook: !!blackbook,
     },
+    plan: planSummary,
   });
 });
