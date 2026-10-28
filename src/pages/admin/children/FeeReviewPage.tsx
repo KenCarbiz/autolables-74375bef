@@ -138,12 +138,12 @@ const Change = ({ before, after }: { before: number | null; after: number }) => 
   );
 };
 
-const TABLE_CLASS = "[&_th]:py-2 [&_th]:px-4 [&_td]:px-4 [&_th]:text-adm-ink [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0";
+const TABLE_CLASS = "[&_th]:py-2 [&_th]:px-4 [&_td]:px-4 [&_th]:text-[13px] [&_th]:text-adm-ink [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0";
 
 const RESULT_TONE: Record<"applied" | "partial" | "failed", Tone> = { applied: "success", partial: "warning", failed: "danger" };
 const RESULT_LABEL: Record<"applied" | "partial" | "failed", string> = { applied: "Applied", partial: "Partially applied", failed: "Not applied" };
 
-const BUTTON_41 = "h-[41px] px-5 text-[14px] gap-3.5";
+const BUTTON_41 = "h-[41px] px-5 text-[15px] gap-3.5";
 
 export default function FeeReviewPage() {
   const fixture = useViewFixture<FeeReviewFixture>("fee-review");
@@ -322,7 +322,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
       >
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 id="fee-review-title" className="text-[22px] leading-[28px] tracking-[-0.3px] font-bold text-adm-ink">Review document fee change</h2>
+            <h2 id="fee-review-title" className="text-[22px] leading-[28px] font-bold text-adm-ink">Review document fee change</h2>
             <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">Confirm the new fee and the vehicles it will update before anything is applied.</p>
           </div>
           <button type="button" onClick={close} aria-label="Close review" className="-mt-2 -mr-3 w-9 h-9 rounded-md inline-flex items-center justify-center text-adm-muted hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary flex-shrink-0">
@@ -383,9 +383,9 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
 
             <div className={cn("grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_315px] gap-7 items-start", state.phase === "conflict" || state.phase === "invalidated" || (state.error && state.phase === "reviewing") ? "mt-5" : "mt-[29px]")}>
               <section aria-labelledby="fee-change-summary" data-landmark="fee-change-summary">
-                <h3 id="fee-change-summary" className="text-[15px] leading-[22px] font-semibold text-adm-ink">Change summary</h3>
+                <h3 id="fee-change-summary" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Change summary</h3>
                 <div className="mt-3 rounded-[8px] border border-adm-border overflow-hidden">
-                  <AdminTable caption="Before and after" className={cn(TABLE_CLASS, "[&_td]:py-[10.5px] [&_td]:text-[13px]")}>
+                  <AdminTable caption="Before and after" className={cn(TABLE_CLASS, "[&_td]:py-[10.5px]")}>
                     <thead>
                       <tr>
                         <Th className="w-[195px]">Field</Th>
@@ -407,7 +407,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               </section>
 
               <section aria-labelledby="fee-expected-impact">
-                <h3 id="fee-expected-impact" className="text-[15px] leading-[22px] font-semibold text-adm-ink">Expected impact</h3>
+                <h3 id="fee-expected-impact" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Expected impact</h3>
                 <div className="mt-3.5 space-y-2">
                   <Tile icon={CarFront} filled tone="success" value={eligibleCount == null ? "Unknown" : eligibleCount.toLocaleString()} label={`${eligibleLabel} eligible`} hint="Rows will be updated only when values differ" />
                   {scope === "all" ? (
@@ -421,7 +421,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
             </div>
 
             <section aria-labelledby="fee-sample-impact" data-landmark="fee-example-impact" className="-mt-0.5">
-              <h3 id="fee-sample-impact" className="text-[15px] leading-[22px] font-semibold text-adm-ink">Example vehicle impact</h3>
+              <h3 id="fee-sample-impact" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Example vehicle impact</h3>
               {impact && impact.samples.length > 0 ? (
                 <div className="mt-[11px] rounded-[8px] border border-adm-border overflow-hidden">
                   <AdminTable caption="Example vehicles" className={cn(TABLE_CLASS, "[&_th]:pt-[9px] [&_th]:pb-[9px] [&_td]:py-[11.5px]")}>
