@@ -36,8 +36,8 @@ enabled. The signed-in checks in section 4 (a pricing role calling the fee
 functions, a salesperson refused with `42501`) were not run by SQL; they are
 exercised through the application.
 
-Migration 2 was applied by the same Lovable run at 11:17 UTC, three minutes
-after migration 1 was verified, although the prompt asked for it to be held
+Migration 2 was applied by the same Lovable run at 11:16 UTC, three minutes
+after migration 1 was verified (the runner's commit followed at 11:17:31), although the prompt asked for it to be held
 for a separate step; the runner's commit is "Applied V2 settings auth mig",
 with the file recorded as `drizzle/migrations/0002_admin_v2_settings_authority.sql`
 and its body matching `main` at `6746a95` (same content hash). Verified

@@ -201,7 +201,8 @@ this session: SECURITY DEFINER on every function, execute rights limited to
 calls, row security on the apply ledger, the version trigger present). The
 fee review, the feed's last-success read, the job status read and the policy
 version now run on the server. Migration 2 was applied by the same Lovable
-run at 11:17 UTC and verified read-only at about 11:30 UTC: the member-wide
+run at 11:16 UTC and verified read-only at about 11:30 UTC, and again by
+the owner's runner at 11:38 UTC: the member-wide
 `dealer_profiles` write policies are gone, the six add-on-role policies are
 on `products` and `product_rules`, the priced-column guard trigger is on
 `vehicle_listings`, `merge_dealer_settings` carries the key-level authority
@@ -352,7 +353,7 @@ replaces `/admin` for every role at once; the legacy page remains in the tree
 as the embedded body of the unpictured tabs.
 
 **Migrations.** Both are applied (2026-10-28, migration 1 at about 11:13
-UTC and migration 2 at 11:17 UTC, each verified with section 4 of
+UTC and migration 2 at 11:16 UTC, each verified with section 4 of
 `ADMIN_V2_SERVER_AUTHORITY.md`; the Lovable runner recorded them as
 `drizzle/migrations/0001_admin_v2_policy_apply.sql` and
 `0002_admin_v2_settings_authority.sql`, bodies unchanged, and wrote no
