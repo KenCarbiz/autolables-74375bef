@@ -164,7 +164,7 @@ export const useProductRules = () => {
   return { rules, loading: q.isLoading, addRule, updateRule, deleteRule, getMatchingProducts };
 };
 
-function matchesRule(rule: ProductRule, vehicle: VehicleContext): boolean {
+export function matchesRule(rule: ProductRule, vehicle: VehicleContext): boolean {
   const vYear = parseInt(vehicle.year) || 0;
   const rMin = parseInt(rule.year_min) || 0;
   const rMax = parseInt(rule.year_max) || 9999;

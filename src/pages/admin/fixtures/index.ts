@@ -1,6 +1,9 @@
 import type { AdminFixture } from "@/lib/admin/dataSource";
 import { fixture01 } from "./01";
 import { FIXTURE_03, FIXTURE_04 } from "./people";
+import { SCREEN_05 } from "./05";
+import { SCREEN_06 } from "./06";
+import { SCREEN_07 } from "./07";
 import { FIXTURE_08 } from "./08";
 import { FIXTURE_09 } from "./09";
 import fixture10 from "./10";
@@ -22,6 +25,9 @@ export const ADMIN_FIXTURES: Record<string, AdminScreenFixture> = {
   "01": fixture01,
   "03": { tabId: "team", fixture: FIXTURE_03 },
   "04": { childPath: "/admin/people/:memberId", fixture: FIXTURE_04 },
+  "05": SCREEN_05,
+  "06": SCREEN_06,
+  "07": SCREEN_07,
   "08": FIXTURE_08,
   "09": FIXTURE_09,
   "10": fixture10,

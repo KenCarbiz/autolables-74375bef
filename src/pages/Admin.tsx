@@ -1,15 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadPhoto } from "@/lib/storage";
 import { Switch } from "@/components/ui/switch";
 import { getPaymentDisplay, type PaymentDisplay } from "@/lib/affordability";
-import { PRICE_BUCKETS } from "@/types/product";
 import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
-import { useProductRules, ProductRule } from "@/hooks/useProductRules";
 import type { ProductUpgrade } from "@/hooks/useProducts";
-import type { Json } from "@/integrations/supabase/types";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -19,32 +15,21 @@ import InstallerContactsCard from "@/components/admin/InstallerContactsCard";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { toast } from "sonner";
-import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
 import MerchandisingSeoPanel from "@/components/admin/MerchandisingSeoPanel";
 import InstallerInvoicesPanel from "@/components/admin/InstallerInvoicesPanel";
 import PassportPublishingCard from "@/components/admin/PassportPublishingCard";
 import PacketDefaultsPanel from "@/components/admin/PacketDefaultsPanel";
 import OemDistributionPanel from "@/components/admin/OemDistributionPanel";
 import { useInstantSave } from "@/hooks/useInstantSave";
-import { TODAYS_PRICE_MODE_OPTIONS, DEFAULT_TODAYS_PRICE_CUSTOM, resolveTodaysPrice } from "@/lib/todaysPrice";
-import { COMP_STRATEGY_OPTIONS, type CompStrategy } from "@/lib/compStrategy";
-import { PRICE_LABEL_PRESETS, DEFAULT_PRICE_LABEL, resolvePriceLabel } from "@/lib/priceModel";
-import OemWarrantyPanel from "@/components/admin/OemWarrantyPanel";
 import StickyButtonsPanel from "@/components/admin/StickyButtonsPanel";
 import DealershipTrustPanel from "@/components/admin/DealershipTrustPanel";
 import PassportContactRoutingPanel from "@/components/admin/PassportContactRoutingPanel";
 import EnabledFeaturesPanel from "@/components/admin/EnabledFeaturesPanel";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import IngestOutcomePanel from "@/components/admin/IngestOutcomePanel";
-import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
-import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
-import { PriceAuditPanel } from "@/components/admin/PriceAuditPanel";
-import { IncentivesSettingsPanel } from "@/components/admin/IncentivesSettingsPanel";
 import MarketcheckSyncCard from "@/components/admin/MarketcheckSyncCard";
 import MarketcheckDataHealthCard from "@/components/admin/MarketcheckDataHealthCard";
 import TeamPanel from "@/components/admin/TeamPanel";
-import { ProductIcon, PRODUCT_ICON_KEYS } from "@/components/addendum/productIcons";
-import { STATE_DOC_FEES } from "@/data/docFees";
 import { format } from "date-fns";
 import { useLeads } from "@/hooks/useLeads";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
@@ -53,7 +38,6 @@ import { useWarranty } from "@/hooks/useWarranty";
 import { useSyndicationFeed } from "@/hooks/useSyndicationFeed";
 import { useServiceSticker } from "@/hooks/useServiceSticker";
 import { useDmsFeed } from "@/hooks/useDmsFeed";
-import { useProductLibrary } from "@/hooks/useProductLibrary";
 import { useTradeInLifecycle } from "@/hooks/useTradeInLifecycle";
 import type { VehicleFile as VehicleFileType, StickerType } from "@/types/vehicleFile";
 import {
@@ -77,7 +61,6 @@ import {
   AlertTriangle,
   FileSignature,
   Sparkles,
-  Library,
   Plus,
 } from "lucide-react";
 
@@ -103,50 +86,6 @@ interface Product {
   price_tiers: Record<string, number> | null;
   icon_type?: string;
 }
-
-const emptyProduct = {
-  name: "",
-  subtitle: "",
-  warranty: "",
-  badge_type: "installed",
-  price: 0,
-  price_label: "Included in Selling Price",
-  disclosure: "",
-  sort_order: 0,
-  is_active: true,
-  benefit_justification: "",
-  benefit_justification_optional: "",
-  disclosure_optional: "",
-  price_in_advertised: true,
-  available_preinstalled: true,
-  upgrade: null as ProductUpgrade | null,
-  contract_url: null as string | null,
-  contract_doc_type: "contract",
-  price_tiers: null as Record<string, number> | null,
-  icon_type: "",
-};
-
-const EMPTY_UPGRADE: ProductUpgrade = {
-  name: "",
-  price: 0,
-  disclosure: "",
-  benefit_justification: "",
-  disclosure_optional: "",
-  benefit_justification_optional: "",
-  available_preinstalled: true,
-};
-
-const emptyRule: Omit<ProductRule, "id"> = {
-  product_id: "",
-  year_min: "",
-  year_max: "",
-  makes: [],
-  models: [],
-  trims: [],
-  body_styles: [],
-  condition: "all",
-  mileage_max: 0,
-};
 
 const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: string; status: "active" | "beta" | "coming_soon" }[] = [
   { key: "feature_vin_decode", label: "VIN Decode", description: "Auto-populate vehicle info from VIN using NHTSA database", status: "active" },
@@ -182,37 +121,14 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
 const VALID_TABS: AdminTab[] = ADMIN_TABS;
 
 const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?: AdminTab } = {}) => {
-  const queryClient = useQueryClient();
   const { user, isAdmin, loading, signOut } = useAuth();
   const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
-  const { rules, addRule, updateRule, deleteRule } = useProductRules();
   const { entries: auditEntries, exportCsv: exportAuditCsv } = useAudit();
   const { currentStore, updateTenant, tenant } = useTenant();
-  const productIconKey = `product_icons:${tenant?.id || "none"}`;
 
   // Doc-fee recalculation is no longer a side effect of settings state. It is
   // an explicit Review & Apply step on Pricing & Products; opening, reloading
   // or switching store in Admin never writes a vehicle price.
-  // Most-recent price term the crawl detected off this dealer's own VDP, shown
-  // in the "Match my website" price-label preview. Null until a crawl captures
-  // one. Cast: website_price_term is a fresh column not yet in generated types.
-  const [detectedWebsiteTerm, setDetectedWebsiteTerm] = useState<string | null>(null);
-  useEffect(() => {
-    if (!tenant?.id || tenant.id === "house") { setDetectedWebsiteTerm(null); return; }
-    let cancelled = false;
-    (async () => {
-      const { data } = await (supabase as any)
-        .from("vehicle_listings")
-        .select("website_price_term")
-        .eq("tenant_id", tenant.id)
-        .not("website_price_term", "is", null)
-        .order("price_last_verified_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!cancelled) setDetectedWebsiteTerm((data?.website_price_term as string) || null);
-    })();
-    return () => { cancelled = true; };
-  }, [tenant?.id]);
   const navigate = useNavigate();
   const { openScan } = useVinScan();
   const { member, loading: entitlementsLoading } = useEntitlements();
@@ -282,59 +198,9 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
   const { pushFeed, pushing: syndicating } = useSyndicationFeed();
   const { stickers: serviceStickers } = useServiceSticker();
   const { getConfig: getDmsConfig, syncInventory, syncing: dmsSyncing } = useDmsFeed();
-  const { library: productLibrary } = useProductLibrary(currentStore?.id || "");
   const { getPending: getPendingTradeIns } = useTradeInLifecycle();
 
   const [products, setProducts] = useState<Product[]>([]);
-  // Doc-fee edits commit on blur behind a confirm — the change recalculates
-  // stored sale prices across inventory, so it must never fire per keystroke.
-  const [docFeeDraft, setDocFeeDraft] = useState<string | null>(null);
-  const [showLibrary, setShowLibrary] = useState(false);
-  const [editing, setEditing] = useState<Partial<Product> | null>(null);
-  const [uploadingDoc, setUploadingDoc] = useState(false);
-
-  const handleUploadDoc = async (file: File) => {
-    // The first path folder MUST be the tenant id so tenant-scoped storage
-    // RLS can match it; never fall back to a shared prefix.
-    const scope = tenant?.id || currentStore?.id;
-    if (!scope) {
-      toast.error("No dealership context found — reload the page and try again.");
-      return;
-    }
-    setUploadingDoc(true);
-    try {
-      const clean = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
-      const path = `${scope}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${clean}`;
-      const { error } = await supabase.storage
-        .from("product-docs")
-        .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
-      if (error) {
-        const raw = error.message || "unknown error";
-        const msg = raw.toLowerCase();
-        // Surface the real Supabase error so storage problems are
-        // diagnosable instead of guessed-at.
-        if (msg.includes("not found") && msg.includes("bucket")) {
-          toast.error("Document storage isn't set up yet. Contact AutoLabels support.");
-        } else if (msg.includes("row-level security") || msg.includes("policy") || msg.includes("permission") || msg.includes("denied")) {
-          toast.error("We couldn't save that file. Contact AutoLabels support.");
-        } else if (msg.includes("mime") || msg.includes("content type") || msg.includes("not supported")) {
-          toast.error("That file type isn't supported — upload a PDF or image.");
-        } else if (msg.includes("schema") || msg.includes("incompatible")) {
-          toast.error("Document storage needs attention. Contact AutoLabels support.");
-        } else {
-          toast.error("Upload failed. Please try again.");
-        }
-        return;
-      }
-      // Bucket is private — store the object path; resolve to a signed URL on view.
-      setEditing(prev => (prev ? { ...prev, contract_url: path } : prev));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload failed.");
-    } finally {
-      setUploadingDoc(false);
-    }
-  };
-  const [editingRule, setEditingRule] = useState<Partial<ProductRule & { _new?: boolean }> | null>(null);
   const [fetching, setFetching] = useState(true);
   const [showComplianceBanner, setShowComplianceBanner] = useState<boolean>(
     typeof window !== "undefined" ? localStorage.getItem("admin_home_compliance_banner_dismissed") !== "1" : true
@@ -485,90 +351,6 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
 
   useEffect(() => { fetchProducts(); }, []);
 
-  const handleSaveProduct = async () => {
-    if (!editing || !editing.name) return;
-    // The contract/warranty document is the substantiation behind the
-    // benefit claims (FTC §5). Strongly encouraged, but do NOT hard-block
-    // the save on it — that would prevent editing benefit/pricing while
-    // document storage is unavailable. Surface it as a warning instead.
-    if (!editing.contract_url) {
-      toast.warning("Saved without a product document. Attach the contract or warranty card when you can — it substantiates the benefit claims.");
-    }
-    const payload = {
-      name: editing.name,
-      subtitle: editing.subtitle || null,
-      warranty: editing.warranty || null,
-      badge_type: editing.badge_type || "installed",
-      price: Number(editing.price) || 0,
-      price_label: editing.price_label || "Included in Selling Price",
-      disclosure: editing.disclosure || null,
-      sort_order: Number(editing.sort_order) || 0,
-      is_active: editing.is_active ?? true,
-      // Wave 16 — benefit justification seeds the per-addendum
-      // line at build time. Required on installed products
-      // before the red-team will release a signing link.
-      benefit_justification: editing.benefit_justification || "",
-      // Optional-disposition copy (used when the line is sold as a
-      // customer-elected add-on rather than pre-installed).
-      benefit_justification_optional: editing.benefit_justification_optional || null,
-      disclosure_optional: editing.disclosure_optional || null,
-      // Default included-in-advertised so an accessory is never
-      // silently charged above the advertised price.
-      price_in_advertised: editing.price_in_advertised ?? true,
-      available_preinstalled: editing.available_preinstalled ?? true,
-      upgrade: ((editing.upgrade && editing.upgrade.name?.trim()) ? editing.upgrade : null) as unknown as Json,
-      contract_url: editing.contract_url || null,
-      contract_doc_type: editing.contract_doc_type || null,
-      price_tiers: (editing.price_tiers && Object.keys(editing.price_tiers).length ? editing.price_tiers : null) as unknown as Json,
-    };
-
-    if (editing.id) {
-      const { error } = await supabase.from("products").update(payload).eq("id", editing.id);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Product updated");
-    } else {
-      // New products belong to this dealer's tenant (Option 1: platform
-      // templates have tenant_id NULL; dealer-created products are scoped).
-      const { error } = await supabase.from("products").insert({ ...payload, tenant_id: tenant?.id ?? null } as typeof payload);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Product added");
-    }
-    // Save icon_type to localStorage (extend later to DB)
-    if (editing.icon_type) {
-      const iconMap = JSON.parse(localStorage.getItem(productIconKey) || "{}");
-      const productId = editing.id || "pending";
-      iconMap[productId] = editing.icon_type;
-      localStorage.setItem(productIconKey, JSON.stringify(iconMap));
-    }
-    setEditing(null);
-    fetchProducts();
-    // Refresh the shared products query the addendum/sticker builders read,
-    // so a just-saved benefit/price is reflected without a hard refresh.
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-  };
-
-  const handleDeleteProduct = async (id: string) => {
-    if (!confirm("Delete this product?")) return;
-    await supabase.from("products").delete().eq("id", id);
-    toast.success("Product deleted");
-    fetchProducts();
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-  };
-
-  const handleSaveRule = () => {
-    if (!editingRule?.product_id) { toast.error("Select a product"); return; }
-    if (editingRule._new) {
-      const { _new, id, ...rest } = editingRule as any;
-      addRule(rest);
-      toast.success("Rule added");
-    } else if (editingRule.id) {
-      const { _new, ...rest } = editingRule as any;
-      updateRule(editingRule.id, rest);
-      toast.success("Rule updated");
-    }
-    setEditingRule(null);
-  };
-
   const handleToggleFeature = (key: keyof DealerSettings) => {
     updateSettings({ [key]: !settings[key] });
   };
@@ -582,20 +364,15 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
 
   const tabs: { id: AdminTab; label: string; group?: "dealer" | "platform" }[] = ([
     { id: "home", label: "Home" },
-    { id: "products", label: "Products" },
-    ...(settings.feature_product_rules ? [{ id: "rules" as const, label: "Rules" }] : []),
     { id: "settings", label: "Store Settings" },
     { id: "branding", label: "Branding" },
     { id: "labels", label: "Label Templates" },
-    { id: "programs", label: "Included with Sale & Warranties" },
-    { id: "factory-warranty", label: "Factory Warranty & CPO" },
     { id: "merchandising-seo", label: "Merchandising & SEO" },
     { id: "passport-ctas", label: "Passport Buttons" },
     { id: "passport-trust", label: "Why Buy From Us" },
     { id: "passport-routing", label: "Lead Routing" },
     { id: "print-settings", label: "Printer Calibration" },
     { id: "document-rules", label: "Approval & Review Rules" },
-    { id: "incentives", label: "Pricing & Incentives" },
     { id: "features", label: "Plan & Billing" },
     { id: "getready", label: "Get-Ready Setup" },
     ...(settings.feature_invoicing ? [{ id: "invoices" as const, label: "Invoices" }] : []),
@@ -1004,219 +781,6 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
           );
         })()}
 
-        {/* ─── Products Tab ─── */}
-        {tab === "products" && (
-          <div className="flex flex-col">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-foreground">Products</h2>
-              <p className="text-xs text-muted-foreground">Your active products power every addendum. Open the template library below to add more.</p>
-            </div>
-
-            {/* Template Library */}
-            <div className="order-2 mt-6 bg-card rounded-xl border border-border shadow-premium p-5">
-              <button onClick={() => setShowLibrary((v) => !v)} className="w-full flex items-center justify-between gap-2 text-left">
-                <span className="inline-flex items-center gap-2">
-                  <Library className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-semibold text-foreground">Template Library</span>
-                </span>
-                <span className="text-xs font-medium text-blue-700">{showLibrary ? "Hide" : "Show templates"}</span>
-              </button>
-              {showLibrary && (
-                <div className="mt-3">
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Browse templates and click "Add to dealership" to copy one into your active products. Need a custom one? Use "+ Add Product" in your Active Products list.
-                  </p>
-              {(() => {
-              // Hide archive/library cards the dealer has already activated
-              // (a product of the same name exists in their active list), so
-              // the library stops looking like duplicates of live products.
-              const activeNames = new Set(products.map((p) => (p.name || "").trim().toLowerCase()));
-              const libraryToShow = productLibrary.filter((e) => !activeNames.has((e.name || "").trim().toLowerCase()));
-              return libraryToShow.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-6 text-center">
-                  No archived products to import — your active products are listed below.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {libraryToShow.map(entry => {
-                    const defaultTier = entry.priceTiers.find(t => t.vehicleCategory === "default");
-                    const basePrice = defaultTier ? defaultTier.price : entry.defaultPrice;
-                    return (
-                      <div
-                        key={entry.id}
-                        className="rounded-lg border border-border bg-background p-3 flex flex-col justify-between"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-semibold text-foreground truncate">{entry.name}</p>
-                            <span className="text-[9px] font-bold uppercase tracking-wider bg-muted text-muted-foreground px-1.5 py-0.5 rounded flex-shrink-0">
-                              {entry.category}
-                            </span>
-                          </div>
-                          {entry.subtitle && (
-                            <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{entry.subtitle}</p>
-                          )}
-                          <p className="text-sm font-semibold text-foreground tabular-nums mt-2">
-                            ${basePrice.toFixed(2)}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setEditing({
-                              ...emptyProduct,
-                              name: entry.name,
-                              subtitle: entry.subtitle,
-                              warranty: entry.warrantyDetails || entry.warranty || "",
-                              price: basePrice,
-                              badge_type: entry.badge_type,
-                              price_label: entry.price_label,
-                              disclosure: entry.disclosure,
-                              icon_type: entry.iconType || "",
-                              sort_order: products.length + 1,
-                              is_active: true,
-                            });
-                          }}
-                          className="mt-3 inline-flex items-center justify-center gap-1 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 w-full"
-                        >
-                          <Plus className="w-3 h-3" />
-                          Add to dealership
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-              })()}
-                </div>
-              )}
-            </div>
-
-            {/* Active products — the dealer's live catalog, the star of the page. */}
-            <div className="order-1">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-foreground">Active Products <span className="font-normal text-muted-foreground">({products.length})</span></h3>
-                <button
-                  onClick={() => setEditing({ ...emptyProduct, sort_order: products.length + 1 })}
-                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
-                >
-                  + Add Product
-                </button>
-              </div>
-              <div className="space-y-2">
-              {products.map((p) => {
-                const iconMap = JSON.parse(localStorage.getItem(productIconKey) || "{}");
-                const icon = iconMap[p.id];
-                const isInstalled = p.badge_type === "installed";
-                const toggleType = async () => {
-                  const next = isInstalled ? "optional" : "installed";
-                  const priceLabel = next === "installed" ? "Included in Selling Price" : "If Accepted";
-                  const { error } = await supabase.from("products").update({ badge_type: next, price_label: priceLabel }).eq("id", p.id);
-                  if (error) { toast.error(error.message); return; }
-                  toast.success(`${p.name} marked as ${next}`);
-                  fetchProducts();
-                  queryClient.invalidateQueries({ queryKey: ["products"] });
-                };
-                return (
-                  <div
-                    key={p.id}
-                    className={`bg-card rounded-lg p-4 shadow-premium border-l-4 transition-colors ${
-                      isInstalled ? "border-l-blue" : "border-l-gold"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {/* Inline type toggle — blue=installed, yellow=optional */}
-                        <button
-                          onClick={toggleType}
-                          className="flex flex-col items-center gap-0.5 flex-shrink-0"
-                          title={`Click to switch to ${isInstalled ? "Optional" : "Installed"}`}
-                        >
-                          <div className={`relative w-10 h-5 rounded-full transition-colors ${isInstalled ? "bg-blue" : "bg-gold"}`}>
-                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-card shadow transition-transform ${isInstalled ? "translate-x-0.5" : "translate-x-[22px]"}`} />
-                          </div>
-                          <span className={`text-[9px] font-bold uppercase tracking-wider ${isInstalled ? "text-blue" : "text-gold"}`}>
-                            {isInstalled ? "Installed" : "Optional"}
-                          </span>
-                        </button>
-
-                        {icon && settings.feature_product_icons && (
-                          <span className="flex-shrink-0 text-muted-foreground"><ProductIcon type={icon} className="w-5 h-5" /></span>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-foreground truncate">{p.name}</span>
-                            {!p.is_active && (
-                              <span className="text-[10px] font-semibold bg-destructive/10 text-destructive px-1.5 py-0.5 rounded uppercase">
-                                Inactive
-                              </span>
-                            )}
-                          </div>
-                          {p.subtitle && <p className="text-xs text-muted-foreground truncate">{p.subtitle}</p>}
-                        </div>
-                      </div>
-                      <div className="flex gap-2 items-center flex-shrink-0">
-                        <span className="text-sm font-semibold text-foreground tabular-nums">${p.price.toFixed(2)}</span>
-                        <button onClick={() => setEditing({ ...p, icon_type: iconMap[p.id] || "" })} className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted text-foreground font-medium transition-colors">Edit</button>
-                        <button onClick={() => handleDeleteProduct(p.id)} className="text-xs px-3 py-1.5 rounded-md border border-destructive/20 hover:bg-destructive/5 text-destructive font-medium transition-colors">Delete</button>
-                      </div>
-                    </div>
-                    {p.subtitle && <p className="text-xs text-muted-foreground mt-1">{p.subtitle}</p>}
-                  </div>
-                );
-              })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ─── Product Rules Tab ─── */}
-        {tab === "rules" && (
-          <div>
-            <div className="bg-card rounded-lg p-4 shadow-sm mb-4">
-              <h3 className="text-sm font-bold text-foreground mb-1">Rules-Based Product Assignment</h3>
-              <p className="text-xs text-muted-foreground">
-                Create rules to auto-assign products based on vehicle attributes. Products without rules always appear. Products with rules only appear when a vehicle matches at least one rule.
-              </p>
-            </div>
-
-            <button
-              onClick={() => setEditingRule({ ...emptyRule, _new: true })}
-              className="mb-4 px-4 py-2 bg-teal text-primary-foreground rounded font-semibold text-sm"
-            >
-              + Add Rule
-            </button>
-
-            <div className="space-y-3">
-              {rules.length === 0 && (
-                <p className="text-sm text-muted-foreground py-8 text-center">No product rules yet. All products will show on every addendum.</p>
-              )}
-              {rules.map((r) => {
-                const product = products.find(p => p.id === r.product_id);
-                return (
-                  <div key={r.id} className="bg-card rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-semibold text-foreground">{product?.name || "Unknown product"}</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {r.year_min && <span className="text-[10px] bg-blue/10 text-blue px-1.5 py-0.5 rounded">{r.year_min}–{r.year_max || "Any"}</span>}
-                          {r.makes.length > 0 && <span className="text-[10px] bg-teal/10 text-teal px-1.5 py-0.5 rounded">{r.makes.join(", ")}</span>}
-                          {r.models.length > 0 && <span className="text-[10px] bg-gold/10 text-gold px-1.5 py-0.5 rounded">{r.models.join(", ")}</span>}
-                          {r.condition !== "all" && <span className="text-[10px] bg-navy/10 text-navy px-1.5 py-0.5 rounded">{r.condition}</span>}
-                          {r.mileage_max > 0 && <span className="text-[10px] bg-action/10 text-action px-1.5 py-0.5 rounded">≤{r.mileage_max.toLocaleString()} mi</span>}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setEditingRule({ ...r })} className="text-xs px-3 py-1 bg-blue text-primary-foreground rounded">Edit</button>
-                        <button onClick={() => { deleteRule(r.id); toast.success("Rule deleted"); }} className="text-xs px-3 py-1 bg-destructive text-primary-foreground rounded">Delete</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* ─── Feature Toggles Tab ─── */}
         {tab === "settings" && (
           <div>
@@ -1428,8 +992,6 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
         )}
 
         {/* ─── Branding Tab ─── */}
-        {tab === "programs" && <DealerProgramsPanel />}
-        {tab === "factory-warranty" && <OemWarrantyPanel />}
         {tab === "merchandising-seo" && <MerchandisingSeoPanel />}
 
         {tab === "passport-ctas" && (
@@ -2056,260 +1618,6 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
         {/* ─── Audit Log Tab ─── */}
         {tab === "team" && <TeamPanel />}
 
-        {/* ─── Pricing & Incentives Tab ─── */}
-        {/* All customer-price controls in one place: doc fee, price display,
-            comps, Today's Price wording, incentive programs, elections, and
-            the price audit/integrity panels (moved here from the audit tab). */}
-        {tab === "incentives" && (
-          <div className="space-y-4">
-            <div id="title-policy" className="bg-card rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-bold text-foreground mb-2">Branded-title policy</h4>
-              <p className="text-xs text-muted-foreground mb-3">
-                Franchise stores that never retail salvage, flood, lemon or rebuilt vehicles can state that on the
-                Vehicle Passport. It appears as <strong>your</strong> statement — &ldquo;Dealer attested&rdquo; — not as a
-                verified title-record check, and it never overrides a brand a source actually reports. Any VIN with a
-                reported brand still shows that brand.
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-foreground">We do not retail branded-title vehicles</span>
-                <Switch
-                  checked={!!settings.title_policy_no_branded}
-                  onCheckedChange={(v) => updateSettings({ title_policy_no_branded: v })}
-                  className="data-[state=checked]:bg-teal"
-                />
-              </div>
-              {settings.title_policy_no_branded && (
-                <p className="mt-3 text-[11px] text-muted-foreground">
-                  You are making this claim on every vehicle where no title record has come back. Turn it off for any
-                  store that takes branded-title trades to retail.
-                </p>
-              )}
-            </div>
-            <div id="doc-fee" className="bg-card rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-bold text-foreground mb-2">Dealer Documentation Fee</h4>
-              <p className="text-xs text-muted-foreground mb-3">Add a state-compliant documentation fee to every addendum. The correct terminology auto-applies based on your state.</p>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-foreground">Enable Doc Fee</span>
-                <Switch
-                  checked={!!settings.doc_fee_enabled}
-                  onCheckedChange={(v) => updateSettings({ doc_fee_enabled: v })}
-                  className="data-[state=checked]:bg-teal"
-                />
-              </div>
-              {settings.doc_fee_enabled && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">State</label>
-                    <select
-                      value={settings.doc_fee_state}
-                      onChange={(e) => updateSettings({ doc_fee_state: e.target.value })}
-                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                    >
-                      {STATE_DOC_FEES.map(s => (
-                        <option key={s.stateCode} value={s.stateCode}>{s.state} — "{s.terminology}"{s.maxFee ? ` (max $${s.maxFee})` : ""}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Amount ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={docFeeDraft ?? String(settings.doc_fee_amount)}
-                      onChange={(e) => setDocFeeDraft(e.target.value)}
-                      onBlur={() => {
-                        if (docFeeDraft == null) return;
-                        const next = parseFloat(docFeeDraft) || 0;
-                        setDocFeeDraft(null);
-                        if (next === settings.doc_fee_amount) return;
-                        if (!window.confirm(`Save the doc fee as $${next.toFixed(2)}? Stored sale prices are not recalculated until the change is reviewed and applied on Pricing & Products.`)) return;
-                        updateSettings({ doc_fee_amount: next });
-                      }}
-                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div id="price-display" className="bg-card rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-bold text-foreground mb-2">Customer Price Display</h4>
-              <select
-                value={settings.price_display_mode || "advertised_before_doc"}
-                onChange={(e) => updateSettings({ price_display_mode: e.target.value as DealerSettings["price_display_mode"] })}
-                className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-              >
-                <option value="advertised_before_doc">Advertised price (before doc fee) — disclose fee separately</option>
-                <option value="website_sale_price">Website sale price (doc fee included)</option>
-              </select>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Controls the price shown on the customer Passport. The advertised price is always compared to market before the doc fee.
-              </p>
-
-              {(() => {
-                const label = settings.price_label || DEFAULT_PRICE_LABEL;
-                const setLabel = (patch: Partial<typeof label>) => updateSettings({ price_label: { ...label, ...patch } });
-                const preview = resolvePriceLabel(label, settings.dealer_name, detectedWebsiteTerm);
-                return (
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <label className="text-xs font-semibold text-muted-foreground">Price label</label>
-                    <select
-                      value={label.preset}
-                      onChange={(e) => setLabel({ preset: e.target.value as typeof label.preset })}
-                      className="w-full px-3 py-2 border border-border-custom rounded text-sm mt-1"
-                    >
-                      {PRICE_LABEL_PRESETS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    {label.preset === "custom" && (
-                      <input
-                        value={label.custom || ""}
-                        onChange={(e) => setLabel({ custom: e.target.value })}
-                        placeholder="Our Price"
-                        className="w-full px-3 py-2 border border-border-custom rounded text-sm mt-2"
-                      />
-                    )}
-                    {label.preset === "website" && !detectedWebsiteTerm ? (
-                      <p className="text-[11px] text-muted-foreground mt-1 italic">
-                        We'll use your website's price term once the nightly price check detects it; showing "Our Price" until then.
-                      </p>
-                    ) : label.preset === "website" ? (
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Wording only — never changes the price. Customers will see:{" "}
-                        <span className="font-semibold text-foreground">{preview}</span>{" "}
-                        <span className="text-muted-foreground">— detected from your website</span>
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Wording only — never changes the price. Customers will see:{" "}
-                        <span className="font-semibold text-foreground">{preview}</span>
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div id="comp-strategy" className="bg-card rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-bold text-foreground mb-2">Market Comparison Pricing</h4>
-              <select
-                value={settings.comp_settings?.compStrategy || "value_building"}
-                onChange={(e) => updateSettings({ comp_settings: { ...(settings.comp_settings || {}), compStrategy: e.target.value as CompStrategy } })}
-                className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-              >
-                {COMP_STRATEGY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Controls how comparable vehicles are selected for customer-facing market panels.{" "}
-                {COMP_STRATEGY_OPTIONS.find((o) => o.value === (settings.comp_settings?.compStrategy || "value_building"))?.help}
-              </p>
-              {(settings.comp_settings?.compStrategy || "value_building") === "value_building" && (
-                <label className="flex items-start gap-2 text-xs text-foreground mt-2">
-                  <input
-                    type="checkbox" className="mt-0.5"
-                    checked={!!settings.comp_settings?.includeLowerPricedComps}
-                    onChange={(e) => updateSettings({ comp_settings: { ...(settings.comp_settings || {}), includeLowerPricedComps: e.target.checked } })}
-                  />
-                  <span>Also allow slightly lower-priced comps (within 3% of this vehicle's price). Off by default so comps never undercut your vehicle.</span>
-                </label>
-              )}
-            </div>
-
-            <div id="todays-price" className="bg-card rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-bold text-foreground mb-2">Today's Price page wording</h4>
-              <select
-                value={settings.todays_price_mode || "payment_estimate"}
-                onChange={(e) => updateSettings({ todays_price_mode: e.target.value as DealerSettings["todays_price_mode"] })}
-                className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-              >
-                {TODAYS_PRICE_MODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                {TODAYS_PRICE_MODE_OPTIONS.find((o) => o.value === (settings.todays_price_mode || "payment_estimate"))?.hint}
-              </p>
-              {(() => {
-                const custom = { ...DEFAULT_TODAYS_PRICE_CUSTOM, ...(settings.todays_price_custom || {}) };
-                const setCustom = (patch: Partial<typeof custom>) => updateSettings({ todays_price_custom: { ...custom, ...patch } });
-                const preview = resolveTodaysPrice({ todays_price_mode: settings.todays_price_mode, todays_price_custom: custom });
-                return (
-                  <div className="mt-2 space-y-2">
-                    {settings.todays_price_mode === "custom" && (
-                      <>
-                        <div>
-                          <label className="text-xs font-semibold text-muted-foreground">Headline</label>
-                          <input value={custom.headline} onChange={(e) => setCustom({ headline: e.target.value })} placeholder="Today's Price" className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-muted-foreground">Subheadline</label>
-                          <input value={custom.sub} onChange={(e) => setCustom({ sub: e.target.value })} placeholder="Personalize your payment estimate for this vehicle." className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-muted-foreground">Button text</label>
-                          <input value={custom.cta} onChange={(e) => setCustom({ cta: e.target.value })} placeholder="Request Payment Details" className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-muted-foreground">Disclaimer</label>
-                          <textarea value={custom.disclaimer} onChange={(e) => setCustom({ disclaimer: e.target.value })} rows={2} placeholder="Estimate only, with approved credit…" className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none" />
-                        </div>
-                        <label className="flex items-start gap-2 text-xs text-foreground">
-                          <input type="checkbox" className="mt-0.5" checked={custom.allow_otd_wording} onChange={(e) => setCustom({ allow_otd_wording: e.target.checked })} />
-                          <span>Allow out-the-door / "best price" wording in custom copy. When off, copy containing that language falls back to the safe default.</span>
-                        </label>
-                      </>
-                    )}
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                      {([
-                        ["show_calculator", "Show payment calculator"],
-                        ["show_down", "Show down payment slider"],
-                        ["show_term", "Show term selector"],
-                        ["show_apr", "Show APR slider"],
-                      ] as ["show_calculator" | "show_down" | "show_term" | "show_apr", string][]).map(([key, label]) => (
-                        <label key={key} className="flex items-center gap-2 text-xs text-foreground">
-                          <input type="checkbox" checked={custom[key]} onChange={(e) => setCustom({ [key]: e.target.checked })} />
-                          {label}
-                        </label>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground border-t border-border pt-2">
-                      Shoppers will see: <span className="font-semibold text-foreground">{preview.headline}</span> — {preview.sub} · Button: <span className="font-semibold text-foreground">{preview.cta}</span>
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div id="passport-version" className="bg-card rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-bold text-foreground mb-2">Passport experience version</h4>
-              <select
-                value={settings.passport_version === "v3" ? "v3" : "current"}
-                onChange={(e) => updateSettings({ passport_version: e.target.value as "current" | "v3" })}
-                className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-              >
-                <option value="current">Current Passport</option>
-                <option value="v3">Passport V3</option>
-              </select>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Store-wide default. A vehicle can override this per-VIN — leave a vehicle on "Inherit store default" to follow this setting.
-              </p>
-            </div>
-
-
-            <div id="incentive-programs">
-              <IncentivesSettingsPanel />
-            </div>
-            <div id="addon-elections">
-              <AddonElectionsPanel storeId={currentStore?.id || ""} />
-            </div>
-            <div id="price-audit">
-              <PriceAuditPanel />
-            </div>
-            {isAdmin && (
-              <div id="price-integrity">
-                <PriceIntegrityPanel />
-              </div>
-            )}
-          </div>
-        )}
-
         {tab === "features" && <EnabledFeaturesPanel />}
 
         {tab === "audit" && (
@@ -2386,513 +1694,10 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
           </div>
         )}
 
-        {/* ─── Product Edit Modal ─── */}
-        {editing && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-lg w-full max-w-4xl max-h-[90vh] flex overflow-hidden">
-              <div className="flex-1 flex flex-col min-w-0">
-              <div className="p-6 space-y-3 overflow-y-auto flex-1">
-              <h2 className="text-lg font-bold font-barlow-condensed">{editing.id ? "Edit Product" : "Add Product"}</h2>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Product Name</label>
-                <input value={editing.name || ""} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Subtitle</label>
-                <input value={editing.subtitle || ""} onChange={(e) => setEditing({ ...editing, subtitle: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Warranty</label>
-                <input value={editing.warranty || ""} onChange={(e) => setEditing({ ...editing, warranty: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Price ($)</label>
-                  <input type="number" step="0.01" value={editing.price || 0} onChange={(e) => setEditing({ ...editing, price: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Sort Order</label>
-                  <input type="number" value={editing.sort_order || 0} onChange={(e) => setEditing({ ...editing, sort_order: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-                </div>
-              </div>
-              {/* Vehicle-category pricing — optional per-size prices. Blank
-                  buckets fall back to the base Price above; the addendum
-                  auto-picks the bucket from the vehicle's decoded body class. */}
-              <div className="rounded-md border border-border-custom p-3 space-y-2">
-                <p className="text-xs font-semibold text-foreground">Vehicle-category pricing <span className="font-normal text-muted-foreground">(optional)</span></p>
-                <p className="text-[11px] text-muted-foreground">Set a price per vehicle size. Blank uses the base Price above. The addendum picks the right one from the vehicle body class.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {PRICE_BUCKETS.map((b) => (
-                    <div key={b.id}>
-                      <label className="text-[11px] font-medium text-muted-foreground">{b.label}</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={editing.price_tiers?.[b.id] ?? ""}
-                        placeholder={`Base $${Number(editing.price) || 0}`}
-                        onChange={(e) => {
-                          const next = { ...(editing.price_tiers || {}) };
-                          const v = parseFloat(e.target.value);
-                          if (!e.target.value || isNaN(v) || v <= 0) delete next[b.id];
-                          else next[b.id] = v;
-                          setEditing({ ...editing, price_tiers: Object.keys(next).length ? next : null });
-                        }}
-                        className="w-full px-2 py-1.5 border border-border-custom rounded text-sm"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Type</label>
-                  <select value={editing.badge_type || "installed"} onChange={(e) => setEditing({ ...editing, badge_type: e.target.value, price_label: e.target.value === "installed" ? "Included in Selling Price" : "If Accepted" })} className="w-full px-3 py-2 border border-border-custom rounded text-sm">
-                    <option value="installed">Pre-Installed</option>
-                    <option value="optional">Optional</option>
-                  </select>
-                </div>
-                {settings.feature_product_icons && (
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Icon</label>
-                    <div className="flex items-center gap-2">
-                      {editing.icon_type && (
-                        <span className="shrink-0 text-muted-foreground"><ProductIcon type={editing.icon_type} className="w-5 h-5" /></span>
-                      )}
-                      <select
-                        value={editing.icon_type || ""}
-                        onChange={(e) => setEditing({ ...editing, icon_type: e.target.value })}
-                        className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                      >
-                        <option value="">No icon</option>
-                        {PRODUCT_ICON_KEYS.map((key) => (
-                          <option key={key} value={key}>{key.replace(/_/g, " ")}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Price Label</label>
-                <input value={editing.price_label || ""} onChange={(e) => setEditing({ ...editing, price_label: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-              </div>
-              {/* Disposition descriptions — one set for pre-installed, one
-                  for customer-elected optional. Both are stored; the
-                  addendum shows the set matching how the line is sold. The
-                  Type above marks which is the default + which benefit the
-                  red-team requires. */}
-              <div className="space-y-3">
-                <label className="text-xs font-semibold text-muted-foreground">Descriptions by how it's sold</label>
-
-                <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-border-custom p-2.5">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={!(editing.available_preinstalled ?? true)}
-                    onChange={(e) =>
-                      setEditing({
-                        ...editing,
-                        available_preinstalled: !e.target.checked,
-                        ...(e.target.checked ? { badge_type: "optional", price_label: "If Accepted" } : {}),
-                      })
-                    }
-                  />
-                  <span>
-                    <span className="text-[11px] font-semibold text-foreground">Not available for pre-install</span>
-                    <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">On — sold only as a customer choice, never pre-installed. The pre-installed description is hidden and the addendum keeps this line optional.</span>
-                  </span>
-                </label>
-
-                {(editing.available_preinstalled ?? true) && (
-                <div className={`rounded-lg border p-3 space-y-2.5 ${((editing.badge_type || "installed") === "installed") ? "border-teal/50 bg-teal/5" : "border-border-custom"}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-foreground">
-                      Pre-installed <span className="font-normal text-muted-foreground">— already on the car, in the price</span>
-                    </span>
-                    {((editing.badge_type || "installed") === "installed") && (
-                      <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-teal text-primary-foreground">Default</span>
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-muted-foreground">Disclosure</label>
-                    <textarea value={editing.disclosure || ""} onChange={(e) => setEditing({ ...editing, disclosure: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Pre-installed, non-removable; cost included in the selling price…" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-foreground inline-flex items-center gap-1.5">
-                      Benefit justification
-                      {((editing.badge_type || "installed") === "installed") && (
-                        <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">Required</span>
-                      )}
-                    </label>
-                    <textarea value={editing.benefit_justification || ""} onChange={(e) => setEditing({ ...editing, benefit_justification: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="This vehicle was treated before sale with… (why it benefits the buyer)" />
-                  </div>
-                  <label className="flex items-start gap-2 cursor-pointer pt-0.5">
-                    <input type="checkbox" className="mt-0.5" checked={editing.price_in_advertised ?? true} onChange={(e) => setEditing({ ...editing, price_in_advertised: e.target.checked })} />
-                    <span>
-                      <span className="text-[11px] font-semibold text-foreground">Price is included in the advertised price</span>
-                      <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">On — itemized for transparency, never charged again. Off — a dealer-installed upcharge above the advertised price the customer confirms.</span>
-                    </span>
-                  </label>
-                </div>
-                )}
-
-                <div className={`rounded-lg border p-3 space-y-2.5 ${!((editing.badge_type || "installed") === "installed") ? "border-teal/50 bg-teal/5" : "border-border-custom"}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-foreground">
-                      Optional <span className="font-normal text-muted-foreground">— customer adds at time of sale</span>
-                    </span>
-                    {!((editing.badge_type || "installed") === "installed") && (
-                      <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-teal text-primary-foreground">Default</span>
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-muted-foreground">Disclosure</label>
-                    <textarea value={editing.disclosure_optional || ""} onChange={(e) => setEditing({ ...editing, disclosure_optional: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Optional — not required to buy or finance, does not affect your rate; itemized as an add-on…" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-foreground inline-flex items-center gap-1.5">
-                      Benefit justification
-                      {!((editing.badge_type || "installed") === "installed") && (
-                        <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">Required</span>
-                      )}
-                    </label>
-                    <textarea value={editing.benefit_justification_optional || ""} onChange={(e) => setEditing({ ...editing, benefit_justification_optional: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="At the time of sale you chose to add… (why it benefits the buyer)" />
-                  </div>
-                </div>
-
-                <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  Both sets are stored. The addendum shows the set matching how the line is sold on each deal (optional falls back to the pre-installed text when blank). Required benefit answers FTC §5 / CA SB 766 §11713.21.
-                </p>
-
-                {/* Upgrade tier — optional higher level (e.g. Standard ->
-                    Platinum). When applied on an addendum line it swaps the
-                    line to this package price + descriptions. */}
-                <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-border-custom p-2.5">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={!!editing.upgrade}
-                    onChange={(e) => setEditing({ ...editing, upgrade: e.target.checked ? (editing.upgrade ?? EMPTY_UPGRADE) : null })}
-                  />
-                  <span>
-                    <span className="text-[11px] font-semibold text-foreground">This product has an upgrade tier</span>
-                    <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">A higher level (e.g. Platinum that includes Standard). On the addendum the dealer can apply it to a line — the line swaps to this package price, disclosure, and benefit.</span>
-                  </span>
-                </label>
-
-                {editing.upgrade && (
-                  <div className="rounded-lg border border-gold/50 bg-gold/5 p-3 space-y-2.5">
-                    <span className="text-xs font-bold text-foreground">Upgrade tier</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] font-semibold text-muted-foreground">Upgrade name</label>
-                        <input value={editing.upgrade.name} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), name: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" placeholder="Platinum Protection" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-semibold text-muted-foreground">Package price ($)</label>
-                        <input type="number" step="0.01" value={editing.upgrade.price} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), price: parseFloat(e.target.value) || 0 } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-                      </div>
-                    </div>
-                    <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-border-custom p-2.5">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5"
-                        checked={!(editing.upgrade.available_preinstalled ?? true)}
-                        onChange={(e) =>
-                          setEditing({
-                            ...editing,
-                            upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), available_preinstalled: !e.target.checked },
-                          })
-                        }
-                      />
-                      <span>
-                        <span className="text-[11px] font-semibold text-foreground">Not available for pre-install</span>
-                        <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">On — this upgrade is installed after delivery only. The pre-installed description is hidden and applying it keeps the line optional, even when the base product is pre-installed.</span>
-                      </span>
-                    </label>
-                    {(editing.available_preinstalled ?? true) && (editing.upgrade.available_preinstalled ?? true) && (
-                      <div className="rounded-lg border border-border-custom p-3 space-y-2.5">
-                        <span className="text-[11px] font-bold text-foreground">Pre-installed <span className="font-normal text-muted-foreground">(upgrade)</span></span>
-                        <div>
-                          <label className="text-[10px] font-semibold text-muted-foreground">Disclosure</label>
-                          <textarea value={editing.upgrade.disclosure} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), disclosure: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Upgrade pre-installed disclosure…" />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-semibold text-muted-foreground">Benefit justification</label>
-                          <textarea value={editing.upgrade.benefit_justification} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), benefit_justification: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Includes Standard, plus… (why the upgrade benefits the buyer)" />
-                        </div>
-                      </div>
-                    )}
-                    <div className="rounded-lg border border-border-custom p-3 space-y-2.5">
-                      <span className="text-[11px] font-bold text-foreground">Optional <span className="font-normal text-muted-foreground">(upgrade)</span></span>
-                      <div>
-                        <label className="text-[10px] font-semibold text-muted-foreground">Disclosure</label>
-                        <textarea value={editing.upgrade.disclosure_optional} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), disclosure_optional: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Upgrade optional disclosure…" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-semibold text-muted-foreground">Benefit justification</label>
-                        <textarea value={editing.upgrade.benefit_justification_optional} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), benefit_justification_optional: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Includes Standard, plus… (why the upgrade benefits the buyer)" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 space-y-2">
-                <span className="text-xs font-bold text-foreground inline-flex items-center gap-1.5">
-                  Product document
-                  <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">Required</span>
-                </span>
-                <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  Attach the product contract — or the warranty card when there is no contract. It's the substantiation behind the benefit claims (FTC §5) and rides with the signed packet.
-                </p>
-                <div className="flex items-center gap-4">
-                  <label className="text-[11px] font-semibold text-foreground inline-flex items-center gap-1.5 cursor-pointer">
-                    <input type="radio" name="contract_doc_type" checked={(editing.contract_doc_type || "contract") === "contract"} onChange={() => setEditing({ ...editing, contract_doc_type: "contract" })} /> Contract
-                  </label>
-                  <label className="text-[11px] font-semibold text-foreground inline-flex items-center gap-1.5 cursor-pointer">
-                    <input type="radio" name="contract_doc_type" checked={editing.contract_doc_type === "warranty"} onChange={() => setEditing({ ...editing, contract_doc_type: "warranty" })} /> Warranty card
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    accept="application/pdf,image/*"
-                    disabled={uploadingDoc}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadDoc(f); }}
-                    className="text-[11px]"
-                  />
-                  {uploadingDoc && <span className="text-[10px] text-muted-foreground">Uploading…</span>}
-                </div>
-                {editing.contract_url ? (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const url = editing.contract_url || "";
-                      if (/^https?:\/\//i.test(url)) { window.open(url, "_blank", "noopener,noreferrer"); return; }
-                      const { data, error } = await supabase.storage.from("product-docs").createSignedUrl(url, 3600);
-                      if (error || !data?.signedUrl) { toast.error(`Could not open document: ${error?.message || "unknown error"}`); return; }
-                      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-                    }}
-                    className="text-[11px] text-[#2563EB] hover:underline text-left"
-                  >
-                    View attached {editing.contract_doc_type === "warranty" ? "warranty card" : "contract"}
-                  </button>
-                ) : (
-                  <p className="text-[10px] text-destructive font-semibold">No document attached — required to save.</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" checked={editing.is_active ?? true} onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })} />
-                <label className="text-xs">Active</label>
-              </div>
-              </div>
-              {/* Sticky footer — always visible regardless of form length. */}
-              <div className="flex gap-2 p-4 border-t border-border bg-card">
-                <button onClick={() => setEditing(null)} className="flex-1 py-2 bg-muted text-foreground rounded font-semibold text-sm">Cancel</button>
-                <button onClick={handleSaveProduct} className="flex-1 py-2 bg-teal text-primary-foreground rounded font-semibold text-sm">{editing.id ? "Save Product" : "Add Product"}</button>
-              </div>
-              </div>
-              <ProductEditPreview editing={editing} />
-            </div>
-          </div>
-        )}
-
-        {/* ─── Rule Edit Modal ─── */}
-        {editingRule && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-lg p-6 w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto">
-              <h2 className="text-lg font-bold font-barlow-condensed">{editingRule._new ? "Add Rule" : "Edit Rule"}</h2>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Product</label>
-                <select
-                  value={editingRule.product_id || ""}
-                  onChange={(e) => setEditingRule({ ...editingRule, product_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                >
-                  <option value="">Select product...</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.badge_type})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Year Min</label>
-                  <input
-                    value={editingRule.year_min || ""}
-                    onChange={(e) => setEditingRule({ ...editingRule, year_min: e.target.value })}
-                    placeholder="e.g. 2020"
-                    className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Year Max</label>
-                  <input
-                    value={editingRule.year_max || ""}
-                    onChange={(e) => setEditingRule({ ...editingRule, year_max: e.target.value })}
-                    placeholder="e.g. 2026"
-                    className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Makes (comma-separated, blank = all)</label>
-                <input
-                  value={editingRule.makes?.join(", ") || ""}
-                  onChange={(e) => setEditingRule({ ...editingRule, makes: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
-                  placeholder="e.g. Honda, Toyota, Nissan"
-                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Models (comma-separated, blank = all)</label>
-                <input
-                  value={editingRule.models?.join(", ") || ""}
-                  onChange={(e) => setEditingRule({ ...editingRule, models: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
-                  placeholder="e.g. CR-V, RAV4, Civic"
-                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Trims (comma-separated, blank = all)</label>
-                <input
-                  value={editingRule.trims?.join(", ") || ""}
-                  onChange={(e) => setEditingRule({ ...editingRule, trims: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
-                  placeholder="e.g. EX-L, Sport, Touring"
-                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Body Styles (comma-separated, blank = all)</label>
-                <input
-                  value={editingRule.body_styles?.join(", ") || ""}
-                  onChange={(e) => setEditingRule({ ...editingRule, body_styles: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
-                  placeholder="e.g. SUV, Sedan, Truck"
-                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Condition</label>
-                  <select
-                    value={editingRule.condition || "all"}
-                    onChange={(e) => setEditingRule({ ...editingRule, condition: e.target.value as any })}
-                    className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                  >
-                    <option value="all">All</option>
-                    <option value="new">New Only</option>
-                    <option value="used">Used Only</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Max Mileage (0 = no limit)</label>
-                  <input
-                    type="number"
-                    value={editingRule.mileage_max || 0}
-                    onChange={(e) => setEditingRule({ ...editingRule, mileage_max: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button onClick={handleSaveRule} className="flex-1 py-2 bg-teal text-primary-foreground rounded font-semibold text-sm">Save Rule</button>
-                <button onClick={() => setEditingRule(null)} className="flex-1 py-2 bg-muted text-foreground rounded font-semibold text-sm">Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Platform-admin tabs moved to the dedicated /platform-admin
             route (src/pages/PlatformAdmin.tsx) so the platform bundle
             doesn't ship with every dealer page load. */}
         </div>
-    </div>
-  );
-};
-
-// Live customer-facing preview + FTC-readiness checklist shown beside the
-// product editor. Mirrors how the line renders on the addendum so the dealer
-// sees the output (and what's still missing) while editing.
-const ProductEditPreview = ({ editing }: { editing: Partial<Product> }) => {
-  const isInstalled = (editing.badge_type || "installed") === "installed";
-  const disclosure = isInstalled
-    ? (editing.disclosure || "")
-    : (editing.disclosure_optional || editing.disclosure || "");
-  const benefit = isInstalled
-    ? (editing.benefit_justification || "")
-    : (editing.benefit_justification_optional || editing.benefit_justification || "");
-  const price = Number(editing.price) || 0;
-  const inAdvertised = editing.price_in_advertised ?? true;
-
-  const checks = [
-    { label: "Pricing set", ok: price > 0 },
-    { label: "Disclosure present", ok: !!(editing.disclosure || editing.disclosure_optional || "").trim() },
-    { label: "Benefit justification present", ok: !!(editing.benefit_justification || editing.benefit_justification_optional || "").trim() },
-    { label: "Contract / warranty attached", ok: !!editing.contract_url },
-  ];
-  const done = checks.filter((c) => c.ok).length;
-  const score = Math.round((done / checks.length) * 100);
-  const scoreColor = score === 100 ? "text-emerald-600" : score >= 50 ? "text-amber-600" : "text-destructive";
-
-  return (
-    <div className="hidden lg:flex w-80 flex-shrink-0 flex-col border-l border-border bg-muted/20 overflow-y-auto">
-      <div className="p-5 space-y-4">
-        <div>
-          <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Customer view</p>
-          <p className="text-[11px] text-muted-foreground">This is exactly how this item appears on the addendum.</p>
-        </div>
-
-        {/* How the line renders to the customer */}
-        <div className="rounded-xl border border-border bg-card shadow-premium p-4">
-          <div className="flex items-center justify-between gap-2">
-            <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isInstalled ? "bg-blue/10 text-blue" : "bg-gold/10 text-gold"}`}>
-              {isInstalled ? "Pre-Installed" : "Optional"}
-            </span>
-            <span className="text-sm font-bold tabular-nums text-foreground">${price.toFixed(2)}</span>
-          </div>
-          <p className="mt-2 text-sm font-semibold text-foreground">{editing.name || "Product name"}</p>
-          {editing.subtitle && <p className="text-xs text-muted-foreground mt-0.5">{editing.subtitle}</p>}
-          {editing.warranty && <p className="text-[11px] text-muted-foreground mt-2">Warranty: {editing.warranty}</p>}
-          <p className="text-[10px] text-muted-foreground mt-2">
-            {inAdvertised ? "Itemized — included in the advertised price." : "Dealer-installed upcharge above the advertised price."}
-          </p>
-          {disclosure ? (
-            <p className="text-[11px] text-foreground mt-3 whitespace-pre-wrap leading-snug">{disclosure}</p>
-          ) : (
-            <p className="text-[11px] italic text-muted-foreground mt-3">Disclosure will appear here.</p>
-          )}
-          {benefit && (
-            <div className="mt-3">
-              <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Why this benefits you</p>
-              <p className="text-[11px] text-foreground mt-1 whitespace-pre-wrap leading-snug">{benefit}</p>
-            </div>
-          )}
-        </div>
-
-        {/* FTC-readiness — the reason dealers buy AutoLabels, so it carries
-            the strongest visual weight (colored border + large score). */}
-        <div className={`rounded-xl border-2 p-4 shadow-premium ${score === 100 ? "border-emerald-500 bg-emerald-50" : score >= 50 ? "border-amber-300 bg-amber-50/60" : "border-destructive/40 bg-destructive/5"}`}>
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-wider text-foreground">{score === 100 ? "FTC Ready" : "FTC Readiness"}</p>
-            <span className={`text-2xl font-bold tabular-nums ${scoreColor}`}>{score}%</span>
-          </div>
-          <div className="mt-3 space-y-2">
-            {checks.map((c) => (
-              <div key={c.label} className="flex items-center gap-2">
-                {c.ok ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                ) : (
-                  <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                )}
-                <span className={`text-[11px] ${c.ok ? "text-foreground" : "text-muted-foreground"}`}>{c.label}</span>
-              </div>
-            ))}
-          </div>
-          {score < 100 && (
-            <p className="text-[10px] text-muted-foreground mt-3">Complete every item before this product is sale-ready.</p>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

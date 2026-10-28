@@ -85,10 +85,11 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     tabs: [
       { id: "price-rules", label: "Price rules", aliases: ["incentives"], legacyTab: "incentives" },
       { id: "products", label: "Products", aliases: ["products"], legacyTab: "products" },
-      { id: "applicability", label: "Applicability", aliases: ["rules"], legacyTab: "rules", featureKey: "feature_product_rules" },
+      { id: "applicability", label: "Applicability", aliases: ["rules"], legacyTab: "rules", featureKey: "feature_product_rules", unpictured: true },
       { id: "benefits", label: "Benefits", aliases: ["programs"], legacyTab: "programs" },
       { id: "warranty-programs", label: "Warranty programs", aliases: ["factory-warranty"], legacyTab: "factory-warranty" },
       { id: "warranty-records", label: "Warranty records", aliases: ["warranty"], legacyTab: "warranty", featureKey: "feature_warranty", unpictured: true },
+      { id: "incentive-programs", label: "Incentives", capabilities: ["can_manage_settings", "can_manage_deals"], unpictured: true },
     ],
   },
   {

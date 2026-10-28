@@ -1,0 +1,36 @@
+import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import { cn } from "@/lib/utils";
+
+// Form controls drawn to the Administration tokens (6px input radius, 1px
+// #D6DFEA lines, 14px text). Shared by the Pricing & Products views only.
+
+export const inputClass =
+  "h-9 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] leading-[20px] text-adm-ink placeholder:text-adm-muted disabled:bg-adm-workspace disabled:text-adm-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary";
+
+export const AdminInput = ({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) => <input className={cn(inputClass, className)} {...rest} />;
+
+export const AdminSelect = ({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) => (
+  <select className={cn(inputClass, "pr-8", className)} {...rest}>
+    {children}
+  </select>
+);
+
+export const Field = ({ label, hint, children, htmlFor, className }: { label: ReactNode; hint?: ReactNode; children: ReactNode; htmlFor?: string; className?: string }) => (
+  <div className={className}>
+    <label htmlFor={htmlFor} className="block text-[12px] leading-[18px] font-semibold text-adm-muted mb-1">
+      {label}
+    </label>
+    {children}
+    {hint && <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">{hint}</p>}
+  </div>
+);
+
+export const CheckRow = ({ checked, onChange, label, detail, disabled, name, type = "checkbox" }: { checked: boolean; onChange: (next: boolean) => void; label: ReactNode; detail?: ReactNode; disabled?: boolean; name?: string; type?: "checkbox" | "radio" }) => (
+  <label className={cn("flex items-start gap-3 rounded-md px-1 py-1.5", disabled ? "opacity-60" : "cursor-pointer")}>
+    <input type={type} name={name} checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} className="mt-[3px] h-4 w-4 accent-adm-primary" />
+    <span className="min-w-0">
+      <span className="block text-[14px] leading-[20px] text-adm-ink">{label}</span>
+      {detail && <span className="block text-[12px] leading-[18px] text-adm-muted">{detail}</span>}
+    </span>
+  </label>
+);
