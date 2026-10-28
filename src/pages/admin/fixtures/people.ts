@@ -17,13 +17,14 @@ const member = (id: string, email: string, role: string, acceptedAt: string | nu
   invited_email: email,
 });
 
-// The five accepted members the reference pictures, in its order.
+// The five accepted members the reference pictures, in its order. The local parts give the
+// reference's initials (ES, SA, IM, TC, GM), which are derived from the address.
 export const EXAMPLE_MEMBERS: TeamMemberRow[] = [
   member("example-member-salesperson", "example.salesperson@example.test", "salesperson", "2026-03-11T13:15:00Z"),
-  member("example-member-service", "example.service.advisor@example.test", "service_advisor", "2026-05-19T17:45:00Z"),
-  member("example-member-inventory", "example.inventory.manager@example.test", "inventory_manager", "2026-04-02T12:00:00Z"),
-  member("example-member-office", "example.office@example.test", "office", "2026-06-08T14:30:00Z"),
-  member("example-member-gm", "example.general.manager@example.test", "general_manager", "2026-01-20T15:30:00Z"),
+  member("example-member-service", "service.advisor@example.test", "service_advisor", "2026-05-19T17:45:00Z"),
+  member("example-member-inventory", "inventory.manager@example.test", "inventory_manager", "2026-04-02T12:00:00Z"),
+  member("example-member-office", "title.clerk@example.test", "office", "2026-06-08T14:30:00Z"),
+  member("example-member-gm", "general.manager@example.test", "general_manager", "2026-01-20T15:30:00Z"),
 ];
 
 const PEOPLE: PeopleFixture = {

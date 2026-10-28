@@ -58,7 +58,7 @@ export default function InvitationsView() {
             <tr key={m.id}>
               <Td>
                 <span className="flex items-center gap-3">
-                  <MemberAvatar initials={m.initials} />
+                  <MemberAvatar initials={m.initials} department={m.department} />
                   <span className="font-semibold text-adm-ink truncate">{m.email}</span>
                 </span>
               </Td>

@@ -39,14 +39,13 @@ describe("TeamView", () => {
   it("renders screen 03 from the fixture with the role summary open and writes nothing", () => {
     renderTeam("/admin?tab=team");
     expect(screen.getAllByText("example.salesperson@example.test")).toHaveLength(2);
-    expect(screen.getByText("example.office@example.test")).toBeTruthy();
-    expect(screen.getAllByText("Member")).toHaveLength(5);
+    expect(screen.getByText("title.clerk@example.test")).toBeTruthy();
     expect(screen.getByRole("complementary", { name: "Role summary" })).toBeTruthy();
     expect(screen.getByText("View assigned customers")).toBeTruthy();
     expect(screen.getByText("Change dealer pricing")).toBeTruthy();
     expect(screen.getByText("Role preview does not grant permissions.")).toBeTruthy();
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Invitation pending")).toBeNull();
+    expect(screen.queryByText("Invited")).toBeNull();
     expect(rpcMock).not.toHaveBeenCalled();
     expect(fromMock).not.toHaveBeenCalled();
     expect(logMock).not.toHaveBeenCalled();
@@ -54,12 +53,31 @@ describe("TeamView", () => {
 
   it("restores department and selection filters from the URL", () => {
     renderTeam("/admin?tab=team&dept=Service&sel=example-member-service");
-    expect(screen.getAllByText("example.service.advisor@example.test").length).toBe(2);
+    expect(screen.getAllByText("service.advisor@example.test").length).toBe(2);
     expect(screen.queryByText("example.salesperson@example.test")).toBeNull();
     expect(screen.getByText("Showing 1 of 5.")).toBeTruthy();
     expect((screen.getByLabelText("Department") as HTMLSelectElement).value).toBe("Service");
     const rail = screen.getByRole("complementary", { name: "Role summary" });
-    expect(rail.textContent).toContain("example.service.advisor@example.test");
+    expect(rail.textContent).toContain("service.advisor@example.test");
+  });
+
+  it("sorts by a column ascending, then descending, then back to the server order", () => {
+    renderTeam("/admin?tab=team");
+    const table = screen.getByRole("table", { name: "Team members" });
+    const rowsInOrder = () => within(table).getAllByRole("row").slice(1).map((r) => r.querySelector("[data-parity='member-name']")?.textContent);
+    const server = rowsInOrder();
+    expect(server).toEqual(["example.salesperson@example.test", "service.advisor@example.test", "inventory.manager@example.test", "title.clerk@example.test", "general.manager@example.test"]);
+    const header = within(table).getByRole("columnheader", { name: /Employee/ });
+    expect(header.getAttribute("aria-sort")).toBe("none");
+    fireEvent.click(within(header).getByRole("button"));
+    expect(header.getAttribute("aria-sort")).toBe("ascending");
+    expect(rowsInOrder()).toEqual(["example.salesperson@example.test", "general.manager@example.test", "inventory.manager@example.test", "service.advisor@example.test", "title.clerk@example.test"]);
+    fireEvent.click(within(header).getByRole("button"));
+    expect(header.getAttribute("aria-sort")).toBe("descending");
+    expect(rowsInOrder()[0]).toBe("title.clerk@example.test");
+    fireEvent.click(within(header).getByRole("button"));
+    expect(header.getAttribute("aria-sort")).toBe("none");
+    expect(rowsInOrder()).toEqual(server);
   });
 
   it("shows a failed read as unavailable, never as an empty team, and issues no write", async () => {
@@ -82,7 +100,6 @@ describe("TeamView", () => {
     renderTeam("/admin?tab=team", false);
     await screen.findByText("example.gm@example.test");
     expect(screen.getByText("example.invited@example.test")).toBeTruthy();
-    expect(screen.getByText("Invitation pending")).toBeTruthy();
     expect(within(screen.getByRole("table", { name: "Team members" })).getByText("Invited")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Department"), { target: { value: "Service" } });
     await waitFor(() => expect(screen.getByText("No team members match these filters")).toBeTruthy());

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useReducer, useState, type FormEvent, type ReactNode } from "react";
-import { AlertTriangle, Ban, Building2, Car, Check, CheckCircle2, Code, Database, FileText, Link, Monitor, Share2, Tag, Users, X } from "lucide-react";
+import { AlertTriangle, Ban, Building, Car, Check, CheckCircle2, Code, Database, FileText, Link, Monitor, Share2, Tag, Users, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AdminButton, AdminLinkButton, AdminTable, ICON, ICON_BOX, InlineNote, KeyValueList, Td, Th } from "@/components/admin/v2/primitives";
 import { useAudit } from "@/contexts/AuditContext";
@@ -26,12 +26,23 @@ import { useTenantId, type TeamAuthority, type TeamWriters } from "./useTeamMemb
 export const INPUT_CLASS = "h-9 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] leading-[20px] text-adm-ink placeholder:text-adm-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary";
 export const SELECT_CLASS = "h-9 rounded-md border border-adm-border bg-adm-surface px-2.5 text-[14px] leading-[20px] text-adm-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary disabled:opacity-50";
 
-// Reference: 52px circles with 18px initials in the team table (measured 48px of ink plus
-// anti-aliasing, sized to the owner's 52), a 56px circle with 20px initials in the rail.
-const AVATAR_SIZE = { sm: `${ICON_BOX.avatar} text-[14px]`, md: `${ICON_BOX.avatarLg} text-[18px]`, lg: `${ICON_BOX.circle} text-[20px]` };
+// Reference: 47px circles with 18px initials in the team table (sized up to the owner's 48),
+// a 55px circle with 20px initials in the rail (56).
+const AVATAR_SIZE = { sm: `${ICON_BOX.avatar} text-[14px]`, md: `${ICON_BOX.avatar} text-[18px]`, lg: `${ICON_BOX.circle} text-[20px]` };
 
-export const MemberAvatar = ({ initials, size = "sm" }: { initials: string; size?: keyof typeof AVATAR_SIZE }) => (
-  <span aria-hidden="true" className={cn("inline-flex items-center justify-center bg-adm-selected text-adm-primary font-semibold flex-shrink-0", AVATAR_SIZE[size])}>
+// The reference tints each avatar by the member's department (blue Sales, green Service, violet
+// Inventory, amber Business Office, red Management), so the tint is derived from the role and
+// never needs a stored colour. Fills and initials are sampled from the reference.
+const DEPARTMENT_TINT: Record<string, string> = {
+  Sales: "bg-[#D3E7FB] text-[#0050AA]",
+  Service: "bg-[#CBECDA] text-[#006C3D]",
+  Inventory: "bg-[#E0D3FB] text-[#3A10C0]",
+  "Business Office": "bg-[#FCE8C4] text-[#B25800]",
+  Management: "bg-[#F4D5D3] text-[#A00A0C]",
+};
+
+export const MemberAvatar = ({ initials, department, size = "sm" }: { initials: string; department?: string; size?: keyof typeof AVATAR_SIZE }) => (
+  <span aria-hidden="true" className={cn("inline-flex items-center justify-center font-semibold flex-shrink-0", (department && DEPARTMENT_TINT[department]) || "bg-adm-selected text-adm-primary", AVATAR_SIZE[size])}>
     {initials}
   </span>
 );
@@ -87,13 +98,17 @@ export const RoleSelect = ({
   );
 };
 
-// Reference: a 32px tinted square holding a 13px check or cross (a 20px lucide box).
+// Reference: a 31px tinted square holding a 13px check or a 10px cross; a 32px square and an 18px lucide box here.
+const MARK_GLYPH = "w-[18px] h-[18px]";
 const Mark = ({ on, label }: { on: boolean; label: string }) => (
   <span className={cn("inline-flex w-8 h-8 items-center justify-center rounded-md", on ? "bg-adm-success-bg text-adm-success" : "bg-adm-danger-bg text-adm-danger")}>
-    {on ? <Check className={ICON.inSquare} aria-hidden="true" /> : <X className={ICON.inSquare} aria-hidden="true" />}
+    {on ? <Check className={MARK_GLYPH} aria-hidden="true" /> : <X className={MARK_GLYPH} aria-hidden="true" />}
     <span className="sr-only">{label}: {on ? "allowed" : "not allowed"}</span>
   </span>
 );
+
+// Row icons on the role child measure 18 to 23px of ink at a 2px stroke: a 26px lucide box.
+const ROW_ICON = "w-[26px] h-[26px] flex-shrink-0 text-adm-ink";
 
 const MATRIX_ROW_ICONS: Record<string, typeof Users> = {
   assigned_customers: Users,
@@ -109,7 +124,7 @@ const MATRIX_HEAD = "px-[14px] py-[9px] text-[13px] leading-[18px] text-adm-ink"
 // The scroll wrapper is positioned so the cells' screen-reader text stays inside it on narrow
 // screens, where the table keeps a 640px width and scrolls inside its box.
 export const CapabilityMatrixTable = ({ matrix }: { matrix: CapabilityMatrix }) => (
-  <AdminTable caption="Role capabilities by task" inset className="relative mx-5 mb-[17px] rounded-lg [&>table]:min-w-[640px]">
+  <AdminTable caption="Role capabilities by task" inset className="relative mx-5 mb-[15px] rounded-lg [&>table]:min-w-[640px]">
     <thead>
       <tr>
         <Th className={MATRIX_HEAD}>Capability</Th>
@@ -128,11 +143,11 @@ export const CapabilityMatrixTable = ({ matrix }: { matrix: CapabilityMatrix }) 
             const Icon = MATRIX_ROW_ICONS[r.id] ?? FileText;
             return (
               <tr key={r.id}>
-                <Td className="py-[9px] pl-[15px]">
-                  <span className="flex items-center gap-[18px]">
-                    <Icon className={cn(ICON.panel, "flex-shrink-0 text-adm-ink")} strokeWidth={1.75} aria-hidden="true" />
+                <Td className="pt-[10px] pb-[9px] pl-[12px]">
+                  <span className="flex items-center gap-[21px]">
+                    <Icon className={ROW_ICON} aria-hidden="true" />
                     <span className="min-w-0">
-                      <span className="block text-[14px] leading-[21px] font-semibold text-adm-ink">{r.label}</span>
+                      <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{r.label}</span>
                       <span className="block text-[13px] leading-[18px] text-adm-muted">{r.detail}</span>
                     </span>
                   </span>
@@ -151,17 +166,18 @@ export const CapabilityMatrixTable = ({ matrix }: { matrix: CapabilityMatrix }) 
 
 const POINT_ICONS: Record<EnforcementPoint, typeof Monitor> = { interface: Monitor, direct_url: Link, api: Code, database: Database };
 
+// Reference: a borderless 116x41 tinted chip, a 20px triangle and two 13px medium lines.
 const ENFORCEMENT_CHIP: Record<"success" | "warning", string> = {
-  success: "bg-adm-success-bg border-[#BFE3CF] text-adm-success",
-  warning: "bg-adm-warning-bg border-[#F1D58A] text-adm-warning",
+  success: "bg-adm-success-bg text-adm-success",
+  warning: "bg-adm-warning-bg text-adm-warning",
 };
 
 const EnforcementChip = ({ tone, children }: { tone: "success" | "warning"; children: ReactNode }) => {
   const Icon = tone === "success" ? CheckCircle2 : AlertTriangle;
   return (
-    <span className={cn("ml-auto inline-flex items-center gap-[6px] rounded-lg border px-2 py-[4px] text-[13px] leading-[16px] font-semibold flex-shrink-0", ENFORCEMENT_CHIP[tone])}>
-      <Icon className={cn(ICON.status, "flex-shrink-0")} aria-hidden="true" />
-      <span className="max-w-[76px]">{children}</span>
+    <span className={cn("ml-auto mt-[7px] inline-flex items-center gap-[9px] rounded-md min-h-[41px] pl-[9px] pr-[10px] py-[3px] text-[13px] leading-[17px] font-medium flex-shrink-0", ENFORCEMENT_CHIP[tone])}>
+      <Icon className={cn(ICON.statusTight, "flex-shrink-0")} aria-hidden="true" />
+      <span className="max-w-[74px]">{children}</span>
     </span>
   );
 };
@@ -173,11 +189,11 @@ export const EnforcementRail = ({ rows }: { rows: EnforcementRow[] }) => (
         const meta = ENFORCEMENT_STATUS_META[r.status];
         const Icon = POINT_ICONS[r.point];
         return (
-          <li key={r.point} className="flex flex-wrap items-start gap-x-[21px] gap-y-3 pl-[18px] pr-[18px] py-[22px]">
-            <Icon className={cn(ICON.panel, "flex-shrink-0 text-adm-ink")} strokeWidth={1.75} aria-hidden="true" />
-            <div className="min-w-[160px] flex-1 max-w-[260px]">
+          <li key={r.point} className="flex flex-wrap items-start gap-x-3 gap-y-3 pl-[17px] pr-[10px] pt-[19px] pb-[22px]">
+            <Icon className={cn(ROW_ICON, "mt-[2px] mr-[11px]")} aria-hidden="true" />
+            <div className="min-w-[160px] flex-1">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.title}</p>
-              <p className="text-[13px] leading-[18px] text-adm-muted">{r.description}</p>
+              <p className="mt-[2px] text-[14px] leading-[19px] text-adm-muted">{r.description}</p>
             </div>
             <EnforcementChip tone={meta.tone}>{meta.label}</EnforcementChip>
           </li>
@@ -204,66 +220,63 @@ export const EnforcementRail = ({ rows }: { rows: EnforcementRow[] }) => (
   </div>
 );
 
-const RAIL_HEADING = "text-[14px] leading-[20px] font-semibold text-adm-ink";
-// 24px marks on a 30px pitch: 3px above and below the mark.
-const RAIL_ITEM = "flex items-center gap-[21px] py-[3px] text-[14px] leading-[20px] text-adm-ink";
+const RAIL_HEADING = "pl-[6px] text-[15px] leading-[20px] font-semibold text-adm-ink";
+// 24px marks on a 30px pitch, the box 26px in from the rail edge and the label at 71px.
+const RAIL_ITEM = "flex items-center gap-[21px] py-[3px] text-[15px] leading-[20px] text-adm-ink";
 
-// The rail is a column of the team card, drawn to the reference rhythm: a rule between each block.
+// The rail is a column of the team card, drawn to the reference rhythm: rules inset 18px from the
+// rail edge and 16px from the card edge, with the button and note on the same inset.
 export const RoleSummaryRail = ({ member, policyHref, onClose, className }: { member: TeamMember; policyHref: string; onClose: () => void; className?: string }) => {
   const summary = roleSummary(member.role);
   return (
-    <aside aria-label="Role summary" className={cn("relative min-w-0 bg-adm-surface", className)}>
-      <button type="button" onClick={onClose} aria-label="Close role summary" className="absolute right-[5px] top-[7px] w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace">
-        <X className={ICON.status} aria-hidden="true" />
+    <aside aria-label="Role summary" className={cn("relative min-w-0 bg-adm-surface pl-[18px] pr-4", className)}>
+      <button type="button" onClick={onClose} aria-label="Close role summary" className="absolute right-1 top-[8px] w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace">
+        <X className={ICON.statusTight} aria-hidden="true" />
       </button>
-      <div className="pl-[18px] pr-[14px] pt-[26px] pb-[17px]">
+      <div className="pl-[3px] pt-6 pb-[18px]">
         <h3 className="pr-10 text-[20px] leading-[28px] font-semibold text-adm-ink">Role summary</h3>
-        <div className="mt-[17px] flex items-center gap-[13px]">
-          <MemberAvatar initials={member.initials} size="lg" />
+        <div className="mt-[17px] flex items-center gap-3">
+          <MemberAvatar initials={member.initials} department={member.department} size="lg" />
           <div className="min-w-0">
             <p className="text-[18px] leading-[24px] font-semibold text-adm-ink truncate" data-parity="member-name">{member.email}</p>
-            <p className="flex items-center gap-2 text-[14px] leading-[20px] text-adm-muted">
-              {member.roleLabel}
-              <span aria-hidden="true">·</span>
-              <MemberStatusText status={member.status} />
-            </p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">{member.roleLabel}</p>
           </div>
         </div>
       </div>
-      <div className="border-t border-adm-border pl-[18px] pr-[14px] pt-[17px] pb-5">
-        <div className="flex items-start gap-5">
-          <Building2 className={cn(ICON.panel, "flex-shrink-0 text-adm-ink")} strokeWidth={1.75} aria-hidden="true" />
-          <dl className="text-[14px] leading-[20px] text-adm-ink">
-            <dt className="font-semibold">Access scope</dt>
-            <dd>This rooftop</dd>
+      <div className="border-t border-adm-border pl-[5px] pt-[15px] pb-[19px]">
+        <div className="flex items-start gap-[22px]">
+          <Building className={cn(ROW_ICON, "mt-px")} aria-hidden="true" />
+          <dl className="text-adm-ink">
+            <dt className="text-[14px] leading-[20px] font-semibold">Access scope</dt>
+            <dd className="mt-[3px] text-[15px] leading-[20px]">This rooftop</dd>
           </dl>
         </div>
       </div>
-      <div className="border-t border-adm-border pl-[18px] pr-[14px] pt-[15px] pb-[14px]">
+      <div className="border-t border-adm-border pt-[14px] pb-[14px]">
         <p className={RAIL_HEADING}>Key permissions (example)</p>
         {summary.keyPermissions.length === 0 ? (
-          <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">No task permissions in this summary.</p>
+          <p className="mt-2 pl-[6px] text-[13px] leading-[18px] text-adm-muted">No task permissions in this summary.</p>
         ) : (
-          <ul className="mt-[9px] pl-[9px]">
+          <ul className="mt-[10px] pl-2">
             {summary.keyPermissions.map((p) => (
               <li key={p} className={RAIL_ITEM}><Check className={cn(ICON.status, "text-adm-success flex-shrink-0")} aria-hidden="true" />{p}</li>
             ))}
           </ul>
         )}
       </div>
-      <div className="border-t border-adm-border pl-[18px] pr-[14px] pt-[14px] pb-[30px]">
+      <div className="border-t border-adm-border pt-[13px] pb-[30px]">
         <p className={RAIL_HEADING}>Restricted (example)</p>
         {summary.restricted.length === 0 ? (
-          <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">No restrictions in this summary.</p>
+          <p className="mt-2 pl-[6px] text-[13px] leading-[18px] text-adm-muted">No restrictions in this summary.</p>
         ) : (
-          <ul className="mt-[9px] pl-[9px]">
+          <ul className="mt-[9px] pl-2">
             {summary.restricted.map((p) => (
-              <li key={p} className={RAIL_ITEM}><Ban className={cn(ICON.status, "text-adm-danger flex-shrink-0")} aria-hidden="true" />{p}</li>
+              <li key={p} className={RAIL_ITEM}><Ban className={cn(ICON.statusTight, "m-px text-adm-danger flex-shrink-0")} aria-hidden="true" />{p}</li>
             ))}
           </ul>
         )}
-        <AdminLinkButton to={policyHref} variant="outline" className="mt-[22px] w-full min-h-[44px] sm:min-h-[44px]" data-landmark="view-role-policy">View role policy</AdminLinkButton>
-        <InlineNote tone="info" className="mt-4 px-[14px] py-[9px] [&>div>span]:text-[12px]">Role preview does not grant permissions.</InlineNote>
+        <AdminLinkButton to={policyHref} variant="outline" className="mt-6 w-full min-h-[43px] sm:min-h-[43px]" data-landmark="view-role-policy">View role policy</AdminLinkButton>
+        <InlineNote tone="info" className="mt-[17px] border-transparent pl-[17px] pr-2 py-[10px] [&>svg]:w-[22px] [&>svg]:h-[22px] [&>svg]:text-adm-primary [&>div>span]:text-[13px]">Role preview does not grant permissions.</InlineNote>
       </div>
     </aside>
   );

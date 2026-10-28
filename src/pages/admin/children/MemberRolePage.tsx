@@ -160,27 +160,28 @@ export default function MemberRolePage() {
       backLabel={backLabel}
       sectionNav={sectionNav}
     >
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_528px] gap-[14px]">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_524px] gap-3">
         <AdminCard
           title={<CardTitle>Role capabilities</CardTitle>}
-          description={<CardDescription>{member ? <>Applied to <span data-parity="member-name">{member.email}</span>. Access scope: this rooftop.</> : "Capability contract for this role. Access scope: this rooftop."}</CardDescription>}
+          description={<CardDescription>{member ? <>Applied to <span data-parity="member-name">{member.email}</span> on this rooftop. Permissions apply across the application.</> : "Capability contract for this role on this rooftop. Permissions apply across the application."}</CardDescription>}
+          headerClassName="px-5"
           flush
         >
           <CapabilityMatrixTable matrix={matrix} />
         </AdminCard>
-        <AdminCard title={<CardTitle>Required enforcement</CardTitle>} description={<CardDescription>Where this policy is enforced today.</CardDescription>} bodyClassName="pl-[19px] pr-[15px]">
+        <AdminCard title={<CardTitle>Required enforcement</CardTitle>} description={<CardDescription>These controls must all match the role policy for it to be enforced.</CardDescription>} headerClassName="px-5" bodyClassName="pl-5 pr-[15px]">
           <EnforcementRail rows={rows} />
         </AdminCard>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-[14px] gap-y-3">
-        <InlineNote tone="info" className="flex-1 min-w-[280px] py-[10px] sm:mr-[11px] [&>svg]:w-7 [&>svg]:h-7">
+      <div className="mt-3 flex flex-wrap items-center gap-x-[13px] gap-y-3">
+        <InlineNote tone="info" className="flex-1 min-w-[280px] gap-3 border-transparent pl-[18px] py-3 sm:mr-[13px] [&>svg]:text-adm-primary [&>div>span]:text-[14px] [&>div>span]:leading-[20px] [&>div>span]:text-adm-primary [&>div>span]:opacity-100">
           Preview as role uses test data. Validate with a restricted account before release.
         </InlineNote>
-        <AdminButton variant="outline" className="min-h-[40px] sm:min-h-[40px] px-[17px]" data-landmark="test-role-access" onClick={() => setPreviewOpen(true)}>
-          <Play className={ICON.status} aria-hidden="true" />
+        <AdminButton variant="outline" className="min-h-[43px] sm:min-h-[43px] pl-[20px] pr-[18px] gap-[10px]" data-landmark="test-role-access" onClick={() => setPreviewOpen(true)}>
+          <Play className={ICON.button} aria-hidden="true" />
           Test role access
         </AdminButton>
-        <AdminButton variant="primary" className="min-h-[40px] sm:min-h-[40px] px-[30px]" data-landmark="review-policy" disabled={!canReview} onClick={() => setReviewOpen(true)}>Review policy changes</AdminButton>
+        <AdminButton variant="primary" className="min-h-[43px] sm:min-h-[43px] px-[29px]" data-landmark="review-policy" disabled={!canReview} onClick={() => setReviewOpen(true)}>Review policy changes</AdminButton>
       </div>
       {!canReview && reviewBlockedReason && <p className="mt-2 text-[12px] leading-[18px] text-adm-muted" role="status">{reviewBlockedReason}</p>}
 

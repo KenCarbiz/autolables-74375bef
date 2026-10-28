@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { MoreHorizontal, Search, UserPlus } from "lucide-react";
+import { ChevronDown, ChevronsUpDown, ChevronUp, MoreHorizontal, Search, UserPlus } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AdminButton, AdminCard, AdminLinkButton, AdminTable, EmptyState, ICON, InlineNote, SkeletonBlock, Td, Th } from "@/components/admin/v2/primitives";
@@ -19,8 +19,9 @@ import { useTeamAuthority, useTeamMembers, useTeamWriters } from "./useTeamMembe
 // never shows an empty team.
 //
 // One card holds the toolbar and table beside the rail, as the reference
-// draws it: 43px controls, a 45px header, 67px rows around 52px avatars and
-// a 356px rail column.
+// draws it: 43px controls, a 44px header, 67px rows around 48px avatars and
+// a 356px rail column. Every column sorts in the browser; the default is the
+// order the server returns.
 
 const policyHref = (member: TeamMember, filters: TeamFilters): string => {
   const params = teamFiltersToParams({ ...filters, sel: member.id });
@@ -28,9 +29,45 @@ const policyHref = (member: TeamMember, filters: TeamFilters): string => {
   return `${ADMIN_CHILD_ROUTES.memberRole(member.id)}?${params.toString()}`;
 };
 
+type SortKey = "employee" | "role" | "department" | "access" | "status";
+type Sort = { key: SortKey; dir: "asc" | "desc" } | null;
+
+const SORT_VALUE: Record<SortKey, (m: TeamMember) => string> = {
+  employee: (m) => m.email,
+  role: (m) => m.roleLabel,
+  department: (m) => m.department,
+  access: () => "This rooftop",
+  status: (m) => m.status,
+};
+
+const sortMembers = (members: TeamMember[], sort: Sort): TeamMember[] => {
+  if (!sort) return members;
+  const value = SORT_VALUE[sort.key];
+  const sign = sort.dir === "asc" ? 1 : -1;
+  return [...members].sort((a, b) => sign * value(a).localeCompare(value(b)));
+};
+
+// Unsorted, ascending, descending, then back to the server's order.
+const nextSort = (sort: Sort, key: SortKey): Sort => (sort?.key !== key ? { key, dir: "asc" } : sort.dir === "asc" ? { key, dir: "desc" } : null);
+
 const CONTROL = "h-[43px]";
-const HEAD = "px-[17px] py-[13px] text-[14px] leading-[19px] text-adm-ink";
-const CELL = "px-[17px] py-[7px]";
+const HEAD = "bg-adm-workspace px-[17px] py-3 text-left text-[14px] leading-[19px] font-semibold text-adm-ink border-b border-adm-border";
+const CELL = "px-[17px] py-[9px]";
+// Reference sort marks: 9x6 and 7x11px of ink, an 18px lucide box 8px after the label.
+const SORT_ICON = "w-[18px] h-[18px] flex-shrink-0";
+
+const SortableTh = ({ label, sortKey, sort, onSort, className }: { label: string; sortKey: SortKey; sort: Sort; onSort: (key: SortKey) => void; className?: string }) => {
+  const active = sort?.key === sortKey ? sort.dir : null;
+  const Icon = active === "asc" ? ChevronUp : active === "desc" ? ChevronDown : ChevronsUpDown;
+  return (
+    <th scope="col" aria-sort={active === "asc" ? "ascending" : active === "desc" ? "descending" : "none"} className={cn(HEAD, className)}>
+      <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-2 rounded-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
+        {label}
+        <Icon className={cn(SORT_ICON, "text-adm-ink")} aria-hidden="true" />
+      </button>
+    </th>
+  );
+};
 
 export default function TeamView() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,6 +79,7 @@ export default function TeamView() {
   const [reviewFor, setReviewFor] = useState<TeamMember | null>(null);
   const [removeFor, setRemoveFor] = useState<TeamMember | null>(null);
   const [flash, setFlash] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const [sort, setSort] = useState<Sort>(null);
 
   const update = (patch: Partial<TeamFilters>) => {
     setSearchParams(teamFiltersToParams({ ...filters, ...patch }, searchParams), { replace: true });
@@ -49,7 +87,8 @@ export default function TeamView() {
   };
 
   const members = read.members;
-  const visible = useMemo(() => (members ? applyTeamFilters(members, filters) : []), [members, filters]);
+  const visible = useMemo(() => (members ? sortMembers(applyTeamFilters(members, filters), sort) : []), [members, filters, sort]);
+  const onSort = (key: SortKey) => setSort((s) => nextSort(s, key));
   const selectedId = filters.sel || (!dismissedFixtureSelection ? read.fixture?.selectedMemberId ?? "" : "");
   const selected = members?.find((m) => m.id === selectedId) ?? null;
   const filtered = filters.q !== "" || filters.dept !== "all" || filters.status !== "all" || filters.role !== "all";
@@ -102,17 +141,17 @@ export default function TeamView() {
       );
     }
     // The scroll wrapper is positioned so the cells' screen-reader text stays inside it on narrow
-    // screens. Fixed columns from the reference (159/146/146/150/58, Employee takes the rest) keep
+    // screens. Fixed columns from the reference (158/147/144/150/58, Employee takes the rest) keep
     // every role and department on one line; a long address truncates with its full text on hover.
     return (
       <AdminTable caption="Team members" inset className="relative mx-[18px] mb-[18px] rounded-lg xl:min-h-[554px] xl:[&>table]:table-fixed">
         <thead>
           <tr>
-            <Th className={HEAD}>Employee</Th>
-            <Th className={cn(HEAD, "xl:w-[159px]")}>Role</Th>
-            <Th className={cn(HEAD, "xl:w-[146px]")}>Department</Th>
-            <Th className={cn(HEAD, "xl:w-[146px]")}>Access</Th>
-            <Th className={cn(HEAD, "xl:w-[150px]")}>Status</Th>
+            <SortableTh label="Employee" sortKey="employee" sort={sort} onSort={onSort} />
+            <SortableTh label="Role" sortKey="role" sort={sort} onSort={onSort} className="xl:w-[158px]" />
+            <SortableTh label="Department" sortKey="department" sort={sort} onSort={onSort} className="xl:w-[147px]" />
+            <SortableTh label="Access" sortKey="access" sort={sort} onSort={onSort} className="xl:w-[144px]" />
+            <SortableTh label="Status" sortKey="status" sort={sort} onSort={onSort} className="xl:w-[150px]" />
             <Th className={cn(HEAD, "w-[58px]")}><span className="sr-only">Actions</span></Th>
           </tr>
         </thead>
@@ -123,12 +162,9 @@ export default function TeamView() {
             return (
               <tr key={m.id} data-selected={isSelected ? "true" : undefined} className={cn(isSelected && "bg-adm-selected")}>
                 <Td className={cn(CELL, "pl-[9px]")}>
-                  <button type="button" onClick={() => update({ sel: m.id })} aria-pressed={isSelected} className="flex items-center gap-4 text-left rounded-md focus-visible:outline-2 focus-visible:outline-adm-primary">
-                    <MemberAvatar initials={m.initials} size="md" />
-                    <span className="min-w-0">
-                      <span className="block font-semibold text-adm-ink truncate" data-parity="member-name" title={m.email}>{m.email}</span>
-                      <span className="block text-[12px] leading-[18px] text-adm-muted">{m.status === "active" ? "Member" : "Invitation pending"}</span>
-                    </span>
+                  <button type="button" onClick={() => update({ sel: m.id })} aria-pressed={isSelected} className="flex w-full min-w-0 items-center gap-4 text-left rounded-md focus-visible:outline-2 focus-visible:outline-adm-primary">
+                    <MemberAvatar initials={m.initials} department={m.department} size="md" />
+                    <span className="min-w-0 flex-1 truncate font-semibold text-adm-ink" data-parity="member-name" title={m.email}>{m.email}</span>
                   </button>
                 </Td>
                 <Td className={cn(CELL, "xl:whitespace-nowrap")}>{m.roleLabel}</Td>
@@ -138,8 +174,8 @@ export default function TeamView() {
                 <Td align="right" className={CELL}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button type="button" aria-label={`Actions for ${m.email}`} className="w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace">
-                        <MoreHorizontal className={ICON.status} aria-hidden="true" />
+                      <button type="button" aria-label={`Actions for ${m.email}`} className="w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-ink hover:bg-adm-workspace">
+                        <MoreHorizontal className={ICON.statusTight} aria-hidden="true" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-[200px]">
@@ -164,16 +200,19 @@ export default function TeamView() {
           <div className="min-w-0 flex-1">
             <div className="px-[18px] pt-[25px] pb-[21px] flex flex-wrap items-center gap-x-[21px] gap-y-3">
               <label className="relative w-full sm:w-[308px]">
-                <Search className={cn(ICON.status, "absolute left-4 top-1/2 -translate-y-1/2 text-adm-muted")} aria-hidden="true" />
+                <Search className={cn(ICON.inline, "absolute left-[14px] top-1/2 -translate-y-1/2 text-adm-muted")} aria-hidden="true" />
                 <span className="sr-only">Search team</span>
                 <input type="search" value={filters.q} onChange={(e) => update({ q: e.target.value })} placeholder="Search team..." className={cn(INPUT_CLASS, CONTROL, "pl-[51px]")} data-landmark="team-search" />
               </label>
-              <label className="inline-flex items-center gap-4 text-[14px] leading-[20px] text-adm-ink">
+              <label className="inline-flex items-center gap-[14px] text-[14px] leading-[20px] font-semibold text-adm-ink">
                 Department
-                <select aria-label="Department" value={filters.dept} onChange={(e) => update({ dept: e.target.value })} className={cn(SELECT_CLASS, CONTROL, "w-[176px] pl-[14px]")}>
-                  <option value="all">All</option>
-                  {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
+                <span className="relative">
+                  <select aria-label="Department" value={filters.dept} onChange={(e) => update({ dept: e.target.value })} className={cn(SELECT_CLASS, CONTROL, "w-[176px] appearance-none pl-[14px] pr-10 font-normal")}>
+                    <option value="all">All</option>
+                    {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <ChevronDown className={cn(SORT_ICON, "pointer-events-none absolute right-[13px] top-1/2 -translate-y-1/2 text-adm-ink")} aria-hidden="true" />
+                </span>
               </label>
               <AdminLinkButton to={adminTabHref("invitations")} variant="primary" className="ml-auto min-h-[42px] sm:min-h-[42px]" data-landmark="add-employee">
                 <UserPlus className={ICON.button} aria-hidden="true" />

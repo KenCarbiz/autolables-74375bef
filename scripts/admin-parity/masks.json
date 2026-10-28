@@ -98,6 +98,13 @@
         "w": 290,
         "h": 20,
         "reason": "mock-only annotation (handoff footer caption, not product UI)"
+      },
+      {
+        "x": 1278,
+        "y": 938,
+        "w": 286,
+        "h": 14,
+        "reason": "mock-only annotation (the same footer caption where the body comparison draws it: the reference is shifted by the -24px body offset, so its ink at y 963-974 lands on 939-950)"
       }
     ]
   },
