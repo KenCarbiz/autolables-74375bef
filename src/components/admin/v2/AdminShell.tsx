@@ -5,8 +5,9 @@ import { cn } from "@/lib/utils";
 import type { AdminChildTab, AdminSection } from "@/lib/admin/sections";
 import { adminTabHref } from "@/lib/admin/sections";
 
-// One Administration page: one breadcrumb, one h1, one row of sections, an
-// optional row of child tabs, then content. Child detail screens use
+// One Administration page: one h1, one row of sections, an optional row of
+// child tabs, then content. The breadcrumb and description show only on the
+// sections whose approved mock draws them (AdminSection.intro). Child detail screens use
 // ChildPageFrame, which carries its own h1 and breadcrumb, so a page never has
 // two titles or two navigation systems.
 
@@ -23,8 +24,8 @@ export const AdminSectionNav = ({ sections, activeId, tabFor, ariaLabel = "Admin
               to={adminTabHref(target.id)}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "inline-flex items-center h-[38px] text-[14px] leading-[20px] font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline-2 focus-visible:outline-adm-primary",
-                active ? "text-adm-primary border-adm-primary" : "text-adm-muted border-transparent hover:text-adm-ink",
+                "inline-flex items-center h-[38px] text-[14px] leading-[20px] whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline-2 focus-visible:outline-adm-primary",
+                active ? "font-semibold text-adm-primary border-adm-primary" : "font-medium text-adm-muted border-transparent hover:text-adm-ink",
               )}
             >
               {s.label}
@@ -40,7 +41,7 @@ export const AdminChildTabs = ({ tabs, activeId, ariaLabel }: { tabs: AdminChild
   if (tabs.length <= 1) return null;
   return (
     <nav aria-label={ariaLabel} className="border-b border-adm-border overflow-x-auto">
-      <ul className="flex items-stretch gap-5 min-w-max">
+      <ul className="flex items-stretch gap-9 min-w-max">
         {tabs.map((t) => {
           const active = t.id === activeId;
           return (
@@ -49,8 +50,8 @@ export const AdminChildTabs = ({ tabs, activeId, ariaLabel }: { tabs: AdminChild
                 to={adminTabHref(t.id)}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex items-center h-9 text-[13px] leading-[18px] font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline-2 focus-visible:outline-adm-primary",
-                  active ? "text-adm-primary border-adm-primary" : "text-adm-muted border-transparent hover:text-adm-ink",
+                  "inline-flex items-center h-10 text-[14px] leading-[20px] whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline-2 focus-visible:outline-adm-primary",
+                  active ? "font-semibold text-adm-primary border-adm-primary" : "font-medium text-adm-muted border-transparent hover:text-adm-ink",
                 )}
               >
                 {t.label}
@@ -108,10 +109,10 @@ export const AdminShell = ({
 }) => (
   <AdminPageContainer>
     <div className="space-y-4">
-      <div>
-        <Breadcrumbs crumbs={[{ label: "Administration", href: "/admin" }, { label: activeSection.label }]} />
-        <h1 className="mt-3 text-[28px] leading-[40px] font-bold text-adm-ink">Administration</h1>
-        <p className="mt-2 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>
+      <div className={activeSection.intro?.description ? undefined : "-mb-[9px]"}>
+        {activeSection.intro?.breadcrumb && <Breadcrumbs crumbs={[{ label: "Administration", href: "/admin" }, { label: activeSection.label }]} />}
+        <h1 className={cn("text-[28px] font-bold text-adm-ink", activeSection.intro?.breadcrumb ? "mt-3 leading-[40px]" : "leading-[36px]")}>Administration</h1>
+        {activeSection.intro?.description && <p className="mt-2 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>}
       </div>
       <AdminSectionNav sections={sections} activeId={activeSection.id} tabFor={firstTabFor} />
       <AdminChildTabs tabs={tabsForSection} activeId={activeTab.id} ariaLabel={`${activeSection.label} views`} />
@@ -150,8 +151,8 @@ export const ChildPageFrame = ({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Breadcrumbs crumbs={crumbs} />
-          <div className="mt-1 flex items-center gap-3 flex-wrap">
-            <h1 className="text-[28px] leading-[36px] font-bold text-adm-ink">{title}</h1>
+          <div className="mt-1 lg:mt-3 flex items-center gap-3 flex-wrap">
+            <h1 className="text-[28px] leading-[36px] lg:text-[32px] lg:leading-[40px] font-bold text-adm-ink">{title}</h1>
             {badge}
           </div>
           {subtitle && <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">{subtitle}</p>}

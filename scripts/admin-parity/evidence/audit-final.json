@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-28T16:20:38.948Z",
-  "baseUrl": "http://127.0.0.1:5192",
+  "generatedAt": "2026-10-28T18:40:35.508Z",
+  "baseUrl": "http://localhost:5192",
   "screens": {
     "10": {
       "desktop": {
@@ -604,17 +604,17 @@
         "under44": [
           "a \"Administration\" 82x18",
           "a \"Overview\" 64x38",
-          "a \"Dealership & Brand\" 129x38",
-          "a \"People & Access\" 113x38",
-          "a \"Pricing & Products\" 125x38",
-          "a \"Customer Experience\" 146x38",
+          "a \"Dealership & Brand\" 128x38",
+          "a \"People & Access\" 112x38",
+          "a \"Pricing & Products\" 123x38",
+          "a \"Customer Experience\" 144x38",
           "a \"Publishing\" 71x38",
-          "a \"Documents & Service\" 145x38",
-          "a \"Integrations\" 81x38",
-          "a \"Effective policy\" 97x36",
-          "a \"Approvals\" 64x36",
-          "a \"Destinations\" 79x36",
-          "a \"Change history\" 96x36",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 80x38",
+          "a \"Effective policy\" 104x40",
+          "a \"Approvals\" 68x40",
+          "a \"Destinations\" 83x40",
+          "a \"Change history\" 102x40",
           "button \"New\" 30x20",
           "button \"Used\" 35x20",
           "button \"CPO\" 30x20",
@@ -1044,17 +1044,17 @@
         "under44": [
           "a \"Administration\" 82x18",
           "a \"Overview\" 64x38",
-          "a \"Dealership & Brand\" 129x38",
-          "a \"People & Access\" 113x38",
-          "a \"Pricing & Products\" 125x38",
-          "a \"Customer Experience\" 146x38",
-          "a \"Publishing\" 71x38",
+          "a \"Dealership & Brand\" 128x38",
+          "a \"People & Access\" 112x38",
+          "a \"Pricing & Products\" 123x38",
+          "a \"Customer Experience\" 144x38",
+          "a \"Publishing\" 70x38",
           "a \"Documents & Service\" 145x38",
-          "a \"Integrations\" 81x38",
-          "a \"Templates\" 65x36",
-          "a \"Approval rules\" 91x36",
-          "a \"Print & Calibration\" 113x36",
-          "a \"Service policy\" 89x36",
+          "a \"Integrations\" 80x38",
+          "a \"Templates\" 69x40",
+          "a \"Approval rules\" 98x40",
+          "a \"Print & Calibration\" 120x40",
+          "a \"Service policy\" 95x40",
           "a \"View change history\" 165x20"
         ],
         "errors": [],
@@ -1244,12 +1244,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"View history\"",
             "w": 83,
             "h": 20,
@@ -1276,7 +1270,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 22,
+          "tabStops": 21,
           "noVisibleFocus": []
         },
         "hoverWithoutFeedback": [
@@ -1463,12 +1457,6 @@
           "a \"Inventory feed\""
         ],
         "smallButSpaced": [
-          {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
           {
             "el": "a \"View history\"",
             "w": 83,
@@ -1675,12 +1663,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"View history\"",
             "w": 83,
             "h": 20,
@@ -1885,12 +1867,6 @@
           "a \"Inventory feed\""
         ],
         "smallButSpaced": [
-          {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
           {
             "el": "a \"View history\"",
             "w": 83,
@@ -2097,12 +2073,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"View history\"",
             "w": 83,
             "h": 20,
@@ -2110,20 +2080,19 @@
           }
         ],
         "under44": [
-          "a \"Administration\" 82x18",
           "a \"Overview\" 64x38",
-          "a \"Dealership & Brand\" 129x38",
-          "a \"People & Access\" 113x38",
-          "a \"Pricing & Products\" 125x38",
-          "a \"Customer Experience\" 146x38",
-          "a \"Publishing\" 71x38",
-          "a \"Documents & Service\" 145x38",
+          "a \"Dealership & Brand\" 128x38",
+          "a \"People & Access\" 112x38",
+          "a \"Pricing & Products\" 123x38",
+          "a \"Customer Experience\" 144x38",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
           "a \"Integrations\" 81x38",
-          "a \"Inventory feed\" 91x36",
-          "a \"Providers\" 60x36",
-          "a \"Data quality\" 75x36",
-          "a \"Jobs & Pipelines\" 103x36",
-          "a \"Activity\" 48x36",
+          "a \"Inventory feed\" 98x40",
+          "a \"Providers\" 64x40",
+          "a \"Data quality\" 80x40",
+          "a \"Jobs & Pipelines\" 110x40",
+          "a \"Activity\" 51x40",
           "a \"View history\" 83x20",
           "a \"Oct 24, 2:07 AM\" 29x77",
           "a \"Oct 23, 2:07 AM\" 29x77",
@@ -2135,7 +2104,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 22,
+          "tabStops": 21,
           "noVisibleFocus": []
         }
       }
@@ -5095,13 +5064,13 @@
         "under44": [
           "a \"Administration\" 82x18",
           "a \"Overview\" 64x38",
-          "a \"Dealership & Brand\" 129x38",
-          "a \"People & Access\" 113x38",
-          "a \"Pricing & Products\" 125x38",
-          "a \"Customer Experience\" 146x38",
-          "a \"Publishing\" 71x38",
-          "a \"Documents & Service\" 145x38",
-          "a \"Integrations\" 81x38",
+          "a \"Dealership & Brand\" 128x38",
+          "a \"People & Access\" 112x38",
+          "a \"Pricing & Products\" 123x38",
+          "a \"Customer Experience\" 144x38",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 80x38",
           "a \"Review sync\" 105x35",
           "a \"Open diagnostics\" 73x36",
           "a \"Review pricing\" 45x36",
@@ -5257,12 +5226,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"Edit\"",
             "w": 22,
             "h": 18,
@@ -5289,7 +5252,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 22,
+          "tabStops": 21,
           "noVisibleFocus": []
         },
         "hoverWithoutFeedback": [
@@ -5432,12 +5395,6 @@
           "a \"Identity\""
         ],
         "smallButSpaced": [
-          {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
           {
             "el": "a \"Edit\"",
             "w": 22,
@@ -5600,12 +5557,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"Edit\"",
             "w": 22,
             "h": 18,
@@ -5767,12 +5718,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"Edit\"",
             "w": 22,
             "h": 18,
@@ -5802,14 +5747,7 @@
       "phone": {
         "overflowX": 0,
         "clipped": [],
-        "overlaps": [
-          {
-            "a": "select \"Select a time zoneEastern Time (ET)Central Time (CT)Mountain\"",
-            "b": "button \"Review changes\"",
-            "w": 147,
-            "h": 26
-          }
-        ],
+        "overlaps": [],
         "headings": [
           "H1: Administration",
           "H3: Store identity",
@@ -5941,12 +5879,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"Edit\"",
             "w": 22,
             "h": 18,
@@ -5954,26 +5886,25 @@
           }
         ],
         "under44": [
-          "a \"Administration\" 82x18",
           "a \"Overview\" 64x38",
           "a \"Dealership & Brand\" 129x38",
-          "a \"People & Access\" 113x38",
-          "a \"Pricing & Products\" 125x38",
-          "a \"Customer Experience\" 146x38",
-          "a \"Publishing\" 71x38",
-          "a \"Documents & Service\" 145x38",
-          "a \"Integrations\" 81x38",
-          "a \"Identity\" 48x36",
-          "a \"Appearance\" 77x36",
-          "a \"Hours & Contact\" 103x36",
-          "a \"Why Buy\" 56x36",
+          "a \"People & Access\" 112x38",
+          "a \"Pricing & Products\" 123x38",
+          "a \"Customer Experience\" 144x38",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 80x38",
+          "a \"Identity\" 52x40",
+          "a \"Appearance\" 82x40",
+          "a \"Hours & Contact\" 110x40",
+          "a \"Why Buy\" 60x40",
           "a \"Edit\" 22x18",
           "a \"Not configured\" 72x37",
           "a \"Not configured\" 72x37"
         ],
         "errors": [],
         "focus": {
-          "tabStops": 22,
+          "tabStops": 21,
           "noVisibleFocus": []
         }
       }
@@ -6199,12 +6130,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "button \"Employee\"",
             "w": 92,
             "h": 19,
@@ -6237,7 +6162,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 33,
+          "tabStops": 32,
           "noVisibleFocus": []
         },
         "hoverWithoutFeedback": [
@@ -6471,12 +6396,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "button \"Employee\"",
             "w": 92,
             "h": 19,
@@ -6728,12 +6647,6 @@
           "button \"ESexample.salesperson@example.test\""
         ],
         "smallButSpaced": [
-          {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
           {
             "el": "button \"Employee\"",
             "w": 92,
@@ -6987,12 +6900,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "button \"Employee\"",
             "w": 92,
             "h": 19,
@@ -7245,12 +7152,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "button \"Employee\"",
             "w": 92,
             "h": 19,
@@ -7282,19 +7183,18 @@
           }
         ],
         "under44": [
-          "a \"Administration\" 82x18",
           "a \"Overview\" 64x38",
-          "a \"Dealership & Brand\" 129x38",
+          "a \"Dealership & Brand\" 128x38",
           "a \"People & Access\" 113x38",
-          "a \"Pricing & Products\" 125x38",
-          "a \"Customer Experience\" 146x38",
-          "a \"Publishing\" 71x38",
-          "a \"Documents & Service\" 145x38",
-          "a \"Integrations\" 81x38",
-          "a \"Team\" 35x36",
-          "a \"Roles\" 34x36",
-          "a \"Invitations\" 66x36",
-          "a \"Access activity\" 96x36",
+          "a \"Pricing & Products\" 123x38",
+          "a \"Customer Experience\" 144x38",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 80x38",
+          "a \"Team\" 37x40",
+          "a \"Roles\" 37x40",
+          "a \"Invitations\" 69x40",
+          "a \"Access activity\" 102x40",
           "input \"\" 320x43",
           "select \"Department\" 270x43",
           "button \"Employee\" 92x19",
@@ -7311,7 +7211,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 33,
+          "tabStops": 32,
           "noVisibleFocus": []
         }
       }
@@ -9214,13 +9114,13 @@
           "a \"Roles\" 31x18",
           "a \"Back to Roles\" 117x21",
           "a \"Overview\" 64x38",
-          "a \"Dealership & Brand\" 129x38",
+          "a \"Dealership & Brand\" 128x38",
           "a \"People & Access\" 113x38",
-          "a \"Pricing & Products\" 125x38",
-          "a \"Customer Experience\" 146x38",
-          "a \"Publishing\" 71x38",
-          "a \"Documents & Service\" 145x38",
-          "a \"Integrations\" 81x38",
+          "a \"Pricing & Products\" 123x38",
+          "a \"Customer Experience\" 144x38",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 80x38",
           "summary \"Where each status comes from\" 321x18"
         ],
         "errors": [],
@@ -9434,12 +9334,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"Price audit\"",
             "w": 93,
             "h": 20,
@@ -9508,7 +9402,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 27,
+          "tabStops": 26,
           "noVisibleFocus": []
         },
         "hoverWithoutFeedback": [
@@ -9720,12 +9614,6 @@
           "a \"Price rules\""
         ],
         "smallButSpaced": [
-          {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
           {
             "el": "a \"Price audit\"",
             "w": 93,
@@ -9998,12 +9886,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"Price audit\"",
             "w": 93,
             "h": 20,
@@ -10268,12 +10150,6 @@
           "a \"Price rules\""
         ],
         "smallButSpaced": [
-          {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
           {
             "el": "a \"Price audit\"",
             "w": 93,
@@ -10546,12 +10422,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "a \"Price audit\"",
             "w": 93,
             "h": 20,
@@ -10613,19 +10483,18 @@
           }
         ],
         "under44": [
-          "a \"Administration\" 82x18",
           "a \"Overview\" 64x38",
-          "a \"Dealership & Brand\" 129x38",
-          "a \"People & Access\" 113x38",
+          "a \"Dealership & Brand\" 128x38",
+          "a \"People & Access\" 112x38",
           "a \"Pricing & Products\" 125x38",
-          "a \"Customer Experience\" 146x38",
-          "a \"Publishing\" 71x38",
-          "a \"Documents & Service\" 145x38",
-          "a \"Integrations\" 81x38",
-          "a \"Price rules\" 67x36",
-          "a \"Products\" 56x36",
-          "a \"Benefits\" 52x36",
-          "a \"Warranty programs\" 122x36",
+          "a \"Customer Experience\" 144x38",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 80x38",
+          "a \"Price rules\" 72x40",
+          "a \"Products\" 60x40",
+          "a \"Benefits\" 55x40",
+          "a \"Warranty programs\" 130x40",
           "button \"Edit\" 75x32",
           "select \"Change scope\" 316x32",
           "button \"Review changes\" 146x32",
@@ -10644,7 +10513,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 27,
+          "tabStops": 26,
           "noVisibleFocus": []
         }
       }
@@ -11947,8 +11816,8 @@
           }
         ],
         "errors": [
-          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
-          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
+          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
+          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
         ]
       },
       "tablet-portrait": {
@@ -12164,8 +12033,8 @@
           }
         ],
         "errors": [
-          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
-          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
+          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
+          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
         ]
       },
       "phone": {
@@ -12885,12 +12754,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "input \"\"",
             "w": 64,
             "h": 20,
@@ -12941,7 +12804,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 37,
+          "tabStops": 36,
           "noVisibleFocus": []
         },
         "hoverWithoutFeedback": [
@@ -12957,6 +12820,7 @@
           "button \"Add\"",
           "button \"\"",
           "button \"\"",
+          "button \"\"",
           "button \"\""
         ],
         "darkContrast": []
@@ -12964,7 +12828,14 @@
       "laptop": {
         "overflowX": 0,
         "clipped": [],
-        "overlaps": [],
+        "overlaps": [
+          {
+            "a": "button[role=switch] \"\"",
+            "b": "button \"Review changes\"",
+            "w": 36,
+            "h": 13
+          }
+        ],
         "headings": [
           "H1: Administration",
           "H2: Contact & Routing",
@@ -13443,12 +13314,6 @@
           "a \"Contact & Routing\""
         ],
         "smallButSpaced": [
-          {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
           {
             "el": "input \"\"",
             "w": 59,
@@ -13983,12 +13848,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "input \"\"",
             "w": 64,
             "h": 20,
@@ -14044,10 +13903,10 @@
         "clipped": [],
         "overlaps": [
           {
-            "a": "a \"Default contactStore contact for unassigned requests.Missing\"",
+            "a": "a \"Sales rotationAt least two salespeople required.2 salespeopl\"",
             "b": "button \"Review changes\"",
             "w": 135,
-            "h": 36
+            "h": 35
           }
         ],
         "headings": [
@@ -14528,12 +14387,6 @@
           "a \"Contact & Routing\""
         ],
         "smallButSpaced": [
-          {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
           {
             "el": "input \"\"",
             "w": 64,
@@ -15041,12 +14894,6 @@
         ],
         "smallButSpaced": [
           {
-            "el": "a \"Administration\"",
-            "w": 82,
-            "h": 18,
-            "spacingException": true
-          },
-          {
             "el": "input \"\"",
             "w": 52,
             "h": 20,
@@ -15096,19 +14943,18 @@
           }
         ],
         "under44": [
-          "a \"Administration\" 82x18",
           "a \"Overview\" 64x38",
-          "a \"Dealership & Brand\" 129x38",
-          "a \"People & Access\" 113x38",
-          "a \"Pricing & Products\" 125x38",
+          "a \"Dealership & Brand\" 128x38",
+          "a \"People & Access\" 112x38",
+          "a \"Pricing & Products\" 123x38",
           "a \"Customer Experience\" 146x38",
-          "a \"Publishing\" 71x38",
-          "a \"Documents & Service\" 145x38",
-          "a \"Integrations\" 81x38",
-          "a \"Passport modules\" 113x36",
-          "a \"Contact & Routing\" 113x36",
-          "a \"Calls to action\" 89x36",
-          "a \"Customer previews\" 122x36",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 80x38",
+          "a \"Passport modules\" 120x40",
+          "a \"Contact & Routing\" 122x40",
+          "a \"Calls to action\" 95x40",
+          "a \"Customer previews\" 130x40",
           "button[role=switch] \"\" 140x24",
           "a \"Edit CRM owner\" 32x32",
           "a \"Edit Assigned salesperson\" 32x32",
@@ -15160,7 +15006,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 41,
+          "tabStops": 40,
           "noVisibleFocus": []
         }
       }

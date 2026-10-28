@@ -45,6 +45,8 @@ export interface AdminSection {
   id: AdminSectionId;
   label: string;
   description: string;
+  /** Header lines the approved mock draws above the section row; the h1 is always shown. */
+  intro?: { breadcrumb?: boolean; description?: boolean };
   tabs: AdminChildTab[];
 }
 
@@ -53,6 +55,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     id: "overview",
     label: "Overview",
     description: "Setup, policies and operational health for this rooftop.",
+    intro: { breadcrumb: true, description: true },
     tabs: [{ id: "overview", label: "Overview", aliases: ["home"], legacyTab: "home" }],
   },
   {
@@ -109,6 +112,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     id: "publishing",
     label: "Publishing",
     description: "Effective listing, document and signing policies.",
+    intro: { breadcrumb: true, description: true },
     tabs: [
       { id: "effective-policy", label: "Effective policy", capabilities: ["can_manage_settings", "can_view_compliance"] },
       { id: "approvals", label: "Approvals", capabilities: ["can_manage_settings", "can_view_compliance"] },
@@ -120,6 +124,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     id: "documents",
     label: "Documents & Service",
     description: "Document, service, approval and version policy.",
+    intro: { breadcrumb: true },
     tabs: [
       { id: "templates", label: "Templates", aliases: ["labels"], legacyTab: "labels" },
       { id: "approval-rules", label: "Approval rules", aliases: ["document-rules"], legacyTab: "document-rules" },

@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | Not met; acceptance pending | No screen reaches 97% on the agreed metric (content parity at 1600x1000: 79.79-91.67%); landmarks fail on 09-13 (section 10) | Owner decision on the proposed exceptions in section 10.6; none is approved |
+| 16 | Visual acceptance | Not met; acceptance pending | Approved title-block change applied; no screen reaches 97% on the agreed metric (content parity at 1600x1000: 83.63-91.43%); landmarks fail on 03, 09, 10, 11, 12 (section 10) | Owner decision on the proposed exceptions in section 10.6; none is approved |
 
 ## 2. How the evidence was produced
 
@@ -216,23 +216,91 @@ owner.
   the doc fee are scored) and the 13 evidence mask was removed.
 - Target: 97% per screen, plus landmarks within 16px.
 
-### 10.1 Protocol results, measured on `6391e7a`
+### 10.1 Protocol results after the approved title-block change
 
-| # | Screen | Route | Full frame | Content (agreed metric) | Structure | Masked | Landmarks |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 01 | Overview | `/admin?tab=overview` | 90.33% | 89.91% | 67.26% | 3.94% | pass |
-| 02 | Dealership & Brand, Identity | `/admin?tab=identity` | 88.63% | 88.02% | 65.28% | 1.42% | pass |
-| 03 | People & Access, Team | `/admin?tab=team` | 92.07% | 91.54% | 71.94% | 3.71% | pass |
-| 04 | Member role (child) | `/admin/people/:memberId` | 88.65% | 88.02% | 65.18% | 0.93% | pass |
-| 05 | Pricing & Products, Price rules | `/admin?tab=price-rules` | 90.04% | 89.41% | 67.02% | 6.20% | pass |
-| 06 | Fee change review (child) | `/admin/pricing/fee-review` | 85.44% | 90.43% | 71.18% | 4.05% | pass |
-| 07 | Product applicability (child) | `/admin/products/:productId/applicability` | 90.23% | 89.86% | 68.24% | 3.04% | pass |
-| 08 | Contact & Routing | `/admin?tab=routing` | 88.56% | 87.10% | 63.64% | 0.26% | pass |
-| 09 | Escalation rules (child) | `/admin/customer-experience/escalation` | 85.71% | 83.53% | 62.13% | 2.57% | fail: tiles |
-| 10 | Publishing, Effective policy | `/admin?tab=effective-policy` | 87.27% | 86.13% | 60.73% | 0.90% | fail: child tabs, policy card, draft status |
-| 11 | Documents & Service, Approval rules | `/admin?tab=approval-rules` | 91.60% | 91.67% | 75.37% | 2.05% | fail: child tabs, rules card, selected rule |
-| 12 | Integrations, Inventory feed | `/admin?tab=inventory-feed` | 82.40% | 79.79% | 66.00% | 2.77% | fail: child tabs |
-| 13 | Sync run detail (child) | `/admin/integrations/runs/:runId` | 89.13% | 88.55% | 65.47% | 3.55% | fail: badge, title |
+Owner approval (2026-10-28): match the mock title blocks, keep one h1 and
+the section tabs, drop redundant breadcrumbs and descriptions, raise child
+titles only as far as the references support, shared style only. The
+target stays 97%. Before is `35cd43c`; after is the commit that carries
+this table. Same protocol: 1600x1000, DPR 1, Chromium, 32/255, the same
+masks.
+
+| # | Screen | Route | Content before | Content after (agreed metric) | Full frame | Structure | Masked | Landmarks |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 01 | Overview | `/admin?tab=overview` | 89.91% | 89.94% | 90.35% | 67.33% | 3.94% | pass |
+| 02 | Dealership & Brand, Identity | `/admin?tab=identity` | 88.02% | 87.38% | 88.13% | 65.35% | 1.42% | pass |
+| 03 | People & Access, Team | `/admin?tab=team` | 91.54% | 90.72% | 91.43% | 71.75% | 3.71% | fail: viewPolicy, railNote |
+| 04 | Member role (child) | `/admin/people/:memberId` | 88.02% | 89.05% | 89.46% | 66.38% | 0.93% | pass |
+| 05 | Pricing & Products, Price rules | `/admin?tab=price-rules` | 89.41% | 90.24% | 90.69% | 66.46% | 7.10% | pass |
+| 06 | Fee change review (child) | `/admin/pricing/fee-review` | 90.43% | 90.37% | 85.39% | 70.82% | 4.05% | pass |
+| 07 | Product applicability (child) | `/admin/products/:productId/applicability` | 89.86% | 89.40% | 89.87% | 67.99% | 3.04% | pass |
+| 08 | Contact & Routing | `/admin?tab=routing` | 87.10% | 89.46% | 90.42% | 66.79% | 0.26% | pass |
+| 09 | Escalation rules (child) | `/admin/customer-experience/escalation` | 83.53% | 83.63% | 85.79% | 61.56% | 2.57% | fail: tiles |
+| 10 | Publishing, Effective policy | `/admin?tab=effective-policy` | 86.13% | 86.76% | 87.76% | 60.58% | 0.90% | fail: childTabs, policyCard, draftStatus |
+| 11 | Documents & Service, Approval rules | `/admin?tab=approval-rules` | 91.67% | 89.46% | 89.90% | 69.17% | 2.05% | fail: previewButton, primaryAction, rulesCard, sectionNav, selectedRuleCard |
+| 12 | Integrations, Inventory feed | `/admin?tab=inventory-feed` | 79.79% | 90.50% | 90.76% | 68.69% | 2.77% | fail: childTabs |
+| 13 | Sync run detail (child) | `/admin/integrations/runs/:runId` | 88.55% | 88.64% | 89.20% | 65.35% | 3.55% | pass |
+
+No screen reaches 97%; the range is 83.63-91.43%. Results by group:
+
+- Improved: 12 (+10.7), 08 (+2.4), 04 (+1.0), 05 (+0.8), 10 (+0.6).
+- Unchanged within 0.1: 01, 06, 09, 13.
+- Lower:
+  - 02 (-0.6) and 03 (-0.8): their mocks title the page with the section
+    name at about 36px, plus a concept chip on 03. With the breadcrumb and
+    description removed, our shorter block sits 38px and 50px higher than
+    the mock's.
+  - 07 (-0.5): the larger child title.
+  - 11 (-2.2): the mock draws an eyebrow and a 36px section title without
+    a description. Following that, our block sits 33px high and the
+    section row lands 33px above the mock's.
+- Landmarks:
+  - 03 now misses two rail landmarks by 1px (17 against 16): the full
+    member address wraps to a second line, and the reference's 40px tab row
+    adds 4px.
+  - 10 and 11 still fail on the in-card tab placement.
+  - 11 also fails its section row.
+  - 12 fails on its extra heading.
+  - 09 fails on its tiles.
+- Sheets:
+  - `scripts/admin-parity/evidence/before-after/NN.png`: Before,
+    Reference and After at 1600x1000, captioned with protocol scores.
+  - `evidence/overlay/NN.png`: reference, actual, overlay and difference
+    map, unmasked.
+  - `evidence/responsive/NN.png`: the responsive captures.
+
+#### Authorized geometry (replaces the 28px-everywhere note)
+
+- Parent sections: one h1, "Administration", at the `page` token 28/36/700
+  (the parent mocks draw it at 25.5-28.6px; 01 alone draws 36px).
+- Breadcrumb and description per section, from `AdminSection.intro` in
+  `src/lib/admin/sections.ts`:
+  - Overview: breadcrumb and description, as its mock.
+  - Publishing: breadcrumb (the mock's eyebrow) and description.
+  - Documents & Service: breadcrumb only.
+  - Every other section: neither.
+- Child pages: title 28/36 below 1024px and 32/40 from 1024px. The four
+  child mocks draw 28-33px (04 about 30, 07 about 33, 09 about 28, 13
+  about 32); none supports 36px. Breadcrumb and back link kept.
+- Section row: 14/20, inactive Medium, active Semibold. The references fit
+  Inter Medium at 13.75px.
+- Child tabs: 40px row, 14/20, inactive Medium, active Semibold, 36px gaps.
+  02, 08 and 12 draw 14px labels about 38px apart; 05 draws about 12.75px,
+  which we do not shrink to.
+- Icon sizes are unchanged in this round. They were set from per-screen
+  measurements in the earlier rounds (`ADMIN_V2_PARITY_REPORT.md`). The
+  audit finds no icon off-centre and the same seven sub-16px glyphs that
+  match their references.
+
+Recheck on this commit (`scripts/admin-parity/audit.cjs`, 1586x992,
+1366x768, 1024x768, 768x1024, 390x844):
+
+- Every screen: one h1, no page overflow, no clipped text, no unnamed
+  control, no small target.
+- Every tab stop shows a visible focus change, and there are no contrast
+  failures in light or dark.
+- Admin, Sticker and harness suites pass, including Review changes staying
+  disabled until a real change (04, 07).
 
 ### 10.2 Diagnostics (not the agreed metric)
 
@@ -375,7 +443,8 @@ Each item gives the screens it affects, the deviation, the evidence and its
 practical impact. The owner can accept an item, reject it (the reference
 then wins and the work is reopened) or change the written requirement.
 
-1. **Title block: one "Administration" title, breadcrumb and description**
+1. **Title block** (owner approved the mock-matching change on 2026-10-28;
+   applied in 10.1, and the conflicts that remain are listed there)
    - Screens: 02, 03, 05, 06, 08, 10, 11, 12.
    - Deviation: 02, 03, 10 and 11 title the page with the section name.
      02, 03, 05, 06, 08 and 12 draw no breadcrumb or description. Ours
@@ -388,7 +457,8 @@ then wins and the work is reopened) or change the written requirement.
      The section name is still the active tab.
    - Decision asked: keep the IA, or drop the breadcrumb and description on
      parent sections (the h1 would stay).
-2. **Page and child title size**
+2. **Page and child title size** (applied within what the references
+   support: child titles 32px from 1024px wide; parent title kept at 28px)
    - Screens: 01, 04, 07, 09, 13.
    - Deviation: 28px (`design/tokens.json` `page` 28/36/700) against about
      36px on 01 and 32-38px on the four child mocks.
