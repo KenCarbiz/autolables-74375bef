@@ -61,7 +61,9 @@ const Terms = lazy(() => import("./pages/Terms"));
 const Login = lazy(() => import("./pages/Login"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AdminV2 = lazy(() => import("./pages/AdminV2"));
-const AdminDesignFixture = lazy(() => import("./pages/admin/AdminDesignFixture"));
+// Development only: the parity fixture page. The dynamic import sits inside the
+// DEV branch so a production bundle carries neither the route nor the chunk.
+const AdminDesignFixture = import.meta.env.DEV ? lazy(() => import("./pages/admin/AdminDesignFixture")) : null;
 const AdminSmokeTest = lazy(() => import("./pages/AdminSmokeTest"));
 const AddendumIconLibrary = lazy(() => import("./pages/AddendumIconLibrary"));
 const AddendumLabelPrint = lazy(() => import("./pages/AddendumLabelPrint"));
@@ -439,7 +441,7 @@ const App = () => (
                       {/* Development only: deterministic Administration screens
                           for the visual parity harness. Never in a production bundle. */}
                       {import.meta.env.DEV && (
-                        <Route path="/admin/design-fixture/:screen" element={<AdminDesignFixture />} />
+                        <Route path="/admin/design-fixture/:screen" element={AdminDesignFixture ? <AdminDesignFixture /> : null} />
                       )}
 
                     <Route path="*" element={<NotFound />} />
