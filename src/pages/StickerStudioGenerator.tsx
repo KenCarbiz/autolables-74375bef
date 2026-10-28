@@ -5,7 +5,10 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
 import { useProducts } from "@/hooks/useProducts";
-import { applicablePrograms, programMode, termLabel, emptyProgram, toStickerValueProp, PROGRAM_DISPLAY_STYLES, PROGRAM_IMAGE_SCALES, type DealerProgram, type ProgramDisplayStyle, type ProgramImageScale } from "@/lib/dealerPrograms";
+import { applicablePrograms, programMode, termLabel, emptyProgram, toStickerValueProp, type DealerProgram } from "@/lib/dealerPrograms";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import ValuePropositionsPanel from "@/components/sticker/ValuePropositionsPanel";
 import { uploadPhoto } from "@/lib/storage";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { curatePrintEquipment } from "@/lib/equipmentPanel";
@@ -76,7 +79,11 @@ const StickerStudioGeneratorInner = ({ baseTemplate }: { baseTemplate: StudioTem
   const navigate = useNavigate();
   const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
   const { tenant, stores, currentStore } = useTenant();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { member } = useEntitlements();
+  // The dealer program library is an add-on claim: add-on roles edit it here;
+  // everyone else chooses which approved programs go on this addendum.
+  const canManagePrograms = hasDealerCapability(member?.role, "can_manage_addons", isAdmin);
   const rules = useDealerDocumentRules();
   const quota = useUsageLimits();
   const { customization, save: saveCustomization } = useTemplateCustomization(templateId);
@@ -435,8 +442,20 @@ const StickerStudioGeneratorInner = ({ baseTemplate }: { baseTemplate: StudioTem
     () => (settings.dealer_programs || []).filter((p) => p.enabled && p.showOnSticker),
     [settings.dealer_programs],
   );
-  const [selectedVpId, setSelectedVpId] = useState<string>("");
-  const selectedVp = stickerPrograms.find((p) => p.id === selectedVpId) || stickerPrograms[0];
+  // Programs withheld on this vehicle (Vehicle File, Passport packet) start
+  // off this addendum; the choice made here stays with this document.
+  const vehicleSuppressed = useMemo(
+    () => new Set((Array.isArray(prefill.vehicle?.raw?.suppressed_programs) ? (prefill.vehicle!.raw.suppressed_programs as unknown[]) : []).map(String)),
+    [prefill.vehicle],
+  );
+  const [omittedVpIds, setOmittedVpIds] = useState<Set<string> | null>(null);
+  const omittedVps = omittedVpIds ?? vehicleSuppressed;
+  const addendumPrograms = useMemo(() => stickerPrograms.filter((p) => !omittedVps.has(p.id)), [stickerPrograms, omittedVps]);
+  const toggleVpIncluded = (id: string, include: boolean) => {
+    const next = new Set(omittedVps);
+    if (include) next.delete(id); else next.add(id);
+    setOmittedVpIds(next);
+  };
   const [uploadingVp, setUploadingVp] = useState(false);
   // Every image any program has ever used, so the dealer picks from one library.
   const vpImageLibrary = useMemo(
@@ -445,22 +464,24 @@ const StickerStudioGeneratorInner = ({ baseTemplate }: { baseTemplate: StudioTem
   );
 
   const saveProgram = (id: string, patch: Partial<DealerProgram>) => {
+    if (!canManagePrograms) return;
     const next = (settings.dealer_programs || []).map((p) => (p.id === id ? { ...p, ...patch } : p));
     updateSettings({ dealer_programs: next });
   };
 
   const addValueProposition = () => {
+    if (!canManagePrograms) return;
     const program = { ...emptyProgram(), title: "New value proposition", showOnSticker: true };
     updateSettings({ dealer_programs: [...(settings.dealer_programs || []), program] });
-    setSelectedVpId(program.id);
+    return program.id;
   };
 
-  const uploadVpImage = async (file: File) => {
-    if (!selectedVp) return;
+  const uploadVpImage = async (id: string, file: File) => {
+    if (!canManagePrograms) return;
     setUploadingVp(true);
     try {
       const up = await uploadPhoto("dealer-logos", file, { tenantId: tenant?.id });
-      if (up?.url) saveProgram(selectedVp.id, { imageUrl: up.url });
+      if (up?.url) saveProgram(id, { imageUrl: up.url });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
     } finally { setUploadingVp(false); }
@@ -469,9 +490,9 @@ const StickerStudioGeneratorInner = ({ baseTemplate }: { baseTemplate: StudioTem
   // Selected propositions flow into the render data, so preview, PDF, PNG,
   // print, and the signing addendum all show the same claims and disclosures.
   useEffect(() => {
-    const next = stickerPrograms.map(toStickerValueProp);
+    const next = addendumPrograms.map(toStickerValueProp);
     setData((d) => (JSON.stringify(d.valueProps || []) === JSON.stringify(next) ? d : { ...d, valueProps: next }));
-  }, [stickerPrograms]);
+  }, [addendumPrograms]);
 
   // Pointer reordering. Dropping a row onto another section is a status change,
   // so the drop routes through changeStatus and picks up the same persistence,
@@ -871,128 +892,17 @@ const StickerStudioGeneratorInner = ({ baseTemplate }: { baseTemplate: StudioTem
           </CfgCard>
 
           <CfgCard title="Value Propositions">
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-muted-foreground">
-                  {stickerPrograms.length ? `${stickerPrograms.length} on this addendum` : "None on this addendum yet"}
-                </span>
-                <button onClick={addValueProposition} className="h-8 shrink-0 inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700">
-                  <Plus className="w-3.5 h-3.5" /> Add value proposition
-                </button>
-              </div>
-
-              {stickerPrograms.length > 1 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {stickerPrograms.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => setSelectedVpId(p.id)}
-                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${p.id === selectedVp?.id ? "border-blue-300 bg-blue-50 text-blue-800" : "border-border text-muted-foreground hover:bg-muted"}`}
-                    >{p.title || "Untitled"}</button>
-                  ))}
-                </div>
-              )}
-
-              {selectedVp ? (
-                <div className="rounded-lg border border-border p-3 space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-foreground truncate">{selectedVp.title || "Untitled"}</span>
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-700">Selected</span>
-                  </div>
-
-                  <div>
-                    <label className={label}>Image library</label>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {vpImageLibrary.map((url) => (
-                        <button
-                          key={url}
-                          onClick={() => saveProgram(selectedVp.id, { imageUrl: url })}
-                          className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-md border-2 bg-white ${selectedVp.imageUrl === url ? "border-blue-500" : "border-border hover:border-blue-300"}`}
-                        >
-                          <img src={url} alt="" className="h-full w-full object-contain p-1" />
-                          {selectedVp.imageUrl === url && <CheckCircle2 className="absolute left-1 top-1 h-3.5 w-3.5 text-blue-600" />}
-                        </button>
-                      ))}
-                      <label className="flex h-14 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-border text-[10px] font-semibold text-muted-foreground hover:border-blue-300">
-                        <Plus className="h-3.5 w-3.5" />
-                        {uploadingVp ? "Uploading…" : "Upload"}
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadVpImage(f); e.target.value = ""; }} />
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-end gap-4">
-                    <div>
-                      <label className={label}>Display style</label>
-                      <div className="mt-1 inline-flex rounded-lg border border-border bg-card p-0.5">
-                        {PROGRAM_DISPLAY_STYLES.map((sty) => (
-                          <button
-                            key={sty.id}
-                            onClick={() => saveProgram(selectedVp.id, { displayStyle: sty.id as ProgramDisplayStyle })}
-                            className={`px-3 h-8 rounded-md text-xs font-semibold ${(selectedVp.displayStyle || "image_text") === sty.id ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
-                          >{sty.label}</button>
-                        ))}
-                      </div>
-                    </div>
-                    {/* Size applies whether or not the text is shown, so a logo
-                        can stand on its own at any scale. */}
-                    <div>
-                      <label className={label}>Logo size</label>
-                      <div className="mt-1 inline-flex rounded-lg border border-border bg-card p-0.5">
-                        {PROGRAM_IMAGE_SCALES.map((sc) => (
-                          <button
-                            key={sc.id}
-                            onClick={() => saveProgram(selectedVp.id, { imageScale: sc.id as ProgramImageScale })}
-                            disabled={!selectedVp.imageUrl}
-                            className={`px-3 h-8 rounded-md text-xs font-bold disabled:opacity-40 ${(selectedVp.imageScale || "sm") === sc.id ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
-                          >{sc.label}</button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className={label}>Headline</label>
-                      <input value={selectedVp.title} onChange={(e) => saveProgram(selectedVp.id, { title: e.target.value })} className={input} />
-                    </div>
-                    <div>
-                      <label className={label}>Supporting line</label>
-                      <input value={selectedVp.supportingLine ?? selectedVp.offer} onChange={(e) => saveProgram(selectedVp.id, { supportingLine: e.target.value })} className={input} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={label}>Disclosure</label>
-                    <textarea
-                      value={selectedVp.disclosure}
-                      onChange={(e) => saveProgram(selectedVp.id, { disclosure: e.target.value })}
-                      rows={2}
-                      placeholder="Terms, conditions, and exclusions printed under the totals."
-                      className="w-full px-2.5 py-2 rounded-md border border-border bg-background text-sm outline-none focus:border-primary resize-y"
-                    />
-                    <label className="mt-1.5 flex items-center gap-2 text-xs text-foreground">
-                      <input type="checkbox" checked={selectedVp.showAskForDetails !== false} onChange={(e) => saveProgram(selectedVp.id, { showAskForDetails: e.target.checked })} />
-                      Show "Ask for details"
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
-                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Saved to dealer library · Available on all addendum templates
-                    </span>
-                    <button
-                      onClick={() => saveProgram(selectedVp.id, { showOnSticker: false })}
-                      className="text-[11px] font-semibold text-rose-600 hover:underline"
-                    >Remove from addendum</button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  Your dealer programs become value propositions here. Add one, or enable "show on sticker" for an existing program in Admin → Programs.
-                </p>
-              )}
-            </div>
+            <ValuePropositionsPanel
+              programs={stickerPrograms}
+              omitted={omittedVps}
+              onToggleIncluded={toggleVpIncluded}
+              canManage={canManagePrograms}
+              imageLibrary={vpImageLibrary}
+              uploading={uploadingVp}
+              onAdd={addValueProposition}
+              onSave={saveProgram}
+              onUpload={(id, f) => void uploadVpImage(id, f)}
+            />
           </CfgCard>
 
           <CfgCard title="Branding">
