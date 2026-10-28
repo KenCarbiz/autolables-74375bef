@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # LOCAL VALIDATION ONLY. Rehearses the staging procedure end to end on a throwaway
 # local Postgres 16 plus local_shim.ts; never contacts any Supabase project.
-# Order: stub, 00, 01, spine, 00, 04, 02, phase1 (flag off), phase2 (flag on),
-# 03 rollback, 00, re-apply spine, 00, 04, 02, phase2 again.
+# Order: stub, 00, 01, spine, 00, 04, 02; direct mode (STAGING_DB_URL) phase1 with
+# the flag off and phase2 with it on; step mode (no DB URL; this script plays the
+# coordinator, running each requested steps/*.sql with psql and saving its JSON)
+# phase1 and phase2; 03 rollback, 00, re-apply spine, 00, 04, 02, direct phase2 again.
 # Usage: supabase/tests/staging/local_validate.sh   (KEEP=1 keeps the cluster)
 set -u
 
@@ -48,7 +50,7 @@ CRON_SECRET="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
 start_shim() {
   [ -n "$SHIM_PID" ] && kill "$SHIM_PID" 2>/dev/null && wait "$SHIM_PID" 2>/dev/null
   SHIM_PORT="$SHIM_PORT" SHIM_DB_URL="$DB_URL" SHIM_ANON_KEY="$ANON_KEY" CRON_SHARED_SECRET="$CRON_SECRET" \
-    ROOFTOP_INTEGRATIONS_ENABLED="$1" SHIM_DISPATCH_HOST="staging-shim.local" \
+    ROOFTOP_INTEGRATIONS_ENABLED="$1" SHIM_DISPATCH_HOST="${2:-staging-shim.local}" \
     deno run -A --quiet --import-map="$WORK/import_map.json" "$S/local_shim.ts" >"$WORK/shim-$1.log" 2>&1 &
   SHIM_PID=$!
   for _ in $(seq 1 100); do grep -q listening "$WORK/shim-$1.log" 2>/dev/null && return 0; sleep 0.2; done
@@ -75,6 +77,32 @@ start_shim false
 echo "-- phase 1 (ROOFTOP_INTEGRATIONS_ENABLED unset)"; runner phase1
 start_shim true
 echo "-- phase 2 (ROOFTOP_INTEGRATIONS_ENABLED=true)"; runner phase2
+kill "$SHIM_PID" 2>/dev/null; wait "$SHIM_PID" 2>/dev/null; SHIM_PID=""
+
+# Step mode: no STAGING_DB_URL. Dispatch endpoints are the staging project's own
+# (set by p2_20); the shim rewrites that host to itself and refuses any other.
+STAGING_HOST="oaefdolxpmrexjqkzonw.supabase.co"
+step_mode() {
+  local out="$WORK/stepmode" rc name
+  mkdir -p "$out/steps"
+  for _ in $(seq 1 12); do
+    STAGING_URL="http://127.0.0.1:$SHIM_PORT" STAGING_ANON_KEY="$ANON_KEY" STAGING_CRON_SECRET="$CRON_SECRET" \
+      deno run -A --quiet "$S/run_staging.ts" "$1" --out="$out" --dispatch-base="https://$STAGING_HOST" >"$WORK/stepmode.log" 2>&1
+    rc=$?
+    cat "$WORK/stepmode.log"
+    [ $rc -ne 3 ] && break
+    name=$(grep -o "WAITING FOR STEP [a-z0-9_]*" "$WORK/stepmode.log" | awk '{print $4}')
+    "$PGBIN/psql" -h "$WORK" -p "$PORT" -U postgres -Xq -At -d staging -v ON_ERROR_STOP=1 \
+      -f "$S/steps/$name.sql" >"$out/steps/$name.json" || { echo "step $name failed"; FAILED=1; return; }
+    echo "   (coordinator stand-in ran steps/$name.sql)"
+  done
+  [ $rc -eq 0 ] || FAILED=1
+  if [ -n "${RESULTS_DIR:-}" ]; then cp "$out"/rooftopos-staging-*.md "$RESULTS_DIR"/ 2>/dev/null; fi
+}
+start_shim false "$STAGING_HOST"
+echo "-- step mode phase 1"; step_mode phase1
+start_shim true "$STAGING_HOST"
+echo "-- step mode phase 2"; step_mode phase2
 kill "$SHIM_PID" 2>/dev/null; wait "$SHIM_PID" 2>/dev/null; SHIM_PID=""
 
 step "03 rollback" "$S/03_rollback.sql" PASS

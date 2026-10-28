@@ -38,6 +38,7 @@ const userFrom = (req: Request): string | null => {
 const localFetch: typeof fetch = (input, init) => {
   const url = String(input instanceof Request ? input.url : input)
     .replace(`https://${DISPATCH_HOST}`, `http://127.0.0.1:${PORT}`);
+  if (!url.startsWith(`http://127.0.0.1:${PORT}/`)) return Promise.reject(new Error(`shim refuses to dispatch off-box: ${url}`));
   return fetch(url, init);
 };
 
