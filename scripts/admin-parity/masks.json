@@ -360,6 +360,13 @@
         "reason": "mock-only annotation (handoff footer caption, not product UI)"
       },
       {
+        "x": 1278,
+        "y": 948,
+        "w": 279,
+        "h": 19,
+        "reason": "mock-only annotation (the same footer caption where the body comparison places it, reference shifted -18px); the capture has only empty workspace here"
+      },
+      {
         "x": 1422,
         "y": 85,
         "w": 138,

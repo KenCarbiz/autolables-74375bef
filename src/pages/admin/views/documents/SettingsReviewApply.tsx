@@ -356,6 +356,6 @@ export function SettingsReviewDialog<T extends object>({ review, title, descript
   );
 }
 
-export const PendingChip = ({ dirty }: { dirty: boolean }) => (
-  <StatusChip tone={dirty ? "warning" : "neutral"}>{dirty ? "Pending review" : "None"}</StatusChip>
+export const PendingChip = ({ dirty, className }: { dirty: boolean; className?: string }) => (
+  <StatusChip tone={dirty ? "warning" : "neutral"} className={className}>{dirty ? "Pending review" : "None"}</StatusChip>
 );

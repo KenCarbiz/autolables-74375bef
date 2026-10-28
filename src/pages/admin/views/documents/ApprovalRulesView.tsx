@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, FileText, Printer, ShieldCheck } from "lucide-react";
+import { Eye, File, FileText, Printer, ShieldCheck } from "lucide-react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudit } from "@/contexts/AuditContext";
@@ -56,9 +56,11 @@ const TILE_TONE: Record<ReadinessItem["key"], Record<ReadinessState, Tone>> = {
   disclosures: { ok: "success", needs: "danger", unknown: "neutral" },
 };
 
-const TH = "px-4 py-4 text-[14px] leading-[20px] text-adm-ink";
-const TD = "px-4 py-[10px]";
-const SECTION_LABEL = "text-[18px] leading-[26px] font-semibold text-adm-ink";
+// Measured on the reference: 15px semibold headers on a 50px row, 14px cells
+// on a 60px row, the action column inset 22px, and 17px rail section labels.
+const TH = "pl-4 pr-1 py-[15px] text-[15px] leading-[20px] text-adm-ink whitespace-nowrap";
+const TD = "pl-4 pr-1 py-[10px]";
+const SECTION_LABEL = "text-[17px] leading-[24px] font-semibold text-adm-ink";
 
 export default function ApprovalRulesView() {
   const fixture = useViewFixture<ApprovalRulesFixture>("approval-rules");
@@ -99,19 +101,19 @@ export default function ApprovalRulesView() {
   };
 
   return (
-    <div className="pt-[38px] space-y-3">
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_489px] gap-4">
+    <div className="pt-[37px] space-y-3">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_494px] gap-4 xl:gap-[13px]">
         <AdminCard flush className="min-w-0">
-          <div className="px-[26px] pt-[17px]">
-            <h3 className="text-[20px] leading-[28px] font-semibold text-adm-ink">Approval rules by document</h3>
-            <p className="mt-2 text-[14px] leading-[20px] text-adm-muted">Define who must approve each document type and what changes require a new approval.</p>
+          <div className="pl-[29px] pr-[26px] pt-[21px]">
+            <h3 className="text-[20px] leading-[28px] font-bold text-adm-ink">Approval rules by document</h3>
+            <p className="mt-1.5 text-[14px] leading-[20px] text-adm-muted">Define who must approve each document type and what changes require a new approval.</p>
           </div>
-          <AdminTable caption="Approval rules by document" inset className="mt-7 mx-[19px] mb-[19px]">
+          <AdminTable caption="Approval rules by document" inset className="mt-[29px] ml-[22px] mr-[20px] mb-[19px] xl:[&_table]:table-fixed [&_tbody_tr:last-child>td]:border-b-0 [&_tbody_tr:last-child>td]:pb-[9px]">
             <colgroup>
               <col className="w-[135px]" />
-              <col className="w-[140px]" />
-              <col className="w-[190px]" />
-              <col className="w-[190px]" />
+              <col className="w-[137px]" />
+              <col className="w-[168px]" />
+              <col className="w-[178px]" />
               <col />
             </colgroup>
             <thead>
@@ -120,7 +122,7 @@ export default function ApprovalRulesView() {
                 <Th className={TH}>Applies to</Th>
                 <Th className={TH}>Approval</Th>
                 <Th className={TH}>Refresh after changes</Th>
-                <Th className={TH}>Action</Th>
+                <Th className={cn(TH, "pl-5")}>Action</Th>
               </tr>
             </thead>
             <tbody>
@@ -128,12 +130,12 @@ export default function ApprovalRulesView() {
                 const isSelected = r.family === selected;
                 return (
                   <tr key={r.family} onClick={() => select(r.family, false)} aria-selected={isSelected} className={cn("cursor-pointer", isSelected ? "bg-adm-selected" : "hover:bg-adm-workspace")}>
-                    <Td className={cn(TD, isSelected && "font-semibold")}>{r.document}</Td>
+                    <Td className={cn(TD, "pr-0", isSelected && "font-semibold")}>{r.document}</Td>
                     <Td className={TD}>{r.appliesTo}</Td>
                     <Td className={TD}>{r.approval}</Td>
                     <Td className={TD}>{r.refreshAfter}</Td>
-                    <Td className={TD}>
-                      <AdminButton variant="outline" className="px-5" aria-label={`Edit ${r.document} rules`} onClick={(e) => { e.stopPropagation(); select(r.family, true); }}>
+                    <Td className={cn(TD, "pl-[22px]")}>
+                      <AdminButton variant="outline" className="min-h-[37px] px-[19px] text-[15px] font-medium border-adm-primary/35" aria-label={`Edit ${r.document} rules`} onClick={(e) => { e.stopPropagation(); select(r.family, true); }}>
                         Edit
                       </AdminButton>
                     </Td>
@@ -144,27 +146,27 @@ export default function ApprovalRulesView() {
           </AdminTable>
         </AdminCard>
 
-        <AdminCard bodyClassName="px-[21px] pt-[13px] pb-[22px]">
-          <p className="text-[12px] leading-[18px] text-adm-muted">Selected rule</p>
-          <h3 className="mt-1 text-[22px] leading-[28px] font-semibold text-adm-ink">{family.label} approval</h3>
+        <AdminCard bodyClassName="pl-[21px] pr-[22px] pt-4 pb-[25px]">
+          <p className="text-[13px] leading-[18px] text-adm-muted">Selected rule</p>
+          <h3 className="mt-1 text-[22px] leading-[28px] font-bold text-adm-ink">{family.label} approval</h3>
 
-          <div className="mt-6 flex items-center justify-between gap-3">
+          <div className="mt-[25px] flex items-center justify-between gap-3">
             <p className={SECTION_LABEL}>Policy in effect</p>
-            <StatusChip tone="info" className="h-[26px] px-2.5">{versionChip}</StatusChip>
+            <StatusChip tone="info" className="h-[26px] px-[14px] text-[13px] font-medium">{versionChip}</StatusChip>
           </div>
-          <p data-parity="policy-changed" className="mt-2 text-[14px] leading-[20px] text-adm-muted">
+          <p data-parity="policy-changed" className="mt-[7px] text-[14px] leading-[20px] text-adm-muted">
             {lastChange ? `Changed ${describeAge(lastChange.at, now)}${lastChange.by ? ` by ${lastChange.by}` : ""}` : "No change recorded in the activity log"}
           </p>
-          <Link to={adminTabHref("change-history")} className="mt-2 flex w-fit items-center gap-2 text-[14px] leading-[20px] font-semibold text-adm-primary hover:underline">
-            <FileText className="w-5 h-5" aria-hidden="true" />
+          <Link to={adminTabHref("change-history")} className="mt-[9px] ml-px flex w-fit items-center gap-2.5 text-[14px] leading-[20px] text-adm-primary hover:underline">
+            <File className="w-5 h-5" aria-hidden="true" />
             View change history
           </Link>
 
-          <hr className="mt-[21px] mb-5 border-adm-border" />
+          <hr className="mt-[19px] mb-[22px] border-adm-border" />
 
           <div className="flex items-center gap-6">
             <p className={SECTION_LABEL}>Pending changes</p>
-            <PendingChip dirty={review.dirty} />
+            <PendingChip dirty={review.dirty} className="h-[28px] px-4 text-[13px] font-medium" />
           </div>
           {review.dirty && (
             <ul className="mt-2 space-y-1 text-[14px] leading-[20px] text-adm-ink">
@@ -175,7 +177,7 @@ export default function ApprovalRulesView() {
               ))}
             </ul>
           )}
-          <p className="mt-2 text-[14px] leading-[20px] text-adm-muted">
+          <p className={cn(review.dirty ? "mt-0.5" : "mt-2", "text-[14px] leading-[20px] text-adm-muted")}>
             Changes apply to documents generated after you apply them. Approved and signed documents keep their current version.
           </p>
 
@@ -210,27 +212,29 @@ export default function ApprovalRulesView() {
             </>
           )}
 
-          <hr className="mt-[19px] mb-[18px] border-adm-border" />
+          <hr className="mt-5 mb-[21px] border-adm-border" />
 
           <p className={SECTION_LABEL}>Readiness</p>
-          <div className="mt-[13px] grid grid-cols-3 divide-x divide-adm-border">
+          <div className="mt-[9px] grid grid-cols-3 xl:grid-cols-[148px_144px_minmax(0,1fr)] divide-x divide-adm-border">
             {readiness.items.map((item) => {
               const Icon = TILE_ICON[item.key];
               return (
-                <div key={item.key} className="px-3 first:pl-0 last:pr-0 min-w-0">
-                  <div className="flex items-center gap-3 text-[13px] leading-[18px] font-semibold text-adm-ink">
-                    <Icon className="w-5 h-5 text-adm-muted flex-shrink-0" aria-hidden="true" />
-                    <span className="truncate">{item.label}</span>
+                <div key={item.key} className="pt-[5px] pl-[13px] pr-2 first:pl-0 last:pr-0 min-w-0">
+                  <div className="flex items-center gap-3 text-[12px] leading-[18px] font-medium text-adm-ink">
+                    <Icon className="w-5 h-5 text-adm-ink flex-shrink-0" aria-hidden="true" />
+                    <span className="truncate" title={item.label}>{item.label}</span>
                   </div>
-                  <StatusChip tone={TILE_TONE[item.key][item.state]} className="mt-[10px]">{item.chip}</StatusChip>
-                  <p className="mt-[7px] text-[12px] leading-[18px] text-adm-muted">{item.detailLabel}</p>
-                  <p data-parity="readiness-detail" className="text-[13px] leading-[18px] text-adm-ink">{item.detailValue}</p>
+                  <div className="sm:pl-8">
+                    <StatusChip tone={TILE_TONE[item.key][item.state]} className="mt-1.5 h-[26px] sm:px-[11px] font-medium">{item.chip}</StatusChip>
+                    <p className="mt-[7px] text-[12px] leading-[18px] text-adm-muted">{item.detailLabel}</p>
+                    <p data-parity="readiness-detail" className="text-[13px] leading-[18px] text-adm-ink">{item.detailValue}</p>
+                  </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-[13px] grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 xl:gap-2.5 xl:-mr-[3px]">
             <AdminLinkButton to={family.previewHref} variant="outline" className="min-h-[48px] sm:min-h-[48px] text-[15px]">
               <Eye className="w-6 h-6" aria-hidden="true" />
               Preview document

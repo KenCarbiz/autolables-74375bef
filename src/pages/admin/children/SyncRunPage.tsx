@@ -45,14 +45,18 @@ const DIAGNOSIS_PANEL: Record<HealthTone, string> = {
   neutral: "border-adm-border",
   success: "border-[#BFE3CF] bg-adm-success-bg",
   warning: "border-[#F1D58A] bg-adm-warning-bg",
-  danger: "border-[#F3B4AE] bg-adm-danger-bg",
+  // The reference frames a refusal in a saturated rose line, stronger than the chip tint.
+  danger: "border-[#F7848E] bg-adm-danger-bg",
   info: "border-[#C5D4F7] bg-adm-selected",
 };
 
 const TITLE = <span className="text-[34px] leading-[40px]">Inventory sync run</span>;
+// Measured on the reference: 12px timeline headers over 13/17 cells, rule
+// lines inset 20px from the card edges, and 16px card titles.
 const CARD_TITLE = "text-[16px] leading-[22px] font-semibold text-adm-ink";
-const TL_TH = "bg-transparent px-3 py-[5px] text-[13px] leading-[18px] font-normal text-adm-muted";
-const TL_TD = "px-3 py-1 leading-[18px] align-top";
+const TL_TH = "bg-transparent px-3 pt-[5px] pb-[6px] text-[12px] leading-[18px] font-normal text-adm-muted";
+const TL_TD = "px-3 py-0 text-[13px] leading-[17px] align-middle";
+const INSET_RULE = "mx-5 border-b border-adm-border";
 
 export default function SyncRunPage() {
   const fixture = useViewFixture<SyncRunFixture>("sync-run");
@@ -155,9 +159,9 @@ export default function SyncRunPage() {
       }
       subtitle={<>{formatAt(run.started_at, { withYear: true, withZone: true })} · Run {run.id.slice(0, 8)}</>}
     >
-      <div className="space-y-5">
+      <div>
         <AdminCard id="run-summary" flush>
-          <dl className="grid grid-cols-2 xl:grid-cols-4 divide-x divide-adm-border">
+          <dl className="grid grid-cols-2 xl:grid-cols-[324fr_317fr_323fr_340fr]">
             <SummaryCell label="HTTP status" value={run.http_status === null ? "—" : String(run.http_status)} hint={httpReason(run.http_status) ?? "No response recorded"} />
             <SummaryCell label="Source" value={host ?? "Unknown"} hint="Inventory feed" text mask="host" />
             <SummaryCell label="Inventory writes" value={writes === null ? "Unknown" : String(writes)} hint="New, updated, or retired" />
@@ -165,27 +169,27 @@ export default function SyncRunPage() {
           </dl>
         </AdminCard>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_556px] gap-4">
-          <AdminCard id="run-diagnosis" className={DIAGNOSIS_PANEL[diagnosis.tone]} bodyClassName="px-6 pt-[22px] pb-6">
-            <div className="flex items-start gap-[19px]">
+        <div className="mt-5 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_561px] gap-4 xl:gap-x-[23px] items-start">
+          <AdminCard id="run-diagnosis" className={cn("xl:min-h-[209px]", DIAGNOSIS_PANEL[diagnosis.tone])} bodyClassName="px-[22px] pt-[22px] pb-6">
+            <div className="flex items-start gap-[15px]">
               <DiagnosisIcon className={cn("w-[34px] h-[34px] flex-shrink-0", DIAGNOSIS_COLOR[diagnosis.tone])} aria-hidden="true" />
               <div className="min-w-0">
-                <h2 className="text-[22px] leading-[30px] font-bold text-adm-ink">{diagnosis.title}</h2>
-                <p className="mt-4 text-[16px] leading-[24px] text-adm-ink">{diagnosis.detail}</p>
+                <h2 className="mt-[2px] text-[23px] leading-[30px] font-bold text-adm-ink">{diagnosis.title}</h2>
+                <p className="mt-4 text-[15px] leading-[23px] text-adm-ink">{diagnosis.detail}</p>
               </div>
             </div>
           </AdminCard>
 
-          <AdminCard id="run-next-step" className="border-[#C5D4F7] bg-adm-selected" bodyClassName="px-6 pt-[14px] pb-3">
-            <div className="flex items-start gap-[11px]">
-              <Wrench className="w-8 h-8 flex-shrink-0 -mt-0.5 text-adm-primary" aria-hidden="true" />
+          <AdminCard id="run-next-step" className="border-[#C5D4F7] bg-adm-selected" bodyClassName="px-[23px] pt-[14px] pb-3">
+            <div className="flex items-start gap-[13px]">
+              <Wrench className="w-8 h-8 flex-shrink-0 -ml-[3px] text-adm-primary" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="text-[16px] leading-[22px] font-semibold text-adm-primary">Next step</p>
-                <h3 className="text-[18px] leading-[26px] font-bold text-adm-ink">{next.title}</h3>
-                <p className="mt-1.5 text-[14px] leading-[20px] text-adm-ink">{next.detail}</p>
+                <h3 className="mt-[2px] text-[18px] leading-[26px] font-bold text-adm-ink">{next.title}</h3>
+                <p className="mt-1.5 text-[14px] leading-[22px] text-adm-ink">{next.detail}</p>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-[1.18fr_1fr] divide-x divide-[#C5D4F7] border-t border-[#C5D4F7] pt-3">
+            <div className="mt-[14px] grid grid-cols-[1.18fr_1fr] xl:grid-cols-[259px_minmax(0,1fr)] divide-x divide-[#C5D4F7] border-t border-[#C5D4F7] pt-[10px]">
               <div className="min-w-0 pr-6">
                 <p className="text-[14px] leading-[20px] text-adm-muted">Last successful run</p>
                 {data.lastSuccessAt ? (
@@ -196,39 +200,41 @@ export default function SyncRunPage() {
               </div>
               <div className="min-w-0 pl-8">
                 <p className="text-[14px] leading-[20px] text-adm-muted">Existing identity</p>
-                <p className="mt-0.5 text-[16px] leading-[22px] font-semibold text-adm-ink">{pinRetained ? "Retained" : "Unknown"}</p>
-                <p className="text-[13px] leading-[18px] text-adm-muted">{pinRetained ? "Rooftop pin remains unchanged" : "Not recorded for this run"}</p>
+                <p className="mt-[2px] text-[16px] leading-[22px] font-semibold text-adm-ink">{pinRetained ? "Retained" : "Unknown"}</p>
+                <p className="text-[13px] leading-[16px] text-adm-muted">{pinRetained ? "Rooftop pin remains unchanged" : "Not recorded for this run"}</p>
               </div>
             </div>
           </AdminCard>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_556px] gap-4 items-start">
-          <div className="space-y-2 min-w-0">
-            <AdminCard id="run-timeline" flush>
-              <div className="flex items-center gap-[17px] border-b border-adm-border px-[19px] pt-2 pb-[9px]">
+        <div className="mt-4 xl:mt-[15px] grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_554px] gap-4 xl:gap-x-[15px] items-start">
+          <div className="space-y-[7px] min-w-0">
+            <AdminCard id="run-timeline" flush className="xl:mt-px">
+              <div className="flex items-center gap-[17px] pl-[17px] pr-5 pt-[9px] pb-2">
                 <FileText className="w-[22px] h-[22px] flex-shrink-0 text-adm-primary" aria-hidden="true" />
                 <h3 className={CARD_TITLE}>Event timeline</h3>
               </div>
-              <AdminTable caption="Run event timeline" className="pb-2">
+              <div className={INSET_RULE} aria-hidden="true" />
+              {/* Row heights follow the reference rhythm (32, 45 and 51px, then a 55px last row); they are minimums, so longer copy still grows. */}
+              <AdminTable caption="Run event timeline" className="mx-5 xl:[&_table]:table-fixed [&_tbody_tr:first-child]:h-[31px] [&_tbody_tr:nth-child(2)]:h-[45px] [&_tbody_tr:nth-child(3)]:h-[51px] [&_tbody_tr:last-child]:h-[55px] [&_tbody_tr:last-child>td]:border-b-0">
                 <colgroup>
-                  <col className="w-[118px]" />
-                  <col className="w-[240px]" />
+                  <col className="w-[114px]" />
+                  <col className="w-[231px]" />
                   <col />
                 </colgroup>
                 <thead>
                   <tr>
-                    <Th className={cn(TL_TH, "pl-6")}>Time{zone ? ` (${zone})` : ""}</Th>
-                    <Th className={TL_TH}>Event</Th>
+                    <Th className={cn(TL_TH, "pl-1")}>Time{zone ? ` (${zone})` : ""}</Th>
+                    <Th className={cn(TL_TH, "pl-[49px]")}>Event</Th>
                     <Th className={TL_TH}>Details</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {timeline.map((ev, i) => (
                     <tr key={`${ev.label}-${i}`}>
-                      <Td className={cn(TL_TD, "pl-6 whitespace-nowrap tabular-nums text-adm-ink")}><span data-parity="timestamp">{ev.at ? formatTime(ev.at, viewer.timeZone) : "—"}</span></Td>
-                      <Td className={cn(TL_TD, "align-middle")}>
-                        <span className="flex items-center gap-5 font-semibold leading-[20px] text-adm-ink">
+                      <Td className={cn(TL_TD, "pl-1 whitespace-nowrap tabular-nums text-adm-ink")}><span data-parity="timestamp">{ev.at ? formatTime(ev.at, viewer.timeZone) : "—"}</span></Td>
+                      <Td className={cn(TL_TD, "pl-0")}>
+                        <span className="flex items-center gap-[23px] text-adm-ink">
                           <EventIcon tone={ev.tone} />
                           <span className="min-w-0">{ev.label}</span>
                         </span>
@@ -242,12 +248,12 @@ export default function SyncRunPage() {
 
             <AdminCard id="run-evidence" flush>
               <details open>
-                <summary className="flex cursor-pointer list-none items-center gap-[17px] px-[19px] pt-1.5 pb-[10px] [&::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-center gap-[15px] pl-[17px] pr-[22px] pt-[7px] pb-[7px] [&::-webkit-details-marker]:hidden">
                   <CodeXml className="w-6 h-6 flex-shrink-0 text-adm-ink" aria-hidden="true" />
                   <h3 className={cn(CARD_TITLE, "flex-1")}>Technical evidence</h3>
                   <ChevronUp className="w-[22px] h-[22px] text-adm-ink" aria-hidden="true" />
                 </summary>
-                <div className="px-[19px] pb-1">
+                <div className="px-5 pb-[4px]">
                   <pre data-parity="evidence" className="overflow-auto rounded-md bg-adm-workspace px-[18px] py-1.5 font-mono text-[12px] leading-[13px] text-adm-ink">{JSON.stringify(summary, null, 2)}</pre>
                 </div>
               </details>
@@ -288,13 +294,14 @@ export default function SyncRunPage() {
             )}
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-5 xl:space-y-[19px]">
             <AdminCard id="run-impact" flush>
-              <div className="flex items-center gap-[18px] border-b border-adm-border px-[22px] pt-[13px] pb-[11px]">
+              <div className="flex items-center gap-[13px] pl-[14px] pr-5 pt-[11px] pb-[9px]">
                 <ChartNoAxesColumn className="w-8 h-8 flex-shrink-0 text-adm-ink" aria-hidden="true" />
                 <h3 className={CARD_TITLE}>Impact</h3>
               </div>
-              <div className="mt-4 mb-[25px] grid grid-cols-3 divide-x divide-adm-border">
+              <div className={INSET_RULE} aria-hidden="true" />
+              <div className="mt-5 mb-[25px] grid grid-cols-3 xl:grid-cols-[179px_187px_minmax(0,1fr)] divide-x divide-adm-border">
                 <ImpactStat value={impact.newVehicles} label="New vehicles" zero="No vehicles imported" some="Vehicles added" />
                 <ImpactStat value={impact.updated} label="Updated vehicles" zero="No vehicles updated" some="Vehicles changed" />
                 <ImpactStat value={impact.retired} label="Retired vehicles" zero="No vehicles retired" some="Vehicles removed" />
@@ -302,14 +309,15 @@ export default function SyncRunPage() {
             </AdminCard>
 
             <AdminCard id="run-actions" flush>
-              <div className="flex items-center gap-[18px] border-b border-adm-border px-[22px] pt-4 pb-4">
-                <Zap className="w-[26px] h-[26px] flex-shrink-0 text-adm-ink" aria-hidden="true" />
+              <div className="flex items-center gap-[13px] pl-4 pr-5 pt-[15px] pb-[13px]">
+                <Zap className="w-7 h-7 flex-shrink-0 text-adm-ink" aria-hidden="true" />
                 <h3 className={CARD_TITLE}>Actions</h3>
               </div>
-              <div className="px-5 pt-[14px] pb-5">
+              <div className={INSET_RULE} aria-hidden="true" />
+              <div className="pl-[18px] pr-[22px] pt-[14px] pb-[19px]">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <AdminLinkButton to={feedHref} variant="outline" className="min-h-[44px] sm:min-h-[44px] text-[15px] gap-2.5">
-                    <ArrowLeft className="w-[22px] h-[22px]" aria-hidden="true" />
+                  <AdminLinkButton to={feedHref} variant="outline" className="min-h-[44px] sm:min-h-[44px] text-[15px] font-medium gap-3">
+                    <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                     Back to feed
                   </AdminLinkButton>
                   <AdminButton variant="primary" className="min-h-[44px] sm:min-h-[44px] text-[15px]" onClick={() => setRetryOpen((o) => !o)} aria-expanded={retryOpen}>Review retry options</AdminButton>
@@ -333,9 +341,9 @@ export default function SyncRunPage() {
 }
 
 const SummaryCell = ({ label, value, hint, text = false, mask }: { label: string; value: string; hint: string; text?: boolean; mask?: string }) => (
-  <div className="min-w-0 px-7 pt-[14px] pb-5">
+  <div className="relative min-w-0 pl-[32px] first:pl-[26px] pr-5 pt-[15px] pb-[19px] before:absolute before:left-0 before:inset-y-[17px] before:w-px before:bg-adm-border before:hidden [&:nth-child(even)]:before:block xl:[&:nth-child(3)]:before:block">
     <dt className="text-[14px] leading-[20px] font-semibold text-adm-muted">{label}</dt>
-    <dd data-parity={mask} className={cn("mt-[3px] truncate font-bold text-adm-ink", text ? "text-[22px] leading-[34px]" : "text-[28px] leading-[34px] tabular-nums")}>{value}</dd>
+    <dd data-parity={mask} className={cn("mt-[5px] truncate font-bold text-adm-ink", text ? "text-[25px] leading-[33px]" : "text-[28px] leading-[33px] tabular-nums")}>{value}</dd>
     <dd className="text-[14px] leading-[20px] text-adm-muted">{hint}</dd>
   </div>
 );
@@ -348,9 +356,9 @@ const EventIcon = ({ tone }: { tone: HealthTone }) => {
 
 /** A count that is never shown as zero when it is not known. */
 const ImpactStat = ({ value, label, zero, some }: { value: number | null; label: string; zero: string; some: string }) => (
-  <div className="min-w-0 px-2 pt-0.5 pb-[15px] text-center">
-    <p className="text-[32px] leading-[40px] font-bold text-adm-ink tabular-nums">{value === null ? "Unknown" : String(value)}</p>
-    <p className="mt-0.5 text-[15px] leading-[20px] font-semibold text-adm-ink">{label}</p>
+  <div className="min-w-0 px-2 pt-0.5 pb-[13px] text-center">
+    <p className="text-[33px] leading-[40px] font-bold text-adm-ink tabular-nums">{value === null ? "Unknown" : String(value)}</p>
+    <p className="text-[15px] leading-[20px] font-medium text-adm-ink">{label}</p>
     <p className="mt-[3px] text-[13px] leading-[18px] text-adm-muted">{value === null ? "Not recorded" : value === 0 ? zero : some}</p>
   </div>
 );

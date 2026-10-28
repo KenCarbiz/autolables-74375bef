@@ -1038,10 +1038,10 @@
     },
     "timelineTable": {
       "selector": "#run-timeline table",
-      "x": 266,
+      "x": 285,
       "yBody": 446,
-      "w": 727,
-      "h": 203
+      "w": 689,
+      "h": 212
     },
     "title": {
       "selector": "[data-admin-v2] h1",

@@ -58,6 +58,7 @@ export const Pager = ({
   onPage,
   onSize,
   loaded,
+  className,
 }: {
   page: number;
   pages: number;
@@ -70,23 +71,25 @@ export const Pager = ({
   onSize: (s: number) => void;
   /** Rows on the current page, for the count line when the total is not known. */
   loaded: number;
+  className?: string;
 }) => {
   const summary = total === null ? `Showing ${loaded} ${noun}` : from <= 1 ? `Showing ${to} of ${total} ${noun}` : `Showing ${from}–${to} of ${total} ${noun}`;
   return (
-    <div className="flex items-center justify-between gap-3 px-6 pt-3 pb-[38px] border-t border-adm-border text-[13px] leading-[18px] text-adm-muted flex-wrap">
-      <span data-parity="count">{summary}</span>
-      <div className="flex items-center gap-6">
-        <label className="inline-flex items-center gap-3 text-[12px] leading-[18px]">
+    <div className={cn("flex items-start justify-between gap-3 px-6 pt-[13px] pb-[39px] border-t border-adm-border text-[12px] leading-[18px] text-adm-muted flex-wrap", className)}>
+      <span data-parity="count" className="mt-px">{summary}</span>
+      <div className="flex items-center">
+        <label className="inline-flex items-center gap-[11px] text-[12px] leading-[18px]">
           Rows per page
           <select value={size} onChange={(e) => onSize(Number(e.target.value))} className="h-[34px] w-[73px] rounded-md border border-adm-border bg-adm-surface px-2 text-[14px] text-adm-ink">
             {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </label>
-        <nav aria-label="Pagination" className="inline-flex items-center gap-2">
-          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)} className="w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace disabled:opacity-40">
+        <span className="ml-[14px] mr-[5px] w-px h-[31px] bg-adm-border" aria-hidden="true" />
+        <nav aria-label="Pagination" className="inline-flex items-center gap-[2px]">
+          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)} className="mr-px w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace disabled:opacity-40">
             <ChevronLeft className="w-5 h-5" aria-hidden="true" />
           </button>
-          <span className="min-w-[26px] h-8 px-2 inline-flex items-center justify-center rounded-md border border-adm-primary text-[14px] text-adm-primary font-semibold" aria-current="page">{page}</span>
+          <span className="mx-px min-w-[31px] h-[31px] px-2 inline-flex items-center justify-center rounded-md border border-adm-primary bg-adm-selected text-[14px] text-adm-primary font-semibold" aria-current="page">{page}</span>
           <button type="button" aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)} className="w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace disabled:opacity-40">
             <ChevronRight className="w-5 h-5" aria-hidden="true" />
           </button>

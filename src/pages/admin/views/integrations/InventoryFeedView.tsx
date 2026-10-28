@@ -31,9 +31,10 @@ export interface FeedViewFixture {
 
 const UNKNOWN_COUNTS: InventoryCounts = { active: { kind: "loading" }, new: { kind: "loading" }, used: { kind: "loading" }, cpo: { kind: "loading" } };
 
-const TH = "px-3 py-[11px] text-[14px] leading-[20px] text-adm-ink";
-const TD = "px-3 py-[13px]";
-const CARD_TITLE = "text-[18px] leading-[26px] font-semibold text-adm-ink";
+// Measured on the reference: a 41px table header and 17px card titles.
+const TH = "px-3 pt-[11px] pb-[10px] text-[14px] leading-[20px] text-adm-ink";
+const TD = "px-3";
+const CARD_TITLE = "text-[17px] leading-[26px] font-semibold text-adm-ink";
 
 export default function InventoryFeedView() {
   const fixture = useViewFixture<FeedViewFixture>("inventory-feed");
@@ -122,23 +123,23 @@ export default function InventoryFeedView() {
       {banner && (
         <FeedBanner
           verdict={banner}
-          action={runHref ? <AdminLinkButton to={runHref} variant="outline" className="min-h-[43px] sm:min-h-[43px] px-5">Open run details</AdminLinkButton> : undefined}
+          action={runHref ? <AdminLinkButton to={runHref} variant="outline" className="min-h-[43px] sm:min-h-[43px] px-[17px] bg-white/40">Open run details</AdminLinkButton> : undefined}
         />
       )}
       <ReadNote failed={configLoadFailed || runsLoadFailed} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[317fr_310fr_311fr_312fr] gap-4 xl:gap-x-[15px]">
         <FeedTile icon={Clock} iconClassName="w-[30px] h-[30px]" label="Last attempt" value={lastAttemptValue} tone={tiles.lastAttempt.tone} href={runHref ?? undefined} ariaLabel={`Last attempt: ${lastAttemptValue}`} mask="timestamp" />
         <FeedTile icon={CircleCheck} iconClassName="w-[30px] h-[30px]" label="Last successful" value={lastSuccessValue} tone={tiles.lastSuccess.tone} mask="timestamp" />
         <FeedTile icon={CarFront} iconClassName="w-[30px] h-[30px]" label="Active vehicles" value={countDisplay(counts.active)} tone="info" href="/inventory" />
-        <FeedTile icon={Database} iconClassName="w-7 h-7" label="Source identity" value={tiles.sourceIdentity.value} tone={tiles.sourceIdentity.tone} />
+        <FeedTile icon={Database} iconClassName="w-7 h-7 translate-x-1" label="Source identity" value={tiles.sourceIdentity.value} tone={tiles.sourceIdentity.tone} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_365px] gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_369px] gap-4 xl:gap-x-[15px]">
         <AdminCard id="recent-attempts" flush className="min-w-0">
-          <div className="flex items-center justify-between gap-4 px-6 pt-[14px] pb-3">
+          <div className="flex items-center justify-between gap-4 pl-6 pr-[19px] pt-[15px] pb-3">
             <h3 className={CARD_TITLE}>Recent attempts</h3>
-            <Link to={`${adminTabHref("activity")}&kind=provider_job`} className="text-[14px] leading-[20px] font-semibold text-adm-primary hover:underline">View history</Link>
+            <Link to={`${adminTabHref("activity")}&kind=provider_job`} className="text-[14px] leading-[20px] font-medium text-adm-primary hover:underline">View history</Link>
           </div>
           {runsFailed ? (
             <p className="px-6 pb-6 text-[13px] text-adm-muted" role="status">The run ledger could not be read.</p>
@@ -146,12 +147,13 @@ export default function InventoryFeedView() {
             <p className="px-6 pb-6 text-[13px] text-adm-muted">No attempts have been recorded for this rooftop yet.</p>
           ) : (
             <>
-              <AdminTable caption="Recent inventory feed attempts">
+              {/* Rows alternate 46 and 47px to land on the reference's 46.5px rhythm; the heights are minimums. */}
+              <AdminTable caption="Recent inventory feed attempts" className="xl:[&_table]:table-fixed [&_tbody_td]:py-0 [&_tbody_tr]:h-[46px] [&_tbody_tr:first-child]:h-[45px] [&_tbody_tr:nth-child(2)]:h-[47px] [&_tbody_tr:last-child>td]:border-b-0">
                 <colgroup>
-                  <col className="w-[156px]" />
-                  <col className="w-[195px]" />
+                  <col className="w-[177px]" />
+                  <col className="w-[196px]" />
                   <col className="w-[106px]" />
-                  <col className="w-[200px]" />
+                  <col className="w-[199px]" />
                   <col />
                 </colgroup>
                 <thead>
@@ -171,9 +173,9 @@ export default function InventoryFeedView() {
                     return (
                       <tr key={run.id} onClick={() => navigate(href)} className="cursor-pointer hover:bg-adm-workspace">
                         <Td className={cn(TD, "pl-[27px]")}><Link to={href} data-parity="timestamp" className="text-adm-ink hover:underline" onClick={(e) => e.stopPropagation()}>{formatAt(run.started_at)}</Link></Td>
-                        <Td className={cn(TD, "py-[10px]")}>
-                          <span className="flex items-center gap-[18px] text-adm-ink">
-                            <OutcomeIcon tone={isProviderErrorOutcome(outcome) ? "danger" : meta.tone} />
+                        <Td className={cn(TD, "pl-[10px]")}>
+                          <span className="flex items-center gap-[15px] text-adm-ink">
+                            <OutcomeIcon tone={isProviderErrorOutcome(outcome) ? "danger" : meta.tone} alert={isProviderErrorOutcome(outcome)} />
                             {meta.label}
                           </span>
                         </Td>
@@ -185,7 +187,7 @@ export default function InventoryFeedView() {
                   })}
                 </tbody>
               </AdminTable>
-              <Pager page={slice.page} pages={slice.pages} from={slice.from} to={slice.to} total={runTotal} noun="attempts" size={size} onPage={setPage} onSize={(s) => { setSize(s); setPage(1); }} loaded={slice.rows.length} />
+              <Pager className="pr-[10px]" page={slice.page} pages={slice.pages} from={slice.from} to={slice.to} total={runTotal} noun="attempts" size={size} onPage={setPage} onSize={(s) => { setSize(s); setPage(1); }} loaded={slice.rows.length} />
             </>
           )}
         </AdminCard>
@@ -193,21 +195,21 @@ export default function InventoryFeedView() {
         <SourceCard snapshot={snapshot} tenantId={tenantId} onChanged={refetch} identityChipTone={identityChipTone} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <AdminCard bodyClassName="px-6 pt-2 pb-[19px]">
+      <div className="grid grid-cols-1 xl:grid-cols-[638fr_642fr] gap-4 xl:gap-x-[15px]">
+        <AdminCard bodyClassName="px-6 pt-3 pb-[19px]">
           <h3 className={CARD_TITLE}>Condition coverage <span className="font-normal">(this rooftop)</span></h3>
-          <div className="mt-3 grid grid-cols-3 divide-x divide-adm-border">
+          <div className="mt-[9px] grid grid-cols-3 sm:grid-cols-[minmax(0,1fr)_207px_218px] divide-x divide-adm-border">
             <CoverageStat label="New" value={countDisplay(counts.new)} />
             <CoverageStat label="Used" value={countDisplay(counts.used)} />
             <CoverageStat label="CPO" value={countDisplay(counts.cpo)} />
           </div>
         </AdminCard>
-        <AdminCard bodyClassName="px-6 pt-2 pb-[19px]">
-          <h3 className={cn(CARD_TITLE, "flex items-center gap-[13px]")}>
-            <RefreshCw className="w-6 h-6 text-adm-primary flex-shrink-0" aria-hidden="true" />
+        <AdminCard bodyClassName="px-[23px] pt-[11px] pb-[19px]">
+          <h3 className={cn(CARD_TITLE, "-ml-[9px] flex items-center gap-[10px]")}>
+            <RefreshCw className="w-[22px] h-[22px] text-adm-primary flex-shrink-0" aria-hidden="true" />
             Refresh status
           </h3>
-          <div className="mt-4 grid grid-cols-1 gap-y-3 divide-adm-border sm:grid-cols-[1fr_auto_1fr] sm:gap-y-0 sm:divide-x">
+          <div className="mt-[14px] grid grid-cols-1 gap-y-3 divide-adm-border sm:grid-cols-[192px_auto_minmax(0,1fr)] sm:gap-y-0 sm:divide-x">
             <RefreshFact label="Scope" value={refresh.scope} />
             <RefreshFact label="Schedule" value={refresh.schedule} />
             <RefreshFact label="Status" value={refresh.statusLabel} />
@@ -233,10 +235,12 @@ export default function InventoryFeedView() {
 const BANNER_TONE: Record<HealthTone, string> = {
   neutral: "bg-adm-workspace border-adm-border text-adm-ink",
   success: "bg-adm-success-bg border-[#BFE3CF] text-adm-success",
-  warning: "bg-adm-warning-bg border-[#F1D58A] text-[#5F3F00]",
+  // The reference draws the warning frame and mark in saturated amber, not the chip tint.
+  warning: "bg-adm-warning-bg border-[#FAC86F] text-[#5F3F00]",
   danger: "bg-adm-danger-bg border-[#F3B4AE] text-adm-danger",
   info: "bg-adm-selected border-[#C5D4F7] text-adm-ink",
 };
+const BANNER_ICON_COLOR: Record<HealthTone, string> = { neutral: "", success: "", warning: "text-[#E06A00]", danger: "", info: "" };
 const BANNER_ICON: Record<HealthTone, typeof Info> = { neutral: Info, success: CircleCheck, warning: TriangleAlert, danger: CircleX, info: Info };
 
 /** The feed verdict as a two-line banner; a healthy feed renders none. */
@@ -244,13 +248,13 @@ const FeedBanner = ({ verdict, action }: { verdict: HealthVerdict; action?: Reac
   const tone = HEALTH_META[verdict.state].tone;
   const Icon = BANNER_ICON[tone];
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex flex-wrap items-center gap-x-[18px] gap-y-3 rounded-[10px] border px-[18px] pt-2.5 pb-[19px]", BANNER_TONE[tone])}>
-      <Icon className="w-[34px] h-[34px] flex-shrink-0" aria-hidden="true" />
+    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex flex-wrap items-start gap-x-[18px] gap-y-3 rounded-[10px] border-2 pl-4 pr-[18px] pt-3 pb-[15px]", BANNER_TONE[tone])}>
+      <Icon className={cn("mt-px w-8 h-8 flex-shrink-0", BANNER_ICON_COLOR[tone])} aria-hidden="true" />
       <div className="min-w-0 flex-1 basis-[200px]">
-        <p className="text-[16px] leading-[22px] font-semibold">{verdict.headline}</p>
-        <p className="mt-1 text-[14px] leading-[20px] opacity-90">{verdict.detail}</p>
+        <p className="text-[18px] leading-[24px] font-semibold">{verdict.headline}</p>
+        <p className="mt-0.5 text-[14px] leading-[20px] text-adm-ink">{verdict.detail}</p>
       </div>
-      {action && <div className="flex-shrink-0 max-sm:basis-full">{action}</div>}
+      {action && <div className="flex-shrink-0 sm:mt-[3px] max-sm:basis-full">{action}</div>}
     </div>
   );
 };
@@ -261,14 +265,16 @@ const TILE_ICON: Record<HealthTone, string> = { neutral: "text-adm-ink", success
 const FeedTile = ({ icon: Icon, iconClassName, label, value, tone, href, ariaLabel, mask }: { icon: typeof Clock; iconClassName: string; label: string; value: string; tone: HealthTone; href?: string; ariaLabel?: string; mask?: string }) => {
   const body = (
     <>
-      <Icon className={cn("flex-shrink-0", iconClassName, TILE_ICON[tone])} aria-hidden="true" />
+      <span className="w-[30px] flex-shrink-0 flex justify-center" aria-hidden="true">
+        <Icon className={cn("flex-shrink-0", iconClassName, TILE_ICON[tone])} />
+      </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[14px] leading-[20px] text-adm-muted">{label}</span>
-        <span data-parity={mask} className="block mt-0.5 text-[22px] leading-[26px] font-bold text-adm-ink tabular-nums truncate">{value}</span>
+        <span className="block text-[15px] leading-[20px] text-adm-muted">{label}</span>
+        <span data-parity={mask} className="block mt-1 text-[20px] leading-[26px] font-bold text-adm-ink tabular-nums truncate">{value}</span>
       </span>
     </>
   );
-  const cls = "flex items-center gap-5 rounded-[10px] border border-adm-border bg-adm-surface px-[21px] min-h-[90px]";
+  const cls = "flex items-start gap-[23px] rounded-[10px] border border-adm-border bg-adm-surface px-5 pt-[21px] pb-3 min-h-[91px]";
   return href ? (
     <Link to={href} data-parity="tile" className={cn(cls, "hover:border-adm-primary/60 focus-visible:outline-2 focus-visible:outline-adm-primary")} aria-label={ariaLabel ?? `${label}: ${value}`}>
       {body}
@@ -287,22 +293,22 @@ const OUTCOME_ICON: Record<HealthTone, { icon: typeof Info; fill: string }> = {
 };
 
 // Filled marks lose a stroke width of visible fill, so the box is drawn larger than the mark it shows.
-const OutcomeIcon = ({ tone }: { tone: HealthTone }) => {
-  const { icon: Icon, fill } = OUTCOME_ICON[tone];
+const OutcomeIcon = ({ tone, alert = false }: { tone: HealthTone; alert?: boolean }) => {
+  const { icon: Icon, fill } = alert ? { icon: CircleAlert, fill: OUTCOME_ICON[tone].fill } : OUTCOME_ICON[tone];
   return <Icon className={cn("w-[26px] h-[26px] flex-shrink-0 text-white", fill)} aria-hidden="true" />;
 };
 
 const CoverageStat = ({ label, value }: { label: string; value: string }) => (
-  <div className="min-w-0 px-3 first:pl-3 last:pr-0">
+  <div className="min-w-0 px-3 first:pl-[13px] sm:[&:not(:first-child)]:pl-[57px] last:pr-0">
     <p className="text-[13px] leading-[18px] text-adm-muted">{label}</p>
-    <p className="text-[24px] leading-[30px] font-bold text-adm-ink tabular-nums">{value}</p>
+    <p className="mt-0.5 text-[24px] leading-[30px] font-bold text-adm-ink tabular-nums">{value}</p>
   </div>
 );
 
 const RefreshFact = ({ label, value }: { label: string; value: string }) => (
-  <div className="min-w-0 sm:pr-4 sm:[&:not(:first-child)]:pl-5">
+  <div className="min-w-0 sm:pr-3 sm:[&:not(:first-child)]:pl-[19px]">
     <p className="text-[13px] leading-[18px] text-adm-muted">{label}</p>
-    <p className="mt-0.5 text-[16px] leading-[22px] text-adm-ink sm:whitespace-nowrap">{value}</p>
+    <p className="mt-[3px] text-[15px] leading-[22px] text-adm-ink sm:whitespace-nowrap">{value}</p>
   </div>
 );
 
@@ -332,22 +338,22 @@ const SourceCard = ({
   };
 
   return (
-    <AdminCard bodyClassName="px-[19px] pt-[13px] pb-[17px]">
+    <AdminCard bodyClassName="pl-[18px] pr-[19px] pt-[14px] pb-[17px]">
       <div className="flex items-center justify-between gap-3">
         <h3 className={CARD_TITLE}>Source</h3>
         <StatusChip tone={identityChipTone} icon className="h-[27px] px-2.5">{snapshot.tiles.sourceIdentity.value}</StatusChip>
       </div>
-      <div className="mt-3 flex items-center gap-[14px]">
+      <div className="mt-[11px] flex items-center gap-[14px]">
         <Globe className="w-6 h-6 text-adm-primary flex-shrink-0" aria-hidden="true" />
         <p data-parity="host" className="text-[16px] leading-[22px] font-semibold text-adm-ink truncate">{source.host ?? "No source configured"}</p>
       </div>
-      <p className="mt-[14px] text-[14px] leading-[20px] text-adm-muted">{source.pinLabel}</p>
+      <p className="mt-[15px] text-[14px] leading-[20px] text-adm-muted">{source.pinLabel}</p>
       {source.pinValue ? (
         <p data-parity="pin" className="mt-0.5 text-[20px] leading-[26px] font-bold text-adm-ink tabular-nums truncate">{source.pinValue}</p>
       ) : (
         <p className="mt-0.5 text-[20px] leading-[26px] font-bold text-adm-muted">Not pinned</p>
       )}
-      <p className={cn("mt-2 flex items-center gap-[7px] text-[14px] leading-[20px] font-semibold", source.identity === "needs_review" ? "text-adm-warning" : "text-adm-success")}>
+      <p className={cn("mt-2 -ml-px flex items-center gap-[7px] text-[14px] leading-[20px] font-semibold", source.identity === "needs_review" ? "text-adm-warning" : "text-adm-success")}>
         {source.identity === "needs_review" ? (
           <CircleAlert className="w-[26px] h-[26px] flex-shrink-0 text-white fill-adm-warning" aria-hidden="true" />
         ) : (
@@ -355,7 +361,7 @@ const SourceCard = ({
         )}
         {source.retainedLabel}
       </p>
-      <div className="mt-3 flex items-center gap-3 rounded-md border border-adm-border bg-adm-workspace px-4 py-0.5 text-[13px] leading-[18px] text-adm-ink">
+      <div className="mt-1.5 mx-px flex items-center gap-[13px] min-h-[42px] rounded-md border border-adm-border bg-adm-workspace pl-3 pr-3 py-0.5 text-[13px] leading-[18px] text-adm-ink">
         <Info className="w-5 h-5 flex-shrink-0 text-adm-muted" aria-hidden="true" />
         <span>{source.note}</span>
       </div>
@@ -365,7 +371,7 @@ const SourceCard = ({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-describedby="review-source-hint"
-        className="mt-[9px] w-full min-h-[43px] sm:min-h-[43px] text-[15px] gap-2.5 disabled:opacity-100 disabled:bg-adm-workspace disabled:text-adm-muted"
+        className="mt-[15px] w-full min-h-[43px] sm:min-h-[43px] text-[14px] font-medium gap-3 disabled:opacity-100 disabled:bg-adm-workspace disabled:text-adm-muted"
       >
         <FileText className="w-5 h-5" aria-hidden="true" />
         {open ? "Close review" : "Review source"}
