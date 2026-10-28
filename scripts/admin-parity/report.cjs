@@ -22,12 +22,12 @@ function readNotes() {
 function gateLine(s) {
   if (!s.gate) return "Gate: not evaluated.";
   if (s.gate.error) return `Gate: FAIL (the screen did not render: ${s.gate.error}).`;
-  const protocol = s.frames && s.frames.protocol && s.frames.protocol.content ? s.frames.protocol.content.parityPercent : s.gate.contentParity;
+  const protocol = s.frames && s.frames.reference && s.frames.reference.content ? s.frames.reference.content.parityPercent : s.gate.contentParity;
   const reasons = [];
   if (s.gate.landmarks === false) reasons.push("landmarks out of tolerance");
   if (!s.gate.responsive) reasons.push("page overflow at a breakpoint");
-  if (typeof protocol !== "number") reasons.push("no protocol-frame score");
-  else if (protocol < 97) reasons.push(`protocol content parity ${protocol.toFixed(2)}% is below 97%`);
+  if (typeof protocol !== "number") reasons.push("no protocol v2 score");
+  else if (protocol < 95) reasons.push(`protocol v2 content parity ${protocol.toFixed(2)}% is below 95%`);
   return reasons.length ? `Gate: FAIL (${reasons.join("; ")}). Acceptance pending; no exception has been approved.` : "Gate: PASS.";
 }
 
@@ -40,8 +40,8 @@ function writeReport(results, outPath) {
   lines.push("");
   lines.push("## Method");
   lines.push("");
-  lines.push(`- Reference frame: ${results.referenceFrame.width}x${results.referenceFrame.height}, the size the mocks were cropped to. Rendered and compared pixel for pixel as a diagnostic; it is not the agreed metric.`);
-  lines.push(`- Protocol frame: ${results.protocolFrame.width}x${results.protocolFrame.height}. This is the agreed comparison frame (\`docs/05_VISUAL_PARITY_97_PROTOCOL.md\`, \`contracts/PARITY_TARGETS.csv\`): the reference is resampled (bilinear) to it, captured at DPR 1 in Playwright Chromium, and its content-region parity is the number held to 97%.`);
+  lines.push(`- Protocol v2 (agreed since 2026-10-28): the application is captured at the references' native ${results.referenceFrame.width}x${results.referenceFrame.height} viewport and compared pixel for pixel, neither image resized. Its content-region parity is the agreed number; acceptance is 95% per screen, 94.00-94.99% reviewable individually, below 94% not passed. Moving from v1 to v2 changes the measurement only; any difference between the two columns is not a code improvement.`);
+  lines.push(`- Protocol v1 (historical, superseded 2026-10-28): ${results.protocolFrame.width}x${results.protocolFrame.height} capture against the reference resampled bilinearly to that frame. Still computed and reported as a labelled column; the v1 contract and its results are preserved in \`scripts/admin-parity/protocol-v1/\`.`);
   lines.push("- Pixel parity: a pixel differs when any channel moves by more than 32 of 255 after masks. Parity is 100 minus the differing share of compared pixels. No anti-aliasing allowance is applied.");
   lines.push("- Structure: mean SSIM over 8x8 luminance blocks after masks.");
   lines.push("- Masks: only dynamic data (counts, relative times, fixture names) listed in `scripts/admin-parity/masks.json`, read from the rendered DOM so the same boxes mask both images. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.");
@@ -107,9 +107,9 @@ function writeReport(results, outPath) {
   }
   lines.push("## Reading the numbers");
   lines.push("");
-  lines.push("- The 97% target in the parity protocol applies to content-region parity at the 1600x1000 protocol frame after permitted dynamic masks. No screen meets it. The full-frame number also includes the product rail and header, which belong to the global shell; treating them separately is a proposal for the owner, not an approved exception.");
+  lines.push("- The acceptance target (95% per screen; 94.00-94.99% individually reviewable) applies to protocol v2 content-region parity at the native 1586x992 frame after permitted dynamic masks. The full-frame number also includes the product rail and header, which belong to the global shell; treating them separately is a proposal for the owner, not an approved exception.");
   lines.push("- A high structural score with a lower pixel parity means the composition matches and the remaining difference is typography rendering or sub-pixel offsets; a low structural score means a layout difference and needs a look at the diff image.");
-  lines.push("- A landmark out of tolerance is a hard-gate failure regardless of the computed score. A screen's gate passes only when every landmark is within tolerance, no breakpoint has page overflow, and content-region parity at the protocol frame is at least 97%.");
+  lines.push("- A landmark out of tolerance is a hard-gate failure regardless of the computed score. A screen's gate passes only when every landmark is within tolerance, no breakpoint has page overflow, and protocol v2 content-region parity is at least 95%.");
   lines.push("- Responsive: page overflow (document wider than the viewport) fails the breakpoint. A region that scrolls by design, such as the section row or a wide table inside its own scroll container, is listed under Scroll regions and does not fail it.");
   lines.push("");
   lines.push("## Reproduce");

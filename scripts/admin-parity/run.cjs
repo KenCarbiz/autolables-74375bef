@@ -29,6 +29,10 @@ const REFERENCE_DIR = path.join(HERE, "reference");
 
 const REFERENCE_FRAME = { width: 1586, height: 992 };
 const PROTOCOL_FRAME = { width: 1600, height: 1000 };
+// Protocol v2 (owner, 2026-10-28): the agreed number is content parity at the references' native
+// 1586x992 with neither image resized. The v1 number (reference resampled to 1600x1000) is still
+// computed and reported as a labelled historical column.
+const ACCEPT_PERCENT = 95;
 const RESPONSIVE = [
   { width: 1920, height: 1080 },
   { width: 1366, height: 768 },
@@ -84,7 +88,7 @@ async function main() {
     baseUrl = `http://127.0.0.1:${args.port}`;
   }
   const browser = await chromium.launch();
-  const results = { generatedAt: new Date().toISOString(), baseUrl, referenceFrame: REFERENCE_FRAME, protocolFrame: PROTOCOL_FRAME, screens: [] };
+  const results = { generatedAt: new Date().toISOString(), baseUrl, protocolVersion: 2, referenceFrame: REFERENCE_FRAME, protocolFrame: PROTOCOL_FRAME, screens: [] };
   try {
     const page = await browser.newPage({ deviceScaleFactor: 1 });
     const registered = await listFixtures(page, baseUrl);
@@ -172,10 +176,11 @@ async function main() {
       const gate = {
         landmarks: entry.landmarks ? entry.landmarks.every((l) => l.ok) : null,
         responsive: entry.responsive.every((x) => x.ok),
-        contentParity: pr && pr.content ? pr.content.parityPercent : null,
+        contentParity: r && r.content ? r.content.parityPercent : null,
+        v1ContentParity: pr && pr.content ? pr.content.parityPercent : null,
       };
       gate.bodyDiagnostic = r && r.body ? r.body.parityPercent : null;
-      gate.pass = gate.landmarks !== false && gate.responsive && typeof gate.contentParity === "number" && gate.contentParity >= 97;
+      gate.pass = gate.landmarks !== false && gate.responsive && typeof gate.contentParity === "number" && gate.contentParity >= ACCEPT_PERCENT;
       entry.gate = gate;
       results.screens.push(entry);
       const split = r && r.body && r.body.nonText ? ` · layout ${r.body.nonText.parityPercent.toFixed(2)}% · text ${r.body.text.parityPercent.toFixed(2)}% (text ${r.body.text.shareOfBodyDiffPercent.toFixed(2)}% / layout ${r.body.nonText.shareOfBodyDiffPercent.toFixed(2)}% of body pixels differ)` : "";

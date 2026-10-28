@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 "use strict";
-// Reference / actual / overlay sheets at the protocol frame (1600x1000), with
+// Reference / actual / overlay sheets at the protocol frame (v2: native 1586x992; --v1: 1600x1000), with
 // nothing masked out of the pictures so every label stays readable.
 //
 //   node scripts/admin-parity/overlay.cjs            every screen in out/results.json
 //   node scripts/admin-parity/overlay.cjs 10,11      selected screens
 //
 // Per screen it writes evidence/overlay/<NN>.png with four panels:
-//   Reference   the original resampled to 1600x1000, as the protocol scores it
-//   Actual      the 1600x1000 capture
+//   Reference   the original, as the protocol scores it (resampled only under --v1)
+//   Actual      the capture at the same frame
 //   Overlay     reference luminance in red, actual luminance in green and blue:
 //               grey where they agree, cyan where only the reference has ink,
 //               red where only the implementation has ink
@@ -25,11 +25,13 @@ const { decodePng, encodePng, resample } = require("./png.cjs");
 const HERE = __dirname;
 const ROOT = path.resolve(HERE, "..", "..");
 const DEST = path.join(HERE, "evidence", "overlay");
-const W = 1600;
-const H = 1000;
+// Protocol v2 (default) compares at the native 1586x992 frame; pass --v1 for the historical resampled 1600x1000 frame.
+const V1 = process.argv.includes("--v1");
+const W = V1 ? 1600 : 1586;
+const H = V1 ? 1000 : 992;
 const THRESHOLD = 32;
 
-const only = process.argv[2] ? process.argv[2].split(",") : null;
+const only = process.argv.find((a) => /^\d\d(,\d\d)*$/.test(a))?.split(",") ?? null;
 const results = JSON.parse(fs.readFileSync(path.join(HERE, "out", "results.json"), "utf8"));
 const landmarks = JSON.parse(fs.readFileSync(path.join(HERE, "landmarks.json"), "utf8"));
 const lum = (d, i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
@@ -68,18 +70,19 @@ function panels(ref, cap, masks, region) {
   const page = await browser.newPage({ deviceScaleFactor: 1, viewport: { width: 2 * W + 72, height: 1000 } });
   for (const entry of results.screens) {
     if (only && !only.includes(entry.screen)) continue;
-    const P = entry.frames.protocol;
+    const P = V1 ? entry.frames.protocol : entry.frames.reference;
     const ref = resample(decodePng(fs.readFileSync(path.join(ROOT, entry.reference))), W, H);
     const cap = decodePng(fs.readFileSync(path.join(ROOT, P.file)));
     const rail = Math.round((landmarks[entry.screen]._rail * W) / 1586);
+    const maskRects = V1 ? (P.maskRects || []) : (entry.masks || []);
     const region = { x: rail + 3, y: 70, w: W - rail - 3, h: H - 70 };
-    const { over, diff } = panels(ref, cap, P.maskRects || [], region);
+    const { over, diff } = panels(ref, cap, maskRects, region);
     const cell = (title, sub, buf) => `<figure><figcaption><b>${title}</b> <span>${sub}</span></figcaption><img src="${uri(buf)}"></figure>`;
     await page.setContent(`<html><body style="margin:0;padding:24px;background:#E9EDF3;font:22px Inter,Arial,sans-serif;color:#17263C">
-      <h2 style="margin:0 0 6px">${entry.screen} · ${path.basename(entry.reference)} · protocol frame ${W}x${H}, DPR 1</h2>
-      <p style="margin:0 0 18px">Protocol score (masks applied): full ${pct(P.full.parityPercent)} · content ${pct(P.content.parityPercent)} · structure (8x8 SSIM, content) ${pct(P.content.structuralPercent)} · masked ${pct(P.maskedPercent)} of the frame · target 97% not met</p>
+      <h2 style="margin:0 0 6px">${entry.screen} · ${path.basename(entry.reference)} · protocol ${V1 ? "v1 (historical)" : "v2"} · ${W}x${H}, DPR 1</h2>
+      <p style="margin:0 0 18px">Protocol score (masks applied): full ${pct(P.full.parityPercent)} · content ${pct(P.content.parityPercent)} · structure (8x8 SSIM, content) ${pct(P.content.structuralPercent)} · masked ${pct(P.maskedPercent)} of the frame · target 95% ${P.content.parityPercent >= 95 ? "met" : "not met"}</p>
       <div style="display:grid;grid-template-columns:${W}px ${W}px;gap:24px">
-        ${cell("Reference", "original resampled to the protocol frame", encodePng(ref))}
+        ${cell("Reference", V1 ? "original resampled to 1600x1000 (v1)" : "original at native size, not resized (v2)", encodePng(ref))}
         ${cell("Actual", "fixture capture, unmasked", encodePng(cap))}
         ${cell("Overlay", "grey = both · cyan = reference only · red = implementation only", encodePng(over))}
         ${cell("Differences", "magenta = pixel past 32/255 · blue = scored region · orange = permitted mask (contents still shown)", encodePng(diff))}

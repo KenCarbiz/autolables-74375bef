@@ -144,7 +144,7 @@ test("the report states the gate, each landmark and each breakpoint", () => {
     }],
   }, out);
   const text = fs.readFileSync(out, "utf8");
-  assert.match(text, /Gate: FAIL \(landmarks out of tolerance; page overflow at a breakpoint; protocol content parity 88\.00% is below 97%\)/);
+  assert.match(text, /Gate: FAIL \(landmarks out of tolerance; page overflow at a breakpoint; protocol v2 content parity 88\.00% is below 95%\)/);
   assert.match(text, /\| title \| OUT of tolerance \| x=1 \| x=30 y=0 w=0 h=0 \| x\+29 \|/);
   assert.doesNotMatch(text, /NaN/);
   assert.match(text, /\| 390x844 \| OVERFLOW \| 442 \| 390 \| 1282 \| nav \|/);
