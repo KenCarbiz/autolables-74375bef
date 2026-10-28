@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Car, CheckCircle2, ChevronRight, ClipboardCheck, FileText, Globe, Route, Store, Tag, Users } from "lucide-react";
+import { AlertCircle, AlertTriangle, Car, CheckCircle2, ChevronRight, FileText, Globe, Info, Route, Store, Tag, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
@@ -71,6 +71,17 @@ const toneForAction = (action: string): ActivityRow["tone"] => {
 
 const humanize = (s: string) => s.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
+/** The activity list's short relative time: 24m ago, 2h ago, 1d ago. */
+const compactAge = (iso: string, now: number): string => {
+  const ms = now - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return describeAge(iso, now);
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return `${Math.max(minutes, 1)}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+};
+
 async function loadOverview(tenantId: string, now: number): Promise<LiveOverview> {
   const db = supabase as unknown as { from: (t: string) => any };
   const [cfgRes, latestRes, realRes, successRes] = await Promise.all([
@@ -138,10 +149,10 @@ const SHORTCUTS = [
 ] as const;
 
 const ATTENTION_ICON: Record<AttentionItem["status"], typeof AlertTriangle> = {
-  blocked: AlertTriangle,
+  blocked: AlertCircle,
   needs_review: AlertTriangle,
   review_required: AlertTriangle,
-  incomplete: ClipboardCheck,
+  incomplete: Info,
   unknown: AlertTriangle,
 };
 
@@ -217,10 +228,10 @@ export default function OverviewView() {
             <AdminTable caption="Ranked attention queue" dense inset>
               <thead>
                 <tr>
-                  <Th>Issue</Th>
-                  <Th>Owner</Th>
-                  <Th>Status</Th>
-                  <Th>Action</Th>
+                  <Th className="w-[44%]">Issue</Th>
+                  <Th className="w-[18%]">Owner</Th>
+                  <Th className="w-[19%]">Status</Th>
+                  <Th className="w-[19%]">Action</Th>
                 </tr>
               </thead>
               <tbody>
@@ -231,15 +242,15 @@ export default function OverviewView() {
                     <tr key={item.id}>
                       <Td>
                         <div className="flex items-start gap-3">
-                          <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${meta.tone === "danger" ? "text-adm-danger" : meta.tone === "warning" ? "text-adm-warning" : "text-adm-muted"}`} aria-hidden="true" />
+                          <Icon className={`w-[18px] h-[18px] mt-1 flex-shrink-0 fill-current stroke-white ${meta.tone === "danger" ? "text-adm-danger" : meta.tone === "warning" ? "text-[#F2A51A]" : "text-adm-muted"}`} aria-hidden="true" />
                           <div className="min-w-0">
-                            <p className="font-semibold text-adm-ink">{item.title}</p>
-                            <p className="text-[12px] leading-[18px] text-adm-muted">{item.detail}</p>
+                            <p className="text-[12.5px] leading-[18px] font-semibold text-adm-ink">{item.title}</p>
+                            <p className="text-adm-muted">{item.detail}</p>
                           </div>
                         </div>
                       </Td>
-                      <Td className="text-adm-muted">{item.owner ?? "—"}</Td>
-                      <Td><StatusChip tone={meta.tone}>{meta.label}</StatusChip></Td>
+                      <Td className="text-adm-ink">{item.owner ?? "—"}</Td>
+                      <Td><StatusChip tone={meta.tone} className="text-[10.5px] leading-[16px] py-1">{meta.label}</StatusChip></Td>
                       <Td><Link to={item.action.href} className="font-semibold text-adm-primary hover:underline">{item.action.label}</Link></Td>
                     </tr>
                   );
@@ -250,39 +261,39 @@ export default function OverviewView() {
         </AdminCard>
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.18fr)_minmax(260px,1fr)] gap-2.5 items-stretch">
-        <AdminCard title="Administration settings" inset="sm" bodyClassName="pt-1.5 pb-3">
+        <AdminCard title="Administration settings" inset="sm" titleSize="sm" headerClassName="pt-2.5" bodyClassName="pt-1.5 pb-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {SHORTCUTS.map((s) => {
               const section = ADMIN_SECTIONS.find((x) => x.id === s.section)!;
               return (
-                <Link key={s.section} to={adminTabHref(section.tabs[0].id)} className="flex items-center gap-2.5 rounded-[10px] border border-adm-border px-3 py-3 hover:border-adm-primary/60">
-                  <span className="w-9 h-9 rounded-md bg-adm-workspace text-adm-ink flex items-center justify-center flex-shrink-0" aria-hidden="true"><s.icon className="w-4 h-4" /></span>
+                <Link key={s.section} to={adminTabHref(section.tabs[0].id)} className="flex items-center gap-2 rounded-[10px] border border-adm-border pl-2 pr-1.5 py-[14px] hover:border-adm-primary/60">
+                  <span className="w-8 h-8 rounded-md bg-adm-workspace text-adm-ink flex items-center justify-center flex-shrink-0" aria-hidden="true"><s.icon className="w-4 h-4" /></span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] leading-[18px] font-semibold text-adm-ink">{s.title}</span>
-                    <span className="block text-[11px] leading-[14px] text-adm-muted line-clamp-2">{s.detail}</span>
+                    <span className="block text-[11px] leading-[15px] font-semibold text-adm-ink truncate">{s.title}</span>
+                    <span className="text-[10px] leading-[13px] text-adm-muted line-clamp-2">{s.detail}</span>
                   </span>
-                  <ChevronRight className="w-4 h-4 text-adm-muted" aria-hidden="true" />
+                  <ChevronRight className="w-4 h-4 text-adm-muted flex-shrink-0" aria-hidden="true" />
                 </Link>
               );
             })}
           </div>
         </AdminCard>
 
-        <AdminCard title="Recent activity" inset="sm" bodyClassName="pt-1.5 pb-3" action={<Link to={adminTabHref("activity")} className="text-[13px] font-semibold text-adm-primary hover:underline">View all</Link>}>
+        <AdminCard title="Recent activity" inset="sm" titleSize="sm" headerClassName="pt-2.5" bodyClassName="pt-2 pb-3" action={<Link to={adminTabHref("activity")} className="text-[12px] font-semibold text-adm-primary hover:underline">View all</Link>}>
           {activity.length === 0 ? (
             <p className="text-[13px] text-adm-muted">No recent activity recorded for this rooftop.</p>
           ) : (
             <ul className="divide-y divide-adm-border">
               {activity.slice(0, 5).map((a) => (
-                <li key={a.id} className="flex items-start gap-3 py-[5px]">
-                  <span className={`mt-px w-4 h-4 flex-shrink-0 ${a.tone === "warning" ? "text-adm-warning" : a.tone === "success" ? "text-adm-success" : "text-adm-muted"}`} aria-hidden="true">
-                    {a.tone === "warning" ? <AlertTriangle className="w-4 h-4" /> : a.tone === "success" ? <CheckCircle2 className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                <li key={a.id} className="flex items-start gap-5 py-[5px]">
+                  <span className={`mt-0.5 w-[18px] h-[18px] flex-shrink-0 ${a.tone === "warning" ? "text-[#F2A51A]" : a.tone === "success" ? "text-adm-success" : "text-adm-primary"}`} aria-hidden="true">
+                    {a.tone === "warning" ? <AlertTriangle className="w-[18px] h-[18px] fill-current stroke-white" /> : a.tone === "success" ? <CheckCircle2 className="w-[18px] h-[18px] fill-current stroke-white" /> : a.tone === "info" ? <Users className="w-[18px] h-[18px]" /> : <FileText className="w-[18px] h-[18px]" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] leading-[16px] font-semibold text-adm-ink truncate">{a.action}</span>
-                    <span className="block text-[11px] leading-[14px] text-adm-muted truncate">{a.detail}</span>
+                    <span className="block text-[10.5px] leading-[16px] font-semibold text-adm-ink truncate">{a.action}</span>
+                    <span className="block text-[10px] leading-[14px] text-adm-muted truncate">{a.detail}</span>
                   </span>
-                  <span className="text-[11px] leading-[16px] text-adm-muted whitespace-nowrap">{describeAge(a.at, now)}</span>
+                  <span className="text-[10px] leading-[16px] text-adm-muted whitespace-nowrap">{compactAge(a.at, now)}</span>
                 </li>
               ))}
             </ul>
@@ -291,7 +302,7 @@ export default function OverviewView() {
         </div>
         </div>
 
-        <AdminCard title="Effective policy" inset="sm" className="h-full" action={<Link to={adminTabHref("effective-policy")} className="text-[13px] font-semibold text-adm-primary hover:underline">Edit</Link>}>
+        <AdminCard title="Effective policy" inset="sm" className="h-full" headerClassName="pt-3" bodyClassName="pt-2 pb-4" action={<Link to={adminTabHref("effective-policy")} className="text-[13px] font-semibold text-adm-primary hover:underline">Edit</Link>}>
           <ul className="divide-y divide-adm-border -mt-2">
             {policy.map((row) => {
               const Icon = row.key === "price_basis" ? Tag : row.key === "publishing" ? Globe : row.key === "used_cpo" ? Car : Route;
@@ -300,12 +311,12 @@ export default function OverviewView() {
                 <li key={row.key} className="flex items-start gap-3 py-[14px]">
                   <span className="w-9 h-9 rounded-md bg-adm-workspace text-adm-muted flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-4 h-4" /></span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      {ok ? <CheckCircle2 className="w-4 h-4 text-adm-success" aria-hidden="true" /> : <AlertTriangle className="w-4 h-4 text-adm-danger" aria-hidden="true" />}
-                      <p className="text-[14px] font-semibold text-adm-ink">{row.title}</p>
+                    <div className="flex items-center gap-4">
+                      {ok ? <CheckCircle2 className="w-[18px] h-[18px] text-adm-success fill-current stroke-white" aria-hidden="true" /> : <AlertTriangle className="w-[18px] h-[18px] text-adm-danger fill-current stroke-white" aria-hidden="true" />}
+                      <p className="text-[11px] leading-[16px] font-semibold text-adm-ink">{row.title}</p>
                     </div>
-                    <Link to={row.href} className="block text-[14px] text-adm-ink hover:underline">{row.value}</Link>
-                    <p className="text-[12px] leading-[18px] text-adm-muted">{row.detail}</p>
+                    <Link to={row.href} className="block text-[15.5px] leading-[22px] font-medium text-adm-ink hover:underline">{row.value}</Link>
+                    <p className="text-[12.5px] leading-[18px] text-adm-muted">{row.detail}</p>
                   </div>
                 </li>
               );

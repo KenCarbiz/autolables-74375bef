@@ -53,6 +53,8 @@ export const AdminCard = ({
   id,
   flush = false,
   inset = "md",
+  titleSize = "md",
+  headerClassName,
 }: {
   title?: ReactNode;
   description?: ReactNode;
@@ -65,15 +67,18 @@ export const AdminCard = ({
   flush?: boolean;
   /** Dense dashboard cards sit on a 16px inset; the default form card keeps 24px. */
   inset?: "sm" | "md";
+  /** Secondary dashboard cards carry a 14px title. */
+  titleSize?: "sm" | "md";
+  headerClassName?: string;
 }) => {
   const sm = inset === "sm";
   const padX = sm ? "px-4" : "px-6";
   return (
     <section id={id} className={cn("rounded-[10px] border border-adm-border bg-adm-surface", className)}>
       {(title || action) && (
-        <header className={cn("flex items-start justify-between gap-4", padX, sm ? "pt-3.5" : "pt-5", flush ? (sm ? "pb-3" : "pb-4") : "pb-0")}>
+        <header className={cn("flex items-start justify-between gap-4", padX, sm ? "pt-3.5" : "pt-5", flush ? (sm ? "pb-3" : "pb-4") : "pb-0", headerClassName)}>
           <div className="min-w-0">
-            {title && <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{title}</h3>}
+            {title && <h3 className={cn("font-semibold text-adm-ink", titleSize === "sm" ? "text-[14px] leading-[20px]" : "text-[16px] leading-[22px]")}>{title}</h3>}
             {description && <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{description}</p>}
           </div>
           {action && <div className="flex-shrink-0 flex items-center gap-2">{action}</div>}
@@ -194,7 +199,7 @@ export const AdminLinkButton = ({ variant = "secondary", size = "md", className,
 
 /** Table shell: 12px semibold headers on the workspace tint, 12px cells, 1px row lines. */
 export const AdminTable = ({ children, className, caption, dense = false, inset = false }: { children: ReactNode; className?: string; caption?: string; /** 7px cells for dashboard queues. */ dense?: boolean; /** Draw the table as a bordered box inside a flush card. */ inset?: boolean }) => (
-  <div className={cn("overflow-x-auto", inset && "mx-4 mb-4 rounded-md border border-adm-border", dense && "[&_th]:py-2.5 [&_td]:py-[7px] [&_tbody_tr:last-child>td]:border-b-0", className)}>
+  <div className={cn("overflow-x-auto", inset && "mx-4 mb-4 rounded-md border border-adm-border", dense && "[&_table]:text-[11.5px] [&_table]:leading-[16px] [&_th]:py-2.5 [&_td]:py-[9px] [&_tbody_tr:last-child>td]:border-b-0", className)}>
     <table className="w-full border-collapse text-left text-[14px] leading-[20px] text-adm-ink">
       {caption && <caption className="sr-only">{caption}</caption>}
       {children}
