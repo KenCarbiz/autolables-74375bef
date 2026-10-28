@@ -148,7 +148,7 @@ export const CapabilityMatrixTable = ({ matrix }: { matrix: CapabilityMatrix }) 
             const Icon = MATRIX_ROW_ICONS[r.id] ?? FileText;
             return (
               <tr key={r.id}>
-                <Td className="pt-[10px] pb-[9px] pl-[12px]">
+                <Td className="pt-[10px] pb-[10px] pl-[12px]">
                   <span className="flex items-center gap-[21px]">
                     <Icon className={ROW_ICON} aria-hidden="true" />
                     <span className="min-w-0">
@@ -194,7 +194,7 @@ export const EnforcementRail = ({ rows }: { rows: EnforcementRow[] }) => (
         const meta = ENFORCEMENT_STATUS_META[r.status];
         const Icon = POINT_ICONS[r.point];
         return (
-          <li key={r.point} className="flex flex-wrap items-start gap-x-3 gap-y-3 pl-[17px] pr-[10px] pt-[19px] pb-[22px]">
+          <li key={r.point} className="flex flex-wrap items-start gap-x-3 gap-y-3 pl-[17px] pr-[10px] pt-[23px] pb-[18px]">
             <Icon className={cn(ROW_ICON, "mt-[2px] mr-[11px]")} aria-hidden="true" />
             <div className="min-w-[160px] flex-1">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.title}</p>
@@ -243,7 +243,7 @@ export const RoleSummaryRail = ({ member, policyHref, onClose, className }: { me
         <div className="mt-[17px] flex items-center gap-3">
           <MemberAvatar initials={member.initials} department={member.department} size="lg" />
           <div className="min-w-0">
-            <p className="text-[18px] leading-[24px] font-semibold text-adm-ink [overflow-wrap:anywhere]" data-parity="member-name"><BreakableAddress value={member.email} /></p>
+            <p className="text-[18px] leading-[22px] font-semibold text-adm-ink [overflow-wrap:anywhere]" data-parity="member-name"><BreakableAddress value={member.email} /></p>
             <p className="text-[14px] leading-[20px] text-adm-muted">{member.roleLabel}</p>
           </div>
         </div>
