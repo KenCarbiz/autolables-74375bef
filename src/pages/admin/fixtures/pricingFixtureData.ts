@@ -42,15 +42,13 @@ const listing = (n: number, over: Partial<ConsistencyListing> = {}): Consistency
 const observed = (price: number, capturedAt = "2026-10-21T06:05:00Z"): WebsiteObservation => ({ price, capturedAt, sourceUrl: "https://dealer.example/vdp", channel: "website" });
 
 // The reference depicts the fee-inclusive basis ("Advertised total includes
-// document fee"), so the fixture policy uses it. The first three rows follow
-// the reference's states in order: consistent on the same version, a
+// document fee"), so the fixture policy uses it. The three rows follow the
+// reference's states in order: consistent on the same version, a
 // mismatch seen on an older version, and a vehicle awaiting evidence.
 export const CONSISTENCY_ROWS: ConsistencyAssessment[] = [
   assessConsistency(listing(41), observed(18_000 + 41 * 525 + 895), 895, "website_sale_price"),
   assessConsistency(listing(32), observed(18_000 + 32 * 525 + 1_895, "2026-10-19T06:05:00Z"), 895, "website_sale_price"),
   assessConsistency(listing(18), null, 895, "website_sale_price"),
-  assessConsistency(listing(58), observed(18_000 + 58 * 525 + 895), 895, "website_sale_price"),
-  assessConsistency(listing(46), observed(18_000 + 46 * 525 + 895), 895, "website_sale_price"),
 ];
 
 export const PRICE_RULES_FIXTURE: PriceRulesFixture = {

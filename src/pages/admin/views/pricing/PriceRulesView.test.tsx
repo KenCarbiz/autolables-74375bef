@@ -67,12 +67,12 @@ describe("PriceRulesView with the 05 fixture", () => {
     expect(screen.getByText("Taxes and registration are separate.")).toBeInTheDocument();
 
     const table = screen.getByRole("table", { name: "Price consistency by vehicle" });
-    expect(within(table).getAllByText("Consistent")).toHaveLength(3);
+    expect(within(table).getAllByText("Consistent")).toHaveLength(1);
     expect(within(table).getAllByText("Mismatch")).toHaveLength(1);
     expect(within(table).getAllByText("Not checked")).toHaveLength(1);
     expect(within(table).getAllByText("Older version")).toHaveLength(1);
     expect(within(table).getAllByText("Awaiting evidence")).toHaveLength(1);
-    expect(screen.getByText("5 vehicles shown")).toBeInTheDocument();
+    expect(screen.getByText("3 vehicles shown")).toBeInTheDocument();
     expect(screen.getByText("1 mismatch needs review.")).toBeInTheDocument();
     expect(writeCalls()).toEqual([]);
   });
