@@ -444,6 +444,51 @@ export type Database = {
           },
         ]
       }
+      admin_policy_applications: {
+        Row: {
+          applied_by: string | null
+          created_at: string
+          idempotency_key: string
+          policy: string
+          requested: Json
+          result: Json
+          tenant_id: string
+        }
+        Insert: {
+          applied_by?: string | null
+          created_at?: string
+          idempotency_key: string
+          policy: string
+          requested: Json
+          result: Json
+          tenant_id: string
+        }
+        Update: {
+          applied_by?: string | null
+          created_at?: string
+          idempotency_key?: string
+          policy?: string
+          requested?: Json
+          result?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_policy_applications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_policy_applications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       advertised_price_crawl_attempts: {
         Row: {
           attempts: number
@@ -1383,6 +1428,7 @@ export type Database = {
       dealer_profiles: {
         Row: {
           created_at: string
+          policy_version: number
           settings: Json
           tenant_id: string
           updated_at: string
@@ -1390,6 +1436,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          policy_version?: number
           settings?: Json
           tenant_id: string
           updated_at?: string
@@ -1397,6 +1444,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          policy_version?: number
           settings?: Json
           tenant_id?: string
           updated_at?: string
@@ -9526,6 +9574,7 @@ export type Database = {
           price_last_verified_at: string | null
           price_parse_notes: string | null
           price_parse_status: string | null
+          price_recalculated_at: string | null
           price_source_url: string | null
           published_at: string | null
           recall_check: Json | null
@@ -9615,6 +9664,7 @@ export type Database = {
           price_last_verified_at?: string | null
           price_parse_notes?: string | null
           price_parse_status?: string | null
+          price_recalculated_at?: string | null
           price_source_url?: string | null
           published_at?: string | null
           recall_check?: Json | null
@@ -9704,6 +9754,7 @@ export type Database = {
           price_last_verified_at?: string | null
           price_parse_notes?: string | null
           price_parse_status?: string | null
+          price_recalculated_at?: string | null
           price_source_url?: string | null
           published_at?: string | null
           recall_check?: Json | null
@@ -10970,10 +11021,35 @@ export type Database = {
         }
         Returns: string
       }
+      admin_doc_fee_change_apply: {
+        Args: {
+          p_amount: number
+          p_enabled: boolean
+          p_expected_version: number
+          p_idempotency_key: string
+          p_include_archived?: boolean
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      admin_doc_fee_change_preview: {
+        Args: {
+          p_amount: number
+          p_enabled: boolean
+          p_include_archived?: boolean
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      admin_feed_last_success: {
+        Args: { p_tenant_id: string }
+        Returns: string
+      }
       admin_invite_member: {
         Args: { _email: string; _role?: string; _tenant_id: string }
         Returns: string
       }
+      admin_job_status: { Args: { p_tenant_id: string }; Returns: Json[] }
       admin_link_autocurb: {
         Args: { p_autocurb_id: string; p_profile: Json; p_tenant_id: string }
         Returns: undefined
@@ -10989,6 +11065,7 @@ export type Database = {
         }
         Returns: string
       }
+      admin_policy_version: { Args: { p_tenant_id: string }; Returns: number }
       admin_purge_tenant_market_evidence: {
         Args: { p_reason: string; p_tenant_id: string }
         Returns: {
@@ -11007,6 +11084,10 @@ export type Database = {
       admin_set_tenant_features: {
         Args: { _patch: Json; _tenant_id: string }
         Returns: undefined
+      }
+      admin_tenant_member_ok: {
+        Args: { p_tenant_id: string }
+        Returns: boolean
       }
       advertised_price_crawl_health: {
         Args: { _tenant_id?: string }
@@ -11581,6 +11662,7 @@ export type Database = {
           price_last_verified_at: string | null
           price_parse_notes: string | null
           price_parse_status: string | null
+          price_recalculated_at: string | null
           price_source_url: string | null
           published_at: string | null
           recall_check: Json | null
@@ -12577,6 +12659,10 @@ export type Database = {
       }
       tenant_price_verification_on: {
         Args: { _tenant_id: string }
+        Returns: boolean
+      }
+      tenant_role_in: {
+        Args: { p_roles: string[]; p_tenant_id: string }
         Returns: boolean
       }
       transition_safety_inspection: {
