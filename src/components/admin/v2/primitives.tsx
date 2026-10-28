@@ -212,7 +212,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primar
 
 const BUTTON_BASE = "inline-flex items-center justify-center gap-2 rounded-md font-semibold text-[14px] leading-[20px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary";
 const BUTTON_VARIANT: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  primary: "bg-adm-primary text-white hover:bg-adm-primary-hover border border-adm-primary",
+  primary: "bg-adm-primary text-white hover:bg-adm-primary-hover border border-adm-primary disabled:bg-adm-border disabled:border-adm-border disabled:text-adm-muted disabled:opacity-100",
   secondary: "bg-adm-surface text-adm-ink border border-adm-border hover:bg-adm-workspace",
   outline: "bg-adm-surface text-adm-primary border border-adm-primary hover:bg-adm-selected",
   ghost: "bg-transparent text-adm-primary hover:bg-adm-selected",
