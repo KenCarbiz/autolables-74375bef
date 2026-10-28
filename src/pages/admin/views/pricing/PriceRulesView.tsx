@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
+import vehiclePlaceholder from "@/assets/admin-v2/artwork/vehicle-placeholder.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, FileText, Globe, Info, Pencil, Tag } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -77,9 +78,10 @@ const previewFromRows = (rows: ConsistencyAssessment[]): PreviewVehicle | null =
   };
 };
 
+// Without a photo, the supplied vehicle line drawing (transparent) sits on the frame's own tint.
 const Thumb = ({ url, className = "w-16 h-[38px]", landmark }: { url: string | null; className?: string; landmark?: string }) => (
-  <span data-landmark={landmark} className={`${className} rounded-md bg-adm-workspace overflow-hidden flex-shrink-0 inline-block`} aria-hidden="true">
-    {url && <img src={url} alt="" className="w-full h-full object-cover" />}
+  <span data-landmark={landmark} className={`${className} rounded-md bg-adm-workspace overflow-hidden flex-shrink-0 inline-flex items-center justify-center`} aria-hidden="true">
+    {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : <img src={vehiclePlaceholder} alt="" className="w-[62%] h-auto" />}
   </span>
 );
 

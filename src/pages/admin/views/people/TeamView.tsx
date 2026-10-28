@@ -62,7 +62,7 @@ const SortableTh = ({ label, sortKey, sort, onSort, className }: { label: string
   const Icon = active === "asc" ? ChevronUp : active === "desc" ? ChevronDown : ChevronsUpDown;
   return (
     <th scope="col" aria-sort={active === "asc" ? "ascending" : active === "desc" ? "descending" : "none"} className={cn(HEAD, className)}>
-      <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-2 rounded-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
+      <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-2 rounded-sm font-semibold hover:text-adm-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
         {label}
         <Icon className={cn(SORT_ICON, "text-adm-ink")} aria-hidden="true" />
       </button>
@@ -164,9 +164,9 @@ export default function TeamView() {
             return (
               <tr key={m.id} data-selected={isSelected ? "true" : undefined} className={cn(isSelected && "bg-adm-selected")}>
                 <Td className={cn(CELL, "pl-[9px]")}>
-                  <button type="button" onClick={() => update({ sel: m.id })} aria-pressed={isSelected} className="flex w-full min-w-0 items-center gap-4 text-left rounded-md focus-visible:outline-2 focus-visible:outline-adm-primary">
+                  <button type="button" onClick={() => update({ sel: m.id })} aria-pressed={isSelected} className="group flex w-full min-w-0 items-center gap-4 text-left rounded-md focus-visible:outline-2 focus-visible:outline-adm-primary">
                     <MemberAvatar initials={m.initials} department={m.department} size="md" />
-                    <span className="min-w-0 flex-1 [overflow-wrap:anywhere] font-semibold text-adm-ink" data-parity="member-name"><BreakableAddress value={m.email} /></span>
+                    <span className="min-w-0 flex-1 [overflow-wrap:anywhere] font-semibold text-adm-ink group-hover:text-adm-primary group-hover:underline" data-parity="member-name"><BreakableAddress value={m.email} /></span>
                   </button>
                 </Td>
                 <Td className={cn(CELL, "2xl:whitespace-nowrap")}>{m.roleLabel}</Td>

@@ -430,12 +430,12 @@ export default function EscalationPage() {
                       onClick={() => api.patchRouting({ escalationRules: withEmailMethod(rules, !m.enabled) })}
                       className={cn(
                         "rounded-[6px] border px-3 pt-[5px] pb-[8px] text-left flex items-start gap-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary",
-                        m.enabled ? "border-adm-primary/90 bg-adm-selected shadow-[inset_0_0_0_1px_#FFFFFF]" : "border-adm-border bg-adm-surface",
+                        m.enabled ? "border-adm-primary/90 bg-adm-selected shadow-[inset_0_0_0_1px_#FFFFFF]" : "border-adm-border bg-adm-surface enabled:hover:border-adm-primary/50 enabled:hover:bg-adm-workspace",
                         !m.supported && "opacity-60 cursor-not-allowed",
                       )}
                     >
                       {m.enabled ? (
-                        <span className="mt-px w-[22px] h-[22px] rounded-full bg-adm-primary text-white flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-3 h-3" /></span>
+                        <span className="mt-px w-[22px] h-[22px] rounded-full bg-adm-primary text-white flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-3.5 h-3.5" strokeWidth={2.5} /></span>
                       ) : (
                         <Icon className={cn(ICON.status, "text-adm-muted flex-shrink-0")} aria-hidden="true" />
                       )}

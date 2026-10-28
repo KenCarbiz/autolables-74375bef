@@ -118,7 +118,7 @@ export default function EffectivePolicyView() {
                     className={cn("cursor-pointer", active ? "bg-adm-selected" : "hover:bg-adm-workspace")}
                   >
                     <Td className={cn("px-5 font-semibold", active ? "text-adm-primary shadow-[inset_3px_0_0_#2457D6]" : "text-adm-ink")}>
-                      <button type="button" className="text-left font-semibold focus-visible:outline-2 focus-visible:outline-adm-primary" aria-pressed={active} onClick={() => setSelected(r.vehicleClass)}>
+                      <button type="button" className="text-left font-semibold hover:text-adm-primary focus-visible:outline-2 focus-visible:outline-adm-primary" aria-pressed={active} onClick={() => setSelected(r.vehicleClass)}>
                         {r.label}
                       </button>
                     </Td>

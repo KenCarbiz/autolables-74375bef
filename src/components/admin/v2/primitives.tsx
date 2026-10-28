@@ -262,7 +262,7 @@ export const KeyValueList = ({ rows, className }: { rows: Array<{ label: ReactNo
 
 export const EmptyState = ({ title, detail, artwork, action, compact = false }: { title: string; detail?: ReactNode; artwork?: string; action?: ReactNode; compact?: boolean }) => (
   <div className={cn("flex flex-col items-center text-center", compact ? "py-6" : "py-10")}>
-    {artwork && <img src={artwork} alt="" aria-hidden="true" className="w-[140px] h-auto mb-4 opacity-90" />}
+    {artwork && <img src={artwork} alt="" aria-hidden="true" className="w-[140px] h-auto mb-4" />}
     <p className="text-[14px] font-semibold text-adm-ink">{title}</p>
     {detail && <p className="mt-1 text-[13px] leading-[18px] text-adm-muted max-w-md">{detail}</p>}
     {action && <div className="mt-4">{action}</div>}

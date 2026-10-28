@@ -114,8 +114,8 @@ export const RoutingPreview = ({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-2.5">
-              <span className="h-8 rounded-lg bg-white/15 border border-white/40 text-[11px] font-bold inline-flex items-center justify-center gap-1"><Phone className="w-3 h-3" aria-hidden="true" /> {preview.callLabel}</span>
-              <span className="h-8 rounded-lg bg-white/15 border border-white/40 text-[11px] font-bold inline-flex items-center justify-center gap-1"><MessageSquare className="w-3 h-3" aria-hidden="true" /> {preview.contactLabel}</span>
+              <span className="h-8 rounded-lg bg-white/15 border border-white/40 text-[11px] font-bold inline-flex items-center justify-center gap-1"><Phone className="w-3.5 h-3.5" aria-hidden="true" /> {preview.callLabel}</span>
+              <span className="h-8 rounded-lg bg-white/15 border border-white/40 text-[11px] font-bold inline-flex items-center justify-center gap-1"><MessageSquare className="w-3.5 h-3.5" aria-hidden="true" /> {preview.contactLabel}</span>
             </div>
           </div>
         </div>
