@@ -30,6 +30,11 @@ export const SELECT_CLASS = "h-9 rounded-md border border-adm-border bg-adm-surf
 // a 55px circle with 20px initials in the rail (56).
 const AVATAR_SIZE = { sm: `${ICON_BOX.avatar} text-[14px]`, md: `${ICON_BOX.avatar} text-[18px]`, lg: `${ICON_BOX.circle} text-[20px]` };
 
+/** An address with line-break opportunities after each "@" and ".", so it wraps between its parts. */
+export const BreakableAddress = ({ value }: { value: string }) => (
+  <>{value.split(/(?<=[@.])/).map((part, i) => <Fragment key={i}>{part}<wbr /></Fragment>)}</>
+);
+
 // The reference tints each avatar by the member's department (blue Sales, green Service, violet
 // Inventory, amber Business Office, red Management), so the tint is derived from the role and
 // never needs a stored colour. Fills and initials are sampled from the reference.
@@ -37,7 +42,7 @@ const DEPARTMENT_TINT: Record<string, string> = {
   Sales: "bg-[#D3E7FB] text-[#0050AA]",
   Service: "bg-[#CBECDA] text-[#006C3D]",
   Inventory: "bg-[#E0D3FB] text-[#3A10C0]",
-  "Business Office": "bg-[#FCE8C4] text-[#B25800]",
+  "Business Office": "bg-[#FCE8C4] text-[#9A4A00]",
   Management: "bg-[#F4D5D3] text-[#A00A0C]",
 };
 
@@ -238,7 +243,7 @@ export const RoleSummaryRail = ({ member, policyHref, onClose, className }: { me
         <div className="mt-[17px] flex items-center gap-3">
           <MemberAvatar initials={member.initials} department={member.department} size="lg" />
           <div className="min-w-0">
-            <p className="text-[18px] leading-[24px] font-semibold text-adm-ink truncate" data-parity="member-name">{member.email}</p>
+            <p className="text-[18px] leading-[24px] font-semibold text-adm-ink [overflow-wrap:anywhere]" data-parity="member-name"><BreakableAddress value={member.email} /></p>
             <p className="text-[14px] leading-[20px] text-adm-muted">{member.roleLabel}</p>
           </div>
         </div>

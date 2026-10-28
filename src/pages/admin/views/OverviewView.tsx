@@ -169,9 +169,10 @@ const BANNER_MARK: Record<HealthTone, string> = {
   info: "[&>svg]:text-adm-primary",
 };
 
-// Chip fills measured on the reference queue: deeper than the banner tints.
+// Chip fills measured on the reference queue: deeper than the banner tints. The
+// warning label is darkened from the token (4.3:1 on this fill) to keep 4.5:1.
 const QUEUE_CHIP: Record<HealthTone, string> = {
-  warning: "bg-[#FDE4B4]",
+  warning: "bg-[#FDE4B4] text-[#8A5900]",
   danger: "bg-[#FDD5D7]",
   neutral: "border-0 bg-[#E3E7EC] text-adm-ink",
   success: "",
@@ -319,7 +320,7 @@ export default function OverviewView() {
                     <span className="hidden min-[1440px]:block float-right w-0 h-4" aria-hidden="true" />
                     <ChevronRight className="absolute right-0.5 top-[23.5px] min-[1440px]:static min-[1440px]:float-right min-[1440px]:clear-right w-5 h-5 text-adm-muted" aria-hidden="true" />
                     <span className="block text-[12.5px] leading-[16px] font-semibold text-adm-ink">{s.title}</span>
-                    <span className="mt-[1.5px] text-[11px] leading-[13px] text-adm-muted line-clamp-2">{s.detail}</span>
+                    <span className="mt-[1.5px] text-[11px] leading-[13px] text-adm-muted">{s.detail}</span>
                   </span>
                 </Link>
               );
@@ -345,10 +346,10 @@ export default function OverviewView() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline gap-2">
-                      <span className="min-w-0 flex-1 text-[11px] leading-[16px] font-semibold text-adm-ink truncate">{a.action}</span>
+                      <span className="min-w-0 flex-1 text-[11px] leading-[16px] font-semibold text-adm-ink break-words">{a.action}</span>
                       <span className="text-[11px] leading-[16px] text-adm-muted whitespace-nowrap">{compactAge(a.at, now)}</span>
                     </span>
-                    <span data-parity="activity-detail" className="block text-[11px] leading-[14px] text-adm-muted truncate">{a.detail}</span>
+                    <span data-parity="activity-detail" className="block text-[11px] leading-[14px] text-adm-muted break-words">{a.detail}</span>
                   </span>
                 </li>
               ))}

@@ -222,7 +222,7 @@ export default function ApprovalRulesView() {
                 <div key={item.key} className="pt-[5px] pl-[13px] pr-2 first:pl-0 last:pr-0 min-w-0">
                   <div className="flex items-center gap-3 text-[12px] leading-[18px] font-medium text-adm-ink">
                     <Icon className="w-5 h-5 text-adm-ink flex-shrink-0" aria-hidden="true" />
-                    <span className="truncate" title={item.label}>{item.label}</span>
+                    <span className="min-w-0 break-words">{item.label}</span>
                   </div>
                   <div className="sm:pl-8">
                     <StatusChip tone={TILE_TONE[item.key][item.state]} className="mt-1.5 h-[26px] sm:px-[11px] font-medium">{item.chip}</StatusChip>

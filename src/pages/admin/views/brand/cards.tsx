@@ -25,8 +25,8 @@ export const HeaderPreviewCard = ({ preview, draftDiffers }: { preview: HeaderPr
       <img src={wordmarkReverse} alt="AutoLabels" className="h-[21px] w-auto flex-shrink-0" />
       <span className="h-10 w-px bg-white/25 flex-shrink-0" aria-hidden="true" />
       <div className="min-w-0 text-white">
-        <p className="text-[18px] leading-[24px] font-semibold truncate" data-parity="dealer-identity">{preview.name || "Dealership name"}</p>
-        <p className="text-[13px] leading-[18px] text-white/80 truncate" data-parity="dealer-identity">{preview.location || "City, State"}</p>
+        <p className="text-[18px] leading-[24px] font-semibold break-words" data-parity="dealer-identity">{preview.name || "Dealership name"}</p>
+        <p className="text-[13px] leading-[18px] text-white/80 break-words" data-parity="dealer-identity">{preview.location || "City, State"}</p>
       </div>
     </div>
     {preview.documentName && preview.documentName !== preview.name && (

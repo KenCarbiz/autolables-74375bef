@@ -8,7 +8,7 @@ import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { applyTeamFilters, DEPARTMENTS, parseTeamFilters, teamFiltersToParams, type TeamFilters, type TeamMember } from "@/lib/admin/people";
 import { cn } from "@/lib/utils";
 import emptyList from "@/assets/admin-v2/artwork/empty-list.svg";
-import { INPUT_CLASS, MemberAvatar, MemberRoleReviewDialog, MemberStatusText, RoleSummaryRail, SELECT_CLASS } from "./components";
+import { BreakableAddress, INPUT_CLASS, MemberAvatar, MemberRoleReviewDialog, MemberStatusText, RoleSummaryRail, SELECT_CLASS } from "./components";
 import { useTeamAuthority, useTeamMembers, useTeamWriters } from "./useTeamMembers";
 
 // Team: the membership list for this rooftop with the search, department and
@@ -51,8 +51,9 @@ const sortMembers = (members: TeamMember[], sort: Sort): TeamMember[] => {
 const nextSort = (sort: Sort, key: SortKey): Sort => (sort?.key !== key ? { key, dir: "asc" } : sort.dir === "asc" ? { key, dir: "desc" } : null);
 
 const CONTROL = "h-[43px]";
-const HEAD = "bg-adm-workspace px-[17px] py-3 text-left text-[14px] leading-[19px] font-semibold text-adm-ink border-b border-adm-border";
-const CELL = "px-[17px] py-[9px]";
+// The reference's 17px cell padding from 1536px; tighter below so all six columns fit beside the rail.
+const HEAD = "bg-adm-workspace px-3 2xl:px-[17px] py-3 text-left text-[14px] leading-[19px] font-semibold text-adm-ink border-b border-adm-border";
+const CELL = "px-3 2xl:px-[17px] py-[9px]";
 // Reference sort marks: 9x6 and 7x11px of ink, an 18px lucide box 8px after the label.
 const SORT_ICON = "w-[18px] h-[18px] flex-shrink-0";
 
@@ -141,17 +142,18 @@ export default function TeamView() {
       );
     }
     // The scroll wrapper is positioned so the cells' screen-reader text stays inside it on narrow
-    // screens. Fixed columns from the reference (158/147/144/150/58, Employee takes the rest) keep
-    // every role and department on one line; a long address truncates with its full text on hover.
+    // screens. From 1536px, fixed columns from the reference (158/147/144/150/58, Employee takes the
+    // rest) keep every role and department on one line; below that the columns size to their content.
+    // A long address wraps rather than truncating, since it is the member's only identifier.
     return (
-      <AdminTable caption="Team members" inset className="relative mx-[18px] mb-[18px] rounded-lg xl:min-h-[554px] xl:[&>table]:table-fixed">
+      <AdminTable caption="Team members" inset className="relative mx-[18px] mb-[18px] rounded-lg xl:min-h-[554px] 2xl:[&>table]:table-fixed">
         <thead>
           <tr>
-            <SortableTh label="Employee" sortKey="employee" sort={sort} onSort={onSort} />
-            <SortableTh label="Role" sortKey="role" sort={sort} onSort={onSort} className="xl:w-[158px]" />
-            <SortableTh label="Department" sortKey="department" sort={sort} onSort={onSort} className="xl:w-[147px]" />
-            <SortableTh label="Access" sortKey="access" sort={sort} onSort={onSort} className="xl:w-[144px]" />
-            <SortableTh label="Status" sortKey="status" sort={sort} onSort={onSort} className="xl:w-[150px]" />
+            <SortableTh label="Employee" sortKey="employee" sort={sort} onSort={onSort} className="min-w-[190px] 2xl:min-w-0" />
+            <SortableTh label="Role" sortKey="role" sort={sort} onSort={onSort} className="2xl:w-[158px]" />
+            <SortableTh label="Department" sortKey="department" sort={sort} onSort={onSort} className="2xl:w-[147px]" />
+            <SortableTh label="Access" sortKey="access" sort={sort} onSort={onSort} className="2xl:w-[144px]" />
+            <SortableTh label="Status" sortKey="status" sort={sort} onSort={onSort} className="2xl:w-[150px]" />
             <Th className={cn(HEAD, "w-[58px]")}><span className="sr-only">Actions</span></Th>
           </tr>
         </thead>
@@ -164,11 +166,11 @@ export default function TeamView() {
                 <Td className={cn(CELL, "pl-[9px]")}>
                   <button type="button" onClick={() => update({ sel: m.id })} aria-pressed={isSelected} className="flex w-full min-w-0 items-center gap-4 text-left rounded-md focus-visible:outline-2 focus-visible:outline-adm-primary">
                     <MemberAvatar initials={m.initials} department={m.department} size="md" />
-                    <span className="min-w-0 flex-1 truncate font-semibold text-adm-ink" data-parity="member-name" title={m.email}>{m.email}</span>
+                    <span className="min-w-0 flex-1 [overflow-wrap:anywhere] font-semibold text-adm-ink" data-parity="member-name"><BreakableAddress value={m.email} /></span>
                   </button>
                 </Td>
-                <Td className={cn(CELL, "xl:whitespace-nowrap")}>{m.roleLabel}</Td>
-                <Td className={cn(CELL, "xl:whitespace-nowrap")}>{m.department}</Td>
+                <Td className={cn(CELL, "2xl:whitespace-nowrap")}>{m.roleLabel}</Td>
+                <Td className={cn(CELL, "2xl:whitespace-nowrap")}>{m.department}</Td>
                 <Td className={cn(CELL, "whitespace-nowrap")}>This rooftop</Td>
                 <Td className={CELL}><MemberStatusText status={m.status} /></Td>
                 <Td align="right" className={CELL}>
@@ -196,7 +198,8 @@ export default function TeamView() {
   return (
     <>
       <AdminCard flush id="team-card" className="min-w-0">
-        <div className="flex flex-col xl:flex-row">
+        {/* The rail sits beside the table from 1360px; narrower, the six columns need the full card width. */}
+        <div className="flex flex-col min-[1360px]:flex-row">
           <div className="min-w-0 flex-1">
             <div className="px-[18px] pt-[25px] pb-[21px] flex flex-wrap items-center gap-x-[21px] gap-y-3">
               <label className="relative w-full sm:w-[308px]">
@@ -231,7 +234,7 @@ export default function TeamView() {
               member={selected}
               policyHref={policyHref(selected, filters)}
               onClose={() => update({ sel: "" })}
-              className="border-t border-adm-border xl:border-t-0 xl:border-l xl:w-[356px] xl:flex-shrink-0"
+              className="border-t border-adm-border min-[1360px]:border-t-0 min-[1360px]:border-l min-[1360px]:w-[356px] min-[1360px]:flex-shrink-0"
             />
           )}
         </div>

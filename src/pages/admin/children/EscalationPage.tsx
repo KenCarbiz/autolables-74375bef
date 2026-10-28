@@ -111,9 +111,9 @@ const Step = ({ n, title, hint, last = false, className, children }: { n: number
 
 /** One tier's controls: the time, then Send to and the destination, with its state on the line below. */
 const TierControls = ({ minutes, destination, note, extra, className }: { minutes: ReactNode; destination: ReactNode; note: ReactNode; extra?: ReactNode; className?: string }) => (
-  <div className={cn("mt-1.5 grid grid-cols-1 sm:grid-cols-[minmax(0,264px)_minmax(61px,1fr)_minmax(0,230px)] gap-x-[21px] sm:gap-x-0 gap-y-2 items-center", className)}>
+  <div className={cn("mt-1.5 grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,264px)_minmax(61px,1fr)_minmax(0,230px)] gap-x-3 2xl:gap-x-0 gap-y-2 items-center", className)}>
     {minutes}
-    <span className="sm:self-start sm:mt-1 sm:pl-5 text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">Send to</span>
+    <span className="sm:self-start sm:mt-1 2xl:pl-5 text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">Send to</span>
     {destination}
     <div className="sm:col-start-3 -mt-1">{note}</div>
     {extra && <div className="sm:col-start-3">{extra}</div>}
@@ -135,7 +135,7 @@ const DestinationState = ({ label, email, editing, onEdit }: { label: string; em
   const missing = email.trim().length === 0;
   if (missing) {
     return (
-      <p role="alert" className="h-4 flex items-center gap-1.5 text-[12px] leading-[16px] text-adm-danger">
+      <p role="alert" className="min-h-4 flex flex-wrap items-center gap-x-1.5 text-[12px] leading-[16px] text-adm-danger">
         <AlertTriangle className={cn(ICON.status, "fill-current stroke-white flex-shrink-0")} aria-hidden="true" />
         <span>Destination required</span>
         {!editing && <button type="button" aria-label={`Add ${label} email`} onClick={onEdit} className="ml-1 font-semibold text-adm-primary hover:underline">Add email</button>}
@@ -143,8 +143,8 @@ const DestinationState = ({ label, email, editing, onEdit }: { label: string; em
     );
   }
   return (
-    <p className="h-4 flex items-center gap-2 text-[12px] leading-[16px] text-adm-muted min-w-0">
-      <span className="truncate" data-parity="destination-email">{email}</span>
+    <p className="min-h-4 flex flex-wrap items-center gap-x-2 text-[12px] leading-[16px] text-adm-muted min-w-0">
+      <span className="min-w-0 [overflow-wrap:anywhere]" data-parity="destination-email">{email}</span>
       {!editing && <button type="button" aria-label={`Change ${label} email`} onClick={onEdit} className="font-semibold text-adm-primary hover:underline">Change</button>}
     </p>
   );

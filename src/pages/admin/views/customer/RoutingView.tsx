@@ -138,7 +138,7 @@ const TimingRow = ({ icon: Icon, title, hint, value, last = false }: { icon: Luc
     <Icon className="w-[22px] h-[22px] text-adm-muted flex-shrink-0" aria-hidden="true" />
     <span className="min-w-0 flex-1 ml-[19px]">
       <span className="block text-[13px] leading-[18px] font-bold text-adm-ink">{title}</span>
-      <span className="block text-[11px] leading-[16px] text-adm-muted truncate">{hint}</span>
+      <span className="block text-[11px] leading-[16px] text-adm-muted break-words">{hint}</span>
     </span>
     <span className="text-[14px] leading-[20px] text-adm-ink whitespace-nowrap">{value}</span>
     <Link to={ADMIN_CHILD_ROUTES.escalation} aria-label={`${title}: open escalation rules`} className={iconBtn}><ChevronRight className={ICON.chevron} aria-hidden="true" /></Link>

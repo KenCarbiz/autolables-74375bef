@@ -62,7 +62,7 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
           <Icon className={cn("mt-px w-[29px] h-[29px] flex-shrink-0", iconClass, status === "saving" && "animate-spin")} aria-hidden="true" />
           <div className="min-w-0">
             <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{view.title}</p>
-            <p className="text-[12px] leading-[18px] text-adm-muted truncate">{view.detail}</p>
+            <p className="text-[12px] leading-[18px] text-adm-muted break-words">{view.detail}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">

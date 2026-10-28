@@ -343,7 +343,7 @@ export default function SyncRunPage() {
 const SummaryCell = ({ label, value, hint, text = false, mask }: { label: string; value: string; hint: string; text?: boolean; mask?: string }) => (
   <div className="relative min-w-0 pl-[32px] first:pl-[26px] pr-5 pt-[15px] pb-[19px] before:absolute before:left-0 before:inset-y-[17px] before:w-px before:bg-adm-border before:hidden [&:nth-child(even)]:before:block xl:[&:nth-child(3)]:before:block">
     <dt className="text-[14px] leading-[20px] font-semibold text-adm-muted">{label}</dt>
-    <dd data-parity={mask} className={cn("mt-[5px] truncate font-bold text-adm-ink", text ? "text-[25px] leading-[33px]" : "text-[28px] leading-[33px] tabular-nums")}>{value}</dd>
+    <dd data-parity={mask} className={cn("mt-[5px] break-words font-bold text-adm-ink", text ? "text-[25px] leading-[33px]" : "text-[28px] leading-[33px] tabular-nums")}>{value}</dd>
     <dd className="text-[14px] leading-[20px] text-adm-muted">{hint}</dd>
   </div>
 );
