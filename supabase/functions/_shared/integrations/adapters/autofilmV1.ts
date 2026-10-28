@@ -1,7 +1,7 @@
 import { payloadChecksum, validateEnvelope, catalogEntry, type EnvelopeV1, type Visibility } from "../envelope.ts";
 import {
   deny, MAX_BODY_BYTES,
-  type ConnectionRecord, type ExistingReceipt, type HeaderReader, type InboxInsert, type IngestDecision,
+  type ConnectionRecord, type ExistingReceipt, type HeaderReader, type InboxInsert, type InboxStatus, type IngestDecision,
 } from "../ingestDecision.ts";
 import { hmacHex, sha256Hex, timingSafeEqualHex } from "../signing.ts";
 import { normalizeVin, validateVin } from "../vin.ts";
@@ -107,29 +107,18 @@ export function mapAfVisibility(data: Obj): MappedVisibility {
   };
 }
 
-const FINDING_STATUS: Record<string, { type: string; status: string }> = {
-  recommended: { type: "repair.recommended", status: "recommended" },
-  sent: { type: "repair.recommended", status: "recommended" },
-  priced: { type: "repair.recommended", status: "recommended" },
-  approved: { type: "repair.approved", status: "approved" },
-  declined: { type: "repair.declined", status: "declined" },
-  deferred: { type: "repair.corrected", status: "deferred" },
-  future_watch: { type: "repair.corrected", status: "deferred" },
-  resolved: { type: "repair.completed", status: "completed" },
-};
-
-export const AF_INBOUND_EVENTS = [
-  "ro.upsert", "finding.upsert", "mpi.report.published", "mpi.customer.decisions.submitted",
-] as const;
+export const AF_INBOUND_EVENTS = ["mpi.report.published", "mpi.customer.decisions.submitted"] as const;
+// Emitted by AutoFilm but with no Phase 1 consumer (metadata only: video_id, message_id, length).
+export const AF_IGNORED_EVENTS = ["mpi.customer.message.created"] as const;
 
 interface AfContext {
-  connection: Pick<ConnectionRecord, "id" | "scopes">;
+  connection: Pick<ConnectionRecord, "id" | "tenant_id" | "scopes">;
   headerTsMs: number;
-  resolveVin?: (connectionId: string, roKey: string) => Promise<string | null>;
+  resolveVin?: (connectionId: string, tenantId: string, roIds: string[]) => Promise<string | null>;
 }
 
 type Translation =
-  | { ok: true; envelopes: EnvelopeV1[]; visibility: MappedVisibility }
+  | { ok: true; envelopes: EnvelopeV1[]; visibility: MappedVisibility; vinResolved: boolean }
   | { ok: false; httpStatus: 400 | 403 | 422; code: "schema_invalid" | "scope_or_tenant_denied" | "rejected"; detail: string[] };
 
 const fail = (
@@ -144,12 +133,6 @@ const uuidFrom = async (seed: string): Promise<string> => {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-${variant}${h.slice(17, 20)}-${h.slice(20, 32)}`;
 };
 
-function evidenceRefs(data: Obj): string[] {
-  const refs = data.evidence_refs;
-  if (!Array.isArray(refs)) return [];
-  return refs.filter((r): r is string => typeof r === "string" && r.length > 0 && r.length <= 256 && !/^[a-z][a-z0-9+.-]*:\/\//i.test(r)).slice(0, 100);
-}
-
 function findingIds(v: unknown): string[] | null {
   if (!Array.isArray(v)) return null;
   const out: string[] = [];
@@ -161,97 +144,83 @@ function findingIds(v: unknown): string[] | null {
   return out;
 }
 
+const count = (v: unknown): number | null => (typeof v === "number" && Number.isInteger(v) && v >= 0 ? v : null);
+
+// Placeholder used only to validate the envelope shape when the VIN is not yet known.
+const UNRESOLVED_VIN_PLACEHOLDER = "1HGCM82633A004352";
+
 export async function translateAutofilm(af: AfEnvelope, ctx: AfContext): Promise<Translation> {
   const data = af.data;
   const event = af.event;
   if (!(AF_INBOUND_EVENTS as readonly string[]).includes(event)) return fail(422, "rejected", "unknown_event");
 
-  const roKey = firstStr(data, ["ro_id", "external_ro_id"]);
+  const roId = firstStr(data, ["ro_id"]);
+  const externalRoId = firstStr(data, ["external_ro_id"]);
+  const roKey = roId ?? externalRoId;
+  if (!roKey) return fail(400, "schema_invalid", "ro_missing");
   const mapped = mapAfVisibility(data);
 
-  let vinRaw = str(data.vin);
-  if (!vinRaw && roKey && ctx.resolveVin) vinRaw = await ctx.resolveVin(ctx.connection.id, roKey);
-  if (!vinRaw) return fail(422, "rejected", "vin_unresolved");
-  const vin = normalizeVin(vinRaw);
-  const vinCheck = validateVin(vin);
-  if (!vinCheck.ok && vinCheck.reason !== "check_digit_mismatch") return fail(400, "schema_invalid", `vin_${vinCheck.reason}`);
+  // A VIN in the payload is optional (AutoFilm does not send one today). An unusable VIN is treated as absent.
+  let vin = "";
+  const given = normalizeVin(data.vin);
+  if (given && /^[A-HJ-NPR-Z0-9]{17}$/.test(given)) vin = given;
+  if (!vin && ctx.resolveVin) {
+    const ids = [...new Set([roId, externalRoId].filter((x): x is string => !!x))];
+    const found = normalizeVin(await ctx.resolveVin(ctx.connection.id, ctx.connection.tenant_id, ids));
+    if (found) vin = found;
+  }
 
-  const versionKeys: Record<string, string[]> = {
-    "ro.upsert": ["updated_at"],
-    "finding.upsert": ["updated_at", "responded_at", "recommended_at"],
-    "mpi.report.published": ["updated_at", "published_at"],
-    "mpi.customer.decisions.submitted": ["decided_at", "submitted_at", "authorized_at", "created_at", "updated_at"],
-  };
   let versionMs: number | null = null;
-  for (const k of versionKeys[event]) {
+  for (const k of ["updated_at", "decided_at", "submitted_at", "published_at"]) {
     versionMs = toEpochMs(data[k]);
     if (versionMs) break;
   }
   const version = versionMs ?? ctx.headerTsMs;
 
-  type Item = { type: string; record: string; payload: Obj; evidence?: string[] };
+  type Item = { type: string; record: string; payload: Obj };
   const items: Item[] = [];
 
-  if (event === "ro.upsert") {
-    if (!roKey) return fail(400, "schema_invalid", "ro_missing");
-    items.push({
-      type: "repair_order.upserted",
-      record: `ro:${roKey}`,
-      payload: { ro_key: roKey, ro_number: str(data.ro_number), ro_status: str(data.status) },
-    });
-  } else if (event === "mpi.report.published") {
-    const inspectionId = firstStr(data, ["inspection_id"]);
-    if (!roKey && !inspectionId) return fail(400, "schema_invalid", "ro_missing");
-    const odo = data.odometer_miles ?? data.mileage;
+  if (event === "mpi.report.published") {
     items.push({
       type: "inspection.completed",
-      record: `inspection:${inspectionId ?? roKey}`,
+      record: `inspection:${roKey}`,
       payload: {
-        inspection_id: inspectionId,
         ro_key: roKey,
+        ro_number: str(data.ro_number),
         inspection_status: "completed",
-        odometer_miles: typeof odo === "number" && Number.isInteger(odo) && odo >= 0 ? odo : null,
-        measurements: isObj(data.measurements) ? data.measurements : {},
+        odometer_miles: null,
+        measurements: {},
         technician_verified: false,
       },
-      evidence: evidenceRefs(data),
-    });
-  } else if (event === "finding.upsert") {
-    const fid = firstStr(data, ["finding_id", "recommendation_id", "id"]);
-    if (!fid) return fail(400, "schema_invalid", "finding_id_missing");
-    if (!roKey) return fail(400, "schema_invalid", "ro_missing");
-    const rawStatus = typeof data.status === "string" ? data.status.trim().toLowerCase() : "recommended";
-    const target = FINDING_STATUS[rawStatus];
-    if (!target) return fail(422, "rejected", "unmapped_finding_status");
-    items.push({
-      type: target.type,
-      record: `finding:${roKey}:${fid}`,
-      payload: {
-        finding_id: fid,
-        ro_key: roKey,
-        item: firstStr(data, ["item", "title", "description"]),
-        severity: firstStr(data, ["severity"]),
-        status: target.status,
-        af_status: rawStatus,
-      },
-      evidence: evidenceRefs(data),
     });
   } else {
-    if (!roKey) return fail(400, "schema_invalid", "ro_missing");
-    const approved = findingIds(data.approved);
-    const declined = findingIds(data.declined);
-    if (!approved || !declined) return fail(422, "rejected", "decision_ids_required");
-    if (approved.length + declined.length === 0) return fail(422, "rejected", "decision_empty");
-    const overlap = approved.filter((id) => declined.includes(id));
-    if (overlap.length) return fail(422, "rejected", "decision_conflict");
     const authorization = firstStr(data, ["authorization_id"]);
-    for (const [ids, type, status] of [[approved, "repair.approved", "approved"], [declined, "repair.declined", "declined"]] as const) {
-      for (const fid of [...new Set(ids)]) {
-        items.push({
-          type,
-          record: `finding:${roKey}:${fid}`,
-          payload: { finding_id: fid, ro_key: roKey, status, authorization_id: authorization },
-        });
+    const idsA = findingIds(data.approved_ids) ?? findingIds(data.approved);
+    const idsD = findingIds(data.declined_ids) ?? findingIds(data.declined);
+    const a = count(data.approved) ?? idsA?.length ?? null;
+    const d = count(data.declined) ?? idsD?.length ?? null;
+    if (a === null || d === null) return fail(400, "schema_invalid", "decision_counts_invalid");
+    items.push({
+      type: "repair_order.decisions_submitted",
+      record: `ro:${roKey}:decisions`,
+      payload: {
+        ro_key: roKey,
+        approved_count: a,
+        declined_count: d,
+        total: typeof data.total === "number" && Number.isFinite(data.total) ? data.total : null,
+        authorization_id: authorization,
+      },
+    });
+    if (idsA && idsD) {
+      if (idsA.some((id) => idsD.includes(id))) return fail(422, "rejected", "decision_conflict");
+      for (const [ids, type, status] of [[idsA, "repair.approved", "approved"], [idsD, "repair.declined", "declined"]] as const) {
+        for (const fid of [...new Set(ids)]) {
+          items.push({
+            type,
+            record: `finding:${roKey}:${fid}`,
+            payload: { finding_id: fid, ro_key: roKey, status, authorization_id: authorization },
+          });
+        }
       }
     }
   }
@@ -264,7 +233,6 @@ export async function translateAutofilm(af: AfEnvelope, ctx: AfContext): Promise
     const entry = catalogEntry(eventType);
     if (!entry) return fail(422, "rejected", "unknown_event");
     if (!ctx.connection.scopes.includes(entry.scope)) return fail(403, "scope_or_tenant_denied", "scope_missing");
-    const recordHash = (await sha256Hex(item.record)).slice(0, 32);
     const payload = { ...item.payload, af_schema_version: AF_SCHEMA_VERSION };
     const envelope: EnvelopeV1 = {
       event_id: await uuidFrom(`${ctx.connection.id}\n${af.event_id}\n${item.record}`),
@@ -273,25 +241,26 @@ export async function translateAutofilm(af: AfEnvelope, ctx: AfContext): Promise
       producer: "autofilm",
       source_record_id: item.record,
       source_version: version,
-      idempotency_key: `autofilm.v1:${recordHash}:${version}`,
+      idempotency_key: `autofilm.v1:${(await sha256Hex(`${af.event_id}\n${item.record}`)).slice(0, 40)}`,
       correlation_id: `af:${af.event_id}`.slice(0, 256),
       causation_id: null,
       occurred_at: occurredAt,
       observed_at: null,
       sent_at: sentAt,
-      vin,
+      vin: vin || UNRESOLVED_VIN_PLACEHOLDER,
       tenant_ref: `rooftop:${af.tenant_id}`.slice(0, 256),
       instance_ref: null,
       visibility: mapped.requested,
-      evidence_refs: item.evidence ?? [],
+      evidence_refs: [],
       payload,
     };
     envelope.payload_checksum = await payloadChecksum(payload);
     const check = validateEnvelope(envelope);
     if (!check.ok) return fail(400, "schema_invalid", ...check.errors.slice(0, 5));
+    if (!vin) envelope.vin = "";
     envelopes.push(envelope);
   }
-  return { ok: true, envelopes, visibility: mapped };
+  return { ok: true, envelopes, visibility: mapped, vinResolved: !!vin };
 }
 
 export interface AfSecret {
@@ -366,6 +335,9 @@ export async function decideAutofilmIngest(input: AfIngestInput): Promise<AfInge
     tenant_id: claimed,
     data: parsed.data as Obj,
   };
+  if ((AF_IGNORED_EVENTS as readonly string[]).includes(af.event)) {
+    return withInserts({ httpStatus: 200, code: "ignored", detail: ["event_not_consumed"], insert: null, duplicateOf: null });
+  }
   const translation = await translateAutofilm(af, {
     connection,
     headerTsMs: Number(tsRaw),
@@ -391,7 +363,7 @@ export async function decideAutofilmIngest(input: AfIngestInput): Promise<AfInge
     );
   }
 
-  const status = input.directionEnabled ? "received" : "held";
+  const status: InboxStatus = !translation.vinResolved ? "unmatched" : input.directionEnabled ? "received" : "held";
   const inserts: InboxInsert[] = translation.envelopes.map((envelope) => ({
     connection_id: connection.id,
     tenant_id: connection.tenant_id,
@@ -403,12 +375,12 @@ export async function decideAutofilmIngest(input: AfIngestInput): Promise<AfInge
     payload_checksum: envelope.payload_checksum as string,
     source_record_id: envelope.source_record_id,
     source_version: envelope.source_version,
-    vin: envelope.vin,
+    vin: envelope.vin || null,
     adapter: AUTOFILM_ADAPTER,
     visibility: translation.visibility.stored,
     requested_visibility: translation.visibility.requested,
     envelope,
     status,
   }));
-  return { httpStatus: 202, code: status, detail: [], duplicateOf: null, insert: inserts[0], inserts };
+  return { httpStatus: 202, code: status, detail: status === "unmatched" ? ["vin_unresolved"] : [], duplicateOf: null, insert: inserts[0], inserts };
 }

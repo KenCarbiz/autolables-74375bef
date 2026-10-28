@@ -66,11 +66,14 @@ function supabaseStore(db: Db): IngestStore {
         existingByIdempotencyKey: (byKey.data ?? null) as ExistingReceipt | null,
       };
     },
-    async resolveVinForRo(connectionId, roKey) {
+    async resolveVinForRo(_connectionId, tenantId, roIds) {
+      const { data: refs } = await db
+        .from("vehicle_external_refs").select("instance_id")
+        .eq("tenant_id", tenantId).eq("app", "autofilm").in("external_id", roIds).limit(1);
+      const instanceId = (refs as Array<{ instance_id: string }> | null)?.[0]?.instance_id;
+      if (!instanceId) return null;
       const { data } = await db
-        .from("integration_inbox").select("vin")
-        .eq("connection_id", connectionId).eq("envelope->payload->>ro_key", roKey)
-        .order("received_at", { ascending: false }).limit(1).maybeSingle();
+        .from("vehicle_instances").select("vin").eq("id", instanceId).eq("tenant_id", tenantId).maybeSingle();
       return (data as { vin?: string } | null)?.vin ?? null;
     },
     async insertInbox(rows) {

@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS public.integration_inbox (
   payload_checksum text NOT NULL,
   source_record_id text NOT NULL,
   source_version   bigint NOT NULL,
-  vin              text NOT NULL,
+  vin              text,
   adapter          text NOT NULL DEFAULT 'rooftop.v1' CHECK (adapter IN ('rooftop.v1','autofilm.v1')),
   visibility           text NOT NULL DEFAULT 'tenant_private'
     CHECK (visibility IN ('tenant_private','custody_shared')),
@@ -131,7 +131,8 @@ CREATE TABLE IF NOT EXISTS public.integration_inbox (
   received_at      timestamptz NOT NULL DEFAULT now(),
   applied_at       timestamptz,
   UNIQUE (connection_id, event_id),
-  UNIQUE (connection_id, idempotency_key)
+  UNIQUE (connection_id, idempotency_key),
+  CHECK (vin IS NOT NULL OR status = 'unmatched')
 );
 CREATE INDEX IF NOT EXISTS integration_inbox_status_idx ON public.integration_inbox (status, next_attempt_at, received_at);
 CREATE INDEX IF NOT EXISTS integration_inbox_tenant_idx ON public.integration_inbox (tenant_id, received_at DESC);

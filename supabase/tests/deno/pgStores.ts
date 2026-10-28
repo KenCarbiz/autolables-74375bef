@@ -55,8 +55,10 @@ export function pgIngestStore(sql: Sql): IngestStore {
         r ? ({ ...r, received_at: String(r.received_at) } as unknown as ExistingReceipt) : null;
       return { existingByEventId: norm(byEvent), existingByIdempotencyKey: norm(byKey) };
     },
-    async resolveVinForRo(connectionId, roKey) {
-      const [r] = await sql`select vin from public.integration_inbox where connection_id = ${connectionId} and envelope->'payload'->>'ro_key' = ${roKey} order by received_at desc limit 1`;
+    async resolveVinForRo(_connectionId, tenantId, roIds) {
+      const [r] = await sql`select i.vin from public.vehicle_external_refs r
+        join public.vehicle_instances i on i.id = r.instance_id and i.tenant_id = r.tenant_id
+        where r.tenant_id = ${tenantId} and r.app = 'autofilm' and r.external_id in ${sql(roIds)} limit 1`;
       return r?.vin ?? null;
     },
     async insertInbox(rows) {

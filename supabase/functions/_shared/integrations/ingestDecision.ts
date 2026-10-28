@@ -35,7 +35,7 @@ export interface ExistingReceipt {
   received_at: string;
 }
 
-export type InboxStatus = "received" | "held";
+export type InboxStatus = "received" | "held" | "unmatched";
 
 export interface InboxInsert {
   connection_id: string;
@@ -48,7 +48,7 @@ export interface InboxInsert {
   payload_checksum: string;
   source_record_id: string;
   source_version: number;
-  vin: string;
+  vin: string | null;
   adapter: Adapter;
   visibility: Exclude<Visibility, "customer_public">;
   requested_visibility: Visibility;
@@ -64,7 +64,9 @@ export type IngestCode =
   | "signature_invalid"
   | "scope_or_tenant_denied"
   | "idempotency_conflict"
-  | "rejected";
+  | "rejected"
+  | "unmatched"
+  | "ignored";
 
 export interface IngestDecision {
   httpStatus: 200 | 202 | 400 | 401 | 403 | 409 | 422;

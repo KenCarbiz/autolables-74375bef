@@ -10,11 +10,16 @@ import {
 const opts = { sanitizeOps: false, sanitizeResources: false, ignore: !Deno.env.get("ROOFTOP_TEST_DB_URL") };
 const test = (name: string, fn: () => Promise<void>) => Deno.test({ name, fn, ...opts });
 
-const AF_UPDATED = "2026-10-28T18:30:00.000Z";
-const afFinding = (over: Record<string, unknown> = {}) => ({
-  vin: VIN, external_ro_id: "ro-77", finding_id: "f-1", item: "rear_brakes", severity: "monitor",
-  status: "recommended", updated_at: AF_UPDATED, ...over,
+const RO = "3f2c1d9e-0a11-4c55-8f6e-2b7d5a9c0e01";
+// Payloads exactly as AutoFilm builds them (api/index.ts:13784, 4861).
+const afPublished = (over: Record<string, unknown> = {}) => ({ ro_id: RO, ro_number: "RO-10442", ...over });
+const afDecisions = (over: Record<string, unknown> = {}) => ({
+  ro_id: RO, external_ro_id: "DMS-5521", approved: 2, declined: 1, total: 1180.5, authorization_id: "auth-77", ...over,
 });
+const linkRo = async (tenantId: string, externalId = RO) => {
+  const [inst] = await admin`select id from public.vehicle_instances where tenant_id = ${tenantId} and vin = ${VIN} and status = 'active'`;
+  await admin`insert into public.vehicle_external_refs (tenant_id, instance_id, app, external_id) values (${tenantId}, ${inst.id}, 'autofilm', ${externalId})`;
+};
 
 test("kill switch off returns 503 from all four functions, even with valid credentials", async () => {
   const srv = startServer();
@@ -83,7 +88,7 @@ test("paused, revoked and pending connections get the same 401 on the live path 
       assert.equal(res.status, 401, `native ${status}`);
       assert.deepEqual(await res.json(), { ok: false, error: "signature_invalid" });
       const af = await seed({ adapter: "autofilm.v1", status });
-      const abody = afBody(af, "finding.upsert", afFinding());
+      const abody = afBody(af, "mpi.report.published", afPublished());
       const ares = await srv.post(`/ingest?connection=${af.connId}`, abody, await afHeaders(af, abody));
       assert.equal(ares.status, 401, `autofilm ${status}`);
       assert.equal((await inboxOf(s.tenantId)).length + (await inboxOf(af.tenantId)).length, 0);
@@ -132,16 +137,19 @@ test("autofilm: a signed x-af request is accepted through the adapter and mapped
   const srv = startServer();
   try {
     const s = await seed({ adapter: "autofilm.v1" });
-    const body = afBody(s, "finding.upsert", afFinding());
-    const res = await srv.post(`/ingest?connection=${s.connId}`, body, await afHeaders(s, body));
+    await linkRo(s.tenantId);
+    const body = afBody(s, "mpi.report.published", afPublished(), { event_id: `pub-${RO}-1761678000123` });
+    const hdr = await afHeaders(s, body);
+    const res = await srv.post(`/ingest?connection=${s.connId}`, body, hdr);
     assert.equal(res.status, 202, JSON.stringify(await res.clone().json()));
     const rows = await inboxOf(s.tenantId);
     assert.equal(rows.length, 1);
     assert.equal(rows[0].adapter, "autofilm.v1");
-    assert.equal(rows[0].event_type, "autofilm.repair.recommended");
-    assert.equal(rows[0].source_record_id, "finding:ro-77:f-1");
-    assert.equal(rows[0].source_version, Date.parse(AF_UPDATED));
-    assert.equal(rows[0].tenant_id, s.tenantId);
+    assert.equal(rows[0].event_type, "autofilm.inspection.completed");
+    assert.equal(rows[0].source_record_id, `inspection:${RO}`);
+    assert.equal(rows[0].source_version, Number(hdr["x-af-timestamp"]));
+    assert.equal(rows[0].vin, VIN);
+    assert.equal(rows[0].status, "received");
     assert.equal(rows[0].visibility, "tenant_private");
   } finally {
     await srv.close();
@@ -153,7 +161,7 @@ test("autofilm: bad signature, stale timestamp, unknown connection, spoofed roof
   try {
     const s = await seed({ adapter: "autofilm.v1" });
     const other = await seed({ adapter: "autofilm.v1" });
-    const body = afBody(s, "finding.upsert", afFinding());
+    const body = afBody(s, "mpi.report.published", afPublished());
     const url = `/ingest?connection=${s.connId}`;
     assert.equal((await srv.post(url, body, await afHeaders(s, body, { secret: "wrong" }))).status, 401);
     assert.equal((await srv.post(url, body, await afHeaders(s, body, { ts: Date.now() - 10 * 60_000 }))).status, 401);
@@ -162,14 +170,18 @@ test("autofilm: bad signature, stale timestamp, unknown connection, spoofed roof
     // signed with another connection's secret
     assert.equal((await srv.post(url, body, await afHeaders(s, body, { secret: other.secret }))).status, 401);
 
-    const spoofed = afBody(s, "finding.upsert", afFinding(), { tenant_id: other.rooftopRef });
+    const spoofed = afBody(s, "mpi.report.published", afPublished(), { tenant_id: other.rooftopRef });
     const sres = await srv.post(url, spoofed, await afHeaders(s, spoofed));
     assert.equal(sres.status, 403);
     assert.deepEqual((await sres.json()).detail, ["rooftop_mismatch"]);
-    const labelsTenant = afBody(s, "finding.upsert", afFinding(), { tenant_id: other.tenantId });
+    const labelsTenant = afBody(s, "mpi.report.published", afPublished(), { tenant_id: other.tenantId });
     assert.equal((await srv.post(url, labelsTenant, await afHeaders(s, labelsTenant))).status, 403);
 
-    const unknown = afBody(s, "mpi.customer.message.created", { vin: VIN, external_ro_id: "ro-1" });
+    const msg = afBody(s, "mpi.customer.message.created", { video_id: "v", message_id: "m", length: 4 });
+    const mres = await srv.post(url, msg, await afHeaders(s, msg));
+    assert.equal(mres.status, 200);
+    assert.equal((await mres.json()).status, "ignored");
+    const unknown = afBody(s, "finding.upsert", { ro_id: RO, item: "x" });
     const ures = await srv.post(url, unknown, await afHeaders(s, unknown));
     assert.equal(ures.status, 422);
     assert.deepEqual(await ures.json(), { ok: false, error: "rejected", detail: ["unknown_event"] });
@@ -177,93 +189,110 @@ test("autofilm: bad signature, stale timestamp, unknown connection, spoofed roof
 
     // a connection configured for the native protocol never accepts the x-af protocol
     const native = await seed();
-    const nbody = afBody(s, "finding.upsert", afFinding());
+    const nbody = afBody(s, "mpi.report.published", afPublished());
     assert.equal((await srv.post(`/ingest?connection=${native.connId}`, nbody, await afHeaders(native, nbody))).status, 401);
   } finally {
     await srv.close();
   }
 });
 
-test("autofilm: a retry with the same event id is a duplicate, and a changed payload under the same business key conflicts", async () => {
+test("autofilm: redelivery with the same event_id is a duplicate; a republish with a new event_id is a newer version", async () => {
   const srv = startServer();
   try {
     const s = await seed({ adapter: "autofilm.v1" });
+    await linkRo(s.tenantId);
     const url = `/ingest?connection=${s.connId}`;
-    const body = afBody(s, "finding.upsert", afFinding(), { event_id: "evt-fixed-1" });
-    assert.equal((await srv.post(url, body, await afHeaders(s, body))).status, 202);
-    const retry = await srv.post(url, body, await afHeaders(s, body, { ts: Date.now() + 1000 }));
+    const body = afBody(s, "mpi.report.published", afPublished(), { event_id: `pub-${RO}-1` });
+    assert.equal((await srv.post(url, body, await afHeaders(s, body, { ts: Date.now() - 2000 }))).status, 202);
+    const retry = await srv.post(url, body, await afHeaders(s, body));
     assert.equal(retry.status, 200);
     assert.equal((await retry.json()).status, "duplicate");
-    const sameFactNewTransportId = afBody(s, "finding.upsert", afFinding(), { event_id: "evt-fixed-2" });
-    assert.equal((await srv.post(url, sameFactNewTransportId, await afHeaders(s, sameFactNewTransportId))).status, 200);
-    const changed = afBody(s, "finding.upsert", afFinding({ severity: "urgent" }), { event_id: "evt-fixed-3" });
+    const changed = afBody(s, "mpi.report.published", afPublished({ ro_number: "RO-OTHER" }), { event_id: `pub-${RO}-1` });
     assert.equal((await srv.post(url, changed, await afHeaders(s, changed))).status, 409);
-    assert.equal((await inboxOf(s.tenantId)).length, 1);
+    const republish = afBody(s, "mpi.report.published", afPublished(), { event_id: `pub-${RO}-2` });
+    assert.equal((await srv.post(url, republish, await afHeaders(s, republish))).status, 202);
+    const rows = await inboxOf(s.tenantId);
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].source_record_id, rows[1].source_record_id);
+    await runApply(srv);
+    const done = await inboxOf(s.tenantId);
+    assert.deepEqual(done.map((r) => r.status), ["applied", "applied"]);
+    assert.equal((await admin`select count(*)::int n from public.inspection_evidence where tenant_id = ${s.tenantId}`)[0].n, 1);
   } finally {
     await srv.close();
   }
 });
 
-test("autofilm end to end: findings, decisions, report and resolved apply correctly and never reach completed_verified", async () => {
+test("autofilm: an event whose VIN cannot be resolved is stored unmatched with 202, never a 4xx", async () => {
   const srv = startServer();
   try {
     const s = await seed({ adapter: "autofilm.v1" });
     const url = `/ingest?connection=${s.connId}`;
-    const send = async (event: string, data: Record<string, unknown>) => {
-      const body = afBody(s, event, data);
+    const body = afBody(s, "mpi.customer.decisions.submitted", afDecisions());
+    const res = await srv.post(url, body, await afHeaders(s, body));
+    assert.equal(res.status, 202);
+    assert.equal((await res.json()).status, "unmatched");
+    const [row] = await inboxOf(s.tenantId);
+    assert.equal(row.status, "unmatched");
+    assert.equal(row.vin, null);
+    await runApply(srv);
+    assert.equal((await inboxOf(s.tenantId))[0].status, "unmatched", "the apply worker leaves it held for a later match");
+    const again = await srv.post(url, body, await afHeaders(s, body));
+    assert.equal(again.status, 200);
+  } finally {
+    await srv.close();
+  }
+});
+
+test("autofilm end to end: live shapes and the patched shape apply, with no verified repair status", async () => {
+  const srv = startServer();
+  try {
+    const s = await seed({ adapter: "autofilm.v1" });
+    await linkRo(s.tenantId);
+    const url = `/ingest?connection=${s.connId}`;
+    const send = async (event: string, data: Record<string, unknown>, eventId: string) => {
+      const body = afBody(s, event, data, { event_id: eventId });
       const res = await srv.post(url, body, await afHeaders(s, body));
       assert.ok([200, 202].includes(res.status), `${event} -> ${res.status} ${JSON.stringify(await res.clone().json())}`);
     };
-    await send("ro.upsert", { vin: VIN, external_ro_id: "ro-77", ro_number: "1001", status: "open", updated_at: "2026-10-28T18:00:00Z" });
-    await send("finding.upsert", afFinding({ finding_id: "f-1", updated_at: "2026-10-28T18:10:00Z" }));
-    await send("finding.upsert", afFinding({ finding_id: "f-2", item: "wipers", severity: "info", updated_at: "2026-10-28T18:10:00Z" }));
-    await send("finding.upsert", afFinding({ finding_id: "f-1", severity: "urgent", updated_at: "2026-10-28T18:20:00Z" }));
-    await send("mpi.report.published", { ro_id: "ro-77", external_ro_id: "ro-77", inspection_id: "insp-1", updated_at: "2026-10-28T18:25:00Z", mileage: 45123, measurements: { front_brake_mm: 6 }, technician_verified: true });
-    await send("mpi.customer.decisions.submitted", { ro_id: "ro-77", external_ro_id: "ro-77", approved: ["f-1"], declined: ["f-2"], total: 100, authorization_id: "auth-1", decided_at: "2026-10-28T18:40:00Z" });
-    await send("finding.upsert", afFinding({ finding_id: "f-3", status: "resolved", verified_evidence_ref: "x", updated_at: "2026-10-28T18:45:00Z" }));
-    const run = await runApply(srv);
-    assert.equal(run.status, 200);
+    await send("mpi.report.published", afPublished(), `pub-${RO}-1`);
+    await send("mpi.customer.decisions.submitted", afDecisions(), "dec-live");
+    await send("mpi.customer.decisions.submitted", afDecisions({
+      vin: VIN, decided_at: new Date(Date.now() + 1000).toISOString(),
+      approved_ids: ["f-1", "f-2"], declined_ids: ["f-3"], authorization_id: "auth-78",
+    }), "dec-patched");
+    await send("mpi.customer.message.created", { video_id: "v", message_id: "m", length: 3 }, "msg-1");
+    await runApply(srv);
 
-    const items = await admin`select source_record_id, status, severity, item, verified_by, verified_evidence_ref, visibility
+    const items = await admin`select source_record_id, status, verified_by, verified_evidence_ref, visibility
       from public.repair_items where tenant_id = ${s.tenantId} order by source_record_id`;
-    const byId = Object.fromEntries(items.map((r) => [r.source_record_id, r]));
-    assert.equal(byId["finding:ro-77:f-1"].status, "approved");
-    assert.equal(byId["finding:ro-77:f-1"].severity, "urgent");
-    assert.equal(byId["finding:ro-77:f-1"].item, "rear_brakes");
-    assert.equal(byId["finding:ro-77:f-2"].status, "declined");
-    assert.equal(byId["finding:ro-77:f-3"].status, "completed");
+    assert.deepEqual(items.map((r) => [r.source_record_id, r.status]), [
+      [`finding:${RO}:f-1`, "approved"], [`finding:${RO}:f-2`, "approved"], [`finding:${RO}:f-3`, "declined"],
+    ]);
     assert.equal(items.some((r) => r.status === "completed_verified" || r.verified_evidence_ref !== null), false);
-    assert.equal(items.length, 3);
-
-    const [ev] = await admin`select odometer_miles, technician_verified, measurements, visibility from public.inspection_evidence where tenant_id = ${s.tenantId}`;
-    assert.equal(ev.odometer_miles, 45123);
+    assert.equal(items.every((r) => r.visibility === "tenant_private"), true);
+    const [ev] = await admin`select technician_verified, visibility from public.inspection_evidence where tenant_id = ${s.tenantId}`;
     assert.equal(ev.technician_verified, false);
-    assert.equal(ev.visibility, "tenant_private");
-    const unapplied = await admin`select status, count(*)::int n from public.integration_inbox where tenant_id = ${s.tenantId} group by status`;
-    assert.deepEqual(Object.fromEntries(unapplied.map((r) => [r.status, r.n])), { applied: 8 });
+    const st = await admin`select status, count(*)::int n from public.integration_inbox where tenant_id = ${s.tenantId} group by status`;
+    assert.deepEqual(Object.fromEntries(st.map((r) => [r.status, r.n])), { applied: 6 });
   } finally {
     await srv.close();
   }
 });
 
-test("autofilm: a public flag is only a request and a shared record is stored custody_shared", async () => {
+test("autofilm: a public flag is only a request (optional future field) and never stored as customer_public", async () => {
   const srv = startServer();
   try {
     const s = await seed({ adapter: "autofilm.v1" });
     const url = `/ingest?connection=${s.connId}`;
-    const pub = afBody(s, "finding.upsert", afFinding({ finding_id: "pub", visibility: "public", is_public: true }));
-    const shared = afBody(s, "finding.upsert", afFinding({ finding_id: "shr", visibility: "shared" }));
+    const pub = afBody(s, "mpi.report.published", afPublished({ vin: VIN, visibility: "public", is_public: true }));
     await srv.post(url, pub, await afHeaders(s, pub));
-    await srv.post(url, shared, await afHeaders(s, shared));
     await runApply(srv);
-    const rows = await admin`select source_record_id, visibility from public.repair_items where tenant_id = ${s.tenantId}`;
-    const vis = Object.fromEntries(rows.map((r) => [r.source_record_id, r.visibility]));
-    assert.equal(vis["finding:ro-77:pub"], "tenant_private");
-    assert.equal(vis["finding:ro-77:shr"], "custody_shared");
-    const inbox = await admin`select source_record_id, requested_visibility from public.integration_inbox where tenant_id = ${s.tenantId}`;
-    const req = Object.fromEntries(inbox.map((r) => [r.source_record_id, r.requested_visibility]));
-    assert.equal(req["finding:ro-77:pub"], "customer_public");
-    assert.equal(rows.some((r) => r.visibility === "customer_public"), false);
+    const [row] = await inboxOf(s.tenantId);
+    assert.equal(row.requested_visibility, "customer_public");
+    assert.equal(row.visibility, "tenant_private");
+    const ev = await admin`select visibility from public.inspection_evidence where tenant_id = ${s.tenantId}`;
+    assert.equal(ev[0].visibility, "tenant_private");
   } finally {
     await srv.close();
   }

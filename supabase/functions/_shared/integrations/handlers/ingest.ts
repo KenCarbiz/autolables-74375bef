@@ -17,7 +17,7 @@ export interface IngestStore {
   connectionSecrets(connectionId: string): Promise<AfSecret[]>;
   directionEnabled(tenantId: string, direction: Direction): Promise<boolean>;
   lookupExisting(connectionId: string, eventId: string, idempotencyKey: string): Promise<ExistingLookup>;
-  resolveVinForRo(connectionId: string, roKey: string): Promise<string | null>;
+  resolveVinForRo(connectionId: string, tenantId: string, roIds: string[]): Promise<string | null>;
   insertInbox(rows: InboxInsert[]): Promise<{ ids: string[] } | "conflict">;
   touchConnection(connectionId: string, outcome: { ok: true } | { ok: false; code: string }): Promise<void>;
 }
@@ -32,8 +32,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function respond(decision: IngestDecision, receiptIds: string[]): Response {
   const { httpStatus, code } = decision;
+  if (httpStatus === 200 && code === "ignored") return json(200, { ok: true, status: "ignored", reason: decision.detail[0] });
   if (httpStatus === 202) {
-    return json(202, { ok: true, status: code, receipt_id: receiptIds[0] ?? null, receipt_ids: receiptIds });
+    return json(202, { ok: true, status: code, receipt_id: receiptIds[0] ?? null, receipt_ids: receiptIds, ...(code === "unmatched" ? { reason: "vin_unresolved" } : {}) });
   }
   if (httpStatus === 200 && decision.duplicateOf) {
     return json(200, {
@@ -107,7 +108,7 @@ export async function handleIngest(req: Request, deps: IngestDeps): Promise<Resp
         connection,
         secrets,
         directionEnabled,
-        resolveVin: (id, ro) => store.resolveVinForRo(id, ro),
+        resolveVin: (id, tenant, ids) => store.resolveVinForRo(id, tenant, ids),
         ...existing,
       }));
     } else {

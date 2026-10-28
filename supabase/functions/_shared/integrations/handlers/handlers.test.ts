@@ -91,8 +91,8 @@ describe("ingest handler", () => {
     const c = conn({ adapter: "autofilm.v1", external_rooftop_ref: "af-1" });
     const { store, inbox } = memoryStore(c);
     const raw = JSON.stringify({
-      event: "finding.upsert", event_id: "e1", schema_version: "1", tenant_id: "af-1",
-      data: { vin: "1HGCM82633A004352", external_ro_id: "ro", finding_id: "f", updated_at: "2026-10-28T18:00:00Z" },
+      event: "mpi.report.published", event_id: "pub-ro-1-1", schema_version: "1", tenant_id: "af-1",
+      data: { ro_id: "ro-1", ro_number: "10", vin: "1HGCM82633A004352" },
     });
     const ts = String(Date.parse("2026-10-28T19:02:00Z"));
     const headers = { "x-af-timestamp": ts, "x-af-signature": await afSign(SECRET, ts, raw) };
