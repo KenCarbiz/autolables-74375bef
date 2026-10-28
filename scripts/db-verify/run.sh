@@ -7,7 +7,7 @@
 # read from the hosted project, then runs the role-by-role cases in stages:
 #
 #   live          the hosted state as it is
-#   preview fix   plus supabase/proposed/20261029120000_fix_fee_preview_warnings.sql
+#   preview fix   plus supabase/migrations/20261029120000_fix_fee_preview_warnings.sql
 #   pricing       plus the proposed pricing-authority migration (--proposed)
 #
 # Nothing here connects to a hosted project.
@@ -47,7 +47,7 @@ run scripts/db-verify/03_fixture.sql
 run scripts/db-verify/10_live.sql
 
 stage 'preview fix'
-run supabase/proposed/20261029120000_fix_fee_preview_warnings.sql
+run supabase/migrations/20261029120000_fix_fee_preview_warnings.sql
 run scripts/db-verify/10_live.sql
 
 if [[ "${1:-}" == "--proposed" ]]; then

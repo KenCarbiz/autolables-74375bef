@@ -17,7 +17,7 @@ every production check was a read or a block that always rolled back.
 | 3 | Products and applicability rules limited to add-on roles | Verified | 75 replica cases | platform administrators cannot edit a dealership's catalog unless they are members (predates V2, section 3.3) |
 | 4 | Price-column guard (live rule) and recall override | Verified | 60 replica cases | INSERT is unguarded: any member who can create a listing can set its price (decision 6.3) |
 | 5 | Pricing restricted to pricing roles, with delegation | Blocked | proposal verified in 96 replica cases; not applied by instruction | needs the owner's decisions in section 6 |
-| 6 | Fee Review & Apply, preview step | **Failed** | fails on every call on production, confirmed with the owner identity on real data (rolled back); 6 replica cases | no fee change can be made through Administration until the one-function fix is applied (section 4) |
+| 6 | Fee Review & Apply, preview step | Verified (fixed) | failed on every call until the fix was applied 2026-10-28 ~16:03 UTC on the owner's approval; after: function md5 `2a1468b9…`, grants unchanged, a rolled-back owner-identity preview returned counts; 29 of 29 replica fee cases pass | none known; the first real fee review in the app is still to be observed |
 | 7 | Fee Review & Apply, apply step | Verified in replica; Untested in production | the 23 fee review cases that do not depend on the preview pass on the live functions: role refusals, idempotency, version conflict, archived scope, disabled fee, verification stamps kept, audit and ledger rows | cannot be reached in production until 6 is fixed; the screen keeps Apply disabled when the preview fails (page test) |
 | 8 | Fee recalculation behind the fallback | Verified | 12 replica cases against the hosted definition | an open invitation for a pricing role can run it; fixed in the proposal |
 | 9 | Settings persistence (value, version, audit, merge) | Verified in replica; production first write not yet observed | 7 replica cases; the 2026-10-29 check-in reports production writes | none found |
@@ -88,7 +88,7 @@ A platform administrator who is not a member of a dealership cannot see that
 dealership's products, rules or vehicles, so an edit from the app matches no
 row. This predates V2; the server authority document now says so.
 
-## 4. Fee Review & Apply: failed, fix ready
+## 4. Fee Review & Apply: failed, fixed 2026-10-28
 
 `admin_doc_fee_change_preview` appends a plain sentence to a text array.
 PostgreSQL reads the untyped sentence as an array literal and raises
@@ -107,8 +107,11 @@ no fee change can be made through Administration either.
 
 Fix: `supabase/proposed/20261029120000_fix_fee_preview_warnings.sql` casts
 the two sentences to text and changes nothing else. With it, all 29 fee
-review cases pass. **Awaiting approval to apply.** After applying, this
-read must return `2a1468b9a62a9177b20193a345c77ce6`:
+review cases pass. **Applied 2026-10-28 ~16:03 UTC on the owner's approval**
+(`supabase/migrations/20261029120000_fix_fee_preview_warnings.sql`). This read
+now returns `2a1468b9a62a9177b20193a345c77ce6`, and a rolled-back preview called
+with the owner's identity on real data returned 0 eligible, 128 unchanged, 2
+without a price basis and 3 warnings:
 
 ```sql
 SELECT md5(pg_get_functiondef('public.admin_doc_fee_change_preview(uuid,boolean,numeric,boolean)'::regprocedure));
@@ -189,9 +192,7 @@ Pending the per-screen re-evaluation; filled in when it completes.
 
 ## 11. Approvals requested
 
-1. Apply `supabase/proposed/20261029120000_fix_fee_preview_warnings.sql`
-   (one function, read-only behaviour, grants kept) and run the
-   fingerprint read in section 4.
+1. Done: the fee preview fix was applied and verified (section 4).
 2. Decide the pricing matrix questions in `ADMIN_V2_SERVER_AUTHORITY.md`
    section 10.3; on approval the proposal is applied and the two screen
    changes are prepared.

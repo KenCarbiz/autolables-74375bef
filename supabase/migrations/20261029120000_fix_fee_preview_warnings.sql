@@ -1,4 +1,7 @@
--- PROPOSED, NOT APPLIED. Corrects admin_doc_fee_change_preview, which fails
+-- APPLIED to the hosted project 2026-10-28 ~16:03 UTC on the owner's approval;
+-- verified: function md5 2a1468b9a62a9177b20193a345c77ce6, grants unchanged, a
+-- rolled-back owner-identity preview call returned counts. Idempotent.
+-- Corrects admin_doc_fee_change_preview, which failed
 -- on every call on the hosted project (PostgreSQL 17.6, verified 2026-10-28):
 -- `text[] || 'literal'` resolves the untyped literal as an array, so the
 -- unconditional closing warning raises 22P02 "malformed array literal" and the
