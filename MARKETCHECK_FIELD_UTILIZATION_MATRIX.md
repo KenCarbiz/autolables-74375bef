@@ -158,3 +158,32 @@ Owner count is deliberately not derived (§15).
 6. Feed `vehicle_status`, `in_transit` -> availability state.
 7. Comparable rows: `is_certified`, `fees`, `price_includes_fees`,
    `mc_rooftop_id`, group ids, `first_seen_at` -> `market_cohort_snapshots`.
+
+## 8. Known from the provider's MCP schemas (read 2026-10-27), unread
+
+Fields and parameters the provider's own tool schemas name that this repo
+does not yet read or send. Class for all of them: **KNOWN, UNREAD** (named
+by the provider, no reader here yet). Registry entries carry the request
+side in `requestContract`.
+
+| Surface | Field or parameter | What it is | Intended consumer |
+|---|---|---|---|
+| active search row | `dos_active` | days the listing has been active at the current dealer | comparable staleness (dealer-level), Market Context; the feed copy is already read as days-on-site |
+| active search row | `dom_active` | cumulative days the vehicle has been listed across dealers | total market exposure for comps and VIN history; distinct from `dos_active` |
+| active search row | `mc_dealership.mc_sub_dealership_group_id`, `_name` | sub-group identity below the dealership group | group concentration cap in Market Value V3; dealership-group context |
+| active search row | `mc_dealership.mc_category` | Dealer, Retailer, Dealership Group, Aggregator, Marketing, Financing | exclude aggregator and marketing rows from comparable evidence |
+| active search row | `in_transit` | listing is in transit | availability state (New Passport), comparable eligibility |
+| active search row | `price_change` / `price_change_percent` as a filter | positive and negative price movement | price-cut signal already read from the feed; as a search filter for market context |
+| active search request | `vins` (max 10), `taxonomy_vins`, `ymmt`, `match` | cohort addressing by VIN list, 10-character taxonomy VIN, Year/Make/Model/Trim | exact and YMMT cohort rungs (`cohortLadder.ts`) |
+| active search request | `options_packages`, `high_value_features` (+ `exclude_*`), via `facets` | equipment-level filtering with facet-discovered values | configuration-aware comparables; AVAILABLE is never INSTALLED |
+| active search request | `include_mc_dealership_object` | returns the mc_* ids, group ids and category per row | comparable rooftop and group identity (`dealerGroup.ts`) |
+| active search request | `seller_type` dealer, fsbo, auction | seller class | AutoLabels sends dealer only; the other two are AutoCurb-reserved |
+| recents request | `sold`, `expired` (VIN-level), `owned`, `active_inventory_date_range` | sold vs expired semantics, ownership, date windows | Past Inventory Search role; inferred-sold wording |
+| sold summary response | `month`, grouping fields, `rank`, `sold_count` | one row per month per group | market trend (3 / 6 / 12 months) |
+| sold summary response | `price`, `miles`, `dom_active`, `dos_active`, `msrp`, `mc_msrp` with `count`, `mean` and percentiles | inferred-sold statistics per group | velocity and trend context; never a transaction price |
+| sold summary response | `price_over_msrp_percentage`, `price_over_mc_msrp_percentage` | advertised price relative to MSRP | new-vehicle market context |
+| sold summary response | `result_count`, `truncated`, `warnings`, `applied` | the envelope: what the provider actually used | persisted verbatim by the provider result envelope (`providerEnvelope.ts`) |
+| Premium request | `miles`, `zip`, `dealer_type`, `is_certified` | required-in-practice inputs with silent defaults | always sent and recorded on the envelope |
+| directory request | `facets` on `mc_dealership_group_id`, `_name`, sub-group ids | the dealership-groups reference | group identity resolution; `get_sold_summary` group names |
+| sold summary request | `ranking_dimensions` with `dealership_group_name`, or `dealership_group_name` as a filter | the dealership-group variant on the same endpoint; about 38% of inferred sales carry a group | sold_summary_dealership_groups (`dealership_group_context`); never a Vehicle Score input |
+| sold summary request | `ranking_measure` dotted statistics (`price.p50`, `dom_active.mean`, `price.sum`), `top_n`, `limit`, `rank_after_filters` | how the monthly rows are ranked and cut | velocity and trend context; `truncated` must be read before a total is trusted |

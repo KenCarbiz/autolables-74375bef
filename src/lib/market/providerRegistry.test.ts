@@ -69,10 +69,23 @@ describe("contract status is honest", () => {
   });
 
   it("labels change-order capabilities whose path has not been read as unlocated", () => {
-    for (const k of ["available_options_packages", "sold_summary_dealership_groups", "dealership_groups_reference"]) {
+    for (const k of ["available_options_packages"]) {
       expect(capability(k)?.contract, k).toBe("unlocated");
       expect(capability(k)?.status, k).toBe("not_active");
+      expect(capability(k)?.contractSource, k).toBe("owner-change-order-2026-10-27");
     }
+  });
+
+  it("records where every entry's contract facts were read", () => {
+    for (const c of PROVIDER_CAPABILITIES) expect(c.contractSource, c.key).toBeTruthy();
+    const fromSchema = PROVIDER_CAPABILITIES.filter((c) => c.contractSource === "mcp-schema-2026-10-27").map((c) => c.key).sort();
+    expect(fromSchema).toEqual([
+      "active_search", "dealers_search_legacy", "dealership_directory", "dealership_groups_reference", "incentives_make_zip",
+      "incentives_oem", "neovin", "price_premium", "recents", "sold_summary", "sold_summary_dealership_groups", "syndication",
+      "vin_history",
+    ]);
+    // A schema settles names and constraints, never entitlement.
+    for (const k of fromSchema) expect(capability(k)?.contract, k).not.toBe("verified");
   });
 
   it("marks the legacy recall path deprecated/replaced and never triggers it", () => {
@@ -216,6 +229,78 @@ describe("the scoring rule is executable", () => {
     for (const k of ["neovin", "vindata_generate", "autorecalls", "vin_history"]) {
       expect(mayInfluenceVehicleScore(k), k).toBe(true);
     }
+  });
+});
+
+describe("the MCP schema reconciliation of 2026-10-27", () => {
+  it("moves the Sold Vehicles Summary to its real path with inventory_type required", () => {
+    const s = capability("sold_summary")!;
+    expect(s.path).toBe("/v2/sold-vehicles/summary");
+    expect(s.contract).toBe("documented");
+    expect(s.status).toBe("entitlement_blocked");
+    expect(s.requestContract?.required[0]).toMatch(/^inventory_type/);
+    expect(s.requestContract?.constraints.join(" ")).toMatch(/month-aligned/);
+    expect(s.requestContract?.constraints.join(" ")).toMatch(/applied/);
+    expect(s.requestContract?.constraints.join(" ")).toMatch(/nine seconds/);
+    expect(s.cacheKey).toContain("inventory_type");
+    expect(capabilityForPath("/v2/sold-vehicles/summary")?.key).toBe("sold_summary");
+    const g = capability("sold_summary_dealership_groups")!;
+    expect(g.path).toBe(s.path);
+    expect(g.contract).toBe("documented");
+    expect(g.status).toBe("not_active");
+    expect(g.requestContract?.alwaysSend.join(" ")).toMatch(/ranking_dimensions including dealership_group_name/);
+    expect(g.requestContract?.constraints.join(" ")).toMatch(/38%/);
+    expect(g.cacheKey).toContain("dealership_group_name");
+  });
+
+  it("makes Premium send the four parameters whose schema defaults describe another car", () => {
+    const p = capability("price_premium")!;
+    expect(p.requestContract?.required).toEqual(["vin"]);
+    expect(p.requestContract?.alwaysSend).toEqual(["miles", "zip", "dealer_type", "is_certified"]);
+    for (const k of p.requestContract!.alwaysSend) expect(p.cacheKey, k).toContain(k);
+    expect(p.requestContract?.constraints.join(" ")).toMatch(/50,000/);
+    expect(p.requestContract?.constraints.join(" ")).toMatch(/50501/);
+  });
+
+  it("resolves the dealership-groups reference to the directory's group facets", () => {
+    const g = capability("dealership_groups_reference")!;
+    expect(g.path).toBe(capability("dealership_directory")?.path);
+    expect(g.contract).toBe("documented");
+    expect(g.status).toBe("not_active");
+    expect(g.requestContract?.alwaysSend.join(" ")).toMatch(/facets=mc_dealership_group_id/);
+    // The directory itself still wins path resolution; the reference is a use of it.
+    expect(capabilityForPath("/v2/dealerships/car")?.key).toBe("dealership_directory");
+  });
+
+  it("keeps private-party and auction reserved whichever form the provider exposes", () => {
+    for (const k of ["fsbo", "auction"]) {
+      const c = capability(k)!;
+      expect(c.notes).toMatch(new RegExp(`seller_type=${k}`));
+      expect(c.requestContract?.constraints.join(" ")).toMatch(/AutoCurb-reserved/);
+      expect(c.status).toBe("autocurb_reserved");
+      expect(policyFor(k, "used").allowed).toBe(false);
+    }
+    expect(capability("active_search")?.requestContract?.constraints.join(" ")).toMatch(/AutoLabels sends dealer only/);
+  });
+
+  it("records the recents constraints, the legacy dealers phase-out and the NeoVIN generic switch", () => {
+    const r = capability("recents")!;
+    expect(r.requestContract?.required[0]).toMatch(/city, state, zip/);
+    expect(r.requestContract?.constraints.join(" ")).toMatch(/radius at most 100/);
+    expect(r.requestContract?.constraints.join(" ")).toMatch(/higher rate/);
+    expect(capability("dealers_search_legacy")?.notes).toMatch(/phased out/);
+    expect(capability("dealers_search_legacy")?.contract).toBe("legacy");
+    expect(capability("neovin")?.requestContract?.constraints.join(" ")).toMatch(/include_generic=true/);
+    expect(capability("active_search")?.requestContract?.constraints.join(" ")).toMatch(/vins at most 10/);
+    expect(capability("incentives_make_zip")?.requestContract?.required).toEqual(["oem", "zip"]);
+  });
+
+  it("leaves what the MCP does not expose exactly as it was", () => {
+    for (const k of ["mds", "autorecalls", "vindata_generate", "price_base", "price_premium_plus", "available_options_packages", "cached_images", "listing_details", "marketmatch", "webhooks"]) {
+      expect(capability(k)?.contractSource, k).not.toBe("mcp-schema-2026-10-27");
+    }
+    expect(capability("mds")?.path).toBe("/v2/mds/car");
+    expect(capability("autorecalls")?.path).toBe("/v2/car/autorecalls/{vin}");
   });
 });
 

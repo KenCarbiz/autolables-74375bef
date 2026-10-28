@@ -32,6 +32,13 @@
 // OpenAPI document, which this environment cannot reach. Nothing in this file
 // is verified yet, and the registry says so rather than implying it.
 //
+// On 2026-10-27 the owner connected the provider's MCP server, whose tool
+// schemas are provider-authored and readable from this environment.
+// `contractSource` records which entries were reconciled against them:
+// parameter names, required fields, defaults, constraints and, for the Sold
+// Vehicles Summary, the path itself. A schema is not a 2xx from this account,
+// so `contract` stays `documented` and nothing becomes `verified`.
+//
 // Influence is declared per capability so the scoring rule (§13 of the change
 // order) is executable: market strength, dealer-group behaviour and demand
 // may inform Market Context and Market Value, and may never move Vehicle
@@ -71,6 +78,21 @@ export type AuthorityClass =
 
 export type ContractStatus = "documented" | "verified" | "legacy" | "unlocated";
 
+/** Where an entry's contract facts were read. */
+export type ContractSource =
+  | "handoff-2026-10-21"
+  | "mcp-schema-2026-10-27"
+  | "owner-change-order-2026-10-27"
+  | "code";
+
+/** What a request must or must always carry, and what the provider constrains, as the schema states it. */
+export interface RequestContract {
+  required: string[];
+  /** Parameters whose omission the provider fills with a default that would describe a different car or market. */
+  alwaysSend: string[];
+  constraints: string[];
+}
+
 export type CapabilityOwnership = "autolabels" | "autocurb" | "shared";
 
 /** Which server-side conclusions a capability's evidence may reach. */
@@ -96,6 +118,8 @@ export interface ProviderCapability {
   /** Which `MC_CALL_PRICE_USD` key the call bills under. */
   billingProduct: string;
   contract: ContractStatus;
+  /** Where this entry's contract facts were read. The MCP schema settles names and constraints, never entitlement. */
+  contractSource: ContractSource;
   /** Where the current contract is documented. */
   reference: string | null;
   appliesTo: { new: VehicleApplicability; used: VehicleApplicability; autocurb: VehicleApplicability };
@@ -113,6 +137,8 @@ export interface ProviderCapability {
   defaultCostUsd: number;
   /** What the account must hold for the call to answer. */
   entitlement: string;
+  /** The request contract as the provider's schema states it, where it has been read. */
+  requestContract?: RequestContract;
   /** Retries the transport may make above a reservation. Zero below it. */
   maxRetries: number;
   rateLimitStrategy: "serial" | "backoff" | "none";
@@ -147,6 +173,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/dealerships/inventory",
     billingProduct: "dealer_inventory_syndication",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "yes", used: "yes", autocurb: "optional" },
     ownership: "shared",
@@ -165,7 +192,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "inventory_state",
     influences: influence({ identity: true, dataConfidence: true }),
     publicBrowseMayTrigger: false,
-    notes: "A refusal must be reported as a refusal and may never retire inventory. Carries fees, price_includes_fees, vehicle_status and the dealership-group ids.",
+    requestContract: {
+      required: ["one dealer identifier: dealer_id, source, mc_website_id, mc_dealer_id, mc_location_id, mc_rooftop_id or a dealership-group id"],
+      alwaysSend: ["owned=true for the physically owned segment", "rows (default and maximum 1,500)"],
+      constraints: ["any dealer identifier on the active search is routed to this product by the provider", "include_non_vin_listings=false keeps VIN-less rows out"],
+    },
+    notes: "A refusal must be reported as a refusal and may never retire inventory. Carries fees, price_includes_fees, vehicle_status, in_transit and the dealership-group ids. MCP schema: any dealer identifier on the active search routes here; rows up to 1,500 a page.",
   },
   {
     key: "dealership_directory",
@@ -174,6 +206,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/dealerships/car",
     billingProduct: "dealer_api",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "yes", used: "yes", autocurb: "optional" },
     ownership: "shared",
@@ -192,15 +225,21 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "inventory_state",
     influences: influence({ marketContext: true }),
     publicBrowseMayTrigger: false,
-    notes: "Resolves a rooftop once to its canonical mc_* ids; the pin is re-validated from the feed, not re-resolved.",
+    requestContract: {
+      required: ["country"],
+      alwaysSend: [],
+      constraints: ["geospatial: latitude and longitude or zip, plus radius up to 7,000 miles", "rows default 10, max 50; start * rows at most 10,000", "facets on city, state, country, dealer_type, mc_* ids, mc_category, mc_dealership_group_id/name, mc_sub_dealership_group_id/name"],
+    },
+    notes: "Resolves a rooftop once to its canonical mc_* ids; the pin is re-validated from the feed, not re-resolved. MCP schema: group-aware (mc_dealership_group_id/name, sub-group ids) and recommended over the legacy dealers search.",
   },
   {
     key: "dealership_groups_reference",
     provider: "marketcheck",
     product: "Dealership Groups reference",
-    path: "/v2/dealerships/groups",
+    path: "/v2/dealerships/car",
     billingProduct: "dealer_api",
-    contract: "unlocated",
+    contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "optional", used: "optional", autocurb: "yes" },
     ownership: "shared",
@@ -208,7 +247,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     triggers: ["operator", "scheduled"],
     cadence: { intake: false, refresh: true },
     ttlHours: 24 * 30,
-    cacheKey: ["mc_dealership_group_id"],
+    cacheKey: ["facets", "mc_dealership_group_id"],
     defaultCostUsd: 0.0025,
     entitlement: "dealer_api",
     maxRetries: 0,
@@ -219,7 +258,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "inventory_state",
     influences: influence({ marketContext: true }),
     publicBrowseMayTrigger: false,
-    notes: "Named by the 2026-10-27 change order; path not yet read from the docs. The feed's mc_dealership_group_id / _name already give an authoritative identity per listing.",
+    requestContract: {
+      required: ["country"],
+      alwaysSend: ["facets=mc_dealership_group_id,mc_dealership_group_name,mc_sub_dealership_group_id,mc_sub_dealership_group_name"],
+      constraints: ["no separate groups path exists: the reference is the directory's group facets, filtered by mc_dealership_group_name to list a group's rooftops"],
+    },
+    notes: "Resolved against the MCP schema on 2026-10-27: there is no separate groups endpoint; the dealership directory's facets on the group and sub-group ids and names are the reference, and get_sold_summary takes mc_dealership_group_name from it. The feed's mc_dealership_group_id / _name already give an authoritative identity per listing.",
   },
   {
     key: "dealers_search_legacy",
@@ -228,6 +272,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/dealers/car",
     billingProduct: "dealer_api",
     contract: "legacy",
+    contractSource: "mcp-schema-2026-10-27",
     reference: null,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
     ownership: "shared",
@@ -246,7 +291,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "inventory_state",
     influences: NONE,
     publicBrowseMayTrigger: false,
-    notes: "Geography-only search whose ids collide with other rooftops in the syndication id space; kept for the manual dealer_id override only.",
+    notes: "Geography-only search whose ids collide with other rooftops in the syndication id space; kept for the manual dealer_id override only. The provider's MCP schema says this endpoint is being phased out; listing_count_range is the one filter the directory lacks.",
   },
   {
     key: "dealer_details_legacy",
@@ -255,6 +300,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/dealer/car",
     billingProduct: "dealer_api",
     contract: "legacy",
+    contractSource: "code",
     reference: null,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
     ownership: "shared",
@@ -282,6 +328,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/search/car/active",
     billingProduct: "inventory_search",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "yes", used: "yes", autocurb: "optional" },
     ownership: "shared",
@@ -300,7 +347,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "market_evidence",
     influences: MARKET,
     publicBrowseMayTrigger: false,
-    notes: "Active-market comparables and cross-channel listing intelligence. fees and price_includes_fees on each row feed the comparable basis. One cohort informs many vehicles.",
+    requestContract: {
+      required: [],
+      alwaysSend: ["car_type", "zip and radius for a market-bounded cohort"],
+      constraints: ["vins at most 10 per request", "taxonomy_vins, ymmt and match address a cohort by build", "dos_active is days on site at the current dealer; dom_active is cumulative days across dealers", "options_packages and high_value_features filter only with values discovered through facets", "include_mc_dealership_object carries mc_dealership_group_id/name, mc_sub_dealership_group_id/name, mc_category and mc_rooftop_id", "seller_type is dealer, fsbo or auction; AutoLabels sends dealer only", "any dealer identifier routes the call to Dealer Inventory Syndication", "carfax_* fields are incomplete and not filters, facets or stats"],
+    },
+    notes: "Active-market comparables and cross-channel listing intelligence. fees and price_includes_fees on each row feed the comparable basis. One cohort informs many vehicles. MCP schema read 2026-10-27: 80+ filters, the dos_active / dom_active distinction, price_change and in_transit filters.",
   },
   {
     key: "recents",
@@ -309,6 +361,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/search/car/recents",
     billingProduct: "recent_inventory",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "optional", used: "yes", autocurb: "yes" },
     ownership: "shared",
@@ -327,7 +380,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "market_evidence",
     influences: CONTEXT,
     publicBrowseMayTrigger: false,
-    notes: "Listing-level recent market exits and supporting evidence (expired, inferred sold, owned, date windows, stats, facets where supported). Not the primary aggregate: that is Sales Stats; trend is Sold Vehicles Summary. Medians only leave the function.",
+    requestContract: {
+      required: ["one of: city, state, zip, latitude+longitude+radius, source, dealer_id"],
+      alwaysSend: [],
+      constraints: ["radius at most 100 miles", "facets, stats and range_facets cannot be combined in one call", "charged at a higher rate than the active search", "expired is a VIN-level filter; sold=true selects sold listings", "a VIN can carry several listing ids; the id changes with price or miles", "carfax_* fields are incomplete and not filters, facets or stats"],
+    },
+    notes: "Listing-level recent market exits and supporting evidence (expired, inferred sold, owned, date windows, stats, facets where supported). Not the primary aggregate: that is Sales Stats; trend is Sold Vehicles Summary. Medians only leave the function. Constraints per the MCP schema read 2026-10-27.",
   },
   {
     key: "neovin",
@@ -336,6 +394,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/decode/car/neovin/{vin}/specs",
     billingProduct: "neovin",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/vehicle-specs/neovin`,
     appliesTo: { new: "first_seen", used: "first_seen", autocurb: "optional" },
     ownership: "shared",
@@ -354,7 +413,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "factory_build",
     influences: influence({ identity: true, vehicleScore: true, dataConfidence: true, marketValue: true }),
     publicBrowseMayTrigger: false,
-    notes: "Immutable; never rebought once a real sheet exists. Three attempts, strict first, refusals uncounted. The preferred source for installed equipment.",
+    requestContract: {
+      required: ["vin"],
+      alwaysSend: [],
+      constraints: ["include_generic=true is the generic switch; sent only on the second, fallback request, and its answer is GENERIC_CANDIDATE identity, never exact"],
+    },
+    notes: "Immutable; never rebought once a real sheet exists. Three attempts, strict first, refusals uncounted. The preferred source for installed equipment. The MCP schema names the generic switch include_generic, which marketcheck-specs already sends on its fallback call.",
   },
   {
     key: "basic_decode",
@@ -363,6 +427,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/decode/car/{vin}/specs",
     billingProduct: "basic_vin_decode",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/vehicle-specs/neovin`,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
     ownership: "shared",
@@ -390,6 +455,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/decode/car/{vin}",
     billingProduct: "basic_vin_decode",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/vehicle-specs/neovin`,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
     ownership: "shared",
@@ -417,6 +483,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/options/packages",
     billingProduct: "available_options_packages",
     contract: "unlocated",
+    contractSource: "owner-change-order-2026-10-27",
     reference: `${MC_DOCS}/vehicle-specs/neovin`,
     appliesTo: { new: "optional", used: "optional", autocurb: "no" },
     ownership: "autolabels",
@@ -444,6 +511,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/predict/car/us/marketcheck_price",
     billingProduct: "price_prediction",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/market-insights/marketcheck-price`,
     appliesTo: { new: "optional", used: "yes", autocurb: "optional" },
     ownership: "shared",
@@ -471,6 +539,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/predict/car/us/marketcheck_price/comparables",
     billingProduct: "price_prediction",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/market-insights/marketcheck-price`,
     appliesTo: { new: "optional", used: "yes", autocurb: "optional" },
     ownership: "shared",
@@ -489,7 +558,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "market_evidence",
     influences: MARKET,
     publicBrowseMayTrigger: false,
-    notes: "The Premium Comparables tier: prediction plus the comparable set. Untested on this account; cost is the Base placeholder until one authorized call reports it. The used REFRESH tier once the build is cached.",
+    requestContract: {
+      required: ["vin"],
+      alwaysSend: ["miles", "zip", "dealer_type", "is_certified"],
+      constraints: ["schema defaults when omitted: miles 50,000, zip 50501, dealer_type franchise, is_certified false; a request that omits them prices a different car in a different market", "city and state are optional when zip is sent"],
+    },
+    notes: "The Premium Comparables tier: prediction plus the comparable set. Untested on this account; cost is the Base placeholder until one authorized call reports it. The used REFRESH tier once the build is cached. Every call sends and the envelope records miles, zip, dealer_type and is_certified, because the provider's defaults would silently describe another car.",
   },
   {
     key: "price_premium_plus",
@@ -498,6 +572,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/predict/car/us/marketcheck_price/comparables/decode",
     billingProduct: "price_prediction",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/market-insights/marketcheck-price`,
     appliesTo: { new: "test", used: "yes", autocurb: "optional" },
     ownership: "shared",
@@ -525,6 +600,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/history/car/{vin}",
     billingProduct: "vin_history",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "no", used: "yes", autocurb: "yes" },
     ownership: "shared",
@@ -543,7 +619,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "listing_history",
     influences: influence({ vehicleScore: true, dataConfidence: true, buyerRecommendation: true, marketContext: true }),
     publicBrowseMayTrigger: false,
-    notes: "Mileage chronology and prior exposure feed Vehicle Integrity and the odometer hard gate. Never an owner count, never an accident history. Not routine for new vehicles.",
+    requestContract: {
+      required: ["vin"],
+      alwaysSend: [],
+      constraints: ["fields, page and sort_order are the only other parameters; episodes come newest first by default"],
+    },
+    notes: "Mileage chronology and prior exposure feed Vehicle Integrity and the odometer hard gate. Never an owner count, never an accident history. Not routine for new vehicles. Parameters per the MCP schema read 2026-10-27.",
   },
   {
     key: "mds",
@@ -552,6 +633,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/mds/car",
     billingProduct: "market_days_supply",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/market-insights/market-days-supply`,
     appliesTo: { new: "optional", used: "yes", autocurb: "yes" },
     ownership: "shared",
@@ -579,6 +661,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/sales/car",
     billingProduct: "sales_stats",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/market-insights/inferred-sales-stats`,
     appliesTo: { new: "optional", used: "yes", autocurb: "yes" },
     ownership: "shared",
@@ -603,9 +686,10 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     key: "sold_summary",
     provider: "marketcheck",
     product: "Sold Vehicles Summary",
-    path: "/v2/sold/car/summary",
+    path: "/v2/sold-vehicles/summary",
     billingProduct: "sales_stats",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/market-insights/sold-vehicles-summary`,
     appliesTo: { new: "optional", used: "yes", autocurb: "yes" },
     ownership: "shared",
@@ -613,7 +697,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     triggers: ["scheduled"],
     cadence: { intake: false, refresh: true },
     ttlHours: 24 * 30,
-    cacheKey: ["cohort", "geography", "period_start", "period_end"],
+    cacheKey: ["inventory_type", "summary_by", "geography", "cohort_filters", "ranking", "date_from", "date_to"],
     defaultCostUsd: 0.002,
     entitlement: "sold_vehicles_summary",
     maxRetries: 2,
@@ -624,15 +708,21 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "market_evidence",
     influences: CONTEXT,
     publicBrowseMayTrigger: false,
-    notes: "Market trend and direction over 3 / 6 / 12 months: inferred sold volume, price, mileage, DOM/DOS statistics and percentiles, CPO segmentation, drivetrain, powertrain, colours, make/model/trim/version, geography, MSRP dimensions where the contract supports them. Requested filters, provider-applied filters, warnings, notices and population size are stored verbatim. Path is a placeholder until the contract is read.",
+    requestContract: {
+      required: ["inventory_type: new, used, certified or all"],
+      alwaysSend: ["date_from and date_to together, or neither for the last complete month"],
+      constraints: ["dates are month-aligned (first day to last day) and at most a year apart", "summary_by is national, state or city_state; per-state rankings must never be summed", "dealership_group_name is exact and comes from the dealership directory", "source is a rooftop inventory_url; comma lists allowed", "ranking_dimensions, ranking_measure, ranking_order, top_n, limit, measure filters and rank_after_filters shape the answer", "response carries result_count, truncated, warnings and applied (the defaults and window actually used)", "sales are inferred and prices are advertised asking prices, never transaction prices", "the service scales to zero: the first call after idle can take about nine seconds", "history starts January 2021 and runs through the last complete month; US franchise and independent dealers only; no auction, private-party, UK or Canada data", "no ZIP or metro filter: geography is summary_by plus state and city lists", "ranking_dimensions may be year, make, model, trim, body_type, body_subtype, drivetrain, transmission, powertrain_type, fuel_type_category, base colours, msrp_label, dealership_group_name, source or inventory_type; state is never a dimension", "top_n is rows kept per group per month and geography, not per response; limit caps the response at 1 to 20,000", "measure filters apply after rank and top_n unless rank_after_filters=true", "enterprise-gated per the provider's server info"],
+    },
+    notes: "Market trend and direction over 3 / 6 / 12 months: inferred sold volume, price, mileage, DOM/DOS statistics and percentiles, CPO segmentation, drivetrain, powertrain, colours, make/model/trim/version, geography, MSRP dimensions. Requested filters, provider-applied filters, warnings, notices and population size are stored verbatim. Path and parameter contract from the MCP schema read 2026-10-27 (the server also lists it as /v2/sold/summary); still untested from this account.",
   },
   {
     key: "sold_summary_dealership_groups",
     provider: "marketcheck",
     product: "Sold Vehicles Summary by dealership group",
-    path: "/v2/sold/car/summary/dealership_groups",
+    path: "/v2/sold-vehicles/summary",
     billingProduct: "sales_stats",
-    contract: "unlocated",
+    contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/market-insights/sold-vehicles-summary`,
     appliesTo: { new: "optional", used: "optional", autocurb: "yes" },
     ownership: "shared",
@@ -640,9 +730,14 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     triggers: ["scheduled"],
     cadence: { intake: false, refresh: true },
     ttlHours: 24 * 30,
-    cacheKey: ["mc_dealership_group_id", "geography", "period_start", "period_end"],
+    cacheKey: ["inventory_type", "summary_by", "geography", "dealership_group_name", "ranking", "date_from", "date_to"],
     defaultCostUsd: 0.002,
     entitlement: "sold_vehicles_summary",
+    requestContract: {
+      required: ["inventory_type: new, used, certified or all"],
+      alwaysSend: ["ranking_dimensions including dealership_group_name, or dealership_group_name as an exact filter"],
+      constraints: ["the same endpoint as sold_summary: the group is a ranking dimension or an exact filter, never a separate path", "dealership_group_name must be the directory's mc_dealership_group_name; an unknown name is a 422; a name containing a comma is sent alone", "only about 38% of inferred sales carry a group, so a group ranking leaves the rest out", "a single rooftop is addressed by source=inventory_url instead"],
+    },
     maxRetries: 2,
     rateLimitStrategy: "serial",
     fallback: null,
@@ -651,7 +746,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "market_evidence",
     influences: CONTEXT,
     publicBrowseMayTrigger: false,
-    notes: "Dealer-group velocity and stocking comparison for management analytics and future AutoCurb fit. Named by the change order; path not yet read from the docs. May never inflate or reduce Vehicle Score.",
+    notes: "Dealer-group velocity and stocking comparison for management analytics and future AutoCurb fit. Resolved against the MCP schema on 2026-10-27: the same Sold Vehicles Summary endpoint with dealership_group_name as a ranking dimension or exact filter. May never inflate or reduce Vehicle Score.",
   },
   {
     key: "vindata_access",
@@ -660,6 +755,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/vindata/access-report/aamva/{vin}",
     billingProduct: "vindata_access",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/third-party/vindata`,
     appliesTo: { new: "no", used: "yes", autocurb: "yes" },
     ownership: "shared",
@@ -687,6 +783,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/vindata/generate-report/aamva/{vin}",
     billingProduct: "vindata_generate",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/third-party/vindata`,
     appliesTo: { new: "no", used: "yes", autocurb: "yes" },
     ownership: "shared",
@@ -714,6 +811,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/car/autorecalls/{vin}",
     billingProduct: "auto_recalls",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/third-party/autorecalls`,
     appliesTo: { new: "yes", used: "yes", autocurb: "yes" },
     ownership: "shared",
@@ -741,6 +839,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/recall/car/{vin}",
     billingProduct: "auto_recalls",
     contract: "legacy",
+    contractSource: "code",
     reference: null,
     appliesTo: { new: "no", used: "no", autocurb: "no" },
     ownership: "shared",
@@ -768,6 +867,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/search/car/incentive/oem",
     billingProduct: "oem_incentive",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/incentives/incentive-search-api`,
     appliesTo: { new: "yes", used: "no", autocurb: "no" },
     ownership: "autolabels",
@@ -786,7 +886,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "offer_context",
     influences: NONE,
     publicBrowseMayTrigger: false,
-    notes: "Owner-disabled 2026-07-28. Cache by program and market, never per VIN. Offer context for the New Passport, never a Vehicle Score input.",
+    requestContract: {
+      required: ["country"],
+      alwaysSend: [],
+      constraints: ["rows at most 10 per request; start up to 10,000", "msa_code is the market dimension; radius default 50", "facets and stats on monthly, apr, cashback_amount"],
+    },
+    notes: "Owner-disabled 2026-07-28. Cache by program and market, never per VIN. Offer context for the New Passport, never a Vehicle Score input. Parameters per the MCP schema read 2026-10-27.",
   },
   {
     key: "incentives_make_zip",
@@ -795,6 +900,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/search/car/incentive/{make}/{zip}",
     billingProduct: "oem_incentive",
     contract: "documented",
+    contractSource: "mcp-schema-2026-10-27",
     reference: `${MC_DOCS}/incentives/incentive-search-api`,
     appliesTo: { new: "yes", used: "no", autocurb: "no" },
     ownership: "autolabels",
@@ -813,7 +919,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "offer_context",
     influences: NONE,
     publicBrowseMayTrigger: false,
-    notes: "Preferred cache dimension once incentives return.",
+    requestContract: {
+      required: ["oem", "zip"],
+      alwaysSend: [],
+      constraints: ["the provider converts the ZIP to an MSA for regional relevance", "rows at most 10 per request"],
+    },
+    notes: "Preferred cache dimension once incentives return. MCP schema: OEM identifier plus a five-character ZIP, converted to an MSA by the provider.",
   },
   {
     key: "cached_images",
@@ -822,6 +933,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/image/cache/car/{id}",
     billingProduct: "cached_images",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "optional", used: "optional", autocurb: "no" },
     ownership: "autolabels",
@@ -849,6 +961,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/listing/car/{id}",
     billingProduct: "inventory_search",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "optional", used: "optional", autocurb: "optional" },
     ownership: "shared",
@@ -876,6 +989,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/search/car/fsbo/active",
     billingProduct: "fsbo",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/inventory/introduction`,
     appliesTo: { new: "no", used: "no", autocurb: "yes" },
     ownership: "autocurb",
@@ -894,7 +1008,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "acquisition",
     influences: NONE,
     publicBrowseMayTrigger: false,
-    notes: "Acquisition context only; never a Vehicle Score input.",
+    requestContract: {
+      required: [],
+      alwaysSend: [],
+      constraints: ["the provider's MCP exposes private-party inventory as seller_type=fsbo on the active search; the documented REST surface keeps this separate path. Both forms are AutoCurb-reserved and refused by policyFor for AutoLabels vehicles"],
+    },
+    notes: "Acquisition context only; never a Vehicle Score input. seller_type=fsbo on the active search is the same product in the MCP.",
   },
   {
     key: "auction",
@@ -903,6 +1022,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/search/car/auction/active",
     billingProduct: "auction",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/inventory/auction-search`,
     appliesTo: { new: "no", used: "no", autocurb: "yes" },
     ownership: "autocurb",
@@ -921,7 +1041,12 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     authority: "acquisition",
     influences: NONE,
     publicBrowseMayTrigger: false,
-    notes: "Wholesale context only.",
+    requestContract: {
+      required: [],
+      alwaysSend: [],
+      constraints: ["the provider's MCP exposes auction inventory as seller_type=auction on the active search; the documented REST surface keeps this separate path. Both forms are AutoCurb-reserved and refused by policyFor for AutoLabels vehicles"],
+    },
+    notes: "Wholesale context only. seller_type=auction on the active search is the same product in the MCP.",
   },
   {
     key: "marketmatch_dealers",
@@ -930,6 +1055,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/marketmatch/dealers/rank",
     billingProduct: "marketmatch",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/market-insights/marketmatch`,
     appliesTo: { new: "no", used: "no", autocurb: "yes" },
     ownership: "autocurb",
@@ -957,6 +1083,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/v2/marketmatch/vins/rank",
     billingProduct: "marketmatch",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: `${MC_DOCS}/market-insights/marketmatch`,
     appliesTo: { new: "no", used: "no", autocurb: "yes" },
     ownership: "autocurb",
@@ -984,6 +1111,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/webhooks/marketcheck",
     billingProduct: "unknown",
     contract: "documented",
+    contractSource: "handoff-2026-10-21",
     reference: "https://docs.marketcheck.com/docs/get-started/api/webhook-integration",
     appliesTo: { new: "yes", used: "yes", autocurb: "optional" },
     ownership: "shared",
@@ -1011,6 +1139,7 @@ export const PROVIDER_CAPABILITIES: readonly ProviderCapability[] = [
     path: "/UsedCarWS/UsedCarVin/{vin}/{mileage}",
     billingProduct: "unknown",
     contract: "legacy",
+    contractSource: "code",
     reference: null,
     appliesTo: { new: "no", used: "yes", autocurb: "yes" },
     ownership: "shared",

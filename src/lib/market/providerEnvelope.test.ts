@@ -3,7 +3,7 @@ import { buildProviderEnvelope, classifyOutcome, envelopeFresh, filtersDiverged 
 
 const base = {
   capabilityKey: "sold_summary",
-  endpoint: "/v2/sold/car/summary",
+  endpoint: "/v2/sold-vehicles/summary",
   contractVersion: "sold-summary@2026-10",
   subjectVin: null,
   requestedFilters: { make: "Example", model: "Model", state: "CT", months: 6 },
