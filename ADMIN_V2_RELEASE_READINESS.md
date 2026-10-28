@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance, 97 percent | see section 10 | | |
+| 16 | Visual acceptance | Verified with exceptions | 10 of 13 screens at or above 97% layout parity; 03, 07 and 10 below by documented choice; full review clean (section 10) | 03, 07, 10 differences are intentional |
 
 ## 2. How the evidence was produced
 
@@ -188,7 +188,99 @@ session. It invokes nothing and changes nothing.
 
 ## 10. Visual acceptance
 
-Pending the per-screen re-evaluation; filled in when it completes.
+Measured on `main` at `bebbf0d` (code), the same harness, Chromium build,
+1586x992 reference frame, device scale 1, light theme and deterministic
+dev-only design fixtures as every earlier run. "Before" is `ff785c1`, the
+commit before this polish round; re-running it reproduced its original
+numbers exactly. Layout parity masks text boxes; it is reported separately
+from the full review below and is not the acceptance test on its own.
+
+| # | Screen | Route | Layout parity before | After | Landmarks | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 01 | Overview | `/admin?tab=overview` | 94.85% | 97.42% | pass | activity and settings text no longer truncated (costs 0.65 against the mock's clamped lines) |
+| 02 | Dealership & Brand, Identity | `/admin?tab=identity` | 96.78% | 98.15% | pass | |
+| 03 | People & Access, Team | `/admin?tab=team` | 96.86% | 95.63% | pass | below 97 by choice: addresses are the member's only identifier and now wrap instead of truncating; the mock shows one-line names our data does not have |
+| 04 | Member role (child) | `/admin/people/:memberId` | 96.65% | 97.99% | pass | |
+| 05 | Pricing & Products, Price rules | `/admin?tab=price-rules` | 95.37% | 98.17% | pass | |
+| 06 | Fee change review (child) | `/admin/pricing/fee-review` | 96.92% | 98.30% | pass | |
+| 07 | Product applicability (child) | `/admin/products/:productId/applicability` | 95.92% | 96.99% | pass | below 97 by choice: Review changes stays disabled until the draft changes (0.48); shell gutter 26 vs 24px (0.46) |
+| 08 | Customer Experience, Contact & Routing | `/admin?tab=routing` | 96.92% | 98.07% | pass | |
+| 09 | Escalation rules (child) | `/admin/customer-experience/escalation` | 97.34% | 97.07% | 3px shift | measured against the navy rail edge; the stream's content-origin rail was reverted |
+| 10 | Publishing, Effective policy | `/admin?tab=effective-policy` | 95.37% | 96.99% | fail (in-card tabs) | below 97: the approved IA draws tabs above the card, the mock inside it (1.60); gutter 30 vs 24px |
+| 11 | Documents & Service, Approval rules | `/admin?tab=approval-rules` | 96.60% | 97.62% | fail (in-card tabs) | readiness labels wrap instead of truncating |
+| 12 | Integrations, Inventory feed | `/admin?tab=inventory-feed` | 96.98% | 98.66% | fail (heading order) | |
+| 13 | Sync run detail (child) | `/admin/integrations/runs/:runId` | 95.77% | 98.95% | fail (title spacing) | |
+
+Evidence: `scripts/admin-parity/evidence/before-after/NN.png` (Before |
+Reference | After at 1586x992), `evidence/responsive/NN.png` (1366, 1024,
+390), `evidence/NN-1586x992-structure.png` (red layout, amber text, blue
+masks), `ADMIN_V2_PARITY_REPORT.md` (every score and remaining difference),
+`evidence/audit-final.json` (the full review below).
+
+### 10.1 Full review (not a screenshot score)
+
+`scripts/admin-parity/audit.cjs`, every screen at 1586x992, 1366x768,
+1024x768, 768x1024 and 390x844, on the final commit: no page overflow, no
+clipped or truncated text, one h1 per screen, no unnamed control, no target
+failing WCAG 2.5.8, every tab stop with a visible focus change, no contrast
+failure in light or with the app's dark class, every boxed icon centred.
+Two overlaps remain by design: the sticky save bar covers content while
+scrolling on 02 (phone) and 08 (tablet portrait); at the page bottom nothing
+is covered. Seven icons are under 16px: 06's 14x9 arrows and 09's 14px badge
+glyphs match the reference geometry; 08's are 14px glyphs in the miniature
+customer preview. 07 logs four console errors: the realtime socket the
+sandbox blocks, not an application error.
+
+Fixed by this review: truncated text on 01, 02, 03, 08, 11 and 13; the
+Team table and Escalation tiers breaking at 1280-1535px; two contrast
+failures; missing hover feedback on four controls; small badge glyphs;
+the supplied vehicle drawing now fills Price rules' empty photo frame and
+empty-state artwork is no longer dimmed; rule editor labels tied to inputs.
+
+### 10.2 Interactions
+
+Tests now drive every screen: open child pages, select rows, edit drafts,
+Review changes only after a valid change, cancel, save, refused and thrown
+saves, retry after a failed read, and paid calls only on explicit click.
+They found eight defects, all fixed with regression tests: refused rule
+writes reported as Applied (07 and the Applicability list), negative prices
+accepted (07), three saves stuck on Applying when the writer throws (02,
+08/09, 10), malformed escalation addresses shown as configured (09), and
+Review change enabled before any change (04). Admin, Sticker and hook
+suites: 72 files, 688 tests, all passing; typecheck clean.
+
+### 10.3 Intentional differences from the references
+
+- 07: Review changes is disabled until the draft differs from the saved
+  policy; the mock draws it enabled. Compared against the same state, the
+  enabled style matches the primary button.
+- 08: the Escalation on/off switch lives on the Escalation page that owns
+  it; Contact & Routing reports the state and links there.
+- 03: members are shown by address (our data has no names); addresses wrap.
+- 09 and 12: "Not supported" and "Previously validated" where the mock
+  says "Coming soon" and "Verified"; we do not claim what the data does not
+  support.
+- 10, 11, 12, 13: tab rows and title blocks follow the approved shell, not
+  each mock's local variation.
+- Page margins: the mocks draw 18-33px; the shell keeps one 24px value
+  (section 10.4).
+
+### 10.4 Shared spacing decision
+
+The references disagree: left gutters 18-33px (median 27), right 15-27px
+(median 25), navigation-to-content gaps 15-21px. No single value in
+`AdminPageContainer` reproduces them; 26 or 28px would move 01, 03 and 04
+further away. The shell keeps 24px and 16px, and no view compensates
+locally.
+
+### 10.5 Not tested
+
+- Native iOS: this repository has no native code; nothing here changed a
+  native screen or shared native asset. The Connect Card and Wallet
+  implementations are not in this repository and were not touched.
+- Real devices and Safari: the audit used Chromium at device scale 1.
+- Live data in the browser: the sandbox cannot reach the hosted project,
+  so screens were exercised through fixtures and component tests.
 
 ## 11. Approvals requested
 
