@@ -42,12 +42,14 @@ const listing = (n: number, over: Partial<ConsistencyListing> = {}): Consistency
 const observed = (price: number, capturedAt = "2026-10-21T06:05:00Z"): WebsiteObservation => ({ price, capturedAt, sourceUrl: "https://dealer.example/vdp", channel: "website" });
 
 // The reference depicts the fee-inclusive basis ("Advertised total includes
-// document fee"), so the fixture policy uses it.
+// document fee"), so the fixture policy uses it. The first three rows follow
+// the reference's states in order: consistent on the same version, a
+// mismatch seen on an older version, and a vehicle awaiting evidence.
 export const CONSISTENCY_ROWS: ConsistencyAssessment[] = [
   assessConsistency(listing(41), observed(18_000 + 41 * 525 + 895), 895, "website_sale_price"),
-  assessConsistency(listing(32), observed(18_000 + 32 * 525 + 895, "2026-10-19T06:05:00Z"), 895, "website_sale_price"),
-  assessConsistency(listing(58), observed(18_000 + 58 * 525 + 2_195), 895, "website_sale_price"),
-  assessConsistency(listing(17), null, 895, "website_sale_price"),
+  assessConsistency(listing(32), observed(18_000 + 32 * 525 + 1_895, "2026-10-19T06:05:00Z"), 895, "website_sale_price"),
+  assessConsistency(listing(18), null, 895, "website_sale_price"),
+  assessConsistency(listing(58), observed(18_000 + 58 * 525 + 895), 895, "website_sale_price"),
   assessConsistency(listing(46), observed(18_000 + 46 * 525 + 895), 895, "website_sale_price"),
 ];
 
@@ -59,6 +61,8 @@ export const PRICE_RULES_FIXTURE: PriceRulesFixture = {
   websiteTerm: "Sale Price",
 };
 
+// The first row is the review's example vehicle; like the reference's, its
+// name fits the example table's 258px vehicle column on one line.
 export const FEE_IMPACT_ROWS: FeeImpactRow[] = Array.from({ length: 60 }, (_, i) => {
   const n = i + 1;
   const selling = 18_000 + n * 525;
@@ -67,7 +71,7 @@ export const FEE_IMPACT_ROWS: FeeImpactRow[] = Array.from({ length: 60 }, (_, i)
     year: 2022 + (n % 4),
     make: "Example",
     model: MODELS[n % MODELS.length],
-    trim: TRIMS[n % TRIMS.length],
+    trim: n === 1 ? null : TRIMS[n % TRIMS.length],
     stock: `EX-${1000 + n}`,
     archived: n > 48,
     advertised_price_before_doc: selling,
@@ -128,17 +132,18 @@ export const EXAMPLE_RULE: ProductRule = {
   mileage_max: 80_000,
 };
 
-// Three sampled vehicles, as the reference shows: one with proof, one without,
-// one outside the mileage limit.
+// Three sampled vehicles in the reference's order: one without proof, one
+// with proof, one outside the mileage limit. Short model names and no trim
+// keep each name on one line in the 164px vehicle column, as the reference's do.
 export const PRODUCT_APPLICABILITY_FIXTURE: ProductApplicabilityFixture = {
   product: EXAMPLE_PRODUCT,
   rule: EXAMPLE_RULE,
   vehicles: [
-    { vin: vinOf(41), year: 2024, make: "Example", model: "Crossover", trim: "Premium", condition: "new", mileage: 12 },
-    { vin: vinOf(32), year: 2023, make: "Example", model: "Sedan", trim: "Sport", condition: "used", mileage: 28_115 },
-    { vin: vinOf(17), year: 2022, make: "Example", model: "Hatch", trim: "Base", condition: "cpo", mileage: 96_480 },
+    { vin: vinOf(41), year: 2024, make: "Example", model: "C40", trim: null, condition: "new", mileage: 12 },
+    { vin: vinOf(32), year: 2023, make: "Example", model: "S30", trim: null, condition: "used", mileage: 28_115 },
+    { vin: vinOf(17), year: 2022, make: "Example", model: "H20", trim: null, condition: "cpo", mileage: 96_480 },
   ],
-  proofs: { [vinOf(41)]: 1, [vinOf(32)]: 0, [vinOf(17)]: 0 },
+  proofs: { [vinOf(41)]: 0, [vinOf(32)]: 1, [vinOf(17)]: 0 },
   policy: { requireManagerApproval: true, requireInstallVerification: true },
   rulesExist: true,
 };

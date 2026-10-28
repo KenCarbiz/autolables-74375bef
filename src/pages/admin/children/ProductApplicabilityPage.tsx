@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Ban, Camera, Car, CheckCircle2, Clock, FileText, HelpCircle, Info, MinusCircle, User, XCircle } from "lucide-react";
+import { AlertCircle, Ban, Camera, CarFront, CheckCircle2, Clock, FileText, HelpCircle, Info, MinusCircle, User, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudit } from "@/contexts/AuditContext";
@@ -64,9 +64,9 @@ const reduce = (s: State, e: Event): State => reviewApplyReducer(s, e);
 
 const EVIDENCE_TONE: Record<EvidenceItemState, Tone> = { complete: "success", pending: "warning", required: "danger", manager_required: "danger", not_required: "neutral" };
 const EVIDENCE_STATE_LABEL: Record<EvidenceItemState, string> = { complete: "Complete", pending: "Pending", required: "Required", manager_required: "Manager required", not_required: "Not required" };
-const EVIDENCE_ICON: Record<EvidenceItem["key"], typeof Car> = { applicable: Car, installation_proof: Camera, disclosure: FileText, approval: User };
+const EVIDENCE_ICON: Record<EvidenceItem["key"], typeof CarFront> = { applicable: CarFront, installation_proof: Camera, disclosure: FileText, approval: User };
 
-type MarkIcon = typeof Car;
+type MarkIcon = typeof CarFront;
 const PROOF_MARK: Record<ProofState, { icon: MarkIcon; tone: Tone }> = {
   attached: { icon: CheckCircle2, tone: "success" },
   missing: { icon: AlertCircle, tone: "danger" },
@@ -85,10 +85,11 @@ const MARK_TEXT: Record<Tone, string> = { success: "text-adm-success", danger: "
 const CONDITION_WORD: Record<string, string> = { new: "New", used: "Used", cpo: "CPO" };
 const CHIP_CLASS = "rounded-full px-3 py-1.5 text-[13px] leading-[18px]";
 
-// Status cell drawn as a 22px mark beside its text, as the reference does.
+// Status cell: a 19px mark (the reference's glyphs measure 16-17px) in the
+// tone colour beside ink text; neutral marks are filled, as drawn.
 const StateMark = ({ icon: Icon, tone, children }: { icon: MarkIcon; tone: Tone; children: ReactNode }) => (
-  <span className={cn("inline-flex items-center gap-1.5 text-[13px] leading-[20px] whitespace-nowrap", MARK_TEXT[tone])}>
-    <Icon className="w-[22px] h-[22px] flex-shrink-0" aria-hidden="true" />
+  <span className="inline-flex items-center gap-2 text-[13px] leading-[20px] text-adm-ink whitespace-nowrap">
+    <Icon className={cn("w-[19px] h-[19px] flex-shrink-0", MARK_TEXT[tone], tone === "neutral" && "fill-current stroke-white")} aria-hidden="true" />
     {children}
   </span>
 );
@@ -296,16 +297,18 @@ export default function ProductApplicabilityPage() {
         {state.phase === "applied" && state.result && <InlineNote tone="success" title="Applied">{state.result.message}</InlineNote>}
         {state.error && state.phase !== "applied" && <InlineNote tone="danger">{state.error}</InlineNote>}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.206fr)_minmax(0,1fr)] gap-[13px] items-start">
-          <Panel title="Applicability rules" description="Choose which inventory is eligible for this product.">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,697fr)_minmax(0,583fr)] gap-[15px] items-start">
+          <Panel title="Applicability rules" description="Choose which inventory is eligible for this product." bodyClassName="pl-[21px] pr-[19px] pb-1">
+            {/* Reference rows: 81, 101 and 108px with dividers inset 16px from the box edge. */}
             <div className="rounded-[8px] border border-adm-border bg-adm-surface" data-landmark="applicability-rules">
-              <fieldset className="px-4 pt-3 pb-[18px] border-b border-adm-border">
-                <legend className="p-0 text-[14px] leading-[20px] font-semibold text-adm-ink">Condition</legend>
-                <div className="mt-3 flex flex-wrap items-center gap-x-10 gap-y-2">
-                  <CheckRow size="lg" checked={draft.rule.conditions.new} onChange={(v) => setConditions({ new: v })} label="New" />
-                  <CheckRow size="lg" checked={draft.rule.conditions.used} onChange={(v) => setConditions({ used: v })} label="Used" />
+              <fieldset className="mx-4 pt-[9px] pb-[17px] border-b border-adm-border">
+                <legend className="float-left w-full p-0 text-[14px] leading-[20px] font-semibold text-adm-ink">Condition</legend>
+                <div className="clear-left pt-3 flex flex-wrap items-center gap-y-2">
+                  <CheckRow size="lg" className="gap-2 w-[104px]" checked={draft.rule.conditions.new} onChange={(v) => setConditions({ new: v })} label="New" />
+                  <CheckRow size="lg" className="gap-2 w-[102px]" checked={draft.rule.conditions.used} onChange={(v) => setConditions({ used: v })} label="Used" />
                   <CheckRow
                     size="lg"
+                    className="gap-2"
                     checked={draft.rule.conditions.cpo}
                     onChange={() => undefined}
                     disabled
@@ -319,15 +322,15 @@ export default function ProductApplicabilityPage() {
                   />
                 </div>
               </fieldset>
-              <fieldset className="px-4 pt-[15px] pb-4 border-b border-adm-border">
-                <legend className="p-0 text-[14px] leading-[20px] font-semibold text-adm-ink">
+              <fieldset className="mx-4 pt-[14px] pb-4 border-b border-adm-border">
+                <legend className="float-left w-full p-0 text-[14px] leading-[20px] font-semibold text-adm-ink">
                   Mileage <span className="font-normal text-adm-muted">(optional limit)</span>
                 </legend>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-12 gap-y-3">
-                  <CheckRow size="lg" type="radio" name="mileage" checked={draft.rule.mileageMax == null} onChange={() => setRule({ mileageMax: null })} label="No limit" />
+                <div className="clear-left pt-1 flex flex-wrap items-center gap-y-3">
+                  <CheckRow size="lg" className="w-[129px]" type="radio" name="mileage" checked={draft.rule.mileageMax == null} onChange={() => setRule({ mileageMax: null })} label="No limit" />
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
                     <CheckRow size="lg" type="radio" name="mileage" checked={draft.rule.mileageMax != null} onChange={() => setRule({ mileageMax: draft.rule.mileageMax ?? 100_000 })} label="Set maximum mileage" />
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-[14px]">
                       <AdminInput
                         type="number"
                         min={0}
@@ -336,26 +339,26 @@ export default function ProductApplicabilityPage() {
                         disabled={draft.rule.mileageMax == null}
                         onChange={(e) => setRule({ mileageMax: Number(e.target.value) })}
                         aria-label="Maximum mileage"
-                        className="h-11 w-[173px] text-[15px]"
+                        className="h-[46px] w-[175px] text-[15px]"
                       />
                       <span className="text-[14px] leading-[20px] text-adm-ink">miles</span>
                     </div>
                   </div>
                 </div>
               </fieldset>
-              <div className="px-4 pt-3.5 pb-3.5">
+              <div className="px-4 pt-[14px] pb-4">
                 <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">
                   Model year range <span className="font-normal text-adm-muted">(optional)</span>
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
-                  <AdminSelect id="year-min" aria-label="Model year from" value={draft.rule.yearMin} onChange={(e) => setRule({ yearMin: e.target.value })} className="h-11 w-full max-w-[237px] text-[15px]">
+                <div className="mt-[11px] flex flex-wrap items-center gap-x-5 gap-y-3">
+                  <AdminSelect id="year-min" aria-label="Model year from" value={draft.rule.yearMin} onChange={(e) => setRule({ yearMin: e.target.value })} className="h-[46px] w-full max-w-[237px] text-[15px]">
                     <option value="">Any year</option>
                     {years.map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </AdminSelect>
                   <span className="text-[14px] leading-[20px] text-adm-ink">to</span>
-                  <AdminSelect id="year-max" aria-label="Model year to" value={draft.rule.yearMax} onChange={(e) => setRule({ yearMax: e.target.value })} className="h-11 w-full max-w-[225px] text-[15px]">
+                  <AdminSelect id="year-max" aria-label="Model year to" value={draft.rule.yearMax} onChange={(e) => setRule({ yearMax: e.target.value })} className="h-[46px] w-full max-w-[228px] text-[15px]">
                     <option value="">Any year</option>
                     {years.map((y) => (
                       <option key={y} value={y}>{y}</option>
@@ -366,44 +369,46 @@ export default function ProductApplicabilityPage() {
               </div>
             </div>
 
-            <div className="mt-5 rounded-[8px] border border-adm-border bg-adm-surface px-4 pt-3 pb-[15px]" data-landmark="price-treatment">
-              <h4 className="text-[18px] leading-[24px] font-semibold text-adm-ink">Price treatment</h4>
-              <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">Select how this product is priced and enter the amount.</p>
-              <div className="mt-2.5 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_195px] gap-x-6 gap-y-3">
-                <div className="pt-2 space-y-[18px]">
-                  <CheckRow size="lg" type="radio" name="treatment" checked={draft.treatment === "installed"} onChange={() => dispatch({ type: "edit", draft: { ...draft, treatment: "installed" } })} label={<span className="font-semibold">Installed product</span>} detail="Added to the vehicle; itemized in the advertised price." />
-                  <CheckRow size="lg" type="radio" name="treatment" checked={draft.treatment === "optional"} onChange={() => dispatch({ type: "edit", draft: { ...draft, treatment: "optional" } })} label={<span className="font-semibold">Optional accessory</span>} detail="Customer can choose to add at time of purchase." />
-                </div>
-                <div>
-                  <label htmlFor="product-price" className="block text-[14px] leading-[20px] font-semibold text-adm-ink">Price</label>
-                  <div className="relative mt-1.5">
-                    <span aria-hidden="true" className="absolute left-[18px] top-1/2 -translate-y-1/2 text-[16px] text-adm-muted">$</span>
-                    <AdminInput id="product-price" type="number" min={0} step="0.01" value={draft.price} onChange={(e) => dispatch({ type: "edit", draft: { ...draft, price: Number(e.target.value) || 0 } })} className="h-11 pl-9 text-[15px]" />
+            {/* The reference draws the proof note as the bottom band of the price box. */}
+            <div className="mt-4 rounded-[8px] border border-adm-border bg-adm-surface overflow-hidden" data-landmark="price-treatment">
+              <div className="px-4 pt-[13px] pb-[25px]">
+                <h4 className="text-[18px] leading-[24px] font-semibold text-adm-ink">Price treatment</h4>
+                <p className="mt-[3px] text-[13px] leading-[18px] text-adm-muted">Select how this product is priced and enter the amount.</p>
+                <div className="mt-[11px] grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_195px] gap-x-6 gap-y-3">
+                  <div className="pt-1.5 space-y-[18px]">
+                    <CheckRow size="lg" type="radio" name="treatment" controlClassName="mt-[3px]" labelClassName="text-[14px]" checked={draft.treatment === "installed"} onChange={() => dispatch({ type: "edit", draft: { ...draft, treatment: "installed" } })} label={<span className="font-semibold">Installed product</span>} detail="Added to the vehicle; itemized in the advertised price." />
+                    <CheckRow size="lg" type="radio" name="treatment" controlClassName="mt-[3px]" labelClassName="text-[14px]" checked={draft.treatment === "optional"} onChange={() => dispatch({ type: "edit", draft: { ...draft, treatment: "optional" } })} label={<span className="font-semibold">Optional accessory</span>} detail="Customer can choose to add at time of purchase." />
+                  </div>
+                  <div>
+                    <label htmlFor="product-price" className="block text-[14px] leading-[20px] font-semibold text-adm-ink">Price</label>
+                    <div className="relative mt-1">
+                      <span aria-hidden="true" className="absolute left-[14px] top-1/2 -translate-y-1/2 text-[16px] text-adm-muted">$</span>
+                      <AdminInput id="product-price" type="number" min={0} step="0.01" value={draft.price} onChange={(e) => dispatch({ type: "edit", draft: { ...draft, price: Number(e.target.value) || 0 } })} className="h-[45px] pl-[49px] text-[15px]" />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div role="status" className="mt-2.5 flex items-center gap-4 rounded-[8px] border border-[#C5D4F7] bg-adm-selected px-5 py-[10px]">
-              <Info className="w-9 h-9 text-adm-primary flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
-              <div className="min-w-0">
-                <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Installed status requires proof before publication.</p>
-                <p className="text-[12px] leading-[18px] text-adm-muted">Installation evidence is required for each vehicle before this product can be published with it.</p>
+              <div role="status" className="flex items-start gap-3.5 bg-adm-selected px-4 pt-[11px] pb-[13px]">
+                <Info className="w-9 h-9 text-adm-primary flex-shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-[14px] leading-[21px] font-semibold text-adm-ink">Installed status requires proof before publication.</p>
+                  <p className="text-[13px] leading-[18px] text-adm-muted">Installation evidence is required for each vehicle before this product can be published with it.</p>
+                </div>
               </div>
             </div>
           </Panel>
 
-          <div className="space-y-3">
-            <Panel title="Evidence checklist" description="Items required for this product before publication." bodyClassName="px-[18px]">
+          <div className="space-y-[11px]">
+            <Panel title="Evidence checklist" description="Items required for this product before publication." bodyClassName="px-[17px] pb-[3px]">
               <ul className="rounded-[8px] border border-adm-border bg-adm-surface divide-y divide-adm-border" data-landmark="evidence-checklist">
                 {checklist.map((item) => {
                   const Icon = EVIDENCE_ICON[item.key];
                   return (
-                    <li key={item.key} className="flex items-center gap-6 pl-[18px] pr-3 py-[13px]">
+                    <li key={item.key} className="flex items-center gap-5 pl-4 pr-3 pt-[9px] pb-[14px] min-h-[63px]">
                       <Icon className="w-8 h-8 text-adm-muted flex-shrink-0" strokeWidth={1.5} aria-hidden="true" />
                       <div className="min-w-0 flex-1">
                         <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{item.label}</p>
-                        <p className="text-[13px] leading-[18px] text-adm-muted">{item.detail}</p>
+                        <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{item.detail}</p>
                       </div>
                       <StatusChip tone={EVIDENCE_TONE[item.state]} className={CHIP_CLASS}>{EVIDENCE_STATE_LABEL[item.state]}</StatusChip>
                     </li>
@@ -412,7 +417,7 @@ export default function ProductApplicabilityPage() {
               </ul>
             </Panel>
 
-            <Panel title="Sample vehicle results" description="Real vehicles from your inventory, run through the same matcher the addendum uses." bodyClassName="px-4">
+            <Panel title="Sample vehicle results" description="Real vehicles from your inventory, run through the same matcher the addendum uses." bodyClassName="mt-[18px] pl-[15px] pr-2 pb-[3px]">
               {live && vehiclesQuery.isLoading ? (
                 <p className="text-[13px] text-adm-muted">Loading vehicles…</p>
               ) : live && vehiclesQuery.isError ? (
@@ -421,12 +426,12 @@ export default function ProductApplicabilityPage() {
                 <p className="text-[13px] text-adm-muted">No active vehicles to sample yet.</p>
               ) : (
                 <div className="rounded-[8px] border border-adm-border overflow-hidden" data-landmark="sample-results">
-                  <AdminTable caption="Sample vehicle results" className="[&_th]:px-2 [&_td]:px-2 [&_th]:py-[11px] [&_th]:text-[13px] [&_th]:text-adm-ink [&_td]:py-[7px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0">
+                  <AdminTable caption="Sample vehicle results" className="[&_th]:px-4 [&_td]:px-4 [&_th]:py-[10px] [&_th]:text-[13px] [&_th]:text-adm-ink [&_td]:py-[7px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0">
                     <thead>
                       <tr>
-                        <Th className="w-[192px]">Vehicle</Th>
-                        <Th className="w-[80px]">Eligible</Th>
-                        <Th className="w-[142px]">Evidence</Th>
+                        <Th className="w-[164px]">Vehicle</Th>
+                        <Th className="w-[89px]">Eligible</Th>
+                        <Th className="w-[153px]">Evidence</Th>
                         <Th>Publication</Th>
                       </tr>
                     </thead>
@@ -476,8 +481,8 @@ export default function ProductApplicabilityPage() {
           </AdminCard>
         )}
 
-        <div className="flex items-center justify-end gap-3 pt-1 flex-wrap">
-          <AdminLinkButton to={adminTabHref("applicability")} className="h-[42px] px-[26px] text-[15px]">Cancel</AdminLinkButton>
+        <div className="flex items-center justify-end gap-3 flex-wrap">
+          <AdminLinkButton to={adminTabHref("applicability")} className="h-[42px] px-[29px] text-[15px]">Cancel</AdminLinkButton>
           {reviewing ? (
             <>
               <AdminButton className="h-[42px] px-[18px] text-[15px]" onClick={() => dispatch({ type: "edit", draft })} disabled={state.phase === "applying"}>Back to edit</AdminButton>

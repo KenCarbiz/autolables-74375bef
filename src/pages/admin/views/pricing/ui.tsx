@@ -36,6 +36,8 @@ export const CheckRow = ({
   size = "md",
   title,
   className,
+  controlClassName,
+  labelClassName,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
@@ -48,6 +50,8 @@ export const CheckRow = ({
   size?: "md" | "lg";
   title?: string;
   className?: string;
+  controlClassName?: string;
+  labelClassName?: string;
 }) => {
   const lg = size === "lg";
   return (
@@ -58,10 +62,10 @@ export const CheckRow = ({
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className={cn("accent-adm-primary flex-shrink-0", lg ? "h-[22px] w-[22px] -mt-px" : "mt-[3px] h-4 w-4")}
+        className={cn("accent-adm-primary flex-shrink-0", lg ? "h-[22px] w-[22px] m-0" : "mt-[3px] h-4 w-4", controlClassName)}
       />
       <span className="min-w-0">
-        <span className={cn("block text-adm-ink", lg ? "text-[15px] leading-[20px]" : "text-[14px] leading-[20px]")}>{label}</span>
+        <span className={cn("block text-adm-ink", lg ? "text-[15px] leading-[20px]" : "text-[14px] leading-[20px]", labelClassName)}>{label}</span>
         {detail && <span className={cn("block text-adm-muted", lg ? "text-[13px] leading-[18px]" : "text-[12px] leading-[18px]")}>{detail}</span>}
       </span>
     </label>

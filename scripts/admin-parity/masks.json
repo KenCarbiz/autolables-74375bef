@@ -121,6 +121,10 @@
         "reason": "preview vehicle name, trim, stock and prices (fixture vehicle)"
       },
       {
+        "selector": "[data-admin-v2] [data-landmark=\"preview-photo\"]",
+        "reason": "preview vehicle photo: a per-vehicle image, like the name and prices beside it; the synthetic fixture vehicle has no photo, so a neutral 268x151 placeholder holds the reference's image box (geometry gated by the previewPhoto landmark)"
+      },
+      {
         "selector": "[data-admin-v2] section",
         "heading": "Price consistency",
         "inner": "tbody td:nth-child(-n+6)",

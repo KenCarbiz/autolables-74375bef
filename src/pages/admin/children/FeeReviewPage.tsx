@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Archive, ArrowLeft, Car, Check, MoveRight, X } from "lucide-react";
+import { Archive, ArrowLeft, CarFront, Check, MoveRight, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -66,37 +66,41 @@ const stepOf = (phase: FeeState["phase"]): 1 | 2 | 3 => {
 
 type StepStatus = "done" | "current" | "todo";
 
-// 38px circle, 18px check or 16px digit, 13/11px label pair, as measured.
-const StepItem = ({ n, label, status, trailing = false }: { n: number; label: string; status: StepStatus; trailing?: boolean }) => (
-  <li className={cn("flex items-center", trailing && "flex-1")}>
-    <div className="flex items-center gap-3.5" data-landmark="fee-review-step">
+// 37px circle (a ringed grey one when not started), 18px check or 16px
+// digit, a 14/12px label pair; a completed step's number hangs left of its
+// label so the status line aligns under the label, as the reference draws it.
+const StepItem = ({ n, label, status, trailing = false, className }: { n: number; label: string; status: StepStatus; trailing?: boolean; className?: string }) => (
+  <li className={cn("flex items-center", trailing && "flex-1", className)}>
+    <div className="flex items-center gap-[13px]" data-landmark="fee-review-step">
       <span
         aria-hidden="true"
-        className={cn("w-[38px] h-[38px] rounded-full flex items-center justify-center text-[16px] font-semibold flex-shrink-0", status === "todo" ? "bg-[#E8EBEF] text-adm-muted" : "bg-adm-primary text-white")}
+        className={cn("w-[37px] h-[37px] rounded-full flex items-center justify-center text-[16px] font-semibold flex-shrink-0", status === "todo" ? "bg-[#E8EBEF] border border-[#C9D3E0] text-adm-ink" : "bg-adm-primary text-white")}
       >
         {status === "done" ? <Check className="w-[18px] h-[18px]" strokeWidth={3} /> : n}
       </span>
-      <span className="min-w-0">
-        <span className="block text-[13px] leading-[18px] font-semibold text-adm-ink whitespace-nowrap">
-          {status === "done" && <span className="text-adm-primary mr-1.5">{n}</span>}
-          {label}
+      <span className="min-w-0 flex">
+        {status === "done" && <span className="w-[15px] flex-shrink-0 text-[14px] leading-[18px] font-semibold text-adm-primary">{n}</span>}
+        <span className="min-w-0">
+          <span className="block text-[14px] leading-[18px] font-semibold text-adm-ink whitespace-nowrap">{label}</span>
+          <span className="block text-[12px] leading-[17px] text-adm-muted whitespace-nowrap">{status === "done" ? "Completed" : status === "current" ? "Current step" : "Not started"}</span>
         </span>
-        <span className="block text-[11px] leading-[16px] text-adm-muted whitespace-nowrap">{status === "done" ? "Completed" : status === "current" ? "Current step" : "Not started"}</span>
       </span>
     </div>
     {trailing && <span aria-hidden="true" className="hidden sm:block flex-1 h-px bg-adm-border ml-[18px] mr-[13px]" />}
   </li>
 );
 
-const Tile = ({ icon: Icon, tone, value, label, hint }: { icon: typeof Car; tone: "success" | "neutral"; value: string; label: string; hint: string }) => (
-  <div data-landmark="fee-impact-tile" className="flex items-start gap-4 rounded-[8px] border border-adm-border bg-adm-workspace px-4 py-[13px]">
-    <span aria-hidden="true" className={cn("w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", tone === "success" ? "bg-adm-success-bg text-adm-success" : "bg-adm-border/50 text-adm-muted")}>
-      <Icon className="w-7 h-7" />
+// Reference tile: a 48px circle with a 26px glyph, a 24px count, a 14px
+// label and a 13px hint, 112px tall.
+const Tile = ({ icon: Icon, tone, value, label, hint, filled = false }: { icon: typeof CarFront; tone: "success" | "neutral"; value: string; label: string; hint: string; filled?: boolean }) => (
+  <div data-landmark="fee-impact-tile" className="flex items-start gap-5 rounded-[8px] border border-adm-border bg-adm-workspace pl-[17px] pr-4 pt-[14px] pb-[11px] min-h-[112px]">
+    <span aria-hidden="true" className={cn("-mt-[2px] w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", tone === "success" ? "bg-adm-success-bg text-adm-success" : "bg-adm-border/50 text-adm-muted")}>
+      <Icon className={cn("w-[26px] h-[26px]", filled && "fill-current")} />
     </span>
     <div className="min-w-0">
-      <p data-landmark="impact-count" className="text-[24px] leading-[28px] font-bold text-adm-ink tabular-nums">{value}</p>
-      <p className="text-[15px] leading-[20px] font-semibold text-adm-ink">{label}</p>
-      <p className="text-[13px] leading-[18px] text-adm-muted">{hint}</p>
+      <p data-landmark="impact-count" className="text-[24px] leading-[25px] font-bold text-adm-ink tabular-nums">{value}</p>
+      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{label}</p>
+      <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{hint}</p>
     </div>
   </div>
 );
@@ -115,9 +119,9 @@ const Change = ({ before, after }: { before: number | null; after: number }) => 
   const down = d != null && d < -0.005;
   return (
     <>
-      <p className="flex items-center gap-2 h-5 text-[15px] leading-[20px] text-adm-ink tabular-nums whitespace-nowrap">
+      <p className="flex items-center gap-2 h-5 text-[14px] leading-[20px] text-adm-ink tabular-nums whitespace-nowrap">
         <span>{fmtMoney(before)}</span>
-        <MoveRight className="w-[26px] h-[26px] text-adm-muted flex-shrink-0" aria-hidden="true" />
+        <MoveRight className="w-[17px] h-[17px] text-adm-muted flex-shrink-0" aria-hidden="true" />
         <span>{fmtMoney(after)}</span>
       </p>
       <p className={cn("mt-0 flex items-center gap-1.5 text-[13px] leading-[18px] tabular-nums", up ? "text-adm-danger" : down ? "text-adm-success" : "text-adm-muted")}>
@@ -134,12 +138,12 @@ const Change = ({ before, after }: { before: number | null; after: number }) => 
   );
 };
 
-const TABLE_CLASS = "[&_th]:py-2 [&_th]:text-[13px] [&_th]:text-adm-ink [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0";
+const TABLE_CLASS = "[&_th]:py-2 [&_th]:px-4 [&_td]:px-4 [&_th]:text-[13px] [&_th]:text-adm-ink [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0";
 
 const RESULT_TONE: Record<"applied" | "partial" | "failed", Tone> = { applied: "success", partial: "warning", failed: "danger" };
 const RESULT_LABEL: Record<"applied" | "partial" | "failed", string> = { applied: "Applied", partial: "Partially applied", failed: "Not applied" };
 
-const BUTTON_41 = "h-[41px] px-6 text-[15px] gap-2.5";
+const BUTTON_41 = "h-[41px] px-5 text-[15px] gap-3.5";
 
 export default function FeeReviewPage() {
   const fixture = useViewFixture<FeeReviewFixture>("fee-review");
@@ -314,7 +318,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         tabIndex={-1}
         onKeyDown={onKeyDown}
         style={{ top: DIALOG_TOP }}
-        className="absolute z-50 left-1/2 -translate-x-1/2 lg:left-[calc(50%-18px)] w-[min(907px,calc(100%-32px))] rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none px-7 pt-6 pb-6 text-adm-ink"
+        className="absolute z-50 left-1/2 -translate-x-1/2 lg:left-[calc(50%-18px)] w-[min(907px,calc(100%-32px))] rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none px-[26px] pt-[22px] pb-6 text-adm-ink"
       >
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -325,9 +329,10 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </header>
-        <ol className="mt-[17px] mx-auto flex items-center flex-wrap gap-y-3 w-full max-w-[640px]" data-landmark="fee-review-steps" aria-label="Review steps">
-          <StepItem n={1} label="Edit" status={step > 1 ? "done" : "current"} trailing />
-          <StepItem n={2} label="Review" status={step === 2 ? "current" : step > 2 ? "done" : "todo"} trailing />
+        {/* At the reference width the circles sit at the measured x (116, 362 and 634px into the content box); narrower dialogs share the row evenly. */}
+        <ol className="mt-[18px] mx-auto xl:mx-0 xl:ml-[116px] flex items-center flex-wrap gap-y-3 w-full max-w-[640px] xl:max-w-none xl:w-auto" data-landmark="fee-review-steps" aria-label="Review steps">
+          <StepItem n={1} label="Edit" status={step > 1 ? "done" : "current"} trailing className="xl:flex-none xl:w-[246px]" />
+          <StepItem n={2} label="Review" status={step === 2 ? "current" : step > 2 ? "done" : "todo"} trailing className="xl:flex-none xl:w-[272px]" />
           <StepItem n={3} label="Apply" status={step === 3 ? (state.phase === "applied" ? "done" : "current") : "todo"} />
         </ol>
 
@@ -376,14 +381,14 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
             )}
             {state.error && state.phase === "reviewing" && <InlineNote tone="danger" className="mt-[31px]">{state.error}</InlineNote>}
 
-            <div className={cn("grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_312px] gap-7 items-start", state.phase === "conflict" || state.phase === "invalidated" || (state.error && state.phase === "reviewing") ? "mt-5" : "mt-[31px]")}>
+            <div className={cn("grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_312px] gap-7 items-start", state.phase === "conflict" || state.phase === "invalidated" || (state.error && state.phase === "reviewing") ? "mt-5" : "mt-7")}>
               <section aria-labelledby="fee-change-summary" data-landmark="fee-change-summary">
                 <h3 id="fee-change-summary" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Change summary</h3>
-                <div className="mt-2.5 rounded-[8px] border border-adm-border overflow-hidden">
-                  <AdminTable caption="Before and after" className={cn(TABLE_CLASS, "[&_td]:py-[11px]")}>
+                <div className="mt-3 rounded-[8px] border border-adm-border overflow-hidden">
+                  <AdminTable caption="Before and after" className={cn(TABLE_CLASS, "[&_td]:py-[10px]")}>
                     <thead>
                       <tr>
-                        <Th className="w-[192px]">Field</Th>
+                        <Th className="w-[193px]">Field</Th>
                         <Th className="w-[168px]">Before</Th>
                         <Th>After</Th>
                       </tr>
@@ -403,8 +408,8 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
 
               <section aria-labelledby="fee-expected-impact">
                 <h3 id="fee-expected-impact" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Expected impact</h3>
-                <div className="mt-2.5 space-y-2">
-                  <Tile icon={Car} tone="success" value={eligibleCount == null ? "Unknown" : eligibleCount.toLocaleString()} label={`${eligibleLabel} eligible`} hint="Rows will be updated only when values differ" />
+                <div className="mt-3.5 space-y-2">
+                  <Tile icon={CarFront} filled tone="success" value={eligibleCount == null ? "Unknown" : eligibleCount.toLocaleString()} label={`${eligibleLabel} eligible`} hint="Rows will be updated only when values differ" />
                   {scope === "all" ? (
                     <Tile icon={Archive} tone="neutral" value={impact ? impact.includedArchived.toLocaleString() : "Unknown"} label="archived vehicles included" hint="Archived records will be recalculated too" />
                   ) : (
@@ -415,16 +420,16 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               </section>
             </div>
 
-            <section aria-labelledby="fee-sample-impact" data-landmark="fee-example-impact" className="-mt-1">
+            <section aria-labelledby="fee-sample-impact" data-landmark="fee-example-impact" className="-mt-0.5">
               <h3 id="fee-sample-impact" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Example vehicle impact</h3>
               {impact && impact.samples.length > 0 ? (
-                <div className="mt-2.5 rounded-[8px] border border-adm-border overflow-hidden">
-                  <AdminTable caption="Example vehicles" className={cn(TABLE_CLASS, "[&_td]:py-3")}>
+                <div className="mt-[11px] rounded-[8px] border border-adm-border overflow-hidden">
+                  <AdminTable caption="Example vehicles" className={cn(TABLE_CLASS, "[&_th]:pt-[9px] [&_td]:py-[11px]")}>
                     <thead>
                       <tr>
-                        <Th className="w-[300px]">Vehicle</Th>
-                        <Th className="w-[140px]">Selling price</Th>
-                        <Th className="w-[177px]">Document fee</Th>
+                        <Th className="w-[258px]">Vehicle</Th>
+                        <Th className="w-[168px]">Selling price</Th>
+                        <Th className="w-[192px]">Document fee</Th>
                         <Th>Advertised total</Th>
                       </tr>
                     </thead>
@@ -436,12 +441,12 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
                               <Thumb />
                               <div className="min-w-0">
                                 <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{s.vehicle}</p>
-                                <p className="text-[13px] leading-[18px] text-adm-muted">{s.stock ? `Stock ${s.stock} · ` : ""}VIN …{s.vinSuffix}</p>
+                                <p className="text-[13px] leading-[18px] text-adm-muted" title={`VIN …${s.vinSuffix}`}>{s.stock ? `Stock ${s.stock}` : `VIN …${s.vinSuffix}`}</p>
                               </div>
                             </div>
                           </Td>
                           <Td>
-                            <p className="text-[15px] leading-[20px] text-adm-ink tabular-nums">{fmtMoney(s.sellingPrice)}</p>
+                            <p className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{fmtMoney(s.sellingPrice)}</p>
                             <p className="text-[13px] leading-[18px] text-adm-muted">No change</p>
                           </Td>
                           <Td><Change before={s.feeBefore} after={s.feeAfter} /></Td>
@@ -456,11 +461,11 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               )}
             </section>
 
-            <div className="mt-5 space-y-2 [&>div]:py-[7px] [&>div>svg]:w-[26px] [&>div>svg]:h-[26px]">
+            <div className="mt-[19px] space-y-[9px] [&>div]:py-[7.5px] [&>div>svg]:w-6 [&>div>svg]:h-6">
               {previewResult?.source === "client" ? (
                 <InlineNote tone="warning">Until the dedicated routine is installed, applying uses the existing recalculation, which also updates archived vehicles and refreshes each recalculated vehicle's verification stamp.</InlineNote>
               ) : (
-                <InlineNote tone="warning">Source verification dates and mismatch flags will be preserved.</InlineNote>
+                <InlineNote tone="warning" className="border-[#FCE3B6]">Source verification dates and mismatch flags will be preserved.</InlineNote>
               )}
               {scope === "active" && <InlineNote tone="neutral">Archived records require a separate authorized action.</InlineNote>}
               {impact?.warnings.map((w) => (
@@ -488,7 +493,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         )}
         {step === 3 && !state.result && state.error && <InlineNote tone="danger" className="mt-[31px]">{state.error}</InlineNote>}
 
-        <footer className="mt-6 flex items-start justify-between gap-4 flex-wrap">
+        <footer className="mt-[23px] flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             {step === 1 && (
               <Link to={backHref} className="inline-flex items-center justify-center h-[41px] px-6 rounded-md border border-adm-border bg-adm-surface text-[15px] font-semibold text-adm-ink hover:bg-adm-workspace">Cancel</Link>

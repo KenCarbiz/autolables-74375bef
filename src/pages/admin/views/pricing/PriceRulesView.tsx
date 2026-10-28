@@ -54,11 +54,13 @@ export interface PriceRulesFixture {
   websiteTerm: string | null;
 }
 
-// Reference marks: a 20px check, a 20px triangle and an 11px filled dot.
+// Reference marks: an 18px check, a 20px filled triangle and an 11px filled
+// dot. The reference draws marks brighter than the text tokens: a #10A523
+// check and dot, and the #F2A51A triangle Overview uses.
 const EvidenceMark = ({ state }: { state: EvidenceState }) => {
   if (state === "awaiting") return <span aria-hidden="true" className="inline-block w-[11px] h-[11px] rounded-full bg-adm-muted flex-shrink-0" />;
-  const Icon = state === "same_version" ? Check : AlertTriangle;
-  return <Icon className={cn("w-5 h-5 flex-shrink-0", state === "same_version" ? "text-adm-success" : "text-adm-warning")} strokeWidth={2.5} aria-hidden="true" />;
+  if (state === "older_version") return <AlertTriangle className="w-5 h-5 -ml-[3px] flex-shrink-0 fill-current stroke-white text-[#F2A51A]" aria-hidden="true" />;
+  return <Check className="w-[18px] h-[18px] -ml-[2px] flex-shrink-0 text-[#10A523]" strokeWidth={2.25} aria-hidden="true" />;
 };
 const STATUS_TONE: Record<ConsistencyStatus, Tone> = { consistent: "success", mismatch: "warning", not_checked: "neutral" };
 
@@ -75,13 +77,15 @@ const previewFromRows = (rows: ConsistencyAssessment[]): PreviewVehicle | null =
   };
 };
 
-const Thumb = ({ url, className = "w-16 h-[38px]" }: { url: string | null; className?: string }) => (
-  <span className={`${className} rounded-md bg-adm-workspace overflow-hidden flex-shrink-0 inline-block`} aria-hidden="true">
+const Thumb = ({ url, className = "w-16 h-[38px]", landmark }: { url: string | null; className?: string; landmark?: string }) => (
+  <span data-landmark={landmark} className={`${className} rounded-md bg-adm-workspace overflow-hidden flex-shrink-0 inline-block`} aria-hidden="true">
     {url && <img src={url} alt="" className="w-full h-full object-cover" />}
   </span>
 );
 
-// Card with the reference's 18px title row; AdminCard fixes its title at 16px.
+// Card with the reference's 17px title row (12px cap height); AdminCard fixes
+// its title at 16px. The reference's header padding differs per card, so each
+// card passes its own.
 const PanelCard = ({
   id,
   title,
@@ -89,6 +93,8 @@ const PanelCard = ({
   action,
   children,
   headerClassName,
+  descriptionClassName = "mt-[3px]",
+  actionClassName,
   headerBorder = true,
 }: {
   id?: string;
@@ -97,29 +103,33 @@ const PanelCard = ({
   action?: ReactNode;
   children: ReactNode;
   headerClassName?: string;
+  descriptionClassName?: string;
+  actionClassName?: string;
   headerBorder?: boolean;
 }) => (
   <AdminCard id={id} flush className="overflow-hidden">
-    <header className={cn("flex items-center justify-between gap-4 px-5 pt-3 pb-[11px]", headerBorder && "border-b border-adm-border", headerClassName)}>
+    <header className={cn("flex items-start justify-between gap-4 px-5 pt-[13px] pb-[11px]", headerBorder && "border-b border-adm-border", headerClassName)}>
       <div className="min-w-0">
-        <h3 className="text-[18px] leading-[20px] font-bold text-adm-ink">{title}</h3>
-        {description && <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{description}</p>}
+        <h3 className="text-[17px] leading-[20px] font-bold text-adm-ink">{title}</h3>
+        {description && <p className={cn("text-[13px] leading-[18px] text-adm-muted", descriptionClassName)}>{description}</p>}
       </div>
-      {action && <div className="flex-shrink-0 flex items-center gap-3">{action}</div>}
+      {action && <div className={cn("flex-shrink-0 flex items-center gap-3", actionClassName)}>{action}</div>}
     </header>
     {children}
   </AdminCard>
 );
 
+// Reference: a 12px dot, a 24px count on a 27px line with a 13px label on its
+// baseline, and a 12px hint directly under the count.
 const ImpactStat = ({ tone, value, label, hint, className }: { tone: "success" | "neutral"; value: string; label: string; hint: string; className?: string }) => (
-  <div className={cn("flex items-start gap-3.5", className)}>
-    <span aria-hidden="true" className={cn("mt-[9px] w-[11px] h-[11px] rounded-full flex-shrink-0", tone === "success" ? "bg-adm-success" : "bg-adm-muted/60")} />
-    <div>
-      <p className="flex items-baseline gap-x-2.5 whitespace-nowrap">
-        <span data-landmark="impact-count" className="text-[24px] leading-[28px] font-bold text-adm-ink tabular-nums">{value}</span>
-        <span className="text-[14px] leading-[20px] text-adm-ink">{label}</span>
+  <div className={cn("flex items-start gap-3", className)}>
+    <span aria-hidden="true" className={cn("mt-[9px] w-3 h-3 rounded-full flex-shrink-0", tone === "success" ? "bg-[#10A523]" : "bg-adm-muted/60")} />
+    <div className="min-w-0">
+      <p className="flex items-baseline gap-x-3 whitespace-nowrap">
+        <span data-landmark="impact-count" className="text-[24px] leading-[27px] font-bold text-adm-ink tabular-nums">{value}</span>
+        <span className="text-[13px] leading-[18px] font-medium text-adm-ink">{label}</span>
       </p>
-      <p className="mt-0.5 text-[12px] leading-[18px] text-adm-muted">{hint}</p>
+      <p className="text-[12px] leading-[18px] text-adm-muted">{hint}</p>
     </div>
   </div>
 );
@@ -194,23 +204,24 @@ export default function PriceRulesView() {
   const pendingText = dirty ? (errors.length ? "Fix the draft before reviewing." : "Draft changes are reviewed before anything is applied.") : "No pending changes";
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-[14px]">
+    <div className="space-y-3.5">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,710fr)_minmax(0,588fr)] gap-x-3 gap-y-3.5">
         <PanelCard
           title="Price display policy"
           description="Controls how pricing is calculated and presented across AutoLabels."
+          actionClassName="mt-[2px] -mr-0.5"
           action={
             editing ? (
-              <AdminButton size="sm" onClick={() => { setEditing(false); setDraft(stored); }}>Discard</AdminButton>
+              <AdminButton size="sm" className="rounded-[6px]" onClick={() => { setEditing(false); setDraft(stored); }}>Discard</AdminButton>
             ) : (
-              <AdminButton variant="outline" size="sm" onClick={() => setEditing(true)}>
-                <Pencil className="w-5 h-5" aria-hidden="true" />
+              <AdminButton variant="outline" size="sm" className="rounded-[6px] border-[#C5D4F7] gap-2" onClick={() => setEditing(true)}>
+                <Pencil className="w-[17px] h-[17px]" aria-hidden="true" />
                 Edit
               </AdminButton>
             )
           }
         >
-          <div className="px-5 pt-1 pb-4">
+          <div className="px-5 pt-2 pb-[18px]">
             {editing ? (
               <div className="mt-2 space-y-3">
                 <div className="flex items-center justify-between gap-4 rounded-md border border-adm-border px-3 py-2.5">
@@ -247,15 +258,15 @@ export default function PriceRulesView() {
                   {
                     label: "Source observation",
                     value: (
-                      <span className="inline-flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-2">
                         Read only
-                        <Info className="w-5 h-5 text-adm-muted" aria-hidden="true" />
+                        <Info className="w-[17px] h-[17px] text-adm-muted" aria-hidden="true" />
                         <span className="sr-only">Website prices are observed by the nightly check and are never edited here.</span>
                       </span>
                     ),
                   },
                 ].map((row) => (
-                  <div key={row.label} className="grid grid-cols-[208px_minmax(0,1fr)] gap-x-4 text-[14px] leading-[24px]">
+                  <div key={row.label} className="grid grid-cols-[209px_minmax(0,1fr)] text-[14px] leading-[24px]">
                     <dt className="text-adm-ink">{row.label}</dt>
                     <dd className="text-adm-ink min-w-0">{row.value}</dd>
                   </div>
@@ -263,39 +274,39 @@ export default function PriceRulesView() {
               </dl>
             )}
 
-            <InlineNote tone="info" className="mt-[18px] px-3 py-[6px] gap-3 [&>svg]:w-5 [&>svg]:h-5 [&>svg]:text-adm-primary">Administrative recalculation does not verify source prices.</InlineNote>
+            <InlineNote tone="info" className="mt-[15px] rounded-[6px] border-transparent bg-adm-workspace pl-[10px] pr-3 py-[5px] gap-[9px] [&>svg]:w-5 [&>svg]:h-5 [&>svg]:text-adm-primary">Administrative recalculation does not verify source prices.</InlineNote>
 
-            <div className="mt-[27px]">
+            <div className="mt-4 border-t border-adm-border pt-[10px]">
               <h4 className="text-[16px] leading-[22px] font-semibold text-adm-ink">Change impact</h4>
-              <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">Shows how many vehicles will be affected by a change to these settings.</p>
-              <label className="mt-2 flex items-center">
-                <span className="w-[90px] flex-shrink-0 text-[14px] leading-[20px] font-medium text-adm-ink">Scope</span>
+              <p className="mt-[3px] text-[13px] leading-[18px] text-adm-muted">Shows how many vehicles will be affected by a change to these settings.</p>
+              <label className="mt-[9px] flex items-center">
+                <span className="w-[89px] flex-shrink-0 text-[14px] leading-[20px] font-medium text-adm-ink">Scope</span>
                 <AdminSelect value={scope} onChange={(e) => setScope(e.target.value as FeeScope)} className="h-8 w-full max-w-[252px] text-[14px]" aria-label="Change scope">
                   <option value="active">Active inventory (default)</option>
                   <option value="all">Include archived records</option>
                 </AdminSelect>
               </label>
-              <div className="mt-3 flex items-stretch flex-wrap gap-y-4">
-                <ImpactStat tone="success" value={countValue(eligible)} label="eligible vehicles" hint="Active vehicles with a price" className="flex-1 pl-4" />
+              <div className="mt-[13px] flex items-stretch flex-wrap gap-y-4">
+                <ImpactStat tone="success" value={countValue(eligible)} label="eligible vehicles" hint="Active inventory to recalculate" className="w-[250px] flex-none pl-[15px]" />
                 <ImpactStat
                   tone="neutral"
                   value={countValue(archived)}
                   label={scope === "all" ? "archived vehicles included" : "archived vehicles excluded"}
-                  hint={scope === "all" ? "Archived records will be recalculated too" : "Archived records are not changed"}
-                  className="flex-1 pl-4 pr-3 border-l border-adm-border"
+                  hint={scope === "all" ? "Archived inventory will be recalculated too" : "Archived inventory is not affected"}
+                  className="flex-auto pl-[17px] pr-3 border-l border-adm-border"
                 />
                 <div className="w-[146px] flex flex-col items-center">
                   <AdminButton
                     variant="primary"
                     size="sm"
-                    className="w-full h-[33px] disabled:opacity-100 disabled:bg-adm-workspace disabled:text-adm-muted disabled:border-adm-border"
+                    className="w-full h-8 min-h-0 rounded-[6px] disabled:font-normal"
                     disabled={!dirty || errors.length > 0}
                     onClick={reviewChanges}
                     data-landmark="price-review"
                   >
                     Review changes
                   </AdminButton>
-                  <span className="mt-[5px] text-[12px] leading-[16px] text-adm-muted text-center">{pendingText}</span>
+                  <span className="mt-[3px] text-[12px] leading-[18px] text-adm-muted text-center">{pendingText}</span>
                 </div>
               </div>
               {!fixture && !tenantId && <p className="mt-2 text-[12px] text-adm-muted">Counts are unavailable without a dealership context.</p>}
@@ -303,22 +314,21 @@ export default function PriceRulesView() {
           </div>
         </PanelCard>
 
-        <PanelCard title="Customer price preview" description="Illustrative example of how pricing is displayed to customers.">
+        <PanelCard title="Customer price preview" description="Illustrative example of how pricing is displayed to customers." headerClassName="pt-[14px] pb-[13px]" descriptionClassName="mt-1">
           {previewCard && preview ? (
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_253px] gap-x-[35px] gap-y-4 items-center pl-[15px] pr-6 pt-[27px] pb-6">
-              <Thumb url={preview.imageUrl} className="w-full h-[130px]" />
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_252px] gap-x-[31px] gap-y-4 items-start pl-[11px] pr-6 pt-[23px] pb-6">
+              <Thumb url={preview.imageUrl} landmark="preview-photo" className="w-full aspect-video md:mt-[34px]" />
               <div className="min-w-0">
-                <p className="text-[18px] leading-[24px] font-semibold text-adm-ink">{preview.title}</p>
+                <p className="text-[18px] leading-[23px] font-semibold text-adm-ink">{preview.title}</p>
                 <p className="text-[13px] leading-[18px] text-adm-muted">{[preview.trim, preview.stock ? `Stock ${preview.stock}` : null].filter(Boolean).join(" · ")}</p>
-                <dl className="mt-[21px] text-[15px] leading-[20px]">
-                  <div className="flex items-center justify-between gap-3 h-8"><dt className="text-adm-ink">Selling price</dt><dd className="font-semibold text-adm-ink tabular-nums">{fmtMoney(previewCard.vehicleSellingPrice)}</dd></div>
-                  <div className="flex items-center justify-between gap-3 h-8"><dt className="text-adm-ink">{previewCard.feeLabel ?? "Document fee"}</dt><dd className="font-semibold text-adm-ink tabular-nums">{previewCard.feeAmount == null ? "None" : fmtMoney(previewCard.feeAmount)}</dd></div>
-                  <div className="mt-2 border-t border-adm-border pt-[7px]">
+                <dl className="mt-[23px] text-[15px] leading-[20px]">
+                  <div className="flex items-center justify-between gap-3 h-[33px]"><dt className="text-adm-ink">Selling price</dt><dd className="font-semibold text-adm-ink tabular-nums">{fmtMoney(previewCard.vehicleSellingPrice)}</dd></div>
+                  <div className="flex items-center justify-between gap-3 h-[33px]"><dt className="text-adm-ink">{previewCard.feeLabel ?? "Document fee"}</dt><dd className="font-semibold text-adm-ink tabular-nums">{previewCard.feeAmount == null ? "None" : fmtMoney(previewCard.feeAmount)}</dd></div>
+                  <div className="mt-[7px] border-t border-adm-border pt-[7px]">
                     <div className="flex items-center justify-between gap-3 h-8"><dt className="text-[16px] font-bold text-adm-ink">Advertised total</dt><dd className="text-[18px] font-bold text-adm-ink tabular-nums">{fmtMoney(previewCard.totalAdvertisedPrice)}</dd></div>
                   </div>
                 </dl>
-                <p className="mt-3 text-[12px] leading-[18px] text-adm-muted">Taxes and registration are separate.</p>
-                <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">Passport shows: {describePriceBasis(policy.mode).toLowerCase()}.</p>
+                <p className="mt-[9px] text-[12px] leading-[18px] text-adm-muted">Taxes and registration are separate.</p>
               </div>
             </div>
           ) : (
@@ -329,9 +339,9 @@ export default function PriceRulesView() {
 
       <PanelCard
         title="Price consistency"
-        description="Website, label and Passport prices for active inventory, with the evidence behind each."
+        description="Compares advertised total across different consumer touchpoints."
         headerBorder={false}
-        headerClassName="pt-[14px] pb-0 items-start"
+        headerClassName="pt-[14px] pb-0"
         action={
           <>
             <StatusChip tone={headline.tone} icon>{headline.label}</StatusChip>
@@ -352,19 +362,19 @@ export default function PriceRulesView() {
           <AdminTable
             caption="Price consistency by vehicle"
             inset
-            className="mx-5 mt-3 mb-0 rounded-[8px] [&_th]:py-[9.5px] [&_td]:py-[6px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0"
+            className="mx-3 mt-[11px] mb-0 rounded-[8px] [&_th]:py-[9.5px] [&_td]:py-[6px] [&_th]:px-[13px] [&_td]:px-[13px] [&_td]:text-[13px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0"
           >
             <thead>
               <tr>
-                <Th className="w-[265px]">Vehicle</Th>
-                <Th className="w-[113px]">Selling price</Th>
-                <Th className="w-[133px]">Document fee</Th>
-                <Th className="w-[130px]"><span className="flex items-center gap-2 h-[18px]"><Globe className="w-5 h-5" aria-hidden="true" />Website</span></Th>
-                <Th className="w-[130px]"><span className="flex items-center gap-2 h-[18px]"><Tag className="w-5 h-5" aria-hidden="true" />Label</span></Th>
-                <Th className="w-[119px]"><span className="flex items-center gap-2 h-[18px]"><FileText className="w-5 h-5" aria-hidden="true" />Passport</span></Th>
+                <Th>Vehicle</Th>
+                <Th className="w-[114px]">Selling price</Th>
+                <Th className="w-[134px]">Document fee</Th>
+                <Th className="w-[130px] !pl-[9px]"><span className="flex items-center gap-1.5 h-[18px]"><Globe className="w-[18px] h-[18px]" aria-hidden="true" />Website</span></Th>
+                <Th className="w-[130px] !pl-[12px]"><span className="flex items-center gap-1.5 h-[18px]"><Tag className="w-[17px] h-[17px]" aria-hidden="true" />Label</span></Th>
+                <Th className="w-[118px] !pl-[10px]"><span className="flex items-center gap-1 h-[18px]"><FileText className="w-5 h-5" aria-hidden="true" />Passport</span></Th>
                 <Th className="w-[164px]">Evidence</Th>
                 <Th className="w-[126px]">Status</Th>
-                <Th>Action</Th>
+                <Th className="w-[92px]">Action</Th>
               </tr>
             </thead>
             <tbody>
@@ -386,12 +396,12 @@ export default function PriceRulesView() {
                     <Td className="tabular-nums">{fmtMoney(row.label)}</Td>
                     <Td className="tabular-nums">{fmtMoney(row.passport)}</Td>
                     <Td>
-                      <span className="inline-flex items-center gap-2.5 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-2 whitespace-nowrap">
                         <EvidenceMark state={row.evidence} />
                         {EVIDENCE_LABEL[row.evidence]}
                       </span>
                     </Td>
-                    <Td><StatusChip tone={STATUS_TONE[row.status]} className="px-3 py-1.5 text-[13px] leading-[18px]">{STATUS_LABEL[row.status]}</StatusChip></Td>
+                    <Td><StatusChip tone={STATUS_TONE[row.status]} className="rounded-full px-3 py-[2px] text-[12px] leading-[18px] font-medium">{STATUS_LABEL[row.status]}</StatusChip></Td>
                     <Td>{row.reviewHref ? <Link to={row.reviewHref} className="font-semibold text-adm-primary hover:underline">Review</Link> : <span className="text-adm-muted">—</span>}</Td>
                   </tr>
                 );

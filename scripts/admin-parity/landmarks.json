@@ -294,7 +294,7 @@
   },
   "05": {
     "_rail": 228,
-    "_comment": "Section row bottom 158 (bluerows: underline y 155-156); yBody is measured from it. Card edges from edges.cjs at x 270/600/905/1300/1555 and hedges rows 230/300/535/585/737; text origins from bbox.cjs.",
+    "_comment": "Section row bottom 158 (bluerows: underline y 155-156); yBody is measured from it. Round 2 re-measure: card borders from edges2 scans (policy 256-961 x 222-635, preview 974-1561 x 222-635, consistency top 650, table borders 269/540/654/788/918/1048/1166/1330/1456/1548, table top 717), car photo ink from bbox at t 755 (986-1253 x 378-474), Edit and Review button boxes from edges at x 900 and y 254/580.",
     "sectionNav": {
       "selector": "nav[aria-label=\"Administration sections\"]",
       "x": 257,
@@ -312,18 +312,33 @@
     "policyCard": {
       "selector": "[data-admin-v2] section",
       "heading": "Price display policy",
-      "x": 257,
-      "yBody": 66,
-      "w": 704,
-      "h": 411
+      "x": 256,
+      "yBody": 64,
+      "w": 706,
+      "h": 414
     },
     "previewCard": {
       "selector": "[data-admin-v2] section",
       "heading": "Customer price preview",
-      "x": 975,
-      "yBody": 66,
-      "w": 587,
-      "h": 411
+      "x": 974,
+      "yBody": 64,
+      "w": 588,
+      "h": 414
+    },
+    "previewPhoto": {
+      "selector": "[data-landmark=\"preview-photo\"]",
+      "x": 986,
+      "yBody": 192,
+      "w": 268,
+      "h": 151
+    },
+    "editButton": {
+      "selector": "[data-admin-v2] section button",
+      "index": 0,
+      "x": 869,
+      "yBody": 80,
+      "w": 74,
+      "h": 33
     },
     "scopeSelect": {
       "selector": "select[aria-label=\"Change scope\"]",
@@ -335,23 +350,23 @@
     "reviewButton": {
       "selector": "[data-landmark=\"price-review\"]",
       "x": 795,
-      "yBody": 405,
+      "yBody": 406,
       "w": 146,
-      "h": 33
+      "h": 32
     },
     "consistencyCard": {
       "selector": "[data-admin-v2] section",
       "heading": "Price consistency",
-      "x": 257,
+      "x": 256,
       "yBody": 492,
-      "w": 1305
+      "w": 1306
     },
     "consistencyTable": {
       "selector": "[data-admin-v2] section table",
       "index": 0,
-      "x": 276,
+      "x": 270,
       "yBody": 560,
-      "w": 1267
+      "w": 1278
     }
   },
   "06": {
@@ -443,7 +458,7 @@
   },
   "07": {
     "_rail": 242,
-    "_comment": "Child page: no section row. The body row is pinned to the child tab row bottom, 228 in the mock (bluerows: underline y 226-227, border 227). Card and box edges from edges.cjs at x 280/300/700/1100/1500 and hedges at y 260/384/475/583/720/954; text origins from bbox.cjs.",
+    "_comment": "Child page: no section row. The body row is pinned to the child tab row bottom, 228 in the mock (bluerows: underline y 226-227, border 227). Card and box edges from edges.cjs at x 280/300/700/1100/1500 and hedges at y 260/384/475/583/720/954; text origins from bbox.cjs. Round 2: the price box includes the proof note as its bottom band (box 639-898, band 834-897), and the sample table spans 995-1553 with columns at 1159/1248/1401.",
     "_anchor": {
       "reference": 228,
       "selector": "nav[aria-label=\"Product views\"]"
@@ -475,7 +490,7 @@
       "x": 290,
       "yBody": 411,
       "w": 655,
-      "h": 186
+      "h": 260
     },
     "evidenceCard": {
       "selector": "[data-admin-v2] section",
@@ -502,9 +517,9 @@
     },
     "samplesTable": {
       "selector": "[data-landmark=\"sample-results\"] table",
-      "x": 999,
+      "x": 996,
       "yBody": 472,
-      "w": 544,
+      "w": 556,
       "h": 197
     },
     "reviewButton": {
