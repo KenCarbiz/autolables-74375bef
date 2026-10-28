@@ -35,6 +35,7 @@ export {
   PROVIDER_CAPABILITIES, PROVIDER_CAPABILITY_KEYS, capability, capabilityForPath, effectiveCost,
   policyFor, publicBrowseMayTrigger, routineCapabilities,
   type ProviderCapability, type CapabilityPolicy, type CapabilityStatus, type CapabilityTrigger,
+  type ContractSource, type RequestContract,
 } from "./providerRegistry.ts";
 export { resolveListingFeeBasis, type ListingFeeBasis, type ListingFeeInput } from "./listingFeeBasis.ts";
 export {
