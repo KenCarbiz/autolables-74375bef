@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   AUTHORITY_CLASSES, containsForbiddenKey, DEAL_RATING_LABELS, HARD_GATES, isNewPassport, makeFact,
   PUBLIC_STATES, RECOMMENDATION_STATES, resolveFreshness, SCORE_DOMAINS, SCORE_NEVER_INFLUENCED_BY, SCORE_WEIGHTS,
-  TITLE_ODOMETER_STATES, unknownFact, VIN_RECALL_CONTRACT_STATES,
+  TITLE_ODOMETER_STATES, unknownFact, VIN_RECALL_CONTRACT_STATES, COMPARABLE_EXCLUSION_REASONS,
 } from "./contracts";
 
 const NOW = Date.parse("2026-10-28T00:00:00Z");
@@ -15,6 +15,8 @@ describe("the shared vocabulary", () => {
     expect(RECOMMENDATION_STATES).toContain("NOT_ENOUGH_VERIFIED_INFORMATION");
     expect(DEAL_RATING_LABELS).toContain("unavailable");
     expect(AUTHORITY_CLASSES).toContain("government_record");
+    expect(COMPARABLE_EXCLUSION_REASONS).toContain("aggregator_category");
+    expect(COMPARABLE_EXCLUSION_REASONS).toContain("own_dealer_group");
   });
 
   it("keeps the score weights at 35/30/20/15 and names what may never raise the score", () => {

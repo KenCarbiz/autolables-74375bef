@@ -343,6 +343,28 @@ export interface ProvenanceSummary {
   freshness: Freshness;
 }
 
+// ── Documentation on file (section 27, Safety / Documentation) ────────────
+
+/** What the dealer holds for this vehicle; the score's documentation domain and the read models read it from one place. */
+export interface DocumentationSummary {
+  serviceRecordCount: number | null;
+  inspectionEvidenceOnFile: boolean | null;
+  warrantyDocumented: boolean | null;
+  windowStickerOnFile: boolean | null;
+  historyReportOnFile: boolean | null;
+  source: "dealer_system" | "dealer_claim" | "none";
+  freshness: Freshness;
+}
+
+// ── Comparable eligibility (section 11, 25) ───────────────────────────────
+
+/** Why a candidate listing was kept out of the comparable set; recorded, never silent. */
+export const COMPARABLE_EXCLUSION_REASONS = [
+  "own_rooftop", "own_dealer_group", "aggregator_category", "marketing_category", "subject_vin",
+  "fee_basis_unknown", "price_implausible", "identity_mismatch", "duplicate_vin", "outlier", "stale_listing",
+] as const;
+export type ComparableExclusionReason = (typeof COMPARABLE_EXCLUSION_REASONS)[number];
+
 // ── Market context (sections 12 to 14) ────────────────────────────────────
 
 export type SalesVelocity = "strong" | "steady" | "slow" | "unknown";
@@ -352,6 +374,10 @@ export interface MarketContextSummary {
   mdsDays: number | null;
   mdsScope: CohortMatchLevel | null;
   mdsCheckedAt: string | null;
+  /** Days this listing has been live at the current dealer (provider dos_active). Optional until the reader lands. */
+  daysOnSiteAtDealer?: number | null;
+  /** Cumulative days the vehicle has been listed across dealers (provider dom_active). Optional until the reader lands. */
+  daysOnMarketCumulative?: number | null;
   salesVelocity: SalesVelocity;
   velocityBasis: "inferred_sales_stats" | "mds_estimate" | "none";
   trend: MarketTrend;
