@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Clock, Info, ShieldCheck, XCircle } from "lucide-react";
+import { ArrowLeft, ChartNoAxesColumn, ChevronUp, CircleCheck, CircleX, Clock, CodeXml, FileText, Info, TriangleAlert, Wrench, Zap } from "lucide-react";
 import { useViewFixture, useAdminNow } from "@/lib/admin/dataSource";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { describeAge, RUN_OUTCOME_META, type HealthTone } from "@/lib/admin/health";
-import { sourceHost } from "@/lib/admin/integrations/runs";
-import { buildRunTimeline, diagnosisFor, httpReason, inventoryWrites, nextStepFor, outcomeForRun, redactEvidence, runImpact, type SyncErrorRow, type SyncRunRow } from "@/lib/admin/integrations/runs";
-import { zoneLabel } from "@/lib/admin/integrations/format";
+import { buildRunTimeline, diagnosisFor, httpReason, inventoryWrites, nextStepFor, outcomeForRun, redactEvidence, runImpact, sourceHost, type SyncErrorRow, type SyncRunRow } from "@/lib/admin/integrations/runs";
+import { formatTime, zoneLabel } from "@/lib/admin/integrations/format";
 import { loadLastSuccessAt, loadRun } from "@/lib/admin/integrations/queries";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
-import { AdminButton, AdminCard, AdminLinkButton, AdminTable, EmptyState, InlineNote, KeyValueList, SkeletonBlock, StatTile, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
-import { BigNumber, TextValue, useFormatAt, useViewer } from "@/pages/admin/views/integrations/common";
+import { AdminButton, AdminCard, AdminLinkButton, AdminTable, EmptyState, InlineNote, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
+import { useFormatAt, useViewer } from "@/pages/admin/views/integrations/common";
+import { cn } from "@/lib/utils";
 
 // One inventory sync run, read from its immutable ledger row. The outcome,
 // diagnosis, next safe action, timeline and impact are all derived from the
@@ -31,8 +31,28 @@ const BADGE_LABEL: Partial<Record<keyof typeof RUN_OUTCOME_META, string>> = {
   identity_hold: "Source identity on hold",
 };
 
-const TIMELINE_ICON: Record<HealthTone, typeof Info> = { neutral: Clock, success: CheckCircle2, warning: AlertTriangle, danger: XCircle, info: Info };
-const TIMELINE_COLOR: Record<HealthTone, string> = { neutral: "text-adm-muted", success: "text-adm-success", warning: "text-adm-warning", danger: "text-adm-danger", info: "text-adm-primary" };
+const EVENT_ICON: Record<HealthTone, { icon: typeof Info; fill: string }> = {
+  neutral: { icon: Clock, fill: "fill-adm-muted" },
+  success: { icon: CircleCheck, fill: "fill-adm-success" },
+  warning: { icon: TriangleAlert, fill: "fill-adm-warning" },
+  danger: { icon: CircleX, fill: "fill-adm-danger" },
+  info: { icon: Info, fill: "fill-adm-primary" },
+};
+
+const DIAGNOSIS_ICON: Record<HealthTone, typeof Info> = { neutral: Clock, success: CircleCheck, warning: TriangleAlert, danger: TriangleAlert, info: Info };
+const DIAGNOSIS_COLOR: Record<HealthTone, string> = { neutral: "text-adm-muted", success: "text-adm-success", warning: "text-adm-warning", danger: "text-adm-danger", info: "text-adm-primary" };
+const DIAGNOSIS_PANEL: Record<HealthTone, string> = {
+  neutral: "border-adm-border",
+  success: "border-[#BFE3CF] bg-adm-success-bg",
+  warning: "border-[#F1D58A] bg-adm-warning-bg",
+  danger: "border-[#F3B4AE] bg-adm-danger-bg",
+  info: "border-[#C5D4F7] bg-adm-selected",
+};
+
+const TITLE = <span className="text-[34px] leading-[40px]">Inventory sync run</span>;
+const CARD_TITLE = "text-[16px] leading-[22px] font-semibold text-adm-ink";
+const TL_TH = "bg-transparent px-3 py-[5px] text-[13px] leading-[18px] font-normal text-adm-muted";
+const TL_TD = "px-3 py-1 leading-[18px] align-top";
 
 export default function SyncRunPage() {
   const fixture = useViewFixture<SyncRunFixture>("sync-run");
@@ -68,6 +88,8 @@ export default function SyncRunPage() {
       next: nextStepFor(outcome, run.http_status),
       timeline: buildRunTimeline(run, outcome, host),
       impact: runImpact(run, outcome),
+      // The headline facts first; the full redacted row follows for anyone who needs it.
+      summary: { http_status: run.http_status, reason: outcome, source: host, timestamp: run.finished_at ?? run.started_at },
       evidence: redactEvidence({
         run_id: run.id,
         status: run.status,
@@ -93,9 +115,9 @@ export default function SyncRunPage() {
 
   if (!data) {
     return (
-      <ChildPageFrame crumbs={crumbs} title="Inventory sync run" backHref={feedHref} backLabel="Back to feed">
+      <ChildPageFrame crumbs={crumbs} title={TITLE}>
         <div className="space-y-4" aria-busy="true" aria-label="Loading run">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">{[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} className="h-[76px]" />)}</div>
+          <SkeletonBlock className="h-[113px] w-full" />
           <SkeletonBlock className="h-64 w-full" />
         </div>
       </ChildPageFrame>
@@ -104,7 +126,7 @@ export default function SyncRunPage() {
 
   if (!run || !model) {
     return (
-      <ChildPageFrame crumbs={crumbs} title="Inventory sync run" backHref={feedHref} backLabel="Back to feed">
+      <ChildPageFrame crumbs={crumbs} title={TITLE}>
         <AdminCard>
           <EmptyState title={data.failed ? "This run could not be read" : "Run not found"} detail={data.failed ? "The ledger did not answer. Nothing here is current." : "No run with this id is recorded for your rooftop."} action={<AdminLinkButton to={feedHref}>Back to feed</AdminLinkButton>} compact />
         </AdminCard>
@@ -112,90 +134,129 @@ export default function SyncRunPage() {
     );
   }
 
-  const { outcome, meta, diagnosis, next, timeline, impact, evidence, host } = model;
+  const { outcome, meta, diagnosis, next, timeline, impact, evidence, summary, host } = model;
   const refusal = outcome === "provider_rate_limited" || outcome === "provider_auth_failed" || outcome === "provider_error" || outcome === "transport_error";
   const badgeTone: HealthTone = refusal ? "danger" : meta.tone;
   const writes = inventoryWrites(impact);
   const pinRetained = meta.inventoryPreserved === true;
   const zone = zoneLabel(viewer.timeZone, now);
-  const diagnosisBorder = diagnosis.tone === "danger" ? "border-[#F3B4AE]" : diagnosis.tone === "warning" ? "border-[#F1D58A]" : diagnosis.tone === "success" ? "border-[#BFE3CF]" : "border-adm-border";
+  const DiagnosisIcon = DIAGNOSIS_ICON[diagnosis.tone];
+  const BadgeIcon = DIAGNOSIS_ICON[badgeTone];
 
   return (
     <ChildPageFrame
       crumbs={crumbs}
-      title="Inventory sync run"
-      badge={<StatusChip tone={badgeTone} icon className={refusal ? "border border-[#F3B4AE] bg-adm-surface" : undefined}>{BADGE_LABEL[outcome] ?? meta.label}</StatusChip>}
+      title={TITLE}
+      badge={
+        <StatusChip tone={badgeTone} className={cn("h-[38px] rounded-lg border px-2.5 text-[15px] leading-[22px]", refusal ? "border-[#F3B4AE] bg-[#FFF1F2]" : "border-transparent")}>
+          <BadgeIcon className="w-[22px] h-[22px] mr-1.5 flex-shrink-0" aria-hidden="true" />
+          {BADGE_LABEL[outcome] ?? meta.label}
+        </StatusChip>
+      }
       subtitle={<>{formatAt(run.started_at, { withYear: true, withZone: true })} · Run {run.id.slice(0, 8)}</>}
-      backHref={feedHref}
-      backLabel="Back to feed"
     >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatTile label="HTTP status" value={run.http_status ?? "—"} hint={httpReason(run.http_status) ?? "No response recorded"} tone={refusal ? "danger" : "neutral"} />
-          <StatTile label="Source domain" value={<TextValue>{host ?? "Unknown"}</TextValue>} hint="Inventory feed" tone="info" />
-          <StatTile label="Inventory writes" value={writes === null ? "Unknown" : writes} hint="New, updated, or retired" tone="neutral" />
-          <StatTile label="Rooftop pin" value={pinRetained ? "Retained" : "Unknown"} hint={pinRetained ? "No changes made" : "Not recorded for this run"} tone={pinRetained ? "success" : "neutral"} />
-        </div>
+      <div className="space-y-5">
+        <AdminCard id="run-summary" flush>
+          <dl className="grid grid-cols-2 xl:grid-cols-4 divide-x divide-adm-border">
+            <SummaryCell label="HTTP status" value={run.http_status === null ? "—" : String(run.http_status)} hint={httpReason(run.http_status) ?? "No response recorded"} />
+            <SummaryCell label="Source" value={host ?? "Unknown"} hint="Inventory feed" text mask="host" />
+            <SummaryCell label="Inventory writes" value={writes === null ? "Unknown" : String(writes)} hint="New, updated, or retired" />
+            <SummaryCell label="Rooftop pin" value={pinRetained ? "Retained" : "Unknown"} hint={pinRetained ? "No changes made" : "Not recorded for this run"} text />
+          </dl>
+        </AdminCard>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-4 items-start">
-          <AdminCard className={diagnosisBorder}>
-            <div className="flex items-start gap-3">
-              <span className={`mt-0.5 ${TIMELINE_COLOR[diagnosis.tone]}`} aria-hidden="true">{(() => { const Icon = TIMELINE_ICON[diagnosis.tone]; return <Icon className="w-5 h-5" />; })()}</span>
-              <div className="min-w-0 space-y-2">
-                <h2 className="text-[18px] leading-[26px] font-semibold text-adm-ink">{diagnosis.title}</h2>
-                <p className="text-[14px] leading-[20px] text-adm-ink">{diagnosis.detail}</p>
-                <p className="text-[13px] leading-[18px] text-adm-muted">
-                  Inventory preserved: {meta.inventoryPreserved === "unknown" ? "unknown" : meta.inventoryPreserved ? "yes" : "no"}. {meta.nextSafeAction}
-                </p>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_556px] gap-4">
+          <AdminCard id="run-diagnosis" className={DIAGNOSIS_PANEL[diagnosis.tone]} bodyClassName="px-6 pt-[22px] pb-6">
+            <div className="flex items-start gap-[19px]">
+              <DiagnosisIcon className={cn("w-[34px] h-[34px] flex-shrink-0", DIAGNOSIS_COLOR[diagnosis.tone])} aria-hidden="true" />
+              <div className="min-w-0">
+                <h2 className="text-[22px] leading-[30px] font-bold text-adm-ink">{diagnosis.title}</h2>
+                <p className="mt-4 text-[16px] leading-[24px] text-adm-ink">{diagnosis.detail}</p>
               </div>
             </div>
           </AdminCard>
-          <AdminCard className="border-[#C5D4F7] bg-adm-selected" title={`Next step: ${next.title}`}>
-            <div className="space-y-3">
-              <p className="text-[13px] leading-[18px] text-adm-ink">{next.detail}</p>
-              <KeyValueList rows={[
-                { label: "Last successful run", value: data.lastSuccessAt ? <>{formatAt(data.lastSuccessAt)}<span className="block text-[11px] text-adm-muted">{describeAge(data.lastSuccessAt, now)}</span></> : <span className="text-adm-muted">None recorded</span> },
-                { label: "Existing identity", value: <>{pinRetained ? "Retained" : "Unknown"}<span className="block text-[11px] text-adm-muted">{pinRetained ? "Rooftop pin remains unchanged" : "Not recorded for this run"}</span></> },
-              ]} />
+
+          <AdminCard id="run-next-step" className="border-[#C5D4F7] bg-adm-selected" bodyClassName="px-6 pt-[14px] pb-3">
+            <div className="flex items-start gap-[11px]">
+              <Wrench className="w-8 h-8 flex-shrink-0 -mt-0.5 text-adm-primary" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-[16px] leading-[22px] font-semibold text-adm-primary">Next step</p>
+                <h3 className="text-[18px] leading-[26px] font-bold text-adm-ink">{next.title}</h3>
+                <p className="mt-1.5 text-[14px] leading-[20px] text-adm-ink">{next.detail}</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-[1.18fr_1fr] divide-x divide-[#C5D4F7] border-t border-[#C5D4F7] pt-3">
+              <div className="min-w-0 pr-6">
+                <p className="text-[14px] leading-[20px] text-adm-muted">Last successful run</p>
+                {data.lastSuccessAt ? (
+                  <p data-parity="timestamp" className="mt-0.5 text-[16px] leading-[22px] font-semibold text-adm-ink" title={describeAge(data.lastSuccessAt, now)}>{formatAt(data.lastSuccessAt, { withYear: true, withZone: true })}</p>
+                ) : (
+                  <p className="mt-0.5 text-[16px] leading-[22px] font-semibold text-adm-muted">None recorded</p>
+                )}
+              </div>
+              <div className="min-w-0 pl-8">
+                <p className="text-[14px] leading-[20px] text-adm-muted">Existing identity</p>
+                <p className="mt-0.5 text-[16px] leading-[22px] font-semibold text-adm-ink">{pinRetained ? "Retained" : "Unknown"}</p>
+                <p className="text-[13px] leading-[18px] text-adm-muted">{pinRetained ? "Rooftop pin remains unchanged" : "Not recorded for this run"}</p>
+              </div>
             </div>
           </AdminCard>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-4 items-start">
-          <div className="space-y-4 min-w-0">
-            <AdminCard title="Event timeline" description="Derived from the run record; times are the ledger's own." flush>
-              <AdminTable caption="Run event timeline">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_556px] gap-4 items-start">
+          <div className="space-y-2 min-w-0">
+            <AdminCard id="run-timeline" flush>
+              <div className="flex items-center gap-[17px] border-b border-adm-border px-[19px] pt-2 pb-[9px]">
+                <FileText className="w-[22px] h-[22px] flex-shrink-0 text-adm-primary" aria-hidden="true" />
+                <h3 className={CARD_TITLE}>Event timeline</h3>
+              </div>
+              <AdminTable caption="Run event timeline" className="pb-2">
+                <colgroup>
+                  <col className="w-[118px]" />
+                  <col className="w-[240px]" />
+                  <col />
+                </colgroup>
                 <thead>
                   <tr>
-                    <Th>Time{zone ? ` (${zone})` : ""}</Th>
-                    <Th>Event</Th>
-                    <Th>Details</Th>
+                    <Th className={cn(TL_TH, "pl-6")}>Time{zone ? ` (${zone})` : ""}</Th>
+                    <Th className={TL_TH}>Event</Th>
+                    <Th className={TL_TH}>Details</Th>
                   </tr>
                 </thead>
                 <tbody>
-                  {timeline.map((ev, i) => {
-                    const Icon = TIMELINE_ICON[ev.tone];
-                    return (
-                      <tr key={`${ev.label}-${i}`}>
-                        <Td className="whitespace-nowrap tabular-nums text-adm-muted">{ev.at ? formatAt(ev.at, { withSeconds: true }) : "—"}</Td>
-                        <Td>
-                          <span className="inline-flex items-center gap-2 font-semibold text-adm-ink">
-                            <Icon className={`w-4 h-4 ${TIMELINE_COLOR[ev.tone]}`} aria-hidden="true" />
-                            {ev.label}
-                          </span>
-                        </Td>
-                        <Td className="text-adm-muted">{ev.detail}</Td>
-                      </tr>
-                    );
-                  })}
+                  {timeline.map((ev, i) => (
+                    <tr key={`${ev.label}-${i}`}>
+                      <Td className={cn(TL_TD, "pl-6 whitespace-nowrap tabular-nums text-adm-ink")}><span data-parity="timestamp">{ev.at ? formatTime(ev.at, viewer.timeZone) : "—"}</span></Td>
+                      <Td className={cn(TL_TD, "align-middle")}>
+                        <span className="flex items-center gap-5 font-semibold leading-[20px] text-adm-ink">
+                          <EventIcon tone={ev.tone} />
+                          <span className="min-w-0">{ev.label}</span>
+                        </span>
+                      </Td>
+                      <Td className={cn(TL_TD, "text-adm-ink")}>{ev.detail}</Td>
+                    </tr>
+                  ))}
                 </tbody>
               </AdminTable>
-              <details className="px-6 py-4 border-t border-adm-border">
-                <summary className="cursor-pointer text-[13px] font-semibold text-adm-primary">Technical evidence</summary>
-                <pre className="mt-3 max-h-80 overflow-auto rounded-md bg-adm-workspace p-3 text-[12px] leading-[18px] text-adm-ink font-mono">{JSON.stringify(evidence, null, 2)}</pre>
-                <p className="mt-2 text-[11px] text-adm-muted">Credential-like fields are removed before display. Run id {run.id}.</p>
+            </AdminCard>
+
+            <AdminCard id="run-evidence" flush>
+              <details open>
+                <summary className="flex cursor-pointer list-none items-center gap-[17px] px-[19px] pt-1.5 pb-[10px] [&::-webkit-details-marker]:hidden">
+                  <CodeXml className="w-6 h-6 flex-shrink-0 text-adm-ink" aria-hidden="true" />
+                  <h3 className={cn(CARD_TITLE, "flex-1")}>Technical evidence</h3>
+                  <ChevronUp className="w-[22px] h-[22px] text-adm-ink" aria-hidden="true" />
+                </summary>
+                <div className="px-[19px] pb-1">
+                  <pre data-parity="evidence" className="overflow-auto rounded-md bg-adm-workspace px-[18px] py-1.5 font-mono text-[12px] leading-[13px] text-adm-ink">{JSON.stringify(summary, null, 2)}</pre>
+                </div>
               </details>
             </AdminCard>
+            <details className="px-1">
+              <summary className="cursor-pointer text-[12px] leading-[18px] font-semibold text-adm-primary">Full redacted payload</summary>
+              <pre data-parity="evidence" className="mt-2 max-h-80 overflow-auto rounded-md border border-adm-border bg-adm-surface p-3 font-mono text-[12px] leading-[18px] text-adm-ink">{JSON.stringify(evidence, null, 2)}</pre>
+              <p className="mt-2 text-[11px] text-adm-muted">Credential-like fields are removed before display. Run id {run.id}.</p>
+            </details>
 
             {(data.errors.length > 0 || outcome === "partial") && (
               <AdminCard title="Per-vehicle errors" description={`${data.errors.length} recorded for this run.`} flush>
@@ -227,33 +288,41 @@ export default function SyncRunPage() {
             )}
           </div>
 
-          <div className="space-y-4">
-            <AdminCard title="Impact">
-              <div className="grid grid-cols-3 gap-3">
-                <BigNumber label="New" value={impact.newVehicles === null ? "Unknown" : String(impact.newVehicles)} hint="Vehicles added" />
-                <BigNumber label="Updated" value={impact.updated === null ? "Unknown" : String(impact.updated)} hint="Vehicles changed" />
-                <BigNumber label="Retired" value={impact.retired === null ? "Unknown" : String(impact.retired)} hint="Vehicles removed" />
+          <div className="space-y-5">
+            <AdminCard id="run-impact" flush>
+              <div className="flex items-center gap-[18px] border-b border-adm-border px-[22px] pt-[13px] pb-[11px]">
+                <ChartNoAxesColumn className="w-8 h-8 flex-shrink-0 text-adm-ink" aria-hidden="true" />
+                <h3 className={CARD_TITLE}>Impact</h3>
+              </div>
+              <div className="mt-4 mb-[25px] grid grid-cols-3 divide-x divide-adm-border">
+                <ImpactStat value={impact.newVehicles} label="New vehicles" zero="No vehicles imported" some="Vehicles added" />
+                <ImpactStat value={impact.updated} label="Updated vehicles" zero="No vehicles updated" some="Vehicles changed" />
+                <ImpactStat value={impact.retired} label="Retired vehicles" zero="No vehicles retired" some="Vehicles removed" />
               </div>
             </AdminCard>
-            <AdminCard title="Actions">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <AdminLinkButton to={feedHref} variant="secondary">Back to feed</AdminLinkButton>
-                  <AdminButton variant="primary" onClick={() => setRetryOpen((o) => !o)} aria-expanded={retryOpen}>Review retry options</AdminButton>
+
+            <AdminCard id="run-actions" flush>
+              <div className="flex items-center gap-[18px] border-b border-adm-border px-[22px] pt-4 pb-4">
+                <Zap className="w-[26px] h-[26px] flex-shrink-0 text-adm-ink" aria-hidden="true" />
+                <h3 className={CARD_TITLE}>Actions</h3>
+              </div>
+              <div className="px-5 pt-[14px] pb-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <AdminLinkButton to={feedHref} variant="outline" className="min-h-[44px] sm:min-h-[44px] text-[15px] gap-2.5">
+                    <ArrowLeft className="w-[22px] h-[22px]" aria-hidden="true" />
+                    Back to feed
+                  </AdminLinkButton>
+                  <AdminButton variant="primary" className="min-h-[44px] sm:min-h-[44px] text-[15px]" onClick={() => setRetryOpen((o) => !o)} aria-expanded={retryOpen}>Review retry options</AdminButton>
                 </div>
                 {retryOpen && (
-                  <InlineNote tone="info" title="Retry options">
+                  <InlineNote tone="info" title="Retry options" className="mt-3">
                     {meta.retryable
                       ? "The next scheduled run retries automatically. A manual run can be started from the Inventory feed tab by a settings manager after a confirmation that states its cost; it is disabled while the provider is rate limiting."
                       : "This outcome is not retried automatically. Review the source identity from the Inventory feed tab before any change."}
-                    {" "}
+                    {" "}Nothing on this page starts a run or changes the source identity.{" "}
                     <Link to={feedHref} className="font-semibold text-adm-primary hover:underline">Open inventory feed</Link>
                   </InlineNote>
                 )}
-                <p className="flex items-center gap-2 text-[12px] leading-[18px] text-adm-muted">
-                  <ShieldCheck className="w-4 h-4 text-adm-success" aria-hidden="true" />
-                  Nothing on this page starts a run or changes the source identity.
-                </p>
               </div>
             </AdminCard>
           </div>
@@ -262,5 +331,28 @@ export default function SyncRunPage() {
     </ChildPageFrame>
   );
 }
+
+const SummaryCell = ({ label, value, hint, text = false, mask }: { label: string; value: string; hint: string; text?: boolean; mask?: string }) => (
+  <div className="min-w-0 px-7 pt-[14px] pb-5">
+    <dt className="text-[14px] leading-[20px] font-semibold text-adm-muted">{label}</dt>
+    <dd data-parity={mask} className={cn("mt-[3px] truncate font-bold text-adm-ink", text ? "text-[22px] leading-[34px]" : "text-[28px] leading-[34px] tabular-nums")}>{value}</dd>
+    <dd className="text-[14px] leading-[20px] text-adm-muted">{hint}</dd>
+  </div>
+);
+
+// Filled marks lose a stroke width of visible fill, so the box is drawn larger than the mark it shows.
+const EventIcon = ({ tone }: { tone: HealthTone }) => {
+  const { icon: Icon, fill } = EVENT_ICON[tone];
+  return <Icon className={cn("w-[26px] h-[26px] flex-shrink-0 text-white", fill)} aria-hidden="true" />;
+};
+
+/** A count that is never shown as zero when it is not known. */
+const ImpactStat = ({ value, label, zero, some }: { value: number | null; label: string; zero: string; some: string }) => (
+  <div className="min-w-0 px-2 pt-0.5 pb-[15px] text-center">
+    <p className="text-[32px] leading-[40px] font-bold text-adm-ink tabular-nums">{value === null ? "Unknown" : String(value)}</p>
+    <p className="mt-0.5 text-[15px] leading-[20px] font-semibold text-adm-ink">{label}</p>
+    <p className="mt-[3px] text-[13px] leading-[18px] text-adm-muted">{value === null ? "Not recorded" : value === 0 ? zero : some}</p>
+  </div>
+);
 
 export const syncRunHref = (runId: string) => ADMIN_CHILD_ROUTES.syncRun(runId);

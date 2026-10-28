@@ -47,6 +47,8 @@ export interface SettingsReviewOptions<T extends object> {
   toPayload: (draft: T, changed: Array<keyof T & string>) => Partial<DealerSettings>;
   canEdit: boolean;
   fixtureImpact?: ImpactFixture | null;
+  /** A draft edit to start from, so a fixture can depict a change pending review. */
+  initialDraft?: Partial<T> | null;
 }
 
 export interface SettingsReview<T extends object> {
@@ -91,7 +93,11 @@ export function useSettingsReview<T extends object>(o: SettingsReviewOptions<T>)
   const [state, dispatch] = useReducer(
     (s: ReviewApplyState<T>, e: ReviewApplyEvent<T>) => reviewApplyReducer(s, e),
     original,
-    (init: T) => initialReviewApply(init),
+    (init: T) => {
+      const base = initialReviewApply(init);
+      const seed = optionsRef.current.initialDraft;
+      return seed ? reviewApplyReducer(base, { type: "edit", draft: { ...init, ...seed } }) : base;
+    },
   );
   const stateRef = useRef(state);
   stateRef.current = state;

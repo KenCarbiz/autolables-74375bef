@@ -73,22 +73,22 @@ export const Pager = ({
 }) => {
   const summary = total === null ? `Showing ${loaded} ${noun}` : from <= 1 ? `Showing ${to} of ${total} ${noun}` : `Showing ${from}–${to} of ${total} ${noun}`;
   return (
-    <div className="flex items-center justify-between gap-3 px-6 py-3 border-t border-adm-border text-[12px] leading-[18px] text-adm-muted flex-wrap">
-      <span>{summary}</span>
-      <div className="flex items-center gap-4">
-        <label className="inline-flex items-center gap-2">
+    <div className="flex items-center justify-between gap-3 px-6 pt-3 pb-[38px] border-t border-adm-border text-[13px] leading-[18px] text-adm-muted flex-wrap">
+      <span data-parity="count">{summary}</span>
+      <div className="flex items-center gap-6">
+        <label className="inline-flex items-center gap-3 text-[12px] leading-[18px]">
           Rows per page
-          <select value={size} onChange={(e) => onSize(Number(e.target.value))} className="h-7 rounded-md border border-adm-border bg-adm-surface px-2 text-[12px] text-adm-ink">
+          <select value={size} onChange={(e) => onSize(Number(e.target.value))} className="h-[34px] w-[73px] rounded-md border border-adm-border bg-adm-surface px-2 text-[14px] text-adm-ink">
             {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </label>
-        <nav aria-label="Pagination" className="inline-flex items-center gap-1">
-          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)} className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-adm-border bg-adm-surface disabled:opacity-40">
-            <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+        <nav aria-label="Pagination" className="inline-flex items-center gap-2">
+          <button type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)} className="w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace disabled:opacity-40">
+            <ChevronLeft className="w-5 h-5" aria-hidden="true" />
           </button>
-          <span className="min-w-[28px] text-center text-adm-ink font-semibold" aria-current="page">{page}</span>
-          <button type="button" aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)} className="w-7 h-7 inline-flex items-center justify-center rounded-md border border-adm-border bg-adm-surface disabled:opacity-40">
-            <ChevronRight className="w-4 h-4" aria-hidden="true" />
+          <span className="min-w-[26px] h-8 px-2 inline-flex items-center justify-center rounded-md border border-adm-primary text-[14px] text-adm-primary font-semibold" aria-current="page">{page}</span>
+          <button type="button" aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)} className="w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace disabled:opacity-40">
+            <ChevronRight className="w-5 h-5" aria-hidden="true" />
           </button>
         </nav>
       </div>

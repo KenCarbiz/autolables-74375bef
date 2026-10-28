@@ -15,6 +15,8 @@ const approvalRules: ApprovalRulesFixture = {
   selected: "addendum",
   lastChange: { at: "2031-03-12T14:00:00Z", by: "Example Manager", action: "settings_updated" },
   impact: { activeVehicles: knownCount(48), policyVersion: 4 },
+  pendingDraft: { autoUnpublishStale: true },
+  canEdit: true,
 };
 
 const readiness: DocumentsReadinessFixture = {

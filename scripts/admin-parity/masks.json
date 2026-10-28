@@ -2,32 +2,130 @@
   "_comment": "Dynamic regions per screen. `selectors` are evaluated against the rendered fixture and their boxes mask both images; a selector may add `heading` (text of the picked element's first h1-h3) and `inner` (descendants to mask inside the picked elements). `rects` are fixed boxes in reference-frame coordinates. Only data that legitimately varies (counts, times, names, identifiers) may be listed. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.",
   "01": {
     "selectors": [
-      { "selector": "[data-admin-v2] a[aria-label] span.tabular-nums", "reason": "summary tile counts" },
-      { "selector": "[data-admin-v2] section", "heading": "Recent activity", "inner": "li span.whitespace-nowrap", "reason": "recent activity relative times" },
-      { "selector": "[data-admin-v2] section", "heading": "Recent activity", "inner": "li span.block.text-\\[11px\\]", "reason": "recent activity detail lines (fixture names)" }
+      {
+        "selector": "[data-admin-v2] a[aria-label] span.tabular-nums",
+        "reason": "summary tile counts"
+      },
+      {
+        "selector": "[data-admin-v2] section",
+        "heading": "Recent activity",
+        "inner": "li span.whitespace-nowrap",
+        "reason": "recent activity relative times"
+      },
+      {
+        "selector": "[data-admin-v2] section",
+        "heading": "Recent activity",
+        "inner": "li span.block.text-\\[11px\\]",
+        "reason": "recent activity detail lines (fixture names)"
+      }
     ],
     "rects": []
   },
   "05": {
     "selectors": [
-      { "selector": "[data-admin-v2] [data-landmark=\"impact-count\"]", "reason": "change impact counts (fixture inventory sizes)" },
-      { "selector": "[data-admin-v2] section", "heading": "Customer price preview", "inner": ".grid > div > p:nth-child(-n+2), .grid dd", "reason": "preview vehicle name, trim, stock and prices (fixture vehicle)" },
-      { "selector": "[data-admin-v2] section", "heading": "Price consistency", "inner": "tbody td:nth-child(-n+6)", "reason": "vehicle names, stock numbers and prices (fixture vehicles)" },
-      { "selector": "[data-admin-v2] section", "heading": "Price consistency", "inner": "section > div > div:last-child > span:first-child", "reason": "vehicles-shown count" }
+      {
+        "selector": "[data-admin-v2] [data-landmark=\"impact-count\"]",
+        "reason": "change impact counts (fixture inventory sizes)"
+      },
+      {
+        "selector": "[data-admin-v2] section",
+        "heading": "Customer price preview",
+        "inner": ".grid > div > p:nth-child(-n+2), .grid dd",
+        "reason": "preview vehicle name, trim, stock and prices (fixture vehicle)"
+      },
+      {
+        "selector": "[data-admin-v2] section",
+        "heading": "Price consistency",
+        "inner": "tbody td:nth-child(-n+6)",
+        "reason": "vehicle names, stock numbers and prices (fixture vehicles)"
+      },
+      {
+        "selector": "[data-admin-v2] section",
+        "heading": "Price consistency",
+        "inner": "section > div > div:last-child > span:first-child",
+        "reason": "vehicles-shown count"
+      }
     ],
     "rects": []
   },
   "06": {
     "selectors": [
-      { "selector": "[role=\"dialog\"] [data-landmark=\"impact-count\"]", "reason": "expected impact counts (fixture inventory sizes)" },
-      { "selector": "[data-landmark=\"fee-example-impact\"] tbody td:not(:nth-child(3))", "reason": "example vehicle name, stock, VIN suffix, selling price and totals (fixture vehicle); the fee column is policy data and stays" }
+      {
+        "selector": "[role=\"dialog\"] [data-landmark=\"impact-count\"]",
+        "reason": "expected impact counts (fixture inventory sizes)"
+      },
+      {
+        "selector": "[data-landmark=\"fee-example-impact\"] tbody td:not(:nth-child(3))",
+        "reason": "example vehicle name, stock, VIN suffix, selling price and totals (fixture vehicle); the fee column is policy data and stays"
+      }
     ],
     "rects": []
   },
   "07": {
     "selectors": [
-      { "selector": "[data-landmark=\"sample-results\"] tbody td:first-child", "reason": "sample vehicle names and mileage (fixture vehicles)" },
-      { "selector": "#product-price", "reason": "product price (fixture value)" }
+      {
+        "selector": "[data-landmark=\"sample-results\"] tbody td:first-child",
+        "reason": "sample vehicle names and mileage (fixture vehicles)"
+      },
+      {
+        "selector": "#product-price",
+        "reason": "product price (fixture value)"
+      }
+    ],
+    "rects": []
+  },
+  "11": {
+    "selectors": [
+      {
+        "selector": "[data-admin-v2] [data-parity=\"policy-changed\"]",
+        "reason": "policy change provenance (relative time and fixture name)"
+      },
+      {
+        "selector": "[data-admin-v2] [data-parity=\"readiness-detail\"]",
+        "reason": "readiness detail values (relative times and counts)"
+      }
+    ],
+    "rects": []
+  },
+  "12": {
+    "selectors": [
+      {
+        "selector": "[data-admin-v2] [data-parity=\"timestamp\"]",
+        "reason": "run timestamps (tile values and attempt times)"
+      },
+      {
+        "selector": "[data-admin-v2] [data-parity=\"host\"]",
+        "reason": "fixture provider domain"
+      },
+      {
+        "selector": "[data-admin-v2] [data-parity=\"pin\"]",
+        "reason": "rooftop pin identifier"
+      },
+      {
+        "selector": "[data-admin-v2] [data-parity=\"count\"]",
+        "reason": "attempt count in the pager summary"
+      }
+    ],
+    "rects": []
+  },
+  "13": {
+    "selectors": [
+      {
+        "selector": "[data-admin-v2] nav[aria-label=\"Breadcrumb\"] ~ p",
+        "reason": "run timestamp and run id under the title"
+      },
+      {
+        "selector": "[data-admin-v2] [data-parity=\"timestamp\"]",
+        "reason": "event times and the last successful run time"
+      },
+      {
+        "selector": "[data-admin-v2] [data-parity=\"host\"]",
+        "reason": "fixture provider domain"
+      },
+      {
+        "selector": "[data-admin-v2] [data-parity=\"evidence\"]",
+        "reason": "technical evidence payload (run id, timestamps, domain)"
+      }
     ],
     "rects": []
   }

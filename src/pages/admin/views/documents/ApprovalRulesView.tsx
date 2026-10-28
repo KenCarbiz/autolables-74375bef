@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, FileText, History, Printer, ShieldCheck } from "lucide-react";
+import { Eye, FileText, Printer, ShieldCheck } from "lucide-react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudit } from "@/contexts/AuditContext";
@@ -43,6 +43,10 @@ export interface ApprovalRulesFixture {
   selected: DocumentFamily;
   lastChange: PolicyChangeRecord | null;
   impact: ImpactFixture;
+  /** A draft edit the fixture depicts as pending review. */
+  pendingDraft?: Partial<DocumentRules>;
+  /** Fixture viewers may edit; production reads the member's capability. */
+  canEdit?: boolean;
 }
 
 const TILE_ICON: Record<ReadinessItem["key"], typeof Printer> = { calibration: Printer, templates: FileText, disclosures: ShieldCheck };
@@ -52,6 +56,10 @@ const TILE_TONE: Record<ReadinessItem["key"], Record<ReadinessState, Tone>> = {
   disclosures: { ok: "success", needs: "danger", unknown: "neutral" },
 };
 
+const TH = "px-4 py-4 text-[14px] leading-[20px] text-adm-ink";
+const TD = "px-4 py-[10px]";
+const SECTION_LABEL = "text-[18px] leading-[26px] font-semibold text-adm-ink";
+
 export default function ApprovalRulesView() {
   const fixture = useViewFixture<ApprovalRulesFixture>("approval-rules");
   const now = useAdminNow();
@@ -60,7 +68,7 @@ export default function ApprovalRulesView() {
   const { member } = useEntitlements();
   const { entries } = useAudit();
   const readiness = useDocumentsReadiness();
-  const canEdit = hasDealerCapability(member?.role, "can_manage_settings", isAdmin);
+  const canEdit = fixture?.canEdit ?? hasDealerCapability(member?.role, "can_manage_settings", isAdmin);
 
   const gates = useMemo(() => fixture?.gates ?? serviceGateContext(settings), [fixture, settings]);
   const review = useSettingsReview<DocumentRules>({
@@ -74,6 +82,7 @@ export default function ApprovalRulesView() {
     toPayload: (draft, changed) => ({ document_rules: { ...rulesFromSettings(settings), ...Object.fromEntries(changed.map((k) => [k, draft[k]])) } }),
     canEdit,
     fixtureImpact: fixture?.impact ?? null,
+    initialDraft: fixture?.pendingDraft ?? null,
   });
 
   const [selected, setSelected] = useState<DocumentFamily>(fixture?.selected ?? "window_sticker");
@@ -90,17 +99,28 @@ export default function ApprovalRulesView() {
   };
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(340px,440px)] gap-4 items-start">
-        <AdminCard title="Approval rules by document" description="Define who must approve each document type and what changes require a new approval." flush>
-          <AdminTable caption="Approval rules by document">
+    <div className="pt-[38px] space-y-3">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_489px] gap-4">
+        <AdminCard flush className="min-w-0">
+          <div className="px-[26px] pt-[17px]">
+            <h3 className="text-[20px] leading-[28px] font-semibold text-adm-ink">Approval rules by document</h3>
+            <p className="mt-2 text-[14px] leading-[20px] text-adm-muted">Define who must approve each document type and what changes require a new approval.</p>
+          </div>
+          <AdminTable caption="Approval rules by document" inset className="mt-7 mx-[19px] mb-[19px]">
+            <colgroup>
+              <col className="w-[135px]" />
+              <col className="w-[140px]" />
+              <col className="w-[190px]" />
+              <col className="w-[190px]" />
+              <col />
+            </colgroup>
             <thead>
               <tr>
-                <Th>Document</Th>
-                <Th>Applies to</Th>
-                <Th>Approval</Th>
-                <Th>Refresh after changes</Th>
-                <Th>Action</Th>
+                <Th className={TH}>Document</Th>
+                <Th className={TH}>Applies to</Th>
+                <Th className={TH}>Approval</Th>
+                <Th className={TH}>Refresh after changes</Th>
+                <Th className={TH}>Action</Th>
               </tr>
             </thead>
             <tbody>
@@ -108,12 +128,12 @@ export default function ApprovalRulesView() {
                 const isSelected = r.family === selected;
                 return (
                   <tr key={r.family} onClick={() => select(r.family, false)} aria-selected={isSelected} className={cn("cursor-pointer", isSelected ? "bg-adm-selected" : "hover:bg-adm-workspace")}>
-                    <Td className={cn(isSelected && "font-semibold")}>{r.document}</Td>
-                    <Td>{r.appliesTo}</Td>
-                    <Td>{r.approval}</Td>
-                    <Td>{r.refreshAfter}</Td>
-                    <Td>
-                      <AdminButton size="sm" aria-label={`Edit ${r.document} rules`} onClick={(e) => { e.stopPropagation(); select(r.family, true); }}>
+                    <Td className={cn(TD, isSelected && "font-semibold")}>{r.document}</Td>
+                    <Td className={TD}>{r.appliesTo}</Td>
+                    <Td className={TD}>{r.approval}</Td>
+                    <Td className={TD}>{r.refreshAfter}</Td>
+                    <Td className={TD}>
+                      <AdminButton variant="outline" className="px-5" aria-label={`Edit ${r.document} rules`} onClick={(e) => { e.stopPropagation(); select(r.family, true); }}>
                         Edit
                       </AdminButton>
                     </Td>
@@ -122,35 +142,32 @@ export default function ApprovalRulesView() {
               })}
             </tbody>
           </AdminTable>
-          <p className="px-6 py-4 text-[12px] leading-[18px] text-adm-muted">{family.description}</p>
         </AdminCard>
 
-        <AdminCard className="xl:sticky xl:top-4">
+        <AdminCard bodyClassName="px-[21px] pt-[13px] pb-[22px]">
           <p className="text-[12px] leading-[18px] text-adm-muted">Selected rule</p>
-          <h3 className="text-[20px] leading-[28px] font-semibold text-adm-ink">{family.label} approval</h3>
+          <h3 className="mt-1 text-[22px] leading-[28px] font-semibold text-adm-ink">{family.label} approval</h3>
 
-          <div className="mt-5 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Policy in effect</p>
-              <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">
-                {lastChange ? `Changed ${describeAge(lastChange.at, now)}${lastChange.by ? ` by ${lastChange.by}` : ""}` : "No change recorded in the activity log"}
-              </p>
-              <Link to={adminTabHref("change-history")} className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold text-adm-primary hover:underline">
-                <History className="w-4 h-4" aria-hidden="true" />
-                View change history
-              </Link>
-            </div>
-            <StatusChip tone="info">{versionChip}</StatusChip>
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <p className={SECTION_LABEL}>Policy in effect</p>
+            <StatusChip tone="info" className="h-[26px] px-2.5">{versionChip}</StatusChip>
           </div>
+          <p data-parity="policy-changed" className="mt-2 text-[14px] leading-[20px] text-adm-muted">
+            {lastChange ? `Changed ${describeAge(lastChange.at, now)}${lastChange.by ? ` by ${lastChange.by}` : ""}` : "No change recorded in the activity log"}
+          </p>
+          <Link to={adminTabHref("change-history")} className="mt-2 flex w-fit items-center gap-2 text-[14px] leading-[20px] font-semibold text-adm-primary hover:underline">
+            <FileText className="w-5 h-5" aria-hidden="true" />
+            View change history
+          </Link>
 
-          <hr className="my-5 border-adm-border" />
+          <hr className="mt-[21px] mb-5 border-adm-border" />
 
-          <div className="flex items-center gap-3">
-            <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Pending changes</p>
+          <div className="flex items-center gap-6">
+            <p className={SECTION_LABEL}>Pending changes</p>
             <PendingChip dirty={review.dirty} />
           </div>
           {review.dirty && (
-            <ul className="mt-2 space-y-1 text-[13px] leading-[18px] text-adm-ink">
+            <ul className="mt-2 space-y-1 text-[14px] leading-[20px] text-adm-ink">
               {changes.map((c) => (
                 <li key={c.key}>
                   {c.label}: <span className="text-adm-muted">{c.before ? "On" : "Off"}</span> to <span className="font-semibold">{c.after ? "On" : "Off"}</span>
@@ -158,7 +175,7 @@ export default function ApprovalRulesView() {
               ))}
             </ul>
           )}
-          <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">
+          <p className="mt-2 text-[14px] leading-[20px] text-adm-muted">
             Changes apply to documents generated after you apply them. Approved and signed documents keep their current version.
           </p>
 
@@ -193,32 +210,32 @@ export default function ApprovalRulesView() {
             </>
           )}
 
-          <hr className="my-5 border-adm-border" />
+          <hr className="mt-[19px] mb-[18px] border-adm-border" />
 
-          <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Readiness</p>
-          <div className="mt-3 grid grid-cols-3 divide-x divide-adm-border">
+          <p className={SECTION_LABEL}>Readiness</p>
+          <div className="mt-[13px] grid grid-cols-3 divide-x divide-adm-border">
             {readiness.items.map((item) => {
               const Icon = TILE_ICON[item.key];
               return (
                 <div key={item.key} className="px-3 first:pl-0 last:pr-0 min-w-0">
-                  <div className="flex items-center gap-1.5 text-[12px] leading-[18px] font-semibold text-adm-ink">
-                    <Icon className="w-4 h-4 text-adm-muted flex-shrink-0" aria-hidden="true" />
+                  <div className="flex items-center gap-3 text-[13px] leading-[18px] font-semibold text-adm-ink">
+                    <Icon className="w-5 h-5 text-adm-muted flex-shrink-0" aria-hidden="true" />
                     <span className="truncate">{item.label}</span>
                   </div>
-                  <StatusChip tone={TILE_TONE[item.key][item.state]} className="mt-2">{item.chip}</StatusChip>
-                  <p className="mt-2 text-[12px] leading-[16px] text-adm-muted">{item.detailLabel}</p>
-                  <p className="text-[12px] leading-[16px] text-adm-ink">{item.detailValue}</p>
+                  <StatusChip tone={TILE_TONE[item.key][item.state]} className="mt-[10px]">{item.chip}</StatusChip>
+                  <p className="mt-[7px] text-[12px] leading-[18px] text-adm-muted">{item.detailLabel}</p>
+                  <p data-parity="readiness-detail" className="text-[13px] leading-[18px] text-adm-ink">{item.detailValue}</p>
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <AdminLinkButton to={family.previewHref} variant="secondary">
-              <Eye className="w-4 h-4" aria-hidden="true" />
+          <div className="mt-[13px] grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <AdminLinkButton to={family.previewHref} variant="outline" className="min-h-[48px] sm:min-h-[48px] text-[15px]">
+              <Eye className="w-6 h-6" aria-hidden="true" />
               Preview document
             </AdminLinkButton>
-            <AdminButton variant="primary" onClick={() => void review.openReview()} disabled={!review.dirty || !canEdit}>
+            <AdminButton variant="primary" data-parity="review-policy" className="min-h-[48px] sm:min-h-[48px] text-[15px]" onClick={() => void review.openReview()} disabled={!review.dirty || !canEdit}>
               Review policy changes
             </AdminButton>
           </div>

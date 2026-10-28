@@ -35,7 +35,8 @@ describe("SyncRunPage for a provider rate limit (screen 13)", () => {
     expect(screen.getByText("New, updated, or retired")).toBeInTheDocument();
     expect(screen.getByText("No changes made")).toBeInTheDocument();
     expect(screen.getByText("The provider declined this request")).toBeInTheDocument();
-    expect(screen.getByText("Next step: Review provider quota and retry policy")).toBeInTheDocument();
+    expect(screen.getByText("Next step")).toBeInTheDocument();
+    expect(screen.getByText("Review provider quota and retry policy")).toBeInTheDocument();
     expect(screen.getByText("Rooftop pin remains unchanged")).toBeInTheDocument();
     expect(screen.getByText("Run details")).toBeInTheDocument();
     expect(mocks.from).not.toHaveBeenCalled();
@@ -48,8 +49,9 @@ describe("SyncRunPage for a provider rate limit (screen 13)", () => {
     const timeline = screen.getByRole("table", { name: "Run event timeline" });
     const rows = within(timeline).getAllByRole("row").slice(1);
     expect(rows.map((r) => within(r).getAllByRole("cell")[1].textContent)).toEqual(["Scheduled run started", "Provider returned 429", "Inventory preservation applied", "Retry pending review"]);
-    const impact = screen.getByText("Vehicles added").closest("section") as HTMLElement;
+    const impact = screen.getByText("No vehicles imported").closest("section") as HTMLElement;
     expect(within(impact).getAllByText("0")).toHaveLength(3);
+    expect(screen.getByText(/"reason": "provider_rate_limited"/)).toBeInTheDocument();
     expect(screen.getByText(/"api_key": "\[redacted\]"/)).toBeInTheDocument();
     expect(screen.getByText(/"Authorization": "\[redacted\]"/)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain("secret-value");

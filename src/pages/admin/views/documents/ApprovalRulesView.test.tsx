@@ -55,6 +55,12 @@ const baseSettings = (): Record<string, unknown> => ({
   require_install_verification: false,
 });
 
+/** The screen fixture without its depicted pending change and viewer override, so the role decides. */
+const readOnlyFixture = (): AdminFixture => {
+  const { pendingDraft: _draft, canEdit: _canEdit, ...rules } = FIXTURE_11.fixture.views["approval-rules"] as Record<string, unknown>;
+  return { ...FIXTURE_11.fixture, views: { ...FIXTURE_11.fixture.views, "approval-rules": rules } };
+};
+
 const renderView = (fixture?: AdminFixture) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = <ApprovalRulesView />;
@@ -86,10 +92,18 @@ describe("ApprovalRulesView", () => {
     expect(screen.getByText("Needs test")).toBeInTheDocument();
     expect(screen.getByText("4 configured")).toBeInTheDocument();
     expect(screen.getByText("Review required")).toBeInTheDocument();
-    expect(screen.getByText("No changes pending")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
+    expect(screen.getByText("Pending review")).toBeInTheDocument();
+    expect(screen.getByText("1 change pending review")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review policy changes" })).toBeEnabled();
     expect(mocks.updateSettings).not.toHaveBeenCalled();
     expect(mocks.log).not.toHaveBeenCalled();
+  });
+
+  it("starts clean when the fixture carries no pending draft", () => {
+    renderView(readOnlyFixture());
+    expect(screen.getByText("None")).toBeInTheDocument();
+    expect(screen.getByText("No changes pending")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
   });
 
   it("never renders a failed readiness read as zero", () => {
@@ -153,7 +167,7 @@ describe("ApprovalRulesView", () => {
 
   it("lets a salesperson read the rules but not change them", () => {
     mocks.role = "salesperson";
-    renderView(FIXTURE_11.fixture);
+    renderView(readOnlyFixture());
     fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
     expect(screen.getByRole("switch", { name: "Require manager approval before printing" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
