@@ -17,6 +17,7 @@ import EntitlementGate from "@/components/layout/EntitlementGate";
 import AdminGate from "@/components/layout/AdminGate";
 import { navModeForRole } from "@/components/layout/adminNav";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import { ADMIN_CHILD_ROUTE_ELEMENTS } from "@/pages/admin/childRoutes";
 
 const GatedLayout = () => (
   <EntitlementGate app="autolabels">
@@ -59,7 +60,8 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Login = lazy(() => import("./pages/Login"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Admin = lazy(() => import("./pages/Admin"));
+const AdminV2 = lazy(() => import("./pages/AdminV2"));
+const AdminDesignFixture = lazy(() => import("./pages/admin/AdminDesignFixture"));
 const AdminSmokeTest = lazy(() => import("./pages/AdminSmokeTest"));
 const AddendumIconLibrary = lazy(() => import("./pages/AddendumIconLibrary"));
 const AddendumLabelPrint = lazy(() => import("./pages/AddendumLabelPrint"));
@@ -360,7 +362,10 @@ const App = () => (
                             manufacturer document, carrying any vehicle the
                             caller had already selected. */}
                         <Route path="/new-car-sticker" element={<NewCarStickerRedirect />} />
-                        <Route path="/admin" element={<Admin />} />
+                        <Route path="/admin" element={<AdminV2 />} />
+                        {ADMIN_CHILD_ROUTE_ELEMENTS.map((r) => (
+                          <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
                         <Route path="/admin/smoke-test" element={<AdminSmokeTest />} />
                         <Route path="/admin/design-system/addendum-icons" element={<AddendumIconLibrary />} />
                         <Route path="/addendum-label/:id" element={<AddendumLabelPrint />} />
@@ -430,6 +435,12 @@ const App = () => (
                       <Route element={<AdminLayout />}>
                         <Route path="/platform-admin" element={<PlatformAdmin />} />
                       </Route>
+
+                      {/* Development only: deterministic Administration screens
+                          for the visual parity harness. Never in a production bundle. */}
+                      {import.meta.env.DEV && (
+                        <Route path="/admin/design-fixture/:screen" element={<AdminDesignFixture />} />
+                      )}
 
                     <Route path="*" element={<NotFound />} />
                   </Routes>

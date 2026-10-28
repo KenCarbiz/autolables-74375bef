@@ -186,7 +186,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
 
 const VALID_TABS: AdminTab[] = ADMIN_TABS;
 
-const Admin = () => {
+const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?: AdminTab } = {}) => {
   const queryClient = useQueryClient();
   const { user, isAdmin, loading, signOut } = useAuth();
   const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
@@ -195,31 +195,9 @@ const Admin = () => {
   const { currentStore, updateTenant, tenant } = useTenant();
   const productIconKey = `product_icons:${tenant?.id || "none"}`;
 
-  // Auto-recalculate stored sale prices when the dealer changes their doc fee,
-  // so existing inventory updates immediately instead of waiting for the next
-  // sync/crawl. Debounced (the amount input fires per keystroke). Baselines the
-  // fee per tenant so it never fires on initial load or a store switch — only
-  // on a real change to the current tenant's doc fee.
-  const docFeeSig = `${!!settings.doc_fee_enabled}:${settings.doc_fee_amount}`;
-  const lastDocFee = useRef<{ tenant: string; sig: string } | null>(null);
-  useEffect(() => {
-    // Settings load in several passes (cache/defaults, then the server row);
-    // re-baseline after every load so only a real edit triggers a recalc.
-    if (settingsLoading) { lastDocFee.current = null; return; }
-    if (!tenant?.id) return;
-    const prev = lastDocFee.current;
-    if (!prev || prev.tenant !== tenant.id) { lastDocFee.current = { tenant: tenant.id, sig: docFeeSig }; return; }
-    if (prev.sig === docFeeSig) return;
-    lastDocFee.current = { tenant: tenant.id, sig: docFeeSig };
-    const t = setTimeout(async () => {
-      const { data, error } = await supabase.rpc("recalc_tenant_doc_fee", { p_tenant_id: tenant.id });
-      if (!error && typeof data === "number" && data > 0) {
-        toast.success(`Updated ${data} vehicle${data === 1 ? "" : "s"} with the new doc fee.`);
-      }
-    }, 1200);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docFeeSig, tenant?.id, settingsLoading]);
+  // Doc-fee recalculation is no longer a side effect of settings state. It is
+  // an explicit Review & Apply step on Pricing & Products; opening, reloading
+  // or switching store in Admin never writes a vehicle price.
   // Most-recent price term the crawl detected off this dealer's own VDP, shown
   // in the "Match my website" price-label preview. Null until a crawl captures
   // one. Cast: website_price_term is a fresh column not yet in generated types.
@@ -251,9 +229,9 @@ const Admin = () => {
   const [tabState, setTabState] = useState<AdminTab>(urlTab && VALID_TABS.includes(urlTab) ? urlTab : "home");
   // A tab the role can't see falls back to its first permitted tab, mirroring
   // the unknown-tab handling above.
-  const tab: AdminTab = canSeeAdminTab(role, tabState, isAdmin)
+  const tab: AdminTab = legacyTab ?? (canSeeAdminTab(role, tabState, isAdmin)
     ? tabState
-    : (firstPermittedAdminTab(role, isAdmin) ?? "home");
+    : (firstPermittedAdminTab(role, isAdmin) ?? "home"));
 
   const setTab = (t: AdminTab) => {
     setTabState(t);
@@ -271,12 +249,13 @@ const Admin = () => {
   // Retired tab ids stay valid so old deep links resolve, but their content
   // now lives on standalone screens — redirect instead of rendering here.
   useEffect(() => {
+    if (legacyTab) return;
     if (tab === "inventory") navigate("/inventory", { replace: true });
     else if (tab === "analytics") navigate("/dashboard/reports?tab=analytics", { replace: true });
     else if (tab === "funnel") navigate("/dashboard/reports?tab=signings", { replace: true });
     else if (tab === "leads") navigate("/leads", { replace: true });
     else if (tab === "queue") navigate("/queue", { replace: true });
-  }, [tab, navigate]);
+  }, [tab, navigate, legacyTab]);
 
   // Command-palette deep links carry ?panel=<anchor>; scroll to the card once
   // the tab body has rendered. Presentation-only.
@@ -616,7 +595,10 @@ const Admin = () => {
 
   // Wait for the member row too — the tab filter needs the role before it can
   // decide which tabs exist, otherwise deep links flash the wrong tab.
-  if (loading || fetching || entitlementsLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Loading...</p></div>;
+  if (loading || fetching || entitlementsLoading) {
+    if (embedded) return <div className="h-40 rounded-[10px] border border-border bg-card animate-pulse" aria-busy="true" aria-label="Loading" />;
+    return <div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Loading...</p></div>;
+  }
 
   const tabs: { id: AdminTab; label: string; group?: "dealer" | "platform" }[] = ([
     { id: "home", label: "Home" },
@@ -646,8 +628,10 @@ const Admin = () => {
     .filter((t) => canSeeAdminTab(role, t.id, isAdmin));
 
   return (
-    <div className="max-w-6xl mx-auto">
-        {/* Page header — clean light surface, no gradient. */}
+    <div className={embedded ? "" : "max-w-6xl mx-auto"}>
+        {/* Page header — clean light surface, no gradient. Hidden when the V2
+            shell embeds this body: the shell owns the title and navigation. */}
+        {!embedded && (
         <div className="px-6 lg:px-10 pt-8 pb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-border">
           <div>
             <div className="inline-flex items-center gap-1.5 text-al-meta font-bold uppercase tracking-label text-muted-foreground">
@@ -670,13 +654,14 @@ const Admin = () => {
             </div>
           </div>
         </div>
+        )}
 
-        <div className="p-4 lg:p-6">
+        <div className={embedded ? "" : "p-4 lg:p-6"}>
 
         {/* Grouped section nav. Collapses the flat tab set into ~6 groups a
             manager uses (+ Advanced). Each group maps to existing ?tab= keys,
             so every deep link still resolves; this is a presentation layer only. */}
-        {(() => {
+        {!embedded && (() => {
           const labelFor = (id: AdminTab) => tabs.find((t) => t.id === id)?.label || id;
           const availIds = new Set(tabs.map((t) => t.id));
           const groupDefs: { id: string; label: string; ids: AdminTab[] }[] = [
@@ -2470,7 +2455,7 @@ const Admin = () => {
                         const next = parseFloat(docFeeDraft) || 0;
                         setDocFeeDraft(null);
                         if (next === settings.doc_fee_amount) return;
-                        if (!window.confirm(`Change the doc fee to $${next.toFixed(2)}? This recalculates stored sale prices across your inventory.`)) return;
+                        if (!window.confirm(`Save the doc fee as $${next.toFixed(2)}? Stored sale prices are not recalculated until the change is reviewed and applied on Pricing & Products.`)) return;
                         updateSettings({ doc_fee_amount: next });
                       }}
                       className="w-full px-3 py-2 border border-border-custom rounded text-sm"

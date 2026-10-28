@@ -74,6 +74,25 @@ export default {
           active: "hsl(var(--al-shell-active))",
           accent: "hsl(var(--al-shell-accent))",
         },
+        // Administration V2 surface tokens (reference design/tokens.json).
+        // Scoped to the Admin area by usage; never applied to customer pages.
+        adm: {
+          sidebar: "#142338",
+          workspace: "#F4F7FB",
+          surface: "#FFFFFF",
+          primary: "#2457D6",
+          "primary-hover": "#1D46AE",
+          ink: "#17263C",
+          muted: "#596A80",
+          border: "#D6DFEA",
+          selected: "#EAF0FF",
+          success: "#167347",
+          "success-bg": "#E8F5EE",
+          warning: "#946000",
+          "warning-bg": "#FFF4D8",
+          danger: "#B42318",
+          "danger-bg": "#FEECEC",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
