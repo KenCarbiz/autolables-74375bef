@@ -7,7 +7,8 @@
 export type SpyCall =
   | { kind: "table"; table: string; op: string; args: unknown[] }
   | { kind: "rpc"; fn: string; args: unknown }
-  | { kind: "storage"; bucket: string; op: string };
+  | { kind: "storage"; bucket: string; op: string }
+  | { kind: "function"; fn: string; args: unknown };
 
 export interface SpyResponse {
   data?: unknown;
@@ -29,6 +30,9 @@ const WRITE_OPS = new Set(["insert", "update", "upsert", "delete"]);
 /** Table writes and every RPC: the set that must stay empty after a mount. */
 export const writeCalls = (): SpyCall[] =>
   spyCalls.filter((c) => (c.kind === "table" && WRITE_OPS.has(c.op)) || c.kind === "rpc");
+
+/** Edge function invocations: the calls that can reach a paid provider or send mail. */
+export const functionCalls = (): string[] => spyCalls.filter((c): c is Extract<SpyCall, { kind: "function" }> => c.kind === "function").map((c) => c.fn);
 
 export const rpcCalls = (): string[] => spyCalls.filter((c): c is Extract<SpyCall, { kind: "rpc" }> => c.kind === "rpc").map((c) => c.fn);
 
@@ -68,5 +72,10 @@ export const supabaseSpy = {
   channel: () => thenable(() => ({ data: null, error: null }), () => undefined),
   removeChannel: () => undefined,
   auth: { getUser: async () => ({ data: { user: null }, error: null }) },
-  functions: { invoke: async () => ({ data: null, error: null }) },
+  functions: {
+    invoke: async (fn: string, args?: unknown) => {
+      spyCalls.push({ kind: "function", fn, args });
+      return { data: null, error: null };
+    },
+  },
 };
