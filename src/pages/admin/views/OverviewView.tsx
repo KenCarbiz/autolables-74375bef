@@ -204,7 +204,8 @@ export default function OverviewView() {
         <StatTile icon={AlertTriangle} label="Open exceptions" value={countDisplay(openExceptions)} href="/admin/exceptions" tone="danger" />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2.15fr)_minmax(300px,1fr)] gap-3.5 items-start">
+        <div className="space-y-4 min-w-0">
         <AdminCard title="What needs attention" flush>
           {loading && !fixture ? (
             <p className="px-6 pb-6 text-[13px] text-adm-muted">Checking this rooftop…</p>
@@ -246,30 +247,7 @@ export default function OverviewView() {
           )}
         </AdminCard>
 
-        <AdminCard title="Effective policy" action={<Link to={adminTabHref("effective-policy")} className="text-[13px] font-semibold text-adm-primary hover:underline">Edit</Link>}>
-          <ul className="divide-y divide-adm-border -mt-2">
-            {policy.map((row) => {
-              const Icon = row.key === "price_basis" ? Tag : row.key === "publishing" ? Globe : row.key === "used_cpo" ? Car : Route;
-              const ok = row.state === "ok";
-              return (
-                <li key={row.key} className="flex items-start gap-3 py-3">
-                  <span className="w-9 h-9 rounded-md bg-adm-workspace text-adm-muted flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-4 h-4" /></span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      {ok ? <CheckCircle2 className="w-4 h-4 text-adm-success" aria-hidden="true" /> : <AlertTriangle className="w-4 h-4 text-adm-danger" aria-hidden="true" />}
-                      <p className="text-[14px] font-semibold text-adm-ink">{row.title}</p>
-                    </div>
-                    <Link to={row.href} className="block text-[14px] text-adm-ink hover:underline">{row.value}</Link>
-                    <p className="text-[12px] leading-[18px] text-adm-muted">{row.detail}</p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </AdminCard>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)] gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.18fr)_minmax(260px,1fr)] gap-2.5 items-start">
         <AdminCard title="Administration settings">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {SHORTCUTS.map((s) => {
@@ -307,6 +285,30 @@ export default function OverviewView() {
               ))}
             </ul>
           )}
+        </AdminCard>
+        </div>
+        </div>
+
+        <AdminCard title="Effective policy" action={<Link to={adminTabHref("effective-policy")} className="text-[13px] font-semibold text-adm-primary hover:underline">Edit</Link>}>
+          <ul className="divide-y divide-adm-border -mt-2">
+            {policy.map((row) => {
+              const Icon = row.key === "price_basis" ? Tag : row.key === "publishing" ? Globe : row.key === "used_cpo" ? Car : Route;
+              const ok = row.state === "ok";
+              return (
+                <li key={row.key} className="flex items-start gap-3 py-3">
+                  <span className="w-9 h-9 rounded-md bg-adm-workspace text-adm-muted flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-4 h-4" /></span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      {ok ? <CheckCircle2 className="w-4 h-4 text-adm-success" aria-hidden="true" /> : <AlertTriangle className="w-4 h-4 text-adm-danger" aria-hidden="true" />}
+                      <p className="text-[14px] font-semibold text-adm-ink">{row.title}</p>
+                    </div>
+                    <Link to={row.href} className="block text-[14px] text-adm-ink hover:underline">{row.value}</Link>
+                    <p className="text-[12px] leading-[18px] text-adm-muted">{row.detail}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </AdminCard>
       </div>
     </div>

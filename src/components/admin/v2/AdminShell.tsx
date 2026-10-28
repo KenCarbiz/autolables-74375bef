@@ -12,7 +12,7 @@ import { adminTabHref } from "@/lib/admin/sections";
 
 export const AdminSectionNav = ({ sections, activeId, tabFor, ariaLabel = "Administration sections" }: { sections: AdminSection[]; activeId: string | null; tabFor: (s: AdminSection) => AdminChildTab | null; ariaLabel?: string }) => (
   <nav aria-label={ariaLabel} className="border-b border-adm-border overflow-x-auto">
-    <ul className="flex items-stretch gap-6 min-w-max">
+    <ul className="flex items-stretch gap-9 min-w-max">
       {sections.map((s) => {
         const target = tabFor(s);
         if (!target) return null;
@@ -110,8 +110,8 @@ export const AdminShell = ({
     <div className="space-y-4">
       <div>
         <Breadcrumbs crumbs={[{ label: "Administration", href: "/admin" }, { label: activeSection.label }]} />
-        <h1 className="mt-1 text-[28px] leading-[36px] font-bold text-adm-ink">Administration</h1>
-        <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>
+        <h1 className="mt-4 text-[28px] leading-[40px] font-bold text-adm-ink">Administration</h1>
+        <p className="mt-1.5 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>
       </div>
       <AdminSectionNav sections={sections} activeId={activeSection.id} tabFor={firstTabFor} />
       <AdminChildTabs tabs={tabsForSection} activeId={activeTab.id} ariaLabel={`${activeSection.label} views`} />

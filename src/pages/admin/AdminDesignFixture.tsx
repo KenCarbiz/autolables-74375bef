@@ -47,7 +47,7 @@ export default function AdminDesignFixture() {
   return (
     <AdminFixtureProvider fixture={entry.fixture}>
       <div data-admin-fixture={screen} className="min-h-screen bg-adm-workspace flex">
-        <div className="w-[224px] flex-shrink-0 bg-adm-sidebar" aria-hidden="true" />
+        <div className="hidden lg:block w-[224px] flex-shrink-0 bg-adm-sidebar" aria-hidden="true" />
         <div className="flex-1 min-w-0">
           <div className="h-16 border-b border-adm-border bg-adm-surface" aria-hidden="true" />
           <Suspense fallback={<div className="p-8 text-sm text-adm-muted">Loading fixture…</div>}>{content}</Suspense>
