@@ -105,8 +105,8 @@ Administration scope fails.
 
 | Run | Files | Tests | Result |
 |---|---|---|---|
-| Full suite (`bun run test`) on the merged main | 419 | 6984 (1 skipped) | 2 failed (section 2), 6981 passed |
-| Administration suites (`bunx vitest run src/lib/admin src/pages/admin src/components/admin src/contexts/DealerSettingsContext.test.tsx`) | 47 | 407 | all passed |
+| Full suite (`bun run test`) on the final main | 419 | 6986 (1 skipped) | 2 failed (section 2), 6983 passed |
+| Administration suites (`bunx vitest run src/lib/admin src/pages/admin src/components/admin src/contexts/DealerSettingsContext.test.tsx`) | 48 | 415 | all passed |
 | Parity harness unit tests (`node --test scripts/admin-parity/harness.test.cjs`) | 1 | 10 | all passed |
 | Typecheck, production build | | | clean; the development-only fixture page is absent from the bundle |
 
