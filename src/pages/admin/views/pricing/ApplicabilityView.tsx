@@ -67,22 +67,22 @@ function RuleEditorModal({ draft, products, onChange, onSave, onCancel }: { draf
           </AdminSelect>
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Year from"><AdminInput value={draft.year_min || ""} onChange={(e) => set({ year_min: e.target.value })} placeholder="2020" /></Field>
-          <Field label="Year to"><AdminInput value={draft.year_max || ""} onChange={(e) => set({ year_max: e.target.value })} placeholder="2026" /></Field>
+          <Field label="Year from" htmlFor="rule-year-min"><AdminInput id="rule-year-min" value={draft.year_min || ""} onChange={(e) => set({ year_min: e.target.value })} placeholder="2020" /></Field>
+          <Field label="Year to" htmlFor="rule-year-max"><AdminInput id="rule-year-max" value={draft.year_max || ""} onChange={(e) => set({ year_max: e.target.value })} placeholder="2026" /></Field>
         </div>
-        <Field label="Makes (comma-separated, blank for all)"><AdminInput value={draft.makes?.join(", ") || ""} onChange={(e) => set({ makes: list(e.target.value) })} /></Field>
-        <Field label="Models (comma-separated, blank for all)"><AdminInput value={draft.models?.join(", ") || ""} onChange={(e) => set({ models: list(e.target.value) })} /></Field>
-        <Field label="Trims (comma-separated, blank for all)"><AdminInput value={draft.trims?.join(", ") || ""} onChange={(e) => set({ trims: list(e.target.value) })} /></Field>
-        <Field label="Body styles (comma-separated, blank for all)"><AdminInput value={draft.body_styles?.join(", ") || ""} onChange={(e) => set({ body_styles: list(e.target.value) })} /></Field>
+        <Field label="Makes (comma-separated, blank for all)" htmlFor="rule-makes"><AdminInput id="rule-makes" value={draft.makes?.join(", ") || ""} onChange={(e) => set({ makes: list(e.target.value) })} /></Field>
+        <Field label="Models (comma-separated, blank for all)" htmlFor="rule-models"><AdminInput id="rule-models" value={draft.models?.join(", ") || ""} onChange={(e) => set({ models: list(e.target.value) })} /></Field>
+        <Field label="Trims (comma-separated, blank for all)" htmlFor="rule-trims"><AdminInput id="rule-trims" value={draft.trims?.join(", ") || ""} onChange={(e) => set({ trims: list(e.target.value) })} /></Field>
+        <Field label="Body styles (comma-separated, blank for all)" htmlFor="rule-body-styles"><AdminInput id="rule-body-styles" value={draft.body_styles?.join(", ") || ""} onChange={(e) => set({ body_styles: list(e.target.value) })} /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Condition">
-            <AdminSelect value={draft.condition || "all"} onChange={(e) => set({ condition: e.target.value as ProductRule["condition"] })}>
+          <Field label="Condition" htmlFor="rule-condition">
+            <AdminSelect id="rule-condition" value={draft.condition || "all"} onChange={(e) => set({ condition: e.target.value as ProductRule["condition"] })}>
               <option value="all">All</option>
               <option value="new">New only</option>
               <option value="used">Used only</option>
             </AdminSelect>
           </Field>
-          <Field label="Maximum mileage (0 for no limit)"><AdminInput type="number" min={0} value={draft.mileage_max || 0} onChange={(e) => set({ mileage_max: parseInt(e.target.value) || 0 })} /></Field>
+          <Field label="Maximum mileage (0 for no limit)" htmlFor="rule-mileage-max"><AdminInput id="rule-mileage-max" type="number" min={0} value={draft.mileage_max || 0} onChange={(e) => set({ mileage_max: parseInt(e.target.value) || 0 })} /></Field>
         </div>
         <div className="flex gap-2 pt-2">
           <AdminButton className="flex-1" onClick={onCancel}>Cancel</AdminButton>
