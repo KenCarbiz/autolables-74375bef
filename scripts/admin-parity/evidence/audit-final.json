@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-28T19:39:36.288Z",
-  "baseUrl": "http://localhost:5192",
+  "generatedAt": "2026-10-28T20:19:40.395Z",
+  "baseUrl": "http://127.0.0.1:5192",
   "screens": {
     "10": {
       "desktop": {
@@ -10407,7 +10407,18 @@
             "decorative": true
           }
         ],
-        "images": [],
+        "images": [
+          {
+            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
+            "alt": "",
+            "imgBackground": "rgba(0, 0, 0, 0)",
+            "imgPadding": "0px",
+            "parentBackground": "rgb(244, 247, 251)",
+            "parentPadding": "0px",
+            "w": 40,
+            "h": 20
+          }
+        ],
         "disabledNoSemantics": [],
         "selected": [],
         "errors": [],
@@ -10538,7 +10549,18 @@
             "decorative": true
           }
         ],
-        "images": [],
+        "images": [
+          {
+            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
+            "alt": "",
+            "imgBackground": "rgba(0, 0, 0, 0)",
+            "imgPadding": "0px",
+            "parentBackground": "rgb(244, 247, 251)",
+            "parentPadding": "0px",
+            "w": 40,
+            "h": 20
+          }
+        ],
         "disabledNoSemantics": [],
         "selected": [],
         "errors": []
@@ -10663,7 +10685,18 @@
             "decorative": true
           }
         ],
-        "images": [],
+        "images": [
+          {
+            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
+            "alt": "",
+            "imgBackground": "rgba(0, 0, 0, 0)",
+            "imgPadding": "0px",
+            "parentBackground": "rgb(244, 247, 251)",
+            "parentPadding": "0px",
+            "w": 40,
+            "h": 20
+          }
+        ],
         "disabledNoSemantics": [],
         "selected": [],
         "errors": []
@@ -10788,7 +10821,18 @@
             "decorative": true
           }
         ],
-        "images": [],
+        "images": [
+          {
+            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
+            "alt": "",
+            "imgBackground": "rgba(0, 0, 0, 0)",
+            "imgPadding": "0px",
+            "parentBackground": "rgb(244, 247, 251)",
+            "parentPadding": "0px",
+            "w": 40,
+            "h": 20
+          }
+        ],
         "disabledNoSemantics": [],
         "selected": [],
         "errors": []
@@ -10913,7 +10957,18 @@
             "decorative": true
           }
         ],
-        "images": [],
+        "images": [
+          {
+            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
+            "alt": "",
+            "imgBackground": "rgba(0, 0, 0, 0)",
+            "imgPadding": "0px",
+            "parentBackground": "rgb(244, 247, 251)",
+            "parentPadding": "0px",
+            "w": 40,
+            "h": 20
+          }
+        ],
         "disabledNoSemantics": [],
         "selected": [],
         "under44": [
@@ -11372,8 +11427,8 @@
           }
         ],
         "errors": [
-          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
-          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
         ]
       },
       "tablet-landscape": {
@@ -11590,8 +11645,8 @@
           }
         ],
         "errors": [
-          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
-          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
         ]
       },
       "tablet-portrait": {
@@ -11808,8 +11863,8 @@
           }
         ],
         "errors": [
-          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
-          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
         ]
       },
       "phone": {
@@ -12612,14 +12667,7 @@
       "laptop": {
         "overflowX": 0,
         "clipped": [],
-        "overlaps": [
-          {
-            "a": "button[role=switch] \"\"",
-            "b": "button \"Review changes\"",
-            "w": 36,
-            "h": 13
-          }
-        ],
+        "overlaps": [],
         "headings": [
           "H1: Administration",
           "H2: Contact & Routing",

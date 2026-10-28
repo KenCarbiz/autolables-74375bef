@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T19:37:02.767Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-28T20:17:13.313Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -289,15 +289,15 @@ Masks (7): expected impact counts (fixture inventory sizes); example vehicle nam
 
 ## Screen 07
 
-Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 88.36% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 87.58% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 89.36% | 67.80% | 88.45% | 63.63% | 92.16% (+64px) | 74.90% | 97.19% | 73.90% | 3.08% |
-| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 89.06% | 69.18% | 88.36% | 65.53% | n/a | n/a | n/a | n/a | 3.04% |
+| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 88.87% | 66.91% | 87.83% | 62.48% | 91.92% (+42px) | 73.67% | 97.07% | 73.81% | 3.08% |
+| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 88.45% | 67.16% | 87.58% | 62.93% | n/a | n/a | n/a | n/a | 3.04% |
 
 Rail stand-in: 242px (the mock's rail width); content region starts at x=245.
-Body anchor (pinned in landmarks.json): reference y=228, capture y=292 (title block offset +64px).
+Body anchor (pinned in landmarks.json): reference y=228, capture y=270 (title block offset +42px).
 Diff image: `scripts/admin-parity/out/07-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/07-1586x992.png` and `scripts/admin-parity/evidence/07-1586x992-diff.png`.
 
@@ -305,15 +305,15 @@ Masks (6): sample vehicle names and mileage (fixture vehicles); product price (f
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
-| childTabs | within tolerance | x=267 yBody=-44 w=1295 h=44 | x=266 y=248 yBody=-44 w=1296 h=44 | x-1 w+1 h+0 yBody+0 |
-| rulesCard | within tolerance | x=267 yBody=19 w=701 h=668 | x=266 y=312 yBody=20 w=698 h=670 | x-1 w-3 h+2 yBody+1 |
-| rulesBox | within tolerance | x=290 yBody=103 w=655 h=289 | x=288 y=397 yBody=105 w=656 h=291 | x-2 w+1 h+2 yBody+2 |
-| priceBox | within tolerance | x=290 yBody=411 w=655 h=260 | x=288 y=704 yBody=412 w=656 h=261 | x-2 w+1 h+1 yBody+1 |
-| evidenceCard | within tolerance | x=981 yBody=19 w=581 h=358 | x=979 y=312 yBody=20 w=583 h=358 | x-2 w+2 h+0 yBody+1 |
-| evidenceList | within tolerance | x=999 yBody=103 w=544 h=259 | x=997 y=397 yBody=105 w=547 h=257 | x-2 w+3 h-2 yBody+2 |
-| samplesCard | within tolerance | x=981 yBody=388 w=581 h=299 | x=979 y=681 yBody=389 w=583 h=298 | x-2 w+2 h-1 yBody+1 |
-| samplesTable | within tolerance | x=996 yBody=472 w=556 h=197 | x=996 y=765 yBody=473 w=558 h=197 | x+0 w+2 h+0 yBody+1 |
-| reviewButton | within tolerance | x=1408 yBody=706 w=155 h=42 | x=1406 y=998 yBody=706 w=156 h=42 | x-2 w+1 h+0 yBody+0 |
+| childTabs | within tolerance | x=267 yBody=-44 w=1295 h=44 | x=266 y=226 yBody=-44 w=1296 h=44 | x-1 w+1 h+0 yBody+0 |
+| rulesCard | within tolerance | x=267 yBody=19 w=701 h=668 | x=266 y=290 yBody=20 w=698 h=670 | x-1 w-3 h+2 yBody+1 |
+| rulesBox | within tolerance | x=290 yBody=103 w=655 h=289 | x=288 y=375 yBody=105 w=656 h=291 | x-2 w+1 h+2 yBody+2 |
+| priceBox | within tolerance | x=290 yBody=411 w=655 h=260 | x=288 y=682 yBody=412 w=656 h=261 | x-2 w+1 h+1 yBody+1 |
+| evidenceCard | within tolerance | x=981 yBody=19 w=581 h=358 | x=979 y=290 yBody=20 w=583 h=358 | x-2 w+2 h+0 yBody+1 |
+| evidenceList | within tolerance | x=999 yBody=103 w=544 h=259 | x=997 y=375 yBody=105 w=547 h=257 | x-2 w+3 h-2 yBody+2 |
+| samplesCard | within tolerance | x=981 yBody=388 w=581 h=299 | x=979 y=659 yBody=389 w=583 h=298 | x-2 w+2 h-1 yBody+1 |
+| samplesTable | within tolerance | x=996 yBody=472 w=556 h=197 | x=996 y=743 yBody=473 w=558 h=197 | x+0 w+2 h+0 yBody+1 |
+| reviewButton | within tolerance | x=1408 yBody=706 w=155 h=42 | x=1406 y=976 yBody=706 w=156 h=42 | x-2 w+1 h+0 yBody+0 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
@@ -335,12 +335,12 @@ Masks (6): sample vehicle names and mileage (fixture vehicles); product price (f
 
 ## Screen 08
 
-Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 89.46% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 89.66% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/08-1586x992.png` | 92.52% | 74.69% | 91.88% | 72.70% | 90.35% (-5px) | 66.52% | 95.70% | 64.05% | 0.27% |
-| 1600x1000 | `scripts/admin-parity/out/08-1600x1000.png` | 90.42% | 69.76% | 89.46% | 66.79% | n/a | n/a | n/a | n/a | 0.26% |
+| 1586x992 | `scripts/admin-parity/out/08-1586x992.png` | 92.72% | 75.28% | 92.12% | 73.45% | 90.53% (-5px) | 67.27% | 95.84% | 65.41% | 0.27% |
+| 1600x1000 | `scripts/admin-parity/out/08-1600x1000.png` | 90.58% | 70.50% | 89.66% | 67.73% | n/a | n/a | n/a | n/a | 0.26% |
 
 Rail stand-in: 237px (the mock's rail width); content region starts at x=240.
 Section row bottom: reference y=172, capture y=167 (title block offset -5px).
@@ -362,7 +362,7 @@ Masks (1): mock-only annotation (handoff footer caption, not product UI).
 | readinessList | within tolerance | x=919 yBody=197 w=628 h=213 | x=914 y=368 yBody=201 w=635 h=213 | x-5 w+7 h+0 yBody+4 |
 | escalationLink | within tolerance | x=919 yBody=421 w=232 h=36 | x=914 y=592 yBody=425 w=232 h=36 | x-5 w+0 h+0 yBody+4 |
 | responseCard | within tolerance | x=906 yBody=486 w=654 h=245 | x=901 y=657 yBody=490 w=661 h=245 | x-5 w+7 h+0 yBody+4 |
-| primaryAction | within tolerance | x=1409 y=925 w=149 h=36 | x=1413 y=940 yBody=773 w=149 h=36 | x+4 y+15 w+0 h+0 |
+| primaryAction | within tolerance | x=1409 y=925 w=149 h=36 | x=1413 y=925 yBody=758 w=149 h=36 | x+4 y+0 w+0 h+0 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
