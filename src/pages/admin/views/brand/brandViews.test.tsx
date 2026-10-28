@@ -205,6 +205,46 @@ describe("Identity in live mode", () => {
     expect((screen.getByLabelText("Dealership name") as HTMLInputElement).value).toBe("Example Motors Changed");
   });
 
+  it("returns to clean, with Review disabled, when an edit is typed back to the saved value", () => {
+    renderLive(IdentityView);
+    const city = screen.getByLabelText("City");
+    fireEvent.change(city, { target: { value: "Another City" } });
+    expect(screen.getByText("Unsaved changes")).toBeTruthy();
+    expect(reviewButton()).toHaveProperty("disabled", false);
+    fireEvent.change(city, { target: { value: "Example City" } });
+    expect(screen.getByText("No changes pending")).toBeTruthy();
+    expect(reviewButton()).toHaveProperty("disabled", true);
+    expect(screen.queryByRole("button", { name: "Discard" })).toBeNull();
+  });
+
+  it("applies only the fields still changed when several are edited and one is reverted", async () => {
+    renderLive(IdentityView);
+    fireEvent.change(screen.getByLabelText("Dealership name"), { target: { value: "Example Motors Renamed" } });
+    fireEvent.change(screen.getByLabelText("City"), { target: { value: "Another City" } });
+    fireEvent.change(screen.getByLabelText("State"), { target: { value: "NY" } });
+    fireEvent.change(screen.getByLabelText("Dealership name"), { target: { value: "Example Motors" } });
+    expect(screen.getByText("2 fields changed. Review to apply them.")).toBeTruthy();
+    fireEvent.click(reviewButton());
+    const panel = screen.getByLabelText("Changes to apply");
+    expect(within(panel).queryByText("Dealership name")).toBeNull();
+    await act(async () => { fireEvent.click(applyButton()); });
+    await waitFor(() => expect(h.ctx.updateSettings).toHaveBeenCalledTimes(1));
+    expect(h.ctx.updateSettings).toHaveBeenCalledWith({ dealer_city: "Another City", dealer_state: "NY" });
+  });
+
+  it("discards a multi-field draft back to every saved value without writing", () => {
+    renderLive(IdentityView);
+    fireEvent.change(screen.getByLabelText("City"), { target: { value: "Another City" } });
+    fireEvent.change(screen.getByLabelText("State"), { target: { value: "NY" } });
+    fireEvent.click(reviewButton());
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(screen.queryByLabelText("Changes to apply")).toBeNull();
+    expect((screen.getByLabelText("City") as HTMLInputElement).value).toBe("Example City");
+    expect((screen.getByLabelText("State") as HTMLSelectElement).value).toBe("CT");
+    expect(reviewButton()).toHaveProperty("disabled", true);
+    expect(h.ctx.updateSettings).not.toHaveBeenCalled();
+  });
+
   it("re-baselines the draft when the settings load again for a tenant", () => {
     const view = renderLive(IdentityView);
     fireEvent.change(screen.getByLabelText("Dealership name"), { target: { value: "Example Motors Changed" } });

@@ -98,6 +98,78 @@ describe("PriceRulesView with the 05 fixture", () => {
   });
 });
 
+describe("PriceRulesView fee draft against live settings", () => {
+  const review = () => screen.getByRole("button", { name: "Review changes" });
+
+  it("keeps Review changes disabled until the draft differs from the saved policy, including after a change back", () => {
+    renderView(null as never);
+    expect(review()).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(review()).toBeDisabled();
+    const amount = screen.getByLabelText("Document fee");
+    expect(amount).toHaveValue(895);
+    fireEvent.change(amount, { target: { value: "925" } });
+    expect(review()).toBeEnabled();
+    expect(screen.getByText("Draft changes are reviewed before anything is applied.")).toBeInTheDocument();
+    fireEvent.change(amount, { target: { value: "895" } });
+    expect(review()).toBeDisabled();
+    expect(screen.getByText("No pending changes")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Jurisdiction"), { target: { value: "NY" } });
+    expect(review()).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("Jurisdiction"), { target: { value: "CT" } });
+    expect(review()).toBeDisabled();
+    expect(writeCalls()).toEqual([]);
+  });
+
+  it("keeps Review changes disabled for a negative, empty or jurisdiction-less draft and says why", () => {
+    renderView(null as never);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const amount = screen.getByLabelText("Document fee");
+
+    fireEvent.change(amount, { target: { value: "-5" } });
+    expect(screen.getByText("The fee cannot be negative.")).toBeInTheDocument();
+    expect(screen.getByText("Fix the draft before reviewing.")).toBeInTheDocument();
+    expect(review()).toBeDisabled();
+
+    fireEvent.change(amount, { target: { value: "" } });
+    expect(screen.getByText("Enter a dollar amount.")).toBeInTheDocument();
+    expect(review()).toBeDisabled();
+
+    fireEvent.change(amount, { target: { value: "925" } });
+    fireEvent.change(screen.getByLabelText("Jurisdiction"), { target: { value: "" } });
+    expect(screen.getByText("Choose the jurisdiction the fee is charged in.")).toBeInTheDocument();
+    expect(review()).toBeDisabled();
+
+    fireEvent.click(review());
+    expect(screen.queryByTestId("location")).toBeNull();
+    expect(settingsState.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("routes a valid draft and the chosen scope to the fee review child without writing", () => {
+    renderView(null as never);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Document fee"), { target: { value: "925.50" } });
+    fireEvent.change(screen.getByLabelText("Change scope"), { target: { value: "all" } });
+    fireEvent.click(review());
+    expect(screen.getByTestId("location")).toHaveTextContent("/admin/pricing/fee-review?enabled=1&amount=925.5&state=CT&scope=all");
+    expect(settingsState.updateSettings).not.toHaveBeenCalled();
+    expect(writeCalls()).toEqual([]);
+  });
+
+  it("discards the draft back to the saved policy", () => {
+    renderView(null as never);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Document fee"), { target: { value: "925" } });
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(screen.queryByLabelText("Document fee")).toBeNull();
+    expect(screen.getByText("$895")).toBeInTheDocument();
+    expect(review()).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByLabelText("Document fee")).toHaveValue(895);
+    expect(writeCalls()).toEqual([]);
+  });
+});
+
 describe("PriceRulesView against live data", () => {
   it("reports Unavailable and Unknown when the reads fail, and issues no write", async () => {
     spyResponses.tables.vehicle_listings = { data: null, count: null, error: { message: "read failed" } };

@@ -165,6 +165,90 @@ describe("ApprovalRulesView", () => {
     expect(mocks.updateSettings).not.toHaveBeenCalled();
   });
 
+  it("opens editing for the document whose Edit is pressed, and selecting a row alone does not edit", async () => {
+    renderView();
+    await screen.findByText("Needs setup");
+    expect(screen.queryByText(/^Rules for /)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Window sticker rules" }));
+    expect(screen.getByRole("heading", { name: "Window sticker approval" })).toBeInTheDocument();
+    expect(screen.getByText("Rules for window sticker")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Track QR scans" })).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Require manager approval before sending an addendum packet" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    expect(screen.getByRole("heading", { name: "Addendum approval" })).toBeInTheDocument();
+    expect(screen.getByText("Rules for addendum")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Require manager approval before sending an addendum packet" })).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Track QR scans" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByText(/^Rules for /)).toBeNull();
+
+    const table = screen.getByRole("table", { name: "Approval rules by document" });
+    fireEvent.click(within(table).getByText("Buyers Guide"));
+    expect(screen.getByRole("heading", { name: "Buyers Guide approval" })).toBeInTheDocument();
+    expect(screen.queryByText(/^Rules for /)).toBeNull();
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("enables review only for a real change: toggling a rule back clears the pending change", async () => {
+    renderView();
+    await screen.findByText("Needs setup");
+    const reviewButton = () => screen.getByRole("button", { name: "Review policy changes" });
+    expect(reviewButton()).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    const sw = screen.getByRole("switch", { name: "Require manager approval before printing" });
+    fireEvent.click(sw);
+    expect(reviewButton()).toBeEnabled();
+    expect(screen.getByText("Pending review")).toBeInTheDocument();
+    fireEvent.click(sw);
+    expect(reviewButton()).toBeDisabled();
+    expect(screen.getByText("None")).toBeInTheDocument();
+    expect(screen.getByText("No changes pending")).toBeInTheDocument();
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("keeps the pending change when the review is cancelled, without writing", async () => {
+    renderView();
+    await screen.findByText("Needs setup");
+    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Require manager approval before printing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review policy changes" }));
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Apply" })).toBeEnabled());
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByText("Pending review")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Require manager approval before printing" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: "Review policy changes" })).toBeEnabled();
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
+    expect(mocks.log).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["resolves false", () => mocks.updateSettings.mockResolvedValue(false)],
+    ["throws", () => mocks.updateSettings.mockRejectedValue(new Error("network down"))],
+  ])("shows Not applied and records nothing when the save %s", async (_label, arrange) => {
+    arrange();
+    renderView();
+    await screen.findByText("Needs setup");
+    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Require manager approval before printing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review policy changes" }));
+    const dialog = await screen.findByRole("dialog");
+    const apply = within(dialog).getByRole("button", { name: "Apply" });
+    await waitFor(() => expect(apply).toBeEnabled());
+    fireEvent.click(apply);
+    expect(await within(dialog).findByText("Not applied")).toBeInTheDocument();
+    expect(within(dialog).getByText("The server did not accept the change. Nothing was written.")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Applied")).toBeNull();
+    expect(mocks.log).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByText("Pending review")).toBeInTheDocument();
+  });
+
   it("lets a salesperson read the rules but not change them", () => {
     mocks.role = "salesperson";
     renderView(readOnlyFixture());

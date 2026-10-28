@@ -148,6 +148,52 @@ describe("FeeReviewPage against live data without the server contracts", () => {
     expect(settingsState.updateSettings).not.toHaveBeenCalled();
   });
 
+  it("returns to Price rules from Cancel on the edit step without any write or RPC", () => {
+    renderPage("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active", null);
+    const cancel = within(dialog()).getByRole("link", { name: "Cancel" });
+    expect(cancel).toHaveAttribute("href", "/admin?tab=price-rules");
+    fireEvent.click(cancel);
+    expect(screen.getByText("price rules page")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Review document fee change" })).toBeNull();
+    expect(writeCalls()).toEqual([]);
+    expect(rpcCalls()).toEqual([]);
+    expect(settingsState.updateSettings).not.toHaveBeenCalled();
+    expect(auditState.log).not.toHaveBeenCalled();
+  });
+
+  it("closes from the close button and from Escape without any write", () => {
+    const first = renderPage("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active", null);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Close review" }));
+    expect(screen.getByText("price rules page")).toBeInTheDocument();
+    first.unmount();
+
+    renderPage("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active", null);
+    fireEvent.keyDown(dialog(), { key: "Escape" });
+    expect(screen.getByText("price rules page")).toBeInTheDocument();
+    expect(writeCalls()).toEqual([]);
+    expect(settingsState.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("goes back from the review step to the edit step keeping the draft, and applies nothing", async () => {
+    spyResponses.tables.vehicle_listings = { data: listingRows, count: 3, error: null };
+    spyResponses.tables.dealer_profiles = { data: { updated_at: "2026-10-20T00:00:00Z" }, error: null };
+    renderPage("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active", null);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Review changes" }));
+    await within(dialog()).findByRole("button", { name: "Apply to 3 active vehicles" });
+
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Back to edit" }));
+    expect(within(dialog()).queryByRole("button", { name: /^Apply to/ })).toBeNull();
+    expect(within(dialog()).getByLabelText("Document fee")).toHaveValue(925);
+    expect(within(dialog()).getByRole("button", { name: "Review changes" })).toBeEnabled();
+    expect(within(dialog()).getByRole("link", { name: "Cancel" })).toBeInTheDocument();
+
+    expect(rpcCalls()).not.toContain("recalc_tenant_doc_fee");
+    expect(rpcCalls()).not.toContain("admin_doc_fee_change_apply");
+    expect(writeCalls().filter((c) => c.kind === "table")).toEqual([]);
+    expect(settingsState.updateSettings).not.toHaveBeenCalled();
+    expect(auditState.log).not.toHaveBeenCalled();
+  });
+
   it("keeps a salesperson from applying even with a computed impact", async () => {
     roleState.role = "salesperson";
     spyResponses.tables.vehicle_listings = { data: listingRows, count: 3, error: null };

@@ -16,14 +16,34 @@ export interface SpyResponse {
   count?: number | null;
 }
 
+/** One link of a table chain, in call order: `select`, `eq`, `maybeSingle`, ... */
+export interface SpyOp {
+  op: string;
+  args: unknown[];
+}
+
+/**
+ * A table response, or a function of the chain that asked for it, for a table
+ * a screen reads in more than one shape (a single head row and a page of rows).
+ */
+export type SpyTableResponse = SpyResponse | ((ops: SpyOp[]) => SpyResponse);
+
 export const spyCalls: SpyCall[] = [];
-export const spyResponses: { tables: Record<string, SpyResponse>; rpcs: Record<string, SpyResponse> } = { tables: {}, rpcs: {} };
+export const spyResponses: {
+  tables: Record<string, SpyTableResponse>;
+  rpcs: Record<string, SpyResponse>;
+  functions: Record<string, SpyResponse>;
+} = { tables: {}, rpcs: {}, functions: {} };
 
 export const resetSupabaseSpy = (): void => {
   spyCalls.length = 0;
   spyResponses.tables = {};
   spyResponses.rpcs = {};
+  spyResponses.functions = {};
 };
+
+/** True when the chain ended in a single-row read. */
+export const isSingleRead = (ops: SpyOp[]): boolean => ops.some((o) => o.op === "maybeSingle" || o.op === "single");
 
 const WRITE_OPS = new Set(["insert", "update", "upsert", "delete"]);
 
@@ -57,11 +77,20 @@ const thenable = (resolveWith: () => SpyResponse, record: (op: string, args: unk
 };
 
 export const supabaseSpy = {
-  from: (table: string) =>
-    thenable(
-      () => spyResponses.tables[table] ?? { data: null, error: null, count: null },
-      (op, args) => spyCalls.push({ kind: "table", table, op, args }),
-    ),
+  from: (table: string) => {
+    const ops: SpyOp[] = [];
+    return thenable(
+      () => {
+        const r = spyResponses.tables[table];
+        if (typeof r === "function") return r(ops);
+        return r ?? { data: null, error: null, count: null };
+      },
+      (op, args) => {
+        ops.push({ op, args });
+        spyCalls.push({ kind: "table", table, op, args });
+      },
+    );
+  },
   rpc: (fn: string, args?: unknown) => {
     spyCalls.push({ kind: "rpc", fn, args });
     return thenable(() => spyResponses.rpcs[fn] ?? missingFunction(fn), () => undefined);
@@ -75,7 +104,8 @@ export const supabaseSpy = {
   functions: {
     invoke: async (fn: string, args?: unknown) => {
       spyCalls.push({ kind: "function", fn, args });
-      return { data: null, error: null };
+      const r = spyResponses.functions[fn];
+      return { data: r?.data ?? null, error: r?.error ?? null };
     },
   },
 };

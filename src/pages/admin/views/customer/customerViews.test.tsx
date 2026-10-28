@@ -142,6 +142,76 @@ describe("RoutingView (screen 08)", () => {
   });
 });
 
+describe("RoutingView draft against live settings", () => {
+  const review = () => screen.getByRole("button", { name: "Review changes" });
+  const smart = () => screen.getByRole("switch", { name: "Smart routing" });
+
+  it("marks an edit as a draft in the Draft configuration bar and Discard restores the saved values", () => {
+    renderWith(<RoutingView />, null);
+    expect(screen.getByText("Draft configuration")).toBeInTheDocument();
+    expect(screen.getByText(/^No pending changes\./)).toBeInTheDocument();
+    expect(review()).toBeDisabled();
+    expect(smart()).toBeChecked();
+
+    fireEvent.click(smart());
+    expect(smart()).not.toBeChecked();
+    expect(screen.getByText("1 setting changed. Review before applying.")).toBeInTheDocument();
+    expect(review()).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(smart()).toBeChecked();
+    expect(screen.getByText(/^No pending changes\./)).toBeInTheDocument();
+    expect(review()).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Discard" })).toBeNull();
+    expect(h.updateSettings).not.toHaveBeenCalled();
+    expect(h.writes).toEqual([]);
+  });
+
+  it("drops back to no pending changes when an edit is reverted by hand", () => {
+    renderWith(<RoutingView />, null);
+    fireEvent.click(smart());
+    expect(review()).toBeEnabled();
+    fireEvent.click(smart());
+    expect(review()).toBeDisabled();
+    expect(screen.getByText(/^No pending changes\./)).toBeInTheDocument();
+  });
+
+  it("keeps the draft and shows the failure in the review and the bar when the save is refused", async () => {
+    h.updateSettings.mockResolvedValueOnce(false);
+    renderWith(<RoutingView />, null);
+    fireEvent.click(smart());
+    fireEvent.click(review());
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply changes" }));
+    await waitFor(() => expect(h.updateSettings).toHaveBeenCalledTimes(1));
+    expect(await within(dialog).findByText("Not applied.")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Done" })).toBeNull();
+    expect(within(dialog).queryByText("Applied.")).toBeNull();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const bar = screen.getByText("Draft configuration").parentElement as HTMLElement;
+    expect(within(bar).getByText("The change was not saved. Nothing was applied.")).toBeInTheDocument();
+    expect(smart()).not.toBeChecked();
+    expect(review()).toBeEnabled();
+  });
+
+  it("closes the review on Cancel without writing and keeps the draft", () => {
+    renderWith(<RoutingView />, null);
+    fireEvent.click(smart());
+    fireEvent.click(review());
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    expect(smart()).not.toBeChecked();
+    expect(screen.getByText("1 setting changed. Review before applying.")).toBeInTheDocument();
+    expect(h.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("links Review escalation rules to the escalation child page", () => {
+    renderWith(<RoutingView />, null);
+    expect(screen.getByRole("link", { name: "Review escalation rules" })).toHaveAttribute("href", "/admin/customer-experience/escalation");
+  });
+});
+
 describe("Passport modules, Calls to action and Customer previews", () => {
   it("render the rehomed panels without writing", async () => {
     renderWith(<PassportModulesView />);

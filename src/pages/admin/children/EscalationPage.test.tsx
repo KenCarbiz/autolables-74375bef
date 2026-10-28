@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ReactElement } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AdminFixtureProvider, type AdminFixture } from "@/lib/admin/dataSource";
@@ -58,10 +58,29 @@ const renderWith = (ui: ReactElement, fixture: AdminFixture = FIXTURE_09.fixture
   );
 
 beforeEach(() => {
-  h.updateSettings.mockClear();
+  h.updateSettings.mockReset();
+  h.updateSettings.mockResolvedValue(true);
   h.writes.length = 0;
   h.invoked.length = 0;
+  h.settings.passport_contact_routing = {};
 });
+
+const renderLive = () =>
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <EscalationPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+
+const CONFIGURED_ROUTING = {
+  contactMode: "smart_routing",
+  dealershipDefaultContact: { salesPhone: "860 555 0100", salesEmail: "" },
+  bdcSettings: { enabled: true, showBdcAsTeam: true, bdcEmail: "bdc@example.test" },
+  managerFallback: { enabled: true, managerEmail: "manager@example.test" },
+  escalationRules: { enabled: true, firstResponseSlaMinutes: 5, escalateToBdcAfterMinutes: 5, escalateToManagerAfterMinutes: 10, notifyMethods: ["email"] },
+};
 
 describe("EscalationPage (screen 09)", () => {
   it("shows destination-required states, keeps review disabled until complete, and reads activity in the sender's vocabulary", () => {
@@ -114,5 +133,103 @@ describe("EscalationPage (screen 09)", () => {
     expect(h.invoked).toEqual([]);
     expect(h.updateSettings).not.toHaveBeenCalled();
     expect(h.writes).toEqual([]);
+  });
+});
+
+describe("EscalationPage draft against live settings (screen 09)", () => {
+  beforeEach(() => {
+    h.settings.passport_contact_routing = CONFIGURED_ROUTING;
+  });
+
+  const review = () => screen.getByRole("button", { name: "Review changes" });
+  const managerAfter = () => screen.getByLabelText("Escalate to manager after") as HTMLSelectElement;
+
+  it("keeps Review changes disabled until the rules change, and again after a change back", () => {
+    renderLive();
+    expect(screen.queryAllByText("Destination required")).toHaveLength(0);
+    expect(review()).toBeDisabled();
+    expect(screen.getByText("No changes to review.")).toBeInTheDocument();
+    expect(screen.queryByText("Keep draft")).toBeNull();
+
+    fireEvent.change(managerAfter(), { target: { value: "15" } });
+    expect(review()).toBeEnabled();
+    expect(screen.getByText("Keep draft")).toBeInTheDocument();
+    expect(screen.getByText("Draft")).toBeInTheDocument();
+    expect(screen.getByText("Nothing is written until you review and apply.")).toBeInTheDocument();
+
+    fireEvent.change(managerAfter(), { target: { value: "10" } });
+    expect(review()).toBeDisabled();
+    expect(screen.queryByText("Keep draft")).toBeNull();
+    expect(h.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("blocks review with a visible message while a destination email is invalid", () => {
+    renderLive();
+    fireEvent.click(screen.getByRole("button", { name: "Change BDC email" }));
+    const email = screen.getByLabelText("BDC email");
+    fireEvent.change(email, { target: { value: "bdc@" } });
+    expect(screen.getByText("Complete all required fields to review your changes.")).toBeInTheDocument();
+    expect(review()).toBeDisabled();
+    fireEvent.click(review());
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.change(email, { target: { value: "desk@example.test" } });
+    expect(screen.queryByText("Complete all required fields to review your changes.")).toBeNull();
+    expect(screen.getByText("Nothing is written until you review and apply.")).toBeInTheDocument();
+    expect(review()).toBeEnabled();
+    expect(h.updateSettings).not.toHaveBeenCalled();
+    expect(h.writes).toEqual([]);
+  });
+
+  it("keeps the draft when the review is cancelled, and Discard restores the saved rules", async () => {
+    renderLive();
+    fireEvent.change(managerAfter(), { target: { value: "15" } });
+    fireEvent.click(review());
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Review escalation changes")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(managerAfter().value).toBe("15");
+    expect(screen.getByText("Keep draft")).toBeInTheDocument();
+    expect(review()).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(managerAfter().value).toBe("10");
+    expect(screen.queryByText("Keep draft")).toBeNull();
+    expect(review()).toBeDisabled();
+    expect(h.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("saves the reviewed rules through updateSettings only on Apply", async () => {
+    renderLive();
+    fireEvent.change(managerAfter(), { target: { value: "15" } });
+    fireEvent.click(review());
+    const dialog = screen.getByRole("dialog");
+    expect(h.updateSettings).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply changes" }));
+    await waitFor(() => expect(h.updateSettings).toHaveBeenCalledTimes(1));
+    const patch = h.updateSettings.mock.calls[0][0] as { passport_contact_routing: { escalationRules: { escalateToManagerAfterMinutes: number }; bdcSettings: { bdcEmail: string } } };
+    expect(Object.keys(patch).sort()).toEqual(["passport_agents", "passport_contact_routing"]);
+    expect(patch.passport_contact_routing.escalationRules.escalateToManagerAfterMinutes).toBe(15);
+    expect(patch.passport_contact_routing.bdcSettings.bdcEmail).toBe("bdc@example.test");
+    expect(await within(dialog).findByRole("button", { name: "Done" })).toBeInTheDocument();
+    expect(h.invoked).toEqual([]);
+  });
+
+  it("shows a refused save as Not applied and keeps the draft for another try", async () => {
+    h.updateSettings.mockResolvedValueOnce(false);
+    renderLive();
+    fireEvent.change(managerAfter(), { target: { value: "15" } });
+    fireEvent.click(review());
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply changes" }));
+    expect(await within(dialog).findByText("Not applied.")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("The change was not saved. Nothing was applied.").length).toBeGreaterThan(0);
+    expect(within(dialog).queryByRole("button", { name: "Done" })).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(managerAfter().value).toBe("15");
+    expect(screen.getByText("Keep draft")).toBeInTheDocument();
+    expect(review()).toBeEnabled();
   });
 });

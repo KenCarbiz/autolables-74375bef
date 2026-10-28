@@ -127,6 +127,69 @@ describe("MemberRolePage", () => {
     expect(logMock.mock.calls[0][0]).toMatchObject({ action: "settings_updated", entity_type: "tenant_member_role", entity_id: SALES, details: { prev_role: "salesperson", new_role: "sales_manager", reason: "Promoted after review" } });
   });
 
+  it("reaches Apply only after a real role change: an unchanged or changed-back draft is refused at review", async () => {
+    rpcMock.mockResolvedValue({ data: liveRows(), error: null });
+    renderPage(`/admin/people/${SALES}`, false);
+    await screen.findByRole("heading", { level: 1, name: "Salesperson role" });
+    fireEvent.click(screen.getByText("Review policy changes"));
+    const select = (await screen.findByLabelText("New role")) as HTMLSelectElement;
+    expect(select.value).toBe("salesperson");
+
+    fireEvent.click(screen.getByText("Review change"));
+    expect(screen.getByText("Choose a different role.")).toBeTruthy();
+    expect(screen.queryByText("Apply change")).toBeNull();
+
+    fireEvent.change(select, { target: { value: "sales_manager" } });
+    fireEvent.change(select, { target: { value: "salesperson" } });
+    fireEvent.click(screen.getByText("Review change"));
+    expect(screen.getByText("Choose a different role.")).toBeTruthy();
+    expect(screen.queryByText("Apply change")).toBeNull();
+
+    fireEvent.change(select, { target: { value: "sales_manager" } });
+    fireEvent.click(screen.getByText("Review change"));
+    expect(await screen.findByText("Apply change")).toBeTruthy();
+    expect(screen.queryByText("Choose a different role.")).toBeNull();
+    expect(rpcMock.mock.calls.map((c) => c[0])).toEqual(["list_tenant_members"]);
+  });
+
+  it("discards the role draft on Cancel, so reopening starts from the saved role", async () => {
+    rpcMock.mockResolvedValue({ data: liveRows(), error: null });
+    renderPage(`/admin/people/${SALES}`, false);
+    await screen.findByRole("heading", { level: 1, name: "Salesperson role" });
+    fireEvent.click(screen.getByText("Review policy changes"));
+    fireEvent.change(await screen.findByLabelText("New role"), { target: { value: "sales_manager" } });
+    fireEvent.click(screen.getByText("Cancel"));
+    await waitFor(() => expect(screen.queryByLabelText("New role")).toBeNull());
+
+    fireEvent.click(screen.getByText("Review policy changes"));
+    expect(((await screen.findByLabelText("New role")) as HTMLSelectElement).value).toBe("salesperson");
+    expect(rpcMock.mock.calls.some((c) => c[0] === "set_tenant_member_role")).toBe(false);
+    expect(logMock).not.toHaveBeenCalled();
+  });
+
+  it("shows a refused write as Not applied and never claims the role was updated", async () => {
+    rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === "list_tenant_members") return { data: liveRows(), error: null };
+      if (fn === "set_tenant_member_role") return { data: null, error: { message: "permission denied for function set_tenant_member_role" } };
+      return { data: null, error: { message: `unexpected ${fn}` } };
+    });
+    renderPage(`/admin/people/${SALES}`, false);
+    await screen.findByRole("heading", { level: 1, name: "Salesperson role" });
+    fireEvent.click(screen.getByText("Review policy changes"));
+    fireEvent.change(await screen.findByLabelText("New role"), { target: { value: "sales_manager" } });
+    fireEvent.click(screen.getByText("Review change"));
+    fireEvent.change(await screen.findByLabelText("Reason (optional)"), { target: { value: "Promoted" } });
+    fireEvent.click(screen.getByText("Apply change"));
+
+    expect(await screen.findByText("Not applied")).toBeTruthy();
+    expect(screen.getByText("Only an owner, admin or general manager can change the team.")).toBeTruthy();
+    expect(rpcMock).toHaveBeenCalledWith("set_tenant_member_role", { p_member_id: SALES, p_role: "sales_manager" });
+    expect(screen.queryByText("Role updated.")).toBeNull();
+    expect(screen.queryByText("Applied")).toBeNull();
+    expect(screen.getByText("Policy draft")).toBeTruthy();
+    expect(logMock).not.toHaveBeenCalled();
+  });
+
   it("refuses to apply when the role changed since the review was opened", async () => {
     let reads = 0;
     rpcMock.mockImplementation(async (fn: string) => {

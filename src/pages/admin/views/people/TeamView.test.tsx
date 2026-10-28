@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AdminFixtureProvider } from "@/lib/admin/dataSource";
 import { FIXTURE_03 } from "@/pages/admin/fixtures/people";
@@ -27,6 +27,37 @@ const renderTeam = (entry: string, withFixture = true) => {
     </QueryClientProvider>
   );
   return render(withFixture ? <AdminFixtureProvider fixture={FIXTURE_03}>{tree}</AdminFixtureProvider> : tree);
+};
+
+const LIVE_MEMBERS = [
+  { id: "m1", user_id: "u1", email: "example.gm@example.test", role: "general_manager", accepted_at: "2026-09-01T00:00:00Z", invited_email: null },
+  { id: "m2", user_id: "u2", email: "example.sales@example.test", role: "salesperson", accepted_at: "2026-09-02T00:00:00Z", invited_email: null },
+];
+
+const LocationEcho = () => {
+  const loc = useLocation();
+  return <p data-testid="location">{loc.pathname + loc.search}</p>;
+};
+
+/** The row's selection button, not its actions menu. */
+const rowButton = (scope: HTMLElement, email: string): HTMLElement => {
+  const hit = within(scope).getAllByRole("button").find((b) => b.hasAttribute("aria-pressed") && b.textContent?.includes(email));
+  if (!hit) throw new Error(`No row button for ${email}`);
+  return hit;
+};
+
+const renderRouted = (entry: string) => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[entry]}>
+        <Routes>
+          <Route path="/admin" element={<TeamView />} />
+          <Route path="/admin/people/:memberId" element={<LocationEcho />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
 };
 
 beforeEach(() => {
@@ -87,6 +118,60 @@ describe("TeamView", () => {
     expect(screen.queryByText("No teammates yet")).toBeNull();
     expect(rpcMock).toHaveBeenCalledTimes(1);
     expect(rpcMock).toHaveBeenCalledWith("list_tenant_members", { p_tenant_id: "tenant-example" });
+  });
+
+  it("opens the role summary for the member whose row is selected, and moves it when another row is selected", async () => {
+    rpcMock.mockResolvedValue({ data: LIVE_MEMBERS, error: null });
+    renderTeam("/admin?tab=team", false);
+    const table = await screen.findByRole("table", { name: "Team members" });
+    expect(screen.queryByRole("complementary", { name: "Role summary" })).toBeNull();
+
+    const salesButton = rowButton(table, "example.sales@example.test");
+    fireEvent.click(salesButton);
+    expect(salesButton).toHaveAttribute("aria-pressed", "true");
+    let rail = screen.getByRole("complementary", { name: "Role summary" });
+    expect(within(rail).getByText("example.sales@example.test")).toBeTruthy();
+    expect(within(rail).getByText("Salesperson")).toBeTruthy();
+
+    fireEvent.click(rowButton(table, "example.gm@example.test"));
+    rail = screen.getByRole("complementary", { name: "Role summary" });
+    expect(within(rail).getByText("example.gm@example.test")).toBeTruthy();
+    expect(within(rail).queryByText("example.sales@example.test")).toBeNull();
+    expect(salesButton).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(within(rail).getByRole("button", { name: "Close role summary" }));
+    expect(screen.queryByRole("complementary", { name: "Role summary" })).toBeNull();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(logMock).not.toHaveBeenCalled();
+  });
+
+  it("links the selected member's role policy to /admin/people/<id> and navigates there", async () => {
+    rpcMock.mockResolvedValue({ data: LIVE_MEMBERS, error: null });
+    renderRouted("/admin?tab=team&dept=Sales");
+    fireEvent.click(rowButton(await screen.findByRole("table", { name: "Team members" }), "example.sales@example.test"));
+    const link = within(screen.getByRole("complementary", { name: "Role summary" })).getByRole("link", { name: "View role policy" });
+    const href = link.getAttribute("href") ?? "";
+    expect(href.startsWith("/admin/people/m2?")).toBe(true);
+    const params = new URLSearchParams(href.split("?")[1]);
+    expect(params.get("from")).toBe("team");
+    expect(params.get("sel")).toBe("m2");
+    expect(params.get("dept")).toBe("Sales");
+    fireEvent.click(link);
+    expect(screen.getByTestId("location").textContent).toBe(href);
+    expect(rpcMock.mock.calls.every((c) => c[0] === "list_tenant_members")).toBe(true);
+  });
+
+  it("recovers from a failed read: Retry re-issues the read and the team appears", async () => {
+    rpcMock.mockResolvedValueOnce({ data: null, error: { message: "statement timeout" } }).mockResolvedValue({ data: LIVE_MEMBERS, error: null });
+    renderTeam("/admin?tab=team", false);
+    await screen.findByText("The team could not be read for this rooftop.");
+    expect(screen.getByText("statement timeout")).toBeTruthy();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("example.gm@example.test")).toBeTruthy();
+    expect(screen.queryByText("The team could not be read for this rooftop.")).toBeNull();
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    expect(rpcMock).toHaveBeenNthCalledWith(2, "list_tenant_members", { p_tenant_id: "tenant-example" });
   });
 
   it("renders live members, including a pending invitation, and shows the empty filter state without clearing the team", async () => {
