@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChartNoAxesColumn, ChevronUp, CircleCheck, CircleX, Clock, CodeXml, FileText, Info, TriangleAlert, Wrench, Zap } from "lucide-react";
+import { ArrowLeft, ChartNoAxesColumn, Check, ChevronUp, CircleCheck, CircleX, Clock, CodeXml, Copy, FileText, Info, TriangleAlert, Wrench, Zap } from "lucide-react";
 import { useViewFixture, useAdminNow } from "@/lib/admin/dataSource";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { describeAge, RUN_OUTCOME_META, type HealthTone } from "@/lib/admin/health";
@@ -9,7 +9,7 @@ import { buildRunTimeline, diagnosisFor, httpReason, inventoryWrites, nextStepFo
 import { formatTime, zoneLabel } from "@/lib/admin/integrations/format";
 import { loadLastSuccessAt, loadRun } from "@/lib/admin/integrations/queries";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
-import { AdminButton, AdminCard, AdminLinkButton, AdminTable, EmptyState, InlineNote, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminCard, AdminLinkButton, AdminTable, EmptyState, ICON, InlineNote, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
 import { useFormatAt, useViewer } from "@/pages/admin/views/integrations/common";
 import { cn } from "@/lib/utils";
 
@@ -146,6 +146,7 @@ export default function SyncRunPage() {
   const zone = zoneLabel(viewer.timeZone, now);
   const DiagnosisIcon = DIAGNOSIS_ICON[diagnosis.tone];
   const BadgeIcon = DIAGNOSIS_ICON[badgeTone];
+  const evidenceText = JSON.stringify(summary, null, 2);
 
   return (
     <ChildPageFrame section="integrations"
@@ -161,7 +162,7 @@ export default function SyncRunPage() {
     >
       <div>
         <AdminCard id="run-summary" flush>
-          <dl className="grid grid-cols-2 xl:grid-cols-[324fr_317fr_323fr_340fr]">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[324fr_317fr_323fr_340fr]">
             <SummaryCell label="HTTP status" value={run.http_status === null ? "—" : String(run.http_status)} hint={httpReason(run.http_status) ?? "No response recorded"} />
             <SummaryCell label="Source" value={host ?? "Unknown"} hint="Inventory feed" text mask="host" />
             <SummaryCell label="Inventory writes" value={writes === null ? "Unknown" : String(writes)} hint="New, updated, or retired" />
@@ -189,8 +190,8 @@ export default function SyncRunPage() {
                 <p className="mt-1.5 text-[14px] leading-[22px] text-adm-ink">{next.detail}</p>
               </div>
             </div>
-            <div className="mt-[14px] grid grid-cols-[1.18fr_1fr] xl:grid-cols-[259px_minmax(0,1fr)] divide-x divide-[#C5D4F7] border-t border-[#C5D4F7] pt-[10px]">
-              <div className="min-w-0 pr-6">
+            <div className="mt-[14px] grid grid-cols-1 sm:grid-cols-[1.18fr_1fr] xl:grid-cols-[259px_minmax(0,1fr)] divide-y sm:divide-y-0 sm:divide-x divide-[#C5D4F7] border-t border-[#C5D4F7] pt-[10px]">
+              <div className="min-w-0 pb-2.5 sm:pb-0 sm:pr-6">
                 <p className="text-[14px] leading-[20px] text-adm-muted">Last successful run</p>
                 {data.lastSuccessAt ? (
                   <p data-parity="timestamp" className="mt-0.5 text-[16px] leading-[22px] font-semibold text-adm-ink" title={describeAge(data.lastSuccessAt, now)}>{formatAt(data.lastSuccessAt, { withYear: true, withZone: true })}</p>
@@ -198,7 +199,7 @@ export default function SyncRunPage() {
                   <p className="mt-0.5 text-[16px] leading-[22px] font-semibold text-adm-muted">None recorded</p>
                 )}
               </div>
-              <div className="min-w-0 pl-8">
+              <div className="min-w-0 pt-2.5 sm:pt-0 sm:pl-8">
                 <p className="text-[14px] leading-[20px] text-adm-muted">Existing identity</p>
                 <p className="mt-[2px] text-[16px] leading-[22px] font-semibold text-adm-ink">{pinRetained ? "Retained" : "Unknown"}</p>
                 <p className="text-[13px] leading-[16px] text-adm-muted">{pinRetained ? "Rooftop pin remains unchanged" : "Not recorded for this run"}</p>
@@ -215,8 +216,23 @@ export default function SyncRunPage() {
                 <h3 className={CARD_TITLE}>Event timeline</h3>
               </div>
               <div className={INSET_RULE} aria-hidden="true" />
+              {/* Below md the three columns would wrap every cell, so each event is a stacked card there instead. */}
+              <ol className="md:hidden mx-5 divide-y divide-adm-border" aria-label="Run event timeline">
+                {timeline.map((ev, i) => (
+                  <li key={`${ev.label}-${i}`} className="flex items-start gap-3 py-3">
+                    <EventIcon tone={ev.tone} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{ev.label}</p>
+                      <p className="text-[13px] leading-[18px] tabular-nums text-adm-muted">
+                        {ev.at ? <time dateTime={ev.at} data-parity="timestamp">{formatTime(ev.at, viewer.timeZone)}{zone ? ` ${zone}` : ""}</time> : "Time not recorded"}
+                      </p>
+                      <p className="mt-1 text-[13px] leading-[19px] text-adm-ink [overflow-wrap:anywhere]">{ev.detail}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
               {/* Row heights follow the reference rhythm (32, 45 and 51px, then a 55px last row); they are minimums, so longer copy still grows. */}
-              <AdminTable caption="Run event timeline" className="mx-5 xl:[&_table]:table-fixed [&_tbody_tr:first-child]:h-[31px] [&_tbody_tr:nth-child(2)]:h-[45px] [&_tbody_tr:nth-child(3)]:h-[51px] [&_tbody_tr:last-child]:h-[55px] [&_tbody_tr:last-child>td]:border-b-0">
+              <AdminTable caption="Run event timeline" className="hidden md:block mx-5 xl:[&_table]:table-fixed [&_tbody_tr:first-child]:h-[31px] [&_tbody_tr:nth-child(2)]:h-[45px] [&_tbody_tr:nth-child(3)]:h-[51px] [&_tbody_tr:last-child]:h-[55px] [&_tbody_tr:last-child>td]:border-b-0">
                 <colgroup>
                   <col className="w-[114px]" />
                   <col className="w-[231px]" />
@@ -247,20 +263,22 @@ export default function SyncRunPage() {
             </AdminCard>
 
             <AdminCard id="run-evidence" flush>
-              <details open>
+              {/* The copy control stays outside the summary so it is not nested inside the toggle; from sm it sits in the corner of the evidence block, beside the short opening lines. */}
+              <details open className="group">
                 <summary className="flex cursor-pointer list-none items-center gap-[15px] pl-[17px] pr-[22px] pt-[7px] pb-[7px] [&::-webkit-details-marker]:hidden">
                   <CodeXml className="w-6 h-6 flex-shrink-0 text-adm-ink" aria-hidden="true" />
                   <h3 className={cn(CARD_TITLE, "flex-1")}>Technical evidence</h3>
-                  <ChevronUp className="w-[22px] h-[22px] text-adm-ink" aria-hidden="true" />
+                  <ChevronUp className="w-[22px] h-[22px] text-adm-ink transition-transform rotate-180 group-open:rotate-0" aria-hidden="true" />
                 </summary>
-                <div className="px-5 pb-[4px]">
-                  <pre data-parity="evidence" className="overflow-auto rounded-md bg-adm-workspace px-[18px] py-1.5 font-mono text-[12px] leading-[13px] text-adm-ink">{JSON.stringify(summary, null, 2)}</pre>
+                <div className="relative px-5 pb-[4px]">
+                  <CopyButton text={evidenceText} label="Copy technical evidence" className="flex w-fit ml-auto mb-1.5 sm:absolute sm:m-0 sm:right-[26px] sm:top-[3px] sm:bg-adm-workspace" />
+                  <pre data-parity="evidence" className="whitespace-pre-wrap [overflow-wrap:anywhere] rounded-md bg-adm-workspace px-3 sm:px-[18px] py-1.5 font-mono text-[12px] leading-[18px] sm:leading-[13px] text-adm-ink">{evidenceText}</pre>
                 </div>
               </details>
             </AdminCard>
             <details className="px-1">
               <summary className="cursor-pointer text-[12px] leading-[18px] font-semibold text-adm-primary">Full redacted payload</summary>
-              <pre data-parity="evidence" className="mt-2 max-h-80 overflow-auto rounded-md border border-adm-border bg-adm-surface p-3 font-mono text-[12px] leading-[18px] text-adm-ink">{JSON.stringify(evidence, null, 2)}</pre>
+              <pre data-parity="evidence" tabIndex={0} role="region" aria-label="Full redacted payload" className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-md border border-adm-border bg-adm-surface p-3 font-mono text-[12px] leading-[18px] text-adm-ink">{JSON.stringify(evidence, null, 2)}</pre>
               <p className="mt-2 text-[11px] text-adm-muted">Credential-like fields are removed before display. Run id {run.id}.</p>
             </details>
 
@@ -341,12 +359,32 @@ export default function SyncRunPage() {
 }
 
 const SummaryCell = ({ label, value, hint, text = false, mask }: { label: string; value: string; hint: string; text?: boolean; mask?: string }) => (
-  <div className="relative min-w-0 pl-[32px] first:pl-[26px] pr-5 pt-[15px] pb-[19px] before:absolute before:left-0 before:inset-y-[17px] before:w-px before:bg-adm-border before:hidden [&:nth-child(even)]:before:block xl:[&:nth-child(3)]:before:block">
+  <div className="relative min-w-0 px-5 sm:pl-[32px] sm:first:pl-[26px] sm:pr-5 pt-[15px] pb-[19px] border-t border-adm-border first:border-t-0 sm:border-t-0 before:absolute before:left-0 before:inset-y-[17px] before:w-px before:bg-adm-border before:hidden sm:[&:nth-child(even)]:before:block xl:[&:nth-child(3)]:before:block">
     <dt className="text-[14px] leading-[20px] font-semibold text-adm-muted">{label}</dt>
     <dd data-parity={mask} className={cn("mt-[5px] break-words font-bold text-adm-ink", text ? "text-[25px] leading-[33px]" : "text-[28px] leading-[33px] tabular-nums")}>{value}</dd>
     <dd className="text-[14px] leading-[20px] text-adm-muted">{hint}</dd>
   </div>
 );
+
+/** Copies exactly the text already shown on the page; nothing hidden is added. */
+const CopyButton = ({ text, label, className }: { text: string; label: string; className?: string }) => {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+    window.setTimeout(() => setState("idle"), 2000);
+  };
+  return (
+    <button type="button" onClick={() => void copy()} aria-label={label} className={cn("inline-flex h-[30px] items-center gap-1.5 rounded-md px-2 text-[13px] leading-[18px] font-semibold text-adm-primary hover:bg-adm-selected focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary", className)}>
+      {state === "copied" ? <Check className={ICON.button} aria-hidden="true" /> : <Copy className={ICON.button} aria-hidden="true" />}
+      <span aria-live="polite">{state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy"}</span>
+    </button>
+  );
+};
 
 // Filled marks lose a stroke width of visible fill, so the box is drawn larger than the mark it shows.
 const EventIcon = ({ tone }: { tone: HealthTone }) => {

@@ -91,6 +91,11 @@ describe("brand views render from the 02 fixture", () => {
     const table = screen.getByRole("table", { name: "Contact readiness" });
     const rows = within(table).getAllByRole("row").slice(1);
     expect(rows.map((r) => within(r).getAllByRole("cell")[2].textContent)).toEqual(["Incomplete", "Incomplete", "Ready"]);
+    const site = within(rows[2]).getAllByRole("link")[0];
+    expect(site.getAttribute("href")).toBe("https://www.example.test");
+    expect(site.getAttribute("title")).toBe("https://www.example.test");
+    expect(site.textContent).toContain("www.example.test");
+    expect(site.textContent).toContain("full address https://www.example.test");
     expect(screen.getByText("No changes pending")).toBeTruthy();
     expect(reviewButton()).toHaveProperty("disabled", true);
     expect(screen.getByText("Branding for this rooftop.")).toBeTruthy();

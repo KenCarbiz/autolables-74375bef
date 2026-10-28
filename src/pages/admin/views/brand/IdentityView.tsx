@@ -14,7 +14,8 @@ import { AppearanceCard, CARD_HEADER, CardDescription, CardTitle, ContactReadine
 // child tabs so the cards start 82px below the section row; a 530px right
 // column with a 14px gutter once the left column can hold the palette and the
 // row fields (from 1540px; one column below); the identity form on a 52.5px
-// row pitch beside a 226px logo column behind a divider.
+// row pitch beside a 226px logo column behind a divider (stacked under the
+// fields below lg so neither is squeezed).
 
 const STATE_OPTIONS = [{ value: "", label: "Select a state" }, ...US_STATES.map((s) => ({ value: s.code, label: s.name }))];
 
@@ -66,7 +67,7 @@ export default function IdentityView() {
       <div className="grid grid-cols-1 min-[1540px]:grid-cols-[minmax(0,1fr)_530px] gap-[14px] items-start">
         <div className="space-y-4">
           <AdminCard title={<CardTitle>Store identity</CardTitle>} description={<CardDescription>Basic information about this dealership. This appears across AutoLabels.</CardDescription>} headerClassName={`${CARD_HEADER} pl-[26px]`} bodyClassName="pt-[23px] pl-[26px]">
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_226px] gap-y-6 md:gap-x-[22px]">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_226px] gap-y-6 lg:gap-x-[22px]">
               <div className="space-y-[15.5px]">
                 <TextField id="brand-name" label="Dealership name" value={draft.dealer_name} onChange={(v) => set("dealer_name", v)} error={nameError} autoComplete="organization" />
                 <RowField label="Group" htmlFor="brand-group">
@@ -83,7 +84,7 @@ export default function IdentityView() {
                   <SelectControl id="brand-timezone" value={draft.dealer_timezone || ""} options={zoneOptions} onChange={(v) => set("dealer_timezone", v)} />
                 </RowField>
               </div>
-              <div className="md:border-l md:border-adm-border md:pl-[22px]">
+              <div className="border-t border-adm-border pt-6 lg:border-t-0 lg:pt-0 lg:border-l lg:pl-[22px]">
                 <LogoField
                   logoUrl={draft.dealer_logo_url}
                   uploading={uploading}

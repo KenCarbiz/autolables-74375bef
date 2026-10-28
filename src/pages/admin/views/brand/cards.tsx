@@ -21,9 +21,10 @@ export const CARD_HEADER = "pt-4";
 
 export const HeaderPreviewCard = ({ preview, draftDiffers }: { preview: HeaderPreview; draftDiffers: boolean }) => (
   <AdminCard title={<CardTitle>Dealer header preview</CardTitle>} description={<CardDescription>How this dealership appears in AutoLabels.</CardDescription>} headerClassName={`${CARD_HEADER} px-[22px]`} bodyClassName="px-[22px]">
-    <div className="mt-[10px] rounded-[10px] bg-adm-sidebar px-[36px] min-h-[98px] flex items-center gap-[22px]" aria-label="Application header preview">
+    {/* Narrow cards stack the wordmark over the name so the name keeps whole words on a line. */}
+    <div className="mt-[10px] rounded-[10px] bg-adm-sidebar px-5 py-4 sm:px-[36px] sm:py-0 min-h-[98px] flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-[22px]" aria-label="Application header preview">
       <img src={wordmarkReverse} alt="AutoLabels" className="h-[21px] w-auto flex-shrink-0" />
-      <span className="h-10 w-px bg-white/25 flex-shrink-0" aria-hidden="true" />
+      <span className="h-px w-10 sm:h-10 sm:w-px bg-white/25 flex-shrink-0" aria-hidden="true" />
       <div className="min-w-0 text-white">
         <p className="text-[18px] leading-[24px] font-semibold break-words" data-parity="dealer-identity">{preview.name || "Dealership name"}</p>
         <p className="text-[13px] leading-[18px] text-white/80 break-words" data-parity="dealer-identity">{preview.location || "City, State"}</p>
@@ -40,17 +41,38 @@ export const HeaderPreviewCard = ({ preview, draftDiffers }: { preview: HeaderPr
   </AdminCard>
 );
 
+/** A web address without its scheme, with break points after dots and slashes so it wraps at a part boundary, never mid-word. */
+const urlLabel = (url: string): ReactNode => {
+  const bare = url.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+  const parts = bare.match(/[^./]*[./]?/g)?.filter(Boolean) ?? [bare];
+  if (parts.length > 1 && /^www\.$/i.test(parts[0])) parts.splice(0, 2, parts[0] + parts[1]);
+  return parts.map((part, i) => (i === 0 ? part : <span key={i}><wbr />{part}</span>));
+};
+
+const ReadinessValue = ({ row }: { row: ReadinessRow }) => {
+  if (row.state !== "ready" || !row.href) return <Link to={row.editHref} className="text-adm-danger hover:underline">{row.value}</Link>;
+  if (row.key !== "website") return <a href={row.href} className="text-adm-primary hover:underline [overflow-wrap:anywhere]">{row.value}</a>;
+  return (
+    <a href={row.href} target="_blank" rel="noreferrer" title={row.value} className="text-adm-primary hover:underline break-words" data-parity="dealer-identity">
+      {urlLabel(row.value)}
+      <span className="sr-only">{` (full address ${row.value}, opens in a new tab)`}</span>
+      <ExternalLink className={cn(ICON.inline, "ml-2 inline-block align-[-4px]")} aria-hidden="true" />
+    </a>
+  );
+};
+
 // Reference table: 37px header, 42px rows and a 49px last row, the text 2px above centre,
-// pill chips left-aligned under Status.
+// pill chips left-aligned under Status. Below sm the value moves under its contact type
+// so it keeps the width the Value column would have squeezed.
 export const ContactReadinessCard = ({ rows }: { rows: ReadinessRow[] }) => (
   <AdminCard title={<CardTitle>Contact readiness</CardTitle>} description={<CardDescription>Key dealership contact details used in customer-facing content.</CardDescription>} headerClassName={`${CARD_HEADER} px-[22px]`} bodyClassName="px-[22px] pt-5 pb-[25px]">
     <div className="rounded-md border border-adm-border overflow-hidden">
       <AdminTable caption="Contact readiness" className="[&_tbody_tr:last-child>td]:border-b-0">
         <thead>
           <tr>
-            <Th className="w-[24.7%] px-[15px] py-[9px] text-adm-ink">Contact type</Th>
-            <Th className="w-[50.8%] px-[15px] py-[9px] text-adm-ink">Value</Th>
-            <Th className="w-[24.5%] px-[15px] py-[9px] text-adm-ink">Status</Th>
+            <Th className="sm:w-[24.7%] px-3 sm:px-[15px] py-[9px] text-adm-ink">Contact type<span className="sm:hidden"> and value</span></Th>
+            <Th className="hidden sm:table-cell w-[50.8%] px-[15px] py-[9px] text-adm-ink">Value</Th>
+            <Th className="w-[1%] sm:w-[24.5%] px-3 sm:px-[15px] py-[9px] text-adm-ink">Status</Th>
           </tr>
         </thead>
         <tbody>
@@ -59,18 +81,12 @@ export const ContactReadinessCard = ({ rows }: { rows: ReadinessRow[] }) => (
             const text = last ? "pt-[11.5px] pb-[17.5px]" : "pt-2 pb-[13px]";
             return (
               <tr key={r.key}>
-                <Td className={cn("px-[15px] whitespace-nowrap", text)}>{r.label}</Td>
-                <Td className={cn("px-[15px]", text)}>
-                  {r.state === "ready" && r.href ? (
-                    <a href={r.href} target={r.key === "website" ? "_blank" : undefined} rel={r.key === "website" ? "noreferrer" : undefined} className="inline-flex items-center gap-2 text-adm-primary hover:underline break-all" data-parity={r.key === "website" ? "dealer-identity" : undefined}>
-                      {r.value}
-                      {r.key === "website" && <ExternalLink className={cn(ICON.inline, "flex-shrink-0")} aria-hidden="true" />}
-                    </a>
-                  ) : (
-                    <Link to={r.editHref} className="text-adm-danger hover:underline">{r.value}</Link>
-                  )}
+                <Td className={cn("px-3 sm:px-[15px] sm:whitespace-nowrap", text)}>
+                  <span className="whitespace-nowrap">{r.label}</span>
+                  <span className="mt-0.5 block sm:hidden"><ReadinessValue row={r} /></span>
                 </Td>
-                <Td className={cn("px-[15px]", last ? "py-[10.5px]" : "py-[6.5px]")}>
+                <Td className={cn("hidden sm:table-cell px-[15px]", text)}><ReadinessValue row={r} /></Td>
+                <Td className={cn("px-3 sm:px-[15px]", last ? "py-[10.5px]" : "py-[6.5px]")}>
                   <StatusChip tone={r.state === "ready" ? "success" : "danger"} className="rounded-full px-2.5 py-[5px]">{r.state === "ready" ? "Ready" : "Incomplete"}</StatusChip>
                 </Td>
               </tr>

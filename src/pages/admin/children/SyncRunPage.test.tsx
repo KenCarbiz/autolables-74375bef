@@ -58,6 +58,24 @@ describe("SyncRunPage for a provider rate limit (screen 13)", () => {
     expect(document.body.textContent).toContain(RUN_RATE_LIMITED.id);
   });
 
+  it("lists the timeline as stacked event cards for narrow screens and copies only the displayed evidence", async () => {
+    const writeText = vi.fn(async (_text: string) => undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderInFixture(<SyncRunPage />, { "sync-run": fixture }, { route: `/admin/integrations/runs/${RUN_RATE_LIMITED.id}`, path: PATH });
+    const cards = within(screen.getByRole("list", { name: "Run event timeline" })).getAllByRole("listitem");
+    expect(cards).toHaveLength(4);
+    expect(cards[1].textContent).toContain("Provider returned 429");
+    expect(cards[1].querySelector("time")?.getAttribute("dateTime")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Copy technical evidence" }));
+    await screen.findByText("Copied");
+    const copied = String(writeText.mock.calls[0]?.[0] ?? "");
+    const shown = Array.from(document.querySelectorAll("pre")).map((el) => el.textContent ?? "");
+    expect(shown).toContain(copied);
+    expect(copied).toContain('"reason": "provider_rate_limited"');
+    expect(copied).not.toContain("secret-value");
+    expect(copied).not.toContain("api_key");
+  });
+
   it("explains retry options without starting a run", () => {
     renderInFixture(<SyncRunPage />, { "sync-run": fixture }, { route: `/admin/integrations/runs/${RUN_RATE_LIMITED.id}`, path: PATH });
     for (const link of screen.getAllByRole("link", { name: "Back to feed" })) expect(link).toHaveAttribute("href", "/admin?tab=inventory-feed");
