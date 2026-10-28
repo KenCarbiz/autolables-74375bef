@@ -1,11 +1,11 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T20:17:13.313Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-28T21:33:20.227Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
-- Reference frame: 1586x992, the size the mocks were cropped to. Rendered and compared pixel for pixel as a diagnostic; it is not the agreed metric.
-- Protocol frame: 1600x1000. This is the agreed comparison frame (`docs/05_VISUAL_PARITY_97_PROTOCOL.md`, `contracts/PARITY_TARGETS.csv`): the reference is resampled (bilinear) to it, captured at DPR 1 in Playwright Chromium, and its content-region parity is the number held to 97%.
+- Protocol v2 (agreed since 2026-10-28): the application is captured at the references' native 1586x992 viewport and compared pixel for pixel, neither image resized. Its content-region parity is the agreed number; acceptance is 95% per screen, 94.00-94.99% reviewable individually, below 94% not passed. Moving from v1 to v2 changes the measurement only; any difference between the two columns is not a code improvement.
+- Protocol v1 (historical, superseded 2026-10-28): 1600x1000 capture against the reference resampled bilinearly to that frame. Still computed and reported as a labelled column; the v1 contract and its results are preserved in `scripts/admin-parity/protocol-v1/`.
 - Pixel parity: a pixel differs when any channel moves by more than 32 of 255 after masks. Parity is 100 minus the differing share of compared pixels. No anti-aliasing allowance is applied.
 - Structure: mean SSIM over 8x8 luminance blocks after masks.
 - Masks: only dynamic data (counts, relative times, fixture names) listed in `scripts/admin-parity/masks.json`, read from the rendered DOM so the same boxes mask both images. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.
@@ -20,11 +20,11 @@ Registered fixtures: 10, 11, 12, 13, 01, 02, 03, 04, 05, 06, 07, 08, 09.
 
 ## Screen 01
 
-Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 89.83% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.99% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 92.98% | 79.20% | 92.99% | 78.59% | 92.81% (+0px) | 77.19% | 97.78% | 70.07% | 3.94% |
+| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 92.98% | 79.20% | 92.99% | 78.59% | 92.81% (+0px) | 77.18% | 97.78% | 70.07% | 3.94% |
 | 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.26% | 69.90% | 89.83% | 67.05% | n/a | n/a | n/a | n/a | 3.94% |
 
 Rail stand-in: 229px (the mock's rail width); content region starts at x=232.
@@ -50,9 +50,9 @@ Masks (14): summary tile counts; recent activity relative times; recent activity
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1851 | none | `scripts/admin-parity/out/01-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/01-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/01-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div | `scripts/admin-parity/out/01-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/01-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/01-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Ranked attention queue (scrolls sideways)] | `scripts/admin-parity/out/01-390x844.png` |
 
 ### Findings for screen 01
 
@@ -63,19 +63,19 @@ Masks (14): summary tile counts; recent activity relative times; recent activity
 
 ## Screen 02
 
-Reference: `scripts/admin-parity/reference/02-dealership-brand.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 87.38% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/02-dealership-brand.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 88.01% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/02-1586x992.png` | 88.83% | 69.02% | 88.00% | 64.99% | 92.72% (-38px) | 73.38% | 96.90% | 71.83% | 1.45% |
-| 1600x1000 | `scripts/admin-parity/out/02-1600x1000.png` | 88.13% | 69.30% | 87.38% | 65.35% | n/a | n/a | n/a | n/a | 1.42% |
+| 1586x992 | `scripts/admin-parity/out/02-1586x992.png` | 88.83% | 69.01% | 88.01% | 64.98% | 92.71% (-38px) | 73.33% | 96.93% | 72.23% | 1.34% |
+| 1600x1000 | `scripts/admin-parity/out/02-1600x1000.png` | 88.14% | 69.32% | 87.40% | 65.37% | n/a | n/a | n/a | n/a | 1.32% |
 
 Rail stand-in: 252px (the mock's rail width); content region starts at x=255.
 Section row bottom: reference y=205, capture y=167 (title block offset -38px).
 Diff image: `scripts/admin-parity/out/02-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/02-1586x992.png` and `scripts/admin-parity/evidence/02-1586x992-diff.png`.
 
-Masks (5): dealership name, location and website address (fixture dealer); mock-only annotation (handoff footer caption, not product UI); mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
+Masks (6): dealership name, location and website address (fixture dealer); mock-only annotation (handoff footer caption, not product UI); mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -87,16 +87,16 @@ Masks (5): dealership name, location and website address (fixture dealer); mock-
 | appearanceCard | within tolerance | x=277 yBody=490 w=742 h=202 | x=276 y=661 yBody=494 w=742 h=204 | x-1 w+0 h+2 yBody+4 |
 | previewCard | within tolerance | x=1032 yBody=82 w=528 h=295 | x=1032 y=253 yBody=86 w=530 h=294 | x+0 w+2 h-1 yBody+4 |
 | previewBlock | within tolerance | x=1055 yBody=176 w=483 h=100 | x=1055 y=347 yBody=180 w=484 h=98 | x+0 w+1 h-2 yBody+4 |
-| readinessCard | within tolerance | x=1032 yBody=394 w=528 h=284 | x=1032 y=565 yBody=398 w=530 h=286 | x+0 w+2 h+2 yBody+4 |
-| readinessTable | within tolerance | x=1056 yBody=482 w=482 h=170 | x=1056 y=654 yBody=487 w=482 h=170 | x+0 w+0 h+0 yBody+5 |
+| readinessCard | within tolerance | x=1032 yBody=394 w=528 h=284 | x=1032 y=565 yBody=398 w=530 h=287 | x+0 w+2 h+3 yBody+4 |
+| readinessTable | within tolerance | x=1056 yBody=482 w=482 h=170 | x=1056 y=654 yBody=487 w=482 h=171 | x+0 w+0 h+1 yBody+5 |
 | primaryAction | within tolerance | x=1390 yBody=703 w=171 h=42 | x=1388 y=877 yBody=710 w=172 h=42 | x-2 w+1 h+0 yBody+7 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1886 | none | `scripts/admin-parity/out/02-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1366 | nav[Administration sections] | `scripts/admin-parity/out/02-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1024 | nav[Administration sections] | `scripts/admin-parity/out/02-1024x768.png` |
-| 390x844 | none | 390 | 390 | 390 | nav[Administration sections], nav[Dealership & Brand views], div | `scripts/admin-parity/out/02-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1366 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/02-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1024 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/02-1024x768.png` |
+| 390x844 | none | 390 | 390 | 390 | div[Administration sections (scrolls sideways)], div[Dealership & Brand views (scrolls sideways)] | `scripts/admin-parity/out/02-390x844.png` |
 
 ### Findings for screen 02
 
@@ -107,12 +107,12 @@ Masks (5): dealership name, location and website address (fixture dealer); mock-
 
 ## Screen 03
 
-Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 90.64% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 90.70% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 91.66% | 74.11% | 90.70% | 71.42% | 92.58% (-50px) | 72.12% | 95.48% | 70.36% | 3.71% |
-| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 91.37% | 73.35% | 90.64% | 71.48% | n/a | n/a | n/a | n/a | 3.65% |
+| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 91.37% | 73.36% | 90.64% | 71.48% | n/a | n/a | n/a | n/a | 3.65% |
 
 Rail stand-in: 238px (the mock's rail width); content region starts at x=241.
 Section row bottom: reference y=217, capture y=167 (title block offset -50px).
@@ -136,9 +136,9 @@ Masks (8): member names in the table and the rail (fixture addresses); mock-only
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1855 | none | `scripts/admin-parity/out/03-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/03-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/03-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div | `scripts/admin-parity/out/03-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/03-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/03-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Team members (scrolls sideways)] | `scripts/admin-parity/out/03-390x844.png` |
 
 ### Findings for screen 03
 
@@ -151,7 +151,7 @@ Masks (8): member names in the table and the rail (fixture addresses); mock-only
 
 ## Screen 04
 
-Reference: `scripts/admin-parity/reference/04-salesperson-role-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 88.96% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/04-salesperson-role-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol v2 content parity 89.87% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -179,9 +179,9 @@ Masks (3): member address in the capabilities description (fixture); mock-only a
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1856 | none | `scripts/admin-parity/out/04-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections], div | `scripts/admin-parity/out/04-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/04-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div | `scripts/admin-parity/out/04-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)], div[Role capabilities by task (scrolls sideways)] | `scripts/admin-parity/out/04-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/04-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/04-390x844.png` |
 
 ### Findings for screen 04
 
@@ -193,19 +193,19 @@ Masks (3): member address in the capabilities description (fixture); mock-only a
 
 ## Screen 05
 
-Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 90.46% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 89.94% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 91.31% | 71.08% | 90.71% | 67.24% | 91.31% (+9px) | 67.95% | 96.69% | 63.34% | 6.28% |
-| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 90.86% | 70.54% | 90.46% | 66.85% | n/a | n/a | n/a | n/a | 6.31% |
+| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 90.71% | 69.79% | 89.94% | 65.57% | 90.46% (+9px) | 66.28% | 96.57% | 66.90% | 6.19% |
+| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 90.26% | 69.68% | 89.69% | 65.76% | n/a | n/a | n/a | n/a | 6.27% |
 
 Rail stand-in: 228px (the mock's rail width); content region starts at x=231.
 Section row bottom: reference y=158, capture y=167 (title block offset +9px).
 Diff image: `scripts/admin-parity/out/05-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/05-1586x992.png` and `scripts/admin-parity/evidence/05-1586x992-diff.png`.
 
-Masks (27): change impact counts (fixture inventory sizes); preview vehicle name, trim, stock and prices (fixture vehicle); preview vehicle photo: a per-vehicle image, like the name and prices beside it; the synthetic fixture vehicle has no photo, so a neutral 268x151 placeholder holds the reference's image box (geometry gated by the previewPhoto landmark); vehicle names, trims, stock numbers and per-vehicle prices (fixture vehicles); text only, so thumbnails, row geometry and the document fee column (policy data) are scored; vehicles-shown count; mock-only annotation (handoff footer caption, not product UI).
+Masks (29): change impact counts (fixture inventory sizes); preview vehicle name, trim, stock and prices (fixture vehicle); preview vehicle photo: a per-vehicle image, like the name and prices beside it; the synthetic fixture vehicle has no photo, so a neutral 268x151 placeholder holds the reference's image box (geometry gated by the previewPhoto landmark); vehicle names, trims, stock numbers and per-vehicle prices (fixture vehicles); text only, so thumbnails, row geometry and the document fee column (policy data) are scored; vehicles-shown count; mock-only annotation (handoff footer caption, not product UI).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -217,15 +217,15 @@ Masks (27): change impact counts (fixture inventory sizes); preview vehicle name
 | editButton | within tolerance | x=869 yBody=80 w=74 h=33 | x=868 y=255 yBody=88 w=75 h=32 | x-1 w+1 h-1 yBody+8 |
 | scopeSelect | within tolerance | x=366 yBody=361 w=252 h=32 | x=362 y=536 yBody=369 w=252 h=32 | x-4 w+0 h+0 yBody+8 |
 | reviewButton | within tolerance | x=795 yBody=406 w=146 h=32 | x=795 y=581 yBody=414 w=146 h=32 | x+0 w+0 h+0 yBody+8 |
-| consistencyCard | within tolerance | x=256 yBody=492 w=1306 | x=252 y=667 yBody=500 w=1310 h=312 | x-4 w+4 yBody+8 |
+| consistencyCard | within tolerance | x=256 yBody=492 w=1306 | x=252 y=667 yBody=500 w=1310 h=360 | x-4 w+4 yBody+8 |
 | consistencyTable | within tolerance | x=270 yBody=560 w=1278 | x=266 y=735 yBody=568 w=1282 h=190 | x-4 w+4 yBody+8 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1850 | none | `scripts/admin-parity/out/05-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/05-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections], div | `scripts/admin-parity/out/05-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Pricing & Products views], div | `scripts/admin-parity/out/05-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/05-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)], div[Price consistency by vehicle (scrolls sideways)] | `scripts/admin-parity/out/05-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Pricing & Products views (scrolls sideways)] | `scripts/admin-parity/out/05-390x844.png` |
 
 ### Findings for screen 05
 
@@ -240,12 +240,12 @@ Masks (27): change impact counts (fixture inventory sizes); preview vehicle name
 
 ## Screen 06
 
-Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 90.47% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 94.16% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 88.53% | 82.52% | 94.23% | 82.23% | 94.19% (+0px) | 82.13% | 98.19% | 84.42% | 4.12% |
-| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.47% | 73.69% | 90.47% | 71.16% | n/a | n/a | n/a | n/a | 4.05% |
+| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 88.48% | 82.32% | 94.16% | 81.96% | 94.11% (+0px) | 81.82% | 98.15% | 84.96% | 4.12% |
+| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.37% | 73.51% | 90.34% | 70.94% | n/a | n/a | n/a | n/a | 4.05% |
 
 Rail stand-in: 243px (the mock's rail width); content region starts at x=246.
 Body anchor (pinned in landmarks.json): reference y=187, capture y=187 (title block offset +0px).
@@ -271,9 +271,9 @@ Masks (7): expected impact counts (fixture inventory sizes); example vehicle nam
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1858 | none | `scripts/admin-parity/out/06-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/06-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections], div | `scripts/admin-parity/out/06-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Pricing & Products views], div | `scripts/admin-parity/out/06-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/06-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)], div[Price consistency by vehicle (scrolls sideways)] | `scripts/admin-parity/out/06-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Pricing & Products views (scrolls sideways)] | `scripts/admin-parity/out/06-390x844.png` |
 
 ### Findings for screen 06
 
@@ -289,11 +289,11 @@ Masks (7): expected impact counts (fixture inventory sizes); example vehicle nam
 
 ## Screen 07
 
-Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 87.58% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 87.83% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 88.87% | 66.91% | 87.83% | 62.48% | 91.92% (+42px) | 73.67% | 97.07% | 73.81% | 3.08% |
+| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 88.88% | 66.93% | 87.83% | 62.50% | 91.93% (+42px) | 73.68% | 97.08% | 73.81% | 3.08% |
 | 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 88.45% | 67.16% | 87.58% | 62.93% | n/a | n/a | n/a | n/a | 3.04% |
 
 Rail stand-in: 242px (the mock's rail width); content region starts at x=245.
@@ -318,9 +318,9 @@ Masks (6): sample vehicle names and mileage (fixture vehicles); product price (f
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1857 | none | `scripts/admin-parity/out/07-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections], div | `scripts/admin-parity/out/07-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/07-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Product views], div | `scripts/admin-parity/out/07-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)], div[Sample vehicle results (scrolls sideways)] | `scripts/admin-parity/out/07-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/07-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Product views (scrolls sideways)], div[Sample vehicle results (scrolls sideways)] | `scripts/admin-parity/out/07-390x844.png` |
 
 ### Findings for screen 07
 
@@ -335,7 +335,7 @@ Masks (6): sample vehicle names and mileage (fixture vehicles); product price (f
 
 ## Screen 08
 
-Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 89.66% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.12% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -367,9 +367,9 @@ Masks (1): mock-only annotation (handoff footer caption, not product UI).
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1879 | none | `scripts/admin-parity/out/08-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1366 | nav[Administration sections] | `scripts/admin-parity/out/08-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1024 | nav[Administration sections] | `scripts/admin-parity/out/08-1024x768.png` |
-| 390x844 | none | 390 | 390 | 390 | nav[Administration sections], nav[Customer Experience views] | `scripts/admin-parity/out/08-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1366 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/08-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1024 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/08-1024x768.png` |
+| 390x844 | none | 390 | 390 | 390 | div[Administration sections (scrolls sideways)], div[Customer Experience views (scrolls sideways)] | `scripts/admin-parity/out/08-390x844.png` |
 
 ### Findings for screen 08
 
@@ -380,7 +380,7 @@ Masks (1): mock-only annotation (handoff footer caption, not product UI).
 
 ## Screen 09
 
-Reference: `scripts/admin-parity/reference/09-escalation-delivery-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 85.60% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/09-escalation-delivery-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 86.53% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -412,9 +412,9 @@ Masks (10): request ids (fixture-generated activity text); rooftop names in the 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1845 | none | `scripts/admin-parity/out/09-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/09-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/09-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div | `scripts/admin-parity/out/09-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/09-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/09-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Escalation delivery activity (scrolls sideways)] | `scripts/admin-parity/out/09-390x844.png` |
 
 ### Findings for screen 09
 
@@ -425,7 +425,7 @@ Masks (10): request ids (fixture-generated activity text); rooftop names in the 
 
 ## Screen 10
 
-Reference: `scripts/admin-parity/reference/10-publishing-policy.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 86.76% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/10-publishing-policy.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol v2 content parity 89.53% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -457,9 +457,9 @@ Masks (3): rooftop name in the policy description (the fixture is synthetic); ac
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1865 | none | `scripts/admin-parity/out/10-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/10-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/10-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Publishing views], div | `scripts/admin-parity/out/10-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/10-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/10-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Publishing views (scrolls sideways)], div[Effective publishing policy by vehicle type (scrolls sideways)] | `scripts/admin-parity/out/10-390x844.png` |
 
 ### Findings for screen 10
 
@@ -470,7 +470,7 @@ Masks (3): rooftop name in the policy description (the fixture is synthetic); ac
 
 ## Screen 11
 
-Reference: `scripts/admin-parity/reference/11-documents-service.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 89.09% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/11-documents-service.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol v2 content parity 89.84% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -498,9 +498,9 @@ Masks (6): policy change provenance (relative time and fixture name); readiness 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1868 | none | `scripts/admin-parity/out/11-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections], div | `scripts/admin-parity/out/11-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/11-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Documents & Service views], div | `scripts/admin-parity/out/11-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)], div[Approval rules by document (scrolls sideways)] | `scripts/admin-parity/out/11-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/11-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Documents & Service views (scrolls sideways)], div[Approval rules by document (scrolls sideways)] | `scripts/admin-parity/out/11-390x844.png` |
 
 ### Findings for screen 11
 
@@ -511,11 +511,11 @@ Masks (6): policy change provenance (relative time and fixture name); readiness 
 
 ## Screen 12
 
-Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 90.50% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol v2 content parity 92.22% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/12-1586x992.png` | 92.29% | 75.60% | 92.22% | 72.57% | 92.00% (-7px) | 70.97% | 96.42% | 65.32% | 2.80% |
+| 1586x992 | `scripts/admin-parity/out/12-1586x992.png` | 92.29% | 75.60% | 92.22% | 72.57% | 92.00% (-7px) | 70.96% | 96.43% | 65.32% | 2.80% |
 | 1600x1000 | `scripts/admin-parity/out/12-1600x1000.png` | 90.76% | 72.23% | 90.50% | 68.69% | n/a | n/a | n/a | n/a | 2.77% |
 
 Rail stand-in: 243px (the mock's rail width); content region starts at x=246.
@@ -543,9 +543,9 @@ Masks (9): run timestamps (tile values and attempt times); fixture provider doma
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1858 | none | `scripts/admin-parity/out/12-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections], div | `scripts/admin-parity/out/12-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/12-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Integrations views], div | `scripts/admin-parity/out/12-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)], div[Recent inventory feed attempts (scrolls sideways)] | `scripts/admin-parity/out/12-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/12-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Integrations views (scrolls sideways)], div[Recent inventory feed attempts (scrolls sideways)] | `scripts/admin-parity/out/12-390x844.png` |
 
 ### Findings for screen 12
 
@@ -556,19 +556,19 @@ Masks (9): run timestamps (tile values and attempt times); fixture provider doma
 
 ## Screen 13
 
-Reference: `scripts/admin-parity/reference/13-sync-run-detail-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 87.26% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/13-sync-run-detail-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol v2 content parity 87.77% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/13-1586x992.png` | 88.77% | 67.22% | 87.80% | 63.13% | 93.38% (+44px) | 81.93% | 98.96% | 69.19% | 3.58% |
-| 1600x1000 | `scripts/admin-parity/out/13-1600x1000.png` | 88.11% | 66.23% | 87.26% | 61.85% | n/a | n/a | n/a | n/a | 3.53% |
+| 1586x992 | `scripts/admin-parity/out/13-1586x992.png` | 88.74% | 67.14% | 87.77% | 63.03% | 93.34% (+44px) | 81.81% | 98.93% | 69.22% | 3.58% |
+| 1600x1000 | `scripts/admin-parity/out/13-1600x1000.png` | 88.09% | 66.15% | 87.23% | 61.76% | n/a | n/a | n/a | n/a | 3.53% |
 
 Rail stand-in: 233px (the mock's rail width); content region starts at x=236.
 Body anchor (pinned in landmarks.json): reference y=166, capture y=210 (title block offset +44px).
 Diff image: `scripts/admin-parity/out/13-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/13-1586x992.png` and `scripts/admin-parity/evidence/13-1586x992-diff.png`.
 
-Masks (11): run timestamp and run id under the title; event times and the last successful run time; fixture provider domain; mock-only annotation (handoff footer caption, not product UI); mock-only annotation (the same footer caption where the body comparison places it, reference shifted -18px); the capture has only empty workspace here; mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
+Masks (15): run timestamp and run id under the title; event times and the last successful run time; fixture provider domain; mock-only annotation (handoff footer caption, not product UI); mock-only annotation (the same footer caption where the body comparison places it, reference shifted -18px); the capture has only empty workspace here; mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -589,9 +589,9 @@ Masks (11): run timestamp and run id under the title; event times and the last s
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1853 | none | `scripts/admin-parity/out/13-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections], pre | `scripts/admin-parity/out/13-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/13-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div, pre | `scripts/admin-parity/out/13-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/13-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/13-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/13-390x844.png` |
 
 ### Findings for screen 13
 
@@ -610,9 +610,9 @@ Masks (11): run timestamp and run id under the title; event times and the last s
 
 ## Reading the numbers
 
-- The 97% target in the parity protocol applies to content-region parity at the 1600x1000 protocol frame after permitted dynamic masks. No screen meets it. The full-frame number also includes the product rail and header, which belong to the global shell; treating them separately is a proposal for the owner, not an approved exception.
+- The acceptance target (95% per screen; 94.00-94.99% individually reviewable) applies to protocol v2 content-region parity at the native 1586x992 frame after permitted dynamic masks. The full-frame number also includes the product rail and header, which belong to the global shell; treating them separately is a proposal for the owner, not an approved exception.
 - A high structural score with a lower pixel parity means the composition matches and the remaining difference is typography rendering or sub-pixel offsets; a low structural score means a layout difference and needs a look at the diff image.
-- A landmark out of tolerance is a hard-gate failure regardless of the computed score. A screen's gate passes only when every landmark is within tolerance, no breakpoint has page overflow, and content-region parity at the protocol frame is at least 97%.
+- A landmark out of tolerance is a hard-gate failure regardless of the computed score. A screen's gate passes only when every landmark is within tolerance, no breakpoint has page overflow, and protocol v2 content-region parity is at least 95%.
 - Responsive: page overflow (document wider than the viewport) fails the breakpoint. A region that scrolls by design, such as the section row or a wide table inside its own scroll container, is listed under Scroll regions and does not fail it.
 
 ## Reproduce

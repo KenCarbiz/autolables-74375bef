@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | Not met; exceptions pending | Target 95% per screen: on `7716842` all 13 screens are below 94% (85.60-90.64%); per-screen exception requests in section 10.1 | Owner review of the exception requests |
+| 16 | Visual acceptance | Not met; exceptions pending | Protocol v2 on `346ba3d`: 06 at 94.16% (individual review); 12 screens below 94%; mobile pass verified (section 10.7) | Owner visual review |
 
 ## 2. How the evidence was produced
 
@@ -521,6 +521,108 @@ Even if items 1-5 were accepted, the body diagnostic (91-95%) shows that
 text rendering and lucide glyphs keep every screen below 97%. Closing that
 gap needs the title-size decision plus icon replacement from the supplied
 set, measured screen by screen.
+
+### 10.7 Mobile and readability pass and protocol v2, implementation commit `346ba3d`
+
+Baseline: `7716842`. The evidence for `346ba3d` is committed separately and
+names this SHA.
+
+Comparison protocol v2 (owner-authorized 2026-10-28):
+- The application is captured at the references' native 1586x992 and
+  compared with neither image resized.
+- v1 (1600x1000 against a resampled reference) is kept as a labelled
+  historical column. Its contract and the `7716842` results are preserved
+  under `scripts/admin-parity/protocol-v1/`.
+- The change from v1 to v2 is a measurement change, not a code
+  improvement.
+
+| # | **Protocol v2 content (agreed)** | Band | v1 historical | Diagnostic: body aligned | Landmarks | Responsive |
+| --- | --- | --- | --- | --- | --- | --- |
+| 01 | **92.99%** | below 94%: not passed | 89.83% | 92.81% | pass | pass |
+| 02 | **88.01%** | below 94%: not passed | 87.40% | 92.71% | pass | pass |
+| 03 | **90.70%** | below 94%: not passed | 90.64% | 92.58% | pass | pass |
+| 04 | **89.87%** | below 94%: not passed | 88.96% | 88.78% | 7 fail (section row above title, owner decision) | pass |
+| 05 | **89.94%** | below 94%: not passed | 89.69% | 90.46% | pass | pass |
+| 06 | **94.16%** | 94.00-94.99%: individual review | 90.34% | 94.11% | pass | pass |
+| 07 | **87.83%** | below 94%: not passed | 87.58% | 91.93% | pass | pass |
+| 08 | **92.12%** | below 94%: not passed | 89.66% | 90.53% | pass | pass |
+| 09 | **86.53%** | below 94%: not passed | 85.60% | 92.85% | pass | pass |
+| 10 | **89.53%** | below 94%: not passed | 86.76% | 88.84% | 3 fail (tabs outside card, owner decision) | pass |
+| 11 | **89.84%** | below 94%: not passed | 89.09% | 92.02% | 1 fail (approved title block) | pass |
+| 12 | **92.22%** | below 94%: not passed | 90.50% | 92.00% | 1 fail (no heading above tabs, owner decision) | pass |
+| 13 | **87.77%** | below 94%: not passed | 87.23% | 93.34% | 3 fail (section row above title, owner decision) | pass |
+
+Fixes in this pass:
+
+- Shared:
+  - Tables and tab rows show edge fades where content is hidden, are
+    labelled keyboard stops while they overflow, and keep the active tab in
+    view.
+  - Below 1024px, tables with a minimum width scroll instead of crushing
+    columns.
+  - The scroll region is positioned, so screen-reader text no longer widens
+    the page. This was 03's 282px overflow.
+- 02: logo and fields stack below 1024px, and the preview keeps dealership
+  names whole. The website shows a readable label while the href, title and
+  screen-reader text keep the full URL. The save bar stacks at 320px.
+- 04: labelled capability cards with Read, Create or act and Manage values
+  below 768px; the desktop matrix is unchanged.
+- 05: the price-consistency logic stripped the document fee from website
+  totals under the fee-inclusive basis, so $40,420 matched $39,525. Those
+  rows now read Mismatch. A basis note explains each column, Passport is
+  compared too, and "Conveyance Fee" is explained as Connecticut's term for
+  the document fee. Phones get stacked labelled cards.
+- 06: below 768px the fee review dialog has a fixed header and footer with
+  an internal scroll, the background is held still, focus is trapped and
+  returns to Review changes, and vehicles show as stacked labelled rows.
+  `dialog-mobile.cjs` runs 12 checks at 390x844, 320x568 and 390x500; all
+  pass, where 12 failed before.
+- 07: evidence badges sit on their own line on narrow screens, and the
+  tables scroll.
+- 08: business-hours rows wrap (28px overflow at 320 fixed).
+- 10: the actions wrap (27px overflow fixed), the badges and counts get
+  their own lines, and the matrix scrolls.
+- 11: Readiness items stack (2px overflow fixed), with no mid-word breaks.
+- 13: the summary reflows, the timeline becomes event cards below 768px,
+  and the technical evidence wraps and has a Copy control limited to what
+  is displayed.
+- 01, 09, 12: tables scroll on phones. 09 regressed briefly, scrolling on
+  desktop, and was fixed by limiting minimum widths to below 1024px.
+
+Checks on `346ba3d`:
+- Typecheck clean.
+- Application tests (vitest, Admin and Sticker): 54 files, 536 tests,
+  all passing.
+- Harness tests: 10 of 10, separate.
+- Audit at 1586, 1366, 1024, 768 and 390 wide, all 13 screens: no
+  overflow, clipping or overlaps; one h1; every focus stop visible; no
+  contrast failures; no off-centre icons.
+- Actual-viewport captures at 390x844, 320x568 and 768x1024: 0px page
+  overflow on all 39, every scroll region labelled and focusable.
+- Review changes behaviour unchanged.
+
+Separated outcomes:
+- Intentional design changes (owner decisions):
+  - the one-Administration title block;
+  - the section row above child titles;
+  - tabs outside cards;
+  - no heading above the 12 tabs.
+- Unresolved:
+  - Light-only: the Administration pages keep their light palette under
+    the app's dark class. A dedicated dark theme is a separate piece of
+    work.
+  - The 05 customer preview adds the fee to the stored price, so the
+    fixture vehicle previews at $40,420 against a $39,525 label and
+    Passport. The locked price arithmetic was left unchanged, pending a
+    decision.
+  - 13 renders the timeline as both cards and table, with CSS choosing
+    which shows.
+- Rendering differences: glyph widths against the mocks' lettering,
+  synthetic data and lucide icons.
+
+Scores: 06 (94.16%) is in the individually reviewable band. The other 12
+are below 94% and not passed. 05 fell 0.77 points because the honest
+Mismatch rows and basis note now show.
 
 ## 11. Approvals requested
 

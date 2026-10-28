@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T20:19:40.395Z",
+  "generatedAt": "2026-10-28T21:35:45.067Z",
   "baseUrl": "http://127.0.0.1:5192",
   "screens": {
     "10": {
@@ -623,7 +623,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 20,
+          "tabStops": 23,
           "noVisibleFocus": []
         }
       }
@@ -1059,7 +1059,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 20,
+          "tabStops": 23,
           "noVisibleFocus": []
         }
       }
@@ -2077,6 +2077,24 @@
             "w": 83,
             "h": 20,
             "spacingException": true
+          },
+          {
+            "el": "a \"Oct 24, 2:07 AM\"",
+            "w": 107,
+            "h": 17,
+            "spacingException": true
+          },
+          {
+            "el": "a \"Oct 23, 2:07 AM\"",
+            "w": 107,
+            "h": 17,
+            "spacingException": true
+          },
+          {
+            "el": "a \"Oct 22, 2:07 AM\"",
+            "w": 108,
+            "h": 17,
+            "spacingException": true
           }
         ],
         "under44": [
@@ -2094,9 +2112,9 @@
           "a \"Jobs & Pipelines\" 110x40",
           "a \"Activity\" 51x40",
           "a \"View history\" 83x20",
-          "a \"Oct 24, 2:07 AM\" 29x77",
-          "a \"Oct 23, 2:07 AM\" 29x77",
-          "a \"Oct 22, 2:07 AM\" 29x77",
+          "a \"Oct 24, 2:07 AM\" 107x17",
+          "a \"Oct 23, 2:07 AM\" 107x17",
+          "a \"Oct 22, 2:07 AM\" 108x17",
           "select \"2550\" 169x34",
           "button \"Previous page\" 32x32",
           "button \"Next page\" 32x32",
@@ -2104,7 +2122,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 21,
+          "tabStops": 24,
           "noVisibleFocus": []
         }
       }
@@ -2218,6 +2236,15 @@
             "decorative": true
           },
           {
+            "name": "copy",
+            "w": 20,
+            "h": 20,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
             "name": "chart-no-axes-column",
             "w": 32,
             "h": 32,
@@ -2278,7 +2305,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 15,
+          "tabStops": 16,
           "noVisibleFocus": []
         },
         "hoverWithoutFeedback": [
@@ -2388,6 +2415,15 @@
             "name": "chevron-up",
             "w": 22,
             "h": 22,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
+            "name": "copy",
+            "w": 20,
+            "h": 20,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -2562,6 +2598,15 @@
             "decorative": true
           },
           {
+            "name": "copy",
+            "w": 20,
+            "h": 20,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
             "name": "chart-no-axes-column",
             "w": 32,
             "h": 32,
@@ -2724,6 +2769,15 @@
             "name": "chevron-up",
             "w": 22,
             "h": 22,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
+            "name": "copy",
+            "w": 20,
+            "h": 20,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -2898,6 +2952,15 @@
             "decorative": true
           },
           {
+            "name": "copy",
+            "w": 20,
+            "h": 20,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
             "name": "chart-no-axes-column",
             "w": 32,
             "h": 32,
@@ -2969,11 +3032,12 @@
           "a \"Integrations\" 67x18",
           "a \"Inventory feed\" 82x18",
           "summary \"Technical evidence\" 356x38",
+          "button \"Copy technical evidence\" 75x30",
           "summary \"Full redacted payload\" 350x18"
         ],
         "errors": [],
         "focus": {
-          "tabStops": 16,
+          "tabStops": 17,
           "noVisibleFocus": []
         }
       }
@@ -5039,6 +5103,18 @@
             "spacingException": true
           },
           {
+            "el": "a \"Review pricing\"",
+            "w": 92,
+            "h": 16,
+            "spacingException": true
+          },
+          {
+            "el": "a \"Open queue\"",
+            "w": 76,
+            "h": 16,
+            "spacingException": true
+          },
+          {
             "el": "a \"Configure\"",
             "w": 63,
             "h": 16,
@@ -5093,8 +5169,8 @@
           "a \"Integrations\" 80x38",
           "a \"Review sync\" 105x35",
           "a \"Open diagnostics\" 73x36",
-          "a \"Review pricing\" 45x36",
-          "a \"Open queue\" 39x36",
+          "a \"Review pricing\" 92x16",
+          "a \"Open queue\" 76x16",
           "a \"Configure\" 63x16",
           "a \"View all\" 47x20",
           "a \"Edit\" 23x24",
@@ -5105,7 +5181,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 30,
+          "tabStops": 32,
           "noVisibleFocus": []
         }
       }
@@ -5264,9 +5340,9 @@
             "spacingException": true
           },
           {
-            "el": "a \"https://www.example.test\"",
-            "w": 197,
-            "h": 20,
+            "el": "a \"www.example.test (full address https://www.example.test, ope\"",
+            "w": 150,
+            "h": 17,
             "spacingException": true
           }
         ],
@@ -5434,9 +5510,9 @@
             "spacingException": true
           },
           {
-            "el": "a \"https://www.example.test\"",
-            "w": 197,
-            "h": 20,
+            "el": "a \"www.example.test (full address https://www.example.test, ope\"",
+            "w": 150,
+            "h": 17,
             "spacingException": true
           }
         ],
@@ -5595,176 +5671,15 @@
             "spacingException": true
           },
           {
-            "el": "a \"https://www.example.test\"",
-            "w": 197,
-            "h": 20,
+            "el": "a \"www.example.test (full address https://www.example.test, ope\"",
+            "w": 150,
+            "h": 17,
             "spacingException": true
           }
         ],
         "errors": []
       },
       "tablet-portrait": {
-        "overflowX": 0,
-        "clipped": [],
-        "overlaps": [],
-        "headings": [
-          "H1: Administration",
-          "H3: Store identity",
-          "H3: Appearance",
-          "H3: Dealer header preview",
-          "H3: Contact readiness"
-        ],
-        "unnamed": [],
-        "smallTargets": [],
-        "contrast": [],
-        "icons": [
-          {
-            "name": "info",
-            "w": 20,
-            "h": 20,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "lock",
-            "w": 20,
-            "h": 20,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": false
-          },
-          {
-            "name": "chevron-down",
-            "w": 24,
-            "h": 24,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "chevron-down",
-            "w": 24,
-            "h": 24,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "info",
-            "w": 20,
-            "h": 20,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": false
-          },
-          {
-            "name": "upload",
-            "w": 20,
-            "h": 20,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "info",
-            "w": 20,
-            "h": 20,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": false
-          },
-          {
-            "name": "info",
-            "w": 24,
-            "h": 24,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "external-link",
-            "w": 20,
-            "h": 20,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "circle-check",
-            "w": 29,
-            "h": 29,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          }
-        ],
-        "images": [
-          {
-            "src": "/src/assets/admin-v2/brand/wordmark-primary.svg",
-            "alt": "No dealership logo uploaded; AutoLabels wordmark shown as a placeholder",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(255, 255, 255)",
-            "parentPadding": "16px",
-            "w": 169,
-            "h": 24
-          },
-          {
-            "src": "/src/assets/admin-v2/brand/wordmark-reverse.svg",
-            "alt": "AutoLabels",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(20, 35, 56)",
-            "parentPadding": "0px 36px",
-            "w": 150,
-            "h": 21
-          }
-        ],
-        "disabledNoSemantics": [],
-        "selected": [
-          "a \"Dealership & Brand\"",
-          "a \"Identity\""
-        ],
-        "smallButSpaced": [
-          {
-            "el": "a \"Edit\"",
-            "w": 22,
-            "h": 18,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Not configured\"",
-            "w": 99,
-            "h": 17,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Not configured\"",
-            "w": 99,
-            "h": 17,
-            "spacingException": true
-          },
-          {
-            "el": "a \"https://www.example.test\"",
-            "w": 197,
-            "h": 20,
-            "spacingException": true
-          }
-        ],
-        "errors": []
-      },
-      "phone": {
         "overflowX": 0,
         "clipped": [],
         "overlaps": [],
@@ -5903,6 +5818,185 @@
             "w": 22,
             "h": 18,
             "spacingException": true
+          },
+          {
+            "el": "a \"Not configured\"",
+            "w": 99,
+            "h": 17,
+            "spacingException": true
+          },
+          {
+            "el": "a \"Not configured\"",
+            "w": 99,
+            "h": 17,
+            "spacingException": true
+          },
+          {
+            "el": "a \"www.example.test (full address https://www.example.test, ope\"",
+            "w": 150,
+            "h": 17,
+            "spacingException": true
+          }
+        ],
+        "errors": []
+      },
+      "phone": {
+        "overflowX": 0,
+        "clipped": [],
+        "overlaps": [],
+        "headings": [
+          "H1: Administration",
+          "H3: Store identity",
+          "H3: Appearance",
+          "H3: Dealer header preview",
+          "H3: Contact readiness"
+        ],
+        "unnamed": [],
+        "smallTargets": [],
+        "contrast": [],
+        "icons": [
+          {
+            "name": "info",
+            "w": 20,
+            "h": 20,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
+            "name": "lock",
+            "w": 20,
+            "h": 20,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": false
+          },
+          {
+            "name": "chevron-down",
+            "w": 24,
+            "h": 24,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
+            "name": "chevron-down",
+            "w": 24,
+            "h": 24,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
+            "name": "info",
+            "w": 20,
+            "h": 20,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": false
+          },
+          {
+            "name": "upload",
+            "w": 20,
+            "h": 20,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
+            "name": "info",
+            "w": 20,
+            "h": 20,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": false
+          },
+          {
+            "name": "info",
+            "w": 24,
+            "h": 24,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
+            "name": "external-link",
+            "w": 20,
+            "h": 20,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          },
+          {
+            "name": "circle-check",
+            "w": 29,
+            "h": 29,
+            "boxed": false,
+            "box": null,
+            "offCentre": null,
+            "decorative": true
+          }
+        ],
+        "images": [
+          {
+            "src": "/src/assets/admin-v2/brand/wordmark-primary.svg",
+            "alt": "No dealership logo uploaded; AutoLabels wordmark shown as a placeholder",
+            "imgBackground": "rgba(0, 0, 0, 0)",
+            "imgPadding": "0px",
+            "parentBackground": "rgb(255, 255, 255)",
+            "parentPadding": "16px",
+            "w": 171,
+            "h": 24
+          },
+          {
+            "src": "/src/assets/admin-v2/brand/wordmark-reverse.svg",
+            "alt": "AutoLabels",
+            "imgBackground": "rgba(0, 0, 0, 0)",
+            "imgPadding": "0px",
+            "parentBackground": "rgb(20, 35, 56)",
+            "parentPadding": "16px 20px",
+            "w": 150,
+            "h": 21
+          }
+        ],
+        "disabledNoSemantics": [],
+        "selected": [
+          "a \"Dealership & Brand\"",
+          "a \"Identity\""
+        ],
+        "smallButSpaced": [
+          {
+            "el": "a \"Edit\"",
+            "w": 22,
+            "h": 18,
+            "spacingException": true
+          },
+          {
+            "el": "a \"Not configured\"",
+            "w": 99,
+            "h": 17,
+            "spacingException": true
+          },
+          {
+            "el": "a \"Not configured\"",
+            "w": 99,
+            "h": 17,
+            "spacingException": true
+          },
+          {
+            "el": "a \"www.example.test (full address https://www.example.test, ope\"",
+            "w": 150,
+            "h": 17,
+            "spacingException": true
           }
         ],
         "under44": [
@@ -5919,12 +6013,13 @@
           "a \"Hours & Contact\" 110x40",
           "a \"Why Buy\" 60x40",
           "a \"Edit\" 22x18",
-          "a \"Not configured\" 72x37",
-          "a \"Not configured\" 72x37"
+          "a \"Not configured\" 99x17",
+          "a \"Not configured\" 99x17",
+          "a \"www.example.test (full address https://www.example.test, ope\" 150x17"
         ],
         "errors": [],
         "focus": {
-          "tabStops": 21,
+          "tabStops": 23,
           "noVisibleFocus": []
         }
       }
@@ -7231,7 +7326,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 32,
+          "tabStops": 34,
           "noVisibleFocus": []
         }
       }
@@ -8800,7 +8895,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "check",
@@ -8809,7 +8904,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "x",
@@ -8818,7 +8913,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "car",
@@ -8836,7 +8931,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "check",
@@ -8845,7 +8940,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "x",
@@ -8854,7 +8949,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "share2",
@@ -8872,7 +8967,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "check",
@@ -8881,7 +8976,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "x",
@@ -8890,7 +8985,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "file-text",
@@ -8908,7 +9003,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "check",
@@ -8917,7 +9012,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "x",
@@ -8926,7 +9021,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "tag",
@@ -8944,7 +9039,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "x",
@@ -8953,7 +9048,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "x",
@@ -8962,7 +9057,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "file-text",
@@ -8980,7 +9075,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "x",
@@ -8989,7 +9084,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "x",
@@ -8998,7 +9093,7 @@
             "boxed": true,
             "box": "32x32",
             "offCentre": 0,
-            "decorative": true
+            "decorative": false
           },
           {
             "name": "monitor",
@@ -10101,33 +10196,6 @@
             "decorative": true
           },
           {
-            "name": "globe",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "tag",
-            "w": 17,
-            "h": 17,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "file-text",
-            "w": 20,
-            "h": 20,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
             "name": "check",
             "w": 18,
             "h": 18,
@@ -10210,24 +10278,6 @@
             "spacingException": true
           },
           {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
-            "spacingException": true
-          },
-          {
             "el": "input \"\"",
             "w": 146,
             "h": 18,
@@ -10269,9 +10319,9 @@
           "select \"Change scope\" 316x32",
           "button \"Review changes\" 146x32",
           "a \"Price audit\" 93x20",
-          "a \"Review\" 45x16",
-          "a \"Review\" 45x16",
-          "a \"Review\" 45x16",
+          "a \"Review\" 45x24",
+          "a \"Review\" 45x24",
+          "a \"Review\" 45x24",
           "input \"\" 308x36",
           "input \"\" 146x18",
           "input \"\" 146x18",
@@ -10281,7 +10331,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 24,
+          "tabStops": 26,
           "noVisibleFocus": []
         }
       }
@@ -11427,8 +11477,8 @@
           }
         ],
         "errors": [
-          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
-          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
+          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
+          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
         ]
       },
       "tablet-landscape": {
@@ -11645,8 +11695,8 @@
           }
         ],
         "errors": [
-          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
-          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
+          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
+          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
         ]
       },
       "tablet-portrait": {
@@ -11863,8 +11913,8 @@
           }
         ],
         "errors": [
-          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
-          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
+          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
+          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
         ]
       },
       "phone": {
@@ -12104,7 +12154,7 @@
           "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
         ],
         "focus": {
-          "tabStops": 17,
+          "tabStops": 19,
           "noVisibleFocus": []
         }
       }
@@ -13148,43 +13198,43 @@
         "smallButSpaced": [
           {
             "el": "input \"\"",
-            "w": 59,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 59,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 59,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 59,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 59,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 59,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 59,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
@@ -14727,43 +14777,43 @@
         "smallButSpaced": [
           {
             "el": "input \"\"",
-            "w": 52,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 52,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 52,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 52,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 52,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 52,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
           {
             "el": "input \"\"",
-            "w": 52,
+            "w": 64,
             "h": 20,
             "spacingException": true
           },
@@ -14812,33 +14862,33 @@
           "button[role=switch] \"\" 308x24",
           "button[role=switch] \"\" 308x24",
           "button[role=switch] \"\" 308x24",
-          "input \"\" 52x20",
-          "input \"Sun opens\" 111x36",
+          "input \"\" 64x20",
+          "input \"Sun opens\" 110x36",
           "input \"Sun closes\" 110x36",
-          "input \"\" 52x20",
-          "input \"Mon opens\" 111x36",
+          "input \"\" 64x20",
+          "input \"Mon opens\" 110x36",
           "input \"Mon closes\" 110x36",
-          "input \"\" 52x20",
-          "input \"Tue opens\" 111x36",
+          "input \"\" 64x20",
+          "input \"Tue opens\" 110x36",
           "input \"Tue closes\" 110x36",
-          "input \"\" 52x20",
-          "input \"Wed opens\" 111x36",
+          "input \"\" 64x20",
+          "input \"Wed opens\" 110x36",
           "input \"Wed closes\" 110x36",
-          "input \"\" 52x20",
-          "input \"Thu opens\" 111x36",
+          "input \"\" 64x20",
+          "input \"Thu opens\" 110x36",
           "input \"Thu closes\" 110x36",
-          "input \"\" 52x20",
-          "input \"Fri opens\" 111x36",
+          "input \"\" 64x20",
+          "input \"Fri opens\" 110x36",
           "input \"Fri closes\" 110x36",
-          "input \"\" 52x20",
-          "input \"Sat opens\" 111x36",
+          "input \"\" 64x20",
+          "input \"Sat opens\" 110x36",
           "input \"Sat closes\" 110x36",
           "select \"Preview mode\" 167x36",
           "button \"Hide\" 27x18"
         ],
         "errors": [],
         "focus": {
-          "tabStops": 40,
+          "tabStops": 42,
           "noVisibleFocus": []
         }
       }
@@ -16041,7 +16091,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 26,
+          "tabStops": 27,
           "noVisibleFocus": []
         }
       }
