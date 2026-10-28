@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AdminChildTab, AdminSection } from "@/lib/admin/sections";
-import { adminTabHref } from "@/lib/admin/sections";
+import type { AdminChildTab, AdminSection, AdminSectionId } from "@/lib/admin/sections";
+import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, visibleSections } from "@/lib/admin/sections";
+import { useAdminVisibility } from "./useAdminVisibility";
 
 // One Administration page: one h1, one row of sections, an optional row of
 // child tabs, then content. The breadcrumb and description show only on the
@@ -121,6 +122,14 @@ export const AdminShell = ({
   </AdminPageContainer>
 );
 
+const ChildSectionNav = ({ section }: { section: AdminSectionId }) => {
+  const { ctx } = useAdminVisibility();
+  const visible = visibleSections(ctx);
+  return <AdminSectionNav sections={visible.length ? visible : [...ADMIN_SECTIONS]} activeId={section} tabFor={(s) => firstVisibleTab(s, ctx) ?? s.tabs[0]} />;
+};
+
+// Child detail screens: the parent section row first, then breadcrumb, the
+// child's h1 and back link, then the child's own tabs and content.
 export const ChildPageFrame = ({
   crumbs,
   title,
@@ -128,7 +137,7 @@ export const ChildPageFrame = ({
   subtitle,
   backHref,
   backLabel,
-  sectionNav,
+  section,
   tabs,
   actions,
   children,
@@ -139,8 +148,8 @@ export const ChildPageFrame = ({
   subtitle?: ReactNode;
   backHref?: string;
   backLabel?: string;
-  /** Some references keep the section row visible under a child title. */
-  sectionNav?: ReactNode;
+  /** The parent section, drawn as the section row above the child title. */
+  section?: AdminSectionId;
   /** A child's own tab row, when it has one. */
   tabs?: ReactNode;
   actions?: ReactNode;
@@ -148,6 +157,7 @@ export const ChildPageFrame = ({
 }) => (
   <AdminPageContainer>
     <div className="space-y-4">
+      {section && <ChildSectionNav section={section} />}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Breadcrumbs crumbs={crumbs} />
@@ -167,7 +177,6 @@ export const ChildPageFrame = ({
           )}
         </div>
       </div>
-      {sectionNav}
       {tabs}
       <div className="pt-1">{children}</div>
     </div>

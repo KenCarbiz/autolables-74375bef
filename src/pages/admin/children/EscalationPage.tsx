@@ -337,7 +337,7 @@ export default function EscalationPage() {
   );
 
   return (
-    <ChildPageFrame
+    <ChildPageFrame section="customer-experience"
       crumbs={[
         { label: "Administration", href: "/admin" },
         { label: "Customer Experience", href: adminTabHref("passport-modules") },

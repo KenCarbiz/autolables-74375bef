@@ -119,7 +119,7 @@ export default function SyncRunPage() {
 
   if (!data) {
     return (
-      <ChildPageFrame crumbs={crumbs} title={TITLE}>
+      <ChildPageFrame section="integrations" crumbs={crumbs} title={TITLE}>
         <div className="space-y-4" aria-busy="true" aria-label="Loading run">
           <SkeletonBlock className="h-[113px] w-full" />
           <SkeletonBlock className="h-64 w-full" />
@@ -130,7 +130,7 @@ export default function SyncRunPage() {
 
   if (!run || !model) {
     return (
-      <ChildPageFrame crumbs={crumbs} title={TITLE}>
+      <ChildPageFrame section="integrations" crumbs={crumbs} title={TITLE}>
         <AdminCard>
           <EmptyState title={data.failed ? "This run could not be read" : "Run not found"} detail={data.failed ? "The ledger did not answer. Nothing here is current." : "No run with this id is recorded for your rooftop."} action={<AdminLinkButton to={feedHref}>Back to feed</AdminLinkButton>} compact />
         </AdminCard>
@@ -148,7 +148,7 @@ export default function SyncRunPage() {
   const BadgeIcon = DIAGNOSIS_ICON[badgeTone];
 
   return (
-    <ChildPageFrame
+    <ChildPageFrame section="integrations"
       crumbs={crumbs}
       title={TITLE}
       badge={

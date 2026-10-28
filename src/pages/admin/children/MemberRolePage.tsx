@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { FileText, Play } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AdminSectionNav, ChildPageFrame } from "@/components/admin/v2/AdminShell";
+import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { AdminButton, AdminCard, AdminLinkButton, EmptyState, ICON, InlineNote, SkeletonBlock, StatusChip } from "@/components/admin/v2/primitives";
 import { buildAdminNavSections, filterNavSections } from "@/components/layout/adminNav";
-import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, visibleSections, type AdminVisibilityContext } from "@/lib/admin/sections";
+import { adminTabHref, visibleSections } from "@/lib/admin/sections";
 import { enforcementRows, policyFullyEnforced } from "@/lib/admin/enforcementMap";
 import { capabilityMatrixForRole, normalizeRole, teamReturnHref } from "@/lib/admin/people";
 import { getDealerCapabilities, hasAnyDealerCapability, hasDealerCapability, roleDisplayName, type DealerRole } from "@/lib/permissions/dealerRoleCapabilities";
@@ -89,7 +89,6 @@ export default function MemberRolePage() {
   const roleKey = !member && ROLE_KEY.test(normalizeRole(key)) ? normalizeRole(key) : null;
   const role: string | null = member?.role ?? roleKey;
 
-  const ctx = useMemo<AdminVisibilityContext>(() => ({ role: authority.role, isAdmin: authority.isAdmin }), [authority.role, authority.isAdmin]);
   const rows = useMemo(() => enforcementRows(), []);
   const matrix = useMemo(() => (role ? capabilityMatrixForRole(role) : null), [role]);
 
@@ -104,11 +103,10 @@ export default function MemberRolePage() {
     { label: "Roles", href: adminTabHref("roles") },
     { label },
   ];
-  const sectionNav = <AdminSectionNav sections={visibleSections(ctx).length ? visibleSections(ctx) : [...ADMIN_SECTIONS]} activeId="people" tabFor={(s) => firstVisibleTab(s, ctx) ?? s.tabs[0]} />;
 
   if (read.state === "loading") {
     return (
-      <ChildPageFrame crumbs={crumbs} title={<SkeletonBlock className="h-9 w-64" />} subtitle="Define the work this employee can perform." backHref={backHref} backLabel={backLabel} sectionNav={sectionNav}>
+      <ChildPageFrame crumbs={crumbs} title={<SkeletonBlock className="h-9 w-64" />} subtitle="Define the work this employee can perform." backHref={backHref} backLabel={backLabel} section="people">
         <div className="space-y-3" aria-busy="true" aria-label="Loading role policy">
           <SkeletonBlock className="h-64 w-full" />
         </div>
@@ -118,7 +116,7 @@ export default function MemberRolePage() {
 
   if (read.state === "failed" || (read.state !== "no-tenant" && !role)) {
     return (
-      <ChildPageFrame crumbs={crumbs} title={read.state === "failed" ? "Role policy" : "Member not found"} backHref={backHref} backLabel={backLabel} sectionNav={sectionNav}>
+      <ChildPageFrame crumbs={crumbs} title={read.state === "failed" ? "Role policy" : "Member not found"} backHref={backHref} backLabel={backLabel} section="people">
         <AdminCard>
           {read.state === "failed" ? (
             <InlineNote tone="danger" title="The team could not be read for this rooftop." action={<AdminButton size="sm" onClick={() => void read.refetch()}>Retry</AdminButton>}>{read.error}</InlineNote>
@@ -132,7 +130,7 @@ export default function MemberRolePage() {
 
   if (!role || !matrix) {
     return (
-      <ChildPageFrame crumbs={crumbs} title="Role policy" backHref={backHref} backLabel={backLabel} sectionNav={sectionNav}>
+      <ChildPageFrame crumbs={crumbs} title="Role policy" backHref={backHref} backLabel={backLabel} section="people">
         <AdminCard><InlineNote tone="info">Select a rooftop to view its role policies.</InlineNote></AdminCard>
       </ChildPageFrame>
     );
@@ -158,7 +156,7 @@ export default function MemberRolePage() {
       subtitle="Define the work this employee can perform."
       backHref={backHref}
       backLabel={backLabel}
-      sectionNav={sectionNav}
+      section="people"
     >
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_524px] gap-3">
         <AdminCard

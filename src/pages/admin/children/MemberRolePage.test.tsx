@@ -15,6 +15,7 @@ vi.mock("@/contexts/TenantContext", () => ({ useTenant: () => ({ tenant: { id: "
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "user-example" }, isAdmin: false }) }));
 vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ member: { role: viewer.role }, loading: false }) }));
 vi.mock("@/contexts/AuditContext", () => ({ useAudit: () => ({ log: logMock, entries: [] }) }));
+vi.mock("@/contexts/DealerSettingsContext", () => ({ useDealerSettings: () => ({ settings: {}, loading: false }) }));
 
 import MemberRolePage from "./MemberRolePage";
 

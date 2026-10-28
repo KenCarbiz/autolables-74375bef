@@ -252,14 +252,14 @@ export default function ProductApplicabilityPage() {
 
   if (live && (productQuery.isLoading || !productId)) {
     return (
-      <ChildPageFrame crumbs={crumbs} title={<SkeletonBlock className="h-9 w-72" />} backHref={adminTabHref("applicability")} backLabel="Back to applicability">
+      <ChildPageFrame section="pricing" crumbs={crumbs} title={<SkeletonBlock className="h-9 w-72" />} backHref={adminTabHref("applicability")} backLabel="Back to applicability">
         <SkeletonBlock className="h-64 w-full" />
       </ChildPageFrame>
     );
   }
   if (!product) {
     return (
-      <ChildPageFrame crumbs={crumbs} title="Product not found" backHref={adminTabHref("products")} backLabel="Back to products">
+      <ChildPageFrame section="pricing" crumbs={crumbs} title="Product not found" backHref={adminTabHref("products")} backLabel="Back to products">
         <InlineNote tone="danger">{productQuery.isError ? "The product could not be read." : "This product does not exist for your dealership."}</InlineNote>
       </ChildPageFrame>
     );
@@ -268,7 +268,7 @@ export default function ProductApplicabilityPage() {
   const reviewing = state.phase === "reviewing" || state.phase === "applying";
 
   return (
-    <ChildPageFrame
+    <ChildPageFrame section="pricing"
       crumbs={crumbs}
       title={product.name}
       badge={badge}
