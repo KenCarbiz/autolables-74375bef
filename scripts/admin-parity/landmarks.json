@@ -314,20 +314,35 @@
     "_rail": 257
   },
   "11": {
-    "_rail": "The mock draws the product rail 264px wide with a 28px content gutter (content x 292); the fixture rail is 224px with a 24px gutter (x 248). x and w values are mock-native, so left-anchored boxes read 44px left and full-width boxes 45px wide until the fixture rail matches.",
-    "sectionNav": {
-      "selector": "nav[aria-label=\"Administration sections\"]",
-      "x": 292,
-      "y": 196,
-      "w": 1268,
-      "h": 38
-    },
+    "_rail": 264,
+    "_railNote": "The mock draws the product rail 264px wide with a 28px content gutter (content x 292); the fixture rail is 224px with a 24px gutter (x 248). x and w values are mock-native, so left-anchored boxes read 44px left and full-width boxes 45px wide until the fixture rail matches.",
     "childTabs": {
       "selector": "nav[aria-label=\"Documents & Service views\"]",
       "x": 292,
       "yBody": 26,
       "w": 1268,
       "h": 54
+    },
+    "editButton": {
+      "selector": "[data-admin-v2] button[aria-label=\"Edit Window sticker rules\"]",
+      "x": 952,
+      "yBody": 274,
+      "w": 66,
+      "h": 36
+    },
+    "previewButton": {
+      "selector": "[data-admin-v2] a[href=\"/addendum\"]",
+      "x": 1090,
+      "yBody": 624,
+      "w": 221,
+      "h": 48
+    },
+    "primaryAction": {
+      "selector": "[data-admin-v2] [data-parity=\"review-policy\"]",
+      "x": 1322,
+      "yBody": 624,
+      "w": 219,
+      "h": 48
     },
     "rulesCard": {
       "selector": "[data-admin-v2] section",
@@ -345,12 +360,12 @@
       "w": 724,
       "h": 296
     },
-    "editButton": {
-      "selector": "[data-admin-v2] button[aria-label=\"Edit Window sticker rules\"]",
-      "x": 952,
-      "yBody": 274,
-      "w": 66,
-      "h": 36
+    "sectionNav": {
+      "selector": "nav[aria-label=\"Administration sections\"]",
+      "x": 292,
+      "y": 196,
+      "w": 1268,
+      "h": 38
     },
     "selectedRuleCard": {
       "selector": "[data-admin-v2] section",
@@ -359,37 +374,11 @@
       "yBody": 106,
       "w": 489,
       "h": 590
-    },
-    "previewButton": {
-      "selector": "[data-admin-v2] a[href=\"/addendum\"]",
-      "x": 1090,
-      "yBody": 624,
-      "w": 221,
-      "h": 48
-    },
-    "primaryAction": {
-      "selector": "[data-admin-v2] [data-parity=\"review-policy\"]",
-      "x": 1322,
-      "yBody": 624,
-      "w": 219,
-      "h": 48
     }
   },
   "12": {
-    "_rail": "The mock draws the product rail 243px wide with a 31px content gutter (content x 274); the fixture rail is 224px with a 24px gutter (x 248). x and w values are mock-native, so left-anchored boxes read 26px left and full-width boxes 27px wide until the fixture rail matches.",
-    "sectionNav": {
-      "selector": "nav[aria-label=\"Administration sections\"]",
-      "x": 274,
-      "w": 1286,
-      "h": 38
-    },
-    "childTabs": {
-      "selector": "nav[aria-label=\"Integrations views\"]",
-      "x": 274,
-      "yBody": 66,
-      "w": 1286,
-      "h": 40
-    },
+    "_rail": 243,
+    "_railNote": "The mock draws the product rail 243px wide with a 31px content gutter (content x 274); the fixture rail is 224px with a 24px gutter (x 248). x and w values are mock-native, so left-anchored boxes read 26px left and full-width boxes 27px wide until the fixture rail matches.",
     "banner": {
       "selector": "[data-admin-v2] [role=\"status\"], [data-admin-v2] [role=\"alert\"]",
       "index": 0,
@@ -398,6 +387,21 @@
       "w": 1286,
       "h": 77
     },
+    "childTabs": {
+      "selector": "nav[aria-label=\"Integrations views\"]",
+      "x": 274,
+      "yBody": 66,
+      "w": 1286,
+      "h": 40
+    },
+    "coverageCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Condition coverage (this rooftop)",
+      "x": 274,
+      "yBody": 662,
+      "w": 631,
+      "h": 115
+    },
     "openRunButton": {
       "selector": "[data-admin-v2] a[href*=\"/admin/integrations/runs/\"]",
       "index": 0,
@@ -405,22 +409,6 @@
       "yBody": 141,
       "w": 146,
       "h": 43
-    },
-    "tile1": {
-      "selector": "[data-admin-v2] [data-parity=\"tile\"]",
-      "index": 0,
-      "x": 274,
-      "yBody": 217,
-      "w": 309,
-      "h": 90
-    },
-    "tile4": {
-      "selector": "[data-admin-v2] [data-parity=\"tile\"]",
-      "index": 3,
-      "x": 1251,
-      "yBody": 217,
-      "w": 309,
-      "h": 90
     },
     "recentCard": {
       "selector": "[data-admin-v2] section",
@@ -438,13 +426,13 @@
       "w": 904,
       "h": 182
     },
-    "sourceCard": {
+    "refreshCard": {
       "selector": "[data-admin-v2] section",
-      "heading": "Source",
-      "x": 1195,
-      "yBody": 324,
-      "w": 365,
-      "h": 321
+      "heading": "Refresh status",
+      "x": 920,
+      "yBody": 662,
+      "w": 640,
+      "h": 115
     },
     "reviewSourceButton": {
       "selector": "[data-admin-v2] button[aria-describedby=\"review-source-hint\"]",
@@ -453,21 +441,35 @@
       "w": 328,
       "h": 43
     },
-    "coverageCard": {
-      "selector": "[data-admin-v2] section",
-      "heading": "Condition coverage (this rooftop)",
+    "sectionNav": {
+      "selector": "nav[aria-label=\"Administration sections\"]",
       "x": 274,
-      "yBody": 662,
-      "w": 631,
-      "h": 115
+      "w": 1286,
+      "h": 38
     },
-    "refreshCard": {
+    "sourceCard": {
       "selector": "[data-admin-v2] section",
-      "heading": "Refresh status",
-      "x": 920,
-      "yBody": 662,
-      "w": 640,
-      "h": 115
+      "heading": "Source",
+      "x": 1195,
+      "yBody": 324,
+      "w": 365,
+      "h": 321
+    },
+    "tile1": {
+      "selector": "[data-admin-v2] [data-parity=\"tile\"]",
+      "index": 0,
+      "x": 274,
+      "yBody": 217,
+      "w": 309,
+      "h": 90
+    },
+    "tile4": {
+      "selector": "[data-admin-v2] [data-parity=\"tile\"]",
+      "index": 3,
+      "x": 1251,
+      "yBody": 217,
+      "w": 309,
+      "h": 90
     }
   },
   "13": {
@@ -475,18 +477,21 @@
       "reference": 166,
       "selector": "[data-admin-v2] h1"
     },
-    "_rail": "The mock draws the product rail 233px wide with a 33px content gutter (content x 266, right edge 1556); the fixture rail is 224px with a 24px gutter (x 248, right edge 1561). x and w values are mock-native.",
-    "breadcrumb": {
-      "selector": "nav[aria-label=\"Breadcrumb\"]",
-      "x": 266,
-      "y": 86,
-      "h": 18
+    "_rail": 233,
+    "_railNote": "The mock draws the product rail 233px wide with a 33px content gutter (content x 266, right edge 1556); the fixture rail is 224px with a 24px gutter (x 248, right edge 1561). x and w values are mock-native.",
+    "actionsCard": {
+      "selector": "#run-actions",
+      "x": 1008,
+      "yBody": 619,
+      "w": 549,
+      "h": 137
     },
-    "title": {
-      "selector": "[data-admin-v2] h1",
-      "x": 266,
-      "y": 126,
-      "h": 40
+    "backButton": {
+      "selector": "#run-actions a[href=\"/admin?tab=inventory-feed\"]",
+      "x": 1028,
+      "yBody": 691,
+      "w": 248,
+      "h": 44
     },
     "badge": {
       "selector": "[data-admin-v2] h1 + span",
@@ -495,12 +500,11 @@
       "w": 201,
       "h": 38
     },
-    "summaryStrip": {
-      "selector": "#run-summary",
+    "breadcrumb": {
+      "selector": "nav[aria-label=\"Breadcrumb\"]",
       "x": 266,
-      "yBody": 42,
-      "w": 1291,
-      "h": 113
+      "y": 86,
+      "h": 18
     },
     "diagnosis": {
       "selector": "#run-diagnosis",
@@ -508,27 +512,6 @@
       "yBody": 176,
       "w": 712,
       "h": 209
-    },
-    "nextStep": {
-      "selector": "#run-next-step",
-      "x": 1001,
-      "yBody": 176,
-      "w": 556,
-      "h": 213
-    },
-    "timelineCard": {
-      "selector": "#run-timeline",
-      "x": 266,
-      "yBody": 405,
-      "w": 727,
-      "h": 254
-    },
-    "timelineTable": {
-      "selector": "#run-timeline table",
-      "x": 266,
-      "yBody": 446,
-      "w": 727,
-      "h": 203
     },
     "evidenceCard": {
       "selector": "#run-evidence",
@@ -544,19 +527,12 @@
       "w": 549,
       "h": 195
     },
-    "actionsCard": {
-      "selector": "#run-actions",
-      "x": 1008,
-      "yBody": 619,
-      "w": 549,
-      "h": 137
-    },
-    "backButton": {
-      "selector": "#run-actions a[href=\"/admin?tab=inventory-feed\"]",
-      "x": 1028,
-      "yBody": 691,
-      "w": 248,
-      "h": 44
+    "nextStep": {
+      "selector": "#run-next-step",
+      "x": 1001,
+      "yBody": 176,
+      "w": 556,
+      "h": 213
     },
     "primaryAction": {
       "selector": "#run-actions button[aria-expanded]",
@@ -564,6 +540,33 @@
       "yBody": 691,
       "w": 249,
       "h": 44
+    },
+    "summaryStrip": {
+      "selector": "#run-summary",
+      "x": 266,
+      "yBody": 42,
+      "w": 1291,
+      "h": 113
+    },
+    "timelineCard": {
+      "selector": "#run-timeline",
+      "x": 266,
+      "yBody": 405,
+      "w": 727,
+      "h": 254
+    },
+    "timelineTable": {
+      "selector": "#run-timeline table",
+      "x": 266,
+      "yBody": 446,
+      "w": 727,
+      "h": 203
+    },
+    "title": {
+      "selector": "[data-admin-v2] h1",
+      "x": 266,
+      "y": 126,
+      "h": 40
     }
   },
   "tolerance": 16
