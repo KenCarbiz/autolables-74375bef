@@ -271,7 +271,7 @@ export default function OverviewView() {
             <p className="px-4 pb-4 text-[13px] text-adm-muted">{failed ? "Attention items could not be checked." : "Nothing needs attention right now."}</p>
           ) : (
             // Row rhythm measured on the reference: 52, 53, 53 and 56px under a 35px header.
-            <AdminTable caption="Ranked attention queue" inset className="mb-[14px] [&_tbody_tr:first-child>td]:pt-[5px] [&_tbody_tr:last-child>td]:border-b-0 [&_tbody_tr:last-child>td]:pt-2 [&_tbody_tr:last-child>td]:pb-[11px]">
+            <AdminTable caption="Ranked attention queue" minWidth={680} inset className="mb-[14px] [&_tbody_tr:first-child>td]:pt-[5px] [&_tbody_tr:last-child>td]:border-b-0 [&_tbody_tr:last-child>td]:pt-2 [&_tbody_tr:last-child>td]:pb-[11px]">
               <thead>
                 <tr>
                   <Th className="w-[43.2%] py-2 text-[12.5px] leading-[18px] text-adm-ink">Issue</Th>

@@ -148,7 +148,7 @@ export default function InventoryFeedView() {
           ) : (
             <>
               {/* Rows alternate 46 and 47px to land on the reference's 46.5px rhythm; the heights are minimums. */}
-              <AdminTable caption="Recent inventory feed attempts" className="xl:[&_table]:table-fixed [&_tbody_td]:py-0 [&_tbody_tr]:h-[46px] [&_tbody_tr:first-child]:h-[45px] [&_tbody_tr:nth-child(2)]:h-[47px] [&_tbody_tr:last-child>td]:border-b-0">
+              <AdminTable caption="Recent inventory feed attempts" minWidth={720} className="xl:[&_table]:table-fixed [&_tbody_td]:py-0 [&_tbody_tr]:h-[46px] [&_tbody_tr:first-child]:h-[45px] [&_tbody_tr:nth-child(2)]:h-[47px] [&_tbody_tr:last-child>td]:border-b-0">
                 <colgroup>
                   <col className="w-[177px]" />
                   <col className="w-[196px]" />

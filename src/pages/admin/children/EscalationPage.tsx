@@ -183,7 +183,7 @@ const ActivityBody = ({ state, rows }: { state: "loading" | "failed" | "ready"; 
     return <div className="px-4"><EmptyState compact title="No escalation notifications recorded." detail="Rows appear here after the escalation sweep attempts a notification." /></div>;
   }
   return (
-    <AdminTable inset caption="Escalation delivery activity" className={ACTIVITY_TABLE_CLS}>
+    <AdminTable inset caption="Escalation delivery activity" minWidth={640} className={ACTIVITY_TABLE_CLS}>
       <colgroup>{ACTIVITY_COLUMNS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
       <thead>
         <tr>
