@@ -73,7 +73,7 @@ export const useProductRules = () => {
   });
 
   const addRuleMutation = useMutation({
-    mutationFn: async (rule: Omit<ProductRule, "id">): Promise<ProductRule | null> => {
+    mutationFn: async (rule: Omit<ProductRule, "id">): Promise<ProductRule> => {
       const { data: row, error } = await (supabase as any)
         .from("product_rules")
         .insert({
@@ -89,7 +89,8 @@ export const useProductRules = () => {
         })
         .select()
         .single();
-      if (error || !row) return null;
+      if (error) throw new Error(error.message || "The rule could not be created.");
+      if (!row) throw new Error("The rule could not be created.");
       return row as ProductRule;
     },
     onSuccess: invalidate,
@@ -97,20 +98,22 @@ export const useProductRules = () => {
 
   const updateRuleMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<ProductRule> }) => {
-      await (supabase as any)
+      const { error } = await (supabase as any)
         .from("product_rules")
         .update(updates)
         .eq("id", id);
+      if (error) throw new Error(error.message || "The rule could not be updated.");
     },
     onSuccess: invalidate,
   });
 
   const deleteRuleMutation = useMutation({
     mutationFn: async (id: string) => {
-      await (supabase as any)
+      const { error } = await (supabase as any)
         .from("product_rules")
         .delete()
         .eq("id", id);
+      if (error) throw new Error(error.message || "The rule could not be deleted.");
     },
     onSuccess: invalidate,
   });

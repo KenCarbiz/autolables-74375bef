@@ -127,7 +127,7 @@ describe("MemberRolePage", () => {
     expect(logMock.mock.calls[0][0]).toMatchObject({ action: "settings_updated", entity_type: "tenant_member_role", entity_id: SALES, details: { prev_role: "salesperson", new_role: "sales_manager", reason: "Promoted after review" } });
   });
 
-  it("reaches Apply only after a real role change: an unchanged or changed-back draft is refused at review", async () => {
+  it("enables Review change only after a real role change: disabled on open and after changing back", async () => {
     rpcMock.mockResolvedValue({ data: liveRows(), error: null });
     renderPage(`/admin/people/${SALES}`, false);
     await screen.findByRole("heading", { level: 1, name: "Salesperson role" });
@@ -135,14 +135,13 @@ describe("MemberRolePage", () => {
     const select = (await screen.findByLabelText("New role")) as HTMLSelectElement;
     expect(select.value).toBe("salesperson");
 
-    fireEvent.click(screen.getByText("Review change"));
-    expect(screen.getByText("Choose a different role.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Review change" })).toBeDisabled();
     expect(screen.queryByText("Apply change")).toBeNull();
 
     fireEvent.change(select, { target: { value: "sales_manager" } });
+    expect(screen.getByRole("button", { name: "Review change" })).toBeEnabled();
     fireEvent.change(select, { target: { value: "salesperson" } });
-    fireEvent.click(screen.getByText("Review change"));
-    expect(screen.getByText("Choose a different role.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Review change" })).toBeDisabled();
     expect(screen.queryByText("Apply change")).toBeNull();
 
     fireEvent.change(select, { target: { value: "sales_manager" } });

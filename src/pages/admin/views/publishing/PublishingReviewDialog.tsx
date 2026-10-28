@@ -115,7 +115,13 @@ export default function PublishingReviewDialog(props: PublishingReviewDialogProp
     }
     dispatch({ type: "apply" });
     setStep("apply");
-    const ok = await updateSettings(publishingPatchFromDraft(state.draft, stored.settings));
+    // A writer that throws is a refused save too; the dialog must leave "applying".
+    let ok = false;
+    try {
+      ok = await updateSettings(publishingPatchFromDraft(state.draft, stored.settings));
+    } catch {
+      ok = false;
+    }
     let audited = false;
     if (ok && state.idempotencyKey) {
       try {

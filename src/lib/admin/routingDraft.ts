@@ -34,7 +34,7 @@ export const routingSliceFrom = (routing: unknown, agents: readonly PassportAgen
   agents: Array.isArray(agents) ? [...agents] : [],
 });
 
-const isEmail = (v: string | undefined): boolean => !!v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+export const isEmail = (v: string | undefined): boolean => !!v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 const blank = (v: string | undefined): boolean => !v || v.trim().length === 0;
 
 /** Real validation errors, independent of readiness: these block review. */

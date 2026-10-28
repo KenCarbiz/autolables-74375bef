@@ -501,7 +501,7 @@ export const MemberRoleReviewDialog = ({
           {(state.phase === "editing" || state.phase === "validating") && (
             <>
               <AdminButton onClick={() => onOpenChange(false)}>Cancel</AdminButton>
-              <AdminButton variant="primary" onClick={review}>Review change</AdminButton>
+              <AdminButton variant="primary" onClick={review} disabled={state.draft.role === member.role}>Review change</AdminButton>
             </>
           )}
           {state.phase === "reviewing" && (

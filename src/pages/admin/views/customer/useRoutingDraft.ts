@@ -164,10 +164,16 @@ export function useRoutingDraft() {
       dispatch({ type: "result", result: { status: "applied", affected: storeCount, message: "Design fixture: nothing was written." } });
       return true;
     }
-    const ok = await updateSettings({
-      passport_contact_routing: state.draft.routing,
-      passport_agents: namedAgents(state.draft.agents),
-    });
+    // A writer that throws is a refused save too; the review must leave "applying".
+    let ok = false;
+    try {
+      ok = await updateSettings({
+        passport_contact_routing: state.draft.routing,
+        passport_agents: namedAgents(state.draft.agents),
+      });
+    } catch {
+      ok = false;
+    }
     if (ok) dispatch({ type: "result", result: { status: "applied", affected: storeCount, message: "Routing applied. Every consumer reads the new configuration from now on." } });
     else dispatch({ type: "error", message: "The change was not saved. Nothing was applied." });
     return ok;

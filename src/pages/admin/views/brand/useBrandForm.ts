@@ -139,7 +139,13 @@ export function useBrandForm<K extends SettingsKey>(keys: readonly K[], validate
     if (!canSave) return false;
     setStatus("saving");
     setError(null);
-    const ok = await source.updateSettings(patchOf(draft, original, keys));
+    // A writer that throws is a refused save too; the bar must leave "saving".
+    let ok = false;
+    try {
+      ok = await source.updateSettings(patchOf(draft, original, keys));
+    } catch {
+      ok = false;
+    }
     if (ok) {
       setStatus("saved");
       return true;

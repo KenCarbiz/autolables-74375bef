@@ -179,7 +179,7 @@ export default function ProductApplicabilityPage() {
     setRule({ conditions: next });
   };
 
-  const errors = validateApplicabilityDraft(draft.rule);
+  const errors = [...validateApplicabilityDraft(draft.rule), ...(Number.isFinite(draft.price) && draft.price >= 0 ? [] : ["Price must be zero or more."])];
   const dirty = synced.current && !isUnchanged(draft, state.original);
   const checklist = product ? evidenceChecklist({ ...product, available_preinstalled: draft.treatment === "installed" ? product.available_preinstalled : false, badge_type: draft.treatment === "installed" ? "installed" : "optional" }, policy, rulesExist) : [];
   const results = vehicles.map((v) => sampleResult(draft.rule, draft.treatment, policy, v, proofs ? proofs[v.vin.toUpperCase()] ?? 0 : null));
@@ -207,7 +207,7 @@ export default function ProductApplicabilityPage() {
       if (rule) await updateRule(rule.id, patch);
       else {
         const created = await addRule({ product_id: productId, makes: [], models: [], trims: [], body_styles: [], ...patch });
-        ruleId = created?.id ?? null;
+        ruleId = created.id;
       }
       const treatmentChanged = draft.treatment !== state.original.treatment || draft.price !== state.original.price;
       if (treatmentChanged) {

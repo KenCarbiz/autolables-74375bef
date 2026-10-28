@@ -17,6 +17,7 @@ import {
   escalationComplete,
   namedAgents,
   notificationMethodRows,
+  isEmail,
   withEmailMethod,
   type AuditRowLike,
   type DeliveryActivityRow,
@@ -139,6 +140,15 @@ const DestinationState = ({ label, email, editing, onEdit }: { label: string; em
         <AlertTriangle className={cn(ICON.status, "fill-current stroke-white flex-shrink-0")} aria-hidden="true" />
         <span>Destination required</span>
         {!editing && <button type="button" aria-label={`Add ${label} email`} onClick={onEdit} className="ml-1 font-semibold text-adm-primary hover:underline">Add email</button>}
+      </p>
+    );
+  }
+  if (!isEmail(email)) {
+    return (
+      <p role="alert" className="min-h-4 flex flex-wrap items-center gap-x-1.5 text-[12px] leading-[16px] text-adm-danger min-w-0">
+        <AlertTriangle className={cn(ICON.status, "fill-current stroke-white flex-shrink-0")} aria-hidden="true" />
+        <span className="min-w-0 [overflow-wrap:anywhere]">Not a valid email address: {email}</span>
+        {!editing && <button type="button" aria-label={`Change ${label} email`} onClick={onEdit} className="ml-1 font-semibold text-adm-primary hover:underline">Change</button>}
       </p>
     );
   }

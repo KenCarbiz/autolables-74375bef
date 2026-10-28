@@ -119,23 +119,32 @@ export default function ApplicabilityView() {
     if (!draft?.product_id) { toast.error("Select a product."); return; }
     const { _new, id, ...rest } = draft;
     const payload: Omit<ProductRule, "id"> = { ...EMPTY_RULE, ...rest, product_id: draft.product_id };
-    if (_new || !id) {
-      const created = await addRule(payload);
-      logRule("rule_added", created?.id ?? "pending", { product_id: payload.product_id, condition: payload.condition, mileage_max: payload.mileage_max });
-      toast.success("Rule added");
-    } else {
-      await updateRule(id, payload);
-      logRule("rule_updated", id, { product_id: payload.product_id, condition: payload.condition, mileage_max: payload.mileage_max });
-      toast.success("Rule updated");
+    try {
+      if (_new || !id) {
+        const created = await addRule(payload);
+        logRule("rule_added", created.id, { product_id: payload.product_id, condition: payload.condition, mileage_max: payload.mileage_max });
+        toast.success("Rule added");
+      } else {
+        await updateRule(id, payload);
+        logRule("rule_updated", id, { product_id: payload.product_id, condition: payload.condition, mileage_max: payload.mileage_max });
+        toast.success("Rule updated");
+      }
+      setDraft(null);
+    } catch (e) {
+      // The draft stays open so nothing typed is lost.
+      toast.error(e instanceof Error ? e.message : "The rule could not be saved.");
     }
-    setDraft(null);
   };
 
   const removeRule = async (r: ProductRule) => {
     if (!window.confirm("Delete this rule?")) return;
-    await deleteRule(r.id);
-    logRule("rule_deleted", r.id, { product_id: r.product_id });
-    toast.success("Rule deleted");
+    try {
+      await deleteRule(r.id);
+      logRule("rule_deleted", r.id, { product_id: r.product_id });
+      toast.success("Rule deleted");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "The rule could not be deleted.");
+    }
   };
 
   const loading = !fixture && (productsQuery.isLoading || rulesLoading);
