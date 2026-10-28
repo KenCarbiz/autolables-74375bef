@@ -17,7 +17,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright");
 const { decodePng, encodePng, resample } = require("./png.cjs");
-const { compareFrames, checkLandmarks } = require("./compare.cjs");
+const { compareFrames, compareBody, findReferenceSectionRowBottom, checkLandmarks } = require("./compare.cjs");
 const { startDevServer, listFixtures, captureScreen, responsiveCheck } = require("./capture.cjs");
 const { writeReport } = require("./report.cjs");
 
@@ -110,12 +110,18 @@ async function main() {
 
       for (const [label, frame] of [["reference", REFERENCE_FRAME], ["protocol", PROTOCOL_FRAME]]) {
         const outPng = path.join(OUT, `${screen}-${frame.width}x${frame.height}.png`);
-        const cap = await captureScreen(page, { baseUrl, screen, viewport: frame, outPng, maskSpec, landmarkSpec });
+        // A screen may pin its own alignment anchor in landmarks.json: `_anchor: { reference: <y of the row the body starts on>, selector: "<element whose bottom is that row in the capture>" }`.
+        // Child screens use it because their mocks have no section row under the title, or carry a chip the underline detector would pick.
+        const anchorSpec = landmarkSpec && landmarkSpec._anchor ? landmarkSpec._anchor : null;
+        const cap = await captureScreen(page, { baseUrl, screen, viewport: frame, outPng, maskSpec, landmarkSpec, anchorSelector: anchorSpec ? anchorSpec.selector : null });
         entry.fonts = cap.fonts;
         const frameResult = { file: path.relative(ROOT, outPng), masks: cap.masks.length };
         if (label === "reference") {
           entry.masks = cap.masks;
-          entry.landmarks = landmarkSpec ? checkLandmarks(Object.fromEntries(Object.entries(landmarkSpec).filter(([k]) => !k.startsWith("_") && k !== "tolerance")), cap.landmarks, landmarksAll.tolerance ?? 16) : null;
+          entry.anchors = anchorSpec
+            ? { referenceTop: typeof anchorSpec.reference === "number" ? anchorSpec.reference : null, captureTop: cap.anchors ? cap.anchors.custom : null, h1Bottom: cap.anchors ? cap.anchors.h1Bottom : null, pinned: true }
+            : { referenceTop: reference ? findReferenceSectionRowBottom(reference, CONTENT_REGION(frame.width, frame.height)) : null, captureTop: cap.anchors ? cap.anchors.sectionNavBottom : null, h1Bottom: cap.anchors ? cap.anchors.h1Bottom : null, pinned: false };
+          entry.landmarks = landmarkSpec ? checkLandmarks(Object.fromEntries(Object.entries(landmarkSpec).filter(([k]) => !k.startsWith("_") && k !== "tolerance")), cap.landmarks, landmarksAll.tolerance ?? 16, entry.anchors) : null;
           entry.measuredLandmarks = cap.landmarks;
         }
         if (reference) {
@@ -133,6 +139,7 @@ async function main() {
           frameResult.content = cmp.content;
           frameResult.referenceResampled = sx !== 1 || sy !== 1;
           if (label === "reference") {
+            frameResult.body = compareBody({ reference: ref, capture, masks: rects, contentRegion: CONTENT_REGION(frame.width, frame.height), referenceTop: entry.anchors.referenceTop, captureTop: entry.anchors.captureTop });
             fs.copyFileSync(outPng, path.join(EVIDENCE, `${screen}-${frame.width}x${frame.height}.png`));
             fs.copyFileSync(diffPath, path.join(EVIDENCE, `${screen}-${frame.width}x${frame.height}-diff.png`));
           }
@@ -148,10 +155,13 @@ async function main() {
         responsive: entry.responsive.every((x) => x.ok),
         contentParity: r && r.content ? r.content.parityPercent : null,
       };
+      gate.bodyParity = r && r.body ? r.body.parityPercent : null;
       gate.pass = gate.landmarks !== false && gate.responsive && (gate.contentParity === null || gate.contentParity >= 97);
+      // The documented title-block exception: the same gate with the body score standing in for the content score.
+      gate.passWithTitleException = gate.landmarks !== false && gate.responsive && (gate.bodyParity === null ? gate.pass : gate.bodyParity >= 97);
       entry.gate = gate;
       results.screens.push(entry);
-      const summary = r && r.full ? `full ${r.full.parityPercent.toFixed(2)}% · content ${r.content.parityPercent.toFixed(2)}% · structure ${r.content.structuralPercent.toFixed(2)}%` : "no reference";
+      const summary = r && r.full ? `full ${r.full.parityPercent.toFixed(2)}% · content ${r.content.parityPercent.toFixed(2)}% · structure ${r.content.structuralPercent.toFixed(2)}%${r.body ? ` · body ${r.body.parityPercent.toFixed(2)}% (offset ${r.body.offset >= 0 ? "+" : ""}${r.body.offset}px)` : ""}` : "no reference";
       process.stdout.write(`${screen}: ${summary}; landmarks ${gate.landmarks === null ? "n/a" : gate.landmarks ? "ok" : "FAIL"}; responsive ${gate.responsive ? "ok" : "OVERFLOW"}; gate ${gate.pass ? "PASS" : "FAIL"}\n`);
     }
   } finally {

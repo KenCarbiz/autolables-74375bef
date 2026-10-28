@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T04:27:48.392Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-28T04:37:03.112Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -10,20 +10,22 @@ Generated 2026-10-28T04:27:48.392Z by `bun run admin:parity` against the develop
 - Structure: mean SSIM over 8x8 luminance blocks after masks.
 - Masks: only dynamic data (counts, relative times, fixture names) listed in `scripts/admin-parity/masks.json`, read from the rendered DOM so the same boxes mask both images. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.
 - Content region: x >= 232 and y >= 70, which excludes the product rail and product header. Those belong to the global application shell (`AppShell`), which this refresh does not restyle; the full-frame score includes them for completeness.
-- Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes.
+- Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes. A `yBody` landmark is measured from the section-row bottom on both sides.
+- Body parity (aligned): the handoff's information architecture fixes one h1, "Administration", with a breadcrumb above it, while the mocks title their pages four different ways (section name as title, no breadcrumb, no description, a chip above the title). That title block is a documented exception: the body score shifts the reference so both section rows end on the same pixel row and scores everything below it in the content region, with the same masks. The offset is printed with the score and the raw content score stays the protocol number.
 - Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.
 
 Registered fixtures: 10, 11, 12, 13, 01, 02, 03, 04, 05, 06, 07, 08, 09.
 
 ## Screen 01
 
-Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.68% is below 97%).
+Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.68% is below 97%). With the title-block exception: FAIL (body parity 89.99%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 90.84% | 71.77% | 90.68% | 69.77% | 2.89% |
-| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.71% | 72.24% | 90.81% | 70.21% | 2.88% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 90.84% | 71.77% | 90.68% | 69.77% | 89.99% (+0px) | 66.27% | 2.89% |
+| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.71% | 72.24% | 90.81% | 70.21% | n/a | n/a | 2.88% |
 
+Section row bottom: reference y=238, capture y=238 (title block offset +0px).
 Diff image: `scripts/admin-parity/out/01-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/01-1586x992.png` and `scripts/admin-parity/evidence/01-1586x992-diff.png`.
 
@@ -31,16 +33,16 @@ Masks (12): summary tile counts; recent activity relative times; recent activity
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
-| breadcrumb | within tolerance | x=249 y=86 | x=248 y=86 w=1314 h=18 | x-1 y+0 |
-| title | within tolerance | x=249 y=116 h=40 | x=248 y=116 w=1314 h=40 | x-1 y+0 h+0 |
-| sectionNav | within tolerance | x=249 y=200 w=1317 h=38 | x=248 y=200 w=1314 h=38 | x-1 y+0 w-3 h+0 |
-| banner | within tolerance | x=249 y=254 w=1317 h=58 | x=248 y=254 w=1314 h=58 | x-1 y+0 w-3 h+0 |
-| tile1 | within tolerance | x=249 y=326 w=313 h=79 | x=248 y=326 w=317 h=79 | x-1 y+0 w+4 h+0 |
-| tile4 | within tolerance | x=1235 y=326 w=331 h=79 | x=1246 y=326 w=317 h=79 | x+11 y+0 w-14 h+0 |
-| attentionCard | within tolerance | x=249 y=420 w=889 | x=248 y=421 w=887 h=318 | x-1 y+1 w-2 |
-| policyCard | within tolerance | x=1152 y=420 w=414 | x=1149 y=421 w=413 h=634 | x-3 y+1 w-1 |
-| settingsCard | within tolerance | x=249 y=748 w=603 | x=248 y=755 w=601 h=300 | x-1 y+7 w-2 |
-| activityCard | within tolerance | x=862 y=748 w=276 | x=859 y=755 w=276 h=300 | x-3 y+7 w+0 |
+| breadcrumb | within tolerance | x=249 y=86 | x=248 y=86 yBody=-152 w=1314 h=18 | x-1 y+0 |
+| title | within tolerance | x=249 y=116 h=40 | x=248 y=116 yBody=-122 w=1314 h=40 | x-1 y+0 h+0 |
+| sectionNav | within tolerance | x=249 y=200 w=1317 h=38 | x=248 y=200 yBody=-38 w=1314 h=38 | x-1 y+0 w-3 h+0 |
+| banner | within tolerance | x=249 y=254 w=1317 h=58 | x=248 y=254 yBody=16 w=1314 h=58 | x-1 y+0 w-3 h+0 |
+| tile1 | within tolerance | x=249 y=326 w=313 h=79 | x=248 y=326 yBody=88 w=317 h=79 | x-1 y+0 w+4 h+0 |
+| tile4 | within tolerance | x=1235 y=326 w=331 h=79 | x=1246 y=326 yBody=88 w=317 h=79 | x+11 y+0 w-14 h+0 |
+| attentionCard | within tolerance | x=249 y=420 w=889 | x=248 y=421 yBody=183 w=887 h=318 | x-1 y+1 w-2 |
+| policyCard | within tolerance | x=1152 y=420 w=414 | x=1149 y=421 yBody=183 w=413 h=634 | x-3 y+1 w-1 |
+| settingsCard | within tolerance | x=249 y=748 w=603 | x=248 y=755 yBody=517 w=601 h=300 | x-1 y+7 w-2 |
+| activityCard | within tolerance | x=862 y=748 w=276 | x=859 y=755 yBody=517 w=276 h=300 | x-3 y+7 w+0 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
@@ -60,13 +62,14 @@ Masks (12): summary tile counts; recent activity relative times; recent activity
 
 ## Screen 02
 
-Reference: `scripts/admin-parity/reference/02-dealership-brand.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 85.64% is below 97%).
+Reference: `scripts/admin-parity/reference/02-dealership-brand.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 85.64% is below 97%). With the title-block exception: FAIL (body parity 89.34%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/02-1586x992.png` | 86.33% | 66.05% | 85.64% | 62.45% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/02-1600x1000.png` | 86.36% | 66.78% | 85.79% | 63.00% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/02-1586x992.png` | 86.33% | 66.05% | 85.64% | 62.45% | 89.34% (+33px) | 67.33% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/02-1600x1000.png` | 86.36% | 66.78% | 85.79% | 63.00% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=205, capture y=238 (title block offset +33px).
 Diff image: `scripts/admin-parity/out/02-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/02-1586x992.png` and `scripts/admin-parity/evidence/02-1586x992-diff.png`.
 
@@ -81,13 +84,14 @@ Masks (0): none.
 
 ## Screen 03
 
-Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter loaded (Inter). Gate: FAIL (page overflow at a breakpoint; content parity 90.25% is below 97%).
+Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter loaded (Inter). Gate: FAIL (page overflow at a breakpoint; content parity 90.25% is below 97%). With the title-block exception: FAIL (body parity 89.84%, overflow).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 90.71% | 71.29% | 90.25% | 68.62% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 90.33% | 70.93% | 89.88% | 68.09% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 90.71% | 71.29% | 90.25% | 68.62% | 89.84% (+21px) | 66.03% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 90.33% | 70.93% | 89.88% | 68.09% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=217, capture y=238 (title block offset +21px).
 Diff image: `scripts/admin-parity/out/03-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/03-1586x992.png` and `scripts/admin-parity/evidence/03-1586x992-diff.png`.
 
@@ -102,13 +106,14 @@ Masks (0): none.
 
 ## Screen 04
 
-Reference: `scripts/admin-parity/reference/04-salesperson-role-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (page overflow at a breakpoint; content parity 88.58% is below 97%).
+Reference: `scripts/admin-parity/reference/04-salesperson-role-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (page overflow at a breakpoint; content parity 88.58% is below 97%). With the title-block exception: FAIL (body parity 88.02%, overflow).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/04-1586x992.png` | 88.76% | 68.44% | 88.58% | 65.39% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/04-1600x1000.png` | 88.56% | 69.67% | 88.41% | 66.83% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/04-1586x992.png` | 88.76% | 68.44% | 88.58% | 65.39% | 88.02% (+96px) | 63.51% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/04-1600x1000.png` | 88.56% | 69.67% | 88.41% | 66.83% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=124, capture y=220 (title block offset +96px).
 Diff image: `scripts/admin-parity/out/04-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/04-1586x992.png` and `scripts/admin-parity/evidence/04-1586x992-diff.png`.
 
@@ -123,13 +128,14 @@ Masks (0): none.
 
 ## Screen 05
 
-Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.05% is below 97%).
+Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.05% is below 97%). With the title-block exception: FAIL (body parity 89.66%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 90.50% | 70.74% | 90.05% | 67.66% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 89.87% | 71.59% | 89.55% | 68.66% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 90.50% | 70.74% | 90.05% | 67.66% | 89.66% (+80px) | 66.63% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 89.87% | 71.59% | 89.55% | 68.66% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=158, capture y=238 (title block offset +80px).
 Diff image: `scripts/admin-parity/out/05-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/05-1586x992.png` and `scripts/admin-parity/evidence/05-1586x992-diff.png`.
 
@@ -146,11 +152,12 @@ Masks (0): none.
 
 Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 50.79% is below 97%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 53.58% | 65.07% | 50.79% | 61.76% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 53.38% | 65.40% | 50.63% | 62.19% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 53.58% | 65.07% | 50.79% | 61.76% | n/a | n/a | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 53.38% | 65.40% | 50.63% | 62.19% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=not found, capture y=238.
 Diff image: `scripts/admin-parity/out/06-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/06-1586x992.png` and `scripts/admin-parity/evidence/06-1586x992-diff.png`.
 
@@ -167,11 +174,12 @@ Masks (0): none.
 
 Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 89.27% is below 97%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 89.42% | 69.27% | 89.27% | 66.57% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 88.92% | 70.39% | 88.76% | 67.78% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 89.42% | 69.27% | 89.27% | 66.57% | n/a | n/a | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 88.92% | 70.39% | 88.76% | 67.78% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=229, capture y=not found.
 Diff image: `scripts/admin-parity/out/07-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/07-1586x992.png` and `scripts/admin-parity/evidence/07-1586x992-diff.png`.
 
@@ -186,13 +194,14 @@ Masks (0): none.
 
 ## Screen 08
 
-Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.00% is below 97%).
+Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.00% is below 97%). With the title-block exception: FAIL (body parity 89.74%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/08-1586x992.png` | 88.94% | 67.81% | 88.00% | 64.60% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/08-1600x1000.png` | 88.31% | 68.54% | 87.31% | 65.40% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/08-1586x992.png` | 88.94% | 67.81% | 88.00% | 64.60% | 89.74% (+66px) | 63.29% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/08-1600x1000.png` | 88.31% | 68.54% | 87.31% | 65.40% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=172, capture y=238 (title block offset +66px).
 Diff image: `scripts/admin-parity/out/08-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/08-1586x992.png` and `scripts/admin-parity/evidence/08-1586x992-diff.png`.
 
@@ -209,11 +218,12 @@ Masks (0): none.
 
 Reference: `scripts/admin-parity/reference/09-escalation-delivery-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 85.19% is below 97%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/09-1586x992.png` | 86.83% | 65.59% | 85.19% | 61.83% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/09-1600x1000.png` | 86.04% | 66.50% | 84.18% | 62.72% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/09-1586x992.png` | 86.83% | 65.59% | 85.19% | 61.83% | n/a | n/a | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/09-1600x1000.png` | 86.04% | 66.50% | 84.18% | 62.72% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=156, capture y=not found.
 Diff image: `scripts/admin-parity/out/09-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/09-1586x992.png` and `scripts/admin-parity/evidence/09-1586x992-diff.png`.
 
@@ -228,13 +238,14 @@ Masks (0): none.
 
 ## Screen 10
 
-Reference: `scripts/admin-parity/reference/10-publishing-policy.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 85.19% is below 97%).
+Reference: `scripts/admin-parity/reference/10-publishing-policy.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 85.19% is below 97%). With the title-block exception: FAIL (body parity 83.75%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/10-1586x992.png` | 86.06% | 65.54% | 85.19% | 61.91% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/10-1600x1000.png` | 85.23% | 64.90% | 84.30% | 61.00% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/10-1586x992.png` | 86.06% | 65.54% | 85.19% | 61.91% | 83.75% (-7px) | 60.29% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/10-1600x1000.png` | 85.23% | 64.90% | 84.30% | 61.00% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=245, capture y=238 (title block offset -7px).
 Diff image: `scripts/admin-parity/out/10-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/10-1586x992.png` and `scripts/admin-parity/evidence/10-1586x992-diff.png`.
 
@@ -249,13 +260,14 @@ Masks (0): none.
 
 ## Screen 11
 
-Reference: `scripts/admin-parity/reference/11-documents-service.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 87.25% is below 97%).
+Reference: `scripts/admin-parity/reference/11-documents-service.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 87.25% is below 97%). With the title-block exception: FAIL (body parity 86.76%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/11-1586x992.png` | 87.65% | 68.98% | 87.25% | 65.81% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/11-1600x1000.png` | 87.20% | 69.75% | 86.81% | 66.75% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/11-1586x992.png` | 87.65% | 68.98% | 87.25% | 65.81% | 86.76% (+4px) | 64.31% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/11-1600x1000.png` | 87.20% | 69.75% | 86.81% | 66.75% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=234, capture y=238 (title block offset +4px).
 Diff image: `scripts/admin-parity/out/11-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/11-1586x992.png` and `scripts/admin-parity/evidence/11-1586x992-diff.png`.
 
@@ -270,13 +282,14 @@ Masks (0): none.
 
 ## Screen 12
 
-Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.00% is below 97%).
+Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.00% is below 97%). With the title-block exception: FAIL (body parity 75.32%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/12-1586x992.png` | 88.44% | 68.43% | 88.00% | 64.43% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/12-1600x1000.png` | 87.92% | 69.56% | 87.49% | 66.09% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/12-1586x992.png` | 88.44% | 68.43% | 88.00% | 64.43% | 75.32% (+64px) | 62.93% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/12-1600x1000.png` | 87.92% | 69.56% | 87.49% | 66.09% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=174, capture y=238 (title block offset +64px).
 Diff image: `scripts/admin-parity/out/12-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/12-1586x992.png` and `scripts/admin-parity/evidence/12-1586x992-diff.png`.
 
@@ -293,11 +306,12 @@ Masks (0): none.
 
 Reference: `scripts/admin-parity/reference/13-sync-run-detail-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.36% is below 97%).
 
-| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
-|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/13-1586x992.png` | 88.70% | 65.89% | 88.36% | 61.97% | 0.00% |
-| 1600x1000 | `scripts/admin-parity/out/13-1600x1000.png` | 88.33% | 67.29% | 88.01% | 63.53% | 0.00% |
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
+|---|---|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/13-1586x992.png` | 88.70% | 65.89% | 88.36% | 61.97% | n/a | n/a | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/13-1600x1000.png` | 88.33% | 67.29% | 88.01% | 63.53% | n/a | n/a | 0.00% |
 
+Section row bottom: reference y=not found, capture y=not found.
 Diff image: `scripts/admin-parity/out/13-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/13-1586x992.png` and `scripts/admin-parity/evidence/13-1586x992-diff.png`.
 

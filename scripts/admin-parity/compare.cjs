@@ -129,8 +129,72 @@ function compareFrames({ reference, capture, masks = [], contentRegion }) {
   };
 }
 
-/** Landmark check: each expected box must be within tolerance on every edge it declares. */
-function checkLandmarks(expected, measured, tolerance = 16) {
+/**
+ * The reference mocks title their pages differently (some title the section,
+ * some omit the breadcrumb and description), while the handoff's IA fixes one
+ * h1 "Administration" with a breadcrumb above it. The body score aligns both
+ * images at the bottom of the section row so that documented title-block
+ * difference is measured once, as an offset, instead of shifting every pixel
+ * below it. In the reference the row bottom is the first row after the active
+ * tab's blue underline; in the capture it is read from the DOM.
+ */
+function findReferenceSectionRowBottom(img, region) {
+  const { width, data } = img;
+  const x0 = region ? region.x : 0;
+  const x1 = region ? region.x + region.w : width;
+  const y0 = region ? region.y : 0;
+  const y1 = Math.min(img.height, y0 + 420);
+  const isBlue = (o) => data[o] < 0x70 && data[o + 1] >= 0x30 && data[o + 1] <= 0x90 && data[o + 2] >= 0xa0;
+  let underlineStart = null;
+  for (let y = y0; y < y1; y++) {
+    let run = 0;
+    let longest = 0;
+    for (let x = x0; x < x1; x++) {
+      if (isBlue((y * width + x) * 4)) { run++; if (run > longest) longest = run; } else run = 0;
+    }
+    if (longest >= 40) {
+      if (underlineStart === null) underlineStart = y;
+    } else if (underlineStart !== null) {
+      // The row after the underline carries the section row's border; the body starts under it.
+      return y + 1;
+    }
+  }
+  return null;
+}
+
+function shiftRows(img, dy) {
+  const out = { width: img.width, height: img.height, data: new Uint8Array(img.data.length).fill(0xff) };
+  const rowBytes = img.width * 4;
+  for (let y = 0; y < img.height; y++) {
+    const src = y - dy;
+    if (src < 0 || src >= img.height) continue;
+    out.data.set(img.data.subarray(src * rowBytes, src * rowBytes + rowBytes), y * rowBytes);
+  }
+  return out;
+}
+
+/** Content-region score below the section row with the reference shifted to the capture's row bottom. */
+function compareBody({ reference, capture, masks = [], contentRegion, referenceTop, captureTop }) {
+  if (referenceTop === null || referenceTop === undefined || captureTop === null || captureTop === undefined) return null;
+  const dy = captureTop - referenceTop;
+  const shifted = shiftRows(reference, dy);
+  const bottomCut = Math.max(0, dy);
+  const region = { x: contentRegion.x, y: captureTop, w: contentRegion.w, h: Math.max(0, reference.height - captureTop - bottomCut) };
+  if (region.h <= 0) return null;
+  const mask = buildMask(reference.width, reference.height, masks);
+  const pixel = pixelDifference(shifted, capture, mask, region);
+  const structure = structuralScore(toGray(shifted), toGray(capture), reference.width, reference.height, mask, region);
+  return { referenceTop, captureTop, offset: dy, rows: region.h, pixelDiffPercent: pixel.percent, parityPercent: 100 - pixel.percent, compared: pixel.compared, structuralPercent: structure.percent, blocks: structure.blocks };
+}
+
+/**
+ * Landmark check: each expected box must be within tolerance on every edge it
+ * declares. `yBody` declares a y measured from the reference section-row
+ * bottom and is compared against the capture's box measured from its own row
+ * bottom, so a landmark can be gated on y under the documented title-block
+ * difference.
+ */
+function checkLandmarks(expected, measured, tolerance = 16, anchors = null) {
   const rows = [];
   for (const [name, exp] of Object.entries(expected)) {
     const got = measured[name];
@@ -146,9 +210,19 @@ function checkLandmarks(expected, measured, tolerance = 16) {
       deltas[edge] = d;
       if (Math.abs(d) > tolerance) ok = false;
     }
-    rows.push({ name, ok, expected: exp, measured: { x: Math.round(got.x), y: Math.round(got.y), w: Math.round(got.w), h: Math.round(got.h) }, deltas });
+    if (exp.yBody !== undefined) {
+      if (!anchors || anchors.captureTop === null || anchors.captureTop === undefined) {
+        ok = false;
+        deltas.yBody = NaN;
+      } else {
+        const d = Math.round(got.y - anchors.captureTop - exp.yBody);
+        deltas.yBody = d;
+        if (Math.abs(d) > tolerance) ok = false;
+      }
+    }
+    rows.push({ name, ok, expected: exp, measured: { x: Math.round(got.x), y: Math.round(got.y), w: Math.round(got.w), h: Math.round(got.h), yBody: anchors && typeof anchors.captureTop === "number" ? Math.round(got.y - anchors.captureTop) : undefined }, deltas });
   }
   return rows;
 }
 
-module.exports = { compareFrames, checkLandmarks, buildMask, PIXEL_TOLERANCE };
+module.exports = { compareFrames, compareBody, findReferenceSectionRowBottom, checkLandmarks, buildMask, PIXEL_TOLERANCE };

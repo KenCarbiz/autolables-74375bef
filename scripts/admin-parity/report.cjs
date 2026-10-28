@@ -5,8 +5,10 @@ const path = require("node:path");
 const pct = (n) => (typeof n === "number" ? `${n.toFixed(2)}%` : "n/a");
 
 function frameRow(label, f) {
-  if (!f || !f.full) return `| ${label} | ${f ? f.file : "n/a"} | ${f && f.note ? f.note : "no comparison"} | | | | |`;
-  return `| ${label} | \`${f.file}\` | ${pct(f.full.parityPercent)} | ${pct(f.full.structuralPercent)} | ${pct(f.content.parityPercent)} | ${pct(f.content.structuralPercent)} | ${pct(f.maskedPercent)} |`;
+  if (!f || !f.full) return `| ${label} | ${f ? f.file : "n/a"} | ${f && f.note ? f.note : "no comparison"} | | | | | | |`;
+  const body = f.body ? `${pct(f.body.parityPercent)} (${f.body.offset >= 0 ? "+" : ""}${f.body.offset}px)` : "n/a";
+  const bodyStructure = f.body ? pct(f.body.structuralPercent) : "n/a";
+  return `| ${label} | \`${f.file}\` | ${pct(f.full.parityPercent)} | ${pct(f.full.structuralPercent)} | ${pct(f.content.parityPercent)} | ${pct(f.content.structuralPercent)} | ${body} | ${bodyStructure} | ${pct(f.maskedPercent)} |`;
 }
 
 function readNotes() {
@@ -22,7 +24,8 @@ function gateLine(s) {
   if (s.gate.landmarks === false) reasons.push("landmarks out of tolerance");
   if (!s.gate.responsive) reasons.push("page overflow at a breakpoint");
   if (typeof s.gate.contentParity === "number" && s.gate.contentParity < 97) reasons.push(`content parity ${s.gate.contentParity.toFixed(2)}% is below 97%`);
-  return s.gate.pass ? "Gate: PASS." : `Gate: FAIL (${reasons.join("; ")}).`;
+  const exception = typeof s.gate.bodyParity === "number" ? ` With the title-block exception: ${s.gate.passWithTitleException ? "PASS" : `FAIL (body parity ${s.gate.bodyParity.toFixed(2)}%${s.gate.landmarks === false ? ", landmarks" : ""}${!s.gate.responsive ? ", overflow" : ""})`}.` : "";
+  return (s.gate.pass ? "Gate: PASS." : `Gate: FAIL (${reasons.join("; ")}).`) + exception;
 }
 
 function writeReport(results, outPath) {
@@ -40,7 +43,8 @@ function writeReport(results, outPath) {
   lines.push("- Structure: mean SSIM over 8x8 luminance blocks after masks.");
   lines.push("- Masks: only dynamic data (counts, relative times, fixture names) listed in `scripts/admin-parity/masks.json`, read from the rendered DOM so the same boxes mask both images. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.");
   lines.push("- Content region: x >= 232 and y >= 70, which excludes the product rail and product header. Those belong to the global application shell (`AppShell`), which this refresh does not restyle; the full-frame score includes them for completeness.");
-  lines.push("- Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes.");
+  lines.push("- Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes. A `yBody` landmark is measured from the section-row bottom on both sides.");
+  lines.push("- Body parity (aligned): the handoff's information architecture fixes one h1, \"Administration\", with a breadcrumb above it, while the mocks title their pages four different ways (section name as title, no breadcrumb, no description, a chip above the title). That title block is a documented exception: the body score shifts the reference so both section rows end on the same pixel row and scores everything below it in the content region, with the same masks. The offset is printed with the score and the raw content score stays the protocol number.");
   lines.push("- Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.");
   lines.push("");
   lines.push(`Registered fixtures: ${results.registered && results.registered.length ? results.registered.join(", ") : "none"}.${results.skipped && results.skipped.length ? ` Requested but not registered: ${results.skipped.join(", ")}.` : ""}`);
@@ -50,11 +54,15 @@ function writeReport(results, outPath) {
     lines.push("");
     lines.push(`Reference: ${s.reference ? `\`${s.reference}\`` : "not present"}. Fonts: Inter ${s.fonts && s.fonts.inter ? "loaded" : "not loaded"}${s.fonts && s.fonts.loaded.length ? ` (${s.fonts.loaded.join(", ")})` : ""}. ${gateLine(s)}`);
     lines.push("");
-    lines.push("| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |");
-    lines.push("|---|---|---|---|---|---|---|");
+    lines.push("| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |");
+    lines.push("|---|---|---|---|---|---|---|---|---|");
     lines.push(frameRow(`${results.referenceFrame.width}x${results.referenceFrame.height}`, s.frames.reference));
     lines.push(frameRow(`${results.protocolFrame.width}x${results.protocolFrame.height}`, s.frames.protocol));
     lines.push("");
+    if (s.anchors) {
+      const a = s.anchors;
+      lines.push(`${a.pinned ? "Body anchor (pinned in landmarks.json)" : "Section row bottom"}: reference y=${a.referenceTop === null ? "not found" : a.referenceTop}, capture y=${a.captureTop === null ? "not found" : a.captureTop}${typeof a.referenceTop === "number" && typeof a.captureTop === "number" ? ` (title block offset ${a.captureTop - a.referenceTop >= 0 ? "+" : ""}${a.captureTop - a.referenceTop}px)` : ""}.`);
+    }
     if (s.frames.reference && s.frames.reference.diff) lines.push(`Diff image: \`${s.frames.reference.diff}\` (red differs, blue masked).`);
     const evidenceName = `${s.screen}-${results.referenceFrame.width}x${results.referenceFrame.height}`;
     if (fs.existsSync(path.join(__dirname, "evidence", `${evidenceName}.png`))) {
@@ -67,7 +75,7 @@ function writeReport(results, outPath) {
       lines.push("| Landmark | Result | Expected | Measured | Delta |");
       lines.push("|---|---|---|---|---|");
       for (const l of s.landmarks) {
-        const fmt = (b) => (b ? ["x", "y", "w", "h"].filter((k) => typeof b[k] === "number").map((k) => `${k}=${Math.round(b[k])}`).join(" ") : "");
+        const fmt = (b) => (b ? ["x", "y", "yBody", "w", "h"].filter((k) => typeof b[k] === "number").map((k) => `${k}=${Math.round(b[k])}`).join(" ") : "");
         lines.push(`| ${l.name} | ${l.ok ? "within tolerance" : l.note ? l.note : "OUT of tolerance"} | ${fmt(l.expected)} | ${fmt(l.measured)} | ${l.deltas ? Object.entries(l.deltas).map(([k, v]) => `${k}${v >= 0 ? "+" : ""}${v}`).join(" ") : ""} |`);
       }
       lines.push("");

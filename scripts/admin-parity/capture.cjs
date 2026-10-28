@@ -97,7 +97,7 @@ const readDom = ({ maskSpecs, landmarkSpecs }) => {
   return { masks, landmarks };
 };
 
-async function captureScreen(page, { baseUrl, screen, viewport, outPng, maskSpec, landmarkSpec }) {
+async function captureScreen(page, { baseUrl, screen, viewport, outPng, maskSpec, landmarkSpec, anchorSelector = null }) {
   await page.setViewportSize(viewport);
   await openFixture(page, baseUrl, screen);
   const fonts = await page.evaluate(() => ({
@@ -110,8 +110,12 @@ async function captureScreen(page, { baseUrl, screen, viewport, outPng, maskSpec
       .map(([k, v]) => [k, { selector: v.selector, index: v.index, heading: v.heading }]),
   );
   const dom = await page.evaluate(readDom, { maskSpecs: maskSpec.selectors || [], landmarkSpecs });
+  const anchors = await page.evaluate((customSelector) => {
+    const bottom = (sel) => { const el = sel ? document.querySelector(sel) : null; return el ? Math.round(el.getBoundingClientRect().bottom) : null; };
+    return { sectionNavBottom: bottom('nav[aria-label="Administration sections"]'), h1Bottom: bottom("[data-admin-v2] h1"), custom: bottom(customSelector) };
+  }, anchorSelector);
   await page.screenshot({ path: outPng, fullPage: false });
-  return { fonts, masks: [...dom.masks, ...(maskSpec.rects || [])], landmarks: dom.landmarks };
+  return { fonts, masks: [...dom.masks, ...(maskSpec.rects || [])], landmarks: dom.landmarks, anchors };
 }
 
 async function responsiveCheck(page, { baseUrl, screen, viewports, outDir }) {
