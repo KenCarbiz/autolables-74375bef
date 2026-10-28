@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T18:37:55.770Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-28T19:37:02.767Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -20,12 +20,12 @@ Registered fixtures: 10, 11, 12, 13, 01, 02, 03, 04, 05, 06, 07, 08, 09.
 
 ## Screen 01
 
-Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 89.94% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 89.83% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 92.82% | 78.32% | 92.79% | 77.46% | 92.57% (+0px) | 75.79% | 97.42% | 70.68% | 3.94% |
-| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.35% | 70.12% | 89.94% | 67.33% | n/a | n/a | n/a | n/a | 3.94% |
+| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 92.98% | 79.20% | 92.99% | 78.59% | 92.81% (+0px) | 77.19% | 97.78% | 70.07% | 3.94% |
+| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.26% | 69.90% | 89.83% | 67.05% | n/a | n/a | n/a | n/a | 3.94% |
 
 Rail stand-in: 229px (the mock's rail width); content region starts at x=232.
 Section row bottom: reference y=238, capture y=238 (title block offset +0px).
@@ -43,9 +43,9 @@ Masks (14): summary tile counts; recent activity relative times; recent activity
 | tile1 | within tolerance | x=249 y=326 w=313 h=79 | x=253 y=326 yBody=88 w=311 h=81 | x+4 y+0 w-2 h+2 |
 | tile4 | within tolerance | x=1235 y=326 w=331 h=79 | x=1235 y=326 yBody=88 w=327 h=81 | x+0 y+0 w-4 h+2 |
 | attentionCard | within tolerance | x=249 y=420 w=889 | x=253 y=421 yBody=183 w=886 h=315 | x+4 y+1 w-3 |
-| policyCard | within tolerance | x=1152 y=420 w=414 | x=1151 y=421 yBody=183 w=411 h=605 | x-1 y+1 w-3 |
-| settingsCard | within tolerance | x=249 y=748 w=603 | x=253 y=750 yBody=512 w=598 h=276 | x+4 y+2 w-5 |
-| activityCard | within tolerance | x=862 y=748 w=276 | x=862 y=750 yBody=512 w=277 h=276 | x+0 y+2 w+1 |
+| policyCard | within tolerance | x=1152 y=420 w=414 | x=1151 y=421 yBody=183 w=411 h=576 | x-1 y+1 w-3 |
+| settingsCard | within tolerance | x=249 y=748 w=603 | x=253 y=750 yBody=512 w=598 h=247 | x+4 y+2 w-5 |
+| activityCard | within tolerance | x=862 y=748 w=276 | x=862 y=750 yBody=512 w=277 h=247 | x+0 y+2 w+1 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
@@ -107,12 +107,12 @@ Masks (5): dealership name, location and website address (fixture dealer); mock-
 
 ## Screen 03
 
-Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 90.72% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 90.64% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 91.74% | 74.44% | 90.80% | 71.83% | 92.57% (-50px) | 71.96% | 95.09% | 73.24% | 3.78% |
-| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 91.43% | 73.56% | 90.72% | 71.75% | n/a | n/a | n/a | n/a | 3.71% |
+| 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 91.66% | 74.11% | 90.70% | 71.42% | 92.58% (-50px) | 72.12% | 95.48% | 70.36% | 3.71% |
+| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 91.37% | 73.35% | 90.64% | 71.48% | n/a | n/a | n/a | n/a | 3.65% |
 
 Rail stand-in: 238px (the mock's rail width); content region starts at x=241.
 Section row bottom: reference y=217, capture y=167 (title block offset -50px).
@@ -125,13 +125,13 @@ Masks (8): member names in the table and the rail (fixture addresses); mock-only
 |---|---|---|---|---|
 | sectionNav | within tolerance | x=254 yBody=-39 w=1315 h=39 | x=262 y=129 yBody=-38 w=1300 h=38 | x+8 w-15 h-1 yBody+1 |
 | childTabs | within tolerance | x=254 yBody=21 w=1315 h=48 | x=262 y=183 yBody=16 w=1300 h=40 | x+8 w-15 h-8 yBody-5 |
-| teamCard | within tolerance | x=254 yBody=70 w=1315 h=661 | x=262 y=239 yBody=72 w=1300 h=675 | x+8 w-15 h+14 yBody+2 |
+| teamCard | within tolerance | x=254 yBody=70 w=1315 h=661 | x=262 y=239 yBody=72 w=1300 h=671 | x+8 w-15 h+10 yBody+2 |
 | searchInput | within tolerance | x=272 yBody=94 w=308 h=43 | x=281 y=265 yBody=98 w=308 h=43 | x+9 w+0 h+0 yBody+4 |
 | addEmployee | within tolerance | x=1043 yBody=95 w=151 h=42 | x=1032 y=266 yBody=99 w=155 h=42 | x-11 w+4 h+0 yBody+4 |
 | teamTable | within tolerance | x=273 yBody=159 w=920 | x=282 y=330 yBody=163 w=904 h=391 | x+9 w-16 yBody+4 |
-| rail | within tolerance | x=1213 yBody=70 w=357 | x=1205 y=240 yBody=73 w=356 h=673 | x-8 w-1 yBody+3 |
-| viewPolicy | OUT of tolerance | x=1231 yBody=595 w=325 h=44 | x=1224 y=779 yBody=612 w=321 h=43 | x-7 w-4 h-1 yBody+17 |
-| railNote | OUT of tolerance | x=1231 yBody=655 w=325 h=45 | x=1224 y=839 yBody=672 w=321 h=44 | x-7 w-4 h-1 yBody+17 |
+| rail | within tolerance | x=1213 yBody=70 w=357 | x=1205 y=240 yBody=73 w=356 h=669 | x-8 w-1 yBody+3 |
+| viewPolicy | within tolerance | x=1231 yBody=595 w=325 h=44 | x=1224 y=775 yBody=608 w=321 h=43 | x-7 w-4 h-1 yBody+13 |
+| railNote | within tolerance | x=1231 yBody=655 w=325 h=45 | x=1224 y=835 yBody=668 w=321 h=44 | x-7 w-4 h-1 yBody+13 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
@@ -151,15 +151,15 @@ Masks (8): member names in the table and the rail (fixture addresses); mock-only
 
 ## Screen 04
 
-Reference: `scripts/admin-parity/reference/04-salesperson-role-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 89.05% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/04-salesperson-role-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 88.96% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/04-1586x992.png` | 90.13% | 69.21% | 89.66% | 65.74% | 93.00% (-12px) | 76.76% | 97.90% | 79.89% | 0.95% |
-| 1600x1000 | `scripts/admin-parity/out/04-1600x1000.png` | 89.46% | 68.91% | 89.05% | 66.38% | n/a | n/a | n/a | n/a | 0.93% |
+| 1586x992 | `scripts/admin-parity/out/04-1586x992.png` | 90.30% | 69.38% | 89.87% | 65.96% | 88.78% (-120px) | 65.38% | 92.79% | 77.65% | 0.95% |
+| 1600x1000 | `scripts/admin-parity/out/04-1600x1000.png` | 89.39% | 68.02% | 88.96% | 65.24% | n/a | n/a | n/a | n/a | 0.93% |
 
 Rail stand-in: 239px (the mock's rail width); content region starts at x=242.
-Body anchor (pinned in landmarks.json): reference y=244, capture y=232 (title block offset -12px).
+Body anchor (pinned in landmarks.json): reference y=244, capture y=124 (title block offset -120px).
 Diff image: `scripts/admin-parity/out/04-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/04-1586x992.png` and `scripts/admin-parity/evidence/04-1586x992-diff.png`.
 
@@ -167,14 +167,14 @@ Masks (3): member address in the capabilities description (fixture); mock-only a
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
-| sectionNav | within tolerance | x=258 yBody=-37 w=1308 h=37 | x=263 y=194 yBody=-38 w=1299 h=38 | x+5 w-9 h+1 yBody-1 |
-| capabilitiesCard | within tolerance | x=258 yBody=20 w=768 h=623 | x=263 y=252 yBody=20 w=763 h=623 | x+5 w-5 h+0 yBody+0 |
-| capabilityTable | within tolerance | x=279 yBody=108 w=726 h=518 | x=285 y=341 yBody=109 w=719 h=517 | x+6 w-7 h-1 yBody+1 |
-| enforcementCard | within tolerance | x=1039 yBody=20 w=528 h=623 | x=1038 y=252 yBody=20 w=524 h=623 | x-1 w-4 h+0 yBody+0 |
-| enforcementList | within tolerance | x=1058 yBody=107 w=494 h=408 | x=1059 y=340 yBody=108 w=487 h=409 | x+1 w-7 h+1 yBody+1 |
-| bottomNote | within tolerance | x=262 yBody=654 w=879 h=50 | x=263 y=887 yBody=655 w=866 h=50 | x+1 w-13 h+0 yBody+1 |
-| testAccess | within tolerance | x=1167 yBody=659 w=169 h=40 | x=1155 y=891 yBody=659 w=180 h=43 | x-12 w+11 h+3 yBody+0 |
-| primaryAction | within tolerance | x=1349 yBody=659 w=218 h=40 | x=1347 y=891 yBody=659 w=215 h=43 | x-2 w-3 h+3 yBody+0 |
+| sectionNav | within tolerance | x=258 yBody=-37 w=1308 h=37 | x=263 y=86 yBody=-38 w=1299 h=38 | x+5 w-9 h+1 yBody-1 |
+| capabilitiesCard | OUT of tolerance | x=258 yBody=20 w=768 h=623 | x=263 y=252 yBody=128 w=763 h=629 | x+5 w-5 h+6 yBody+108 |
+| capabilityTable | OUT of tolerance | x=279 yBody=108 w=726 h=518 | x=285 y=341 yBody=217 w=719 h=523 | x+6 w-7 h+5 yBody+109 |
+| enforcementCard | OUT of tolerance | x=1039 yBody=20 w=528 h=623 | x=1038 y=252 yBody=128 w=524 h=629 | x-1 w-4 h+6 yBody+108 |
+| enforcementList | OUT of tolerance | x=1058 yBody=107 w=494 h=408 | x=1059 y=340 yBody=216 w=487 h=409 | x+1 w-7 h+1 yBody+109 |
+| bottomNote | OUT of tolerance | x=262 yBody=654 w=879 h=50 | x=263 y=893 yBody=769 w=866 h=50 | x+1 w-13 h+0 yBody+115 |
+| testAccess | OUT of tolerance | x=1167 yBody=659 w=169 h=40 | x=1155 y=897 yBody=773 w=180 h=43 | x-12 w+11 h+3 yBody+114 |
+| primaryAction | OUT of tolerance | x=1349 yBody=659 w=218 h=40 | x=1347 y=897 yBody=773 w=215 h=43 | x-2 w-3 h+3 yBody+114 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
@@ -193,19 +193,19 @@ Masks (3): member address in the capabilities description (fixture); mock-only a
 
 ## Screen 05
 
-Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 90.24% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 90.46% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 91.19% | 70.56% | 90.55% | 66.53% | 91.12% (+9px) | 67.24% | 96.58% | 63.47% | 6.89% |
-| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 90.69% | 70.26% | 90.24% | 66.46% | n/a | n/a | n/a | n/a | 7.10% |
+| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 91.31% | 71.08% | 90.71% | 67.24% | 91.31% (+9px) | 67.95% | 96.69% | 63.34% | 6.28% |
+| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 90.86% | 70.54% | 90.46% | 66.85% | n/a | n/a | n/a | n/a | 6.31% |
 
 Rail stand-in: 228px (the mock's rail width); content region starts at x=231.
 Section row bottom: reference y=158, capture y=167 (title block offset +9px).
 Diff image: `scripts/admin-parity/out/05-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/05-1586x992.png` and `scripts/admin-parity/evidence/05-1586x992-diff.png`.
 
-Masks (39): change impact counts (fixture inventory sizes); preview vehicle name, trim, stock and prices (fixture vehicle); preview vehicle photo: a per-vehicle image, like the name and prices beside it; the synthetic fixture vehicle has no photo, so a neutral 268x151 placeholder holds the reference's image box (geometry gated by the previewPhoto landmark); vehicle names, trims, stock numbers and per-vehicle prices (fixture vehicles); text only, so thumbnails, row geometry and the document fee column (policy data) are scored; vehicles-shown count; mock-only annotation (handoff footer caption, not product UI).
+Masks (27): change impact counts (fixture inventory sizes); preview vehicle name, trim, stock and prices (fixture vehicle); preview vehicle photo: a per-vehicle image, like the name and prices beside it; the synthetic fixture vehicle has no photo, so a neutral 268x151 placeholder holds the reference's image box (geometry gated by the previewPhoto landmark); vehicle names, trims, stock numbers and per-vehicle prices (fixture vehicles); text only, so thumbnails, row geometry and the document fee column (policy data) are scored; vehicles-shown count; mock-only annotation (handoff footer caption, not product UI).
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
@@ -217,8 +217,8 @@ Masks (39): change impact counts (fixture inventory sizes); preview vehicle name
 | editButton | within tolerance | x=869 yBody=80 w=74 h=33 | x=868 y=255 yBody=88 w=75 h=32 | x-1 w+1 h-1 yBody+8 |
 | scopeSelect | within tolerance | x=366 yBody=361 w=252 h=32 | x=362 y=536 yBody=369 w=252 h=32 | x-4 w+0 h+0 yBody+8 |
 | reviewButton | within tolerance | x=795 yBody=406 w=146 h=32 | x=795 y=581 yBody=414 w=146 h=32 | x+0 w+0 h+0 yBody+8 |
-| consistencyCard | within tolerance | x=256 yBody=492 w=1306 | x=252 y=667 yBody=500 w=1310 h=414 | x-4 w+4 yBody+8 |
-| consistencyTable | within tolerance | x=270 yBody=560 w=1278 | x=266 y=735 yBody=568 w=1282 h=292 | x-4 w+4 yBody+8 |
+| consistencyCard | within tolerance | x=256 yBody=492 w=1306 | x=252 y=667 yBody=500 w=1310 h=312 | x-4 w+4 yBody+8 |
+| consistencyTable | within tolerance | x=270 yBody=560 w=1278 | x=266 y=735 yBody=568 w=1282 h=190 | x-4 w+4 yBody+8 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
@@ -240,12 +240,12 @@ Masks (39): change impact counts (fixture inventory sizes); preview vehicle name
 
 ## Screen 06
 
-Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 90.37% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 90.47% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 88.53% | 82.52% | 94.23% | 82.23% | 94.19% (+0px) | 82.12% | 98.19% | 84.42% | 4.12% |
-| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.39% | 73.42% | 90.37% | 70.82% | n/a | n/a | n/a | n/a | 4.05% |
+| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 88.53% | 82.52% | 94.23% | 82.23% | 94.19% (+0px) | 82.13% | 98.19% | 84.42% | 4.12% |
+| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.47% | 73.69% | 90.47% | 71.16% | n/a | n/a | n/a | n/a | 4.05% |
 
 Rail stand-in: 243px (the mock's rail width); content region starts at x=246.
 Body anchor (pinned in landmarks.json): reference y=187, capture y=187 (title block offset +0px).
@@ -289,15 +289,15 @@ Masks (7): expected impact counts (fixture inventory sizes); example vehicle nam
 
 ## Screen 07
 
-Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 89.40% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 88.36% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 89.50% | 67.63% | 88.63% | 63.41% | 91.87% (+10px) | 74.11% | 96.87% | 72.75% | 3.08% |
-| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 89.87% | 71.09% | 89.40% | 67.99% | n/a | n/a | n/a | n/a | 3.04% |
+| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 89.36% | 67.80% | 88.45% | 63.63% | 92.16% (+64px) | 74.90% | 97.19% | 73.90% | 3.08% |
+| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 89.06% | 69.18% | 88.36% | 65.53% | n/a | n/a | n/a | n/a | 3.04% |
 
 Rail stand-in: 242px (the mock's rail width); content region starts at x=245.
-Body anchor (pinned in landmarks.json): reference y=228, capture y=238 (title block offset +10px).
+Body anchor (pinned in landmarks.json): reference y=228, capture y=292 (title block offset +64px).
 Diff image: `scripts/admin-parity/out/07-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/07-1586x992.png` and `scripts/admin-parity/evidence/07-1586x992-diff.png`.
 
@@ -305,22 +305,22 @@ Masks (6): sample vehicle names and mileage (fixture vehicles); product price (f
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
-| childTabs | within tolerance | x=267 yBody=-44 w=1295 h=44 | x=266 y=194 yBody=-44 w=1296 h=44 | x-1 w+1 h+0 yBody+0 |
-| rulesCard | within tolerance | x=267 yBody=19 w=701 h=668 | x=266 y=258 yBody=20 w=698 h=670 | x-1 w-3 h+2 yBody+1 |
-| rulesBox | within tolerance | x=290 yBody=103 w=655 h=289 | x=288 y=343 yBody=105 w=656 h=291 | x-2 w+1 h+2 yBody+2 |
-| priceBox | within tolerance | x=290 yBody=411 w=655 h=260 | x=288 y=650 yBody=412 w=656 h=261 | x-2 w+1 h+1 yBody+1 |
-| evidenceCard | within tolerance | x=981 yBody=19 w=581 h=358 | x=979 y=258 yBody=20 w=583 h=358 | x-2 w+2 h+0 yBody+1 |
-| evidenceList | within tolerance | x=999 yBody=103 w=544 h=259 | x=997 y=343 yBody=105 w=547 h=257 | x-2 w+3 h-2 yBody+2 |
-| samplesCard | within tolerance | x=981 yBody=388 w=581 h=299 | x=979 y=627 yBody=389 w=583 h=298 | x-2 w+2 h-1 yBody+1 |
-| samplesTable | within tolerance | x=996 yBody=472 w=556 h=197 | x=996 y=711 yBody=473 w=558 h=197 | x+0 w+2 h+0 yBody+1 |
-| reviewButton | within tolerance | x=1408 yBody=706 w=155 h=42 | x=1406 y=944 yBody=706 w=156 h=42 | x-2 w+1 h+0 yBody+0 |
+| childTabs | within tolerance | x=267 yBody=-44 w=1295 h=44 | x=266 y=248 yBody=-44 w=1296 h=44 | x-1 w+1 h+0 yBody+0 |
+| rulesCard | within tolerance | x=267 yBody=19 w=701 h=668 | x=266 y=312 yBody=20 w=698 h=670 | x-1 w-3 h+2 yBody+1 |
+| rulesBox | within tolerance | x=290 yBody=103 w=655 h=289 | x=288 y=397 yBody=105 w=656 h=291 | x-2 w+1 h+2 yBody+2 |
+| priceBox | within tolerance | x=290 yBody=411 w=655 h=260 | x=288 y=704 yBody=412 w=656 h=261 | x-2 w+1 h+1 yBody+1 |
+| evidenceCard | within tolerance | x=981 yBody=19 w=581 h=358 | x=979 y=312 yBody=20 w=583 h=358 | x-2 w+2 h+0 yBody+1 |
+| evidenceList | within tolerance | x=999 yBody=103 w=544 h=259 | x=997 y=397 yBody=105 w=547 h=257 | x-2 w+3 h-2 yBody+2 |
+| samplesCard | within tolerance | x=981 yBody=388 w=581 h=299 | x=979 y=681 yBody=389 w=583 h=298 | x-2 w+2 h-1 yBody+1 |
+| samplesTable | within tolerance | x=996 yBody=472 w=556 h=197 | x=996 y=765 yBody=473 w=558 h=197 | x+0 w+2 h+0 yBody+1 |
+| reviewButton | within tolerance | x=1408 yBody=706 w=155 h=42 | x=1406 y=998 yBody=706 w=156 h=42 | x-2 w+1 h+0 yBody+0 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1857 | none | `scripts/admin-parity/out/07-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | div | `scripts/admin-parity/out/07-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | none | `scripts/admin-parity/out/07-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | nav[Product views], div | `scripts/admin-parity/out/07-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections], div | `scripts/admin-parity/out/07-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/07-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Product views], div | `scripts/admin-parity/out/07-390x844.png` |
 
 ### Findings for screen 07
 
@@ -380,15 +380,15 @@ Masks (1): mock-only annotation (handoff footer caption, not product UI).
 
 ## Screen 09
 
-Reference: `scripts/admin-parity/reference/09-escalation-delivery-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 83.63% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/09-escalation-delivery-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 85.60% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/09-1586x992.png` | 86.57% | 65.65% | 84.38% | 61.59% | 91.76% (-81px) | 74.96% | 97.01% | 73.33% | 2.60% |
-| 1600x1000 | `scripts/admin-parity/out/09-1600x1000.png` | 85.79% | 65.66% | 83.63% | 61.56% | n/a | n/a | n/a | n/a | 2.57% |
+| 1586x992 | `scripts/admin-parity/out/09-1586x992.png` | 88.28% | 64.78% | 86.53% | 60.51% | 92.85% (-27px) | 78.32% | 98.71% | 74.19% | 2.60% |
+| 1600x1000 | `scripts/admin-parity/out/09-1600x1000.png` | 87.36% | 65.19% | 85.60% | 60.97% | n/a | n/a | n/a | n/a | 2.57% |
 
 Rail stand-in: 217px (the mock's rail width); content region starts at x=220.
-Body anchor (pinned in landmarks.json): reference y=289, capture y=208 (title block offset -81px).
+Body anchor (pinned in landmarks.json): reference y=289, capture y=262 (title block offset -27px).
 Diff image: `scripts/admin-parity/out/09-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/09-1586x992.png` and `scripts/admin-parity/evidence/09-1586x992-diff.png`.
 
@@ -396,25 +396,25 @@ Masks (10): request ids (fixture-generated activity text); rooftop names in the 
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
-| childTabs | within tolerance | x=244 w=1318 h=40 | x=241 y=172 yBody=-36 w=1321 h=36 | x-3 w+3 h-4 |
-| rulesCard | within tolerance | x=244 yBody=19 w=660 h=680 | x=241 y=228 yBody=20 w=662 h=695 | x-3 w+2 h+15 yBody+1 |
-| tier1 | within tolerance | x=262 yBody=75 w=627 h=117 | x=258 y=285 yBody=77 w=631 h=115 | x-4 w+4 h-2 yBody+2 |
-| minutesSelect1 | within tolerance | x=318 yBody=123 w=264 h=34 | x=315 y=331 yBody=123 w=264 h=34 | x-3 w+0 h+0 yBody+0 |
-| destination1 | within tolerance | x=660 yBody=123 w=230 h=34 | x=659 y=331 yBody=123 w=230 h=34 | x-1 w+0 h+0 yBody+0 |
-| tiles | OUT of tolerance | x=261 yBody=593 w=625 h=49 | x=258 y=818 yBody=610 w=627 h=49 | x-3 w+2 h+0 yBody+17 |
-| reviewButton | within tolerance | x=262 yBody=653 w=286 h=33 | x=258 y=877 yBody=669 w=286 h=33 | x-4 w+0 h+0 yBody+16 |
-| statesCard | within tolerance | x=917 yBody=19 w=645 h=403 | x=916 y=228 yBody=20 w=646 h=403 | x-1 w+1 h+0 yBody+1 |
-| statesList | within tolerance | x=933 yBody=90 w=612 h=236 | x=933 y=298 yBody=90 w=612 h=236 | x+0 w+0 h+0 yBody+0 |
-| retryNote | within tolerance | x=933 yBody=342 w=612 h=65 | x=933 y=550 yBody=342 w=612 h=65 | x+0 w+0 h+0 yBody+0 |
-| activityCard | within tolerance | x=917 yBody=432 w=645 h=247 | x=916 y=640 yBody=432 w=646 h=247 | x-1 w+1 h+0 yBody+0 |
-| activityTable | within tolerance | x=933 yBody=500 w=612 h=112 | x=934 y=709 yBody=501 w=610 h=110 | x+1 w-2 h-2 yBody+1 |
+| childTabs | within tolerance | x=244 w=1318 h=40 | x=241 y=226 yBody=-36 w=1321 h=36 | x-3 w+3 h-4 |
+| rulesCard | within tolerance | x=244 yBody=19 w=660 h=680 | x=241 y=282 yBody=20 w=662 h=679 | x-3 w+2 h-1 yBody+1 |
+| tier1 | within tolerance | x=262 yBody=75 w=627 h=117 | x=258 y=339 yBody=77 w=631 h=115 | x-4 w+4 h-2 yBody+2 |
+| minutesSelect1 | within tolerance | x=318 yBody=123 w=264 h=34 | x=315 y=385 yBody=123 w=264 h=34 | x-3 w+0 h+0 yBody+0 |
+| destination1 | within tolerance | x=660 yBody=123 w=230 h=34 | x=659 y=385 yBody=123 w=230 h=34 | x-1 w+0 h+0 yBody+0 |
+| tiles | within tolerance | x=261 yBody=593 w=625 h=49 | x=258 y=856 yBody=594 w=627 h=49 | x-3 w+2 h+0 yBody+1 |
+| reviewButton | within tolerance | x=262 yBody=653 w=286 h=33 | x=258 y=915 yBody=653 w=286 h=33 | x-4 w+0 h+0 yBody+0 |
+| statesCard | within tolerance | x=917 yBody=19 w=645 h=403 | x=916 y=282 yBody=20 w=646 h=403 | x-1 w+1 h+0 yBody+1 |
+| statesList | within tolerance | x=933 yBody=90 w=612 h=236 | x=933 y=352 yBody=90 w=612 h=236 | x+0 w+0 h+0 yBody+0 |
+| retryNote | within tolerance | x=933 yBody=342 w=612 h=65 | x=933 y=604 yBody=342 w=612 h=65 | x+0 w+0 h+0 yBody+0 |
+| activityCard | within tolerance | x=917 yBody=432 w=645 h=247 | x=916 y=694 yBody=432 w=646 h=247 | x-1 w+1 h+0 yBody+0 |
+| activityTable | within tolerance | x=933 yBody=500 w=612 h=112 | x=934 y=763 yBody=501 w=610 h=110 | x+1 w-2 h-2 yBody+1 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1845 | none | `scripts/admin-parity/out/09-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | none | `scripts/admin-parity/out/09-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | none | `scripts/admin-parity/out/09-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | div | `scripts/admin-parity/out/09-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/09-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/09-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div | `scripts/admin-parity/out/09-390x844.png` |
 
 ### Findings for screen 09
 
@@ -470,12 +470,12 @@ Masks (3): rooftop name in the policy description (the fixture is synthetic); ac
 
 ## Screen 11
 
-Reference: `scripts/admin-parity/reference/11-documents-service.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 89.46% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/11-documents-service.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 89.09% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/11-1586x992.png` | 90.72% | 72.29% | 90.24% | 69.41% | 91.17% (-33px) | 73.79% | 96.42% | 66.63% | 2.08% |
-| 1600x1000 | `scripts/admin-parity/out/11-1600x1000.png` | 89.90% | 72.28% | 89.46% | 69.17% | n/a | n/a | n/a | n/a | 2.05% |
+| 1586x992 | `scripts/admin-parity/out/11-1586x992.png` | 90.41% | 72.35% | 89.84% | 69.50% | 92.02% (-33px) | 74.79% | 97.60% | 65.98% | 2.10% |
+| 1600x1000 | `scripts/admin-parity/out/11-1600x1000.png` | 89.61% | 71.89% | 89.09% | 68.66% | n/a | n/a | n/a | n/a | 2.06% |
 
 Rail stand-in: 264px (the mock's rail width); content region starts at x=267.
 Section row bottom: reference y=234, capture y=201 (title block offset -33px).
@@ -488,12 +488,12 @@ Masks (6): policy change provenance (relative time and fixture name); readiness 
 |---|---|---|---|---|
 | childTabs | within tolerance | x=292 yBody=26 w=1268 h=54 | x=288 y=217 yBody=16 w=1274 h=40 | x-4 w+6 h-14 yBody-10 |
 | editButton | within tolerance | x=952 yBody=274 w=66 h=36 | x=952 y=479 yBody=278 w=67 h=37 | x+0 w+1 h+1 yBody+4 |
-| previewButton | OUT of tolerance | x=1090 yBody=624 w=221 h=48 | x=1090 y=845 yBody=644 w=221 h=48 | x+0 w+0 h+0 yBody+20 |
-| primaryAction | OUT of tolerance | x=1322 yBody=624 w=219 h=48 | x=1321 y=845 yBody=644 w=221 h=48 | x-1 w+2 h+0 yBody+20 |
-| rulesCard | OUT of tolerance | x=292 yBody=106 w=762 h=590 | x=288 y=310 yBody=109 w=767 h=609 | x-4 w+5 h+19 yBody+3 |
+| previewButton | within tolerance | x=1090 yBody=624 w=221 h=48 | x=1090 y=829 yBody=628 w=221 h=48 | x+0 w+0 h+0 yBody+4 |
+| primaryAction | within tolerance | x=1322 yBody=624 w=219 h=48 | x=1321 y=829 yBody=628 w=221 h=48 | x-1 w+2 h+0 yBody+4 |
+| rulesCard | within tolerance | x=292 yBody=106 w=762 h=590 | x=288 y=310 yBody=109 w=767 h=593 | x-4 w+5 h+3 yBody+3 |
 | rulesTable | within tolerance | x=311 yBody=210 w=724 h=296 | x=312 y=416 yBody=215 w=721 h=293 | x+1 w-3 h-3 yBody+5 |
 | sectionNav | OUT of tolerance | x=292 y=196 w=1268 h=38 | x=288 y=163 yBody=-38 w=1274 h=38 | x-4 y-33 w+6 h+0 |
-| selectedRuleCard | OUT of tolerance | x=1070 yBody=106 w=489 h=590 | x=1068 y=310 yBody=109 w=494 h=609 | x-2 w+5 h+19 yBody+3 |
+| selectedRuleCard | within tolerance | x=1070 yBody=106 w=489 h=590 | x=1068 y=310 yBody=109 w=494 h=593 | x-2 w+5 h+3 yBody+3 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
@@ -556,15 +556,15 @@ Masks (9): run timestamps (tile values and attempt times); fixture provider doma
 
 ## Screen 13
 
-Reference: `scripts/admin-parity/reference/13-sync-run-detail-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol content parity 88.64% is below 97%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/13-sync-run-detail-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol content parity 87.26% is below 97%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/13-1586x992.png` | 90.35% | 69.98% | 89.82% | 66.66% | 93.61% (-9px) | 82.18% | 99.02% | 68.60% | 3.61% |
-| 1600x1000 | `scripts/admin-parity/out/13-1600x1000.png` | 89.20% | 68.97% | 88.64% | 65.35% | n/a | n/a | n/a | n/a | 3.55% |
+| 1586x992 | `scripts/admin-parity/out/13-1586x992.png` | 88.77% | 67.22% | 87.80% | 63.13% | 93.38% (+44px) | 81.93% | 98.96% | 69.19% | 3.58% |
+| 1600x1000 | `scripts/admin-parity/out/13-1600x1000.png` | 88.11% | 66.23% | 87.26% | 61.85% | n/a | n/a | n/a | n/a | 3.53% |
 
 Rail stand-in: 233px (the mock's rail width); content region starts at x=236.
-Body anchor (pinned in landmarks.json): reference y=166, capture y=157 (title block offset -9px).
+Body anchor (pinned in landmarks.json): reference y=166, capture y=210 (title block offset +44px).
 Diff image: `scripts/admin-parity/out/13-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/13-1586x992.png` and `scripts/admin-parity/evidence/13-1586x992-diff.png`.
 
@@ -572,26 +572,26 @@ Masks (11): run timestamp and run id under the title; event times and the last s
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
-| actionsCard | within tolerance | x=1008 yBody=619 w=549 h=137 | x=1008 y=776 yBody=619 w=554 h=136 | x+0 w+5 h-1 yBody+0 |
-| backButton | within tolerance | x=1028 yBody=691 w=248 h=44 | x=1027 y=848 yBody=691 w=250 h=44 | x-1 w+2 h+0 yBody+0 |
-| badge | within tolerance | x=570 y=127 w=201 h=38 | x=581 y=118 yBody=-39 w=202 h=38 | x+11 y-9 w+1 h+0 |
-| breadcrumb | within tolerance | x=266 y=86 h=18 | x=257 y=86 yBody=-71 w=526 h=18 | x-9 y+0 h+0 |
-| diagnosis | within tolerance | x=266 yBody=176 w=712 h=209 | x=257 y=333 yBody=176 w=721 h=209 | x-9 w+9 h+0 yBody+0 |
-| evidenceCard | within tolerance | x=266 yBody=666 w=727 h=134 | x=257 y=823 yBody=666 w=736 h=134 | x-9 w+9 h+0 yBody+0 |
-| impactCard | within tolerance | x=1008 yBody=405 w=549 h=195 | x=1008 y=561 yBody=404 w=554 h=196 | x+0 w+5 h+1 yBody-1 |
-| nextStep | within tolerance | x=1001 yBody=176 w=556 h=213 | x=1001 y=333 yBody=176 w=561 h=213 | x+0 w+5 h+0 yBody+0 |
-| primaryAction | within tolerance | x=1288 yBody=691 w=249 h=44 | x=1289 y=848 yBody=691 w=250 h=44 | x+1 w+1 h+0 yBody+0 |
-| summaryStrip | within tolerance | x=266 yBody=42 w=1291 h=113 | x=257 y=199 yBody=42 w=1305 h=114 | x-9 w+14 h+1 yBody+0 |
-| timelineCard | within tolerance | x=266 yBody=405 w=727 h=254 | x=257 y=562 yBody=405 w=736 h=254 | x-9 w+9 h+0 yBody+0 |
-| timelineTable | within tolerance | x=285 yBody=446 w=689 h=212 | x=278 y=603 yBody=446 w=694 h=212 | x-7 w+5 h+0 yBody+0 |
-| title | within tolerance | x=266 y=126 h=40 | x=257 y=116 yBody=-41 w=312 h=41 | x-9 y-10 h+1 |
+| actionsCard | within tolerance | x=1008 yBody=619 w=549 h=137 | x=1008 y=829 yBody=619 w=554 h=136 | x+0 w+5 h-1 yBody+0 |
+| backButton | within tolerance | x=1028 yBody=691 w=248 h=44 | x=1027 y=901 yBody=691 w=250 h=44 | x-1 w+2 h+0 yBody+0 |
+| badge | OUT of tolerance | x=570 y=127 w=201 h=38 | x=563 y=171 yBody=-39 w=202 h=38 | x-7 y+44 w+1 h+0 |
+| breadcrumb | OUT of tolerance | x=266 y=86 h=18 | x=257 y=140 yBody=-70 w=508 h=18 | x-9 y+54 h+0 |
+| diagnosis | within tolerance | x=266 yBody=176 w=712 h=209 | x=257 y=386 yBody=176 w=721 h=209 | x-9 w+9 h+0 yBody+0 |
+| evidenceCard | within tolerance | x=266 yBody=666 w=727 h=134 | x=257 y=876 yBody=666 w=736 h=134 | x-9 w+9 h+0 yBody+0 |
+| impactCard | within tolerance | x=1008 yBody=405 w=549 h=195 | x=1008 y=614 yBody=404 w=554 h=196 | x+0 w+5 h+1 yBody-1 |
+| nextStep | within tolerance | x=1001 yBody=176 w=556 h=213 | x=1001 y=386 yBody=176 w=561 h=213 | x+0 w+5 h+0 yBody+0 |
+| primaryAction | within tolerance | x=1288 yBody=691 w=249 h=44 | x=1289 y=901 yBody=691 w=250 h=44 | x+1 w+1 h+0 yBody+0 |
+| summaryStrip | within tolerance | x=266 yBody=42 w=1291 h=113 | x=257 y=252 yBody=42 w=1305 h=114 | x-9 w+14 h+1 yBody+0 |
+| timelineCard | within tolerance | x=266 yBody=405 w=727 h=254 | x=257 y=615 yBody=405 w=736 h=254 | x-9 w+9 h+0 yBody+0 |
+| timelineTable | within tolerance | x=285 yBody=446 w=689 h=212 | x=278 y=656 yBody=446 w=694 h=212 | x-7 w+5 h+0 yBody+0 |
+| title | OUT of tolerance | x=266 y=126 h=40 | x=257 y=170 yBody=-40 w=294 h=40 | x-9 y+44 h+0 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1853 | none | `scripts/admin-parity/out/13-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | pre | `scripts/admin-parity/out/13-1366x768.png` |
-| 1024x768 | none | 1024 | 1024 | 1000 | none | `scripts/admin-parity/out/13-1024x768.png` |
-| 390x844 | none | 390 | 390 | 374 | div, pre | `scripts/admin-parity/out/13-390x844.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections], pre | `scripts/admin-parity/out/13-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/13-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div, pre | `scripts/admin-parity/out/13-390x844.png` |
 
 ### Findings for screen 13
 

@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | Not met; acceptance pending | Approved title-block change applied; no screen reaches 97% on the agreed metric (content parity at 1600x1000: 83.63-91.43%); landmarks fail on 03, 09, 10, 11, 12 (section 10) | Owner decision on the proposed exceptions in section 10.6; none is approved |
+| 16 | Visual acceptance | Not met; acceptance pending | Owner layout decisions applied; on `d701dae` no screen reaches 94% or 97% on the agreed metric (85.60-90.64%); owner-decided landmark differences on 04, 10, 11, 12, 13 (section 10.1) | Owner decision on the proposed exceptions in section 10.6; none is approved |
 
 ## 2. How the evidence was produced
 
@@ -216,91 +216,137 @@ owner.
   the doc fee are scored) and the 13 evidence mask was removed.
 - Target: 97% per screen, plus landmarks within 16px.
 
-### 10.1 Protocol results after the approved title-block change
+### 10.1 Final results, implementation commit `d701dae`
 
-Owner approval (2026-10-28): match the mock title blocks, keep one h1 and
-the section tabs, drop redundant breadcrumbs and descriptions, raise child
-titles only as far as the references support, shared style only. The
-target stays 97%. Before is `35cd43c`; after is the commit that carries
-this table. Same protocol: 1600x1000, DPR 1, Chromium, 32/255, the same
-masks.
+Measured on implementation commit `d701dae` (all 13 captures, the
+overlays, the before/after sheets and the breakpoint audit ran on that
+tree; evidence is committed separately and records this SHA). Before is
+`8680e6d`. The comparison contract is unchanged: 1600x1000, DPR 1,
+Chromium, reference resampled bilinearly, 32/255, same masks and
+landmarks. **Target 97% (interim bar 94%): not met on any screen.**
 
-| # | Screen | Route | Content before | Content after (agreed metric) | Full frame | Structure | Masked | Landmarks |
+| # | Protocol before | **Protocol after (agreed metric)** | Full frame | Structure | Diagnostic: native 1586x992 | Diagnostic: body aligned | Landmarks | Responsive (5 sizes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 01 | Overview | `/admin?tab=overview` | 89.91% | 89.94% | 90.35% | 67.33% | 3.94% | pass |
-| 02 | Dealership & Brand, Identity | `/admin?tab=identity` | 88.02% | 87.38% | 88.13% | 65.35% | 1.42% | pass |
-| 03 | People & Access, Team | `/admin?tab=team` | 91.54% | 90.72% | 91.43% | 71.75% | 3.71% | fail: viewPolicy, railNote |
-| 04 | Member role (child) | `/admin/people/:memberId` | 88.02% | 89.05% | 89.46% | 66.38% | 0.93% | pass |
-| 05 | Pricing & Products, Price rules | `/admin?tab=price-rules` | 89.41% | 90.24% | 90.69% | 66.46% | 7.10% | pass |
-| 06 | Fee change review (child) | `/admin/pricing/fee-review` | 90.43% | 90.37% | 85.39% | 70.82% | 4.05% | pass |
-| 07 | Product applicability (child) | `/admin/products/:productId/applicability` | 89.86% | 89.40% | 89.87% | 67.99% | 3.04% | pass |
-| 08 | Contact & Routing | `/admin?tab=routing` | 87.10% | 89.46% | 90.42% | 66.79% | 0.26% | pass |
-| 09 | Escalation rules (child) | `/admin/customer-experience/escalation` | 83.53% | 83.63% | 85.79% | 61.56% | 2.57% | fail: tiles |
-| 10 | Publishing, Effective policy | `/admin?tab=effective-policy` | 86.13% | 86.76% | 87.76% | 60.58% | 0.90% | fail: childTabs, policyCard, draftStatus |
-| 11 | Documents & Service, Approval rules | `/admin?tab=approval-rules` | 91.67% | 89.46% | 89.90% | 69.17% | 2.05% | fail: previewButton, primaryAction, rulesCard, sectionNav, selectedRuleCard |
-| 12 | Integrations, Inventory feed | `/admin?tab=inventory-feed` | 79.79% | 90.50% | 90.76% | 68.69% | 2.77% | fail: childTabs |
-| 13 | Sync run detail (child) | `/admin/integrations/runs/:runId` | 88.55% | 88.64% | 89.20% | 65.35% | 3.55% | pass |
+| 01 | 89.94% | **89.83%** | 90.26% | 67.05% | 92.99% | 92.81% | pass | pass |
+| 02 | 87.38% | **87.38%** | 88.13% | 65.35% | 88.00% | 92.72% | pass | pass |
+| 03 | 90.72% | **90.64%** | 91.37% | 71.48% | 90.70% | 92.58% | pass | pass |
+| 04 | 89.05% | **88.96%** | 89.39% | 65.24% | 89.87% | 88.78% | 7 fail (body anchor: section row now above the title, owner decision) | pass |
+| 05 | 90.24% | **90.46%** | 90.86% | 66.85% | 90.71% | 91.31% | pass | pass |
+| 06 | 90.37% | **90.47%** | 85.47% | 71.16% | 94.23% | 94.19% | pass | pass |
+| 07 | 89.40% | **88.36%** | 89.06% | 65.53% | 88.45% | 92.16% | pass | pass |
+| 08 | 89.46% | **89.46%** | 90.42% | 66.79% | 91.88% | 90.35% | pass | pass |
+| 09 | 83.63% | **85.60%** | 87.36% | 60.97% | 86.53% | 92.85% | pass | pass |
+| 10 | 86.76% | **86.76%** | 87.76% | 60.58% | 89.53% | 88.84% | 3 fail (tabs outside card, owner decision) | pass |
+| 11 | 89.46% | **89.09%** | 89.61% | 68.66% | 89.84% | 92.02% | 1 fail (sectionNav: authorized title block) | pass |
+| 12 | 90.50% | **90.50%** | 90.76% | 68.69% | 92.22% | 92.00% | 1 fail (childTabs: no heading above tabs, owner decision) | pass |
+| 13 | 88.64% | **87.26%** | 88.11% | 61.85% | 87.80% | 93.38% | 3 fail (section row above title, owner decision) | pass |
 
-No screen reaches 97%; the range is 83.63-91.43%. Results by group:
+Resampling penalty (disclosed, not corrected): the protocol stretches the
+1586x992 mock by 0.88% x 0.81%, so a correctly sized element drifts up to
+14px right and 8px down in the reference. 06 scores 94.23% against the
+native mock and 90.47% at the protocol frame from that alone.
 
-- Improved: 12 (+10.7), 08 (+2.4), 04 (+1.0), 05 (+0.8), 10 (+0.6).
-- Unchanged within 0.1: 01, 06, 09, 13.
-- Lower:
-  - 02 (-0.6) and 03 (-0.8): their mocks title the page with the section
-    name at about 36px, plus a concept chip on 03. With the breadcrumb and
-    description removed, our shorter block sits 38px and 50px higher than
-    the mock's.
-  - 07 (-0.5): the larger child title.
-  - 11 (-2.2): the mock draws an eyebrow and a 36px section title without
-    a description. Following that, our block sits 33px high and the
-    section row lands 33px above the mock's.
-- Landmarks:
-  - 03 now misses two rail landmarks by 1px (17 against 16): the full
-    member address wraps to a second line, and the reference's 40px tab row
-    adds 4px.
-  - 10 and 11 still fail on the in-card tab placement.
-  - 11 also fails its section row.
-  - 12 fails on its extra heading.
-  - 09 fails on its tiles.
-- Sheets:
-  - `scripts/admin-parity/evidence/before-after/NN.png`: Before,
-    Reference and After at 1600x1000, captioned with protocol scores.
-  - `evidence/overlay/NN.png`: reference, actual, overlay and difference
-    map, unmasked.
-  - `evidence/responsive/NN.png`: the responsive captures.
+Consistency check applied to every stream under one rule: geometry must
+come from the source mock at its native size; responsive changes are
+fine, offsets or sizes that only reproduce the 0.8% stretch are not.
 
-#### Authorized geometry (replaces the 28px-everywhere note)
+- Reverted:
+  - Overview and Inventory feed row heights, paddings and banner margins.
+    The stream's own notes measured them "at the 1600x1000 protocol frame",
+    e.g. rows 53/54/54/57 against the source's 52/53/53/56.
+  - The fee review dialog at 915px, which is exactly 907px x 1600/1586,
+    with every column nudged by the same ratio. With it, 06 read 93.98%
+    at `93729a8`; without it, 90.47%.
+  - The role enforcement rows moved down 4px. The native mock puts each
+    title 26-27px under the row edge; it is now 27.
+- Kept, as source-backed:
+  - The Overview tile description bug fix (inline text ignored its line
+    height and wrapped to four lines).
+  - 13 drops its unauthorized 34px title override in favour of the shared
+    style.
+  - Capability rows 59px (the native mock averages 59).
+  - 09's warning mark and 11's readiness columns (below).
+  - The 05 fixture's three consistency rows. They live in
+    `src/pages/admin/fixtures/` and its test only; production rows stay
+    data-driven and nothing outside fixtures imports them.
+- 09 tiles (not approved as a difference; corrected): the "Destination
+  required" mark was a 24px icon that made its line 24px tall and pushed
+  the tiers and tiles 8-17px down. Now it is:
+  - a 16x16 canvas with visible artwork 12x10px, against the mock's 12x12
+    (2px short in height from lucide's triangle proportions);
+  - decorative (`aria-hidden`) and inside no control, so no touch target
+    applies.
 
-- Parent sections: one h1, "Administration", at the `page` token 28/36/700
-  (the parent mocks draw it at 25.5-28.6px; 01 alone draws 36px).
-- Breadcrumb and description per section, from `AdminSection.intro` in
-  `src/lib/admin/sections.ts`:
-  - Overview: breadcrumb and description, as its mock.
-  - Publishing: breadcrumb (the mock's eyebrow) and description.
-  - Documents & Service: breadcrumb only.
-  - Every other section: neither.
-- Child pages: title 28/36 below 1024px and 32/40 from 1024px. The four
-  child mocks draw 28-33px (04 about 30, 07 about 33, 09 about 28, 13
-  about 32); none supports 36px. Breadcrumb and back link kept.
-- Section row: 14/20, inactive Medium, active Semibold. The references fit
-  Inter Medium at 13.75px.
-- Child tabs: 40px row, 14/20, inactive Medium, active Semibold, 36px gaps.
-  02, 08 and 12 draw 14px labels about 38px apart; 05 draws about 12.75px,
-  which we do not shrink to.
-- Icon sizes are unchanged in this round. They were set from per-screen
-  measurements in the earlier rounds (`ADMIN_V2_PARITY_REPORT.md`). The
-  audit finds no icon off-centre and the same seven sub-16px glyphs that
-  match their references.
+  Every 09 landmark now passes.
+- 11 regression: the overlay shows the whole body 33px high, because the
+  authorized intro (breadcrumb + 28px h1) is shorter than the mock's
+  eyebrow + 36px section title. The rail cards were also 19px too tall
+  from a wrapped readiness label; the columns now match the mock's
+  widths, and those landmarks pass.
 
-Recheck on this commit (`scripts/admin-parity/audit.cjs`, 1586x992,
-1366x768, 1024x768, 768x1024, 390x844):
+Owner-decided structural differences (documented, not passed):
 
-- Every screen: one h1, no page overflow, no clipped text, no unnamed
-  control, no small target.
-- Every tab stop shows a visible focus change, and there are no contrast
-  failures in light or dark.
-- Admin, Sticker and harness suites pass, including Review changes staying
-  disabled until a real change (04, 07).
+- 04, 07, 09 and 13 draw the parent section row above the child title,
+  where the 04 mock draws it under the title and the 07 and 13 mocks draw
+  none. As a result:
+  - 04's body anchor (the section row) now sits above the title, so 7
+    landmarks read as shifted. The 16px tolerance would be met if anchored
+    on the capabilities card, but the anchor is part of the frozen
+    contract.
+  - 13 fails breadcrumb, title and badge.
+  - 07 fell 1.0 point.
+- 10: the tabs are outside the card (childTabs, policyCard, draftStatus).
+- 12: there is no heading above the tabs (childTabs).
+- 02, 03 and 11: the authorized title block is shorter than these mocks'
+  section-name titles. Bodies sit 38, 50 and 33px high.
+
+Unresolved implementation differences:
+
+- Text glyphs. The mock's lettering is 5-10% narrower than Chromium's
+  Inter at the same height; 64-74% of the remaining aligned-body
+  difference is inside text boxes. It cannot be closed without shrinking
+  text.
+- Icons. No supplied asset matched the reference closely enough to swap.
+  The database glyph has no top ellipse, and the vehicle drawing is not
+  the mock's car. The lucide glyphs stay.
+- 08: the draft bar is 69px with the button centred; the mock draws 75px
+  with the button near the top.
+- 10: the policy-library copy is longer than the mock's sample, so 13px
+  card text would grow the cards.
+- 09: the warning artwork is 2px shorter than the mock's.
+- Sub-16px icons at their reference size:
+  - 06: two 14x9 change arrows;
+  - 08: two 14px glyphs in the miniature preview;
+  - 09: three badge glyphs.
+
+Checks on `d701dae`:
+
+- `bunx tsc -p tsconfig.app.json --noEmit` is clean.
+- Vitest (`src/pages/admin`, `src/components/admin`, `src/lib/admin`,
+  `src/components/sticker`): 54 files, 524 tests, all passing. Earlier
+  counts: 518 was the same run without the Sticker suite (53 files), and
+  the 515 previously reported was an error.
+- Harness tests (`node --test scripts/admin-parity/harness.test.cjs`):
+  10 of 10 pass. They are not part of the 524.
+- Audit (`scripts/admin-parity/audit.cjs` at 1586x992, 1366x768,
+  1024x768, 768x1024 and 390x844), every screen:
+  - no overflow, clipped text or overlaps;
+  - one h1, no unnamed control, no small target;
+  - every focus stop visible, no contrast failure in light or dark, no
+    icon off-centre.
+  - 07 logs 6 console errors. They are sandbox network failures, not
+    application errors.
+- Review changes stays disabled until a real change on 04 and 07. This is
+  covered by the suites above.
+
+Evidence on the evidence commit that names `d701dae`:
+
+- `scripts/admin-parity/evidence/before-after/NN.png`: before `8680e6d`,
+  reference and after `d701dae`, all at 1600x1000 with protocol scores.
+- `evidence/overlay/NN.png`: reference, actual, overlay and difference,
+  unmasked.
+- `evidence/responsive/NN.png`.
+- `evidence/audit-final.json`.
 
 ### 10.2 Diagnostics (not the agreed metric)
 

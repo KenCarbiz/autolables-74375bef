@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T18:40:35.508Z",
+  "generatedAt": "2026-10-28T19:39:36.288Z",
   "baseUrl": "http://localhost:5192",
   "screens": {
     "10": {
@@ -2247,7 +2247,9 @@
         ],
         "images": [],
         "disabledNoSemantics": [],
-        "selected": [],
+        "selected": [
+          "a \"Integrations\""
+        ],
         "smallButSpaced": [
           {
             "el": "a \"Administration\"",
@@ -2276,10 +2278,12 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 7,
+          "tabStops": 15,
           "noVisibleFocus": []
         },
-        "hoverWithoutFeedback": [],
+        "hoverWithoutFeedback": [
+          "a \"Integrations\""
+        ],
         "darkContrast": []
       },
       "laptop": {
@@ -2419,7 +2423,9 @@
         ],
         "images": [],
         "disabledNoSemantics": [],
-        "selected": [],
+        "selected": [
+          "a \"Integrations\""
+        ],
         "smallButSpaced": [
           {
             "el": "a \"Administration\"",
@@ -2585,7 +2591,9 @@
         ],
         "images": [],
         "disabledNoSemantics": [],
-        "selected": [],
+        "selected": [
+          "a \"Integrations\""
+        ],
         "smallButSpaced": [
           {
             "el": "a \"Administration\"",
@@ -2751,7 +2759,9 @@
         ],
         "images": [],
         "disabledNoSemantics": [],
-        "selected": [],
+        "selected": [
+          "a \"Integrations\""
+        ],
         "smallButSpaced": [
           {
             "el": "a \"Administration\"",
@@ -2917,7 +2927,9 @@
         ],
         "images": [],
         "disabledNoSemantics": [],
-        "selected": [],
+        "selected": [
+          "a \"Integrations\""
+        ],
         "smallButSpaced": [
           {
             "el": "a \"Administration\"",
@@ -2945,6 +2957,14 @@
           }
         ],
         "under44": [
+          "a \"Overview\" 64x38",
+          "a \"Dealership & Brand\" 128x38",
+          "a \"People & Access\" 112x38",
+          "a \"Pricing & Products\" 123x38",
+          "a \"Customer Experience\" 144x38",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 81x38",
           "a \"Administration\" 82x18",
           "a \"Integrations\" 67x18",
           "a \"Inventory feed\" 82x18",
@@ -2953,7 +2973,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 8,
+          "tabStops": 16,
           "noVisibleFocus": []
         }
       }
@@ -9109,10 +9129,6 @@
           }
         ],
         "under44": [
-          "a \"Administration\" 82x18",
-          "a \"People & Access\" 95x18",
-          "a \"Roles\" 31x18",
-          "a \"Back to Roles\" 117x21",
           "a \"Overview\" 64x38",
           "a \"Dealership & Brand\" 128x38",
           "a \"People & Access\" 113x38",
@@ -9121,6 +9137,10 @@
           "a \"Publishing\" 70x38",
           "a \"Documents & Service\" 144x38",
           "a \"Integrations\" 80x38",
+          "a \"Administration\" 82x18",
+          "a \"People & Access\" 95x18",
+          "a \"Roles\" 31x18",
+          "a \"Back to Roles\" 117x21",
           "summary \"Where each status comes from\" 321x18"
         ],
         "errors": [],
@@ -9238,24 +9258,6 @@
             "decorative": true
           },
           {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
             "name": "info",
             "w": 20,
             "h": 20,
@@ -9275,26 +9277,6 @@
             "parentPadding": "0px",
             "w": 166,
             "h": 83
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
           },
           {
             "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
@@ -9358,18 +9340,6 @@
             "spacingException": true
           },
           {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
-            "spacingException": true
-          },
-          {
             "el": "input \"\"",
             "w": 620,
             "h": 18,
@@ -9402,7 +9372,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 26,
+          "tabStops": 24,
           "noVisibleFocus": []
         },
         "hoverWithoutFeedback": [
@@ -9519,24 +9489,6 @@
             "decorative": true
           },
           {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
             "name": "info",
             "w": 20,
             "h": 20,
@@ -9586,26 +9538,6 @@
             "parentPadding": "0px",
             "w": 40,
             "h": 20
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
           }
         ],
         "disabledNoSemantics": [],
@@ -9618,18 +9550,6 @@
             "el": "a \"Price audit\"",
             "w": 93,
             "h": 20,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
             "spacingException": true
           },
           {
@@ -9790,24 +9710,6 @@
             "decorative": true
           },
           {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
             "name": "info",
             "w": 20,
             "h": 20,
@@ -9857,26 +9759,6 @@
             "parentPadding": "0px",
             "w": 40,
             "h": 20
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
           }
         ],
         "disabledNoSemantics": [],
@@ -9889,18 +9771,6 @@
             "el": "a \"Price audit\"",
             "w": 93,
             "h": 20,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
             "spacingException": true
           },
           {
@@ -10055,24 +9925,6 @@
             "decorative": true
           },
           {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
             "name": "info",
             "w": 20,
             "h": 20,
@@ -10122,26 +9974,6 @@
             "parentPadding": "0px",
             "w": 40,
             "h": 20
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
           }
         ],
         "disabledNoSemantics": [],
@@ -10154,18 +9986,6 @@
             "el": "a \"Price audit\"",
             "w": 93,
             "h": 20,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
             "spacingException": true
           },
           {
@@ -10326,24 +10146,6 @@
             "decorative": true
           },
           {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
-            "name": "check",
-            "w": 18,
-            "h": 18,
-            "boxed": false,
-            "box": null,
-            "offCentre": null,
-            "decorative": true
-          },
-          {
             "name": "info",
             "w": 20,
             "h": 20,
@@ -10393,26 +10195,6 @@
             "parentPadding": "0px",
             "w": 40,
             "h": 20
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
-          },
-          {
-            "src": "/src/assets/admin-v2/artwork/vehicle-placeholder.svg",
-            "alt": "",
-            "imgBackground": "rgba(0, 0, 0, 0)",
-            "imgPadding": "0px",
-            "parentBackground": "rgb(244, 247, 251)",
-            "parentPadding": "0px",
-            "w": 40,
-            "h": 20
           }
         ],
         "disabledNoSemantics": [],
@@ -10425,18 +10207,6 @@
             "el": "a \"Price audit\"",
             "w": 93,
             "h": 20,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
-            "spacingException": true
-          },
-          {
-            "el": "a \"Review\"",
-            "w": 45,
-            "h": 16,
             "spacingException": true
           },
           {
@@ -10502,8 +10272,6 @@
           "a \"Review\" 45x16",
           "a \"Review\" 45x16",
           "a \"Review\" 45x16",
-          "a \"Review\" 45x16",
-          "a \"Review\" 45x16",
           "input \"\" 308x36",
           "input \"\" 146x18",
           "input \"\" 146x18",
@@ -10513,7 +10281,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 26,
+          "tabStops": 24,
           "noVisibleFocus": []
         }
       }
@@ -11313,6 +11081,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Pricing & Products\"",
           "a \"Applicability\""
         ],
         "smallButSpaced": [
@@ -11375,13 +11144,16 @@
           "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
           "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
           "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
+          "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+          "WebSocket connection to 'wss://onnbmmdbrsgytfozfozn.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
           "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
         ],
         "focus": {
-          "tabStops": 9,
+          "tabStops": 17,
           "noVisibleFocus": []
         },
         "hoverWithoutFeedback": [
+          "a \"Pricing & Products\"",
           "a \"Applicability\""
         ],
         "darkContrast": []
@@ -11540,6 +11312,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Pricing & Products\"",
           "a \"Applicability\""
         ],
         "smallButSpaced": [
@@ -11757,6 +11530,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Pricing & Products\"",
           "a \"Applicability\""
         ],
         "smallButSpaced": [
@@ -11974,6 +11748,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Pricing & Products\"",
           "a \"Applicability\""
         ],
         "smallButSpaced": [
@@ -12191,6 +11966,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Pricing & Products\"",
           "a \"Applicability\""
         ],
         "smallButSpaced": [
@@ -12250,6 +12026,14 @@
           }
         ],
         "under44": [
+          "a \"Overview\" 64x38",
+          "a \"Dealership & Brand\" 128x38",
+          "a \"People & Access\" 112x38",
+          "a \"Pricing & Products\" 125x38",
+          "a \"Customer Experience\" 144x38",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 80x38",
           "a \"Administration\" 82x18",
           "a \"Pricing & Products\" 105x18",
           "a \"Products\" 51x18",
@@ -12265,7 +12049,7 @@
           "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
         ],
         "focus": {
-          "tabStops": 9,
+          "tabStops": 17,
           "noVisibleFocus": []
         }
       }
@@ -15073,8 +14857,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -15100,8 +14884,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -15201,6 +14985,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Customer Experience\"",
           "button[role=tab] \"Rules\""
         ],
         "smallButSpaced": [
@@ -15243,10 +15028,11 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 17,
+          "tabStops": 25,
           "noVisibleFocus": []
         },
         "hoverWithoutFeedback": [
+          "a \"Customer Experience\"",
           "button \"\"",
           "button \"Rules\"",
           "button \"EmailSend by email\""
@@ -15314,8 +15100,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -15341,8 +15127,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -15442,6 +15228,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Customer Experience\"",
           "button[role=tab] \"Rules\""
         ],
         "smallButSpaced": [
@@ -15545,8 +15332,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -15572,8 +15359,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -15673,6 +15460,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Customer Experience\"",
           "button[role=tab] \"Rules\""
         ],
         "smallButSpaced": [
@@ -15776,8 +15564,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -15803,8 +15591,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -15904,6 +15692,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Customer Experience\"",
           "button[role=tab] \"Rules\""
         ],
         "smallButSpaced": [
@@ -16007,8 +15796,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -16034,8 +15823,8 @@
           },
           {
             "name": "triangle-alert",
-            "w": 24,
-            "h": 24,
+            "w": 16,
+            "h": 16,
             "boxed": false,
             "box": null,
             "offCentre": null,
@@ -16135,6 +15924,7 @@
         "images": [],
         "disabledNoSemantics": [],
         "selected": [
+          "a \"Customer Experience\"",
           "button[role=tab] \"Rules\""
         ],
         "smallButSpaced": [
@@ -16176,6 +15966,14 @@
           }
         ],
         "under44": [
+          "a \"Overview\" 64x38",
+          "a \"Dealership & Brand\" 128x38",
+          "a \"People & Access\" 112x38",
+          "a \"Pricing & Products\" 123x38",
+          "a \"Customer Experience\" 146x38",
+          "a \"Publishing\" 70x38",
+          "a \"Documents & Service\" 144x38",
+          "a \"Integrations\" 80x38",
           "a \"Administration\" 82x18",
           "a \"Customer Experience\" 122x18",
           "a \"Contact & Routing\" 102x18",
@@ -16195,7 +15993,7 @@
         ],
         "errors": [],
         "focus": {
-          "tabStops": 18,
+          "tabStops": 26,
           "noVisibleFocus": []
         }
       }
