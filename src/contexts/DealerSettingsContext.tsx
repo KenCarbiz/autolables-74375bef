@@ -571,6 +571,16 @@ interface DealerSettingsContextType {
   loading: boolean;
   updateSettings: (updates: Partial<DealerSettings>) => Promise<boolean>;
   reload: () => Promise<void>;
+  /** The tenant the settings belong to; null for anonymous or the house tenant. */
+  tenantId: string | null;
+  /** Increments after every load, success or failure. Forms baseline on it so a
+   *  tenant switch or a late server answer can never be saved as an edit. */
+  loadGeneration: number;
+  /** The server row was read on the latest load. False means cache or defaults
+   *  are showing, and nothing derived from them may be saved. */
+  serverLoaded: boolean;
+  loadError: string | null;
+  lastSaveError: string | null;
 }
 
 const DealerSettingsContext = createContext<DealerSettingsContextType | undefined>(undefined);
@@ -608,6 +618,10 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
 
   const [settings, setSettings] = useState<DealerSettings>(() => readCache(tenantId) ?? DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const [loadGeneration, setLoadGeneration] = useState(0);
+  const [serverLoaded, setServerLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [lastSaveError, setLastSaveError] = useState<string | null>(null);
   const loadedKeyRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -616,7 +630,10 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
     if (!user || !tenantId) {
       const cached = readCache(tenantId);
       setSettings(cached ?? DEFAULT_SETTINGS);
+      setServerLoaded(false);
+      setLoadError(null);
       setLoading(false);
+      setLoadGeneration((g) => g + 1);
       return;
     }
 
@@ -665,13 +682,19 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
       };
       setSettings(merged);
       writeCache(tenantId, merged);
-    } catch {
-      // Table may not exist yet (migration not applied) or query failed.
-      // Fall back to cache then defaults, but still seed the tenant basics.
+      setServerLoaded(true);
+      setLoadError(null);
+    } catch (e) {
+      // The read failed. Cache then defaults keep the screens readable, but
+      // serverLoaded stays false so no form treats what it sees as saved
+      // truth or writes it back.
       const cached = readCache(tenantId);
       setSettings({ ...DEFAULT_SETTINGS, ...tenantBasics, ...(cached || {}) });
+      setServerLoaded(false);
+      setLoadError(e instanceof Error ? e.message : String((e as { message?: string })?.message || e || "settings read failed"));
     } finally {
       setLoading(false);
+      setLoadGeneration((g) => g + 1);
     }
   }, [user, tenantId, tenant]);
 
@@ -688,39 +711,38 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
     async (updates: Partial<DealerSettings>) => {
       const next: DealerSettings = { ...settings, ...updates };
       setSettings(next);
-      writeCache(tenantId, next);
       // Only persist to Supabase when we have a real tenant.
-      if (!user || !tenantId) return false;
-      // Supabase returns RLS denials in `error` (it does not throw), so check
-      // it explicitly and tell the dealer when a save didn't reach the server —
-      // otherwise edits silently live in cache and vanish on reload.
-      // Prefer the server-side merge RPC: it patches only the keys this save
-      // touched, so concurrent editors on other panels aren't clobbered. Fall
-      // back to the full-snapshot upsert until the migration is applied.
-      let { error } = await (supabase as any)
-        .rpc("merge_dealer_settings", { _tenant_id: tenantId, _patch: updates });
-      if (error && /function|merge_dealer_settings|schema cache/i.test(error.message || "")) {
-        ({ error } = await (supabase as any)
-          .from("dealer_profiles")
-          .upsert(
-            { tenant_id: tenantId, settings: next, updated_by: user.id },
-            { onConflict: "tenant_id" }
-          ));
-      }
-      if (error) {
-        // eslint-disable-next-line no-console
-        console.warn("dealer_profiles upsert failed:", error.message);
-        toast.error("Couldn't save to the server — you may not have access to this dealership's settings. Changes are kept locally only.");
+      if (!user || !tenantId) {
+        writeCache(tenantId, next);
         return false;
       }
+      // The server-side merge is the only write path: it patches the keys
+      // this save touched, so concurrent editors on other panels are not
+      // clobbered, and it enforces the key-level authority a direct row write
+      // would skip. Supabase returns RLS denials in `error` (it does not
+      // throw), so the result is checked explicitly. The cache is written only
+      // after the server accepted the change: a value the server refused must
+      // not come back on the next load looking saved.
+      const { error } = await (supabase as any)
+        .rpc("merge_dealer_settings", { _tenant_id: tenantId, _patch: updates });
+      if (error) {
+        const message = String(error.message || "unknown error");
+        // eslint-disable-next-line no-console
+        console.warn("merge_dealer_settings failed:", message);
+        setLastSaveError(message);
+        toast.error("Couldn't save to the server. The change is shown here but was not saved; reload to see what is in force.");
+        return false;
+      }
+      setLastSaveError(null);
+      writeCache(tenantId, next);
       return true;
     },
     [settings, tenantId, user]
   );
 
   const value = useMemo(
-    () => ({ settings, loading, updateSettings, reload: load }),
-    [settings, loading, updateSettings, load],
+    () => ({ settings, loading, updateSettings, reload: load, tenantId, loadGeneration, serverLoaded, loadError, lastSaveError }),
+    [settings, loading, updateSettings, load, tenantId, loadGeneration, serverLoaded, loadError, lastSaveError],
   );
 
   return (

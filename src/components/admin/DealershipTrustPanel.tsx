@@ -17,7 +17,7 @@ type TrustKey =
   | "dealer_storefront_url" | "dealer_review_sources"
   | "dealer_advisor_name" | "dealer_advisor_title" | "dealer_advisor_photo" | "dealer_advisor_response"
   | "dealer_family_owned" | "dealer_service_location" | "dealer_service_address" | "dealer_delivery"
-  | "dealer_financing" | "dealer_amenities" | "dealer_services" | "dealer_hours"
+  | "dealer_financing" | "dealer_amenities" | "dealer_services"
   | "mobile_slideout_cta_variant";
 
 const FIELDS: { key: TrustKey; label: string; placeholder: string; hint?: string; wide?: boolean }[] = [
@@ -59,7 +59,6 @@ const DealershipTrustPanel = () => {
     dealer_financing: settings.dealer_financing || "",
     dealer_amenities: settings.dealer_amenities || "",
     dealer_services: settings.dealer_services || "",
-    dealer_hours: settings.dealer_hours || "",
     mobile_slideout_cta_variant: settings.mobile_slideout_cta_variant || "dealer_availability",
   }));
   const [iihsEnabled, setIihsEnabled] = useState<boolean>(settings.iihs_awards_enabled || false);
@@ -177,10 +176,6 @@ const DealershipTrustPanel = () => {
             <label className="text-[13px] font-semibold text-foreground">Amenities</label>
             <input value={cfg.dealer_amenities} onChange={(e) => set("dealer_amenities", e.target.value)} placeholder="Customer lounge, Café, Kids area, EV charging, Loaner vehicles" className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
             <p className="text-[11px] text-muted-foreground mt-1">Comma-separated.</p>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-[13px] font-semibold text-foreground">Hours</label>
-            <input value={cfg.dealer_hours} onChange={(e) => set("dealer_hours", e.target.value)} placeholder="Mon–Sat 9–7, Sun closed" className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
           </div>
           <div className="sm:col-span-2">
             <label className="text-[13px] font-semibold text-foreground">Mobile Slide-Out CTA Style</label>

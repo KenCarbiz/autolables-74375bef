@@ -64,6 +64,8 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
       { id: "appearance", label: "Appearance", capabilities: ["can_manage_settings"] },
       { id: "hours-contact", label: "Hours & Contact", capabilities: ["can_manage_settings"] },
       { id: "why-buy", label: "Why Buy", aliases: ["passport-trust"], legacyTab: "passport-trust" },
+      { id: "websites-feeds", label: "Websites & feeds", capabilities: ["can_manage_settings"], unpictured: true },
+      { id: "document-defaults", label: "Document defaults", capabilities: ["can_manage_settings"], unpictured: true },
       { id: "store-settings", label: "Store settings", aliases: ["settings"], legacyTab: "settings", unpictured: true },
     ],
   },
