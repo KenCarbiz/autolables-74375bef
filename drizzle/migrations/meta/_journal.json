@@ -22,6 +22,13 @@
       "when": 1793186225814,
       "tag": "0002_admin_v2_settings_authority",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793224026521,
+      "tag": "0003_tighten_tenant_insert_and_budget_read",
+      "breakpoints": true
     }
   ]
 }
