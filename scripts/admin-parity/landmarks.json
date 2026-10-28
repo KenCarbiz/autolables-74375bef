@@ -531,8 +531,8 @@
     }
   },
   "08": {
-    "_rail": 246,
-    "_comment": "_rail is set to the mock's content origin, not its navy edge: the mock draws a 237px rail with a 33px gutter (content x 270, cards 269-891 and 906-1559), the shell draws a 24px gutter, so a 246px stand-in puts the shell's content origin on the mock's (the horizontal counterpart of the body offset). With the navy-edge rail (237) every left-anchored box reads 9px left. Mock-native edges from pixel scans: section-row bottom 172 (underline 169-170), card borders at y 318 (left 269-891, right 906-1559, both to 902), order rows 282-878 at 373-440 on a 75.5px pitch, readiness box 919-1546 at 369-581 with rules at 421.5/474.5/528, Review escalation rules 919-1150 at 593-628, response card 658-902 with timing rules at 752 and 803 and the warning note border at 854, sticky bar 917 with its button at 925-961. The section row carries no y: the one-h1 title block puts it 66px lower than the mock's section-titled page, which the body offset documents. The primary action is viewport-anchored, so it carries y, not yBody.",
+    "_rail": 237,
+    "_comment": "_rail is the mock's navy rail edge (237px), as the top-level comment defines. The mock draws a 33px gutter; the shell draws 24px, so left-anchored boxes read 9px left of the mock. That is a measured shell difference, not compensated here. Mock-native edges from pixel scans: section-row bottom 172 (underline 169-170), card borders at y 318 (left 269-891, right 906-1559, both to 902), order rows 282-878 at 373-440 on a 75.5px pitch, readiness box 919-1546 at 369-581 with rules at 421.5/474.5/528, Review escalation rules 919-1150 at 593-628, response card 658-902 with timing rules at 752 and 803 and the warning note border at 854, sticky bar 917 with its button at 925-961. The section row carries no y: the one-h1 title block puts it 66px lower than the mock's section-titled page, which the body offset documents. The primary action is viewport-anchored, so it carries y, not yBody.",
     "sectionNav": {
       "selector": "nav[aria-label=\"Administration sections\"]",
       "x": 270,
@@ -622,8 +622,8 @@
     }
   },
   "09": {
-    "_rail": 220,
-    "_comment": "_rail is set to the mock's content origin (tabs and cards at x 244 behind a 217px navy rail and a 27px gutter; the shell's gutter is 24, so a 220px stand-in lines the origins up). Child page: the mock stacks a section-titled header, a breadcrumb, the h1 and the Rules / Delivery activity / Test route row, so the body is pinned to that row (Rules underline at y 287-288 by bluerows.cjs, row bottom 289). Mock-native edges from pixel scans: card borders at y 308 (left 244-903 to 987, right 917-1561 to 711 and 721-967), tier selects 318-582 and 660-889 at 412-445, 527-560 and 646-678, the Scope rule at 709, the scope box 261-492 at 766-794, chips from 802, tiles 261-885 at 882/883-931 (148/149/152/154 wide, 8px gaps), Review changes 262-547 at 942-974, delivery-state box 933-1544 at 379-614 with rules at 437, 497 and 557, retry note 631-695, activity table 933-1544 at 789-900 with column lines at 1043/1142/1229/1305/1441, header rule 818, row rule 859, delivery note 910-954.",
+    "_rail": 217,
+    "_comment": "_rail is the mock's navy rail edge (217px), as the top-level comment defines. The mock draws a 27px gutter; the shell draws 24px, so left-anchored boxes read 3px left of the mock. That is a measured shell difference, not compensated here. Child page: the mock stacks a section-titled header, a breadcrumb, the h1 and the Rules / Delivery activity / Test route row, so the body is pinned to that row (Rules underline at y 287-288 by bluerows.cjs, row bottom 289). Mock-native edges from pixel scans: card borders at y 308 (left 244-903 to 987, right 917-1561 to 711 and 721-967), tier selects 318-582 and 660-889 at 412-445, 527-560 and 646-678, the Scope rule at 709, the scope box 261-492 at 766-794, chips from 802, tiles 261-885 at 882/883-931 (148/149/152/154 wide, 8px gaps), Review changes 262-547 at 942-974, delivery-state box 933-1544 at 379-614 with rules at 437, 497 and 557, retry note 631-695, activity table 933-1544 at 789-900 with column lines at 1043/1142/1229/1305/1441, header rule 818, row rule 859, delivery note 910-954.",
     "_anchor": {
       "reference": 289,
       "selector": "[role=\"tablist\"][aria-label=\"Escalation views\"]"
@@ -719,8 +719,8 @@
     }
   },
   "10": {
-    "_rail": 263,
-    "_comment": "_rail is set to the mock's content origin (section row and card at x 287 behind a 257px navy rail and a 30px gutter; the shell's gutter is 24, so a 263px stand-in lines the origins up). Mock-native edges from pixel scans: section-row bottom 245 (underline 243), card 287-1559 x 266-946, draft box 1397-1538 x 284-329, matrix 308-1537 x 408-587 with column lines at 476/734/1035/1280 and row rules at 453, 498 and 542, detail section 308-1537 x 604-863 with its header rule at 648, cards 328-606, 620-912 and 926-1210 at 664-848, the rule column divider at 1232 with text from 1259, recall note 307-1211 x 876-923 (soft edges 875 and 924), buttons 1230-1380 and 1393-1538 at 876-923. The mock draws the child tabs inside the card under its header (y 350-392); the fixed IA draws them above the card, which the childTabs, policyCard and draftStatus deltas record.",
+    "_rail": 257,
+    "_comment": "_rail is the mock's navy rail edge (257px), as the top-level comment defines. The mock draws a 30px gutter; the shell draws 24px, so left-anchored boxes read 6px left of the mock. That is a measured shell difference, not compensated here. Mock-native edges from pixel scans: section-row bottom 245 (underline 243), card 287-1559 x 266-946, draft box 1397-1538 x 284-329, matrix 308-1537 x 408-587 with column lines at 476/734/1035/1280 and row rules at 453, 498 and 542, detail section 308-1537 x 604-863 with its header rule at 648, cards 328-606, 620-912 and 926-1210 at 664-848, the rule column divider at 1232 with text from 1259, recall note 307-1211 x 876-923 (soft edges 875 and 924), buttons 1230-1380 and 1393-1538 at 876-923. The mock draws the child tabs inside the card under its header (y 350-392); the fixed IA draws them above the card, which the childTabs, policyCard and draftStatus deltas record.",
     "sectionNav": {
       "selector": "nav[aria-label=\"Administration sections\"]",
       "x": 287,
