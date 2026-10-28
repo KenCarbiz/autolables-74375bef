@@ -188,31 +188,33 @@ export default function OverviewView() {
 
   return (
     <div className="space-y-4">
-      <HealthBanner
-        verdict={feed}
-        title={feed && feed.state !== "healthy" ? "Inventory sync needs attention" : undefined}
-        action={<AdminLinkButton to={adminTabHref("inventory-feed")} variant="secondary" size="sm">Review sync</AdminLinkButton>}
-      />
-      {failed && (
-        <p role="status" className="text-[13px] text-adm-muted">Some counts could not be read for this rooftop. They show as Unavailable rather than zero.</p>
-      )}
+      <div className="space-y-3.5">
+        <HealthBanner
+          verdict={feed}
+          title={feed && feed.state !== "healthy" ? "Inventory sync needs attention" : undefined}
+          action={<AdminLinkButton to={adminTabHref("inventory-feed")} variant="outline" size="sm">Review sync</AdminLinkButton>}
+        />
+        {failed && (
+          <p role="status" className="text-[13px] text-adm-muted">Some counts could not be read for this rooftop. They show as Unavailable rather than zero.</p>
+        )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatTile icon={Car} label="Active inventory" value={countDisplay(activeInventory)} href="/inventory" tone="info" />
-        <StatTile icon={CheckCircle2} label="Setup" value={setup ? `${setup.done} of ${setup.total}` : "Unknown"} href={adminTabHref("identity")} tone="success" />
-        <StatTile icon={FileText} label="Policy reviews" value={countDisplay(policyReviews)} href="/dashboard/document-review" tone="info" />
-        <StatTile icon={AlertTriangle} label="Open exceptions" value={countDisplay(openExceptions)} href="/admin/exceptions" tone="danger" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatTile icon={Car} label="Active inventory" value={countDisplay(activeInventory)} href="/inventory" tone="info" />
+          <StatTile icon={CheckCircle2} label="Setup" value={setup ? `${setup.done} of ${setup.total}` : "Unknown"} href={adminTabHref("identity")} tone="success" />
+          <StatTile icon={FileText} label="Policy reviews" value={countDisplay(policyReviews)} href="/dashboard/document-review" tone="info" />
+          <StatTile icon={AlertTriangle} label="Open exceptions" value={countDisplay(openExceptions)} href="/admin/exceptions" tone="danger" />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2.15fr)_minmax(300px,1fr)] gap-3.5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2.15fr)_minmax(300px,1fr)] gap-3.5 items-stretch">
         <div className="space-y-4 min-w-0">
-        <AdminCard title="What needs attention" flush>
+        <AdminCard title="What needs attention" flush inset="sm">
           {loading && !fixture ? (
-            <p className="px-6 pb-6 text-[13px] text-adm-muted">Checking this rooftop…</p>
+            <p className="px-4 pb-4 text-[13px] text-adm-muted">Checking this rooftop…</p>
           ) : attention.length === 0 ? (
-            <p className="px-6 pb-6 text-[13px] text-adm-muted">{failed ? "Attention items could not be checked." : "Nothing needs attention right now."}</p>
+            <p className="px-4 pb-4 text-[13px] text-adm-muted">{failed ? "Attention items could not be checked." : "Nothing needs attention right now."}</p>
           ) : (
-            <AdminTable caption="Ranked attention queue">
+            <AdminTable caption="Ranked attention queue" dense inset>
               <thead>
                 <tr>
                   <Th>Issue</Th>
@@ -247,17 +249,17 @@ export default function OverviewView() {
           )}
         </AdminCard>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.18fr)_minmax(260px,1fr)] gap-2.5 items-start">
-        <AdminCard title="Administration settings">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.18fr)_minmax(260px,1fr)] gap-2.5 items-stretch">
+        <AdminCard title="Administration settings" inset="sm" bodyClassName="pt-1.5 pb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {SHORTCUTS.map((s) => {
               const section = ADMIN_SECTIONS.find((x) => x.id === s.section)!;
               return (
-                <Link key={s.section} to={adminTabHref(section.tabs[0].id)} className="flex items-center gap-3 rounded-[10px] border border-adm-border px-4 py-3 hover:border-adm-primary/60">
+                <Link key={s.section} to={adminTabHref(section.tabs[0].id)} className="flex items-center gap-2.5 rounded-[10px] border border-adm-border px-3 py-3 hover:border-adm-primary/60">
                   <span className="w-9 h-9 rounded-md bg-adm-workspace text-adm-ink flex items-center justify-center flex-shrink-0" aria-hidden="true"><s.icon className="w-4 h-4" /></span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-semibold text-adm-ink">{s.title}</span>
-                    <span className="block text-[11px] leading-[16px] text-adm-muted truncate">{s.detail}</span>
+                    <span className="block text-[13px] leading-[18px] font-semibold text-adm-ink">{s.title}</span>
+                    <span className="block text-[11px] leading-[14px] text-adm-muted line-clamp-2">{s.detail}</span>
                   </span>
                   <ChevronRight className="w-4 h-4 text-adm-muted" aria-hidden="true" />
                 </Link>
@@ -266,21 +268,21 @@ export default function OverviewView() {
           </div>
         </AdminCard>
 
-        <AdminCard title="Recent activity" action={<Link to={adminTabHref("activity")} className="text-[13px] font-semibold text-adm-primary hover:underline">View all</Link>}>
+        <AdminCard title="Recent activity" inset="sm" bodyClassName="pt-1.5 pb-3" action={<Link to={adminTabHref("activity")} className="text-[13px] font-semibold text-adm-primary hover:underline">View all</Link>}>
           {activity.length === 0 ? (
             <p className="text-[13px] text-adm-muted">No recent activity recorded for this rooftop.</p>
           ) : (
-            <ul className="divide-y divide-adm-border -mt-2">
+            <ul className="divide-y divide-adm-border">
               {activity.slice(0, 5).map((a) => (
-                <li key={a.id} className="flex items-start gap-3 py-2.5">
-                  <span className={`mt-0.5 w-4 h-4 flex-shrink-0 ${a.tone === "warning" ? "text-adm-warning" : a.tone === "success" ? "text-adm-success" : "text-adm-muted"}`} aria-hidden="true">
+                <li key={a.id} className="flex items-start gap-3 py-[5px]">
+                  <span className={`mt-px w-4 h-4 flex-shrink-0 ${a.tone === "warning" ? "text-adm-warning" : a.tone === "success" ? "text-adm-success" : "text-adm-muted"}`} aria-hidden="true">
                     {a.tone === "warning" ? <AlertTriangle className="w-4 h-4" /> : a.tone === "success" ? <CheckCircle2 className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-semibold text-adm-ink truncate">{a.action}</span>
-                    <span className="block text-[11px] leading-[16px] text-adm-muted truncate">{a.detail}</span>
+                    <span className="block text-[12px] leading-[16px] font-semibold text-adm-ink truncate">{a.action}</span>
+                    <span className="block text-[11px] leading-[14px] text-adm-muted truncate">{a.detail}</span>
                   </span>
-                  <span className="text-[11px] text-adm-muted whitespace-nowrap">{describeAge(a.at, now)}</span>
+                  <span className="text-[11px] leading-[16px] text-adm-muted whitespace-nowrap">{describeAge(a.at, now)}</span>
                 </li>
               ))}
             </ul>
@@ -289,13 +291,13 @@ export default function OverviewView() {
         </div>
         </div>
 
-        <AdminCard title="Effective policy" action={<Link to={adminTabHref("effective-policy")} className="text-[13px] font-semibold text-adm-primary hover:underline">Edit</Link>}>
+        <AdminCard title="Effective policy" inset="sm" className="h-full" action={<Link to={adminTabHref("effective-policy")} className="text-[13px] font-semibold text-adm-primary hover:underline">Edit</Link>}>
           <ul className="divide-y divide-adm-border -mt-2">
             {policy.map((row) => {
               const Icon = row.key === "price_basis" ? Tag : row.key === "publishing" ? Globe : row.key === "used_cpo" ? Car : Route;
               const ok = row.state === "ok";
               return (
-                <li key={row.key} className="flex items-start gap-3 py-3">
+                <li key={row.key} className="flex items-start gap-3 py-[14px]">
                   <span className="w-9 h-9 rounded-md bg-adm-workspace text-adm-muted flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-4 h-4" /></span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

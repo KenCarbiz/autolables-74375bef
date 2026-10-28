@@ -23,7 +23,7 @@ export const AdminSectionNav = ({ sections, activeId, tabFor, ariaLabel = "Admin
               to={adminTabHref(target.id)}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "inline-flex items-center h-10 text-[14px] leading-[20px] font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline-2 focus-visible:outline-adm-primary",
+                "inline-flex items-center h-[38px] text-[14px] leading-[20px] font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline-2 focus-visible:outline-adm-primary",
                 active ? "text-adm-primary border-adm-primary" : "text-adm-muted border-transparent hover:text-adm-ink",
               )}
             >
@@ -86,7 +86,7 @@ export const Breadcrumbs = ({ crumbs }: { crumbs: Crumb[] }) => (
 );
 
 export const AdminPageContainer = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <div data-admin-v2="" className={cn("w-full max-w-[1600px] mx-auto px-4 sm:px-6 py-5 sm:py-6 text-adm-ink", className)}>
+  <div data-admin-v2="" className={cn("w-full max-w-[1600px] mx-auto px-4 sm:px-6 py-5 sm:py-[22px] text-adm-ink", className)}>
     {children}
   </div>
 );
@@ -110,12 +110,12 @@ export const AdminShell = ({
     <div className="space-y-4">
       <div>
         <Breadcrumbs crumbs={[{ label: "Administration", href: "/admin" }, { label: activeSection.label }]} />
-        <h1 className="mt-4 text-[28px] leading-[40px] font-bold text-adm-ink">Administration</h1>
-        <p className="mt-1.5 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>
+        <h1 className="mt-3 text-[28px] leading-[40px] font-bold text-adm-ink">Administration</h1>
+        <p className="mt-2 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>
       </div>
       <AdminSectionNav sections={sections} activeId={activeSection.id} tabFor={firstTabFor} />
       <AdminChildTabs tabs={tabsForSection} activeId={activeTab.id} ariaLabel={`${activeSection.label} views`} />
-      <div className="pt-1">{children}</div>
+      <div>{children}</div>
     </div>
   </AdminPageContainer>
 );

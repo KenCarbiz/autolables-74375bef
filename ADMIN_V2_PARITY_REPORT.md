@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T03:41:30.459Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-28T04:06:43.914Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -13,16 +13,16 @@ Generated 2026-10-28T03:41:30.459Z by `bun run admin:parity` against the develop
 - Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes.
 - Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.
 
-Registered fixtures: 01.
+Registered fixtures: 10, 11, 01, 03, 04, 08, 09.
 
 ## Screen 01
 
-Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; page overflow at a breakpoint; content parity 88.64% is below 97%).
+Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.68% is below 97%).
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
 |---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 89.23% | 66.71% | 88.64% | 63.34% | 2.31% |
-| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 88.50% | 67.40% | 88.01% | 64.08% | 2.40% |
+| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 90.84% | 71.77% | 90.68% | 69.77% | 2.89% |
+| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.71% | 72.24% | 90.81% | 70.21% | 2.88% |
 
 Diff image: `scripts/admin-parity/out/01-1586x992-diff.png` (red differs, blue masked).
 Committed copies of that capture and diff: `scripts/admin-parity/evidence/01-1586x992.png` and `scripts/admin-parity/evidence/01-1586x992-diff.png`.
@@ -31,23 +31,23 @@ Masks (12): summary tile counts; recent activity relative times; recent activity
 
 | Landmark | Result | Expected | Measured | Delta |
 |---|---|---|---|---|
-| breadcrumb | within tolerance | x=249 y=86 | x=248 y=88 w=1314 h=18 | x-1 y+2 |
-| title | within tolerance | x=249 y=116 h=40 | x=248 y=110 w=1314 h=36 | x-1 y-6 h-4 |
-| sectionNav | within tolerance | x=249 y=200 w=1317 h=38 | x=248 y=184 w=1314 h=40 | x-1 y-16 w-3 h+2 |
-| banner | within tolerance | x=249 y=254 w=1317 h=58 | x=248 y=244 w=1314 h=58 | x-1 y-10 w-3 h+0 |
-| tile1 | within tolerance | x=249 y=326 w=313 h=79 | x=248 y=318 w=317 h=86 | x-1 y-8 w+4 h+7 |
-| tile4 | within tolerance | x=1235 y=326 w=331 h=79 | x=1246 y=318 w=317 h=86 | x+11 y-8 w-14 h+7 |
-| attentionCard | OUT of tolerance | x=249 y=420 w=889 | x=248 y=420 w=865 h=355 | x-1 y+0 w-24 |
-| policyCard | OUT of tolerance | x=1152 y=420 w=414 | x=1129 y=420 w=433 h=415 | x-23 y+0 w+19 |
-| settingsCard | OUT of tolerance | x=249 y=748 w=603 | x=248 y=851 w=974 h=220 | x-1 y+103 w+371 |
-| activityCard | OUT of tolerance | x=862 y=748 w=276 | x=1238 y=851 w=325 h=301 | x+376 y+103 w+49 |
+| breadcrumb | within tolerance | x=249 y=86 | x=248 y=86 w=1314 h=18 | x-1 y+0 |
+| title | within tolerance | x=249 y=116 h=40 | x=248 y=116 w=1314 h=40 | x-1 y+0 h+0 |
+| sectionNav | within tolerance | x=249 y=200 w=1317 h=38 | x=248 y=200 w=1314 h=38 | x-1 y+0 w-3 h+0 |
+| banner | within tolerance | x=249 y=254 w=1317 h=58 | x=248 y=254 w=1314 h=58 | x-1 y+0 w-3 h+0 |
+| tile1 | within tolerance | x=249 y=326 w=313 h=79 | x=248 y=326 w=317 h=79 | x-1 y+0 w+4 h+0 |
+| tile4 | within tolerance | x=1235 y=326 w=331 h=79 | x=1246 y=326 w=317 h=79 | x+11 y+0 w-14 h+0 |
+| attentionCard | within tolerance | x=249 y=420 w=889 | x=248 y=421 w=887 h=318 | x-1 y+1 w-2 |
+| policyCard | within tolerance | x=1152 y=420 w=414 | x=1149 y=421 w=413 h=634 | x-3 y+1 w-1 |
+| settingsCard | within tolerance | x=249 y=748 w=603 | x=248 y=755 w=601 h=300 | x-1 y+7 w-2 |
+| activityCard | within tolerance | x=862 y=748 w=276 | x=859 y=755 w=276 h=300 | x-3 y+7 w+0 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/01-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | none | `scripts/admin-parity/out/01-1366x768.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/01-1366x768.png` |
 | 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/01-1024x768.png` |
-| 390x844 | OVERFLOW | 442 | 390 | 416 | nav[Administration sections], div | `scripts/admin-parity/out/01-390x844.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div | `scripts/admin-parity/out/01-390x844.png` |
 
 ### Findings for screen 01
 
