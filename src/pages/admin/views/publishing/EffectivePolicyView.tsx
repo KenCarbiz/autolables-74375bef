@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, ChevronUp, ChevronDown, Eye, FileText, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronUp, ChevronDown, Eye, File, FileText, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   VEHICLE_CLASS_LABEL,
@@ -23,7 +23,7 @@ import PublishingReviewDialog from "./PublishingReviewDialog";
 // only writes happen inside the Review & Apply dialog after an explicit
 // Apply.
 
-const CARD_ICON: Record<ClassDetailCard["key"], typeof Eye> = { visibility: Eye, documents: FileText, readiness: Wrench };
+const CARD_ICON: Record<ClassDetailCard["key"], typeof Eye> = { visibility: Eye, documents: File, readiness: Wrench };
 
 const CARD_TONE: Record<ClassDetailCard["tone"], { icon: string; box: string }> = {
   info: { icon: "bg-adm-selected text-adm-primary", box: "bg-adm-selected text-adm-ink" },
@@ -32,9 +32,10 @@ const CARD_TONE: Record<ClassDetailCard["tone"], { icon: string; box: string }> 
   success: { icon: "bg-adm-success-bg text-adm-success", box: "bg-adm-success-bg text-adm-success" },
 };
 
-// The reference's matrix columns: 169, 258, 301, 245 and 258px of 1231.
+// The reference's matrix columns: 169, 258, 301, 245 and 258px of 1231, under a
+// 45px header with body rows on a 44.67px pitch (lines at 453, 498, 542, 587).
 const MATRIX_COLUMNS = ["13.7%", "21%", "24.5%", "19.9%", "20.9%"];
-const MATRIX_TABLE_CLS = "[&_th+th]:border-l [&_td+td]:border-l [&_th+th]:border-adm-border [&_td+td]:border-adm-border [&_tbody_tr:last-child>td]:border-b-0";
+const MATRIX_TABLE_CLS = "[&_tbody_td]:py-[11.83px] [&_th+th]:border-l [&_td+td]:border-l [&_th+th]:border-adm-border [&_td+td]:border-adm-border [&_tbody_tr:last-child>td]:border-b-0";
 
 const Cell = ({ cell }: { cell: PolicyCell }) => (
   <span title={cell.detail} className={cn(cell.state === "unknown" && "text-adm-muted")}>
@@ -73,7 +74,8 @@ export default function EffectivePolicyView() {
         inset="sm"
         title={<span className="text-[20px] leading-[28px]">This rooftop</span>}
         description={<span className="text-[14px] leading-[20px]">Policy applies to all vehicles at <span data-parity="rooftop-name">{rooftopLabel}</span>.</span>}
-        bodyClassName="pt-[29px] pb-[22px]"
+        headerClassName="px-5"
+        bodyClassName="px-5 pt-[30px] pb-[21px]"
         action={
           draftPending ? (
             <div data-parity="draft-status" className="rounded-[8px] bg-adm-warning-bg px-4 py-[7px] flex items-start gap-3">
@@ -115,7 +117,7 @@ export default function EffectivePolicyView() {
                     onClick={() => setSelected(r.vehicleClass)}
                     className={cn("cursor-pointer", active ? "bg-adm-selected" : "hover:bg-adm-workspace")}
                   >
-                    <Td className={cn("px-5 font-semibold", active ? "text-adm-primary border-l-[3px] border-l-adm-primary pl-[17px]" : "text-adm-ink")}>
+                    <Td className={cn("px-5 font-semibold", active ? "text-adm-primary shadow-[inset_3px_0_0_#2457D6]" : "text-adm-ink")}>
                       <button type="button" className="text-left font-semibold focus-visible:outline-2 focus-visible:outline-adm-primary" aria-pressed={active} onClick={() => setSelected(r.vehicleClass)}>
                         {r.label}
                       </button>
@@ -132,8 +134,8 @@ export default function EffectivePolicyView() {
         </div>
 
         <section className="mt-4 rounded-[8px] border border-adm-border" aria-labelledby="publishing-class-detail">
-          <header className="flex items-center justify-between gap-4 px-5 py-[10px] border-b border-adm-border">
-            <h3 id="publishing-class-detail" className="flex items-baseline gap-2 min-w-0 text-[20px] leading-[26px] font-semibold text-adm-primary">
+          <header className="flex items-center justify-between gap-4 px-5 pt-2 pb-[9px] border-b border-adm-border">
+            <h3 id="publishing-class-detail" className="flex items-baseline gap-2 min-w-0 text-[18px] leading-[26px] font-semibold text-adm-primary">
               <span>{VEHICLE_CLASS_LABEL[selected]}</span>
               <span className="text-[14px] leading-[20px] font-normal text-adm-muted">Policy details and example status</span>
               <span className="ml-2 text-[12px] leading-[18px] font-normal text-adm-muted whitespace-nowrap" data-parity="class-counts">Active {classCounts.active} · Published {classCounts.published}</span>
@@ -143,27 +145,27 @@ export default function EffectivePolicyView() {
             </button>
           </header>
           {expanded && (
-            <div className="px-5 pt-[14px] pb-[17px] grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,293px)] gap-[14px]">
+            <div className="pl-[19px] pr-5 pt-[15px] pb-[14px] grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(0,279fr)_minmax(0,293fr)_minmax(0,285fr)_minmax(0,294fr)] gap-[14px] xl:gap-x-[13px]">
               {detail.cards.map((c) => {
                 const Icon = CARD_ICON[c.key];
                 const tone = CARD_TONE[c.tone];
                 return (
-                  <article key={c.key} data-landmark="class-card" className="rounded-[10px] border border-adm-border p-[10px] flex flex-col">
-                    <div className="flex items-start gap-3">
+                  <article key={c.key} data-landmark="class-card" className="rounded-[10px] border border-adm-border pt-[11px] px-[14px] pb-[14px] flex flex-col">
+                    <div className="flex items-start gap-[14px]">
                       <span className={cn(ICON_BOX.avatarLg, "flex items-center justify-center flex-shrink-0", tone.icon)} aria-hidden="true"><Icon className={ICON.inCircle} /></span>
                       <div className="min-w-0 pt-1.5">
                         <p className="text-[14px] leading-[22px] font-semibold tracking-tight text-adm-ink">{c.title}</p>
                         <p className="mt-0.5 min-h-[40px] text-[12px] leading-[20px] text-adm-muted">{c.summary}</p>
                       </div>
                     </div>
-                    <p className={cn("mt-[10px] rounded-[8px] px-4 py-2 text-[12px] leading-[20px]", tone.box)}>{c.explanation}</p>
+                    <p className={cn("mt-[10px] rounded-[8px] px-4 py-[9px] text-[12px] leading-[20px]", tone.box)}>{c.explanation}</p>
                   </article>
                 );
               })}
-              <aside className="xl:ml-2 xl:border-l xl:border-adm-border xl:pl-6 pt-[3px] text-[13px] leading-[18px]">
+              <aside className="xl:ml-2 xl:border-l xl:border-adm-border xl:pl-[26px] pt-1 text-[13px] leading-[18px]">
                 <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Effective rule for {VEHICLE_CLASS_LABEL[selected]}</p>
                 <p className="mt-[7px] text-adm-ink">{detail.ruleText}</p>
-                <Link to={detail.approvalRulesHref} className="mt-4 inline-flex items-center gap-2 text-[14px] leading-[20px] font-semibold text-adm-primary hover:underline">
+                <Link to={detail.approvalRulesHref} className="mt-[11px] inline-flex items-center gap-2 text-[14px] leading-[20px] font-semibold text-adm-primary hover:underline">
                   Review approval rules <ArrowRight className={ICON.button} aria-hidden="true" />
                 </Link>
               </aside>
@@ -171,14 +173,14 @@ export default function EffectivePolicyView() {
           )}
         </section>
 
-        <div className="mt-[11px] flex flex-col lg:flex-row lg:items-center gap-5">
-          <div data-parity="recall-note" className="flex-1 rounded-[10px] border border-[#F1D58A] bg-adm-warning-bg px-4 py-[10px] text-[13px] leading-[18px] font-semibold text-[#5F3F00] inline-flex items-center gap-3">
+        <div className="mt-3 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-[19px]">
+          <div data-parity="recall-note" className="flex-1 rounded-[10px] border border-[#FDE1BB] bg-adm-warning-bg pl-[13px] pr-4 pt-[9px] pb-[10px] text-[13px] leading-[18px] font-semibold text-[#5F3F00] inline-flex items-center gap-2">
             <AlertTriangle className={cn(ICON.panel, "text-adm-warning fill-current stroke-white flex-shrink-0")} aria-hidden="true" />
             Do-not-drive recall follows a separate blocking policy.
           </div>
           <div className="flex items-center gap-[13px]">
-            <AdminButton variant="primary" data-parity="review-changes" className="min-h-[48px] sm:min-h-[48px] px-6" onClick={() => setDialog("edit")}>Review changes</AdminButton>
-            <AdminButton variant="outline" data-parity="preview-impact" className="min-h-[48px] sm:min-h-[48px] px-6" onClick={() => setDialog("review")}>Preview impact</AdminButton>
+            <AdminButton variant="primary" data-parity="review-changes" className="min-h-[48px] sm:min-h-[48px] min-w-[151px] px-4" onClick={() => setDialog("edit")}>Review changes</AdminButton>
+            <AdminButton variant="outline" data-parity="preview-impact" className="min-h-[48px] sm:min-h-[48px] min-w-[146px] px-4" onClick={() => setDialog("review")}>Preview impact</AdminButton>
           </div>
         </div>
       </AdminCard>

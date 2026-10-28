@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Bell, Check, Mail, MessageCircle, Monitor, PlayCircle, Send, Truck, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Bell, Check, ChevronDown, Info, Mail, MessageCircleMore, Monitor, PlayCircle, Send, Truck, type LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { cn } from "@/lib/utils";
@@ -47,17 +47,20 @@ const TABS: Array<{ id: TabId; label: string }> = [
 ];
 
 const MINUTE_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120];
-const METHOD_ICON: Record<NotificationMethodRow["key"], LucideIcon> = { email: Mail, sms: MessageCircle, in_app: Monitor, push: Bell };
+const METHOD_ICON: Record<NotificationMethodRow["key"], LucideIcon> = { email: Mail, sms: MessageCircleMore, in_app: Monitor, push: Bell };
 const METHOD_SHORT: Record<NotificationMethodRow["key"], string> = { email: "Email", sms: "SMS", in_app: "In-app", push: "Push" };
 
-// The reference draws each state in a 36px circle: tinted with a 20px glyph
-// for the states the sender reports as requests, solid with a white mark for
-// the two outcomes.
+// The reference draws each state in a tinted 36px circle: a 20px glyph for
+// the states the sender reports as requests, a solid 22px mark for the two
+// outcomes.
+// The reference's state rows are 57, 59, 59 and 56px tall.
+const STATE_ROW_PAD = ["pt-[8px] pb-[11px]", "pt-[10px] pb-[11px]", "pt-[10px] pb-[11px]", "pt-[8px] pb-[10px]"];
+
 const DELIVERY_STATES: Array<{ title: string; detail: string; mark: ReactNode }> = [
   { title: "Attempted", detail: "The request to send was made to the sender.", mark: <span className="w-9 h-9 rounded-full bg-adm-selected text-adm-primary flex items-center justify-center"><Send className="w-5 h-5" /></span> },
-  { title: "Accepted", detail: "The sender accepted the notification for delivery.", mark: <span className="w-9 h-9 rounded-full bg-adm-success text-white flex items-center justify-center"><Check className="w-5 h-5 stroke-[3]" /></span> },
+  { title: "Accepted", detail: "The sender accepted the notification for delivery.", mark: <span className="w-9 h-9 rounded-full bg-adm-success-bg flex items-center justify-center"><span className="w-[22px] h-[22px] rounded-full bg-adm-success text-white flex items-center justify-center"><Check className="w-3.5 h-3.5 stroke-[3]" /></span></span> },
   { title: "Delivered", detail: "The recipient received it. The current sender does not report this, so it is never claimed.", mark: <span className="w-9 h-9 rounded-full bg-adm-selected text-adm-primary flex items-center justify-center"><Truck className="w-6 h-6" /></span> },
-  { title: "Failed", detail: "The sender refused or could not be reached. The lead stays where it was.", mark: <span className="w-9 h-9 rounded-full bg-adm-danger text-white flex items-center justify-center text-[22px] leading-none font-bold">!</span> },
+  { title: "Failed", detail: "The sender refused or could not be reached. The lead stays where it was.", mark: <span className="w-9 h-9 rounded-full bg-adm-danger-bg flex items-center justify-center"><span className="w-[22px] h-[22px] rounded-full bg-adm-danger text-white flex items-center justify-center text-[14px] leading-none font-bold">!</span></span> },
 ];
 
 const humanize = (s: string) => s.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
@@ -78,30 +81,39 @@ async function loadActivity(tenantId: string, limit: number): Promise<AuditRowLi
   return (data ?? []) as AuditRowLike[];
 }
 
+// The reference draws its own chevron on every select (14px from the right on
+// the time, 10px on the destination), so the native arrow is replaced.
+const SelectChevron = ({ right }: { right: string }) => (
+  <ChevronDown className={cn(ICON.chevron, "pointer-events-none absolute top-1/2 -translate-y-1/2 text-adm-ink", right)} aria-hidden="true" />
+);
+
 const MinutesSelect = ({ id, label, value, onChange, allowOff = false, disabled }: { id: string; label: string; value: number; onChange: (v: number) => void; allowOff?: boolean; disabled: boolean }) => {
   const options = Array.from(new Set([...(allowOff ? [0] : []), ...MINUTE_OPTIONS, value])).filter((m) => m >= 0).sort((a, b) => a - b);
   return (
-    <select id={id} aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} className={cn(selectCls, "mt-0 h-8 w-full px-4")}>
-      {options.map((m) => <option key={m} value={m}>{m === 0 ? (allowOff ? "Off" : "0 minutes") : `${m} minutes`}</option>)}
-    </select>
+    <div className="relative">
+      <select id={id} aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} className={cn(selectCls, "mt-0 h-[34px] w-full appearance-none pl-4 pr-10")}>
+        {options.map((m) => <option key={m} value={m}>{m === 0 ? (allowOff ? "Off" : "0 minutes") : `${m} minutes`}</option>)}
+      </select>
+      <SelectChevron right="right-[14px]" />
+    </div>
   );
 };
 
-const Step = ({ n, title, hint, last = false, children }: { n: number; title: string; hint: string; last?: boolean; children: ReactNode }) => (
-  <li data-landmark="escalation-tier" className={cn("relative pl-[55px]", last ? "pb-3" : "pb-[15px]")}>
+const Step = ({ n, title, hint, last = false, className, children }: { n: number; title: string; hint: string; last?: boolean; className?: string; children: ReactNode }) => (
+  <li data-landmark="escalation-tier" className={cn("relative pl-[57px]", last ? "pb-[9px]" : "pb-[15px]", className)}>
     {!last && <span aria-hidden="true" className="absolute left-4 top-[38px] bottom-0 w-px bg-adm-border" />}
     <span className="absolute left-0 top-0 w-[34px] h-[34px] rounded-full bg-adm-selected text-adm-primary text-[14px] font-semibold flex items-center justify-center">{n}</span>
-    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink pt-1">{title}</p>
+    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink pt-0.5">{title}</p>
     <p className="text-[12px] leading-[18px] text-adm-muted">{hint}</p>
     {children}
   </li>
 );
 
 /** One tier's controls: the time, then Send to and the destination, with its state on the line below. */
-const TierControls = ({ minutes, destination, note, extra }: { minutes: ReactNode; destination: ReactNode; note: ReactNode; extra?: ReactNode }) => (
-  <div className="mt-[7px] grid grid-cols-1 sm:grid-cols-[minmax(0,264px)_auto_minmax(0,230px)] gap-x-[21px] gap-y-2 items-center">
+const TierControls = ({ minutes, destination, note, extra, className }: { minutes: ReactNode; destination: ReactNode; note: ReactNode; extra?: ReactNode; className?: string }) => (
+  <div className={cn("mt-1.5 grid grid-cols-1 sm:grid-cols-[minmax(0,264px)_minmax(61px,1fr)_minmax(0,230px)] gap-x-[21px] sm:gap-x-0 gap-y-2 items-center", className)}>
     {minutes}
-    <span className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">Send to</span>
+    <span className="sm:self-start sm:mt-1 sm:pl-5 text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">Send to</span>
     {destination}
     <div className="sm:col-start-3 -mt-1">{note}</div>
     {extra && <div className="sm:col-start-3">{extra}</div>}
@@ -109,9 +121,12 @@ const TierControls = ({ minutes, destination, note, extra }: { minutes: ReactNod
 );
 
 const DestinationSelect = ({ label, tier, missing }: { label: string; tier: string; missing: boolean }) => (
-  <select aria-label={`${tier}: send to`} data-landmark="tier-destination" defaultValue={label} className={cn(selectCls, "mt-0 h-8 w-full px-4 font-semibold", missing ? "border-adm-danger" : "border-adm-border")}>
-    <option value={label}>{label}</option>
-  </select>
+  <div className="relative">
+    <select aria-label={`${tier}: send to`} data-landmark="tier-destination" defaultValue={label} className={cn(selectCls, "mt-0 h-[34px] w-full appearance-none pl-3 pr-9 font-semibold", missing ? "border-[#F04438]" : "border-adm-border")}>
+      <option value={label}>{label}</option>
+    </select>
+    <SelectChevron right="right-[10px]" />
+  </div>
 );
 
 // The mark is a filled 19x14 triangle in the reference; drawn with a white
@@ -141,11 +156,11 @@ const ResultMark = ({ result }: { result: DeliveryResult }) => {
   return <span className="w-[22px] h-[22px] rounded-full bg-adm-workspace text-adm-muted flex items-center justify-center flex-shrink-0" aria-hidden="true"><Send className="w-3 h-3" /></span>;
 };
 
-// The reference's columns are 110/99/87/77/136/104 of 613; the Result column
-// is widened to keep "Provider rejected" beside its 22px mark on one line.
-const ACTIVITY_COLUMNS = ["14.7%", "13.2%", "14.2%", "12.6%", "28.4%", "16.9%"];
+// The reference's columns are 110/99/87/76/136/103 of 611 with 11px text in
+// ink-coloured headers and cells.
+const ACTIVITY_COLUMNS = ["18%", "16.2%", "14.2%", "12.4%", "22.3%", "16.9%"];
 const ACTIVITY_TABLE_CLS =
-  "mb-0 [&_table]:text-[12px] [&_table]:leading-[16px] [&_th]:py-[6px] [&_th]:px-3 [&_td]:py-1 [&_td]:px-3 [&_th+th]:border-l [&_td+td]:border-l [&_th+th]:border-adm-border [&_td+td]:border-adm-border [&_tbody_tr:last-child>td]:border-b-0";
+  "mb-0 [&_table]:text-[11px] [&_table]:leading-[16px] [&_th]:text-[11px] [&_th]:leading-[16px] [&_th]:text-adm-ink [&_th]:py-[6px] [&_th]:px-3 [&_td]:py-1 [&_td]:px-3 [&_th+th]:border-l [&_td+td]:border-l [&_th+th]:border-adm-border [&_td+td]:border-adm-border [&_tbody_tr:last-child>td]:border-b-0";
 
 const ActivityBody = ({ state, rows }: { state: "loading" | "failed" | "ready"; rows: DeliveryActivityRow[] }) => {
   if (state === "loading") {
@@ -179,7 +194,7 @@ const ActivityBody = ({ state, rows }: { state: "loading" | "failed" | "ready"; 
               <Td>{r.rooftop}</Td>
               <Td>{r.channel}</Td>
               <Td>{r.attempt ?? "Unknown"}</Td>
-              <Td><span className="inline-flex items-center gap-2 text-[14px] leading-[20px]"><ResultMark result={r.result} />{meta.label}</span></Td>
+              <Td className="!pr-1"><span className="inline-flex items-center gap-[6px]"><ResultMark result={r.result} />{meta.label}</span></Td>
               <Td className="text-adm-muted whitespace-nowrap">
                 <time dateTime={r.at} className="block">{formatDay(r.at)}</time>
                 <span className="block">{formatTime(r.at)}</span>
@@ -192,7 +207,29 @@ const ActivityBody = ({ state, rows }: { state: "loading" | "failed" | "ready"; 
   );
 };
 
-const cardTitle = (text: string) => <span className="text-[18px] leading-[26px]">{text}</span>;
+const cardTitle = (text: string, leading = "leading-[26px]") => <span className={cn("text-[18px]", leading)}>{text}</span>;
+
+// Notes drawn to the reference: the retry note on its peach tint with a 28px
+// mark beside the title line, the delivery note with a 20px mark.
+const RetryNote = () => (
+  <div role="status" className="flex items-start gap-[14px] rounded-[8px] border border-[#FDE1BB] bg-adm-warning-bg pl-[11px] pr-4 pt-[12px] pb-[11px]">
+    <AlertTriangle className="w-7 h-7 -mt-[2px] text-[#8B2D00] flex-shrink-0" aria-hidden="true" />
+    <p className="min-w-0">
+      <span className="block text-[15px] leading-[20px] font-semibold text-adm-ink">A failed notification stays eligible for retry.</span>
+      <span className="block mt-0.5 text-[12px] leading-[18px] text-adm-muted">If a notification fails, the lead keeps its level and the next sweep tries again.</span>
+    </p>
+  </div>
+);
+
+const DeliveryNote = () => (
+  <div role="status" className="flex items-start gap-[11px] rounded-[8px] border border-adm-selected bg-adm-selected pl-3 pr-4 pt-[6px] pb-[3px]">
+    <Info className="w-5 h-5 mt-px text-adm-primary flex-shrink-0" aria-hidden="true" />
+    <p className="min-w-0">
+      <span className="block text-[12px] leading-[16px] font-semibold text-adm-primary">Accepted does not mean delivered.</span>
+      <span className="block mt-0.5 text-[11px] leading-[16px] text-adm-muted">A notification can be accepted by the sender and still not reach the recipient.</span>
+    </p>
+  </div>
+);
 
 export default function EscalationPage() {
   const api = useRoutingDraft();
@@ -277,15 +314,13 @@ export default function EscalationPage() {
     <AdminCard
       inset="sm"
       flush
-      title={cardTitle(api.fixture ? "Example delivery activity" : "Delivery activity")}
+      title={cardTitle(api.fixture ? "Example delivery activity" : "Delivery activity", "leading-[22px]")}
       description="Recent escalation notifications for this rule. Accepted does not mean delivered."
-      headerClassName="pb-[9px]"
+      headerClassName="pt-[13px] pb-3"
     >
       <ActivityBody state={activityState} rows={activity} />
-      <div className="px-4 pt-[10px] pb-[7px] space-y-2">
-        <InlineNote tone="info" className="py-[5px]" title={<span className="text-[13px] leading-[18px]">Accepted does not mean delivered.</span>}>
-          <span className="text-[12px] leading-[16px]">A notification can be accepted by the sender and still not reach the recipient.</span>
-        </InlineNote>
+      <div className="px-4 pt-[9px] pb-3 space-y-2">
+        <DeliveryNote />
         {full && <InlineNote tone="neutral" title="Older rows read as Attempted.">Rows recorded before delivery outcomes were tracked carry no acceptance, so they are never promoted to Accepted.</InlineNote>}
       </div>
     </AdminCard>
@@ -312,14 +347,14 @@ export default function EscalationPage() {
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,660fr)_minmax(0,645fr)] gap-4 xl:gap-[13px] items-start">
           <AdminCard
             inset="sm"
-            title={<span className="inline-flex items-center gap-[18px] flex-wrap">{cardTitle("Unanswered customer requests")} {dirty && <StatusChip tone="warning" className="py-0">Keep draft</StatusChip>}</span>}
+            title={<span className="relative sm:top-[3px] inline-flex items-center gap-[18px] flex-wrap">{cardTitle("Unanswered customer requests")} {dirty && <StatusChip tone="warning" className="py-0">Keep draft</StatusChip>}</span>}
             action={
               <>
-                <p className="hidden sm:block max-w-[230px] text-[12px] leading-[18px] text-adm-muted">Configure how and when to escalate unanswered customer requests.</p>
+                <p className="hidden sm:block max-w-[212px] text-[12px] leading-[18px] text-adm-muted">Configure how and when to escalate unanswered customer requests.</p>
                 <div className="sm:hidden"><ToggleRow compact id="escalation-on-sm" label="Escalation" checked={rules.enabled} onChange={(v) => patchRules({ enabled: v })} disabled={ro} /></div>
               </>
             }
-            bodyClassName="pt-1 pb-[10px]"
+            bodyClassName="pt-1.5 pb-3 pr-[13px]"
           >
             <p className="sm:hidden mb-3 text-[12px] leading-[18px] text-adm-muted">Configure how and when to escalate unanswered customer requests.</p>
             {!rules.enabled && <p className="mb-4 text-[13px] text-adm-muted" role="status">Escalation is off. Unanswered requests are never escalated until it is on.</p>}
@@ -331,7 +366,7 @@ export default function EscalationPage() {
                   note={<p className="h-4 flex items-center text-[12px] leading-[16px] text-adm-muted">No one is notified at this step.</p>}
                 />
               </Step>
-              <Step n={2} title="BDC escalation" hint="If there is still no response, notify the BDC desk.">
+              <Step n={2} title="BDC escalation" hint="If there is still no response, notify the BDC desk." className="pb-[17px]">
                 <TierControls
                   minutes={<MinutesSelect id="bdc-after" label="Escalate to BDC after" value={rules.escalateToBdcAfterMinutes ?? rules.firstResponseSlaMinutes} allowOff disabled={inputsOff} onChange={(v) => patchRules({ escalateToBdcAfterMinutes: v })} />}
                   destination={<DestinationSelect label="BDC desk" tier="BDC escalation" missing={bdcMissing} />}
@@ -345,6 +380,7 @@ export default function EscalationPage() {
               </Step>
               <Step n={3} title="Manager escalation" hint="If there is still no response, send a final escalation to the sales manager." last>
                 <TierControls
+                  className="mt-2"
                   minutes={<MinutesSelect id="manager-after" label="Escalate to manager after" value={rules.escalateToManagerAfterMinutes ?? 0} allowOff disabled={inputsOff} onChange={(v) => patchRules({ escalateToManagerAfterMinutes: v })} />}
                   destination={<DestinationSelect label="Sales manager" tier="Manager escalation" missing={mgrMissing} />}
                   note={<DestinationState label="Sales manager" email={mgrEmail} editing={editing.manager} onEdit={() => setEditing((e) => ({ ...e, manager: true }))} />}
@@ -360,18 +396,18 @@ export default function EscalationPage() {
             <div className="pt-3 border-t border-adm-border">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Scope</p>
               <p className="text-[12px] leading-[18px] text-adm-muted">Escalation rules are stored once per account and apply to every rooftop.</p>
-              <div className="mt-[6px] inline-flex items-center h-[30px] min-w-[232px] px-3 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold text-adm-ink">
+              <div className="mt-[6px] inline-flex items-center h-[29px] min-w-[232px] px-3 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold text-adm-ink">
                 {storeCount > 1 ? `All rooftops (${storeCount})` : "This rooftop"}
               </div>
-              <div className="mt-[6px] flex flex-wrap gap-2">
-                {storeCount > 1 ? stores.map((s) => <span key={s.id} data-parity="store-name"><StatusChip tone="info">{s.name}</StatusChip></span>) : <span data-parity="store-name"><StatusChip tone="info">{api.currentStoreName}</StatusChip></span>}
+              <div className="mt-[7px] flex flex-wrap gap-2">
+                {storeCount > 1 ? stores.map((s) => <span key={s.id} data-parity="store-name" className="flex"><StatusChip tone="info">{s.name}</StatusChip></span>) : <span data-parity="store-name" className="flex"><StatusChip tone="info">{api.currentStoreName}</StatusChip></span>}
               </div>
             </div>
 
             <div className="mt-[13px]">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Notification methods</p>
               <p className="text-[12px] leading-[18px] text-adm-muted">Select how escalation notifications are sent.</p>
-              <div className="mt-[6px] grid grid-cols-2 sm:grid-cols-4 gap-[5px]" role="group" aria-label="Notification methods">
+              <div className="mt-[6px] grid grid-cols-2 sm:grid-cols-[148fr_149fr_152fr_154fr] gap-2 sm:mr-1" role="group" aria-label="Notification methods">
                 {methods.map((m) => {
                   const Icon = METHOD_ICON[m.key];
                   return (
@@ -383,18 +419,18 @@ export default function EscalationPage() {
                       disabled={!m.supported || ro}
                       onClick={() => api.patchRouting({ escalationRules: withEmailMethod(rules, !m.enabled) })}
                       className={cn(
-                        "rounded-[6px] border px-3 py-[7px] text-left flex items-center gap-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary",
-                        m.enabled ? "border-adm-primary bg-adm-selected" : "border-adm-border bg-adm-surface",
+                        "rounded-[6px] border px-3 pt-[5px] pb-[8px] text-left flex items-start gap-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary",
+                        m.enabled ? "border-adm-primary/90 bg-adm-selected shadow-[inset_0_0_0_1px_#FFFFFF]" : "border-adm-border bg-adm-surface",
                         !m.supported && "opacity-60 cursor-not-allowed",
                       )}
                     >
                       {m.enabled ? (
-                        <span className="w-[22px] h-[22px] rounded-full bg-adm-primary text-white flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-3 h-3" /></span>
+                        <span className="mt-px w-[22px] h-[22px] rounded-full bg-adm-primary text-white flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-3 h-3" /></span>
                       ) : (
                         <Icon className={cn(ICON.status, "text-adm-muted flex-shrink-0")} aria-hidden="true" />
                       )}
                       <span className="min-w-0">
-                        <span className="block text-[13px] leading-[18px] font-semibold text-adm-ink">{METHOD_SHORT[m.key]}</span>
+                        <span className="block text-[12px] leading-[18px] font-semibold text-adm-ink">{METHOD_SHORT[m.key]}</span>
                         <span className="block text-[11px] leading-[16px] text-adm-muted">{m.supported ? "Send by email" : "Not supported"}</span>
                       </span>
                     </button>
@@ -403,28 +439,28 @@ export default function EscalationPage() {
               </div>
             </div>
 
-            <div className="mt-[11px] flex items-center gap-[15px] flex-wrap">
-              <AdminButton variant="primary" data-parity="review-changes" className="min-h-[34px] w-[285px] max-w-full disabled:opacity-100 disabled:bg-adm-border disabled:border-adm-border disabled:text-adm-muted" disabled={!canReview} onClick={onReview}>Review changes</AdminButton>
+            <div className="mt-[10px] flex items-center gap-[15px] flex-wrap">
+              <AdminButton variant="primary" data-parity="review-changes" className="min-h-[33px] w-[286px] rounded max-w-full disabled:opacity-100 disabled:bg-adm-border disabled:border-adm-border disabled:text-adm-muted" disabled={!canReview} onClick={onReview}>Review changes</AdminButton>
               {dirty && state.phase !== "applying" && <AdminButton variant="ghost" className="min-h-[34px]" onClick={api.discard}>Discard</AdminButton>}
               <p className={cn("text-[12px] leading-[18px]", state.validation.length ? "text-adm-danger" : "text-adm-muted")} role="status">{helper}</p>
             </div>
           </AdminCard>
 
           <div className="space-y-[9px]">
-            <AdminCard inset="sm" title={cardTitle("Delivery states")} description="Possible states when sending an escalation notification." bodyClassName="pt-2">
+            <AdminCard inset="sm" title={cardTitle("Delivery states")} description="Possible states when sending an escalation notification." headerClassName="pt-3" bodyClassName="pt-[11px] pb-[15px]">
               <ul data-landmark="delivery-states" className="rounded-[10px] border border-adm-border divide-y divide-adm-border">
-                {DELIVERY_STATES.map((s) => (
-                  <li key={s.title} className="flex items-center gap-6 px-[14px] py-[10px]">
+                {DELIVERY_STATES.map((s, i) => (
+                  <li key={s.title} className={cn("flex items-center gap-[22px] px-[14px]", STATE_ROW_PAD[i])}>
                     <span className="flex-shrink-0" aria-hidden="true">{s.mark}</span>
                     <span className="min-w-0">
-                      <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{s.title}</span>
-                      <span className="block text-[12px] leading-[18px] text-adm-muted">{s.detail}</span>
+                      <span className="block text-[14px] leading-[18px] font-semibold text-adm-ink">{s.title}</span>
+                      <span className="block pt-[2px] text-[12px] leading-[18px] text-adm-muted">{s.detail}</span>
                     </span>
                   </li>
                 ))}
               </ul>
               <div data-landmark="retry-note" className="mt-4">
-                <InlineNote tone="warning" title="A failed notification stays eligible for retry.">If a notification fails, the lead keeps its level and the next sweep tries again.</InlineNote>
+                <RetryNote />
               </div>
             </AdminCard>
             {activityCard(false)}

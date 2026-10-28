@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Building2, ChevronRight, Clock, FileText, GripVertical, Headset, Mail, MessageSquare, Plus, ShieldCheck, Smartphone, Trash2, User, Users, type LucideIcon } from "lucide-react";
+import { Bell, Building, Building2, ChevronRight, CircleAlert, CircleCheck, Clock, FileText, GripVertical, Headset, Mail, MessageSquare, Plus, ShieldCheck, Smartphone, Trash2, TriangleAlert, User, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AdminButton, AdminCard, ICON, InlineNote, SectionTitle, StatusChip } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminCard, ICON, InlineNote, SectionTitle } from "@/components/admin/v2/primitives";
 import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import type { RoutingReadiness } from "@/lib/admin/effectivePolicy";
 import { namedAgents, notificationMethodRows, routingOrderRows, withEmailMethod, type NotificationMethodRow, type RoutingOrderRow } from "@/lib/admin/routingDraft";
@@ -56,33 +56,54 @@ const iconBtn = "w-8 h-8 rounded-md inline-flex items-center justify-center text
 // in the mock, so the inline size from the shared scale is too small here.
 const ROW_ICON = "w-6 h-6";
 
+type PillTone = "success" | "danger" | "warning" | "neutral";
+
+// The mock's state chips are 29px pills with a 16px mark 12px in and the
+// label 8px after it, wider than the shared StatusChip (28px, 6px radius).
+const PILL: Record<PillTone, { cls: string; icon: LucideIcon | null }> = {
+  success: { cls: "bg-adm-success-bg text-adm-success", icon: CircleCheck },
+  danger: { cls: "bg-adm-danger-bg text-adm-danger", icon: CircleAlert },
+  warning: { cls: "bg-adm-warning-bg text-adm-warning", icon: TriangleAlert },
+  neutral: { cls: "bg-adm-workspace text-adm-muted border border-adm-border", icon: null },
+};
+
+const Pill = ({ tone, children }: { tone: PillTone; children: string }) => {
+  const Icon = PILL[tone].icon;
+  return (
+    <span className={cn("inline-flex items-center gap-2 h-[29px] px-3 rounded-full text-[12px] leading-[18px] font-semibold whitespace-nowrap", PILL[tone].cls)}>
+      {Icon && <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />}
+      {children}
+    </span>
+  );
+};
+
 const OrderRow = ({ row }: { row: RoutingOrderRow }) => {
   const Icon = ORDER_ICON[row.key];
   return (
-    <li data-landmark="order-row" className="rounded-[10px] border border-adm-border bg-adm-surface flex items-stretch">
-      <div className="min-w-0 flex-1 flex items-center pl-px py-[14px]">
-        <GripVertical className={cn(ICON.inline, "text-adm-muted/50 flex-shrink-0")} aria-hidden="true" />
-        <span className="ml-3 w-[34px] h-[34px] rounded-full bg-adm-workspace text-adm-ink text-[14px] font-semibold flex items-center justify-center flex-shrink-0">{row.step}</span>
-        <div className="min-w-0 flex-1 ml-[22px] pr-3">
+    <li data-landmark="order-row" className="min-h-[67.5px] rounded-[10px] border border-adm-border bg-adm-surface flex items-stretch">
+      <div className="min-w-0 flex-1 flex items-center py-[13px]">
+        <GripVertical className={cn(ICON.inline, "-ml-[3px] text-adm-muted flex-shrink-0")} aria-hidden="true" />
+        <span className="ml-[14px] w-[34px] h-[34px] rounded-full bg-adm-workspace text-adm-ink text-[14px] font-semibold flex items-center justify-center flex-shrink-0">{row.step}</span>
+        <div className="min-w-0 flex-1 ml-[21px] pr-3">
           <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{row.title}</p>
           <p className="text-[12px] leading-[18px] text-adm-muted">{row.description}</p>
         </div>
       </div>
-      <div className="relative sm:w-[232px] flex-shrink-0 flex items-center pl-[13px] pr-[3px] py-[14px] before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-[11px] before:w-px before:bg-adm-border">
+      <div className="relative sm:w-[230px] flex-shrink-0 flex items-center pl-[13px] pr-[3px] pt-[11px] pb-[15px] before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-[7px] before:w-px before:bg-adm-border">
         {row.state === "incomplete" ? (
-          <StatusChip tone="danger" icon className="py-[5px]">Incomplete</StatusChip>
+          <Pill tone="danger">Incomplete</Pill>
         ) : row.state === "off" ? (
-          <StatusChip tone="neutral" className="py-[5px]">Off</StatusChip>
+          <Pill tone="neutral">Off</Pill>
         ) : (
-          <span className="hidden sm:flex items-center gap-[14px] min-w-0">
+          <span className="hidden sm:flex items-center gap-[13px] min-w-0">
             <Icon className={cn(ROW_ICON, "text-adm-muted flex-shrink-0")} aria-hidden="true" />
             <span className="min-w-0">
-              <span className="block text-[13px] leading-[18px] font-semibold text-adm-ink truncate">{row.owner}</span>
+              <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink truncate">{row.owner}</span>
               <span className="block text-[11px] leading-[16px] text-adm-muted truncate">{row.ownerDetail}</span>
             </span>
           </span>
         )}
-        <a href={`#${row.anchor}`} aria-label={`Edit ${row.title}`} className={cn(iconBtn, "ml-auto")}><ChevronRight className={ICON.chevron} aria-hidden="true" /></a>
+        <a href={`#${row.anchor}`} aria-label={`Edit ${row.title}`} className={cn(iconBtn, "ml-auto mt-1")}><ChevronRight className={ICON.chevron} aria-hidden="true" /></a>
       </div>
     </li>
   );
@@ -90,31 +111,33 @@ const OrderRow = ({ row }: { row: RoutingOrderRow }) => {
 
 type Check = RoutingReadiness["checks"][number];
 
-const ReadinessRow = ({ check, chip }: { check: Check; chip: { tone: "success" | "danger" | "warning" | "neutral"; label: string } }) => {
+const ReadinessRow = ({ check, chip }: { check: Check; chip: { tone: PillTone; label: string } }) => {
   const meta = READINESS_META[check.key] ?? { icon: Bell, href: "#routing-contact-mode", description: check.detail };
   const Icon = meta.icon;
   const body = (
     <>
       <Icon className={cn(ROW_ICON, "text-adm-muted flex-shrink-0")} aria-hidden="true" />
-      <span className="min-w-0 flex-1 ml-3 sm:ml-[21px]">
-        <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{check.label}</span>
-        <span className="block text-[12px] leading-[18px] text-adm-muted">{meta.description}</span>
+      <span className="min-w-0 flex-1 ml-3 sm:ml-[22px]">
+        <span className="block text-[13px] leading-[18px] font-bold text-adm-ink">{check.label}</span>
+        <span className="block text-[11px] leading-[16px] text-adm-muted">{meta.description}</span>
       </span>
       <span className="sm:w-[146px] flex-shrink-0 flex items-center">
-        <StatusChip tone={chip.tone} icon={chip.tone !== "neutral"} className="py-[5px]">{chip.label}</StatusChip>
+        <Pill tone={chip.tone}>{chip.label}</Pill>
       </span>
       <span className="w-8 h-8 flex items-center justify-center flex-shrink-0" aria-hidden="true"><ChevronRight className={cn(ICON.chevron, "text-adm-muted")} /></span>
     </>
   );
-  const cls = "flex items-center pl-[19px] pr-[3px] py-[7.5px] hover:bg-adm-workspace/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary";
+  const cls = "flex items-center pl-[18px] pr-[3px] py-[9px] hover:bg-adm-workspace/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary";
   return <li title={check.detail}>{meta.href.startsWith("#") ? <a href={meta.href} className={cls}>{body}</a> : <Link to={meta.href} className={cls}>{body}</Link>}</li>;
 };
 
-const TimingRow = ({ icon: Icon, title, hint, value }: { icon: LucideIcon; title: string; hint: string; value: string }) => (
-  <li className="flex items-center gap-[3px] py-[7px] pl-[3px] pr-[5px]">
-    <Icon className={cn(ROW_ICON, "text-adm-muted flex-shrink-0")} aria-hidden="true" />
-    <span className="min-w-0 flex-1 ml-[21px]">
-      <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{title}</span>
+// The mock's row rules start under the title and stop at the value, leaving
+// the icon and the chevron columns open.
+const TimingRow = ({ icon: Icon, title, hint, value, last = false }: { icon: LucideIcon; title: string; hint: string; value: string; last?: boolean }) => (
+  <li className={cn("relative flex items-center gap-[3px] pt-2 pl-[5px] pr-[5px]", last ? "pb-2" : "pb-[9px] after:content-[''] after:absolute after:left-[49px] after:right-[40px] after:bottom-0 after:h-px after:bg-adm-border")}>
+    <Icon className="w-[22px] h-[22px] text-adm-muted flex-shrink-0" aria-hidden="true" />
+    <span className="min-w-0 flex-1 ml-[19px]">
+      <span className="block text-[13px] leading-[18px] font-bold text-adm-ink">{title}</span>
       <span className="block text-[11px] leading-[16px] text-adm-muted truncate">{hint}</span>
     </span>
     <span className="text-[14px] leading-[20px] text-adm-ink whitespace-nowrap">{value}</span>
@@ -125,10 +148,10 @@ const TimingRow = ({ icon: Icon, title, hint, value }: { icon: LucideIcon; title
 const minutesLabel = (v: number | undefined | null, off: string): string => (v && v > 0 ? `${v} ${v === 1 ? "minute" : "minutes"}` : off);
 
 const ScopeBadge = ({ count }: { count: number }) => (
-  <div data-parity="scope" className="flex items-center gap-[18px]" title="Routing is stored once per account and applies to every rooftop.">
+  <div data-parity="scope" className="flex items-center gap-[14px]" title="Routing is stored once per account and applies to every rooftop.">
     <span className="text-[13px] leading-[18px] text-adm-muted">Scope</span>
-    <span className="inline-flex items-center gap-[14px] h-[42px] min-w-[191px] px-4 rounded-[8px] border border-adm-border bg-adm-surface text-[14px] font-semibold text-adm-ink">
-      <Building2 className={cn(ROW_ICON, "text-adm-muted flex-shrink-0")} aria-hidden="true" />
+    <span className="inline-flex items-center gap-[11px] h-[42px] min-w-[191px] pl-[11px] pr-4 rounded-[8px] border border-adm-border bg-adm-surface text-[13px] leading-[18px] text-adm-ink">
+      <Building className="w-[22px] h-[22px] text-adm-muted flex-shrink-0" aria-hidden="true" />
       {count > 1 ? `All rooftops (${count})` : "This rooftop"}
     </span>
   </div>
@@ -148,7 +171,7 @@ export default function RoutingView() {
   const rows = routingOrderRows(draft);
   const methods = notificationMethodRows(rules).filter((m) => SUMMARY_METHODS.includes(m.key));
   const railChecks = readiness.checks.filter((c) => RAIL_CHECKS.includes(c.key));
-  const escalationBlockers = readiness.checks.filter((c) => !RAIL_CHECKS.includes(c.key) && c.state === "missing").map((c) => c.label.toLowerCase());
+  const escalationBlockers = readiness.checks.filter((c) => !RAIL_CHECKS.includes(c.key) && c.state === "missing").map((c) => c.label.replace(/^[A-Z](?=[a-z])/, (ch) => ch.toLowerCase()));
   const smart = cfg.contactMode === "smart_routing";
   const rotationCount = namedAgents(agents).filter((a) => a.acceptsPassportLeads !== false && a.manualOverride !== "unavailable").length;
 
@@ -197,20 +220,26 @@ export default function RoutingView() {
   const ro = !canEdit;
 
   return (
-    <div className="pt-[3px]">
+    <div className="pt-[5px]">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-[26px] leading-[32px] font-bold text-adm-ink">Contact & Routing</h2>
-          <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">Give every customer request a clear owner and fallback.</p>
+          <p className="text-[15px] leading-[22px] text-adm-muted">Give every customer request a clear owner and fallback.</p>
         </div>
-        <div className="mt-[3px]"><ScopeBadge count={api.storeCount} /></div>
+        <div className="mt-px"><ScopeBadge count={api.storeCount} /></div>
       </div>
 
       {ro && <InlineNote tone="info" title="View only." className="mt-4">Your role can see routing but cannot change it. Ask an administrator for changes.</InlineNote>}
 
-      <div className="mt-[22px] grid grid-cols-1 xl:grid-cols-[minmax(0,623fr)_minmax(0,653fr)] gap-4 xl:gap-[15px]">
-        <AdminCard inset="sm" title="Routing order" bodyClassName="pt-[15px]" action={<ToggleRow compact id="smart-routing" label="Smart routing" checked={smart} onChange={setSmart} disabled={ro} />}>
-          <ol className={cn("space-y-[7.5px]", !smart && "opacity-60")}>{rows.map((r) => <OrderRow key={r.key} row={r} />)}</ol>
+      <div className="mt-[19px] grid grid-cols-1 xl:grid-cols-[minmax(0,622fr)_minmax(0,656fr)] gap-4 xl:gap-[14px]">
+        <AdminCard
+          inset="sm"
+          title="Routing order"
+          headerClassName="pt-[13px] pr-[14px]"
+          bodyClassName="px-3 pt-[15px]"
+          action={<div className="mt-[2px]"><ToggleRow compact id="smart-routing" label="Smart routing" checked={smart} onChange={setSmart} disabled={ro} switchSize="routing" /></div>}
+        >
+          <ol className={cn("space-y-2", !smart && "opacity-60")}>{rows.map((r) => <OrderRow key={r.key} row={r} />)}</ol>
           {!smart && (
             <p className="mt-3 text-[12px] leading-[18px] text-adm-muted" role="status">
               Smart routing is off. Every request goes to {MODE_LABEL[cfg.contactMode]}. The order above applies when it is on.
@@ -218,34 +247,45 @@ export default function RoutingView() {
           )}
         </AdminCard>
 
-        <div className="space-y-4">
-          <AdminCard inset="sm" title="Configuration readiness" bodyClassName="pt-[13px]">
+        <div className="space-y-[14px]">
+          <AdminCard inset="sm" title="Configuration readiness" headerClassName="pt-[13px] px-[14px]" bodyClassName="px-3 pt-[15px] pb-[14px]">
             <ul data-landmark="readiness-list" className="rounded-[10px] border border-adm-border divide-y divide-adm-border">
               {railChecks.map((c) => <ReadinessRow key={c.key} check={c} chip={chipFor(c)} />)}
             </ul>
-            <Link to={ADMIN_CHILD_ROUTES.escalation} data-parity="review-escalation" className="mt-[7px] inline-flex items-center gap-3 min-h-[36px] w-[230px] max-w-full pl-4 pr-2 rounded-md border border-adm-primary/40 text-[14px] font-semibold text-adm-primary whitespace-nowrap hover:bg-adm-selected focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
+            <Link to={ADMIN_CHILD_ROUTES.escalation} data-parity="review-escalation" className="mt-[11px] inline-flex items-center gap-[15px] min-h-[36px] w-[232px] max-w-full pl-[25px] pr-2 rounded-md border border-adm-primary/40 text-[14px] font-semibold text-adm-primary whitespace-nowrap hover:bg-adm-selected focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
               <FileText className={cn(ICON.button, "flex-shrink-0")} aria-hidden="true" />
               Review escalation rules
             </Link>
           </AdminCard>
 
-          <AdminCard inset="sm" title="Response and escalation" bodyClassName="pt-1" action={<ToggleRow compact id="escalation-enabled" label="Escalation" checked={rules.enabled} onChange={(v) => patchRules({ enabled: v })} disabled={ro} />}>
+          {/* The escalation on/off switch lives on the Escalation child, which owns the tiers; this card reports the state. */}
+          <AdminCard inset="sm" title="Response and escalation" headerClassName="pt-[14px] px-[14px]" bodyClassName="px-3 pt-[7px] pb-3">
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_266px]">
-              <ul className="divide-y divide-adm-border">
-                <TimingRow icon={Clock} title="First response" hint="Customer should get a reply within:" value={minutesLabel(rules.firstResponseSlaMinutes, "Not set")} />
-                <TimingRow icon={Users} title="Route to BDC" hint="If no response after:" value={minutesLabel(rules.escalateToBdcAfterMinutes ?? rules.firstResponseSlaMinutes, "Off")} />
-                <TimingRow icon={ShieldCheck} title="Route to manager" hint="If still no response after:" value={minutesLabel(rules.escalateToManagerAfterMinutes, "Off")} />
+              <ul>
+                <TimingRow icon={Clock} title="First response" hint="Customer should get a reply within:" value={rules.enabled ? minutesLabel(rules.firstResponseSlaMinutes, "Not set") : "Off"} />
+                <TimingRow icon={Users} title="Route to BDC" hint="If no response after:" value={rules.enabled ? minutesLabel(rules.escalateToBdcAfterMinutes ?? rules.firstResponseSlaMinutes, "Off") : "Off"} />
+                <TimingRow icon={ShieldCheck} title="Route to manager" hint="If still no response after:" value={rules.enabled ? minutesLabel(rules.escalateToManagerAfterMinutes, "Off") : "Off"} last />
               </ul>
-              <div className="pt-1.5 lg:border-l lg:border-adm-border lg:pl-5">
-                <p className="text-[15px] leading-[22px] font-semibold text-adm-ink">Notification methods</p>
-                <ul className="mt-2 space-y-3">
+              <div className="pt-[5px] lg:border-l lg:border-adm-border lg:pl-[19px]">
+                <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Notification methods</p>
+                <ul className="mt-2.5 space-y-[14px]">
                   {methods.map((m) => {
                     const Icon = METHOD_ICON[m.key];
                     return (
-                      <li key={m.key} className="flex items-start gap-[18px]">
-                        <Icon className={cn(ROW_ICON, "mt-[3px] text-adm-ink flex-shrink-0")} aria-hidden="true" />
+                      <li key={m.key} className="flex items-start gap-[21px]">
+                        <Icon className="w-[21px] h-[21px] mt-[6px] text-adm-ink flex-shrink-0" aria-hidden="true" />
                         <div className="min-w-0 flex-1">
-                          <ToggleRow id={`method-${m.key}`} label={m.label} hint={m.supported ? m.detail : "Not supported yet."} checked={m.enabled} onChange={(v) => patchRules(withEmailMethod(rules, v))} disabled={ro || !m.supported} />
+                          <ToggleRow
+                            id={`method-${m.key}`}
+                            label={m.label}
+                            hint={m.supported ? m.detail : "Not supported yet."}
+                            hintClassName="text-[11px] leading-[14px]"
+                            switchSize="sm"
+                            switchClassName="mt-[3px] mr-1"
+                            checked={m.enabled}
+                            onChange={(v) => patchRules(withEmailMethod(rules, v))}
+                            disabled={ro || !m.supported}
+                          />
                         </div>
                       </li>
                     );
@@ -254,12 +294,13 @@ export default function RoutingView() {
               </div>
             </div>
             {readiness.blockers.length > 0 && (
-              <InlineNote tone="warning" className="py-[5px]">
-                <span className="text-[12px] leading-[16px]">
+              <div role="status" className="flex items-center gap-3 rounded-[8px] border border-[#F1D58A] bg-adm-warning-bg pl-[13px] pr-3 py-[7px] text-[12px] leading-[18px] text-adm-ink">
+                <TriangleAlert className="w-5 h-5 text-adm-warning flex-shrink-0" aria-hidden="true" />
+                <p className="min-w-0">
                   <span className="font-semibold">Add a valid fallback before enabling this route.</span>
                   {escalationBlockers.length > 0 && <> Missing: {escalationBlockers.join(", ")}.</>}
-                </span>
-              </InlineNote>
+                </p>
+              </div>
             )}
           </AdminCard>
         </div>

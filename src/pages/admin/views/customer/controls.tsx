@@ -21,6 +21,12 @@ export const newAgent = (): PassportAgent => ({
   workingHours: [],
 });
 
+const SWITCH_SIZE = {
+  md: "",
+  routing: "w-[42px] [&[data-state=checked]>span]:translate-x-[18px]",
+  sm: "h-5 w-9 [&>span]:h-4 [&>span]:w-4 [&[data-state=checked]>span]:translate-x-4",
+} as const;
+
 export const ToggleRow = ({
   id,
   checked,
@@ -29,6 +35,9 @@ export const ToggleRow = ({
   hint,
   disabled = false,
   compact = false,
+  switchSize = "md",
+  switchClassName,
+  hintClassName,
 }: {
   id: string;
   checked: boolean;
@@ -37,13 +46,16 @@ export const ToggleRow = ({
   hint?: string;
   disabled?: boolean;
   compact?: boolean;
+  switchSize?: keyof typeof SWITCH_SIZE;
+  switchClassName?: string;
+  hintClassName?: string;
 }) => (
   <div className={cn("flex justify-between gap-3", compact ? "items-center" : "items-start")}>
     <label htmlFor={id} className="min-w-0 cursor-pointer">
       <span className={cn("block font-semibold text-adm-ink", compact ? "text-[13px] leading-[18px]" : "text-[14px] leading-[20px]")}>{label}</span>
-      {hint && <span className="block text-[12px] leading-[18px] text-adm-muted">{hint}</span>}
+      {hint && <span className={cn("block text-[12px] leading-[18px] text-adm-muted", hintClassName)}>{hint}</span>}
     </label>
-    <Switch id={id} checked={checked} onCheckedChange={onChange} disabled={disabled} className={cn(SWITCH_CLS, "flex-shrink-0")} />
+    <Switch id={id} checked={checked} onCheckedChange={onChange} disabled={disabled} className={cn(SWITCH_CLS, SWITCH_SIZE[switchSize], "flex-shrink-0", switchClassName)} />
   </div>
 );
 
