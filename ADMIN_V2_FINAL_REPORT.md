@@ -200,8 +200,16 @@ this session: SECURITY DEFINER on every function, execute rights limited to
 `authenticated` and `service_role`, argument names matching the client
 calls, row security on the apply ledger, the version trigger present). The
 fee review, the feed's last-success read, the job status read and the policy
-version now run on the server. Migration 2 is not applied; its callers keep
-the honest fallbacks (section I).
+version now run on the server. Migration 2 was applied by the same Lovable
+run at 11:17 UTC and verified read-only at about 11:30 UTC: the member-wide
+`dealer_profiles` write policies are gone, the six add-on-role policies are
+on `products` and `product_rules`, the priced-column guard trigger is on
+`vehicle_listings`, `merge_dealer_settings` carries the key-level authority
+and audits policy-class changes, and anon holds SELECT alone on
+`dealer_profiles`. The application-level checks (a manager refused on a
+pricing key with `42501`, a salesperson's workspace key accepted, the next
+feed and crawl runs writing under the service role) are to be observed on
+the next saves and runs.
 
 **Client gating.** Every V2 view and child derives its edit rights from
 `hasDealerCapability` over the same capability table the legacy tabs used
@@ -343,18 +351,18 @@ documents. Lovable reads `main`; there is no feature flag. The V2 route
 replaces `/admin` for every role at once; the legacy page remains in the tree
 as the embedded body of the unpictured tabs.
 
-**Migrations.** Migration 1 is applied (2026-10-28, about 11:13 UTC,
-verified; the Lovable runner recorded it as
-`drizzle/migrations/0001_admin_v2_policy_apply.sql`, body unchanged, and
-wrote no `supabase_migrations.schema_migrations` row). Migration 2 waits on
-the owner's two role decisions and is applied the same way, outside the feed
-window (07:00 UTC) and the crawl window (07:20 UTC), verified with section 4
-of `ADMIN_V2_SERVER_AUTHORITY.md`. Until then its callers fall back
-honestly: settings writes are still accepted from any member by the server
-(the UI gates by capability), products and product rules keep the
-member-wide policies, and no server audit row is written for policy-class
-settings changes. The migration 1 fallbacks (browser-computed fee impact,
-whole-ledger feed success, `get_cron_job_status`) are no longer exercised.
+**Migrations.** Both are applied (2026-10-28, migration 1 at about 11:13
+UTC and migration 2 at 11:17 UTC, each verified with section 4 of
+`ADMIN_V2_SERVER_AUTHORITY.md`; the Lovable runner recorded them as
+`drizzle/migrations/0001_admin_v2_policy_apply.sql` and
+`0002_admin_v2_settings_authority.sql`, bodies unchanged, and wrote no
+`supabase_migrations.schema_migrations` rows). The honest fallbacks
+(browser-computed fee impact, whole-ledger feed success,
+`get_cron_job_status`, member-wide settings writes) are no longer exercised;
+they remain in the code for a rollback. The two role choices the migration
+text makes (price columns writable by every `can_edit_inventory` holder;
+`dealer_programs` as an add-on claim) are live; narrowing either is a
+follow-up migration.
 
 **Edge function (not deployed).** `supabase/functions/passport-lead-escalation`
 is rewritten on `supabase/functions/_shared/escalation.ts`. Deploying changes
@@ -384,14 +392,14 @@ migration 1 (additive: columns, ledger, functions), then migration 2
 
 | Item | Owner | Blocker | Safe current behaviour |
 |---|---|---|---|
-| Apply migration 2 (migration 1 is applied and verified) | Owner, through Lovable, after the two role decisions below | Authorization | The UI gates by capability; the server accepts any member's settings, product and rule writes as before |
+| Observe the first writes under migration 2 (a manager refused on a pricing key, a salesperson's workspace key accepted, the next feed and crawl runs) | Owner and this session, on 2026-10-29 after the 07:20 UTC crawl | Nothing had been written by 11:30 UTC on apply day | Rollback SQL for migration 2 is section 5.1 of the server authority document |
 | Deploy `passport-lead-escalation` | Owner, through Lovable | Authorization | The live sweep keeps its pre-existing behaviour (advances on any send attempt); the Administration child shows legacy rows as Attempted, never Accepted |
 | Visual parity below 97 on screens listed in F | Owner | The title-block exception and glyph rendering (F) | The screens pass their landmark and overflow gates where listed; the parity report itemises hotspots |
-| Price-column guard roles (`can_edit_inventory` holders, not only the four pricing roles) | Owner | Decision, `ADMIN_V2_SERVER_AUTHORITY.md` section 9.1 | Migration text uses the wider set so inventory surfaces keep working |
-| `dealer_programs` written by Sticker Studio for any document role | Owner | Decision, section 9.2 | Classed as an add-on claim in migration 2; salespeople would lose that write on apply |
+| Price-column guard roles (`can_edit_inventory` holders, not only the four pricing roles) | Owner | Decision, `ADMIN_V2_SERVER_AUTHORITY.md` section 9.1; live as written | Inventory surfaces keep working; narrowing is a follow-up migration |
+| `dealer_programs` written by Sticker Studio for any document role | Owner | Decision, section 9.2; live as written | Salespeople can no longer add a dealer program from Sticker Studio; moving the key to the member list is a follow-up migration |
+| No `settings_updated`-style audit for routing changes | Resolved by migration 2 | | `merge_dealer_settings` writes `routing_policy_changed` for routing keys |
 | `empty_valid` feed runs not counted as success | Owner | Decision, section 9.3 | Last success counts `success` and `partial` only |
 | `can_manage_team` wider than the server gate; invitations and removals unaudited; enforcement rail never Verified | S10 scope, a later migration | No server evidence of enforcement | The rail says "Must match role policy"; the preview grants nothing |
-| No `settings_updated` audit for routing changes until migration 2 (`routing_policy_changed`) | Migration 2 | Authorization | The review dialog records nothing and says so |
 | Old escalation audit rows unreadable to dealers (written with a store uuid) | A later `audit_log` policy change | Policy design | New rows use the tenant id; old rows are simply absent from the dealer view |
 | Printer test record table absent, so a saved profile reads "Needs test" | A later migration | Schema | Never claims Tested |
 | Per-tenant document versions absent | Schema | Schema | The rail shows "In effect" with the last audited change |

@@ -1,8 +1,8 @@
 # Administration V2: server authority and policy apply
 
-Prepared 2026-10-28. **Migration 1 applied; migration 2 not applied.** Two
-migrations, applied only on the owner's explicit authorization, through the
-usual Lovable migration path, in this order:
+Prepared 2026-10-28. **Both migrations applied on 2026-10-28.** Two
+migrations, applied on the owner's authorization through the usual Lovable
+migration path, in this order:
 
 1. `supabase/migrations/20261029000000_admin_v2_policy_apply.sql`
 2. `supabase/migrations/20261029001000_admin_v2_settings_authority.sql`
@@ -34,8 +34,28 @@ policy, SELECT for `authenticated` and full rights for `service_role`, and
 no rows; the trigger `dealer_profiles_bump_policy_version` is present and
 enabled. The signed-in checks in section 4 (a pricing role calling the fee
 functions, a salesperson refused with `42501`) were not run by SQL; they are
-exercised through the application. Migration 2 waits on the two role
-decisions in section 9.
+exercised through the application.
+
+Migration 2 was applied by the same Lovable run at 11:17 UTC, three minutes
+after migration 1 was verified, although the prompt asked for it to be held
+for a separate step; the runner's commit is "Applied V2 settings auth mig",
+with the file recorded as `drizzle/migrations/0002_admin_v2_settings_authority.sql`
+and its body matching `main` at `6746a95` (same content hash). Verified
+read-only from this session at about 11:30 UTC (section 4, "After migration
+2"): `dealer_profiles` carries no `dealer_profiles_update` or
+`dealer_profiles_insert` policy, only the read policy and the two
+platform-admin policies; `products` and `product_rules` carry the six "addon
+roles" policies, `TO authenticated`, on `tenant_role_in`; the trigger
+`trg_vehicle_listings_priced_columns_guard` is on `vehicle_listings`;
+`merge_dealer_settings` contains `pricing_policy_changed` and is executable
+by `authenticated` and `service_role` only; anon holds SELECT alone on
+`dealer_profiles`. No settings write, policy audit row, ledger row or
+listing update had occurred by then, so the application-level checks
+(a manager refused on `doc_fee_amount` with `42501`, an owner's write
+bumping `policy_version`, a salesperson's `label_defaults` save, the next
+feed and crawl runs) remain to be observed. The two role choices in section
+9 are therefore in effect as written; narrowing either is a small follow-up
+migration, not a rollback.
 
 Text-level tests live in `src/lib/admin/sql/` and run with
 `bunx vitest run src/lib/admin/sql`. They hold the SQL to the rules below;
@@ -598,6 +618,10 @@ member-editable, and the guard is column-level by design.
 - Platform-admin paths: `has_role(uid, 'admin')` passes every new check.
 
 ## 9. Open questions for the owner
+
+Status 2026-10-28: migration 2 is applied, so items 1 and 2 are live as the
+migration text decides them. Either can be narrowed with a follow-up
+migration on request; items 3 to 5 stand.
 
 1. **Price-column roles.** The brief says "pricing roles" for the listing
    column guard. The migration uses the roles that hold
