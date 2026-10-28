@@ -1,0 +1,11 @@
+{
+  "_comment": "Dynamic regions per screen. `selectors` are evaluated against the rendered fixture and their boxes mask both images; a selector may add `heading` (text of the picked element's first h1-h3) and `inner` (descendants to mask inside the picked elements). `rects` are fixed boxes in reference-frame coordinates. Only data that legitimately varies (counts, times, names, identifiers) may be listed. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.",
+  "01": {
+    "selectors": [
+      { "selector": "[data-admin-v2] a[aria-label] span.tabular-nums", "reason": "summary tile counts" },
+      { "selector": "[data-admin-v2] section", "heading": "Recent activity", "inner": "li span.whitespace-nowrap", "reason": "recent activity relative times" },
+      { "selector": "[data-admin-v2] section", "heading": "Recent activity", "inner": "li span.block.text-\\[11px\\]", "reason": "recent activity detail lines (fixture names)" }
+    ],
+    "rects": []
+  }
+}

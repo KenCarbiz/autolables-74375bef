@@ -40,3 +40,6 @@ deno.lock
 
 # Agent worktrees created by the Claude Code harness; working copies, never source.
 .claude/worktrees/
+
+# Parity harness working captures; the evidence folder keeps the reviewed ones.
+scripts/admin-parity/out/
