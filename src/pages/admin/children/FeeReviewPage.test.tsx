@@ -135,6 +135,19 @@ describe("FeeReviewPage against live data without the server contracts", () => {
     expect(rpcCalls()).not.toContain("recalc_tenant_doc_fee");
   });
 
+  it("refuses the review and writes nothing when the installed preview fails, without falling back to the browser count", async () => {
+    spyResponses.rpcs.admin_doc_fee_change_preview = { data: null, error: { code: "22P02", message: 'malformed array literal: "Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation."' } };
+    spyResponses.rpcs.admin_policy_version = { data: 4, error: null };
+    spyResponses.tables.vehicle_listings = { data: listingRows, count: 3, error: null };
+    renderPage("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active", null);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Review changes" }));
+    expect(await within(dialog()).findByText("The review is no longer valid.")).toBeInTheDocument();
+    await waitFor(() => expect(within(dialog()).getByRole("button", { name: /^Apply to/ })).toBeDisabled());
+    expect(rpcCalls()).not.toContain("admin_doc_fee_change_apply");
+    expect(rpcCalls()).not.toContain("recalc_tenant_doc_fee");
+    expect(settingsState.updateSettings).not.toHaveBeenCalled();
+  });
+
   it("keeps a salesperson from applying even with a computed impact", async () => {
     roleState.role = "salesperson";
     spyResponses.tables.vehicle_listings = { data: listingRows, count: 3, error: null };

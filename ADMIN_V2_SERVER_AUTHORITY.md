@@ -559,10 +559,16 @@ forbids deleting them.
 | `dealer_profiles` | INSERT, UPDATE | any accepted member, directly | platform admins directly; members only through `merge_dealer_settings` | member policies dropped; admin policy existing |
 | `dealer_profiles` | DELETE | platform admins | unchanged | existing |
 | `products` | SELECT | templates and own tenant | unchanged | existing |
-| `products` | INSERT, UPDATE, DELETE | any accepted member (ALL); platform admins | addon roles on own tenant rows; platform admins | `TO authenticated`; `tenant_role_in` wraps `(SELECT auth.uid())` |
+| `products` | INSERT, UPDATE, DELETE | any accepted member (ALL); platform admins | addon roles on own tenant rows; platform admins can insert, and can update or delete only rows the SELECT policy shows them (templates, or tenants they belong to) | `TO authenticated`; `tenant_role_in` wraps `(SELECT auth.uid())` |
 | `product_rules` | SELECT | own tenant | unchanged | existing |
 | `product_rules` | INSERT, UPDATE, DELETE | any accepted member (ALL) | addon roles on own tenant | `TO authenticated`; `tenant_role_in` |
 | `vehicle_listings` | UPDATE | tenant members (row policy) | unchanged row policy plus the column guard | trigger, not a policy; `current_user` check; `tenant_role_in` |
+
+Measured 2026-10-28 in the isolated replica (`scripts/db-verify`): a
+platform administrator who is not a member of the dealership cannot see
+that dealership's products, product rules or vehicles, so an update or
+delete from the app matches no row, and a product rule insert is refused.
+The read policies predate Administration V2 and were not changed by it.
 | `admin_policy_applications` | SELECT | n/a | accepted members of the tenant | `TO authenticated`; `(SELECT auth.uid())` |
 | `admin_policy_applications` | INSERT, UPDATE, DELETE | n/a | nobody from the client; the apply RPC writes as owner | privileges revoked |
 
