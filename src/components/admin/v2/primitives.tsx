@@ -67,6 +67,13 @@ export const HealthChip = ({ state, className }: { state: HealthState; className
   </StatusChip>
 );
 
+const TITLE_SIZE = {
+  sm: "text-[14px] leading-[20px]",
+  md: "text-[16px] leading-[22px]",
+  lg: "text-[18px] leading-[26px]",
+  xl: "text-[20px] leading-[28px]",
+} as const;
+
 export const AdminCard = ({
   title,
   description,
@@ -91,8 +98,8 @@ export const AdminCard = ({
   flush?: boolean;
   /** Dense dashboard cards sit on a 16px inset; the default form card keeps 24px. */
   inset?: "sm" | "md";
-  /** Secondary dashboard cards carry a 14px title. */
-  titleSize?: "sm" | "md";
+  /** Measured title ink across the mocks: 14px on secondary dashboard cards, 16px by default, 18px and 20px on form and panel cards. */
+  titleSize?: "sm" | "md" | "lg" | "xl";
   headerClassName?: string;
 }) => {
   const sm = inset === "sm";
@@ -102,7 +109,7 @@ export const AdminCard = ({
       {(title || action) && (
         <header className={cn("flex items-start justify-between gap-4", padX, sm ? "pt-3.5" : "pt-5", flush ? (sm ? "pb-3" : "pb-4") : "pb-0", headerClassName)}>
           <div className="min-w-0">
-            {title && <h3 className={cn("font-semibold text-adm-ink", titleSize === "sm" ? "text-[14px] leading-[20px]" : "text-[16px] leading-[22px]")}>{title}</h3>}
+            {title && <h3 className={cn("font-semibold text-adm-ink", TITLE_SIZE[titleSize])}>{title}</h3>}
             {description && <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{description}</p>}
           </div>
           {action && <div className="flex-shrink-0 flex items-center gap-2">{action}</div>}
@@ -211,7 +218,8 @@ const BUTTON_VARIANT: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ghost: "bg-transparent text-adm-primary hover:bg-adm-selected",
   danger: "bg-adm-surface text-adm-danger border border-[#F3B4AE] hover:bg-adm-danger-bg",
 };
-const BUTTON_SIZE = { sm: "min-h-[32px] px-3 text-[13px]", md: "min-h-[36px] px-3.5 sm:min-h-[36px] max-sm:min-h-[44px]" };
+// A caller's min-h-* class must win through tailwind-merge, so the desktop height carries no variant prefix.
+const BUTTON_SIZE = { sm: "min-h-[32px] px-3 text-[13px]", md: "min-h-[36px] px-3.5 max-sm:min-h-[44px]" };
 
 export const AdminButton = ({ variant = "secondary", size = "md", className, type = "button", ...rest }: ButtonProps) => (
   <button type={type} className={cn(BUTTON_BASE, BUTTON_VARIANT[variant], BUTTON_SIZE[size], className)} {...rest} />
@@ -223,7 +231,7 @@ export const AdminLinkButton = ({ variant = "secondary", size = "md", className,
 
 /** Table shell: 12px semibold headers on the workspace tint, 12px cells, 1px row lines. */
 export const AdminTable = ({ children, className, caption, dense = false, inset = false }: { children: ReactNode; className?: string; caption?: string; /** 7px cells for dashboard queues. */ dense?: boolean; /** Draw the table as a bordered box inside a flush card. */ inset?: boolean }) => (
-  <div className={cn("overflow-x-auto", inset && "mx-4 mb-4 rounded-md border border-adm-border", dense && "[&_table]:text-[11.5px] [&_table]:leading-[16px] [&_th]:py-2.5 [&_td]:py-[9px] [&_tbody_tr:last-child>td]:border-b-0", className)}>
+  <div className={cn("relative overflow-x-auto", inset && "mx-4 mb-4 rounded-md border border-adm-border", dense && "[&_table]:text-[11.5px] [&_table]:leading-[16px] [&_th]:py-2.5 [&_td]:py-[9px] [&_tbody_tr:last-child>td]:border-b-0", className)}>
     <table className="w-full border-collapse text-left text-[14px] leading-[20px] text-adm-ink">
       {caption && <caption className="sr-only">{caption}</caption>}
       {children}
