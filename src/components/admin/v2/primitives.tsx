@@ -11,6 +11,30 @@ import { cn } from "@/lib/utils";
 
 export type Tone = HealthTone;
 
+// Icon scale measured from the reference screens. The mocks never draw a
+// 16px glyph: inline and table icons are 20px, status marks 22 to 24px,
+// glyphs inside a 40px square are 18 to 20px, inside a 44px square 22 to
+// 24px, inside a 56px circle 26 to 28px, and chevrons are 20px.
+export const ICON = {
+  inline: "w-5 h-5",
+  status: "w-6 h-6",
+  statusTight: "w-[22px] h-[22px]",
+  button: "w-5 h-5",
+  chevron: "w-5 h-5",
+  inSquare: "w-5 h-5",
+  inSquareLg: "w-6 h-6",
+  inCircle: "w-7 h-7",
+  panel: "w-7 h-7",
+} as const;
+
+export const ICON_BOX = {
+  square: "w-10 h-10 rounded-md",
+  squareLg: "w-11 h-11 rounded-[10px]",
+  circle: "w-14 h-14 rounded-full",
+  avatar: "w-12 h-12 rounded-full",
+  avatarLg: "w-[52px] h-[52px] rounded-full",
+} as const;
+
 const TONE_CHIP: Record<Tone, string> = {
   neutral: "bg-adm-workspace text-adm-muted border border-adm-border",
   success: "bg-adm-success-bg text-adm-success",
@@ -31,7 +55,7 @@ export const StatusChip = ({ tone = "neutral", children, className, icon = false
   const Icon = TONE_ICON[tone];
   return (
     <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-[3px] text-[12px] leading-[18px] font-semibold whitespace-nowrap", TONE_CHIP[tone], className)}>
-      {icon && <Icon className="w-3.5 h-3.5" aria-hidden="true" />}
+      {icon && <Icon className="w-4 h-4" aria-hidden="true" />}
       {children}
     </span>
   );
@@ -126,8 +150,8 @@ export const StatTile = ({
   const body = (
     <>
       {Icon && (
-        <span className={cn("w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", iconWrap[tone])} aria-hidden="true">
-          <Icon className="w-5 h-5" />
+        <span className={cn(ICON_BOX.circle, "flex items-center justify-center flex-shrink-0", iconWrap[tone])} aria-hidden="true">
+          <Icon className={ICON.inCircle} />
         </span>
       )}
       <span className="min-w-0 flex-1">
@@ -135,10 +159,10 @@ export const StatTile = ({
         <span className="block text-[28px] leading-[34px] font-bold text-adm-ink tabular-nums truncate">{value}</span>
         {hint && <span className="block text-[12px] leading-[18px] text-adm-muted mt-0.5 truncate">{hint}</span>}
       </span>
-      {href && <ChevronRight className="w-4 h-4 text-adm-muted flex-shrink-0" aria-hidden="true" />}
+      {href && <ChevronRight className={cn(ICON.chevron, "text-adm-muted flex-shrink-0")} aria-hidden="true" />}
     </>
   );
-  const cls = "flex items-center gap-4 rounded-[10px] border border-adm-border bg-adm-surface px-4 py-3 min-h-[79px]";
+  const cls = "flex items-center gap-4 rounded-[10px] border border-adm-border bg-adm-surface px-4 py-[11px] min-h-[79px]";
   return href ? (
     <Link to={href} className={cn(cls, "hover:border-adm-primary/60 focus-visible:outline-2 focus-visible:outline-adm-primary")} aria-label={ariaLabel ?? `${label}: ${typeof value === "string" || typeof value === "number" ? value : ""}`}>
       {body}

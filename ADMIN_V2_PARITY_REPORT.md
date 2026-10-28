@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T04:54:22.035Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-28T05:11:41.673Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -18,12 +18,12 @@ Registered fixtures: 10, 11, 12, 13, 01, 02, 03, 04, 05, 06, 07, 08, 09.
 
 ## Screen 01
 
-Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.69% is below 97%). With the title-block exception: FAIL (body parity 90.01%).
+Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.50% is below 97%). With the title-block exception: FAIL (body parity 89.78%).
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Masked |
 |---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 90.85% | 71.63% | 90.69% | 69.61% | 90.01% (+0px) | 66.13% | 2.10% |
-| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.84% | 72.63% | 90.98% | 70.73% | n/a | n/a | 2.09% |
+| 1586x992 | `scripts/admin-parity/out/01-1586x992.png` | 90.70% | 70.48% | 90.50% | 68.17% | 89.78% (+0px) | 64.38% | 1.93% |
+| 1600x1000 | `scripts/admin-parity/out/01-1600x1000.png` | 90.65% | 71.92% | 90.74% | 69.84% | n/a | n/a | 1.92% |
 
 Section row bottom: reference y=238, capture y=238 (title block offset +0px).
 Diff image: `scripts/admin-parity/out/01-1586x992-diff.png` (red differs, blue masked).
@@ -37,12 +37,12 @@ Masks (8): summary tile counts; recent activity relative times.
 | title | within tolerance | x=249 y=116 h=40 | x=248 y=116 yBody=-122 w=1314 h=40 | x-1 y+0 h+0 |
 | sectionNav | within tolerance | x=249 y=200 w=1317 h=38 | x=248 y=200 yBody=-38 w=1314 h=38 | x-1 y+0 w-3 h+0 |
 | banner | within tolerance | x=249 y=254 w=1317 h=58 | x=248 y=254 yBody=16 w=1314 h=58 | x-1 y+0 w-3 h+0 |
-| tile1 | within tolerance | x=249 y=326 w=313 h=79 | x=248 y=326 yBody=88 w=317 h=79 | x-1 y+0 w+4 h+0 |
-| tile4 | within tolerance | x=1235 y=326 w=331 h=79 | x=1246 y=326 yBody=88 w=317 h=79 | x+11 y+0 w-14 h+0 |
-| attentionCard | within tolerance | x=249 y=420 w=889 | x=248 y=421 yBody=183 w=887 h=318 | x-1 y+1 w-2 |
-| policyCard | within tolerance | x=1152 y=420 w=414 | x=1149 y=421 yBody=183 w=413 h=549 | x-3 y+1 w-1 |
-| settingsCard | within tolerance | x=249 y=748 w=603 | x=248 y=755 yBody=517 w=601 h=215 | x-1 y+7 w-2 |
-| activityCard | within tolerance | x=862 y=748 w=276 | x=859 y=755 yBody=517 w=276 h=215 | x-3 y+7 w+0 |
+| tile1 | within tolerance | x=249 y=326 w=313 h=79 | x=248 y=326 yBody=88 w=317 h=80 | x-1 y+0 w+4 h+1 |
+| tile4 | within tolerance | x=1235 y=326 w=331 h=79 | x=1246 y=326 yBody=88 w=317 h=80 | x+11 y+0 w-14 h+1 |
+| attentionCard | within tolerance | x=249 y=420 w=889 | x=248 y=422 yBody=184 w=887 h=318 | x-1 y+2 w-2 |
+| policyCard | within tolerance | x=1152 y=420 w=414 | x=1149 y=422 yBody=184 w=413 h=549 | x-3 y+2 w-1 |
+| settingsCard | within tolerance | x=249 y=748 w=603 | x=248 y=756 yBody=518 w=601 h=215 | x-1 y+8 w-2 |
+| activityCard | within tolerance | x=862 y=748 w=276 | x=859 y=756 yBody=518 w=276 h=215 | x-3 y+8 w+0 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|

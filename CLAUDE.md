@@ -85,6 +85,13 @@ source — do not push there expecting it to deploy.)
   (a subtle invariant, a legal/compliance hook, a workaround).
 - Match existing styling patterns (Tailwind utility classes, shadcn
   primitives, `rounded-2xl`, `shadow-premium`, `font-display`).
+- Icons are sized from the reference, never defaulted to 16px (owner
+  feedback 2026-10-28: they always come out too small). Measure the glyph
+  and its container in the mock before choosing a class. In Administration
+  V2 the measured scale is: inline and table icons 20px, status marks
+  22-24px, 18-20px glyphs in a 40px square, 22-24px in a 44px square,
+  26-28px in a 56px circle, chevrons 20px, avatars 48-52px; see `ICON`
+  and `ICON_BOX` in `src/components/admin/v2/primitives.tsx`.
 
 ## SQL / RLS canonical pattern (Supabase 2026)
 

@@ -242,7 +242,7 @@ export default function OverviewView() {
                     <tr key={item.id}>
                       <Td>
                         <div className="flex items-start gap-3">
-                          <Icon className={`w-[18px] h-[18px] mt-1 flex-shrink-0 fill-current stroke-white ${meta.tone === "danger" ? "text-adm-danger" : meta.tone === "warning" ? "text-[#F2A51A]" : "text-adm-muted"}`} aria-hidden="true" />
+                          <Icon className={`w-7 h-7 -mt-px -ml-0.5 flex-shrink-0 fill-current stroke-white ${meta.tone === "danger" ? "text-adm-danger" : meta.tone === "warning" ? "text-[#F2A51A]" : "text-adm-muted"}`} aria-hidden="true" />
                           <div className="min-w-0">
                             <p className="text-[12.5px] leading-[18px] font-semibold text-adm-ink">{item.title}</p>
                             <p className="text-adm-muted">{item.detail}</p>
@@ -266,13 +266,13 @@ export default function OverviewView() {
             {SHORTCUTS.map((s) => {
               const section = ADMIN_SECTIONS.find((x) => x.id === s.section)!;
               return (
-                <Link key={s.section} to={adminTabHref(section.tabs[0].id)} className="flex items-center gap-2 rounded-[10px] border border-adm-border pl-2 pr-1.5 py-[14px] hover:border-adm-primary/60">
-                  <span className="w-8 h-8 rounded-md bg-adm-workspace text-adm-ink flex items-center justify-center flex-shrink-0" aria-hidden="true"><s.icon className="w-4 h-4" /></span>
+                <Link key={s.section} to={adminTabHref(section.tabs[0].id)} className="flex items-center gap-2.5 rounded-[10px] border border-adm-border pl-2 pr-1.5 py-[11px] hover:border-adm-primary/60">
+                  <span className="w-11 h-11 rounded-[10px] bg-adm-workspace text-adm-ink flex items-center justify-center flex-shrink-0" aria-hidden="true"><s.icon className="w-[22px] h-[22px]" /></span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[11px] leading-[15px] font-semibold text-adm-ink truncate">{s.title}</span>
+                    <span className="text-[11px] leading-[14px] font-semibold text-adm-ink line-clamp-2">{s.title}</span>
                     <span className="text-[10px] leading-[13px] text-adm-muted line-clamp-2">{s.detail}</span>
                   </span>
-                  <ChevronRight className="w-4 h-4 text-adm-muted flex-shrink-0" aria-hidden="true" />
+                  <ChevronRight className="w-5 h-5 text-adm-muted flex-shrink-0" aria-hidden="true" />
                 </Link>
               );
             })}
@@ -286,8 +286,8 @@ export default function OverviewView() {
             <ul className="divide-y divide-adm-border">
               {activity.slice(0, 5).map((a) => (
                 <li key={a.id} className="flex items-start gap-5 py-[5px]">
-                  <span className={`mt-0.5 w-[18px] h-[18px] flex-shrink-0 ${a.tone === "warning" ? "text-[#F2A51A]" : a.tone === "success" ? "text-adm-success" : "text-adm-primary"}`} aria-hidden="true">
-                    {a.tone === "warning" ? <AlertTriangle className="w-[18px] h-[18px] fill-current stroke-white" /> : a.tone === "success" ? <CheckCircle2 className="w-[18px] h-[18px] fill-current stroke-white" /> : a.tone === "info" ? <Users className="w-[18px] h-[18px]" /> : <FileText className="w-[18px] h-[18px]" />}
+                  <span className={`mt-px w-[22px] h-[22px] flex items-center justify-center flex-shrink-0 ${a.tone === "warning" ? "text-[#F2A51A]" : a.tone === "success" ? "text-adm-success" : "text-adm-primary"}`} aria-hidden="true">
+                    {a.tone === "warning" ? <AlertTriangle className="w-6 h-6 fill-current stroke-white" /> : a.tone === "success" ? <CheckCircle2 className="w-6 h-6 fill-current stroke-white" /> : a.tone === "info" ? <Users className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[10.5px] leading-[16px] font-semibold text-adm-ink truncate">{a.action}</span>
@@ -309,10 +309,10 @@ export default function OverviewView() {
               const ok = row.state === "ok";
               return (
                 <li key={row.key} className="flex items-start gap-3 py-[14px]">
-                  <span className="w-9 h-9 rounded-md bg-adm-workspace text-adm-muted flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-4 h-4" /></span>
+                  <span className="w-10 h-10 rounded-md bg-adm-workspace text-adm-muted flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-5 h-5" /></span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-4">
-                      {ok ? <CheckCircle2 className="w-[18px] h-[18px] text-adm-success fill-current stroke-white" aria-hidden="true" /> : <AlertTriangle className="w-[18px] h-[18px] text-adm-danger fill-current stroke-white" aria-hidden="true" />}
+                    <div className="flex items-center gap-3">
+                      {ok ? <CheckCircle2 className="w-7 h-7 -ml-0.5 text-adm-success fill-current stroke-white" aria-hidden="true" /> : <AlertCircle className="w-7 h-7 -ml-0.5 text-adm-danger fill-current stroke-white" aria-hidden="true" />}
                       <p className="text-[11px] leading-[16px] font-semibold text-adm-ink">{row.title}</p>
                     </div>
                     <Link to={row.href} className="block text-[15.5px] leading-[22px] font-medium text-adm-ink hover:underline">{row.value}</Link>
