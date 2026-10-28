@@ -18,7 +18,7 @@ export const ADMIN_CHILD_ROUTE_ELEMENTS: AdminChildRoute[] = [
   { path: ADMIN_CHILD_ROUTES.feeReview, element: lazyElement(() => import("./children/FeeReviewPage")) },
   { path: PRODUCT_APPLICABILITY_PATH, element: lazyElement(() => import("./children/ProductApplicabilityPage")) },
   { path: ADMIN_CHILD_ROUTES.escalation, element: lazyElement(() => import("./children/EscalationPage")) },
-  { path: ADMIN_CHILD_ROUTES.syncRun(":runId"), element: lazyElement(() => import("./children/SyncRunPage")) },
+  { path: "/admin/integrations/runs/:runId", element: lazyElement(() => import("./children/SyncRunPage")) },
 ];
 
 export { lazyElement };

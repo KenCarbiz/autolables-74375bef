@@ -17,6 +17,7 @@ function readNotes() {
 
 function gateLine(s) {
   if (!s.gate) return "Gate: not evaluated.";
+  if (s.gate.error) return `Gate: FAIL (the screen did not render: ${s.gate.error}).`;
   const reasons = [];
   if (s.gate.landmarks === false) reasons.push("landmarks out of tolerance");
   if (!s.gate.responsive) reasons.push("page overflow at a breakpoint");

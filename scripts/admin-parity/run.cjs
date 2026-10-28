@@ -83,12 +83,25 @@ async function main() {
   try {
     const page = await browser.newPage({ deviceScaleFactor: 1 });
     const registered = await listFixtures(page, baseUrl);
-    const screens = args.screens ? args.screens.filter((s) => registered.includes(s)) : registered;
+    const byNumber = (a, b) => Number(a) - Number(b) || a.localeCompare(b);
+    const screens = (args.screens ? args.screens.filter((s) => registered.includes(s)) : registered).slice().sort(byNumber);
     const skipped = (args.screens || []).filter((s) => !registered.includes(s));
     results.registered = registered;
     results.skipped = skipped;
     for (const screen of screens) {
       const entry = { screen, reference: null, fonts: null, masks: [], frames: {}, landmarks: null, responsive: [] };
+      try {
+      await measureScreen(entry);
+      } catch (err) {
+        // One screen that fails to render must not hide the others; the report shows the failure.
+        entry.error = String(err && err.message ? err.message : err).split("\n")[0];
+        entry.gate = { landmarks: null, responsive: false, contentParity: null, pass: false, error: entry.error };
+        results.screens.push(entry);
+        process.stdout.write(`${screen}: ERROR ${entry.error}\n`);
+      }
+    }
+    async function measureScreen(entry) {
+      const { screen } = entry;
       const maskSpec = masksAll[screen] || { selectors: [], rects: [] };
       const landmarkSpec = landmarksAll[screen] || null;
       const refPath = referenceFor(screen);

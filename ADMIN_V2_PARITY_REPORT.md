@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T04:06:43.914Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-28T04:27:48.392Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -13,7 +13,7 @@ Generated 2026-10-28T04:06:43.914Z by `bun run admin:parity` against the develop
 - Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes.
 - Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.
 
-Registered fixtures: 10, 11, 01, 03, 04, 08, 09.
+Registered fixtures: 10, 11, 12, 13, 01, 02, 03, 04, 05, 06, 07, 08, 09.
 
 ## Screen 01
 
@@ -57,6 +57,258 @@ Masks (12): summary tile counts; recent activity relative times; recent activity
 - Stat tiles: the four tiles render at equal 317px widths; the reference measures 313px for the first three and 331px for the last, so tile 4 starts at x 1246 against 1235 (+11). Within tolerance.
 - Pixel parity stayed at 88.66% with the composition patch applied (88.64% without) because the remaining difference is inside the cards, where the diff image is red: row heights and the status chip column in What needs attention, the row rhythm of Effective policy (about 88px per row in the reference), the 3 by 2 shortcut grid of Administration settings (tiles about 186 by 70px), Recent activity row spacing, and glyph-level rendering of Inter by Chromium against the reference renderer, which keeps even matching text from scoring as identical pixels. Structure (63.34%) will move before pixel parity does; re-measure after each internal fix.
 - Responsive: 390x844 fails on page overflow (scrollWidth 442 against 390, widest fixed element at 416) because the fixture page draws its 224px rail stand-in at every width, while the product AppShell hides its rail below the lg breakpoint. With the stand-in hidden below lg (the one-line AdminDesignFixture.tsx hunk in the same patch) the keystone view and shell have no page overflow at 390: scrollWidth 390, widest fixed element 374, with the section row and the attention table scrolling inside their own containers by design. 1024x768 passes; its only scroll region is the section row. 1920x1080 and 1366x768 pass with no scroll regions. Every breakpoint renders exactly one h1.
+
+## Screen 02
+
+Reference: `scripts/admin-parity/reference/02-dealership-brand.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 85.64% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/02-1586x992.png` | 86.33% | 66.05% | 85.64% | 62.45% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/02-1600x1000.png` | 86.36% | 66.78% | 85.79% | 63.00% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/02-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/02-1586x992.png` and `scripts/admin-parity/evidence/02-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/02-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/02-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/02-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections] | `scripts/admin-parity/out/02-390x844.png` |
+
+## Screen 03
+
+Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter loaded (Inter). Gate: FAIL (page overflow at a breakpoint; content parity 90.25% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 90.71% | 71.29% | 90.25% | 68.62% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 90.33% | 70.93% | 89.88% | 68.09% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/03-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/03-1586x992.png` and `scripts/admin-parity/evidence/03-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/03-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections], div | `scripts/admin-parity/out/03-1366x768.png` |
+| 1024x768 | OVERFLOW | 1025 | 1024 | 1000 | nav[Administration sections], div | `scripts/admin-parity/out/03-1024x768.png` |
+| 390x844 | OVERFLOW | 793 | 390 | 374 | nav[Administration sections], div | `scripts/admin-parity/out/03-390x844.png` |
+
+## Screen 04
+
+Reference: `scripts/admin-parity/reference/04-salesperson-role-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (page overflow at a breakpoint; content parity 88.58% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/04-1586x992.png` | 88.76% | 68.44% | 88.58% | 65.39% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/04-1600x1000.png` | 88.56% | 69.67% | 88.41% | 66.83% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/04-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/04-1586x992.png` and `scripts/admin-parity/evidence/04-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/04-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/04-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/04-1024x768.png` |
+| 390x844 | OVERFLOW | 421 | 390 | 421 | nav[Administration sections] | `scripts/admin-parity/out/04-390x844.png` |
+
+## Screen 05
+
+Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 90.05% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 90.50% | 70.74% | 90.05% | 67.66% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 89.87% | 71.59% | 89.55% | 68.66% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/05-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/05-1586x992.png` and `scripts/admin-parity/evidence/05-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/05-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/05-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections], div | `scripts/admin-parity/out/05-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div | `scripts/admin-parity/out/05-390x844.png` |
+
+## Screen 06
+
+Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 50.79% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 53.58% | 65.07% | 50.79% | 61.76% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 53.38% | 65.40% | 50.63% | 62.19% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/06-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/06-1586x992.png` and `scripts/admin-parity/evidence/06-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/06-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/06-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections], div | `scripts/admin-parity/out/06-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], div | `scripts/admin-parity/out/06-390x844.png` |
+
+## Screen 07
+
+Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 89.27% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 89.42% | 69.27% | 89.27% | 66.57% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 88.92% | 70.39% | 88.76% | 67.78% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/07-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/07-1586x992.png` and `scripts/admin-parity/evidence/07-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | div | `scripts/admin-parity/out/07-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div | `scripts/admin-parity/out/07-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | none | `scripts/admin-parity/out/07-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Product views], div | `scripts/admin-parity/out/07-390x844.png` |
+
+## Screen 08
+
+Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.00% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/08-1586x992.png` | 88.94% | 67.81% | 88.00% | 64.60% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/08-1600x1000.png` | 88.31% | 68.54% | 87.31% | 65.40% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/08-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/08-1586x992.png` and `scripts/admin-parity/evidence/08-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1872 | none | `scripts/admin-parity/out/08-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1366 | nav[Administration sections] | `scripts/admin-parity/out/08-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1024 | nav[Administration sections] | `scripts/admin-parity/out/08-1024x768.png` |
+| 390x844 | none | 390 | 390 | 390 | nav[Administration sections], nav[Customer Experience views] | `scripts/admin-parity/out/08-390x844.png` |
+
+## Screen 09
+
+Reference: `scripts/admin-parity/reference/09-escalation-delivery-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 85.19% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/09-1586x992.png` | 86.83% | 65.59% | 85.19% | 61.83% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/09-1600x1000.png` | 86.04% | 66.50% | 84.18% | 62.72% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/09-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/09-1586x992.png` and `scripts/admin-parity/evidence/09-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/09-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div | `scripts/admin-parity/out/09-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | none | `scripts/admin-parity/out/09-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div | `scripts/admin-parity/out/09-390x844.png` |
+
+## Screen 10
+
+Reference: `scripts/admin-parity/reference/10-publishing-policy.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 85.19% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/10-1586x992.png` | 86.06% | 65.54% | 85.19% | 61.91% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/10-1600x1000.png` | 85.23% | 64.90% | 84.30% | 61.00% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/10-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/10-1586x992.png` and `scripts/admin-parity/evidence/10-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/10-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/10-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/10-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Publishing views], div | `scripts/admin-parity/out/10-390x844.png` |
+
+## Screen 11
+
+Reference: `scripts/admin-parity/reference/11-documents-service.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 87.25% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/11-1586x992.png` | 87.65% | 68.98% | 87.25% | 65.81% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/11-1600x1000.png` | 87.20% | 69.75% | 86.81% | 66.75% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/11-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/11-1586x992.png` and `scripts/admin-parity/evidence/11-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/11-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/11-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/11-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Documents & Service views], div | `scripts/admin-parity/out/11-390x844.png` |
+
+## Screen 12
+
+Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.00% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/12-1586x992.png` | 88.44% | 68.43% | 88.00% | 64.43% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/12-1600x1000.png` | 87.92% | 69.56% | 87.49% | 66.09% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/12-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/12-1586x992.png` and `scripts/admin-parity/evidence/12-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/12-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | nav[Administration sections] | `scripts/admin-parity/out/12-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | nav[Administration sections] | `scripts/admin-parity/out/12-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | nav[Administration sections], nav[Integrations views], div | `scripts/admin-parity/out/12-390x844.png` |
+
+## Screen 13
+
+Reference: `scripts/admin-parity/reference/13-sync-run-detail-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (content parity 88.36% is below 97%).
+
+| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Masked |
+|---|---|---|---|---|---|---|
+| 1586x992 | `scripts/admin-parity/out/13-1586x992.png` | 88.70% | 65.89% | 88.36% | 61.97% | 0.00% |
+| 1600x1000 | `scripts/admin-parity/out/13-1600x1000.png` | 88.33% | 67.29% | 88.01% | 63.53% | 0.00% |
+
+Diff image: `scripts/admin-parity/out/13-1586x992-diff.png` (red differs, blue masked).
+Committed copies of that capture and diff: `scripts/admin-parity/evidence/13-1586x992.png` and `scripts/admin-parity/evidence/13-1586x992-diff.png`.
+
+Masks (0): none.
+
+| Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
+|---|---|---|---|---|---|---|
+| 1920x1080 | none | 1920 | 1920 | 1848 | none | `scripts/admin-parity/out/13-1920x1080.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | none | `scripts/admin-parity/out/13-1366x768.png` |
+| 1024x768 | none | 1024 | 1024 | 1000 | none | `scripts/admin-parity/out/13-1024x768.png` |
+| 390x844 | none | 390 | 390 | 374 | div, pre | `scripts/admin-parity/out/13-390x844.png` |
 
 ## Findings across screens
 
