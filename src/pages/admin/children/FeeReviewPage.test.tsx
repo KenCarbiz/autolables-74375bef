@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { renderAdmin } from "@/test/adminRender";
 import { resetSupabaseSpy, rpcCalls, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
 import { SCREEN_06 } from "@/pages/admin/fixtures/06";
@@ -37,14 +37,22 @@ import FeeReviewPage from "./FeeReviewPage";
 
 const dialog = () => screen.getByRole("dialog", { name: "Review document fee change" });
 
+const ReturnEcho = () => {
+  const loc = useLocation();
+  return <p data-testid="returned">{JSON.stringify((loc.state as { feeReviewReturn?: unknown } | null)?.feeReviewReturn ?? null)}</p>;
+};
+
 const renderPage = (route: string, fixture: typeof SCREEN_06.fixture | null) =>
   renderAdmin(
     <Routes>
       <Route path="/admin/pricing/fee-review" element={<FeeReviewPage />} />
-      <Route path="/admin" element={<p>price rules page</p>} />
+      <Route path="/admin" element={<><p>price rules page</p><ReturnEcho /></>} />
+      <Route path="/admin/design-fixture/05" element={<ReturnEcho />} />
     </Routes>,
     { route, fixture },
   );
+
+const LIVE_BACK_FIXTURE = { ...SCREEN_06.fixture, views: { ...SCREEN_06.fixture.views, "fee-review": { ...FEE_REVIEW_FIXTURE, backHref: undefined } } };
 
 const listingRows = [
   { vin: "EXAMPLEVIN0000001", year: 2024, make: "Example", model: "Crossover", trim: "Base", archived_at: null, advertised_price_before_doc: 30000, doc_fee: 895, website_sale_price: 30895, price_parse_status: "ok", stock: "EX-1" },
@@ -82,6 +90,29 @@ describe("FeeReviewPage with the 06 fixture", () => {
     expect(within(d).getByRole("button", { name: "Apply to 48 active vehicles" })).toBeEnabled();
     expect(within(d).getByText("Requires pricing-management permission. Change will be audited.")).toBeInTheDocument();
     expect(writeCalls()).toEqual([]);
+  });
+
+  it("lists each example vehicle with labelled fee and advertised-total changes for narrow screens", () => {
+    renderPage("/admin/pricing/fee-review", SCREEN_06.fixture);
+    const list = within(dialog()).getByRole("list", { name: "Example vehicles" });
+    const item = within(list).getAllByRole("listitem")[0];
+    expect(within(item).getByText("Selling price").nextElementSibling).toHaveTextContent("$18,525No change");
+    expect(within(item).getByText("Document fee").nextElementSibling).toHaveTextContent("$895$925$30");
+    expect(within(item).getByText("Advertised total").nextElementSibling).toHaveTextContent("$19,420$19,450$30");
+  });
+
+  it("returns to Price rules with the draft on Escape and on Close, writing nothing", () => {
+    renderPage("/admin/pricing/fee-review", LIVE_BACK_FIXTURE);
+    fireEvent.keyDown(dialog(), { key: "Escape" });
+    expect(screen.getByText("price rules page")).toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId("returned").textContent ?? "null")).toEqual({ draft: { enabled: true, amount: 925, stateCode: "CT" }, scope: "active" });
+    expect(writeCalls()).toEqual([]);
+  });
+
+  it("closes to the fixture's own back route when it names one", () => {
+    renderPage("/admin/pricing/fee-review", SCREEN_06.fixture);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Close review" }));
+    expect(JSON.parse(screen.getByTestId("returned").textContent ?? "null")).toMatchObject({ draft: { amount: 925 } });
   });
 
   it("disables Apply for a role without pricing authority and says why", () => {

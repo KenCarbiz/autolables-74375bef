@@ -34,6 +34,15 @@ export interface WebsiteObservation {
 }
 
 export type EvidenceState = "same_version" | "older_version" | "awaiting";
+/**
+ * What the Label and Passport figures mean under the display basis. In
+ * website_sale_price mode the stored `price` IS the fee-inclusive advertised
+ * total (resolveDisplayPrice anchors on it), so it is compared as a total; in
+ * advertised_before_doc mode it is the price before the document fee.
+ */
+export type PriceBasis = "includes_fee" | "before_fee";
+/** How the observed website figure relates to the basis it was compared on. */
+export type WebsiteBasis = "as_shown" | "fee_removed" | "fee_added";
 export type ConsistencyStatus = "consistent" | "mismatch" | "not_checked";
 
 export interface ConsistencyAssessment {
@@ -44,10 +53,15 @@ export interface ConsistencyAssessment {
   website: number | null;
   label: number | null;
   passport: number | null;
+  basis: PriceBasis;
+  websiteBasis: WebsiteBasis;
   evidence: EvidenceState;
   status: ConsistencyStatus;
   detail: string;
+  /** Website minus label on the compared basis. */
   delta: number | null;
+  /** Passport minus label; both are on the display basis. */
+  passportDelta: number | null;
   reviewHref: string | null;
   sourceUrl: string | null;
 }
@@ -66,6 +80,10 @@ export const STATUS_LABEL: Record<ConsistencyStatus, string> = {
 
 const TOLERANCE = 1;
 
+export const priceBasisOf = (mode: PriceDisplayMode): PriceBasis => (mode === "website_sale_price" ? "includes_fee" : "before_fee");
+
+const signedMoney = (n: number): string => `${n > 0 ? "+" : "-"}$${Math.abs(Math.round(n)).toLocaleString()}`;
+
 export const conditionOfListing = (condition: string | null | undefined): "new" | "used" | "cpo" => {
   const c = (condition ?? "").toLowerCase();
   if (c === "new") return "new";
@@ -83,6 +101,7 @@ export function assessConsistency(
   mode: PriceDisplayMode,
 ): ConsistencyAssessment {
   const docFee = listing.docFee ?? configuredFee;
+  const basis = priceBasisOf(mode);
   const label = listing.price;
   const passport = resolveDisplayPrice(
     { advertised_price_before_doc: listing.advertisedBeforeDoc, doc_fee: docFee, website_sale_price: listing.websiteSalePrice, price: listing.price },
@@ -100,30 +119,41 @@ export function assessConsistency(
 
   if (website == null || label == null) {
     return {
-      listing, vehicle: vehicleTitle(listing), sellingPrice: listing.advertisedBeforeDoc, docFee, website, label, passport,
+      listing, vehicle: vehicleTitle(listing), sellingPrice: listing.advertisedBeforeDoc, docFee, website, label, passport, basis, websiteBasis: "as_shown",
       evidence: "awaiting", status: "not_checked", detail: website == null ? "No website observation for this vehicle yet." : "No stored label price to compare.",
-      delta: null, reviewHref, sourceUrl: observation?.sourceUrl ?? null,
+      delta: null, passportDelta: null, reviewHref, sourceUrl: observation?.sourceUrl ?? null,
     };
   }
 
-  const { difference } = reconcileGap(
-    website,
-    label,
-    docFee,
-    feeExclusiveEquivalent(website, { website_sale_price: listing.websiteSalePrice, advertised_price_before_doc: listing.advertisedBeforeDoc }),
-  );
+  // The website figure is brought onto the label's basis. On a before-fee
+  // basis a page total that the stored breakdown shows as price + fee is read
+  // as its pre-fee price. On a fee-inclusive basis the label is already the
+  // total, so a page total is compared as shown; only a page that shows the
+  // pre-fee price (website + fee = label) is lifted by the fee.
+  const feeExclusiveWebsite = basis === "before_fee"
+    ? feeExclusiveEquivalent(website, { website_sale_price: listing.websiteSalePrice, advertised_price_before_doc: listing.advertisedBeforeDoc })
+    : null;
+  const { difference, matchedWithDocFee } = reconcileGap(website, label, docFee, feeExclusiveWebsite);
+  const websiteBasis: WebsiteBasis = !matchedWithDocFee ? "as_shown" : basis === "before_fee" ? "fee_removed" : "fee_added";
+  const passportDifference = passport == null ? 0 : passport - label;
+  const websiteAgrees = Math.abs(difference) < TOLERANCE;
+  const passportAgrees = Math.abs(passportDifference) < TOLERANCE;
   const parserWarning = listing.parseStatus === "warning";
-  const numericallyConsistent = Math.abs(difference) < TOLERANCE;
-  const status: ConsistencyStatus = numericallyConsistent && !parserWarning ? "consistent" : "mismatch";
+  const status: ConsistencyStatus = websiteAgrees && passportAgrees && !parserWarning ? "consistent" : "mismatch";
+  const basisText = basis === "includes_fee" ? "advertised total including the document fee" : "price before the document fee";
+  const disagreements = [
+    websiteAgrees ? null : `Website differs from the label by ${signedMoney(difference)} on the ${basisText}.`,
+    passportAgrees ? null : `Passport differs from the label by ${signedMoney(passportDifference)}.`,
+  ].filter((x): x is string => !!x);
   const detail = parserWarning
     ? "The price parser flagged this vehicle; the flag is preserved until the source is reviewed."
-    : numericallyConsistent
-      ? "Website, label and Passport agree on the advertised total."
-      : `Website differs from the label by ${difference > 0 ? "+" : "-"}$${Math.abs(Math.round(difference)).toLocaleString()}.`;
+    : disagreements.length
+      ? disagreements.join(" ")
+      : `Website, label and Passport agree on the ${basisText}.`;
 
   return {
-    listing, vehicle: vehicleTitle(listing), sellingPrice: listing.advertisedBeforeDoc, docFee, website, label, passport,
-    evidence, status, detail, delta: numericallyConsistent ? 0 : difference, reviewHref,
+    listing, vehicle: vehicleTitle(listing), sellingPrice: listing.advertisedBeforeDoc, docFee, website, label, passport, basis, websiteBasis,
+    evidence, status, detail, delta: websiteAgrees ? 0 : difference, passportDelta: passportAgrees ? 0 : passportDifference, reviewHref,
     sourceUrl: observation?.sourceUrl ?? null,
   };
 }

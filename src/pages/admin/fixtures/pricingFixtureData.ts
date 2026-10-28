@@ -57,6 +57,8 @@ export const PRICE_RULES_FIXTURE: PriceRulesFixture = {
   preview: { title: "2024 Example Crossover", trim: "Premium", stock: "EX-1041", imageUrl: null, sellingPrice: 18_000 + 41 * 525, vehicleType: "used" },
   consistency: { rows: CONSISTENCY_ROWS, truncated: false },
   websiteTerm: "Sale Price",
+  // Review and Close stay inside the design fixtures, so the round trip can be exercised.
+  reviewHref: "/admin/design-fixture/06",
 };
 
 // The first row is the review's example vehicle; like the reference's, its
@@ -92,6 +94,7 @@ export const FEE_REVIEW_FIXTURE: FeeReviewFixture = {
   version: { version: 12, source: "server" },
   preview: { impact: buildFeeImpact(FEE_IMPACT_ROWS, FEE_AFTER, { includeArchived: false, sampleSize: 1 }), source: "server", version: 12, truncated: false, notes: [] },
   canManage: true,
+  backHref: "/admin/design-fixture/05",
 };
 
 export const EXAMPLE_PRODUCT: AdminProduct = {

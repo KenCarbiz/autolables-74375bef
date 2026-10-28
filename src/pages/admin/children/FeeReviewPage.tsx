@@ -39,12 +39,21 @@ export interface FeeReviewFixture {
   version: PolicyVersion;
   preview: FeePreviewResult;
   canManage: boolean;
+  /** Where Close returns to; defaults to the Price rules tab. */
+  backHref?: string;
+}
+
+/** Router state Close hands back to Price rules so it can restore the draft and refocus its trigger. */
+export interface FeeReviewReturn {
+  draft: FeeDraft;
+  scope: FeeScope;
 }
 
 const APPLY_ROLES = new Set(["owner", "admin", "general_manager", "gsm"]);
 const FOCUSABLE = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
-// The dialog top sits 123px under the product header in the reference frame.
-const DIALOG_TOP = 123;
+// The dialog top sits 123px under the product header in the reference frame
+// (md:top-[123px]). Below md the dialog is pinned to the viewport instead.
+const NARROW = "(max-width: 767px)";
 
 type FeeState = ReviewApplyState<FeeDraft>;
 type FeeEvent = ReviewApplyEvent<FeeDraft>;
@@ -143,7 +152,7 @@ const Change = ({ before, after }: { before: number | null; after: number }) => 
   );
 };
 
-const TABLE_CLASS = "[&_th]:py-2 [&_th]:px-4 [&_td]:px-4 [&_th]:text-[13px] [&_th]:text-adm-ink [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0";
+const TABLE_CLASS = "[&_th]:py-2 [&_th]:px-3 [&_td]:px-3 md:[&_th]:px-4 md:[&_td]:px-4 [&_th]:text-[13px] [&_th]:text-adm-ink [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0";
 
 const RESULT_TONE: Record<"applied" | "partial" | "failed", Tone> = { applied: "success", partial: "warning", failed: "danger" };
 const RESULT_LABEL: Record<"applied" | "partial" | "failed", string> = { applied: "Applied", partial: "Partially applied", failed: "Not applied" };
@@ -211,8 +220,22 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
     dialogRef.current?.focus();
   }, []);
 
-  const backHref = adminTabHref("price-rules");
-  const close = () => navigate(backHref);
+  // Below md the dialog is pinned to the viewport and scrolls its own body, so
+  // the page behind it is held still.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(NARROW);
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    const sync = () => { root.style.overflow = mq.matches ? "hidden" : previous; };
+    sync();
+    mq.addEventListener?.("change", sync);
+    return () => { mq.removeEventListener?.("change", sync); root.style.overflow = previous; };
+  }, []);
+
+  const backHref = fixture?.backHref ?? adminTabHref("price-rules");
+  const returnState: { feeReviewReturn: FeeReviewReturn } = { feeReviewReturn: { draft: state.draft, scope } };
+  const close = () => navigate(backHref, { state: returnState });
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") { e.preventDefault(); close(); return; }
@@ -312,9 +335,9 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
           </AdminShell>
         )}
       </div>
-      <div className="absolute inset-0 z-40 bg-[#626A75]/[0.64]" onClick={close} aria-hidden="true" />
+      <div className="absolute max-md:fixed inset-0 z-40 bg-[#626A75]/[0.64]" onClick={close} aria-hidden="true" />
       {/* The reference draws the review 18px left of the content column centre on desktop; narrow widths centre it. */}
-      <div aria-hidden="true" data-landmark="fee-review-top" className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: DIALOG_TOP }} />
+      <div aria-hidden="true" data-landmark="fee-review-top" className="absolute inset-x-0 top-0 h-[123px] pointer-events-none" />
       <div
         ref={dialogRef}
         role="dialog"
@@ -322,10 +345,9 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         aria-labelledby="fee-review-title"
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        style={{ top: DIALOG_TOP }}
-        className="absolute z-50 left-1/2 -translate-x-1/2 lg:left-[calc(50%-18px)] w-[min(907px,calc(100%-32px))] rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none px-[26px] pt-[22px] pb-6 text-adm-ink"
+        className="z-50 rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none text-adm-ink md:absolute md:top-[123px] md:left-1/2 md:-translate-x-1/2 lg:left-[calc(50%-18px)] md:w-[min(907px,calc(100%-32px))] md:px-[26px] md:pt-[22px] md:pb-6 max-md:fixed max-md:inset-x-3 max-md:top-3 max-md:max-h-[calc(100dvh-24px)] max-md:flex max-md:flex-col max-md:overflow-hidden"
       >
-        <header className="flex items-start justify-between gap-4">
+        <header className="flex items-start justify-between gap-4 max-md:flex-shrink-0 max-md:px-4 max-md:pt-4 max-md:pb-3 max-md:border-b max-md:border-adm-border">
           <div className="min-w-0">
             <h2 id="fee-review-title" className="text-[22px] leading-[28px] font-bold text-adm-ink">Review document fee change</h2>
             <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">Confirm the new fee and the vehicles it will update before anything is applied.</p>
@@ -334,6 +356,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </header>
+        <div data-fee-review-body className="max-md:flex-1 max-md:min-h-0 max-md:overflow-y-auto max-md:overscroll-contain max-md:px-4 max-md:pb-5">
         {/* At the reference width the circles sit at the measured x (116, 362 and 634px into the content box); narrower dialogs share the row evenly. */}
         <ol className="mt-[18px] mx-auto xl:mx-0 xl:ml-[116px] flex items-center flex-wrap gap-y-3 w-full max-w-[640px] xl:max-w-none xl:w-auto" data-landmark="fee-review-steps" aria-label="Review steps">
           <StepItem n={1} label="Edit" status={step > 1 ? "done" : "current"} trailing className="xl:flex-none xl:w-[246px]" />
@@ -393,8 +416,8 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
                   <AdminTable caption="Before and after" className={cn(TABLE_CLASS, "[&_td]:py-[10px]")}>
                     <thead>
                       <tr>
-                        <Th className="w-[193px]">Field</Th>
-                        <Th className="w-[168px]">Before</Th>
+                        <Th className="md:w-[193px]">Field</Th>
+                        <Th className="md:w-[168px]">Before</Th>
                         <Th>After</Th>
                       </tr>
                     </thead>
@@ -425,10 +448,41 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               </section>
             </div>
 
-            <section aria-labelledby="fee-sample-impact" data-landmark="fee-example-impact" className="-mt-0.5">
+            <section aria-labelledby="fee-sample-impact" data-landmark="fee-example-impact" className="max-md:mt-5 md:-mt-0.5">
               <h3 id="fee-sample-impact" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Example vehicle impact</h3>
               {impact && impact.samples.length > 0 ? (
-                <div className="mt-[11px] rounded-[8px] border border-adm-border overflow-hidden">
+                <>
+                <ul className="md:hidden mt-[11px] space-y-2" aria-label="Example vehicles">
+                  {impact.samples.map((s) => (
+                    <li key={s.vinSuffix} className="rounded-[8px] border border-adm-border px-3 pt-3 pb-1">
+                      <div className="flex items-center gap-3">
+                        <Thumb />
+                        <div className="min-w-0">
+                          <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{s.vehicle}</p>
+                          <p className="text-[13px] leading-[18px] text-adm-muted">{s.stock ? `Stock ${s.stock}` : `VIN …${s.vinSuffix}`}</p>
+                        </div>
+                      </div>
+                      <dl className="mt-2 divide-y divide-adm-border">
+                        <div className="flex items-start justify-between gap-3 py-2">
+                          <dt className="text-[13px] leading-[20px] font-semibold text-adm-ink">Selling price</dt>
+                          <dd className="flex flex-col items-end">
+                            <p className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{fmtMoney(s.sellingPrice)}</p>
+                            <p className="text-[13px] leading-[18px] text-adm-muted">No change</p>
+                          </dd>
+                        </div>
+                        <div className="flex items-start justify-between gap-3 py-2">
+                          <dt className="text-[13px] leading-[20px] font-semibold text-adm-ink">Document fee</dt>
+                          <dd className="flex flex-col items-end"><Change before={s.feeBefore} after={s.feeAfter} /></dd>
+                        </div>
+                        <div className="flex items-start justify-between gap-3 py-2">
+                          <dt className="text-[13px] leading-[20px] font-semibold text-adm-ink">Advertised total</dt>
+                          <dd className="flex flex-col items-end"><Change before={s.totalBefore} after={s.totalAfter} /></dd>
+                        </div>
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+                <div className="max-md:hidden mt-[11px] rounded-[8px] border border-adm-border overflow-hidden">
                   <AdminTable caption="Example vehicles" className={cn(TABLE_CLASS, "[&_th]:pt-[9px] [&_td]:py-[11px]")}>
                     <thead>
                       <tr>
@@ -461,6 +515,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
                     </tbody>
                   </AdminTable>
                 </div>
+                </>
               ) : (
                 <p className="mt-2.5 text-[13px] text-adm-muted">{impact ? "No vehicle would change." : "The example rows are not available."}</p>
               )}
@@ -497,11 +552,12 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
           </div>
         )}
         {step === 3 && !state.result && state.error && <InlineNote tone="danger" className="mt-[31px]">{state.error}</InlineNote>}
+        </div>
 
-        <footer className="mt-[23px] flex items-start justify-between gap-4 flex-wrap">
+        <footer className="mt-[23px] flex items-start justify-between gap-x-4 gap-y-2 flex-wrap max-md:flex-shrink-0 max-md:mt-0 max-md:px-4 max-md:pt-3 max-md:pb-3 max-md:border-t max-md:border-adm-border">
           <div className="flex items-center gap-2">
             {step === 1 && (
-              <Link to={backHref} className="inline-flex items-center justify-center h-[41px] px-6 rounded-md border border-adm-border bg-adm-surface text-[15px] font-semibold text-adm-ink hover:bg-adm-workspace">Cancel</Link>
+              <Link to={backHref} state={returnState} className="inline-flex items-center justify-center h-[41px] px-6 rounded-md border border-adm-border bg-adm-surface text-[15px] font-semibold text-adm-ink hover:bg-adm-workspace">Cancel</Link>
             )}
             {step === 2 && (
               <AdminButton data-landmark="fee-back" className={BUTTON_41} onClick={() => dispatch({ type: "edit", draft: state.draft })} disabled={state.phase === "applying"}>

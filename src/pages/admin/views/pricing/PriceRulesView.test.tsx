@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { fireEvent, screen, within } from "@testing-library/react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { renderAdmin } from "@/test/adminRender";
 import { resetSupabaseSpy, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
 import { SCREEN_05 } from "@/pages/admin/fixtures/05";
@@ -36,14 +36,18 @@ const LocationEcho = () => {
   return <p data-testid="location">{loc.pathname + loc.search}</p>;
 };
 
-const renderView = (fixture = SCREEN_05.fixture) =>
+const renderView = (fixture = SCREEN_05.fixture, returned?: unknown) =>
   renderAdmin(
     <Routes>
       <Route path="/admin" element={<PriceRulesView />} />
       <Route path="/admin/pricing/fee-review" element={<LocationEcho />} />
+      <Route path="/admin/design-fixture/06" element={<LocationEcho />} />
+      <Route path="/return" element={<Navigate to="/admin" state={{ feeReviewReturn: returned }} />} />
     </Routes>,
-    { route: "/admin", fixture },
+    { route: returned ? "/return" : "/admin", fixture },
   );
+
+const LIVE_ROUTE_FIXTURE = { ...SCREEN_05.fixture, views: { "price-rules": { ...PRICE_RULES_FIXTURE, reviewHref: undefined } } };
 
 beforeEach(() => {
   resetSupabaseSpy();
@@ -66,14 +70,26 @@ describe("PriceRulesView with the 05 fixture", () => {
     expect(screen.getByText("Advertised total")).toBeInTheDocument();
     expect(screen.getByText("Taxes and registration are separate.")).toBeInTheDocument();
 
+    // The display basis is fee-inclusive, so the first row's $40,420 website
+    // total disagrees with the $39,525 total the label and Passport advertise.
     const table = screen.getByRole("table", { name: "Price consistency by vehicle" });
-    expect(within(table).getAllByText("Consistent")).toHaveLength(1);
-    expect(within(table).getAllByText("Mismatch")).toHaveLength(1);
+    const first = within(table).getAllByRole("row")[1];
+    expect(within(first).getByText("$40,420")).toBeInTheDocument();
+    expect(within(first).getAllByText("$39,525")).toHaveLength(3);
+    expect(within(first).getByText("Mismatch")).toBeInTheDocument();
+    expect(within(first).getByText(/Website differs from the label by \+\$895 on the advertised total including the document fee\./)).toBeInTheDocument();
+    expect(within(table).queryByText("Consistent")).toBeNull();
+    expect(within(table).getAllByText("Mismatch")).toHaveLength(2);
     expect(within(table).getAllByText("Not checked")).toHaveLength(1);
     expect(within(table).getAllByText("Older version")).toHaveLength(1);
     expect(within(table).getAllByText("Awaiting evidence")).toHaveLength(1);
+    expect(screen.getByText(/^Compared on the advertised total including the document fee \(the display basis\)/)).toBeInTheDocument();
+    expect(screen.getByText("Conveyance Fee is what Connecticut calls the document fee; customers see that term.")).toBeInTheDocument();
+    const stacked = screen.getByRole("list", { name: "Price consistency by vehicle" });
+    expect(within(stacked).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(stacked).getAllByText("Mismatch")).toHaveLength(2);
     expect(screen.getByText("3 vehicles shown")).toBeInTheDocument();
-    expect(screen.getByText("1 mismatch needs review.")).toBeInTheDocument();
+    expect(screen.getByText("2 mismatches need review.")).toBeInTheDocument();
     expect(writeCalls()).toEqual([]);
   });
 
@@ -85,7 +101,7 @@ describe("PriceRulesView with the 05 fixture", () => {
   });
 
   it("enables Review changes only once the draft differs and hands the draft to the review route", () => {
-    renderView();
+    renderView(LIVE_ROUTE_FIXTURE);
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const amount = screen.getByLabelText("Document fee");
     fireEvent.change(amount, { target: { value: "925" } });
@@ -95,6 +111,32 @@ describe("PriceRulesView with the 05 fixture", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active");
     expect(settingsState.updateSettings).not.toHaveBeenCalled();
     expect(writeCalls()).toEqual([]);
+  });
+});
+
+describe("PriceRulesView returning from Fee Change Review", () => {
+  it("restores the returned draft and puts focus back on Review changes", async () => {
+    renderView(LIVE_ROUTE_FIXTURE, { draft: { enabled: true, amount: 925, stateCode: "CT" }, scope: "all" });
+    const review = screen.getByRole("button", { name: "Review changes" });
+    expect(review).toBeEnabled();
+    expect(screen.getByLabelText("Document fee")).toHaveValue(925);
+    expect(screen.getByLabelText("Change scope")).toHaveValue("all");
+    await waitFor(() => expect(review).toHaveFocus());
+    expect(writeCalls()).toEqual([]);
+  });
+
+  it("keeps Review changes disabled when the returned draft equals the saved policy, and focuses Edit", async () => {
+    renderView(LIVE_ROUTE_FIXTURE, { draft: { enabled: true, amount: 895, stateCode: "CT" }, scope: "active" });
+    expect(screen.getByRole("button", { name: "Review changes" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Edit" })).toHaveFocus());
+  });
+
+  it("stays inside the design fixtures when the fixture names its review route", () => {
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Document fee"), { target: { value: "925" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/admin/design-fixture/06");
   });
 });
 

@@ -1,6 +1,6 @@
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import vehiclePlaceholder from "@/assets/admin-v2/artwork/vehicle-placeholder.svg";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, FileText, Globe, Info, Pencil, Tag } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,7 +23,7 @@ import {
   validateFeeDraft,
   type FeeDraft,
 } from "@/lib/admin/pricing/feePolicy";
-import { consistencyHeadline, conditionOfListing, summarizeConsistency, EVIDENCE_LABEL, STATUS_LABEL, type ConsistencyAssessment, type ConsistencyStatus, type EvidenceState } from "@/lib/admin/pricing/priceConsistency";
+import { consistencyHeadline, conditionOfListing, priceBasisOf, summarizeConsistency, EVIDENCE_LABEL, STATUS_LABEL, type ConsistencyAssessment, type ConsistencyStatus, type EvidenceState, type PriceBasis } from "@/lib/admin/pricing/priceConsistency";
 import { feeReviewHref, tenantIdOf, useConsistency, useListingCounts, useWebsitePriceTerm, type FeeScope } from "./pricingData";
 import { AdminInput, AdminSelect, Field } from "./ui";
 import { AdminButton, AdminCard, AdminTable, InlineNote, StatusChip, Td, Th, type Tone } from "@/components/admin/v2/primitives";
@@ -53,7 +53,11 @@ export interface PriceRulesFixture {
   /** Null means the read failed: the table reports Unknown. */
   consistency: { rows: ConsistencyAssessment[]; truncated: boolean } | null;
   websiteTerm: string | null;
+  /** Where Review changes goes; defaults to the Fee Change Review route. */
+  reviewHref?: string;
 }
+
+type ReturnedReview = { draft: FeeDraft; scope: FeeScope };
 
 // Reference marks: an 18px check, a 20px filled triangle and an 11px filled
 // dot. The reference draws marks brighter than the text tokens: a #10A523
@@ -64,6 +68,23 @@ const EvidenceMark = ({ state }: { state: EvidenceState }) => {
   return <Check className="w-[18px] h-[18px] -ml-[2px] flex-shrink-0 text-[#10A523]" strokeWidth={2.25} aria-hidden="true" />;
 };
 const STATUS_TONE: Record<ConsistencyStatus, Tone> = { consistent: "success", mismatch: "warning", not_checked: "neutral" };
+
+// Says which basis each column is on, so a website total beside a label
+// price is never read as agreement or disagreement by eye alone.
+const basisNote = (basis: PriceBasis, fee: number): string =>
+  basis === "includes_fee"
+    ? `Compared on the advertised total including the document fee (the display basis): Label and Passport show that total. Website shows the price observed on the dealer's page; one marked "before fee" was compared with the ${fmtMoney(fee)} fee added. Selling price and Document fee are the stored breakdown.`
+    : `Compared on the price before the document fee (the display basis): Label and Passport show that price. Website shows the price observed on the dealer's page; one marked "incl. fee" was compared without the ${fmtMoney(fee)} fee. Selling price and Document fee are the stored breakdown.`;
+
+const WebsiteValue = ({ row }: { row: ConsistencyAssessment }) =>
+  row.website == null ? (
+    <span className="text-adm-muted">—</span>
+  ) : (
+    <span className="inline-flex flex-col">
+      <span data-parity="fixture-price">{fmtMoney(row.website)}</span>
+      {row.websiteBasis !== "as_shown" && <span className="text-[12px] leading-[16px] text-adm-muted whitespace-nowrap">{row.websiteBasis === "fee_removed" ? `incl. ${fmtMoney(row.docFee)} fee` : `before ${fmtMoney(row.docFee)} fee`}</span>}
+    </span>
+  );
 
 const previewFromRows = (rows: ConsistencyAssessment[]): PreviewVehicle | null => {
   const row = rows.find((r) => r.sellingPrice != null && r.sellingPrice > 0) ?? null;
@@ -141,6 +162,7 @@ const countValue = (c: CountValue | null): string => (c == null ? "Unknown" : co
 export default function PriceRulesView() {
   const fixture = useViewFixture<PriceRulesFixture>("price-rules");
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAdmin } = useAuth();
   const { tenant } = useTenant();
   const { settings, updateSettings } = useDealerSettings();
@@ -159,12 +181,26 @@ export default function PriceRulesView() {
   );
   const stored = useMemo<FeeDraft>(() => ({ enabled: policy.feeEnabled, amount: policy.feeAmount, stateCode: policy.stateCode }), [policy]);
 
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<FeeDraft>(stored);
-  const [scope, setScope] = useState<FeeScope>("active");
+  // Closing Fee Change Review hands its draft back, so the draft survives the
+  // round trip and focus returns to the Review changes trigger.
+  const [returned] = useState<ReturnedReview | null>(() => (location.state as { feeReviewReturn?: ReturnedReview } | null)?.feeReviewReturn ?? null);
+  const restoreDraft = !!returned && !isFeeDraftEqual(returned.draft, stored);
+  const [editing, setEditing] = useState(restoreDraft);
+  const [draft, setDraft] = useState<FeeDraft>(restoreDraft && returned ? returned.draft : stored);
+  const [scope, setScope] = useState<FeeScope>(returned?.scope ?? "active");
   useEffect(() => {
     if (!editing) setDraft(stored);
   }, [stored, editing]);
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!returned) return;
+    const root = rootRef.current;
+    const review = root?.querySelector<HTMLButtonElement>('[data-landmark="price-review"]');
+    const target = review && !review.disabled ? review : root?.querySelector<HTMLElement>("[data-focus-return]");
+    target?.focus();
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, []);
 
   const dirty = !isFeeDraftEqual(draft, stored);
   const errors = validateFeeDraft(draft);
@@ -200,13 +236,13 @@ export default function PriceRulesView() {
 
   const reviewChanges = () => {
     if (!dirty || errors.length) return;
-    navigate(feeReviewHref(draft, scope));
+    navigate(fixture?.reviewHref ?? feeReviewHref(draft, scope));
   };
 
   const pendingText = dirty ? (errors.length ? "Fix the draft before reviewing." : "Draft changes are reviewed before anything is applied.") : "No pending changes";
 
   return (
-    <div className="space-y-3.5">
+    <div ref={rootRef} className="space-y-3.5">
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,710fr)_minmax(0,588fr)] gap-x-3 gap-y-3.5">
         <PanelCard
           title="Price display policy"
@@ -214,9 +250,9 @@ export default function PriceRulesView() {
           actionClassName="mt-[2px] -mr-0.5"
           action={
             editing ? (
-              <AdminButton size="sm" className="rounded-[6px]" onClick={() => { setEditing(false); setDraft(stored); }}>Discard</AdminButton>
+              <AdminButton size="sm" data-focus-return className="rounded-[6px]" onClick={() => { setEditing(false); setDraft(stored); }}>Discard</AdminButton>
             ) : (
-              <AdminButton variant="outline" size="sm" className="rounded-[6px] border-[#C5D4F7] gap-2" onClick={() => setEditing(true)}>
+              <AdminButton variant="outline" size="sm" data-focus-return className="rounded-[6px] border-[#C5D4F7] gap-2" onClick={() => setEditing(true)}>
                 <Pencil className="w-[17px] h-[17px]" aria-hidden="true" />
                 Edit
               </AdminButton>
@@ -331,6 +367,9 @@ export default function PriceRulesView() {
                   </div>
                 </dl>
                 <p className="mt-[9px] text-[12px] leading-[18px] text-adm-muted">Taxes and registration are separate.</p>
+                {previewCard.feeLabel && previewCard.feeLabel.toLowerCase() !== "document fee" && (
+                  <p className="text-[12px] leading-[18px] text-adm-muted">{previewCard.feeLabel} is what {jurisdictionLabel((editing ? draft : stored).stateCode)} calls the document fee; customers see that term.</p>
+                )}
               </div>
             </div>
           ) : (
@@ -361,10 +400,52 @@ export default function PriceRulesView() {
         ) : consistencyRows.length === 0 ? (
           <p className="px-5 pt-3 pb-5 text-[13px] text-adm-muted">No active vehicle carries a price yet.</p>
         ) : (
+          <>
+          <ul className="md:hidden mx-3 mt-[11px] space-y-2" aria-label="Price consistency by vehicle">
+            {consistencyRows.map((row) => (
+              <li key={row.listing.id} className="rounded-[8px] border border-adm-border px-3 py-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Thumb url={row.listing.heroImageUrl} />
+                  <div className="min-w-0">
+                    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{row.vehicle}</p>
+                    <p className="text-[12px] leading-[18px] text-adm-muted">{[row.listing.trim, row.listing.stock ? `Stock ${row.listing.stock}` : null].filter(Boolean).join(" · ") || "—"}</p>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <StatusChip tone={STATUS_TONE[row.status]} className="rounded-full px-3 py-[2px] text-[12px] leading-[18px] font-medium">{STATUS_LABEL[row.status]}</StatusChip>
+                  {row.reviewHref && <Link to={row.reviewHref} className="text-[13px] leading-[24px] font-semibold text-adm-primary hover:underline">Review</Link>}
+                </div>
+                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px] leading-[18px] tabular-nums">
+                  {[
+                    { label: "Selling price", value: fmtMoney(row.sellingPrice) },
+                    { label: "Document fee", value: fmtMoney(row.docFee) },
+                    { label: "Website", value: <WebsiteValue row={row} /> },
+                    { label: "Label", value: fmtMoney(row.label) },
+                    { label: "Passport", value: fmtMoney(row.passport) },
+                    {
+                      label: "Evidence",
+                      value: (
+                        <span className="inline-flex items-center gap-2">
+                          <EvidenceMark state={row.evidence} />
+                          {EVIDENCE_LABEL[row.evidence]}
+                        </span>
+                      ),
+                    },
+                  ].map((f) => (
+                    <div key={f.label} className="min-w-0">
+                      <dt className="text-[12px] leading-[18px] text-adm-muted">{f.label}</dt>
+                      <dd className="text-adm-ink">{f.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-2 text-[12px] leading-[18px] text-adm-muted">{row.detail}</p>
+              </li>
+            ))}
+          </ul>
           <AdminTable
             caption="Price consistency by vehicle"
             inset
-            className="mx-3 mt-[11px] mb-0 rounded-[8px] [&_th]:py-[9.5px] [&_td]:py-[6px] [&_th]:px-[13px] [&_td]:px-[13px] [&_td]:text-[13px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0"
+            className="max-md:hidden mx-3 mt-[11px] mb-0 rounded-[8px] [&_th]:py-[9.5px] [&_td]:py-[6px] [&_th]:px-[13px] [&_td]:px-[13px] [&_td]:text-[13px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0"
           >
             <thead>
               <tr>
@@ -394,7 +475,7 @@ export default function PriceRulesView() {
                     </Td>
                     <Td className="tabular-nums"><span data-parity="fixture-price">{fmtMoney(row.sellingPrice)}</span></Td>
                     <Td className="tabular-nums">{fmtMoney(row.docFee)}</Td>
-                    <Td className="tabular-nums">{row.website == null ? <span className="text-adm-muted">—</span> : <span data-parity="fixture-price">{fmtMoney(row.website)}</span>}</Td>
+                    <Td className="tabular-nums"><WebsiteValue row={row} /></Td>
                     <Td className="tabular-nums"><span data-parity="fixture-price">{fmtMoney(row.label)}</span></Td>
                     <Td className="tabular-nums"><span data-parity="fixture-price">{fmtMoney(row.passport)}</span></Td>
                     <Td>
@@ -403,16 +484,18 @@ export default function PriceRulesView() {
                         {EVIDENCE_LABEL[row.evidence]}
                       </span>
                     </Td>
-                    <Td><StatusChip tone={STATUS_TONE[row.status]} className="rounded-full px-3 py-[2px] text-[12px] leading-[18px] font-medium">{STATUS_LABEL[row.status]}</StatusChip></Td>
+                    <Td><StatusChip tone={STATUS_TONE[row.status]} className="rounded-full px-3 py-[2px] text-[12px] leading-[18px] font-medium">{STATUS_LABEL[row.status]}</StatusChip><span className="sr-only"> {row.detail}</span></Td>
                     <Td>{row.reviewHref ? <Link to={row.reviewHref} className="font-semibold text-adm-primary hover:underline">Review</Link> : <span className="text-adm-muted">—</span>}</Td>
                   </tr>
                 );
               })}
             </tbody>
           </AdminTable>
+          <p className="px-5 pt-3 text-[12px] leading-[18px] text-adm-muted">{basisNote(priceBasisOf(policy.mode), effectiveFee(stored))}</p>
+          </>
         )}
         {consistencyRows && consistencyRows.length > 0 && (
-          <div className="flex items-center justify-between gap-4 px-5 py-4 text-[12px] leading-[18px] text-adm-muted">
+          <div className="flex items-center justify-between gap-x-4 gap-y-1 flex-wrap px-5 py-4 text-[12px] leading-[18px] text-adm-muted">
             <span>{consistencyRows.length.toLocaleString()} vehicles shown{truncated ? " (first page)" : ""}</span>
             <span className="inline-flex items-center gap-2">
               <Info className="w-5 h-5" aria-hidden="true" />

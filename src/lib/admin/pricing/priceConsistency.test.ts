@@ -39,6 +39,8 @@ describe("price consistency assessment", () => {
     const a = assessConsistency(listing(), obs(30_895), 895, "advertised_before_doc");
     expect(a.status).toBe("consistent");
     expect(a.delta).toBe(0);
+    expect(a.basis).toBe("before_fee");
+    expect(a.websiteBasis).toBe("fee_removed");
   });
 
   it("flags a website price that disagrees with the label and links to the vehicle file", () => {
@@ -78,6 +80,48 @@ describe("price consistency assessment", () => {
   it("shows the Passport value for the configured display basis", () => {
     expect(assessConsistency(listing(), obs(30_000), 895, "website_sale_price").passport).toBe(30_000);
     expect(assessConsistency(listing({ price: 29_500 }), obs(29_500), 895, "advertised_before_doc").passport).toBe(29_500);
+  });
+});
+
+// In website_sale_price mode `price` is the fee-inclusive advertised total the
+// label and Passport show (resolveDisplayPrice anchors on it), so the website
+// figure is compared with it as a total and is never stripped of the fee.
+describe("price consistency on the fee-inclusive display basis", () => {
+  it("flags a website total that is the label total plus the fee (the screen 05 first row)", () => {
+    const l = listing({ price: 39_525, advertisedBeforeDoc: 39_525, websiteSalePrice: 40_420 });
+    const a = assessConsistency(l, obs(40_420), 895, "website_sale_price");
+    expect(a.basis).toBe("includes_fee");
+    expect(a.website).toBe(40_420);
+    expect(a.label).toBe(39_525);
+    expect(a.passport).toBe(39_525);
+    expect(a.status).toBe("mismatch");
+    expect(a.delta).toBe(895);
+    expect(a.websiteBasis).toBe("as_shown");
+    expect(a.detail).toBe("Website differs from the label by +$895 on the advertised total including the document fee.");
+  });
+
+  it("is consistent when the website shows the same advertised total", () => {
+    const a = assessConsistency(listing(), obs(30_000), 895, "website_sale_price");
+    expect(a.status).toBe("consistent");
+    expect(a.websiteBasis).toBe("as_shown");
+    expect(a.detail).toBe("Website, label and Passport agree on the advertised total including the document fee.");
+  });
+
+  it("lifts a website price shown before the fee onto the total and says so", () => {
+    const a = assessConsistency(listing(), obs(29_105), 895, "website_sale_price");
+    expect(a.status).toBe("consistent");
+    expect(a.websiteBasis).toBe("fee_added");
+  });
+});
+
+describe("price consistency across all three touchpoints", () => {
+  it("flags a Passport that shows a different figure from the label even when the website agrees", () => {
+    const a = assessConsistency(listing({ advertisedBeforeDoc: 29_500, websiteSalePrice: 30_395 }), obs(30_000), 895, "advertised_before_doc");
+    expect(a.passport).toBe(29_500);
+    expect(a.delta).toBe(0);
+    expect(a.passportDelta).toBe(-500);
+    expect(a.status).toBe("mismatch");
+    expect(a.detail).toBe("Passport differs from the label by -$500.");
   });
 });
 
