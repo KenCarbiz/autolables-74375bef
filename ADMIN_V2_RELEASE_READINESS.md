@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | Verified with exceptions | 10 of 13 screens at or above 97% layout parity; 03, 07 and 10 below by documented choice; full review clean (section 10) | 03, 07, 10 differences are intentional |
+| 16 | Visual acceptance | Not met; acceptance pending | No screen reaches 97% on the agreed metric (content parity at 1600x1000: 79.79-91.67%); landmarks fail on 09-13 (section 10) | Owner decision on the proposed exceptions in section 10.6; none is approved |
 
 ## 2. How the evidence was produced
 
@@ -188,36 +188,139 @@ session. It invokes nothing and changes nothing.
 
 ## 10. Visual acceptance
 
-Measured on `main` at `bebbf0d` (code), the same harness, Chromium build,
-1586x992 reference frame, device scale 1, light theme and deterministic
-dev-only design fixtures as every earlier run. "Before" is `ff785c1`, the
-commit before this polish round; re-running it reproduced its original
-numbers exactly. Layout parity masks text boxes; it is reported separately
-from the full review below and is not the acceptance test on its own.
+Status: the 97% target is **not met** on any screen, and no exception has
+been approved. Everything under 10.3 and 10.6 is a proposal awaiting the
+owner.
 
-| # | Screen | Route | Layout parity before | After | Landmarks | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| 01 | Overview | `/admin?tab=overview` | 94.85% | 97.42% | pass | activity and settings text no longer truncated (costs 0.65 against the mock's clamped lines) |
-| 02 | Dealership & Brand, Identity | `/admin?tab=identity` | 96.78% | 98.15% | pass | |
-| 03 | People & Access, Team | `/admin?tab=team` | 96.86% | 95.63% | pass | below 97 by choice: addresses are the member's only identifier and now wrap instead of truncating; the mock shows one-line names our data does not have |
-| 04 | Member role (child) | `/admin/people/:memberId` | 96.65% | 97.99% | pass | |
-| 05 | Pricing & Products, Price rules | `/admin?tab=price-rules` | 95.37% | 98.17% | pass | |
-| 06 | Fee change review (child) | `/admin/pricing/fee-review` | 96.92% | 98.30% | pass | |
-| 07 | Product applicability (child) | `/admin/products/:productId/applicability` | 95.92% | 96.99% | pass | below 97 by choice: Review changes stays disabled until the draft changes (0.48); shell gutter 26 vs 24px (0.46) |
-| 08 | Customer Experience, Contact & Routing | `/admin?tab=routing` | 96.92% | 98.07% | pass | |
-| 09 | Escalation rules (child) | `/admin/customer-experience/escalation` | 97.34% | 97.07% | 3px shift | measured against the navy rail edge; the stream's content-origin rail was reverted |
-| 10 | Publishing, Effective policy | `/admin?tab=effective-policy` | 95.37% | 96.99% | fail (in-card tabs) | below 97: the approved IA draws tabs above the card, the mock inside it (1.60); gutter 30 vs 24px |
-| 11 | Documents & Service, Approval rules | `/admin?tab=approval-rules` | 96.60% | 97.62% | fail (in-card tabs) | readiness labels wrap instead of truncating |
-| 12 | Integrations, Inventory feed | `/admin?tab=inventory-feed` | 96.98% | 98.66% | fail (heading order) | |
-| 13 | Sync run detail (child) | `/admin/integrations/runs/:runId` | 95.77% | 98.95% | fail (title spacing) | |
+### 10.0 Comparison contract (as agreed in the handoff)
 
-Evidence: `scripts/admin-parity/evidence/before-after/NN.png` (Before |
-Reference | After at 1586x992), `evidence/responsive/NN.png` (1366, 1024,
-390), `evidence/NN-1586x992-structure.png` (red layout, amber text, blue
-masks), `ADMIN_V2_PARITY_REPORT.md` (every score and remaining difference),
-`evidence/audit-final.json` (the full review below).
+- References: the 13 mocks in `screens/annotated/` (2186x1048 with the
+  annotation panel), cropped to the 1586x992 screen area in
+  `scripts/admin-parity/reference/`.
+- Primary viewport: 1600x1000 (`contracts/PARITY_TARGETS.csv`,
+  `docs/05_VISUAL_PARITY_97_PROTOCOL.md`); the reference is resampled
+  bilinearly to that frame. DPR 1, Playwright Chromium, light theme,
+  development-only synthetic fixtures.
+- Font: Inter v20 variable from Google Fonts (one latin woff2, weights 400,
+  500, 600 and 700 loaded); `document.fonts.ready` awaited before capture.
+- Threshold: a pixel differs when any channel moves more than 32/255; no
+  anti-aliasing allowance. Structure: mean SSIM of 8x8 luminance blocks.
+- Crop: the content region starts 3px right of each mock's navy rail edge
+  and at y 70; the full frame is also reported. No alignment shift is
+  applied to the protocol score.
+- Masks: only the dynamic content the protocol permits (names, times,
+  counts, ids, fixture values) plus mock-only annotation captions
+  (Proposed design footer, DESIGN CONCEPT chip), disclosed per screen in
+  `scripts/admin-parity/masks.json`. This round narrowed two: the 05 mask
+  now covers only fixture vehicle names and prices (thumbnails, rows and
+  the doc fee are scored) and the 13 evidence mask was removed.
+- Target: 97% per screen, plus landmarks within 16px.
 
-### 10.1 Full review (not a screenshot score)
+### 10.1 Protocol results, measured on `6391e7a`
+
+| # | Screen | Route | Full frame | Content (agreed metric) | Structure | Masked | Landmarks |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 01 | Overview | `/admin?tab=overview` | 90.33% | 89.91% | 67.26% | 3.94% | pass |
+| 02 | Dealership & Brand, Identity | `/admin?tab=identity` | 88.63% | 88.02% | 65.28% | 1.42% | pass |
+| 03 | People & Access, Team | `/admin?tab=team` | 92.07% | 91.54% | 71.94% | 3.71% | pass |
+| 04 | Member role (child) | `/admin/people/:memberId` | 88.65% | 88.02% | 65.18% | 0.93% | pass |
+| 05 | Pricing & Products, Price rules | `/admin?tab=price-rules` | 90.04% | 89.41% | 67.02% | 6.20% | pass |
+| 06 | Fee change review (child) | `/admin/pricing/fee-review` | 85.44% | 90.43% | 71.18% | 4.05% | pass |
+| 07 | Product applicability (child) | `/admin/products/:productId/applicability` | 90.23% | 89.86% | 68.24% | 3.04% | pass |
+| 08 | Contact & Routing | `/admin?tab=routing` | 88.56% | 87.10% | 63.64% | 0.26% | pass |
+| 09 | Escalation rules (child) | `/admin/customer-experience/escalation` | 85.71% | 83.53% | 62.13% | 2.57% | fail: tiles |
+| 10 | Publishing, Effective policy | `/admin?tab=effective-policy` | 87.27% | 86.13% | 60.73% | 0.90% | fail: child tabs, policy card, draft status |
+| 11 | Documents & Service, Approval rules | `/admin?tab=approval-rules` | 91.60% | 91.67% | 75.37% | 2.05% | fail: child tabs, rules card, selected rule |
+| 12 | Integrations, Inventory feed | `/admin?tab=inventory-feed` | 82.40% | 79.79% | 66.00% | 2.77% | fail: child tabs |
+| 13 | Sync run detail (child) | `/admin/integrations/runs/:runId` | 89.13% | 88.55% | 65.47% | 3.55% | fail: badge, title |
+
+### 10.2 Diagnostics (not the agreed metric)
+
+These isolate causes; none of them stands in for the protocol score. The
+earlier version of this section reported the text-masked column as the
+result, which was wrong.
+
+| # | Content at 1586x992 | Body, aligned at the section row | Layout with text boxes masked |
+| --- | --- | --- | --- |
+| 01 | 92.78% | 92.57% | 97.42% |
+| 02 | 87.74% | 94.31% | 98.15% |
+| 03 | 91.26% | 92.31% | 95.63% |
+| 04 | 88.89% | 93.20% | 97.99% |
+| 05 | 89.65% | 92.34% | 97.80% |
+| 06 | 94.11% | 94.14% | 98.30% |
+| 07 | 91.87% | 92.12% | 96.99% |
+| 08 | 88.08% | 93.27% | 98.07% |
+| 09 | 83.85% | 91.89% | 97.07% |
+| 10 | 88.00% | 91.19% | 96.99% |
+| 11 | 91.08% | 92.49% | 97.62% |
+| 12 | 79.44% | 94.46% | 98.66% |
+| 13 | 89.21% | 93.58% | 98.98% |
+
+The gap between the protocol and body columns is the vertical offset of
+the title block (-24 to +80px); the gap between body and layout is text
+rendering inside boxes that are in the right place.
+
+### 10.3 Font substantiation
+
+- Loaded: one Google Fonts Inter v20 woff2 (latin), weights 400/500/600/700
+  loaded, 800 unused. `CSS.getPlatformFontsForNode` reports family Inter,
+  `isCustomFont` true, for the h1, nav and body text: no fallback is used.
+  Computed letter-spacing `normal`, optical sizing `auto`, line heights
+  20px body, 40px title (36px on child pages).
+- Fit against the references: for every candidate face (Inter webfont with
+  optical sizing on and off, local Inter, Inter Display, Liberation Sans,
+  FreeSans, DejaVu Sans, Carlito), each reference string was rendered over
+  a sweep of sizes and its ink box compared with the reference's.
+  - The screen 01 title "Administration" (254x29px ink) matches Inter Bold
+    at 35.75px exactly (0.00% width, 0px height).
+  - The subtitle (388x16) matches Inter Regular at 15.4px (0.26%).
+  - The section labels match Inter Medium at 13.75px (2.0% RMS; Semibold
+    2.9%).
+  - The mocks use the same font. The differences are size and weight
+    choices, not a font substitution.
+- Our 01 capture: title 199x22 ink (28px token), subtitle 352x14 (14px),
+  section labels 14px Semibold.
+- Across the 13 references the "Administration" title is drawn at about
+  28px on 05, 06, 08, 09 and 12 (ink 22-24px, as ours) and about 36px on
+  01. Child titles are about 32-38px on all four child mocks against the
+  28px `page` token. Section-label rows span 997-1225px across the
+  references; ours spans 1126px, the median.
+- Crops: `/tmp` scratch only; the per-screen overlays below show the same
+  text unmasked at the protocol frame.
+
+### 10.4 Reference / actual / overlay
+
+`scripts/admin-parity/evidence/overlay/NN.png`, built by
+`scripts/admin-parity/overlay.cjs`, has four panels at 1600x1000 for every
+screen, with no text hidden:
+
+- the reference;
+- the capture;
+- an overlay, cyan where only the reference has ink and red where only
+  ours does;
+- a difference map, with magenta at every pixel past 32/255, the scored
+  region outlined and each permitted mask outlined with its content still
+  visible.
+
+What they show, by kind:
+
+- Spacing: the title block is the main mover. Our breadcrumb and
+  description push every section body down 37-80px on 02, 03, 05, 08 and
+  12, where the mocks draw neither. The shell's 24px gutter sits against
+  the mocks' 18-33px.
+- Typography: page and child titles at 28px against 32-38px; section
+  labels Semibold against Medium; glyph anti-aliasing everywhere.
+- Icons: lucide glyphs where the mocks draw their own set. The supplied
+  `assets/icons` set is used for the vehicle placeholder and the empty,
+  restricted and paused states. The remaining lucide glyphs are listed per
+  screen in `ADMIN_V2_PARITY_REPORT.md`.
+- Backgrounds: the mock's workspace tint and banner gradients vary by more
+  than the threshold in places. The fixture's rail and header stand-ins
+  are flat.
+- Control geometry: child-tab rows are 36px against the mocks' 40-54px.
+  On 10 and 11 the mocks put the tabs inside the card.
+
+### 10.5 Full review (not a screenshot score)
 
 `scripts/admin-parity/audit.cjs`, every screen at 1586x992, 1366x768,
 1024x768, 768x1024 and 390x844, on the final commit: no page overflow, no
@@ -237,7 +340,7 @@ failures; missing hover feedback on four controls; small badge glyphs;
 the supplied vehicle drawing now fills Price rules' empty photo frame and
 empty-state artwork is no longer dimmed; rule editor labels tied to inputs.
 
-### 10.2 Interactions
+### 10.5a Interactions
 
 Tests now drive every screen: open child pages, select rows, edit drafts,
 Review changes only after a valid change, cancel, save, refused and thrown
@@ -249,31 +352,15 @@ accepted (07), three saves stuck on Applying when the writer throws (02,
 Review change enabled before any change (04). Admin, Sticker and hook
 suites: 72 files, 688 tests, all passing; typecheck clean.
 
-### 10.3 Intentional differences from the references
-
-- 07: Review changes is disabled until the draft differs from the saved
-  policy; the mock draws it enabled. Compared against the same state, the
-  enabled style matches the primary button.
-- 08: the Escalation on/off switch lives on the Escalation page that owns
-  it; Contact & Routing reports the state and links there.
-- 03: members are shown by address (our data has no names); addresses wrap.
-- 09 and 12: "Not supported" and "Previously validated" where the mock
-  says "Coming soon" and "Verified"; we do not claim what the data does not
-  support.
-- 10, 11, 12, 13: tab rows and title blocks follow the approved shell, not
-  each mock's local variation.
-- Page margins: the mocks draw 18-33px; the shell keeps one 24px value
-  (section 10.4).
-
-### 10.4 Shared spacing decision
+### 10.5b Shared spacing (proposal)
 
 The references disagree: left gutters 18-33px (median 27), right 15-27px
 (median 25), navigation-to-content gaps 15-21px. No single value in
 `AdminPageContainer` reproduces them; 26 or 28px would move 01, 03 and 04
 further away. The shell keeps 24px and 16px, and no view compensates
-locally.
+locally. This is a proposal for the owner, not an accepted deviation.
 
-### 10.5 Not tested
+### 10.5c Not tested
 
 - Native iOS: this repository has no native code; nothing here changed a
   native screen or shared native asset. The Connect Card and Wallet
@@ -281,6 +368,78 @@ locally.
 - Real devices and Safari: the audit used Chromium at device scale 1.
 - Live data in the browser: the sandbox cannot reach the hosted project,
   so screens were exercised through fixtures and component tests.
+
+### 10.6 Exception proposal (pending; nothing approved)
+
+Each item gives the screens it affects, the deviation, the evidence and its
+practical impact. The owner can accept an item, reject it (the reference
+then wins and the work is reopened) or change the written requirement.
+
+1. **Title block: one "Administration" title, breadcrumb and description**
+   - Screens: 02, 03, 05, 06, 08, 10, 11, 12.
+   - Deviation: 02, 03, 10 and 11 title the page with the section name.
+     02, 03, 05, 06, 08 and 12 draw no breadcrumb or description. Ours
+     always shows the breadcrumb, "Administration" and a one-line
+     description.
+   - Evidence: IA `02_ADMIN_INFORMATION_ARCHITECTURE.md` ("one page title:
+     Administration"), acceptance A01, annotation 01-1. The references
+     contradict each other: 01 and 10 draw a breadcrumb or eyebrow.
+   - Impact: bodies sit 24-80px off (the protocol vs body columns in 10.2).
+     The section name is still the active tab.
+   - Decision asked: keep the IA, or drop the breadcrumb and description on
+     parent sections (the h1 would stay).
+2. **Page and child title size**
+   - Screens: 01, 04, 07, 09, 13.
+   - Deviation: 28px (`design/tokens.json` `page` 28/36/700) against about
+     36px on 01 and 32-38px on the four child mocks.
+   - Evidence: section 10.3.
+   - Impact: the title and everything under it sit 8-19px higher (the 13
+     badge and title landmarks).
+   - Decision asked: keep the token, or adopt about 36px.
+3. **Child tabs outside the card**
+   - Screens: 10, 11.
+   - Deviation: the mocks draw the tab row inside the policy card (11 at
+     54px tall); 02, 03, 05, 08 and 12 draw it outside, as the shared
+     component does.
+   - Impact: the child-tab, policy-card, draft-status, rules-card and
+     selected-rule landmarks fail.
+   - Decision asked: one placement for all sections.
+4. **Section heading above the tabs**
+   - Screen: 12.
+   - Deviation: the mock adds an "Integrations & Data" heading between the
+     section row and the tabs; no other parent mock does.
+   - Impact: the child-tab landmark is 50px off, and so is everything
+     below it.
+5. **Shell gutter 24px**
+   - Screens: all.
+   - Deviation: the mocks draw 18-33px (section 10.5b).
+   - Impact: card edges move 4-9px.
+6. **Behaviour over the mock's static state**
+   - Screens: 03, 04, 07, 08, 09, 12.
+   - Deviations:
+     - Review changes stays disabled until there is a real change (04, 07).
+     - Members are shown by address, which wraps (03).
+     - The Escalation switch lives on its own page (08).
+     - Labels read "Not supported" and "Previously validated" where the
+       mocks say "Coming soon" and "Verified" (09, 12).
+   - Evidence: the 10.5a interaction tests and the annotations' data-truth
+     notes.
+   - Impact: local differences under 1 point each.
+7. **Notification tiles**
+   - Screen: 09.
+   - Deviation: the tile group is out of landmark tolerance. This is a real
+     layout difference with no requirement behind it. It is open, not
+     proposed as an exception.
+8. **Product rail and header**
+   - Screens: all (full frame only).
+   - Deviation: the fixture draws flat stand-ins for the global shell.
+   - Impact: full-frame scores only. Proposed to be scored outside this
+     refresh.
+
+Even if items 1-5 were accepted, the body diagnostic (91-95%) shows that
+text rendering and lucide glyphs keep every screen below 97%. Closing that
+gap needs the title-size decision plus icon replacement from the supplied
+set, measured screen by screen.
 
 ## 11. Approvals requested
 
