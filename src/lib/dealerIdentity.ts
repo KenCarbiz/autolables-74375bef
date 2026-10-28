@@ -273,10 +273,10 @@ export function resolveDealerIdentity(args: ResolveIdentityArgs): DealerIdentity
   const resolvedStore = chain[0]?.store;
 
   const warnings: IdentityWarning[] = [];
-  if (!phone) warnings.push({ code: "missing_phone", message: "Dealership phone number is missing.", settingsPath: "/admin?tab=branding" });
-  if (!logo.value) warnings.push({ code: "missing_logo", message: "No logo is configured for this dealership location.", settingsPath: "/admin?tab=branding" });
-  if (!website.resolved.display) warnings.push({ code: "missing_website", message: "Public website has not been configured.", settingsPath: "/admin?tab=branding" });
-  if (!address.value) warnings.push({ code: "missing_address", message: "Dealership street address is missing.", settingsPath: "/admin?tab=branding" });
+  if (!phone) warnings.push({ code: "missing_phone", message: "Dealership phone number is missing.", settingsPath: "/admin?tab=hours-contact" });
+  if (!logo.value) warnings.push({ code: "missing_logo", message: "No logo is configured for this dealership location.", settingsPath: "/admin?tab=identity" });
+  if (!website.resolved.display) warnings.push({ code: "missing_website", message: "Public website has not been configured.", settingsPath: "/admin?tab=hours-contact" });
+  if (!address.value) warnings.push({ code: "missing_address", message: "Dealership street address is missing.", settingsPath: "/admin?tab=hours-contact" });
   if (args.vehicleAssigned === false && stores.length > 1) {
     warnings.push({ code: "unassigned_vehicle", message: "This vehicle is not assigned to a dealership location.", settingsPath: "/inventory" });
   }

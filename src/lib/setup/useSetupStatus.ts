@@ -63,8 +63,8 @@ export function useSetupStatus(): SetupStatus {
   const passportDone = inv.published > 0;
 
   const steps: SetupStep[] = [
-    { id: "profile", label: "Dealership profile", done: profileDone, to: "/admin?tab=branding", hint: "Name, address, phone, and operating state." },
-    { id: "branding", label: "Branding & logo", done: brandingDone, to: "/admin?tab=branding", hint: "Upload your logo and set brand colors." },
+    { id: "profile", label: "Dealership profile", done: profileDone, to: "/admin?tab=hours-contact", hint: "Name, address, phone, and operating state." },
+    { id: "branding", label: "Branding & logo", done: brandingDone, to: "/admin?tab=identity", hint: "Upload your logo and set brand colors." },
     { id: "templates", label: "Default sticker templates", done: templatesDone, to: "/sticker-studio", hint: "Pick a default window and addendum template." },
     { id: "print", label: "Print settings & calibration", done: printDone, optional: true, to: "/admin?tab=print-settings", hint: "Calibrate how stickers land on your label stock." },
     { id: "rules", label: "Document workflow rules", done: rulesDone, optional: true, to: "/admin?tab=document-rules", hint: "Approval, stale, and packet rules for your store." },

@@ -68,7 +68,10 @@ export default function ApprovalRulesView() {
     read: (s) => fixture?.rules ?? rulesFromSettings(s),
     describe: (field, before, after) => ({ field, label: DOCUMENT_RULE_LABELS[field], before: before ? "On" : "Off", after: after ? "On" : "Off" }),
     warnings: documentRuleWarnings,
-    toPayload: (draft) => ({ document_rules: draft }),
+    // merge_dealer_settings replaces a nested object, so the payload carries the
+    // current rules with only the reviewed keys changed; Publishing writes its
+    // own keys of the same object the same way.
+    toPayload: (draft, changed) => ({ document_rules: { ...rulesFromSettings(settings), ...Object.fromEntries(changed.map((k) => [k, draft[k]])) } }),
     canEdit,
     fixtureImpact: fixture?.impact ?? null,
   });

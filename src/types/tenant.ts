@@ -40,6 +40,9 @@ export interface AuditLogEntry {
     | "product_added" | "product_updated" | "product_deleted" | "product_sale_mode_changed"
     | "rule_added" | "rule_updated" | "rule_deleted"
     | "settings_updated" | "buyers_guide_created"
+    // Administration V2 server authority (20261029000000 / 20261029001000)
+    | "pricing_policy_changed" | "routing_policy_changed" | "publishing_policy_changed"
+    | "addon_policy_changed" | "doc_fee_policy_applied"
     | "invoice_created" | "invoice_updated"
     | "lead_captured" | "lead_exported"
     | "inventory_imported"
