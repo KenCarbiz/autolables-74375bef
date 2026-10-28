@@ -31,8 +31,8 @@ export interface FeedViewFixture {
 
 const UNKNOWN_COUNTS: InventoryCounts = { active: { kind: "loading" }, new: { kind: "loading" }, used: { kind: "loading" }, cpo: { kind: "loading" } };
 
-// Measured on the reference: a 41px table header and 17px card titles.
-const TH = "px-3 pt-[11px] pb-[10px] text-[14px] leading-[20px] text-adm-ink";
+// Measured on the reference at the 1600x1000 protocol frame: a 42px table header and 17px card titles.
+const TH = "px-3 pt-[11px] pb-[11px] text-[14px] leading-[20px] text-adm-ink";
 const TD = "px-3";
 const CARD_TITLE = "text-[17px] leading-[26px] font-semibold text-adm-ink";
 
@@ -119,7 +119,7 @@ export default function InventoryFeedView() {
 
   return (
     <div className="space-y-4">
-      <h2 className="pb-1 text-[28px] leading-[36px] font-bold text-adm-ink">Integrations &amp; Data</h2>
+      <h2 className="pb-[9px] text-[28px] leading-[36px] font-bold text-adm-ink">Integrations &amp; Data</h2>
       {banner && (
         <FeedBanner
           verdict={banner}
@@ -147,8 +147,8 @@ export default function InventoryFeedView() {
             <p className="px-6 pb-6 text-[13px] text-adm-muted">No attempts have been recorded for this rooftop yet.</p>
           ) : (
             <>
-              {/* Rows alternate 46 and 47px to land on the reference's 46.5px rhythm; the heights are minimums. */}
-              <AdminTable caption="Recent inventory feed attempts" className="xl:[&_table]:table-fixed [&_tbody_td]:py-0 [&_tbody_tr]:h-[46px] [&_tbody_tr:first-child]:h-[45px] [&_tbody_tr:nth-child(2)]:h-[47px] [&_tbody_tr:last-child>td]:border-b-0">
+              {/* Rows of 46, 47 and 46px land on the reference's rhythm at the protocol frame; the heights are minimums. */}
+              <AdminTable caption="Recent inventory feed attempts" className="xl:[&_table]:table-fixed [&_tbody_td]:py-0 [&_tbody_tr]:h-[46px] [&_tbody_tr:first-child]:h-[45px] [&_tbody_tr:nth-child(2)]:h-[48px] [&_tbody_tr:last-child>td]:border-b-0">
                 <colgroup>
                   <col className="w-[177px]" />
                   <col className="w-[196px]" />
@@ -195,8 +195,8 @@ export default function InventoryFeedView() {
         <SourceCard snapshot={snapshot} tenantId={tenantId} onChanged={refetch} identityChipTone={identityChipTone} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[638fr_642fr] gap-4 xl:gap-x-[15px]">
-        <AdminCard bodyClassName="px-6 pt-3 pb-[19px]">
+      <div className="grid grid-cols-1 xl:grid-cols-[638fr_642fr] gap-4 xl:gap-x-[15px] xl:pt-0.5">
+        <AdminCard bodyClassName="px-6 pt-3 pb-4">
           <h3 className={CARD_TITLE}>Condition coverage <span className="font-normal">(this rooftop)</span></h3>
           <div className="mt-[9px] grid grid-cols-3 sm:grid-cols-[minmax(0,1fr)_207px_218px] divide-x divide-adm-border">
             <CoverageStat label="New" value={countDisplay(counts.new)} />
@@ -204,7 +204,7 @@ export default function InventoryFeedView() {
             <CoverageStat label="CPO" value={countDisplay(counts.cpo)} />
           </div>
         </AdminCard>
-        <AdminCard bodyClassName="px-[23px] pt-[11px] pb-[19px]">
+        <AdminCard bodyClassName="px-[23px] pt-[11px] pb-4">
           <h3 className={cn(CARD_TITLE, "-ml-[9px] flex items-center gap-[10px]")}>
             <RefreshCw className="w-[22px] h-[22px] text-adm-primary flex-shrink-0" aria-hidden="true" />
             Refresh status
@@ -248,7 +248,7 @@ const FeedBanner = ({ verdict, action }: { verdict: HealthVerdict; action?: Reac
   const tone = HEALTH_META[verdict.state].tone;
   const Icon = BANNER_ICON[tone];
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex flex-wrap items-start gap-x-[18px] gap-y-3 rounded-[10px] border-2 pl-4 pr-[18px] pt-3 pb-[15px]", BANNER_TONE[tone])}>
+    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex flex-wrap items-start gap-x-[18px] gap-y-3 rounded-[10px] border-2 pl-4 pr-[18px] pt-3 pb-4", BANNER_TONE[tone])}>
       <Icon className={cn("mt-px w-8 h-8 flex-shrink-0", BANNER_ICON_COLOR[tone])} aria-hidden="true" />
       <div className="min-w-0 flex-1 basis-[200px]">
         <p className="text-[18px] leading-[24px] font-semibold">{verdict.headline}</p>
@@ -274,7 +274,7 @@ const FeedTile = ({ icon: Icon, iconClassName, label, value, tone, href, ariaLab
       </span>
     </>
   );
-  const cls = "flex items-start gap-[23px] rounded-[10px] border border-adm-border bg-adm-surface px-5 pt-[21px] pb-3 min-h-[91px]";
+  const cls = "flex items-start gap-[23px] rounded-[10px] border border-adm-border bg-adm-surface px-5 pt-[21px] pb-3 min-h-[92px]";
   return href ? (
     <Link to={href} data-parity="tile" className={cn(cls, "hover:border-adm-primary/60 focus-visible:outline-2 focus-visible:outline-adm-primary")} aria-label={ariaLabel ?? `${label}: ${value}`}>
       {body}
@@ -338,7 +338,7 @@ const SourceCard = ({
   };
 
   return (
-    <AdminCard bodyClassName="pl-[18px] pr-[19px] pt-[14px] pb-[17px]">
+    <AdminCard bodyClassName="pl-[18px] pr-[19px] pt-[16px] pb-[15px]">
       <div className="flex items-center justify-between gap-3">
         <h3 className={CARD_TITLE}>Source</h3>
         <StatusChip tone={identityChipTone} icon className="h-[27px] px-2.5">{snapshot.tiles.sourceIdentity.value}</StatusChip>

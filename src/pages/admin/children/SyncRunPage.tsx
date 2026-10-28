@@ -50,7 +50,7 @@ const DIAGNOSIS_PANEL: Record<HealthTone, string> = {
   info: "border-[#C5D4F7] bg-adm-selected",
 };
 
-const TITLE = <span className="text-[34px] leading-[40px]">Inventory sync run</span>;
+const TITLE = "Inventory sync run";
 // Measured on the reference: 12px timeline headers over 13/17 cells, rule
 // lines inset 20px from the card edges, and 16px card titles.
 const CARD_TITLE = "text-[16px] leading-[22px] font-semibold text-adm-ink";

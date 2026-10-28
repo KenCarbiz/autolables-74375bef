@@ -186,7 +186,7 @@ const POLICY_ICON: Record<string, typeof Tag> = { price_basis: Tag, publishing: 
 // violet. StatTile takes no className, so the geometry is set from here.
 const TILE_GRID = [
   "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[311fr_315fr_320fr_327fr] gap-3",
-  "[&>a]:min-h-[81px] [&>a]:px-3.5",
+  "[&>a]:min-h-[80px] [&>a]:px-3.5",
   "[&>a>span:first-child]:w-[52px] [&>a>span:first-child]:h-[52px]",
   "[&_.tabular-nums]:mt-[5px]",
   "[&>a:first-child>span:first-child>svg]:w-[30px] [&>a:first-child>span:first-child>svg]:h-[30px]",
@@ -238,12 +238,12 @@ export default function OverviewView() {
   const bannerTone = feed && needsAttention(feed.state) ? HEALTH_META[feed.state].tone : null;
 
   return (
-    <div className="space-y-3.5">
+    <div className="pt-px space-y-3.5">
       <div className="space-y-3.5">
         {feed && bannerTone && (
           <InlineNote
             tone={bannerTone}
-            className={`-mt-px -mb-px border-2 py-[10.5px] pl-[15px] pr-[12px] text-adm-ink [&>svg]:w-[34px] [&>svg]:h-[34px] [&>svg]:-ml-0.5 [&>svg]:fill-current [&>svg]:stroke-white ${BANNER_MARK[bannerTone]}`}
+            className={`border-2 py-[10.5px] pl-[15px] pr-[12px] text-adm-ink [&>svg]:w-[34px] [&>svg]:h-[34px] [&>svg]:-ml-0.5 [&>svg]:fill-current [&>svg]:stroke-white ${BANNER_MARK[bannerTone]}`}
             title={<span className="text-[16px]">{feed.state !== "healthy" ? "Inventory sync needs attention" : feed.headline}</span>}
             action={<AdminLinkButton to={adminTabHref("inventory-feed")} variant="outline" size="sm" className="min-h-[35px] px-3">Review sync</AdminLinkButton>}
           >
@@ -270,8 +270,8 @@ export default function OverviewView() {
           ) : attention.length === 0 ? (
             <p className="px-4 pb-4 text-[13px] text-adm-muted">{failed ? "Attention items could not be checked." : "Nothing needs attention right now."}</p>
           ) : (
-            // Row rhythm measured on the reference: 52, 53, 53 and 56px under a 35px header.
-            <AdminTable caption="Ranked attention queue" inset className="mb-[14px] [&_tbody_tr:first-child>td]:pt-[5px] [&_tbody_tr:last-child>td]:border-b-0 [&_tbody_tr:last-child>td]:pt-2 [&_tbody_tr:last-child>td]:pb-[11px]">
+            // Row rhythm measured on the reference at the 1600x1000 protocol frame: 53, 54, 54 and 57px under a 35px header.
+            <AdminTable caption="Ranked attention queue" inset className="mb-[15px] [&_tbody_tr:first-child>td]:pt-[5px] [&_tbody_tr:last-child>td]:border-b-0 [&_tbody_tr:last-child>td]:pt-2 [&_tbody_tr:last-child>td]:pb-[11px]">
               <thead>
                 <tr>
                   <Th className="w-[43.2%] py-2 text-[12.5px] leading-[18px] text-adm-ink">Issue</Th>
@@ -286,7 +286,7 @@ export default function OverviewView() {
                   const Icon = ATTENTION_ICON[item.status];
                   return (
                     <tr key={item.id}>
-                      <Td className="pt-1.5 pb-[9px]">
+                      <Td className="pt-1.5 pb-[10px]">
                         <div className="flex items-center gap-[22px]">
                           <Icon className={`w-7 h-7 -ml-[3px] flex-shrink-0 fill-current stroke-white ${MARK[meta.tone]}`} aria-hidden="true" />
                           <div className="min-w-0">
@@ -295,9 +295,9 @@ export default function OverviewView() {
                           </div>
                         </div>
                       </Td>
-                      <Td className="pt-1.5 pb-[9px] text-[13px] leading-[18px] text-adm-ink">{item.owner ?? "—"}</Td>
-                      <Td className="pt-1.5 pb-[9px]"><StatusChip tone={meta.tone} className={`px-3 py-[3.5px] text-[12.5px] leading-[18px] ${QUEUE_CHIP[meta.tone]}`}>{meta.label}</StatusChip></Td>
-                      <Td className="pt-1.5 pb-[9px]"><Link to={item.action.href} className="text-[13px] leading-[18px] font-semibold text-adm-primary hover:underline">{item.action.label}</Link></Td>
+                      <Td className="pt-1.5 pb-[10px] text-[13px] leading-[18px] text-adm-ink">{item.owner ?? "—"}</Td>
+                      <Td className="pt-1.5 pb-[10px]"><StatusChip tone={meta.tone} className={`px-3 py-[3.5px] text-[12.5px] leading-[18px] ${QUEUE_CHIP[meta.tone]}`}>{meta.label}</StatusChip></Td>
+                      <Td className="pt-1.5 pb-[10px]"><Link to={item.action.href} className="text-[13px] leading-[18px] font-semibold text-adm-primary hover:underline">{item.action.label}</Link></Td>
                     </tr>
                   );
                 })}
@@ -320,7 +320,7 @@ export default function OverviewView() {
                     <span className="hidden min-[1440px]:block float-right w-0 h-4" aria-hidden="true" />
                     <ChevronRight className="absolute right-0.5 top-[23.5px] min-[1440px]:static min-[1440px]:float-right min-[1440px]:clear-right w-5 h-5 text-adm-muted" aria-hidden="true" />
                     <span className="block text-[12.5px] leading-[16px] font-semibold text-adm-ink">{s.title}</span>
-                    <span className="mt-[1.5px] text-[11px] leading-[13px] text-adm-muted">{s.detail}</span>
+                    <span className="block mt-[1.5px] text-[11px] leading-[13px] text-adm-muted">{s.detail}</span>
                   </span>
                 </Link>
               );
@@ -364,7 +364,7 @@ export default function OverviewView() {
           inset="sm"
           className="h-full"
           headerClassName="pt-3 [&_h3]:text-[17px] [&_h3]:leading-[24px]"
-          bodyClassName="pt-[2.5px] pb-3"
+          bodyClassName="pt-[3.5px] pb-3"
           action={<Link to={adminTabHref("effective-policy")} className="text-[12.5px] leading-[24px] font-semibold text-adm-primary hover:underline">Edit</Link>}
         >
           <ul className="divide-y divide-adm-border">
@@ -372,7 +372,7 @@ export default function OverviewView() {
               const Icon = POLICY_ICON[row.key] ?? ArrowLeftRight;
               const ok = row.state === "ok";
               return (
-                <li key={row.key} className="flex items-start py-3">
+                <li key={row.key} className="flex items-start pt-3 pb-[12.5px]">
                   <span className="mt-[3px] -ml-0.5 w-9 h-9 rounded-md bg-adm-workspace text-adm-ink flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-5 h-5" /></span>
                   {ok ? <CheckCircle2 className={`-mt-[1.5px] ml-[6.5px] w-[25px] h-[25px] flex-shrink-0 fill-current stroke-white ${MARK.success}`} aria-hidden="true" /> : <AlertCircle className={`-mt-[1.5px] ml-[6.5px] w-[25px] h-[25px] flex-shrink-0 fill-current stroke-white ${MARK.danger}`} aria-hidden="true" />}
                   <div className="ml-[11.5px] min-w-0 flex-1">
