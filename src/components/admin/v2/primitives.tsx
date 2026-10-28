@@ -1,4 +1,4 @@
-import type { ReactNode, ButtonHTMLAttributes, AnchorHTMLAttributes } from "react";
+import type { ReactNode, ButtonHTMLAttributes, AnchorHTMLAttributes, CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Info, XCircle, ChevronRight } from "lucide-react";
 import { HEALTH_META, type HealthState, type HealthTone, type HealthVerdict, needsAttention } from "@/lib/admin/health";
@@ -231,9 +231,9 @@ export const AdminLinkButton = ({ variant = "secondary", size = "md", className,
 );
 
 /** Table shell: 12px semibold headers on the workspace tint, 12px cells, 1px row lines. */
-export const AdminTable = ({ children, className, caption, dense = false, inset = false, minWidth }: { children: ReactNode; className?: string; caption?: string; /** 7px cells for dashboard queues. */ dense?: boolean; /** Draw the table as a bordered box inside a flush card. */ inset?: boolean; /** Narrow screens scroll the table sideways instead of squeezing columns below this width. */ minWidth?: number }) => (
+export const AdminTable = ({ children, className, caption, dense = false, inset = false, minWidth }: { children: ReactNode; className?: string; caption?: string; /** 7px cells for dashboard queues. */ dense?: boolean; /** Draw the table as a bordered box inside a flush card. */ inset?: boolean; /** Below 1024px the table scrolls sideways instead of squeezing columns under this width; wider layouts keep their own column widths. */ minWidth?: number }) => (
   <ScrollRegion label={caption ?? "Table"} className={cn(inset && "mx-4 mb-4 rounded-md border border-adm-border", dense && "[&_table]:text-[11.5px] [&_table]:leading-[16px] [&_th]:py-2.5 [&_td]:py-[9px] [&_tbody_tr:last-child>td]:border-b-0", className)}>
-    <table className="w-full border-collapse text-left text-[14px] leading-[20px] text-adm-ink" style={minWidth ? { minWidth } : undefined}>
+    <table className={cn("w-full border-collapse text-left text-[14px] leading-[20px] text-adm-ink", minWidth && "max-lg:min-w-[var(--adm-table-min)]")} style={minWidth ? ({ "--adm-table-min": `${minWidth}px` } as CSSProperties) : undefined}>
       {caption && <caption className="sr-only">{caption}</caption>}
       {children}
     </table>
