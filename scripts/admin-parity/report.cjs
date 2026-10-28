@@ -22,12 +22,13 @@ function readNotes() {
 function gateLine(s) {
   if (!s.gate) return "Gate: not evaluated.";
   if (s.gate.error) return `Gate: FAIL (the screen did not render: ${s.gate.error}).`;
+  const protocol = s.frames && s.frames.protocol && s.frames.protocol.content ? s.frames.protocol.content.parityPercent : s.gate.contentParity;
   const reasons = [];
   if (s.gate.landmarks === false) reasons.push("landmarks out of tolerance");
   if (!s.gate.responsive) reasons.push("page overflow at a breakpoint");
-  if (typeof s.gate.contentParity === "number" && s.gate.contentParity < 97) reasons.push(`content parity ${s.gate.contentParity.toFixed(2)}% is below 97%`);
-  const exception = typeof s.gate.bodyParity === "number" ? ` With the title-block exception: ${s.gate.passWithTitleException ? "PASS" : `FAIL (body parity ${s.gate.bodyParity.toFixed(2)}%${s.gate.landmarks === false ? ", landmarks" : ""}${!s.gate.responsive ? ", overflow" : ""})`}.` : "";
-  return (s.gate.pass ? "Gate: PASS." : `Gate: FAIL (${reasons.join("; ")}).`) + exception;
+  if (typeof protocol !== "number") reasons.push("no protocol-frame score");
+  else if (protocol < 97) reasons.push(`protocol content parity ${protocol.toFixed(2)}% is below 97%`);
+  return reasons.length ? `Gate: FAIL (${reasons.join("; ")}). Acceptance pending; no exception has been approved.` : "Gate: PASS.";
 }
 
 function writeReport(results, outPath) {
@@ -39,8 +40,8 @@ function writeReport(results, outPath) {
   lines.push("");
   lines.push("## Method");
   lines.push("");
-  lines.push(`- Reference frame: ${results.referenceFrame.width}x${results.referenceFrame.height}, the native size of \`screens/original\`. The fixture is rendered at exactly that viewport and compared pixel for pixel, no resampling of the reference.`);
-  lines.push(`- Protocol frame: ${results.protocolFrame.width}x${results.protocolFrame.height}. The reference is resampled (bilinear) to that frame, which softens one-pixel lines, so the reference-frame row is the primary number.`);
+  lines.push(`- Reference frame: ${results.referenceFrame.width}x${results.referenceFrame.height}, the size the mocks were cropped to. Rendered and compared pixel for pixel as a diagnostic; it is not the agreed metric.`);
+  lines.push(`- Protocol frame: ${results.protocolFrame.width}x${results.protocolFrame.height}. This is the agreed comparison frame (\`docs/05_VISUAL_PARITY_97_PROTOCOL.md\`, \`contracts/PARITY_TARGETS.csv\`): the reference is resampled (bilinear) to it, captured at DPR 1 in Playwright Chromium, and its content-region parity is the number held to 97%.`);
   lines.push("- Pixel parity: a pixel differs when any channel moves by more than 32 of 255 after masks. Parity is 100 minus the differing share of compared pixels. No anti-aliasing allowance is applied.");
   lines.push("- Structure: mean SSIM over 8x8 luminance blocks after masks.");
   lines.push("- Masks: only dynamic data (counts, relative times, fixture names) listed in `scripts/admin-parity/masks.json`, read from the rendered DOM so the same boxes mask both images. Navigation, tabs, headings, card bounds, tables, buttons and chips are never masked.");
@@ -48,7 +49,7 @@ function writeReport(results, outPath) {
   lines.push("- Landmarks: hand-measured boxes from the reference (`scripts/admin-parity/landmarks.json`, tolerance 16px) compared with the rendered DOM boxes. A `yBody` landmark is measured from the section-row bottom on both sides.");
   lines.push("- Layout parity (text masked) and text-box parity: the body region split by the implementation's text boxes (every rendered line of text, padded 2px, and the content box of every form control). Layout parity scores everything outside them: fills, borders, spacing, component sizes and icons. Text-box parity scores the glyphs inside them, where Chromium's Inter and the mock renderer differ even when the box sits exactly where the mock's text sits. Mock text that falls outside every implementation text box counts against layout, so misplaced or missing copy is not hidden by the split. The layout diff image (`*-structure.png`) marks layout differences red and text-box differences amber.");
   lines.push("- Mock-only annotations: the handoff mocks print captions on the image itself (the Proposed design footer, the DESIGN CONCEPT label, a sample-policy caption, a recovery-flow caption). They are not product UI; `masks.json` covers them on both images with the reason recorded.");
-  lines.push("- Body parity (aligned): the handoff's information architecture fixes one h1, \"Administration\", with a breadcrumb above it, while the mocks title their pages four different ways (section name as title, no breadcrumb, no description, a chip above the title). That title block is a documented exception: the body score shifts the reference so both section rows end on the same pixel row and scores everything below it in the content region, with the same masks. The offset is printed with the score and the raw content score stays the protocol number.");
+  lines.push("- Body parity (aligned): the handoff's information architecture fixes one h1, \"Administration\", with a breadcrumb above it, while the mocks title their pages four different ways (section name as title, no breadcrumb, no description, a chip above the title). That title block is a proposed exception awaiting the owner, not an approved one. As a diagnostic only, the body score shifts the reference so both section rows end on the same pixel row and scores everything below it in the content region, with the same masks. The offset is printed with the score and it never replaces the protocol number.");
   lines.push("- Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.");
   lines.push("");
   lines.push(`Registered fixtures: ${results.registered && results.registered.length ? results.registered.join(", ") : "none"}.${results.skipped && results.skipped.length ? ` Requested but not registered: ${results.skipped.join(", ")}.` : ""}`);
@@ -106,9 +107,9 @@ function writeReport(results, outPath) {
   }
   lines.push("## Reading the numbers");
   lines.push("");
-  lines.push("- The 97% target in the parity protocol applies after approved dynamic masks. The content-region reference-frame parity is the number to hold to it; the full-frame number will stay lower while the product rail and header differ from the mock, which is a shell decision outside this refresh and is called out as an exception for the owner.");
+  lines.push("- The 97% target in the parity protocol applies to content-region parity at the 1600x1000 protocol frame after permitted dynamic masks. No screen meets it. The full-frame number also includes the product rail and header, which belong to the global shell; treating them separately is a proposal for the owner, not an approved exception.");
   lines.push("- A high structural score with a lower pixel parity means the composition matches and the remaining difference is typography rendering or sub-pixel offsets; a low structural score means a layout difference and needs a look at the diff image.");
-  lines.push("- A landmark out of tolerance is a hard-gate failure regardless of the computed score. A screen's gate passes only when every landmark is within tolerance, no breakpoint has page overflow, and content-region parity at the reference frame is at least 97%.");
+  lines.push("- A landmark out of tolerance is a hard-gate failure regardless of the computed score. A screen's gate passes only when every landmark is within tolerance, no breakpoint has page overflow, and content-region parity at the protocol frame is at least 97%.");
   lines.push("- Responsive: page overflow (document wider than the viewport) fails the breakpoint. A region that scrolls by design, such as the section row or a wide table inside its own scroll container, is listed under Scroll regions and does not fail it.");
   lines.push("");
   lines.push("## Reproduce");

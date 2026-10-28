@@ -387,16 +387,16 @@ export default function PriceRulesView() {
                       <div className="flex items-center gap-4">
                         <Thumb url={row.listing.heroImageUrl} />
                         <div className="min-w-0">
-                          <p className="font-semibold text-adm-ink truncate">{row.vehicle}</p>
-                          <p className="text-[12px] leading-[18px] text-adm-muted truncate">{[row.listing.trim, row.listing.stock ? `Stock ${row.listing.stock}` : null].filter(Boolean).join(" · ") || "—"}</p>
+                          <p className="font-semibold text-adm-ink truncate" data-parity="fixture-vehicle">{row.vehicle}</p>
+                          <p className="text-[12px] leading-[18px] text-adm-muted truncate" data-parity="fixture-vehicle">{[row.listing.trim, row.listing.stock ? `Stock ${row.listing.stock}` : null].filter(Boolean).join(" · ") || "—"}</p>
                         </div>
                       </div>
                     </Td>
-                    <Td className="tabular-nums">{fmtMoney(row.sellingPrice)}</Td>
+                    <Td className="tabular-nums"><span data-parity="fixture-price">{fmtMoney(row.sellingPrice)}</span></Td>
                     <Td className="tabular-nums">{fmtMoney(row.docFee)}</Td>
-                    <Td className="tabular-nums">{row.website == null ? <span className="text-adm-muted">—</span> : fmtMoney(row.website)}</Td>
-                    <Td className="tabular-nums">{fmtMoney(row.label)}</Td>
-                    <Td className="tabular-nums">{fmtMoney(row.passport)}</Td>
+                    <Td className="tabular-nums">{row.website == null ? <span className="text-adm-muted">—</span> : <span data-parity="fixture-price">{fmtMoney(row.website)}</span>}</Td>
+                    <Td className="tabular-nums"><span data-parity="fixture-price">{fmtMoney(row.label)}</span></Td>
+                    <Td className="tabular-nums"><span data-parity="fixture-price">{fmtMoney(row.passport)}</span></Td>
                     <Td>
                       <span className="inline-flex items-center gap-2 whitespace-nowrap">
                         <EvidenceMark state={row.evidence} />

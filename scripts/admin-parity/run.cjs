@@ -122,7 +122,7 @@ async function main() {
         const anchorSpec = landmarkSpec && landmarkSpec._anchor ? landmarkSpec._anchor : null;
         const cap = await captureScreen(page, { baseUrl, screen, viewport: frame, outPng, maskSpec, landmarkSpec, anchorSelector: anchorSpec ? anchorSpec.selector : null, rail });
         entry.fonts = cap.fonts;
-        const frameResult = { file: path.relative(ROOT, outPng), masks: cap.masks.length };
+        const frameResult = { file: path.relative(ROOT, outPng), masks: cap.masks.length, maskRects: cap.masks };
         if (label === "reference") {
           entry.masks = cap.masks;
           entry.anchors = anchorSpec
@@ -166,15 +166,16 @@ async function main() {
       }
       entry.responsive = await responsiveCheck(page, { baseUrl, screen, viewports: RESPONSIVE, outDir: OUT, rail });
       const r = entry.frames.reference;
+      const pr = entry.frames.protocol;
+      // The agreed metric is content-region parity at the protocol frame (1600x1000). Body and text-masked
+      // layout scores are diagnostics only and never stand in for it.
       const gate = {
         landmarks: entry.landmarks ? entry.landmarks.every((l) => l.ok) : null,
         responsive: entry.responsive.every((x) => x.ok),
-        contentParity: r && r.content ? r.content.parityPercent : null,
+        contentParity: pr && pr.content ? pr.content.parityPercent : null,
       };
-      gate.bodyParity = r && r.body ? r.body.parityPercent : null;
-      gate.pass = gate.landmarks !== false && gate.responsive && (gate.contentParity === null || gate.contentParity >= 97);
-      // The documented title-block exception: the same gate with the body score standing in for the content score.
-      gate.passWithTitleException = gate.landmarks !== false && gate.responsive && (gate.bodyParity === null ? gate.pass : gate.bodyParity >= 97);
+      gate.bodyDiagnostic = r && r.body ? r.body.parityPercent : null;
+      gate.pass = gate.landmarks !== false && gate.responsive && typeof gate.contentParity === "number" && gate.contentParity >= 97;
       entry.gate = gate;
       results.screens.push(entry);
       const split = r && r.body && r.body.nonText ? ` · layout ${r.body.nonText.parityPercent.toFixed(2)}% · text ${r.body.text.parityPercent.toFixed(2)}% (text ${r.body.text.shareOfBodyDiffPercent.toFixed(2)}% / layout ${r.body.nonText.shareOfBodyDiffPercent.toFixed(2)}% of body pixels differ)` : "";

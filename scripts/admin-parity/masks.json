@@ -125,10 +125,8 @@
         "reason": "preview vehicle photo: a per-vehicle image, like the name and prices beside it; the synthetic fixture vehicle has no photo, so a neutral 268x151 placeholder holds the reference's image box (geometry gated by the previewPhoto landmark)"
       },
       {
-        "selector": "[data-admin-v2] section",
-        "heading": "Price consistency",
-        "inner": "tbody td:nth-child(-n+6)",
-        "reason": "vehicle names, stock numbers and prices (fixture vehicles)"
+        "selector": "[data-admin-v2] [data-parity=\"fixture-vehicle\"], [data-admin-v2] [data-parity=\"fixture-price\"]",
+        "reason": "vehicle names, trims, stock numbers and per-vehicle prices (fixture vehicles); text only, so thumbnails, row geometry and the document fee column (policy data) are scored"
       },
       {
         "selector": "[data-admin-v2] section",
@@ -342,10 +340,6 @@
       {
         "selector": "[data-admin-v2] [data-parity=\"host\"]",
         "reason": "fixture provider domain"
-      },
-      {
-        "selector": "[data-admin-v2] [data-parity=\"evidence\"]",
-        "reason": "technical evidence payload (run id, timestamps, domain)"
       }
     ],
     "rects": [
