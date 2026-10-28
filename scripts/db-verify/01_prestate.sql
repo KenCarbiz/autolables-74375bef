@@ -551,6 +551,83 @@ $function$
 REVOKE ALL ON FUNCTION public.recalc_tenant_doc_fee(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.recalc_tenant_doc_fee(uuid) TO authenticated, service_role;
 
+-- Audit hash chain and the leads tenant trigger, verbatim from the hosted
+-- project (read 2026-10-28). Every audit insert in the cases runs through the
+-- chain trigger, as it does there.
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+CREATE OR REPLACE FUNCTION public._audit_chain_payload(_prev_hash text, _action text, _entity_type text, _entity_id text, _store_id text, _user_email text, _details jsonb, _created_at timestamp with time zone)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT encode(
+    extensions.digest(
+      coalesce(_prev_hash, 'GENESIS') || '|'
+        || coalesce(_action, '') || '|'
+        || coalesce(_entity_type, '') || '|'
+        || coalesce(_entity_id, '') || '|'
+        || coalesce(_store_id, '') || '|'
+        || coalesce(_user_email, '') || '|'
+        || coalesce(_details::text, '{}') || '|'
+        || to_char(_created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+      'sha256'
+    ),
+    'hex'
+  );
+$function$
+;
+CREATE OR REPLACE FUNCTION public._audit_chain_before_insert()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  _prev TEXT;
+BEGIN
+  SELECT row_hash INTO _prev
+  FROM public.audit_log
+  WHERE coalesce(store_id, '') = coalesce(NEW.store_id, '')
+  ORDER BY created_at DESC, id DESC
+  LIMIT 1
+  FOR UPDATE;
+
+  NEW.prev_hash := _prev;
+  NEW.created_at := coalesce(NEW.created_at, now());
+  NEW.row_hash := public._audit_chain_payload(
+    _prev,
+    NEW.action,
+    NEW.entity_type,
+    NEW.entity_id,
+    NEW.store_id,
+    NEW.user_email,
+    NEW.details,
+    NEW.created_at
+  );
+  RETURN NEW;
+END;
+$function$
+;
+CREATE TRIGGER audit_log_chain_before_insert BEFORE INSERT ON public.audit_log FOR EACH ROW EXECUTE FUNCTION _audit_chain_before_insert();
+CREATE OR REPLACE FUNCTION public.set_tenant_id_leads()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NEW.tenant_id IS NULL THEN
+    NEW.tenant_id := public.current_tenant_id();
+  END IF;
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$function$
+;
+CREATE TRIGGER set_tenant_id_leads BEFORE INSERT OR UPDATE ON public.leads FOR EACH ROW EXECUTE FUNCTION set_tenant_id_leads();
+
 -- Table privileges as the hosted snapshot showed them before migration 2.
 GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated, service_role;
 GRANT ALL ON public.dealer_profiles, public.vehicle_listings TO anon;
