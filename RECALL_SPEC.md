@@ -85,8 +85,9 @@ The documented current path is `/v2/car/autorecalls/{vin}`
 (`/v2/recall/car/{vin}` on two hosts, `/v2/recall/car?vin=`,
 `/v2/recalls/car/{vin}`), which answers 404 or empty on this account, so
 every VIN is honestly `UNKNOWN` today (91 active vehicles carry an
-attempted, unanswered record; the enrich cursor re-asks each one every 30
-days). The flag `autorecalls_vin` (declared OFF, no reader yet) switches the
+attempted, unanswered record; the enrich cursor re-asks each one 30 days
+after its last sweep visit, since a call the policy engine skips leaves no
+attempt record). The flag `autorecalls_vin` (declared OFF, no reader yet) switches the
 callers to the current path once one authorized call has shown the product
 is entitled; until then the registry carries the legacy family as
 DEPRECATED_REPLACED.

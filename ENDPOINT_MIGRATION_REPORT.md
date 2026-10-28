@@ -38,6 +38,10 @@ the OpenAPI 3.1 document is vendored into `contracts/marketcheck/`.
 - `supabase/migrations/20261027203000_enrich_batch_recall_retry_window.sql`:
   unanswered VIN recall re-asked every 30 days, not daily (applied
   2026-10-27, 92 vehicles offered a day before, 1 after).
+- `supabase/migrations/20261028000000_enrich_batch_recall_retry_on_visit.sql`:
+  the 30-day window counted from the vehicle's last sweep visit, not from the
+  recall attempt stamp that a policy-skipped call never writes (applied
+  2026-10-28; 0 offered on the recall clause today under either clock).
 - `supabase/migrations/20261027204000_pause_enrich_sweep_nightly.sql`: the
   nightly sweep cron job paused until the plan quota is settled (applied
   2026-10-27).

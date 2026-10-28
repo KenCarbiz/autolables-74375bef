@@ -167,6 +167,19 @@ Performed, with authorization, 2026-10-27:
   after (91 were on the recall clause alone). Signature now four
   parameters; ledger row written. Reversible: re-applying 20261027200000
   restores the daily clause.
+- `20261028000000_enrich_batch_recall_retry_on_visit.sql` applied 2026-10-28
+  at about 00:35Z: the recall retry window now counts from the vehicle's last
+  sweep visit (`enriched_at`) instead of from `recall_check.attempted_at`,
+  and the never-attempted branch is gone. Reason: the provider policy engine
+  deployed after 20261027203000 skips the AutoRecalls call on every visit
+  while the product is entitlement-blocked, and a skipped call writes no
+  attempt record, so the attempt stamp would never move; from about Nov 26
+  the 91 unanswered vehicles would have been offered daily again, and every
+  newly synced vehicle daily from its first sweep. Measured at apply time:
+  131 active, 91 unanswered (all attempted 2026-10-27, none never-attempted),
+  0 offered on the recall clause under either clause today, 1 offered in all
+  (the build-sheet clause). Signature unchanged; ledger row written.
+  Reversible: re-applying 20261027203000 restores the attempt-stamp clock.
 - `20261027204000_pause_enrich_sweep_nightly.sql` applied in the same
   window: the cron job `enrich-sweep-nightly` (03:15 UTC) set inactive;
   `marketcheck-sync` (hourly, the feed) left active. The 08:00 UTC kick
@@ -223,8 +236,8 @@ low-authority (existing precedence tests); 429 never becomes a scope
 mismatch, NOT_FOUND, CLEAN or zero (pinned feed classifier); NeoVIN is cached,
 not repurchased (`shouldDecodeVin`, existing); New and Used cadence rules
 remain separate (registry policy tests); every new flag is declared and inert;
-the cursor's recall retry window and its signature change are held by the
-migration-text test.
+the cursor's recall retry window, its signature change and its visit-clock
+amendment are held by the migration-text test.
 
 ## 11. Provider contract read from the MarketCheck MCP schemas (2026-10-27)
 

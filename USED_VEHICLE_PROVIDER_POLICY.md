@@ -20,7 +20,7 @@ starting policy against the provider registry
 | `recents` | supporting evidence | monthly | 30 d | listing-level; medians only leave the function |
 | `sold_summary` | routine once entitled | monthly | 30 d | 3- and 6-month direction; inferred-sold semantics stored with the cohort |
 | `vindata_access` then `vindata_generate` | pre-publication, exception-based (owner spend decision) | before a strong public title claim; freshness rule | provider's 90 d | access before generate; session-only by terms; 50 generates per dealer per month |
-| `autorecalls` | routine once entitled | intake, periodic, pre-sale | 30 d | VIN scope; UNKNOWN is honest until it answers; the enrich cursor re-asks an unanswered VIN only on this window (`p_recall_retry_days`) |
+| `autorecalls` | routine once entitled | intake, periodic, pre-sale | 30 d | VIN scope; UNKNOWN is honest until it answers; the enrich cursor re-asks an unanswered VIN only on this window (`p_recall_retry_days`, counted from the vehicle's last sweep visit) |
 | `blackbook_used_vin` | when configured | intake, 7 d | 7 d | not a live signal until rows populate |
 | `cached_images` | passive | never requested | n/a | |
 | `fsbo`, `auction`, `marketmatch`, `marketmatch_dealers` | never | - | - | AutoCurb-reserved |

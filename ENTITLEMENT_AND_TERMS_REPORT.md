@@ -27,7 +27,8 @@ The refusal cluster (syndication, history, recents/sales) starts the day the
 quota is exhausted and ends on the 1st. On the current plan the feed answers
 again on Nov 1 and stays live only as long as the enrich sweep does not
 spend the quota first. The sweep was contained the same evening: cursor
-amended (`20261027203000`, 92 vehicles a day offered before, 1 after) and
+amended (`20261027203000`, 92 vehicles a day offered before, 1 after;
+`20261028000000` keeps the window on the visit clock) and
 the nightly job paused (`20261027204000`); see
 PROVIDER_COST_AND_CACHE_REPORT.md §2.
 

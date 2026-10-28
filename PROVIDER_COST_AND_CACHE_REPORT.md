@@ -65,6 +65,14 @@ action needed when the product is entitled. The nightly sweep job was also
 paused (`20261027204000`) until the quota is settled, so the sweep spends
 nothing until it is un-paused.
 
+`20261028000000_enrich_batch_recall_retry_on_visit.sql` (applied 2026-10-28)
+keeps that figure true under the provider policy engine: the 30-day window
+is now counted from the vehicle's last sweep visit rather than from the
+recall attempt stamp, which a policy-skipped call never writes. Without it
+the 91 unanswered vehicles would have returned to the daily offer from about
+Nov 26, and each newly synced vehicle would have been offered daily from its
+first sweep.
+
 Under the registry defaults (USED_VEHICLE_PROVIDER_POLICY.md,
 NEW_VEHICLE_PROVIDER_POLICY.md) the recurring cost of a used vehicle is about
 $0.09 a week and a new vehicle about $0.02 a week (daily price-integrity

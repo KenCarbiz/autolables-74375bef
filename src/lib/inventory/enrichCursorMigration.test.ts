@@ -11,7 +11,8 @@ const read = (name: string) => readFileSync(`supabase/migrations/${name}`, "utf8
 const bodyOf = (sql: string) => sql.slice(sql.indexOf("AS $function$"), sql.indexOf("$function$;"));
 
 const V1 = read("20261027200000_enrich_batch_once_per_day_active_only.sql");
-const SQL = read("20261027203000_enrich_batch_recall_retry_window.sql");
+const V2 = read("20261027203000_enrich_batch_recall_retry_window.sql");
+const SQL = read("20261028000000_enrich_batch_recall_retry_on_visit.sql");
 const body = bodyOf(SQL);
 
 describe("next_enrich_batch cursor", () => {
@@ -36,15 +37,22 @@ describe("next_enrich_batch cursor", () => {
     expect(body).toMatch(/NOT \(coalesce\(vl\.mc_attributes, '\{\}'::jsonb\) \? 'build_sheet'\)/);
   });
 
-  it("reaches a VIN whose recall has never been attempted", () => {
-    expect(body).toMatch(/vl\.recall_status IS NULL\s+AND \(\s+vl\.recall_check IS NULL/);
-    expect(body).toMatch(/\(vl\.recall_check->>'attempted_at'\) IS NULL/);
+  it("reaches a VIN with no recall answer that has never been visited", () => {
+    expect(body).toMatch(/vl\.recall_status IS NULL\s+AND \(\s+vl\.enriched_at IS NULL\s+OR vl\.enriched_at < now\(\) - make_interval\(days/);
   });
 
-  it("re-asks an attempted, unanswered recall only after the retry window", () => {
+  it("does not key the recall retry on the attempt record, which a skipped call never writes", () => {
+    expect(body).not.toMatch(/recall_check/);
+  });
+
+  it("re-asks an unanswered recall only when the last visit is older than the retry window", () => {
+    // The visit stamp, not the recall attempt stamp: the policy engine skips
+    // the recall call while the product is entitlement-blocked, so the attempt
+    // stamp would never move and the daily re-offer would return after 30 days.
     expect(body).toMatch(
-      /\(vl\.recall_check->>'attempted_at'\)::timestamptz\s+< now\(\) - make_interval\(days => greatest\(coalesce\(p_recall_retry_days, 30\), 1\)\)/,
+      /vl\.enriched_at < now\(\) - make_interval\(days => greatest\(coalesce\(p_recall_retry_days, 30\), 1\)\)/,
     );
+    expect(body).not.toMatch(/attempted_at/);
     const recallClause = body.slice(body.indexOf("vl.recall_status IS NULL"), body.indexOf("OR vl.comparables IS NULL"));
     expect(recallClause).not.toMatch(/recall_status IS NULL\s*\n\s*OR/);
   });
@@ -58,7 +66,10 @@ describe("next_enrich_batch cursor", () => {
   it("defaults both windows so the existing two-argument callers keep working", () => {
     expect(SQL).toMatch(/p_min_age_hours integer DEFAULT 20/);
     expect(SQL).toMatch(/p_recall_retry_days integer DEFAULT 30/);
-    expect(SQL).toMatch(/DROP FUNCTION IF EXISTS public\.next_enrich_batch\(timestamp with time zone, integer, integer\)/);
+    // The four-parameter signature arrived in 20261027203000, which dropped the
+    // three-parameter one; the visit-clock amendment keeps that signature.
+    expect(V2).toMatch(/DROP FUNCTION IF EXISTS public\.next_enrich_batch\(timestamp with time zone, integer, integer\)/);
+    expect(SQL).not.toMatch(/DROP FUNCTION/);
   });
 
   it("supersedes the first cursor migration without changing its other rules", () => {
