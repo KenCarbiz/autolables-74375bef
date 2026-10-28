@@ -439,13 +439,15 @@ export default function RoutingView() {
               {DAY_NAMES.map((dName, day) => {
                 const block = cfg.businessHours.find((b) => b.dayOfWeek === day);
                 return (
-                  <div key={day} className="flex items-center gap-2">
+                  <div key={day} className="flex flex-wrap items-center gap-2">
                     <label className="w-16 flex items-center gap-1.5 text-[13px] font-semibold text-adm-ink cursor-pointer">
                       <input type="checkbox" checked={!!block} disabled={ro} onChange={(e) => setHours(day, "enabled", e.target.checked)} className="w-4 h-4 accent-[#2457D6]" /> {dName}
                     </label>
-                    <input type="time" aria-label={`${dName} opens`} value={block?.startTime || "09:00"} disabled={ro || !block} onChange={(e) => setHours(day, "startTime", e.target.value)} className="h-9 px-2 rounded-[6px] border border-adm-border bg-adm-surface text-[13px] disabled:opacity-40" />
-                    <span className="text-adm-muted text-[13px]">to</span>
-                    <input type="time" aria-label={`${dName} closes`} value={block?.endTime || "19:00"} disabled={ro || !block} onChange={(e) => setHours(day, "endTime", e.target.value)} className="h-9 px-2 rounded-[6px] border border-adm-border bg-adm-surface text-[13px] disabled:opacity-40" />
+                    <span className="flex min-w-0 items-center gap-2 max-sm:gap-1.5">
+                      <input type="time" aria-label={`${dName} opens`} value={block?.startTime || "09:00"} disabled={ro || !block} onChange={(e) => setHours(day, "startTime", e.target.value)} className="h-9 w-[110px] min-w-0 px-2 max-sm:px-1.5 rounded-[6px] border border-adm-border bg-adm-surface text-[13px] disabled:opacity-40" />
+                      <span className="text-adm-muted text-[13px]">to</span>
+                      <input type="time" aria-label={`${dName} closes`} value={block?.endTime || "19:00"} disabled={ro || !block} onChange={(e) => setHours(day, "endTime", e.target.value)} className="h-9 w-[110px] min-w-0 px-2 max-sm:px-1.5 rounded-[6px] border border-adm-border bg-adm-surface text-[13px] disabled:opacity-40" />
+                    </span>
                   </div>
                 );
               })}

@@ -126,47 +126,100 @@ const MATRIX_ROW_ICONS: Record<string, typeof Users> = {
 
 const MATRIX_HEAD = "px-[14px] py-[9px] text-[13px] leading-[18px] text-adm-ink";
 
-// The scroll wrapper is positioned so the cells' screen-reader text stays inside it on narrow
-// screens, where the table keeps a 640px width and scrolls inside its box.
-export const CapabilityMatrixTable = ({ matrix }: { matrix: CapabilityMatrix }) => (
-  <AdminTable caption="Role capabilities by task" inset className="relative mx-5 mb-[15px] rounded-lg [&_table]:min-w-[640px]">
-    <thead>
-      <tr>
-        <Th className={MATRIX_HEAD}>Capability</Th>
-        <Th className={cn(MATRIX_HEAD, "text-center w-[120px]")}>Read</Th>
-        <Th className={cn(MATRIX_HEAD, "text-center w-[120px]")}>Create or act</Th>
-        <Th className={cn(MATRIX_HEAD, "text-center w-[118px]")}>Manage</Th>
-      </tr>
-    </thead>
-    <tbody>
-      {matrix.map((g) => (
-        <Fragment key={g.group}>
-          <tr>
-            <td colSpan={4} className="px-[14px] py-[7px] border-b border-adm-border bg-adm-workspace text-[14px] leading-[18px] font-semibold text-adm-ink">{g.group}</td>
-          </tr>
+const CARD_LEVELS = [
+  { key: "read", label: "Read" },
+  { key: "act", label: "Create or act" },
+  { key: "manage", label: "Manage" },
+] as const;
+
+// Below md the matrix becomes one card per capability with the three levels labelled,
+// so a phone shows every permission without scrolling a 640px table sideways.
+const CapabilityCards = ({ matrix }: { matrix: CapabilityMatrix }) => (
+  <div className="md:hidden mx-5 mb-[15px] space-y-4" aria-label="Role capabilities by task" role="group">
+    {matrix.map((g) => (
+      <div key={g.group}>
+        <p id={`capability-group-${g.group.replace(/\W+/g, "-").toLowerCase()}`} className="text-[14px] leading-[18px] font-semibold text-adm-ink">{g.group}</p>
+        <ul aria-labelledby={`capability-group-${g.group.replace(/\W+/g, "-").toLowerCase()}`} className="mt-2 space-y-2">
           {g.rows.map((r) => {
             const Icon = MATRIX_ROW_ICONS[r.id] ?? FileText;
             return (
-              <tr key={r.id}>
-                <Td className="pt-[10px] pb-[10px] pl-[12px]">
-                  <span className="flex items-center gap-[21px]">
-                    <Icon className={ROW_ICON} aria-hidden="true" />
-                    <span className="min-w-0">
-                      <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{r.label}</span>
-                      <span className="block text-[13px] leading-[18px] text-adm-muted">{r.detail}</span>
-                    </span>
-                  </span>
-                </Td>
-                <Td className="py-[9px] text-center"><Mark on={r.read} label={`${r.label} read`} /></Td>
-                <Td className="py-[9px] text-center"><Mark on={r.act} label={`${r.label} create or act`} /></Td>
-                <Td className="py-[9px] text-center"><Mark on={r.manage} label={`${r.label} manage`} /></Td>
-              </tr>
+              <li key={r.id} className="rounded-lg border border-adm-border px-3 pt-3 pb-2">
+                <div className="flex items-start gap-3">
+                  <Icon className={cn(ROW_ICON, "mt-[1px]")} aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.label}</p>
+                    <p className="text-[13px] leading-[18px] text-adm-muted">{r.detail}</p>
+                  </div>
+                </div>
+                <dl className="mt-2 divide-y divide-adm-border border-t border-adm-border">
+                  {CARD_LEVELS.map((l) => {
+                    const on = r[l.key];
+                    return (
+                      <div key={l.key} className="flex items-center justify-between gap-3 py-1.5">
+                        <dt className="text-[13px] leading-[18px] text-adm-ink">{l.label}</dt>
+                        <dd className={cn("inline-flex items-center gap-2 text-[13px] leading-[18px] font-semibold", on ? "text-adm-success" : "text-adm-danger")}>
+                          <span aria-hidden="true" className={cn("inline-flex w-8 h-8 items-center justify-center rounded-md", on ? "bg-adm-success-bg" : "bg-adm-danger-bg")}>
+                            {on ? <Check className={MARK_GLYPH} /> : <X className={MARK_GLYPH} />}
+                          </span>
+                          {on ? "Allowed" : "Not allowed"}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </li>
             );
           })}
-        </Fragment>
-      ))}
-    </tbody>
-  </AdminTable>
+        </ul>
+      </div>
+    ))}
+  </div>
+);
+
+// The scroll wrapper is positioned so the cells' screen-reader text stays inside it,
+// where the table keeps a 640px width and scrolls inside its box.
+export const CapabilityMatrixTable = ({ matrix }: { matrix: CapabilityMatrix }) => (
+  <>
+    <CapabilityCards matrix={matrix} />
+    <AdminTable caption="Role capabilities by task" inset className="relative mx-5 mb-[15px] rounded-lg [&_table]:min-w-[640px] max-md:hidden">
+      <thead>
+        <tr>
+          <Th className={MATRIX_HEAD}>Capability</Th>
+          <Th className={cn(MATRIX_HEAD, "text-center w-[120px]")}>Read</Th>
+          <Th className={cn(MATRIX_HEAD, "text-center w-[120px]")}>Create or act</Th>
+          <Th className={cn(MATRIX_HEAD, "text-center w-[118px]")}>Manage</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {matrix.map((g) => (
+          <Fragment key={g.group}>
+            <tr>
+              <td colSpan={4} className="px-[14px] py-[7px] border-b border-adm-border bg-adm-workspace text-[14px] leading-[18px] font-semibold text-adm-ink">{g.group}</td>
+            </tr>
+            {g.rows.map((r) => {
+              const Icon = MATRIX_ROW_ICONS[r.id] ?? FileText;
+              return (
+                <tr key={r.id}>
+                  <Td className="pt-[10px] pb-[10px] pl-[12px]">
+                    <span className="flex items-center gap-[21px]">
+                      <Icon className={ROW_ICON} aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{r.label}</span>
+                        <span className="block text-[13px] leading-[18px] text-adm-muted">{r.detail}</span>
+                      </span>
+                    </span>
+                  </Td>
+                  <Td className="py-[9px] text-center"><Mark on={r.read} label={`${r.label} read`} /></Td>
+                  <Td className="py-[9px] text-center"><Mark on={r.act} label={`${r.label} create or act`} /></Td>
+                  <Td className="py-[9px] text-center"><Mark on={r.manage} label={`${r.label} manage`} /></Td>
+                </tr>
+              );
+            })}
+          </Fragment>
+        ))}
+      </tbody>
+    </AdminTable>
+  </>
 );
 
 const POINT_ICONS: Record<EnforcementPoint, typeof Monitor> = { interface: Monitor, direct_url: Link, api: Code, database: Database };

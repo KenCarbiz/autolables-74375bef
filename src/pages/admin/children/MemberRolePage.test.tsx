@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AdminFixtureProvider } from "@/lib/admin/dataSource";
@@ -52,9 +52,10 @@ describe("MemberRolePage", () => {
     expect(screen.getByText("Policy draft")).toBeTruthy();
     expect(screen.getByText("Define the work this employee can perform.")).toBeTruthy();
     expect(screen.getByText("Back to Roles")).toBeTruthy();
-    expect(screen.getByText("Assigned customers")).toBeTruthy();
-    expect(screen.getByText("Vehicle Passport share")).toBeTruthy();
-    expect(screen.getByText("Publishing policy")).toBeTruthy();
+    const table = screen.getByRole("table", { name: "Role capabilities by task" });
+    expect(within(table).getByText("Assigned customers")).toBeTruthy();
+    expect(within(table).getByText("Vehicle Passport share")).toBeTruthy();
+    expect(within(table).getByText("Publishing policy")).toBeTruthy();
     expect(screen.getAllByText("Must match role policy")).toHaveLength(4);
     expect(screen.queryByText("Verified")).toBeNull();
     expect(screen.getByText("Test role access")).toBeTruthy();
@@ -70,6 +71,17 @@ describe("MemberRolePage", () => {
     expect(screen.getByText("Assigned customers manage: not allowed")).toBeTruthy();
     expect(screen.getByText("Price rules read: not allowed")).toBeTruthy();
     expect(screen.getByText("Publishing policy manage: not allowed")).toBeTruthy();
+  });
+
+  it("shows every permission value as labelled capability cards for narrow screens", () => {
+    renderPage("/admin/design-fixture/04", true);
+    const cards = screen.getByRole("group", { name: "Role capabilities by task" });
+    const customers = within(cards).getByText("Assigned customers").closest("li") as HTMLElement;
+    const values = within(customers).getAllByRole("definition").map((d) => d.textContent);
+    expect(within(customers).getAllByRole("term").map((t) => t.textContent)).toEqual(["Read", "Create or act", "Manage"]);
+    expect(values).toEqual(["Allowed", "Allowed", "Not allowed"]);
+    const prices = within(cards).getByText("Price rules").closest("li") as HTMLElement;
+    expect(within(prices).getAllByRole("definition").map((d) => d.textContent)).toEqual(["Not allowed", "Not allowed", "Not allowed"]);
   });
 
   it("opens the role preview as labelled test data without granting anything", () => {

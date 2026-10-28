@@ -31,6 +31,7 @@ import {
 } from "@/lib/admin/pricing/productApplicability";
 import { fmtMoney } from "@/lib/admin/pricing/feePolicy";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
+import { ScrollRegion } from "@/components/admin/v2/ScrollRegion";
 import { AdminButton, AdminCard, AdminLinkButton, AdminTable, InlineNote, SkeletonBlock, StatusChip, Td, Th, type Tone } from "@/components/admin/v2/primitives";
 import { tenantIdOf, useInstallProofCounts, useProduct, useSampleVehicles, type AdminProduct } from "@/pages/admin/views/pricing/pricingData";
 import { AdminInput, AdminSelect, CheckRow } from "@/pages/admin/views/pricing/ui";
@@ -274,7 +275,8 @@ export default function ProductApplicabilityPage() {
       backHref={adminTabHref("applicability")}
       backLabel="Back to applicability"
       tabs={
-        <nav aria-label="Product views" className="border-b border-adm-border overflow-x-auto">
+        <nav aria-label="Product views" className="border-b border-adm-border">
+          <ScrollRegion label="Product views" revealSelector='[aria-current="page"]'>
           <ul className="flex items-stretch gap-4 min-w-max">
             {tabs.map((t) => (
               <li key={t.id}>
@@ -288,6 +290,7 @@ export default function ProductApplicabilityPage() {
               </li>
             ))}
           </ul>
+          </ScrollRegion>
         </nav>
       }
     >
@@ -402,13 +405,15 @@ export default function ProductApplicabilityPage() {
                 {checklist.map((item) => {
                   const Icon = EVIDENCE_ICON[item.key];
                   return (
-                    <li key={item.key} className="flex items-center gap-5 pl-4 pr-3 pt-[9px] pb-[14px] min-h-[63px]">
+                    <li key={item.key} className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-x-5 gap-y-2 pl-4 pr-3 pt-[9px] pb-[14px] min-h-[63px]">
                       <Icon className="w-8 h-8 text-adm-muted flex-shrink-0" strokeWidth={1.5} aria-hidden="true" />
                       <div className="min-w-0 flex-1">
                         <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{item.label}</p>
                         <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{item.detail}</p>
                       </div>
-                      <StatusChip tone={EVIDENCE_TONE[item.state]} className={CHIP_CLASS}>{EVIDENCE_STATE_LABEL[item.state]}</StatusChip>
+                      <div className="flex flex-shrink-0 basis-full pl-[52px] sm:basis-auto sm:pl-0">
+                        <StatusChip tone={EVIDENCE_TONE[item.state]} className={CHIP_CLASS}>{EVIDENCE_STATE_LABEL[item.state]}</StatusChip>
+                      </div>
                     </li>
                   );
                 })}
@@ -424,7 +429,7 @@ export default function ProductApplicabilityPage() {
                 <p className="text-[13px] text-adm-muted">No active vehicles to sample yet.</p>
               ) : (
                 <div className="rounded-[8px] border border-adm-border overflow-hidden" data-landmark="sample-results">
-                  <AdminTable caption="Sample vehicle results" className="[&_th]:px-4 [&_td]:px-4 [&_th]:py-[10px] [&_th]:text-[13px] [&_th]:text-adm-ink [&_td]:py-[7px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0">
+                  <AdminTable caption="Sample vehicle results" minWidth={560} className="[&_th]:px-4 [&_td]:px-4 [&_th]:py-[10px] [&_th]:text-[13px] [&_th]:text-adm-ink [&_td]:py-[7px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0">
                     <thead>
                       <tr>
                         <Th className="w-[164px]">Vehicle</Th>
@@ -456,7 +461,7 @@ export default function ProductApplicabilityPage() {
         {reviewing && (
           <AdminCard title="Review changes" description="These changes apply to every addendum built after they are saved.">
             <div className="rounded-[10px] border border-adm-border overflow-hidden">
-              <AdminTable caption="Changes to apply">
+              <AdminTable caption="Changes to apply" minWidth={420}>
                 <thead>
                   <tr>
                     <Th>Field</Th>
