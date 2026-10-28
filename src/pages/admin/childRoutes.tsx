@@ -11,7 +11,7 @@ export interface AdminChildRoute {
 const lazyElement = (loader: () => Promise<{ default: React.ComponentType }>): ReactElement => createElement(lazy(loader));
 
 export const ADMIN_CHILD_ROUTE_ELEMENTS: AdminChildRoute[] = [
-  // { path: "/admin/people/:memberId", element: lazyElement(() => import("./children/MemberRolePage")) },
+  { path: "/admin/people/:memberId", element: lazyElement(() => import("./children/MemberRolePage")) },
 ];
 
 export { lazyElement };

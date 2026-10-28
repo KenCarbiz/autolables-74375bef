@@ -6,4 +6,8 @@ import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 
 export const ADMIN_VIEWS: Readonly<Record<string, LazyExoticComponent<ComponentType<Record<string, never>>>>> = {
   overview: lazy(() => import("./views/OverviewView")),
+  team: lazy(() => import("./views/people/TeamView")),
+  roles: lazy(() => import("./views/people/RolesView")),
+  invitations: lazy(() => import("./views/people/InvitationsView")),
+  "access-activity": lazy(() => import("./views/people/AccessActivityView")),
 };

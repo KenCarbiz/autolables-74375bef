@@ -1,4 +1,5 @@
 import type { AdminFixture } from "@/lib/admin/dataSource";
+import { FIXTURE_03, FIXTURE_04 } from "./people";
 
 // Design fixtures for the parity harness. Each entry renders one reference
 // screen with synthetic data under /admin/design-fixture/:screen, a route that
@@ -12,4 +13,7 @@ export interface AdminScreenFixture {
   fixture: AdminFixture;
 }
 
-export const ADMIN_FIXTURES: Record<string, AdminScreenFixture> = {};
+export const ADMIN_FIXTURES: Record<string, AdminScreenFixture> = {
+  "03": { tabId: "team", fixture: FIXTURE_03 },
+  "04": { childPath: "/admin/people/:memberId", fixture: FIXTURE_04 },
+};
