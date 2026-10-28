@@ -171,9 +171,10 @@ Performed, with authorization, 2026-10-27:
   at about 00:35Z: the recall retry window now counts from the vehicle's last
   sweep visit (`enriched_at`) instead of from `recall_check.attempted_at`,
   and the never-attempted branch is gone. Reason: the provider policy engine
-  deployed after 20261027203000 skips the AutoRecalls call on every visit
-  while the product is entitlement-blocked, and a skipped call writes no
-  attempt record, so the attempt stamp would never move; from about Nov 26
+  merged after 20261027203000 (on `main`; its `vehicle-enrich` deploy is
+  pending) skips the AutoRecalls call on every visit while the product is
+  entitlement-blocked, and a skipped call writes no attempt record, so once
+  it is live the attempt stamp would never move; from about Nov 26
   the 91 unanswered vehicles would have been offered daily again, and every
   newly synced vehicle daily from its first sweep. Measured at apply time:
   131 active, 91 unanswered (all attempted 2026-10-27, none never-attempted),
@@ -301,3 +302,36 @@ them as separate paths; the sold-summary path is spelled two ways by the
 server itself. Updating
 the registry entries, the capability matrix paths and the edge mirror is the
 next tranche; nothing here changes a request the code sends today.
+
+## 12. Vehicle Intelligence build merged to `main` (2026-10-28)
+
+Merged, tested and typechecked on `main`; none of it is deployed or shown to
+a customer (every §38 flag defaults off and the Passport at `/v/:slug` is
+unchanged):
+
+- Shared contracts: `src/lib/intelligence/contracts.ts`.
+- Market Value V3 and valuation confidence: `marketValueV3.ts`,
+  MARKET_VALUE_V3_SPEC.md.
+- Vehicle Score and Data Confidence: `vehicleScore.ts`, `dataConfidence.ts`,
+  VEHICLE_SCORE_AND_CONFIDENCE_SPEC.md.
+- Deal Rating and Buyer Recommendation: `dealRating.ts`,
+  `buyerRecommendation.ts`, DEAL_RATING_AND_RECOMMENDATION_SPEC.md.
+- Title and odometer, recall classifiers: `titleOdometer.ts`,
+  `recallContract.ts`, TITLE_ODOMETER_NMVTIS_SPEC.md, RECALL_SPEC.md.
+- Passport read models: `readModels/listingFacts.ts`, `usedPassport.ts`,
+  `newPassport.ts`, PASSPORT_2_SERVER_CONTRACTS.md,
+  VEHICLE_INTELLIGENCE_DATA_FLOW.md.
+- AutoCurb handoff contract: `autocurbContract.ts`,
+  AUTOCURB_HANDOFF_CONTRACT.md, with ROLLOUT_AND_ROLLBACK.md, TEST_REPORT.md
+  and PRODUCTION_DATA_HEALTH_REPORT.md.
+- Provider registry contract sources and the provider policy engine:
+  `src/lib/market/providerRegistry.ts`, `providerPolicy.ts`, mirrored under
+  `supabase/functions/_shared/`, consulted by `vehicle-enrich` before each
+  paid call.
+
+Still open from the build: deploy `vehicle-enrich` from `main` so the policy
+engine governs the sweep before it is un-paused (one deploy, on the owner's
+word); the contract additions the read models asked for (remaining warranty
+coverage, recall attempt time, fee-basis reasons) and a server route that
+serves the read models; the canary report (gate item 28); the Passport 2.0
+UI, which waits on the gate.

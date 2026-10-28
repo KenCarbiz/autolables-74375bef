@@ -2,11 +2,12 @@
 --
 -- 20261027203000 re-asked an unanswered VIN recall only after
 -- p_recall_retry_days, measured from recall_check.attempted_at. That stamp is
--- written by the recall call itself. The provider policy engine (deployed
--- after it) skips that call on every visit while the AutoRecalls product is
--- entitlement-blocked, so the stamp stops moving, and thirty days after the
--- last real attempt every unanswered vehicle would be offered to the sweep
--- again every day, the pattern the cursor exists to stop.
+-- written by the recall call itself. The provider policy engine (merged
+-- after it, deployed separately) skips that call on every visit while the
+-- AutoRecalls product is entitlement-blocked, so once it is live the stamp
+-- stops moving, and thirty days after the last real attempt every
+-- unanswered vehicle would be offered to the sweep again every day, the
+-- pattern the cursor exists to stop.
 --
 -- The retry clock is now the vehicle's last visit, enriched_at, which the
 -- sweep stamps on every visit whatever the outcome. A visit that was allowed

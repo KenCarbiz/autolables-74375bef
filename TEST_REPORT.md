@@ -1,7 +1,7 @@
 # TEST_REPORT
 
 Master build section 39. State of the automated suite on 2026-10-28 (UTC),
-run from the Vehicle Intelligence build branch at the shared contracts base.
+run from `main` after the eight build streams and the cursor amendment merged.
 Every fixture in the suite is synthetic; no production VIN, price, slug or
 tenant appears in a test.
 
@@ -9,11 +9,12 @@ tenant appears in a test.
 
 | Run | Files | Tests | Result |
 |---|---|---|---|
-| Full suite (`bun run test`) at the contracts base | 358 | 6377 (1 skipped) | 2 failed, 6374 passed |
-| Handoff contract and shared contracts (`bunx vitest run src/lib/intelligence`) | 2 | 14 | 14 passed |
+| Full suite (`bun run test`) on `main` at the merge | 371 | 6571 (1 skipped) | 2 failed, 6568 passed |
+| Vehicle Intelligence modules (`bunx vitest run src/lib/intelligence`) | 15 | 175 | 175 passed |
 | Typecheck (`bunx tsc -p tsconfig.app.json --noEmit`) | | | clean |
 
-Combined: 359 files, 6384 tests, the same two pre-existing failures.
+The intelligence run is a subset of the full suite. The same two
+pre-existing failures remain and nothing else fails.
 
 ## 2. The two pre-existing failures
 
@@ -54,12 +55,12 @@ before writing a new one.
 | Edge mirror in sync with the client registry | `edgeLibSync.test.ts` | covered |
 | Shared Vehicle Intelligence contracts | `contracts.test.ts` | covered |
 | AutoCurb handoff contract | `autocurbContract.test.ts` | covered, 7 tests |
-| Market Value V3 and valuation confidence | stream A | in progress |
-| Vehicle Score and Data Confidence | stream B | in progress |
-| Deal Rating and Buyer Recommendation hard gates | stream C | in progress |
-| Title and odometer classifier, recall classifier | stream D | in progress |
-| Passport read models (new, used) | stream E | in progress |
-| Provider policy and TTL engine | stream G | in progress |
+| Market Value V3 and valuation confidence | `marketValueV3.test.ts` | covered |
+| Vehicle Score and Data Confidence | `vehicleScore.test.ts`, `dataConfidence.test.ts`, `scoreFixtures.test.ts`, `buyingConfidence.test.ts` | covered |
+| Deal Rating and Buyer Recommendation hard gates | `dealRating.test.ts`, `buyerRecommendation.test.ts` | covered |
+| Title and odometer classifier, recall classifier | `titleOdometer.test.ts`, `recallContract.test.ts` | covered |
+| Passport read models (new, used) | `readModels/listingFacts.test.ts`, `readModels/usedPassport.test.ts`, `readModels/newPassport.test.ts` | covered |
+| Provider policy and TTL engine | `providerPolicy.test.ts` (src/lib/market) | covered |
 | Syndication sync, prune and segment rules | none by name | not found |
 | Comparables engine internals (concentration, outliers, composite, adjustments, similarity) | none by name | not found |
 | Title, NMVTIS and VINData boundary (no report body persisted) | none by name | not found |
