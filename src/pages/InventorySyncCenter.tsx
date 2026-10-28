@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { useTenant } from "@/contexts/TenantContext";
 import ShadowEvidenceTable from "@/components/admin/ShadowEvidenceTable";
 import { useShadowEvidence } from "@/hooks/useShadowEvidence";
@@ -111,6 +113,8 @@ export default function InventorySyncCenter() {
   const { isAdmin } = useAuth();
   const shadowEvidence = useShadowEvidence(tenant?.id);
   const tenantId = tenant?.id || null;
+  const [searchParams] = useSearchParams();
+  const selectedRunId = searchParams.get("run");
 
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
@@ -120,11 +124,12 @@ export default function InventorySyncCenter() {
   const [selectedErrs, setSelectedErrs] = useState<SyncErr[]>([]);
   const [errsLoading, setErrsLoading] = useState(false);
   const [unresolvedCount, setUnresolvedCount] = useState<number>(0);
+  const [lastSuccessRow, setLastSuccessRow] = useState<Run | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
-    const [{ data: c }, { data: r }, { count: excCount }] = await Promise.all([
+    const [{ data: c }, { data: r }, { count: excCount }, { data: s }] = await Promise.all([
       (supabase as any).from("marketcheck_sync_config")
         .select("source, enabled, frequency, run_hour, day_of_week, last_run_at")
         .eq("tenant_id", tenantId).maybeSingle(),
@@ -134,10 +139,16 @@ export default function InventorySyncCenter() {
       (supabase as any).from("vehicle_exceptions")
         .select("id", { count: "exact", head: true })
         .eq("tenant_id", tenantId).in("status", ["open", "in_progress"]),
+      // The whole ledger, not the 50-row window: a long run of refusals or
+      // skips must not turn a real last success into "Never".
+      (supabase as any).from("inventory_sync_runs")
+        .select("*").eq("tenant_id", tenantId).in("status", ["success", "partial"])
+        .order("started_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     setCfg((c as Cfg) || null);
     setRuns((r as Run[]) || []);
     setUnresolvedCount(typeof excCount === "number" ? excCount : 0);
+    setLastSuccessRow((s as Run) || null);
     setLoading(false);
   }, [tenantId]);
 
@@ -182,7 +193,7 @@ export default function InventorySyncCenter() {
   };
 
   const latest = runs[0] || null;
-  const lastSuccessful = useMemo(() => runs.find((r) => r.status === "success" || r.status === "partial") || null, [runs]);
+  const lastSuccessful = useMemo(() => lastSuccessRow ?? runs.find((r) => r.status === "success" || r.status === "partial") ?? null, [lastSuccessRow, runs]);
   const prevWithInventory = useMemo(() => runs.slice(1).find((r) => r.seen > 0) || null, [runs]);
 
   const health: { tone: "healthy" | "warning" | "failed"; label: string } = useMemo(() => {
@@ -230,6 +241,7 @@ export default function InventorySyncCenter() {
     return out;
   }, [latest, prevWithInventory, lastSuccessful]);
 
+  if (selectedRunId) return <Navigate to={ADMIN_CHILD_ROUTES.syncRun(selectedRunId)} replace />;
   if (!tenantId) return null;
   if (loading) {
     return (
@@ -243,6 +255,14 @@ export default function InventorySyncCenter() {
 
   return (
     <div className="max-w-6xl mx-auto p-4 lg:p-6 space-y-5">
+      <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 px-4 py-3 text-sm text-sky-900 flex items-start gap-3">
+        <Info className="w-4 h-4 mt-0.5 shrink-0" />
+        <div>
+          The inventory health center now lives in{" "}
+          <Link to={adminTabHref("inventory-feed")} className="font-semibold underline">Administration, Integrations, Inventory feed</Link>
+          , with typed run outcomes and per-run detail. This page stays as the shadow market-evidence review surface.
+        </div>
+      </div>
       {/* ── Header ───────────────────────────────────────────── */}
       <div>
         <div className="inline-flex items-center gap-1.5 text-al-meta font-bold uppercase tracking-wider text-muted-foreground">
