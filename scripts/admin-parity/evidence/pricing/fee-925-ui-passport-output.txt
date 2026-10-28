@@ -1,0 +1,6 @@
+TRACE preview saved fee 895: Selling price $39,525 | Conveyance Fee $895 | Advertised total $40,420
+TRACE preview draft fee 925: Selling price $39,495 | Conveyance Fee $925 | Advertised total $40,420
+TRACE Passport derivePassport.price: 40420 priceIncludesDoc: true docFee: 925
+TRACE Passport sale card: selling 39495 | fee 925 | total 40420
+TRACE Label (vehicle_listings.price): 40420 | Passport column: 40420 | breakdownDelta: 30 | status: mismatch | Website differs from the label by +$30 on the advertised total including the document fee. Stored breakdown ($39,525 before fee + $925 fee = $40,450) differs from the advertised total by +$30.
+ ✓ src/pages/admin/views/pricing/feeTrace.scratch.test.tsx (2 tests) 178ms

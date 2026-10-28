@@ -1,0 +1,39 @@
+== 0. Stored row before (vehicle_listings)
+  price   | advertised_price_before_doc | doc_fee | website_sale_price 
+----------+-----------------------------+---------+--------------------
+ 40420.00 |                       39525 |     895 |              40420
+
+== 0b. Tenant policy (dealer_profiles.settings)
+ doc_fee_amount | price_display_mode | policy_version 
+----------------+--------------------+----------------
+ 895            | website_sale_price |              2
+
+ become 
+--------
+ 
+
+== 2. Server dry-run: admin_doc_fee_change_preview(tenant, true, 925) sample for this vehicle
+ vin_suffix | selling_price | fee_before | fee_after | total_before | total_after 
+------------+---------------+------------+-----------+--------------+-------------
+ 040420     | 39525         | 895        | 925.00    | 40420        | 40450.00
+
+== 2b. If the sample list does not include it, the computation the function performs for every row:
+ selling_price | fee_before | fee_after | total_before | total_after 
+---------------+------------+-----------+--------------+-------------
+         39525 |        895 |       925 |        40420 |       40450
+
+== 3. Save: admin_doc_fee_change_apply(tenant, true, 925, expected_version, key)
+                                              apply_result                                              
+--------------------------------------------------------------------------------------------------------
+ {"status": "applied", "version": 3, "affected": 4, "audit_id": "4dc83ca8-206d-4410-8eb4-0de25478c747"}
+
+== 3b. Stored row after the save (reloaded)
+  price   | advertised_price_before_doc | doc_fee | website_sale_price 
+----------+-----------------------------+---------+--------------------
+ 40420.00 |                       39525 |  925.00 |           40450.00
+
+== 3c. Tenant policy after
+ doc_fee_amount | price_display_mode | policy_version 
+----------------+--------------------+----------------
+ 925            | website_sale_price |              3
+

@@ -720,6 +720,56 @@ Protocol v2 (agreed) with v1 historical:
 No screen reaches 95%. Only 06 (94.15%) is in the individually reviewable
 band; the other twelve are below 94% and not passed.
 
+### 10.9 Open pricing conflict: fee change on a fee-inclusive vehicle (traced on `1dd1d4b`)
+
+One coherent fee-inclusive vehicle, fee $895 to $925, traced through the
+real paths:
+- the deployed `admin_doc_fee_change_preview` and
+  `admin_doc_fee_change_apply`, in the isolated local database
+  (`scripts/db-verify`, transaction rolled back);
+- the rendered screen 05 component;
+- the actual `derivePassport` and `buildPassportSaleCard` code on the
+  reloaded row.
+
+No production data was read or changed. Evidence:
+`scripts/admin-parity/evidence/pricing/fee-925-*`.
+
+| Step | Source (field) | Selling portion | Fee | Advertised total |
+| --- | --- | --- | --- | --- |
+| Before | `vehicle_listings`: `price` 40,420; `advertised_price_before_doc` 39,525; `doc_fee` 895; `website_sale_price` 40,420; tenant `price_display_mode` = `website_sale_price` | 39,525 | 895 | 40,420 |
+| 1. Screen 05 draft preview | `customerPrice()` reading `price` (inventory total) | 39,495 | 925 | **40,420** |
+| 2. Screen 06 server dry-run | `admin_doc_fee_change_preview` sample: `selling_price` = `advertised_price_before_doc`; `total_after` = `advertised_price_before_doc + fee` | 39,525 | 925 | **40,450** |
+| 3. Saved (reloaded) | `admin_doc_fee_change_apply` writes `doc_fee` = 925 and `website_sale_price` = 40,450; `price` stays 40,420 | n/a | 925 | `website_sale_price` **40,450**; `price` **40,420** |
+| 4a. Label after reload | `vehicle_listings.price` | n/a | n/a | **40,420** |
+| 4b. Passport after reload | `public-listing-view` copies `price_display_mode`; `derivePassport` uses `resolveDisplayPrice`, which anchors on `price`; `buildPassportSaleCard` gives selling = price - fee | 39,495 | 925 | **40,420** |
+
+**Conflict:**
+- The server dry-run and the saved `website_sale_price` say the advertised
+  total becomes $40,450, with the before-fee price kept.
+- The Label, the Passport and the screen 05 preview all read `price`, so
+  for customers the total stays $40,420 and the selling portion drops to
+  $39,495.
+- After the save the same vehicle carries two different totals.
+
+The consistency check reports this rather than hiding it: Mismatch,
+breakdown +$30, "Stored breakdown ($39,525 before fee + $925 fee = $40,450)
+differs from the advertised total by +$30".
+
+On the `advertised_before_doc` basis the paths agree: the Passport shows
+the before-fee $39,525 + $925 = $40,450.
+
+**Not decided.** Two consistent policies are possible, and choosing one is
+an owner decision:
+- (A) The before-fee price is authoritative. A fee change moves the
+  customer total to $40,450, which needs the save path or the display to
+  stop anchoring on `price` for fee-inclusive tenants.
+- (B) The inventory total is authoritative. A fee change keeps $40,420 and
+  reduces the selling portion, which needs the dry-run and save paths to
+  stop deriving totals from `advertised_price_before_doc`.
+
+No code or data was changed for this trace. The screen 05 preview
+currently follows (B) because it mirrors the Passport.
+
 ## 11. Approvals requested
 
 1. Done: the fee preview fix was applied and verified (section 4).
