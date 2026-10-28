@@ -15,7 +15,7 @@
       {
         "selector": "[data-admin-v2] section",
         "heading": "Recent activity",
-        "inner": "li span.block.text-\\[11px\\]",
+        "inner": "li [data-parity=\"activity-detail\"]",
         "reason": "recent activity detail lines (fixture names)"
       }
     ],

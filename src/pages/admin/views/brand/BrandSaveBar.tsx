@@ -32,9 +32,9 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
     return { tone: "success" as const, title: "No changes pending", detail: "Your settings are up to date." };
   })();
   const Icon = view.tone === "success" ? CheckCircle2 : status === "saving" ? Loader2 : AlertTriangle;
-  const iconClass = view.tone === "success" ? "text-adm-success" : view.tone === "danger" ? "text-adm-danger" : view.tone === "warning" ? "text-adm-warning" : "text-adm-muted";
+  const iconClass = view.tone === "success" ? "text-[#1A9F5F]" : view.tone === "danger" ? "text-adm-danger" : view.tone === "warning" ? "text-adm-warning" : "text-adm-muted";
   // Reference: a footer strip from the rail edge to the page edge, flush under the cards,
-  // with a 26px status mark 28px in and 42px buttons ending 26px from the edge.
+  // with a 27px status mark 27px in, top-aligned with the 42px buttons ending 26px from the edge.
   const button = "min-h-[42px] sm:min-h-[42px]";
 
   return (
@@ -57,9 +57,9 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
           </dl>
         </div>
       )}
-      <div role="status" aria-live="polite" className="flex items-center justify-between gap-4 px-4 sm:pl-7 sm:pr-[26px] py-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Icon className={cn("w-8 h-8 flex-shrink-0", iconClass, status === "saving" && "animate-spin")} aria-hidden="true" />
+      <div role="status" aria-live="polite" className="flex items-center justify-between gap-4 px-4 sm:pl-[26px] sm:pr-[26px] pt-[11px] pb-[9px]">
+        <div className="flex items-start gap-3 min-w-0 self-start -mt-px">
+          <Icon className={cn("mt-px w-[29px] h-[29px] flex-shrink-0", iconClass, status === "saving" && "animate-spin")} aria-hidden="true" />
           <div className="min-w-0">
             <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{view.title}</p>
             <p className="text-[12px] leading-[18px] text-adm-muted truncate">{view.detail}</p>

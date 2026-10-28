@@ -35,7 +35,7 @@ export const TextField = ({ label, value, onChange, hint, error, id, className, 
   return (
     <div className={className}>
       <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
-      <input id={fieldId} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={error ? true : undefined} className={cn(controlClass, "mt-[7px]", error && "border-adm-danger")} {...rest} />
+      <input id={fieldId} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={error ? true : undefined} className={cn(controlClass, "mt-[9px]", error && "border-adm-danger")} {...rest} />
       {error ? <FieldHint error>{error}</FieldHint> : hint ? <FieldHint>{hint}</FieldHint> : null}
     </div>
   );
@@ -105,7 +105,7 @@ export const SelectField = ({ label, hint, inline = false, id, className, ...res
 /** Label on the left (118px column), control on the right, as the reference's identity card. */
 export const RowField = ({ label, htmlFor, children, className }: { label: ReactNode; htmlFor?: string; children: ReactNode; className?: string }) => (
   <div className={cn("grid grid-cols-1 sm:grid-cols-[118px_minmax(0,1fr)] sm:items-start gap-1 sm:gap-4", className)}>
-    <label htmlFor={htmlFor} className="text-[14px] leading-[20px] font-semibold text-adm-ink sm:pt-[9px]">{label}</label>
+    <label htmlFor={htmlFor} className="text-[14px] leading-[20px] font-semibold text-adm-ink sm:pt-[7px]">{label}</label>
     <div className="min-w-0">{children}</div>
   </div>
 );

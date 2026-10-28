@@ -11,9 +11,10 @@ import { ReadOnlyValue, RowField, SelectControl, TextField, controlClass } from 
 import { AppearanceCard, CARD_HEADER, CardDescription, CardTitle, ContactReadinessCard, HeaderPreviewCard, LogoField } from "./cards";
 
 // Composition from the reference: the branding note sits in the gap under the
-// child tabs so the cards start 82px below the section row; a 528px right
-// column with a 13px gutter; the identity form on a 52px row pitch beside a
-// 226px logo column behind a divider.
+// child tabs so the cards start 82px below the section row; a 530px right
+// column with a 14px gutter once the left column can hold the palette and the
+// row fields (from 1540px; one column below); the identity form on a 52.5px
+// row pitch beside a 226px logo column behind a divider.
 
 const STATE_OPTIONS = [{ value: "", label: "Select a state" }, ...US_STATES.map((s) => ({ value: s.code, label: s.name }))];
 
@@ -57,16 +58,16 @@ export default function IdentityView() {
 
   return (
     <div>
-      <p className="-mt-2 mb-1 flex items-center justify-end gap-1.5 text-[12px] leading-[18px] text-adm-muted">
+      <p className="-mt-2 mb-0.5 flex items-center justify-end gap-1.5 text-[12px] leading-[18px] text-adm-muted">
         <Info className={ICON.inline} aria-hidden="true" />
         Branding for this rooftop.
       </p>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_528px] gap-[13px] items-start">
+      <div className="grid grid-cols-1 min-[1540px]:grid-cols-[minmax(0,1fr)_530px] gap-[14px] items-start">
         <div className="space-y-4">
-          <AdminCard title={<CardTitle>Store identity</CardTitle>} description={<CardDescription>Basic information about this dealership. This appears across AutoLabels.</CardDescription>} headerClassName={CARD_HEADER} bodyClassName="pt-[23px]">
+          <AdminCard title={<CardTitle>Store identity</CardTitle>} description={<CardDescription>Basic information about this dealership. This appears across AutoLabels.</CardDescription>} headerClassName={`${CARD_HEADER} pl-[26px]`} bodyClassName="pt-[23px] pl-[26px]">
             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_226px] gap-y-6 md:gap-x-[22px]">
-              <div className="space-y-[15px]">
+              <div className="space-y-[15.5px]">
                 <TextField id="brand-name" label="Dealership name" value={draft.dealer_name} onChange={(v) => set("dealer_name", v)} error={nameError} autoComplete="organization" />
                 <RowField label="Group" htmlFor="brand-group">
                   <ReadOnlyValue id="brand-group" value={source.tenantName ?? ""} locked placeholder="No dealer group" />
@@ -97,7 +98,7 @@ export default function IdentityView() {
           <AppearanceCard accent={source.settings.primary_color} editHref={adminTabHref("appearance")} />
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-[18px]">
           <HeaderPreviewCard preview={preview} draftDiffers={previewDiffers} />
           <ContactReadinessCard rows={readiness} />
         </div>
