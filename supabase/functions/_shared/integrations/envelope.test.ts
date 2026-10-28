@@ -46,7 +46,7 @@ describe("envelope v1", () => {
     expect(requiredScope("autocurb.trade.captured")).toBe("trade:write");
     expect(requiredScope("autocurb.valuation.updated")).toBe("valuation:write");
     expect(requiredScope("autofilm.nope.never")).toBeNull();
-    expect(Object.keys(EVENT_CATALOG)).toHaveLength(29);
+    expect(Object.keys(EVENT_CATALOG)).toHaveLength(30);
     expect(inboundDirection("autofilm")).toBe("film_to_labels");
     expect(inboundDirection("autocurb")).toBe("curb_to_labels");
     expect(outboundDirection("autofilm")).toBe("labels_to_film");

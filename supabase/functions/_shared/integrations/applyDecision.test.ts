@@ -76,7 +76,7 @@ describe("apply decision", () => {
     expect(second.effect && "row" in second.effect && second.effect.row.instance_id).toBe("ep-2");
   });
 
-  it("EVT-02 versions delivered 3, 1, 2 leave 3 in force and mark the others stale", () => {
+  it("EVT-02 versions delivered 3, 1, 2 leave 3 in force and mark the others superseded", () => {
     const env = fixture("autofilm_inspection_completed");
     let latest: number | null = null;
     const outcomes: string[] = [];
@@ -85,12 +85,12 @@ describe("apply decision", () => {
       outcomes.push(d.status);
       if (d.status === "applied" && d.recordVersion) latest = Math.max(latest ?? 0, v);
     }
-    expect(outcomes).toEqual(["applied", "stale", "stale"]);
+    expect(outcomes).toEqual(["applied", "superseded", "superseded"]);
     expect(latest).toBe(3);
   });
 
-  it("treats an equal version as stale", () => {
-    expect(decideApply({ row: rowFrom(fixture("autofilm_inspection_completed")), latestVersion: 1, instance: INSTANCE_A }).status).toBe("stale");
+  it("treats an equal version as superseded", () => {
+    expect(decideApply({ row: rowFrom(fixture("autofilm_inspection_completed")), latestVersion: 1, instance: INSTANCE_A }).status).toBe("superseded");
   });
 
   it("EVT-05 a revocation sets revoked_at and carries no measurements", () => {

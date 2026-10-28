@@ -153,7 +153,7 @@ export const EVENT_CATALOG: Readonly<Record<string, CatalogEntry>> = Object.from
   ...entries("autolabels", "passport:read", ["passport.published", "passport.revoked"]),
   ...entries("autolabels", "market:read", ["market.handoff"]),
   ...entries("autofilm", "inspection:write", ["inspection.completed", "inspection.corrected", "inspection.revoked", "finding.recorded", "finding.corrected"]),
-  ...entries("autofilm", "repair:write", ["repair.recommended", "repair.approved", "repair.declined", "repair.completed", "repair.completed_verified", "repair.corrected"]),
+  ...entries("autofilm", "repair:write", ["repair_order.upserted", "repair.recommended", "repair.approved", "repair.declined", "repair.completed", "repair.completed_verified", "repair.corrected"]),
   ...entries("autofilm", "video:write", ["video.published", "video.revoked"]),
   ...entries("autocurb", "acquisition:write", ["acquisition.recorded", "acquisition.cancelled", "acquisition.confirmed"]),
   ...entries("autocurb", "appraisal:write", ["appraisal.recorded", "appraisal.updated"]),

@@ -26,6 +26,8 @@ const keyFor = (over: Partial<KeyRecord["connection"]> = {}, keyStatus: KeyRecor
     app: "autofilm",
     status: "active",
     scopes: ["inspection:write", "repair:write"],
+    adapter: "rooftop.v1",
+    external_rooftop_ref: null,
     ...over,
   },
 });
@@ -118,12 +120,17 @@ describe("ingest decision", () => {
     expect(d.httpStatus).toBe(401);
   });
 
-  it("SEC-04 returns 403 for a validly signed request on a paused or revoked connection", async () => {
+  it("SEC-04 returns 401 for a validly signed request on a paused or revoked connection, same as the live path", async () => {
     const env = fixture("autofilm_inspection_completed");
     for (const status of ["paused", "revoked", "pending", "error"] as const) {
       const d = await decideIngest(await request(env, { keyRecord: keyFor({ status }) }));
-      expect(d).toMatchObject({ httpStatus: 403, detail: ["connection_inactive"] });
+      expect(d).toMatchObject({ httpStatus: 401, code: "signature_invalid", detail: ["credentials"], insert: null });
     }
+  });
+
+  it("returns 401 when the connection is configured for a different adapter", async () => {
+    const d = await decideIngest(await request(fixture("autofilm_inspection_completed"), { keyRecord: keyFor({ adapter: "autofilm.v1" }) }));
+    expect(d).toMatchObject({ httpStatus: 401, detail: ["credentials"] });
   });
 
   it("SEC-04 accepts a retiring key during rotation overlap", async () => {

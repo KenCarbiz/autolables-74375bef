@@ -16,7 +16,11 @@ export interface ConnectionRecord {
   app: Exclude<Producer, "autolabels">;
   status: "pending" | "active" | "paused" | "revoked" | "error";
   scopes: string[];
+  adapter: Adapter;
+  external_rooftop_ref: string | null;
 }
+
+export type Adapter = "rooftop.v1" | "autofilm.v1";
 
 export interface KeyRecord {
   key_id: string;
@@ -45,7 +49,8 @@ export interface InboxInsert {
   source_record_id: string;
   source_version: number;
   vin: string;
-  visibility: Visibility;
+  adapter: Adapter;
+  visibility: Exclude<Visibility, "customer_public">;
   requested_visibility: Visibility;
   envelope: EnvelopeV1;
   status: InboxStatus;
@@ -58,10 +63,11 @@ export type IngestCode =
   | "schema_invalid"
   | "signature_invalid"
   | "scope_or_tenant_denied"
-  | "idempotency_conflict";
+  | "idempotency_conflict"
+  | "rejected";
 
 export interface IngestDecision {
-  httpStatus: 200 | 202 | 400 | 401 | 403 | 409;
+  httpStatus: 200 | 202 | 400 | 401 | 403 | 409 | 422;
   code: IngestCode;
   detail: string[];
   insert: InboxInsert | null;
@@ -79,7 +85,7 @@ export interface IngestInput {
   directionEnabled: boolean;
 }
 
-const deny = (httpStatus: 400 | 401 | 403 | 409, code: IngestCode, detail: string[] = []): IngestDecision => ({
+export const deny = (httpStatus: 400 | 401 | 403 | 409 | 422, code: IngestCode, detail: string[] = []): IngestDecision => ({
   httpStatus, code, detail, insert: null, duplicateOf: null,
 });
 
@@ -91,6 +97,9 @@ export async function decideIngest(input: IngestInput): Promise<IngestDecision> 
 
   if (!keyId || !ts || !signature || !keyRecord || !secret) return deny(401, "signature_invalid", ["credentials"]);
   if (keyRecord.key_id !== keyId || keyRecord.status === "revoked") return deny(401, "signature_invalid", ["credentials"]);
+  if (keyRecord.connection.status !== "active" || keyRecord.connection.adapter !== "rooftop.v1") {
+    return deny(401, "signature_invalid", ["credentials"]);
+  }
 
   if (!/^\d{1,12}$/.test(ts) || !withinSkew(Number(ts), Math.floor(input.nowMs / 1000))) {
     return deny(401, "signature_invalid", ["timestamp"]);
@@ -100,7 +109,6 @@ export async function decideIngest(input: IngestInput): Promise<IngestDecision> 
   }
 
   const { connection } = keyRecord;
-  if (connection.status !== "active") return deny(403, "scope_or_tenant_denied", ["connection_inactive"]);
 
   if (input.rawBody.length > MAX_BODY_BYTES) return deny(400, "schema_invalid", ["body_too_large"]);
   let parsed: unknown;
@@ -154,6 +162,7 @@ export async function decideIngest(input: IngestInput): Promise<IngestDecision> 
       source_record_id: envelope.source_record_id,
       source_version: envelope.source_version,
       vin: envelope.vin,
+      adapter: "rooftop.v1",
       visibility: "tenant_private",
       requested_visibility: envelope.visibility,
       envelope,
@@ -162,4 +171,5 @@ export async function decideIngest(input: IngestInput): Promise<IngestDecision> 
   };
 }
 
+export const MAX_BODY = MAX_BODY_BYTES;
 export const bodySha256 = (rawBody: string): Promise<string> => sha256Hex(rawBody);

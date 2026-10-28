@@ -14,7 +14,7 @@ export async function sha256Hex(data: string | Uint8Array): Promise<string> {
 export const signingMessage = (ts: string | number, keyId: string, bodySha256Hex: string): string =>
   `${SIGNING_DOMAIN}\n${ts}\n${keyId}\n${bodySha256Hex}`;
 
-async function hmacHex(secret: string, message: string): Promise<string> {
+export async function hmacHex(secret: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     encoder.encode(secret),

@@ -1,7 +1,7 @@
 import { catalogEntry } from "./envelope.ts";
 import { validateVin } from "./vin.ts";
 
-export type ApplyStatus = "applied" | "stale" | "unmatched" | "rejected";
+export type ApplyStatus = "applied" | "superseded" | "unmatched" | "rejected";
 
 export interface InboxRowForApply {
   id: string;
@@ -26,6 +26,8 @@ export interface ResolvedInstance {
   tenant_id: string;
 }
 
+export type StoredVisibility = "tenant_private" | "custody_shared";
+
 export type RepairStatus =
   | "recommended" | "approved" | "declined" | "deferred" | "completed" | "completed_verified";
 
@@ -37,7 +39,7 @@ export interface InspectionEvidenceUpsert {
     source_app: string;
     source_record_id: string;
     source_version: number;
-    visibility: "tenant_private";
+    visibility: StoredVisibility;
     inspected_at?: string | null;
     odometer_miles?: number | null;
     measurements?: Record<string, unknown>;
@@ -55,7 +57,7 @@ export interface RepairItemUpsert {
     source_app: string;
     source_record_id: string;
     source_version: number;
-    visibility: "tenant_private";
+    visibility: StoredVisibility;
     status: RepairStatus;
     finding_ref: string | null;
     item: string | null;
@@ -101,7 +103,7 @@ export function decideApply({ row, latestVersion, instance }: ApplyInput): Apply
   if (!vin.ok) return result("unmatched", `vin_${vin.reason}`);
   if (!instance || instance.tenant_id !== row.tenant_id) return result("unmatched", "no_active_instance");
 
-  if (latestVersion !== null && row.source_version <= latestVersion) return result("stale", "stale_version");
+  if (latestVersion !== null && row.source_version <= latestVersion) return result("superseded", "stale_version");
 
   const payload = row.envelope.payload ?? {};
   const base = {
@@ -110,7 +112,7 @@ export function decideApply({ row, latestVersion, instance }: ApplyInput): Apply
     source_app: row.producer,
     source_record_id: row.source_record_id,
     source_version: row.source_version,
-    visibility: "tenant_private" as const,
+    visibility: (row.visibility === "custody_shared" ? "custody_shared" : "tenant_private") as StoredVisibility,
   };
 
   if (row.event_type === "autofilm.inspection.completed" || row.event_type === "autofilm.inspection.corrected") {
@@ -162,4 +164,26 @@ export function decideApply({ row, latestVersion, instance }: ApplyInput): Apply
   }
 
   return result("applied", "applied_no_effect", null, true);
+}
+
+export interface ApplyPlan {
+  verdict: "apply" | "noop" | "reject" | "unmatched";
+  outcome: string;
+  effect?: Record<string, unknown>;
+}
+
+const EFFECT_OMIT = new Set(["tenant_id", "instance_id", "source_app", "source_record_id", "source_version", "visibility"]);
+
+// Version- and instance-independent part of the decision. The database function
+// integration_apply_event owns ordering, instance lookup and the watermark.
+export function planApply(row: InboxRowForApply): ApplyPlan {
+  const d = decideApply({ row, latestVersion: null, instance: { id: "plan", tenant_id: row.tenant_id } });
+  if (d.status === "rejected") return { verdict: "reject", outcome: d.outcomeCode };
+  if (d.status === "unmatched") return { verdict: "unmatched", outcome: d.outcomeCode };
+  if (!d.effect) return { verdict: "noop", outcome: d.outcomeCode };
+  const effect: Record<string, unknown> = { kind: d.effect.kind };
+  for (const [k, v] of Object.entries(d.effect.row)) {
+    if (!EFFECT_OMIT.has(k) && v !== undefined) effect[k] = v;
+  }
+  return { verdict: "apply", outcome: d.outcomeCode, effect };
 }
