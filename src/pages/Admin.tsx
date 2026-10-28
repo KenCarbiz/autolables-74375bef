@@ -5,7 +5,7 @@ import { uploadPhoto } from "@/lib/storage";
 import { Switch } from "@/components/ui/switch";
 import { getPaymentDisplay, type PaymentDisplay } from "@/lib/affordability";
 import { PRICE_BUCKETS } from "@/types/product";
-import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS, type GetReadyService } from "@/contexts/DealerSettingsContext";
+import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { useProductRules, ProductRule } from "@/hooks/useProductRules";
 import type { ProductUpgrade } from "@/hooks/useProducts";
@@ -33,12 +33,7 @@ import OemWarrantyPanel from "@/components/admin/OemWarrantyPanel";
 import StickyButtonsPanel from "@/components/admin/StickyButtonsPanel";
 import DealershipTrustPanel from "@/components/admin/DealershipTrustPanel";
 import PassportContactRoutingPanel from "@/components/admin/PassportContactRoutingPanel";
-import PrintSettingsPanel from "@/components/admin/PrintSettingsPanel";
-import DocumentRulesPanel from "@/components/admin/DocumentRulesPanel";
 import EnabledFeaturesPanel from "@/components/admin/EnabledFeaturesPanel";
-import StickerPrintTemplates from "@/components/admin/StickerPrintTemplates";
-import LabelDefaultsPanel from "@/components/admin/LabelDefaultsPanel";
-import FactoryStickerPanel from "@/components/admin/FactoryStickerPanel";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import IngestOutcomePanel from "@/components/admin/IngestOutcomePanel";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
@@ -275,24 +270,9 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
   const { files: vehicleFiles, stats: fileStats, findByVin } = useVehicleFiles(currentStore?.id || "");
   const [fileSearch, setFileSearch] = useState("");
 
-  // Get-Ready service catalog config (the work surface lives at /prep)
+  // Get-Ready pending count for the home KPI. The service catalog and prep
+  // sign-off rules are edited on Documents & Service > Service policy.
   const { getPending: getPendingGetReady } = useGetReady(currentStore?.id || "");
-  const [svcDraft, setSvcDraft] = useState<GetReadyService[]>(settings.get_ready_services || []);
-  const [svcOpen, setSvcOpen] = useState(false);
-  useInstantSave(svcDraft, (v) => updateSettings({ get_ready_services: v }), { ready: !settingsLoading, toastId: "getready-services" });
-
-  // Mobile prep sign-off rules (/prep/:vin). The photo-task list hydrates once
-  // from async settings before instant-save arms, like the branding form.
-  const prepTasksHydratedRef = useRef(false);
-  const [prepTasksReady, setPrepTasksReady] = useState(false);
-  const [prepPhotoTasksDraft, setPrepPhotoTasksDraft] = useState("");
-  useEffect(() => {
-    if (settingsLoading || prepTasksHydratedRef.current) return;
-    prepTasksHydratedRef.current = true;
-    setPrepTasksReady(true);
-    setPrepPhotoTasksDraft(settings.prep_service_photo_tasks);
-  }, [settingsLoading, settings]);
-  useInstantSave(prepPhotoTasksDraft, (v) => updateSettings({ prep_service_photo_tasks: v }), { ready: prepTasksReady, toastId: "prep-rules" });
 
   // Warranty
   const { records: warrantyRecords, getExpiringSoon } = useWarranty(currentStore?.id || "");
@@ -1247,54 +1227,7 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
               </p>
             </div>
 
-            {/* Paper Size Settings */}
-            <div id="paper-size" className="bg-card rounded-lg p-4 shadow-sm mb-3">
-              <h4 className="text-sm font-bold text-foreground mb-2">Addendum Paper Size</h4>
-              <p className="text-xs text-muted-foreground mb-3">Addendum scales to this size. FTC Buyers Guide stays at its federally-mandated minimum (11" × 7¼", 16 CFR § 455).</p>
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  { key: "letter" as const, label: "Letter (8.5×11)" },
-                  { key: "legal" as const, label: "Legal (8.5×14)" },
-                  { key: "half-sheet" as const, label: "Half Sheet (5.5×8.5)" },
-                  { key: "addendum-strip" as const, label: "Strip (4.25×11)" },
-                  { key: "addendum-half" as const, label: "Half Page (5.5×12.5)" },
-                  { key: "monroney" as const, label: "Monroney (7.5×10)" },
-                  { key: "custom" as const, label: "Custom" },
-                ].map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => updateSettings({ addendum_paper_size: key })}
-                    className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${settings.addendum_paper_size === key ? "bg-primary text-primary-foreground border-primary" : "bg-card text-foreground border-border hover:bg-muted"}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {settings.addendum_paper_size === "custom" && (
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Width (in)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={settings.addendum_custom_width}
-                      onChange={(e) => updateSettings({ addendum_custom_width: e.target.value })}
-                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Height (in)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={settings.addendum_custom_height}
-                      onChange={(e) => updateSettings({ addendum_custom_height: e.target.value })}
-                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Addendum paper size moved to Documents & Service > Templates. */}
 
             {/* Product Default Mode */}
             <div id="product-default-mode" className="bg-card rounded-lg p-4 shadow-sm mb-3">
@@ -1329,51 +1262,8 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
             {/* Doc fee + customer price display + comps + Today's Price moved
                 to the Pricing & Incentives tab (?tab=incentives). */}
 
-            {/* Title / MCO capture */}
-            <div id="title-clerk" className="bg-card rounded-lg p-4 shadow-premium mb-3">
-              <h4 className="text-sm font-bold text-foreground mb-1">Title / MCO Upload</h4>
-              <p className="text-xs text-muted-foreground mb-3">The office gets a per-vehicle link + QR to upload the title (used) or MCO (new), front and back, into the private vehicle file.</p>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Office clerk email(s)</label>
-                  <textarea
-                    value={settings.title_clerk_email || ""}
-                    onChange={(e) => updateSettings({ title_clerk_email: e.target.value })}
-                    rows={2}
-                    placeholder="titles@dealership.com, backup-clerk@dealership.com"
-                    className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none"
-                  />
-                  <p className="text-[11px] text-muted-foreground mt-1">Separate multiple addresses with commas — add a backup so it still goes out when someone's out of office.</p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-foreground">Email the office automatically on intake</span>
-                  <Switch checked={!!settings.title_email_on_intake} onCheckedChange={(v) => updateSettings({ title_email_on_intake: v })} className="data-[state=checked]:bg-teal" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="pr-3">
-                    <span className="text-sm font-semibold text-foreground">Round-robin the request</span>
-                    <p className="text-[11px] text-muted-foreground">Send to one clerk at a time and rotate to the next on each reminder, instead of emailing everyone at once.</p>
-                  </div>
-                  <Switch checked={!!settings.title_round_robin} onCheckedChange={(v) => updateSettings({ title_round_robin: v })} className="data-[state=checked]:bg-teal" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-foreground">Resend reminders until received</span>
-                  <Switch checked={!!settings.title_reminders_enabled} onCheckedChange={(v) => updateSettings({ title_reminders_enabled: v })} className="data-[state=checked]:bg-teal" />
-                </div>
-                {settings.title_reminders_enabled && (
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Remind every (days)</label>
-                    <input
-                      type="number" min={1} step={1}
-                      value={settings.title_reminder_days ?? 3}
-                      onChange={(e) => updateSettings({ title_reminder_days: Math.max(1, parseInt(e.target.value) || 3) })}
-                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                    />
-                    <p className="text-[11px] text-muted-foreground mt-1">Re-emails the office every N days while no title/MCO is on file for an in-stock vehicle.</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Title / MCO, recon approval and the customer-signing gates are
+                edited on Documents & Service > Service policy. */}
 
             {/* Shopper engagement loop */}
             <div id="shopper-engagement" className="bg-card rounded-lg p-4 shadow-premium mb-3">
@@ -1409,35 +1299,6 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
               </div>
             </div>
 
-            {/* Recon approval gate */}
-            <div id="recon-approval" className="bg-card rounded-lg p-4 shadow-premium mb-3">
-              <h4 className="text-sm font-bold text-foreground mb-1">Recon Approval</h4>
-              <p className="text-xs text-muted-foreground mb-3">When service submits a recon estimate, line items at or under this amount clear automatically so work isn't stalled. Anything higher routes to the used-car manager to approve or decline.</p>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Auto-approve line items up to ($)</label>
-                  <input
-                    type="number" min={0} step={50}
-                    value={settings.recon_auto_approve_amount ?? 500}
-                    onChange={(e) => updateSettings({ recon_auto_approve_amount: Math.max(0, parseInt(e.target.value) || 0) })}
-                    className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                  />
-                  <p className="text-[11px] text-muted-foreground mt-1">Set to 0 to route every estimate to the manager. Industry-typical is $500&ndash;$800.</p>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Used-car manager email(s) for approvals</label>
-                  <textarea
-                    value={settings.recon_approval_email || ""}
-                    onChange={(e) => updateSettings({ recon_approval_email: e.target.value })}
-                    rows={2}
-                    placeholder="ucm@dealership.com, gm@dealership.com"
-                    className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none"
-                  />
-                  <p className="text-[11px] text-muted-foreground mt-1">Gets the approve/decline link when an estimate needs a decision. Leave blank to send to the dealership's main contact email.</p>
-                </div>
-              </div>
-            </div>
-
             {/* Nightly-ingest automation */}
             <div id="feed-automation" className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-1">Feed Automation</h4>
@@ -1453,83 +1314,6 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
                     onCheckedChange={(v) => {
                       if (v && !window.confirm("Auto-publish puts the customer passport live the moment a vehicle is ingested, before recon, K-208, or installs are done. Enable it?")) return;
                       updateSettings({ ingest_auto_publish: v });
-                    }}
-                    className="data-[state=checked]:bg-teal"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="pr-3">
-                    <span className="text-sm font-semibold text-foreground">Require K-208 before finalizing</span>
-                    <p className="text-xs text-muted-foreground">Block the customer disclosure from being signed until the CT K-208 safety inspection is done (used/CPO only; new cars exempt).</p>
-                  </div>
-                  <Switch
-                    checked={settings.require_safety_inspection === true}
-                    onCheckedChange={(v) => {
-                      if (!v && !window.confirm("Turning this off lets customer disclosures be signed without a completed K-208 safety inspection. Disable the gate?")) return;
-                      updateSettings({ require_safety_inspection: v });
-                    }}
-                    className="data-[state=checked]:bg-teal"
-                  />
-                </div>
-                {settings.require_safety_inspection === true && (
-                  <div className="pl-1 border-l-2 border-border-custom ml-1">
-                    <div className="pl-3">
-                      <span className="text-xs font-semibold text-foreground">Who may sign the K-208</span>
-                      <p className="text-xs text-muted-foreground mb-1.5">Leave all off to accept any signed K-208. Select roles to require the satisfying inspection be signed by a logged-in member with that role (a tech's anonymous QR sign-off won't count).</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {([
-                          { key: "owner", label: "Owner" },
-                          { key: "admin", label: "Admin" },
-                          { key: "general_manager", label: "General Manager" },
-                          { key: "service_manager", label: "Service Manager" },
-                          { key: "service_advisor", label: "Service Writer" },
-                        ] as const).map(({ key, label }) => {
-                          const on = (settings.k208_authority_roles || []).includes(key);
-                          return (
-                            <button key={key} onClick={() => {
-                              if (!window.confirm(`${on ? "Remove" : "Add"} ${label} ${on ? "from" : "to"} the roles allowed to sign the K-208? This changes which inspections satisfy the compliance gate.`)) return;
-                              const cur = settings.k208_authority_roles || [];
-                              updateSettings({ k208_authority_roles: on ? cur.filter((r) => r !== key) : [...cur, key] });
-                            }} className={`h-8 px-3 rounded-full text-xs font-semibold border ${on ? "border-primary bg-primary/10 text-primary" : "border-border-custom text-foreground"}`}>
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="pl-3 mt-3 flex items-center justify-between">
-                      <div className="pr-3">
-                        <span className="text-xs font-semibold text-foreground">Also require licensee certification</span>
-                        <p className="text-xs text-muted-foreground">Block signing until a manager (licensee) certifies the A/B/C result and signs — not just the technician's inspection.</p>
-                      </div>
-                      <Switch
-                        checked={settings.require_k208_licensee_certification === true}
-                        onCheckedChange={(v) => {
-                          if (v && !window.confirm("Require a manager to certify the K-208 (A/B/C result + signature) before customer disclosures can be signed?")) return;
-                          updateSettings({ require_k208_licensee_certification: v });
-                        }}
-                        className="data-[state=checked]:bg-teal"
-                      />
-                    </div>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => navigate("/service/settings")}
-                  className="text-xs font-semibold text-primary hover:underline text-left"
-                >
-                  Full K-208 policy (per-user signer grants, overdue threshold, inspection rules) lives in Service Desk → Settings
-                </button>
-                <div className="flex items-center justify-between">
-                  <div className="pr-3">
-                    <span className="text-sm font-semibold text-foreground">Require install verification before finalizing</span>
-                    <p className="text-xs text-muted-foreground">Block the customer disclosure from being signed until every pre-installed product has a verified install (photo + signature).</p>
-                  </div>
-                  <Switch
-                    checked={settings.require_install_verification === true}
-                    onCheckedChange={(v) => {
-                      if (!v && !window.confirm("Turning this off lets customer disclosures be signed without verified install proof (photo + signature) for pre-installed products. Disable the gate?")) return;
-                      updateSettings({ require_install_verification: v });
                     }}
                     className="data-[state=checked]:bg-teal"
                   />
@@ -2086,124 +1870,11 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
           </div>
         )}
 
-        {/* ─── Label Templates Tab ─── */}
-        {tab === "labels" && (
-          <div className="space-y-3">
-            <LabelDefaultsPanel />
-            <FactoryStickerPanel />
-            <div className="bg-card rounded-lg p-4 shadow-premium">
-              <h4 className="text-sm font-bold text-foreground mb-1">Design your own templates</h4>
-              <p className="text-xs text-muted-foreground mb-2">
-                Browse the template gallery, customize one with your branding, then set it as a
-                default above or from the Used / New chips on any template card.
-              </p>
-              <a href="/sticker-studio" className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold">
-                Open Sticker Studio
-              </a>
-            </div>
-            <StickerPrintTemplates />
-          </div>
-        )}
+        {/* Label templates, approval rules, print calibration and the
+            get-ready setup render from src/pages/admin/views/documents. */}
 
         {/* Analytics + Deal Signings live at /dashboard/reports; Leads at
             /leads; the VIN print queue at /queue. Their ?tab= ids redirect. */}
-
-        {/* ─── Get-Ready Setup Tab ─── */}
-        {/* Config only. The install-proof work surface (records, photos,
-            F&I notify) lives on /prep under Install Proof. */}
-        {tab === "getready" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-sm font-semibold text-foreground">Get-Ready Setup</h3>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Configure the internal service catalog. Day-to-day install proof and records live in{" "}
-                  <button onClick={() => navigate("/prep?view=installs")} className="text-blue-600 font-semibold hover:underline">Prep &amp; Install</button>.
-                </p>
-              </div>
-            </div>
-
-            {/* Configurable internal service catalog (non-customer charge) */}
-            <div id="getready-catalog" className="rounded-2xl border border-border-custom bg-card p-4">
-              <div className="flex items-center justify-between">
-                <button onClick={() => setSvcOpen((o) => !o)} className="flex items-center gap-2 text-left min-w-0">
-                  <span className={`text-muted-foreground transition-transform ${svcOpen ? "rotate-90" : ""}`}>›</span>
-                  <span>
-                    <span className="text-sm font-bold text-foreground">Get-Ready service catalog</span>
-                    <span className="text-[11px] text-muted-foreground ml-2">{svcDraft.length} configured</span>
-                  </span>
-                </button>
-                {svcOpen && (
-                  <button onClick={() => setSvcDraft((s) => [...s, { name: "", responsible_name: "", responsible_email: "", cost: "" }])} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add service</button>
-                )}
-              </div>
-              {svcOpen && (<>
-              <p className="text-[11px] text-muted-foreground mt-1">Internal services you can add to any Get-Ready — routed to a responsible party. Non-customer charge; never billed to the buyer. Changes save automatically.</p>
-              <div className="mt-3 space-y-2">
-                {svcDraft.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No services configured. Add reconditioning, emissions, key cut, etc.</p>
-                ) : svcDraft.map((s, i) => (
-                  <div key={i} className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1.4fr_0.7fr_auto] gap-2">
-                    <input value={s.name} onChange={(e) => setSvcDraft((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Service (e.g. Reconditioning)" className="px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
-                    <input value={s.responsible_name} onChange={(e) => setSvcDraft((p) => p.map((x, j) => j === i ? { ...x, responsible_name: e.target.value } : x))} placeholder="Responsible (Service Dept.)" className="px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
-                    <input value={s.responsible_email} type="email" onChange={(e) => setSvcDraft((p) => p.map((x, j) => j === i ? { ...x, responsible_email: e.target.value } : x))} placeholder="responsible@email.com" className="px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
-                    <input value={s.cost} onChange={(e) => setSvcDraft((p) => p.map((x, j) => j === i ? { ...x, cost: e.target.value } : x))} placeholder="$ cost" className="px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
-                    <button onClick={() => setSvcDraft((p) => p.filter((_, j) => j !== i))} className="h-9 w-9 inline-flex items-center justify-center rounded border border-border-custom text-muted-foreground hover:text-destructive">×</button>
-                  </div>
-                ))}
-              </div>
-              </>)}
-            </div>
-
-            {/* Mobile prep sign-off rules (QR flow at /prep/:vin) */}
-            <div id="getready-prep-rules" className="rounded-2xl border border-border-custom bg-card p-4">
-              <p className="text-sm font-bold text-foreground">Mobile prep sign-off</p>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Rules for the QR work-event flow at /prep/&lt;VIN&gt;. Changes save automatically.
-              </p>
-              <div className="mt-3 space-y-3">
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={settings.prep_require_ro}
-                    onChange={async (e) => {
-                      const ok = await updateSettings({ prep_require_ro: e.target.checked });
-                      if (ok) toast.success("Saved", { id: "prep-rules" });
-                    }}
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className="text-sm text-foreground">Require RO number on Service Install sign-offs</span>
-                </label>
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={settings.prep_detail_photos_required}
-                    onChange={async (e) => {
-                      const ok = await updateSettings({ prep_detail_photos_required: e.target.checked });
-                      if (ok) toast.success("Saved", { id: "prep-rules" });
-                    }}
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                  <span className="text-sm text-foreground">Require photos on Initial Inventory Detail</span>
-                </label>
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">Service tasks that require photo proof</label>
-                  <input
-                    value={prepPhotoTasksDraft}
-                    onChange={(e) => setPrepPhotoTasksDraft(e.target.value)}
-                    placeholder="Mud flaps installed, Running boards installed"
-                    className="w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1">Comma-separated task labels. Matching Service Install tasks show a camera icon and block submit until a photo is attached.</p>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        )}
 
         {/* ─── Invoices Tab ─── */}
         {tab === "invoices" && <InstallerInvoicesPanel />}
@@ -2384,10 +2055,6 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
 
         {/* ─── Audit Log Tab ─── */}
         {tab === "team" && <TeamPanel />}
-
-        {tab === "print-settings" && <PrintSettingsPanel />}
-
-        {tab === "document-rules" && <DocumentRulesPanel />}
 
         {/* ─── Pricing & Incentives Tab ─── */}
         {/* All customer-price controls in one place: doc fee, price display,
