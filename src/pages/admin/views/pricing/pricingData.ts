@@ -5,6 +5,7 @@ import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import { knownCount, type CountValue } from "@/lib/admin/health";
 import type { ApplyResult } from "@/lib/admin/reviewApply";
 import { buildFeeImpact, type FeeDraft, type FeeImpact, type FeeImpactRow } from "@/lib/admin/pricing/feePolicy";
+import { describeFeeBasis, type FeeBasis } from "@/lib/admin/pricing/feeBasis";
 import { assessConsistency, type ConsistencyAssessment, type ConsistencyListing, type WebsiteObservation } from "@/lib/admin/pricing/priceConsistency";
 import type { SampleVehicle } from "@/lib/admin/pricing/productApplicability";
 import type { PriceDisplayMode } from "@/lib/priceModel";
@@ -87,7 +88,7 @@ interface ListingRow {
 const LISTING_COLUMNS =
   "id, vin, year, make, model, trim, condition, mileage, price, advertised_price_before_doc, doc_fee, website_sale_price, price_parse_status, price_last_verified_at, archived_at, hero_image_url, vehicle_file_id, stock:mc_attributes->>stock_no";
 
-const FEE_COLUMNS = "vin, year, make, model, trim, archived_at, advertised_price_before_doc, doc_fee, website_sale_price, price_parse_status, stock:mc_attributes->>stock_no";
+const FEE_COLUMNS = "vin, year, make, model, trim, archived_at, price, advertised_price_before_doc, doc_fee, website_sale_price, price_parse_status, stock:mc_attributes->>stock_no";
 
 export const FEE_ROW_LIMIT = 1000;
 export const CONSISTENCY_LIMIT = 200;
@@ -100,6 +101,7 @@ const toFeeRow = (r: ListingRow): FeeImpactRow => ({
   trim: r.trim,
   stock: r.stock ?? null,
   archived: !!r.archived_at,
+  price: num(r.price),
   advertised_price_before_doc: num(r.advertised_price_before_doc),
   doc_fee: num(r.doc_fee),
   website_sale_price: num(r.website_sale_price),
@@ -141,40 +143,69 @@ export interface FeePreviewResult {
   version: string | number | null;
   truncated: boolean;
   notes: string[];
+  /** Why this change must not be applied as reviewed; null when it may be. */
+  blocked?: string | null;
 }
 
 interface ServerPreview {
   version?: number | string | null;
   computed_at?: string;
+  basis?: FeeBasis;
   eligible?: number | null;
   unchanged?: number | null;
   excluded_archived?: number | null;
-  samples?: Array<{ vin_suffix: string; selling_price: number; fee_before: number; fee_after: number; total_before: number | null; total_after: number }>;
+  no_price_basis?: number | null;
+  invalid?: number | null;
+  split_mismatches?: number | null;
+  source_mismatches?: number | null;
+  samples?: Array<{ vin_suffix: string; selling_price: number; selling_before?: number | null; fee_before: number; fee_after: number; total_before: number | null; total_after: number; source_mismatch?: boolean }>;
   warnings?: string[];
 }
 
-const impactFromServer = (p: ServerPreview, includeArchived: boolean): FeeImpact => ({
-  eligible: p.eligible ?? 0,
-  unchanged: p.unchanged ?? 0,
-  excludedArchived: p.excluded_archived ?? 0,
-  includedArchived: 0,
-  noPrice: 0,
-  parserWarnings: 0,
-  samples: (p.samples ?? []).map((s) => ({
-    vinSuffix: s.vin_suffix,
-    vehicle: `VIN ending ${s.vin_suffix}`,
-    stock: null,
-    sellingPrice: Number(s.selling_price),
-    feeBefore: Number(s.fee_before),
-    feeAfter: Number(s.fee_after),
-    totalBefore: s.total_before == null ? null : Number(s.total_before),
-    totalAfter: Number(s.total_after),
-  })),
-  warnings: p.warnings ?? [],
-  exclusions: includeArchived ? [] : ["Archived records are excluded and require a separate authorized action."],
-});
+// The routine installed before the fee basis contract adds the fee on top of
+// the before-fee price for every tenant. On a tenant whose advertised prices
+// include the fee that moves every advertised total, so it is not offered.
+export const LEGACY_SPLIT_BLOCK =
+  "This dealership advertises prices that include the document fee. The installed recalculation would add the fee on top of the before-fee price and change every advertised total, so applying is held until the fee basis update is installed. Nothing has been changed.";
+const CONFLICT_BLOCK = describeFeeBasis("conflict");
 
-export async function loadFeePreview(tenantId: string, draft: FeeDraft, includeArchived: boolean): Promise<FeePreviewResult> {
+const impactFromServer = (p: ServerPreview, includeArchived: boolean): FeeImpact => {
+  const basis: FeeBasis = p.basis ?? "before_fee";
+  return {
+    basis,
+    eligible: p.eligible ?? 0,
+    unchanged: p.unchanged ?? 0,
+    excludedArchived: p.excluded_archived ?? 0,
+    includedArchived: 0,
+    noPrice: p.no_price_basis ?? 0,
+    invalid: p.invalid ?? 0,
+    splitMismatches: p.split_mismatches ?? 0,
+    sourceMismatches: p.source_mismatches ?? 0,
+    parserWarnings: 0,
+    samples: (p.samples ?? []).map((s) => ({
+      vinSuffix: s.vin_suffix,
+      vehicle: `VIN ending ${s.vin_suffix}`,
+      stock: null,
+      sellingPrice: Number(s.selling_price),
+      sellingBefore: s.selling_before == null ? null : Number(s.selling_before),
+      feeBefore: Number(s.fee_before),
+      feeAfter: Number(s.fee_after),
+      totalBefore: s.total_before == null ? null : Number(s.total_before),
+      totalAfter: Number(s.total_after),
+      basis,
+      sourceMismatch: !!s.source_mismatch,
+    })),
+    warnings: p.warnings ?? [],
+    exclusions: includeArchived ? [] : ["Archived records are excluded and require a separate authorized action."],
+  };
+};
+
+/**
+ * The dry-run for one draft. `tenantBasis` is the dealership's fee basis read
+ * from its settings (resolveFeeBasis); it decides whether the routine that
+ * answered may be used at all.
+ */
+export async function loadFeePreview(tenantId: string, draft: FeeDraft, includeArchived: boolean, tenantBasis: FeeBasis = "before_fee"): Promise<FeePreviewResult> {
   const { data, error } = await db().rpc("admin_doc_fee_change_preview", {
     p_tenant_id: tenantId,
     p_enabled: draft.enabled,
@@ -183,16 +214,19 @@ export async function loadFeePreview(tenantId: string, draft: FeeDraft, includeA
   });
   if (!error && data && typeof data === "object") {
     const p = data as ServerPreview;
-    return { impact: impactFromServer(p, includeArchived), source: "server", version: p.version ?? null, truncated: false, notes: [] };
+    const blocked = p.basis === "conflict" || (p.basis == null && tenantBasis === "conflict") ? CONFLICT_BLOCK
+      : p.basis == null && tenantBasis === "includes_fee" ? LEGACY_SPLIT_BLOCK : null;
+    return { impact: impactFromServer(p, includeArchived), source: "server", version: p.version ?? null, truncated: false, notes: [], blocked };
   }
   if (error && !isMissingFunction(error)) throw readError(error, "The change preview could not be computed.");
   const { rows, truncated } = await loadFeeImpactRows(tenantId);
-  const impact = buildFeeImpact(rows, draft, { includeArchived });
+  const impact = buildFeeImpact(rows, draft, { includeArchived, basis: tenantBasis });
   const notes = [
     `${PENDING_MIGRATION_COPY} Counts were computed in the browser from inventory rows${truncated ? ` (first ${FEE_ROW_LIMIT.toLocaleString()} vehicles only)` : ""}.`,
     FALLBACK_APPLY_WARNING,
   ];
-  return { impact, source: "client", version: null, truncated, notes };
+  const blocked = tenantBasis === "conflict" ? CONFLICT_BLOCK : tenantBasis === "includes_fee" ? LEGACY_SPLIT_BLOCK : null;
+  return { impact, source: "client", version: null, truncated, notes, blocked };
 }
 
 export interface PolicyVersion {
@@ -421,11 +455,11 @@ export const useWebsitePriceTerm = (tenantId: string | null, enabled: boolean) =
     staleTime: 5 * 60_000,
   });
 
-export const useFeePreview = (args: { tenantId: string | null; draft: FeeDraft | null; includeArchived: boolean; enabled: boolean }) =>
+export const useFeePreview = (args: { tenantId: string | null; draft: FeeDraft | null; includeArchived: boolean; basis: FeeBasis; enabled: boolean }) =>
   useQuery({
-    queryKey: [KEY, "pricing", "fee-preview", args.tenantId, args.draft?.enabled, args.draft?.amount, args.draft?.stateCode, args.includeArchived],
+    queryKey: [KEY, "pricing", "fee-preview", args.tenantId, args.draft?.enabled, args.draft?.amount, args.draft?.stateCode, args.includeArchived, args.basis],
     enabled: args.enabled && !!args.tenantId && !!args.draft,
-    queryFn: () => loadFeePreview(args.tenantId as string, args.draft as FeeDraft, args.includeArchived),
+    queryFn: () => loadFeePreview(args.tenantId as string, args.draft as FeeDraft, args.includeArchived, args.basis),
     staleTime: 0,
     gcTime: 0,
   });

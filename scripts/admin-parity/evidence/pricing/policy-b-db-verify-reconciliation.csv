@@ -1,0 +1,11 @@
+kind,tenant_id,basis,basis_source,action,listing_id,vin_suffix,archived,price,before_fee,doc_fee,website_sale_price,configured_fee,policy_before_fee,policy_total,findings,vehicles
+row,b0000000-0000-4000-8000-000000000001,before_fee,price_display_mode,no price to anchor on; no change,c0000000-0000-4000-8000-000000000005,000005,f,,,,,895.00,,,no_basis,
+row,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,no price to anchor on; no change,c0000000-0000-4000-8000-000000000305,000000,f,,,,,895.00,,,no_basis,
+row,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,"review source mismatch; observed prices kept, no automatic change",c0000000-0000-4000-8000-000000000302,030000,f,30000.00,29105,895,30500,895.00,29105.00,30000.00,website_price_differs_from_total,
+row,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,"review: before-fee price and total disagree; skipped by fee changes, no automatic change",c0000000-0000-4000-8000-000000000303,020000,f,20000.00,20000,895,20000,895.00,19105.00,20000.00,derived_split_stale,
+summary,b0000000-0000-4000-8000-000000000001,before_fee,price_display_mode,consistent,,,,,,,,,,,,4
+summary,b0000000-0000-4000-8000-000000000001,before_fee,price_display_mode,no price to anchor on; no change,,,,,,,,,,,,1
+summary,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,consistent,,,,,,,,,,,,3
+summary,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,no price to anchor on; no change,,,,,,,,,,,,1
+summary,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,"review source mismatch; observed prices kept, no automatic change",,,,,,,,,,,,1
+summary,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,"review: before-fee price and total disagree; skipped by fee changes, no automatic change",,,,,,,,,,,,1

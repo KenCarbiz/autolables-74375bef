@@ -6,7 +6,7 @@ vi.mock("@/integrations/supabase/client", async () => {
   return { supabase: m.supabaseSpy };
 });
 
-import { applyFeeChange, feeReviewHref, isMissingFunction, loadFeePreview, loadPolicyVersion, parseFeeReviewParams } from "./pricingData";
+import { applyFeeChange, feeReviewHref, isMissingFunction, LEGACY_SPLIT_BLOCK, loadFeePreview, loadPolicyVersion, parseFeeReviewParams } from "./pricingData";
 
 const draft = { enabled: true, amount: 925, stateCode: "CT" };
 const rows = [
@@ -49,6 +49,28 @@ describe("fee preview", () => {
     expect(p.impact).toMatchObject({ eligible: 5, unchanged: 1, excludedArchived: 2, warnings: ["w"] });
     expect(p.impact.samples[0]).toMatchObject({ vinSuffix: "000001", totalAfter: 30925 });
     expect(spyCalls.some((c) => c.kind === "table")).toBe(false);
+  });
+
+  it("holds a fee-inclusive dealership's change when the installed preview predates the fee basis contract", async () => {
+    // The deployed routine's answer for the traced vehicle: before-fee + fee = $40,450 beside a $40,420 label.
+    spyResponses.rpcs.admin_doc_fee_change_preview = { data: { version: 3, eligible: 1, unchanged: 0, excluded_archived: 0, samples: [{ vin_suffix: "040420", selling_price: 39525, fee_before: 895, fee_after: 925, total_before: 40420, total_after: 40450 }], warnings: [] }, error: null };
+    const inclusive = await loadFeePreview("tenant-1", draft, false, "includes_fee");
+    expect(inclusive.blocked).toBe(LEGACY_SPLIT_BLOCK);
+    expect((await loadFeePreview("tenant-1", draft, false, "before_fee")).blocked).toBeNull();
+  });
+
+  it("reads the fee basis contract's answer: the total kept, the split moved, mismatches counted", async () => {
+    spyResponses.rpcs.admin_doc_fee_change_preview = { data: { version: 3, basis: "includes_fee", eligible: 3, unchanged: 0, excluded_archived: 1, no_price_basis: 1, invalid: 1, source_mismatches: 1,
+      samples: [{ vin_suffix: "040420", selling_price: 39495, selling_before: 39525, selling_after: 39495, fee_before: 895, fee_after: 925, total_before: 40420, total_after: 40420, source_mismatch: false }], warnings: [] }, error: null };
+    const p = await loadFeePreview("tenant-1", draft, false, "includes_fee");
+    expect(p.blocked).toBeNull();
+    expect(p.impact).toMatchObject({ basis: "includes_fee", eligible: 3, invalid: 1, sourceMismatches: 1, noPrice: 1 });
+    expect(p.impact.samples[0]).toMatchObject({ sellingBefore: 39_525, sellingPrice: 39_495, totalBefore: 40_420, totalAfter: 40_420 });
+  });
+
+  it("holds every change while the basis settings contradict each other", async () => {
+    spyResponses.rpcs.admin_doc_fee_change_preview = { data: { version: 3, basis: "conflict", eligible: 0, samples: [], warnings: [] }, error: null };
+    expect((await loadFeePreview("tenant-1", draft, false, "includes_fee")).blocked).toMatch(/contradict/);
   });
 
   it("computes the impact in the browser when the contract is not installed and says so", async () => {

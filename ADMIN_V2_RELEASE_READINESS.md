@@ -720,7 +720,7 @@ Protocol v2 (agreed) with v1 historical:
 No screen reaches 95%. Only 06 (94.15%) is in the individually reviewable
 band; the other twelve are below 94% and not passed.
 
-### 10.9 Open pricing conflict: fee change on a fee-inclusive vehicle (traced on `1dd1d4b`)
+### 10.9 Pricing conflict: fee change on a fee-inclusive vehicle (traced on `1dd1d4b`, policy B prepared)
 
 One coherent fee-inclusive vehicle, fee $895 to $925, traced through the
 real paths:
@@ -758,17 +758,84 @@ differs from the advertised total by +$30".
 On the `advertised_before_doc` basis the paths agree: the Passport shows
 the before-fee $39,525 + $925 = $40,450.
 
-**Not decided.** Two consistent policies are possible, and choosing one is
-an owner decision:
-- (A) The before-fee price is authoritative. A fee change moves the
-  customer total to $40,450, which needs the save path or the display to
-  stop anchoring on `price` for fee-inclusive tenants.
-- (B) The inventory total is authoritative. A fee change keeps $40,420 and
-  reduces the selling portion, which needs the dry-run and save paths to
-  stop deriving totals from `advertised_price_before_doc`.
+**Decided: policy B** (owner, 2026-10-28). On a fee-inclusive tenant the
+inventory total is authoritative.
 
-No code or data was changed for this trace. The screen 05 preview
-currently follows (B) because it mirrors the Passport.
+The fix is prepared, not applied:
+- `supabase/proposed/20261031000000_doc_fee_basis_policy_b.sql`. It has not
+  been applied to any hosted project. There was no backfill and no deploy.
+- Client code that mirrors it: `src/lib/admin/pricing/feeBasis.ts`.
+
+**Fee basis** (`doc_fee_basis` / `resolveFeeBasis`):
+- `includes_fee` when `advertised_includes_doc_fee` is true (or the legacy
+  `advertised_excludes_doc_fee` is false).
+- If neither key is set, the basis follows the display mode: `includes_fee`
+  when `price_display_mode` is `website_sale_price`, otherwise `before_fee`.
+- `conflict` when the two keys contradict each other. Nothing is applied
+  under a conflict.
+
+**Source versus derived fields**, read from marketcheck-sync and
+crawl-advertised-prices:
+
+| Basis | Source (kept by a fee change) | Derived (rewritten by a fee change) |
+| --- | --- | --- |
+| includes_fee | `price` (advertised total); `website_sale_price` (observation, never rewritten, never used to reprice) | `advertised_price_before_doc` = `price` - fee |
+| before_fee | `advertised_price_before_doc` | `website_sale_price` = before-fee + fee |
+
+**Rows the fix skips.** A fee-inclusive row is skipped (`split_mismatch`)
+when its stored before-fee price plus its current fee does not equal
+`price`. The row is left exactly as stored and reported. Which value is
+the newer observation cannot be known here, so neither is rewritten to
+make them agree.
+
+**The traced vehicle under policy B:**
+
+| Step | Selling portion | Fee | Advertised total |
+| --- | --- | --- | --- |
+| Before | 39,525 | 895 | 40,420 |
+| Screen 05 draft preview | 39,495 | 925 | 40,420 |
+| Screen 06 dry-run sample | 39,525 -> 39,495 | 895 -> 925 | 40,420 -> 40,420 (No change) |
+| Saved, reloaded row | `advertised_price_before_doc` 39,495 | 925 | `price` 40,420; `website_sale_price` 40,420 (kept) |
+| Label | n/a | n/a | 40,420 |
+| Passport | 39,495 | 925 | 40,420 |
+
+The same vehicle on a fee-exclusive tenant: before-fee 39,525 is kept, and
+39,525 + 925 = 40,450.
+
+**Until the migration is applied:**
+- For a fee-inclusive dealership, the review now holds Apply whenever the
+  installed preview does not report a basis, that is, the deployed routine.
+  The deployed routine would write 40,450.
+- Fee-exclusive dealerships are unaffected.
+
+**Read-only reconciliation of existing rows.**
+`scripts/db-verify/fee-basis-reconciliation.sql` runs in a READ ONLY
+transaction. A counts-only summary was read from the hosted database on
+2026-10-28. No identifiers or prices are recorded here.
+- Tenant 1 (`includes_fee` from the setting):
+  - Active vehicles: 85 consistent, 43 whose before-fee price does not add
+    up to the total, 2 without a price.
+  - Archived vehicles: 185 consistent, 12 that do not add up, 3 without a
+    price.
+- Tenant 2: one active vehicle stored as before-fee = total; it also fails
+  the fee check.
+- In every row that disagrees, `website_sale_price` equals before-fee +
+  fee. The disagreement is therefore between the stored before-fee price
+  and `price`. These rows need review: none is repriced or backfilled, and
+  policy B skips them.
+
+**Verification** (isolated database, every case rolled back):
+- 1,035 cases, run with `scripts/db-verify/run.sh --policy-b`.
+- All fee-conflict (deployed), reconciliation and policy B cases pass.
+- The deployed conflict is pinned in `31_fee_conflict_deployed.sql`.
+- The only failures are the 6 known `live`-stage cases of the pre-fix
+  preview (section 4).
+- Results: `scripts/admin-parity/evidence/pricing/policy-b-db-verify*.csv`.
+
+**Screen 06 parity re-measured** with the new example row:
+- Content 94.11% (was 94.15%).
+- Full 88.44% (was 88.47%).
+- Landmarks ok.
 
 ## 11. Approvals requested
 

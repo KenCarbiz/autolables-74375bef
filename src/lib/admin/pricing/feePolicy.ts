@@ -1,5 +1,6 @@
 import { STATE_DOC_FEES, type DocFeeConfig } from "@/data/docFees";
 import type { PriceDisplayMode } from "@/lib/priceModel";
+import { describeFeeBasis, planFeeChange, type FeeBasis } from "./feeBasis";
 
 // The documentation-fee policy as a reviewable draft, plus the pure dry-run
 // that mirrors the server's recalculation predicate. Nothing here writes.
@@ -64,6 +65,8 @@ export interface FeeImpactRow {
   trim: string | null;
   stock: string | null;
   archived: boolean;
+  /** The inventory price: the advertised total on an includes_fee basis. */
+  price?: number | null;
   advertised_price_before_doc: number | null;
   doc_fee: number | null;
   website_sale_price: number | null;
@@ -74,81 +77,105 @@ export interface FeeImpactSample {
   vinSuffix: string;
   vehicle: string;
   stock: string | null;
+  /** The vehicle price after the change (before the fee). */
   sellingPrice: number;
+  sellingBefore: number | null;
   feeBefore: number;
   feeAfter: number;
   totalBefore: number | null;
   totalAfter: number;
+  basis: FeeBasis;
+  /** A stored website price that disagrees with the advertised total; preserved. */
+  sourceMismatch: boolean;
 }
 
 export interface FeeImpact {
+  basis: FeeBasis;
   eligible: number;
   unchanged: number;
   excludedArchived: number;
   includedArchived: number;
   noPrice: number;
+  invalid: number;
+  /** Fee-inclusive rows whose stored before-fee price does not add up to the total; skipped. */
+  splitMismatches: number;
+  sourceMismatches: number;
   parserWarnings: number;
   samples: FeeImpactSample[];
   warnings: string[];
   exclusions: string[];
 }
 
-const cents = (n: number | null | undefined): number | null => (n == null || !Number.isFinite(Number(n)) ? null : Math.round(Number(n) * 100));
+const storedOf = (r: Pick<FeeImpactRow, "price" | "advertised_price_before_doc" | "doc_fee" | "website_sale_price">) => ({
+  price: r.price == null ? null : Number(r.price),
+  advertisedBeforeDoc: r.advertised_price_before_doc == null ? null : Number(r.advertised_price_before_doc),
+  websiteSalePrice: r.website_sale_price == null ? null : Number(r.website_sale_price),
+  docFee: r.doc_fee == null ? null : Number(r.doc_fee),
+});
 
 /**
- * The server predicate, cent for cent: a row is touched only when its stored
- * fee or its stored total would change. Rows without an advertised price are
- * never touched.
+ * The server predicate, cent for cent (doc_fee_row_plan): a row is touched
+ * only when its fee or a derived price would change. Rows with nothing to
+ * anchor on are never touched.
  */
-export function rowNeedsUpdate(row: Pick<FeeImpactRow, "advertised_price_before_doc" | "doc_fee" | "website_sale_price">, fee: number): boolean {
-  const adv = cents(row.advertised_price_before_doc);
-  if (adv == null) return false;
-  const feeC = cents(fee) ?? 0;
-  const storedFee = cents(row.doc_fee);
-  const storedTotal = cents(row.website_sale_price);
-  return storedFee !== feeC || storedTotal !== adv + feeC;
+export function rowNeedsUpdate(row: Pick<FeeImpactRow, "price" | "advertised_price_before_doc" | "doc_fee" | "website_sale_price">, fee: number, basis: FeeBasis = "before_fee"): boolean {
+  return planFeeChange(basis, storedOf(row), fee).status === "change";
 }
 
 export const vehicleLabel = (r: Pick<FeeImpactRow, "year" | "make" | "model" | "trim">): string =>
   [r.year, r.make, r.model].filter((x) => x != null && `${x}`.trim() !== "").join(" ") + (r.trim ? ` ${r.trim}` : "");
 
-export function buildFeeImpact(rows: FeeImpactRow[], draft: FeeDraft, opts: { includeArchived?: boolean; sampleSize?: number } = {}): FeeImpact {
+export function buildFeeImpact(rows: FeeImpactRow[], draft: FeeDraft, opts: { includeArchived?: boolean; sampleSize?: number; basis?: FeeBasis } = {}): FeeImpact {
   const fee = effectiveFee(draft);
+  const basis = opts.basis ?? "before_fee";
   const sampleSize = opts.sampleSize ?? 3;
   let eligible = 0;
   let unchanged = 0;
   let excludedArchived = 0;
   let includedArchived = 0;
   let noPrice = 0;
+  let invalid = 0;
+  let splitMismatches = 0;
+  let sourceMismatches = 0;
   let parserWarnings = 0;
   const samples: FeeImpactSample[] = [];
   for (const r of rows) {
-    if (r.advertised_price_before_doc == null) { noPrice += 1; continue; }
-    if (r.archived && !opts.includeArchived) { excludedArchived += 1; continue; }
+    const plan = planFeeChange(basis, storedOf(r), fee);
+    if (plan.status === "no_basis") { if (!r.archived) noPrice += 1; continue; }
+    if (r.archived && !opts.includeArchived) { if (plan.status === "change") excludedArchived += 1; continue; }
+    if (plan.sourceMismatch) sourceMismatches += 1;
+    if (plan.status === "invalid") { invalid += 1; continue; }
+    if (plan.status === "split_mismatch") { splitMismatches += 1; continue; }
+    if (plan.status !== "change") { unchanged += 1; continue; }
     if (r.archived) includedArchived += 1;
-    if (!rowNeedsUpdate(r, fee)) { unchanged += 1; continue; }
     eligible += 1;
     if (r.price_parse_status === "warning") parserWarnings += 1;
     if (samples.length < sampleSize) {
-      const selling = Number(r.advertised_price_before_doc);
       samples.push({
         vinSuffix: r.vin.slice(-6),
         vehicle: vehicleLabel(r),
         stock: r.stock,
-        sellingPrice: selling,
+        sellingPrice: plan.sellingAfter as number,
+        sellingBefore: plan.sellingBefore,
         feeBefore: Number(r.doc_fee ?? 0),
         feeAfter: fee,
-        totalBefore: r.website_sale_price == null ? null : Number(r.website_sale_price),
-        totalAfter: round2(selling + fee),
+        totalBefore: plan.totalBefore,
+        totalAfter: plan.totalAfter as number,
+        basis,
+        sourceMismatch: plan.sourceMismatch,
       });
     }
   }
-  const warnings: string[] = [];
+  const warnings: string[] = [describeFeeBasis(basis)];
+  if (invalid > 0) warnings.push(`${invalid} ${invalid === 1 ? "vehicle" : "vehicles"} would be left with no vehicle price under this fee and ${invalid === 1 ? "is" : "are"} skipped.`);
+  if (splitMismatches > 0) warnings.push(`${splitMismatches} ${splitMismatches === 1 ? "vehicle has" : "vehicles have"} a stored before-fee price that does not add up to the advertised total; ${splitMismatches === 1 ? "it is" : "they are"} skipped and left as stored for review.`);
+  if (sourceMismatches > 0) warnings.push(`${sourceMismatches} ${sourceMismatches === 1 ? "vehicle carries" : "vehicles carry"} a website price that differs from the advertised total; it is preserved for review and not used to reprice.`);
   if (parserWarnings > 0) warnings.push(`${parserWarnings} eligible ${parserWarnings === 1 ? "vehicle carries" : "vehicles carry"} a price parser warning; the warning and its source observation date are preserved.`);
   const exclusions: string[] = [];
   if (!opts.includeArchived) exclusions.push("Archived records are excluded and require a separate authorized action.");
   if (noPrice > 0) exclusions.push(`${noPrice} ${noPrice === 1 ? "vehicle has" : "vehicles have"} no advertised price and cannot be recalculated.`);
-  return { eligible, unchanged, excludedArchived, includedArchived, noPrice, parserWarnings, samples, warnings, exclusions };
+  if (basis === "conflict") return { basis, eligible: 0, unchanged, excludedArchived: 0, includedArchived: 0, noPrice, invalid: 0, splitMismatches: 0, sourceMismatches: 0, parserWarnings: 0, samples: [], warnings, exclusions };
+  return { basis, eligible, unchanged, excludedArchived, includedArchived, noPrice, invalid, splitMismatches, sourceMismatches, parserWarnings, samples, warnings, exclusions };
 }
 
 export interface FeeDiffRow {

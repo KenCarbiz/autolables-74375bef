@@ -12,7 +12,8 @@ import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { useViewFixture } from "@/lib/admin/dataSource";
 import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, resolveAdminTab, visibleSections, visibleTabs, type AdminVisibilityContext } from "@/lib/admin/sections";
 import { canApply, initialReviewApply, newIdempotencyKey, reviewApplyReducer, type ImpactSnapshot, type ReviewApplyEvent, type ReviewApplyState } from "@/lib/admin/reviewApply";
-import { feeChangeDiff, feeDraftFromSettings, feeDraftWarnings, fmtMoney, validateFeeDraft, type FeeDraft } from "@/lib/admin/pricing/feePolicy";
+import { feeChangeDiff, feeDraftFromSettings, feeDraftWarnings, fmtMoney, validateFeeDraft, type FeeDraft, type FeeImpactSample } from "@/lib/admin/pricing/feePolicy";
+import { describeFeeBasis, resolveFeeBasis, type FeeBasis } from "@/lib/admin/pricing/feeBasis";
 import { STATE_DOC_FEES } from "@/data/docFees";
 import type { PriceDisplayMode } from "@/lib/priceModel";
 import { AdminPageContainer, AdminShell } from "@/components/admin/v2/AdminShell";
@@ -35,6 +36,8 @@ export interface FeeReviewFixture {
   before: FeeDraft;
   after: FeeDraft;
   mode: PriceDisplayMode;
+  /** The dealership's fee basis; defaults to the one its display mode implies. */
+  basis?: FeeBasis;
   scope: FeeScope;
   version: PolicyVersion;
   preview: FeePreviewResult;
@@ -115,6 +118,20 @@ const Tile = ({ icon: Icon, tone, value, label, hint, filled = false }: { icon: 
   </div>
 );
 
+const MISMATCH_NOTE = "The website shows a different price; it is kept for review.";
+
+// The vehicle price before the fee. On a fee-inclusive basis it is the part
+// of the kept total that the fee does not take, so it moves when the fee does.
+const SellingChange = ({ s }: { s: FeeImpactSample }) =>
+  s.sellingBefore != null && Math.round(s.sellingBefore * 100) !== Math.round(s.sellingPrice * 100) ? (
+    <Change before={s.sellingBefore} after={s.sellingPrice} neutral />
+  ) : (
+    <>
+      <p className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{fmtMoney(s.sellingPrice)}</p>
+      <p className="text-[13px] leading-[18px] text-adm-muted">No change</p>
+    </>
+  );
+
 const Thumb = () => (
   <span aria-hidden="true" className="w-[65px] h-10 rounded-md bg-adm-workspace flex-shrink-0 inline-flex items-center justify-center">
     <img src={vehiclePlaceholder} alt="" className="w-[62%] h-auto" />
@@ -127,7 +144,7 @@ const DeltaMark = ({ down = false }: { down?: boolean }) => (
   </svg>
 );
 
-const Change = ({ before, after }: { before: number | null; after: number }) => {
+const Change = ({ before, after, neutral = false }: { before: number | null; after: number; neutral?: boolean }) => {
   const d = before == null ? null : after - before;
   const up = d != null && d > 0.005;
   const down = d != null && d < -0.005;
@@ -138,7 +155,7 @@ const Change = ({ before, after }: { before: number | null; after: number }) => 
         <MoveRight className="w-[17px] h-[17px] text-adm-muted flex-shrink-0" aria-hidden="true" />
         <span>{fmtMoney(after)}</span>
       </p>
-      <p className={cn("mt-0 flex items-center gap-1.5 text-[13px] leading-[18px] tabular-nums", up ? "text-adm-danger" : down ? "text-adm-success" : "text-adm-muted")}>
+      <p className={cn("mt-0 flex items-center gap-1.5 text-[13px] leading-[18px] tabular-nums", neutral ? "text-adm-muted" : up ? "text-adm-danger" : down ? "text-adm-success" : "text-adm-muted")}>
         {d == null ? "Previous total unknown" : up || down ? (
           <>
             <DeltaMark down={down} />
@@ -199,13 +216,14 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
     return parsed.provided ? reduce(s, { type: "edit", draft: parsed.draft }) : s;
   });
   const mode: PriceDisplayMode = fixture?.mode ?? settings.price_display_mode ?? "advertised_before_doc";
+  const basis: FeeBasis = fixture?.basis ?? resolveFeeBasis(fixture ? { price_display_mode: fixture.mode } : settings).basis;
 
   const role = member?.role;
   const roleAllowed = isAdmin || APPLY_ROLES.has(`${role ?? ""}`.trim().toLowerCase());
   const canManage = fixture ? fixture.canManage : roleAllowed && hasDealerCapability(role, "can_manage_settings", isAdmin);
 
   const previewing = state.phase === "validating" || state.phase === "reviewing" || state.phase === "applying";
-  const preview = useFeePreview({ tenantId, draft: state.draft, includeArchived: scope === "all", enabled: live && previewing });
+  const preview = useFeePreview({ tenantId, draft: state.draft, includeArchived: scope === "all", basis, enabled: live && previewing });
   const version = usePolicyVersion(tenantId, live && previewing);
 
   useEffect(() => {
@@ -259,14 +277,17 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
   const unchanged = state.draft.enabled === state.original.enabled && state.draft.amount === state.original.amount && state.draft.stateCode === state.original.stateCode;
   const versionKnown = state.impact?.version != null;
   const gate = canApply(state);
+  const blocked = previewResult?.blocked ?? null;
   const applyReason = !canManage
     ? "Your role cannot apply pricing changes. Ask an owner, general manager or GSM."
+    : blocked
+      ? blocked
     : !versionKnown
       ? "The policy version could not be read, so the change cannot be applied safely."
       : gate.ok
         ? null
         : gate.reason ?? null;
-  const applyEnabled = state.phase === "reviewing" && canManage && versionKnown && gate.ok && (fixture ? true : !!tenantId);
+  const applyEnabled = state.phase === "reviewing" && canManage && !blocked && versionKnown && gate.ok && (fixture ? true : !!tenantId);
 
   const startReview = () => {
     const errs = validateFeeDraft(state.draft);
@@ -437,7 +458,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               <section aria-labelledby="fee-expected-impact">
                 <h3 id="fee-expected-impact" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Expected impact</h3>
                 <div className="mt-3.5 space-y-2">
-                  <Tile icon={CarFront} filled tone="success" value={eligibleCount == null ? "Unknown" : eligibleCount.toLocaleString()} label={`${eligibleLabel} eligible`} hint="Rows will be updated only when values differ" />
+                  <Tile icon={CarFront} filled tone="success" value={eligibleCount == null ? "Unknown" : eligibleCount.toLocaleString()} label={`${eligibleLabel} eligible`} hint={(impact?.basis ?? basis) === "includes_fee" ? "Totals stay; the fee comes out of the vehicle price" : "Rows will be updated only when values differ"} />
                   {scope === "all" ? (
                     <Tile icon={Archive} tone="neutral" value={impact ? impact.includedArchived.toLocaleString() : "Unknown"} label="archived vehicles included" hint="Archived records will be recalculated too" />
                   ) : (
@@ -465,10 +486,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
                       <dl className="mt-2 divide-y divide-adm-border">
                         <div className="flex items-start justify-between gap-3 py-2">
                           <dt className="text-[13px] leading-[20px] font-semibold text-adm-ink">Selling price</dt>
-                          <dd className="flex flex-col items-end">
-                            <p className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{fmtMoney(s.sellingPrice)}</p>
-                            <p className="text-[13px] leading-[18px] text-adm-muted">No change</p>
-                          </dd>
+                          <dd className="flex flex-col items-end"><SellingChange s={s} /></dd>
                         </div>
                         <div className="flex items-start justify-between gap-3 py-2">
                           <dt className="text-[13px] leading-[20px] font-semibold text-adm-ink">Document fee</dt>
@@ -479,6 +497,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
                           <dd className="flex flex-col items-end"><Change before={s.totalBefore} after={s.totalAfter} /></dd>
                         </div>
                       </dl>
+                      {s.sourceMismatch && <p className="pb-2 text-[12px] leading-[18px] text-adm-warning">{MISMATCH_NOTE}</p>}
                     </li>
                   ))}
                 </ul>
@@ -504,12 +523,12 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
                               </div>
                             </div>
                           </Td>
-                          <Td>
-                            <p className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{fmtMoney(s.sellingPrice)}</p>
-                            <p className="text-[13px] leading-[18px] text-adm-muted">No change</p>
-                          </Td>
+                          <Td><SellingChange s={s} /></Td>
                           <Td><Change before={s.feeBefore} after={s.feeAfter} /></Td>
-                          <Td><Change before={s.totalBefore} after={s.totalAfter} /></Td>
+                          <Td>
+                            <Change before={s.totalBefore} after={s.totalAfter} />
+                            {s.sourceMismatch && <p className="text-[12px] leading-[18px] text-adm-warning">{MISMATCH_NOTE}</p>}
+                          </Td>
                         </tr>
                       ))}
                     </tbody>
@@ -527,8 +546,9 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               ) : (
                 <InlineNote tone="warning" className="border-[#FCE3B6]">Source verification dates and mismatch flags will be preserved.</InlineNote>
               )}
+              {blocked && <InlineNote tone="danger" title="This change cannot be applied yet.">{blocked}</InlineNote>}
               {scope === "active" && <InlineNote tone="neutral">Archived records require a separate authorized action.</InlineNote>}
-              {impact?.warnings.map((w) => (
+              {impact?.warnings.filter((w) => w !== describeFeeBasis("includes_fee") && w !== describeFeeBasis("before_fee")).map((w) => (
                 <InlineNote key={w} tone="warning">{w}</InlineNote>
               ))}
               {previewResult?.notes.filter((n) => !/existing recalculation/.test(n)).map((n) => (

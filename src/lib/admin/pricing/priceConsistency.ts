@@ -127,9 +127,20 @@ export function assessConsistency(
     ? listing.advertisedBeforeDoc + docFee - label
     : 0;
   const breakdownAgrees = Math.abs(breakdownDifference) < TOLERANCE;
-  const breakdownText = breakdownAgrees || listing.advertisedBeforeDoc == null
-    ? null
-    : `Stored breakdown (${money(listing.advertisedBeforeDoc)} before fee + ${money(docFee)} fee = ${money(listing.advertisedBeforeDoc + docFee)}) differs from the advertised total by ${signedMoney(breakdownDifference)}.`;
+  // On the fee-inclusive basis website_sale_price is an observation of the
+  // dealer's total, never derived from it, so disagreeing with the label is a
+  // source mismatch to review. It is reported, not reconciled.
+  const storedWebsiteDifference = basis === "includes_fee" && label != null && listing.websiteSalePrice != null
+    ? listing.websiteSalePrice - label
+    : 0;
+  const breakdownText = [
+    breakdownAgrees || listing.advertisedBeforeDoc == null
+      ? null
+      : `Stored breakdown (${money(listing.advertisedBeforeDoc)} before fee + ${money(docFee)} fee = ${money(listing.advertisedBeforeDoc + docFee)}) differs from the advertised total by ${signedMoney(breakdownDifference)}.`,
+    Math.abs(storedWebsiteDifference) < TOLERANCE
+      ? null
+      : `Stored website price ${money(listing.websiteSalePrice as number)} differs from the advertised total by ${signedMoney(storedWebsiteDifference)}; it is kept for review.`,
+  ].filter(Boolean).join(" ") || null;
 
   if (website == null || label == null) {
     const base = website == null ? "No website observation for this vehicle yet." : "No stored label price to compare.";
@@ -154,7 +165,7 @@ export function assessConsistency(
   const websiteAgrees = Math.abs(difference) < TOLERANCE;
   const passportAgrees = Math.abs(passportDifference) < TOLERANCE;
   const parserWarning = listing.parseStatus === "warning";
-  const status: ConsistencyStatus = websiteAgrees && passportAgrees && breakdownAgrees && !parserWarning ? "consistent" : "mismatch";
+  const status: ConsistencyStatus = websiteAgrees && passportAgrees && !breakdownText && !parserWarning ? "consistent" : "mismatch";
   const basisText = basis === "includes_fee" ? "advertised total including the document fee" : "price before the document fee";
   const disagreements = [
     websiteAgrees ? null : `Website differs from the label by ${signedMoney(difference)} on the ${basisText}.`,

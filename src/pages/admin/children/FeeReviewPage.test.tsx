@@ -5,6 +5,7 @@ import { renderAdmin } from "@/test/adminRender";
 import { resetSupabaseSpy, rpcCalls, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
 import { SCREEN_06 } from "@/pages/admin/fixtures/06";
 import { FEE_REVIEW_FIXTURE } from "@/pages/admin/fixtures/pricingFixtureData";
+import { LEGACY_SPLIT_BLOCK } from "@/pages/admin/views/pricing/pricingData";
 
 vi.mock("@/integrations/supabase/client", async () => {
   const m = await import("@/test/mocks/supabaseSpy");
@@ -82,7 +83,7 @@ describe("FeeReviewPage with the 06 fixture", () => {
     expect(within(summary).getByText("13")).toBeInTheDocument();
     expect(within(d).getByText("48")).toBeInTheDocument();
     expect(within(d).getByText("active vehicles eligible")).toBeInTheDocument();
-    expect(within(d).getByText("Rows will be updated only when values differ")).toBeInTheDocument();
+    expect(within(d).getByText("Totals stay; the fee comes out of the vehicle price")).toBeInTheDocument();
     expect(within(d).getByText("No changes will be made to archived records")).toBeInTheDocument();
     expect(within(within(d).getByRole("table", { name: "Example vehicles" })).getAllByRole("row")).toHaveLength(2);
     expect(within(d).getByText("Source verification dates and mismatch flags will be preserved.")).toBeInTheDocument();
@@ -92,13 +93,13 @@ describe("FeeReviewPage with the 06 fixture", () => {
     expect(writeCalls()).toEqual([]);
   });
 
-  it("lists each example vehicle with labelled fee and advertised-total changes for narrow screens", () => {
+  it("lists each example vehicle for narrow screens: the fee moves the split, the advertised total stays", () => {
     renderPage("/admin/pricing/fee-review", SCREEN_06.fixture);
     const list = within(dialog()).getByRole("list", { name: "Example vehicles" });
     const item = within(list).getAllByRole("listitem")[0];
-    expect(within(item).getByText("Selling price").nextElementSibling).toHaveTextContent("$18,525No change");
+    expect(within(item).getByText("Selling price").nextElementSibling).toHaveTextContent("$18,525$18,495$30");
     expect(within(item).getByText("Document fee").nextElementSibling).toHaveTextContent("$895$925$30");
-    expect(within(item).getByText("Advertised total").nextElementSibling).toHaveTextContent("$19,420$19,450$30");
+    expect(within(item).getByText("Advertised total").nextElementSibling).toHaveTextContent("$19,420$19,420No change");
   });
 
   it("returns to Price rules with the draft on Escape and on Close, writing nothing", () => {
@@ -113,6 +114,17 @@ describe("FeeReviewPage with the 06 fixture", () => {
     renderPage("/admin/pricing/fee-review", SCREEN_06.fixture);
     fireEvent.click(within(dialog()).getByRole("button", { name: "Close review" }));
     expect(JSON.parse(screen.getByTestId("returned").textContent ?? "null")).toMatchObject({ draft: { amount: 925 } });
+  });
+
+  it("disables Apply and says why when the review is held", () => {
+    renderPage("/admin/pricing/fee-review", { ...SCREEN_06.fixture, views: { ...SCREEN_06.fixture.views, "fee-review": { ...FEE_REVIEW_FIXTURE, preview: { ...FEE_REVIEW_FIXTURE.preview, blocked: LEGACY_SPLIT_BLOCK } } } });
+    expect(within(dialog()).getByRole("button", { name: "Apply to 48 active vehicles" })).toBeDisabled();
+    expect(within(dialog()).getAllByText(LEGACY_SPLIT_BLOCK).length).toBeGreaterThan(0);
+  });
+
+  it("states the fee basis: the advertised total is kept and the fee comes out of the vehicle price", () => {
+    renderPage("/admin/pricing/fee-review", SCREEN_06.fixture);
+    expect(within(dialog()).getByText("Totals stay; the fee comes out of the vehicle price")).toBeInTheDocument();
   });
 
   it("disables Apply for a role without pricing authority and says why", () => {

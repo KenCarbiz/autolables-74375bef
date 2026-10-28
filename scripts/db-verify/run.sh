@@ -9,10 +9,13 @@
 #   live          the hosted state as it is
 #   preview fix   plus supabase/migrations/20261029120000_fix_fee_preview_warnings.sql
 #   pricing       plus the proposed pricing-authority migration (--proposed)
+#   fee conflict  a fee-inclusive tenant through the deployed fee functions,
+#                 and the read-only reconciliation report
+#   policy B      plus the proposed fee basis migration (--policy-b)
 #
 # Nothing here connects to a hosted project.
 #
-#   PGHOST=/path/to/socket PGPORT=54329 scripts/db-verify/run.sh [--proposed]
+#   PGHOST=/path/to/socket PGPORT=54329 scripts/db-verify/run.sh [--proposed] [--policy-b]
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 DB=${VERIFY_DB:-admin_v2_verify}
@@ -50,7 +53,30 @@ stage 'preview fix'
 run supabase/migrations/20261029120000_fix_fee_preview_warnings.sql
 run scripts/db-verify/10_live.sql
 
-if [[ "${1:-}" == "--proposed" ]]; then
+stage 'fee conflict (deployed)'
+run scripts/db-verify/04_fee_basis_fixture.sql
+run scripts/db-verify/31_fee_conflict_deployed.sql
+RECON=$(mktemp)
+CHECKSUM="SELECT md5(string_agg(t::text, ',' ORDER BY id)) FROM public.vehicle_listings t"
+"${PSQL[@]}" -d "$DB" -c "CREATE TABLE t.recon_checksums (checksum text); GRANT SELECT ON t.recon_checksums TO authenticated" \
+  -c "INSERT INTO t.recon_checksums $CHECKSUM"
+"${PSQL[@]}" -d "$DB" --csv -f scripts/db-verify/fee-basis-reconciliation.sql > "$RECON"
+"${PSQL[@]}" -d "$DB" -c "INSERT INTO t.recon_checksums $CHECKSUM" \
+  -c "CREATE TABLE t.recon (kind text, tenant_id uuid, basis text, basis_source text, action text, listing_id text, vin_suffix text, archived boolean,
+        price numeric, before_fee numeric, doc_fee numeric, website_sale_price numeric, configured_fee numeric, policy_before_fee numeric, policy_total numeric,
+        findings text, vehicles bigint); GRANT SELECT ON t.recon TO authenticated" \
+  -c "\\copy t.recon FROM '$RECON' WITH CSV HEADER"
+cp "$RECON" "${OUT%.csv}-reconciliation.csv"; rm -f "$RECON"
+run scripts/db-verify/32_fee_reconciliation.sql
+
+if [[ " $* " == *" --policy-b "* ]]; then
+  stage 'policy B'
+  run supabase/proposed/20261031000000_doc_fee_basis_policy_b.sql
+  run scripts/db-verify/10_live.sql
+  run scripts/db-verify/30_fee_basis.sql
+fi
+
+if [[ " $* " == *" --proposed "* ]]; then
   stage 'pricing proposal'
   run supabase/proposed/20261030000000_pricing_authority_delegation.sql
   run scripts/db-verify/20_proposed.sql

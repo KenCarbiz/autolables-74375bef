@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { customerPrice, type StoredListingPrice } from "@/lib/admin/pricing/previewPricing";
+import { resolveFeeBasis } from "@/lib/admin/pricing/feeBasis";
 import vehiclePlaceholder from "@/assets/admin-v2/artwork/vehicle-placeholder.svg";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, FileText, Globe, Info, Pencil, Tag } from "lucide-react";
@@ -96,7 +97,7 @@ const previewFromRows = (rows: ConsistencyAssessment[]): PreviewVehicle | null =
     trim: row.listing.trim,
     stock: row.listing.stock,
     imageUrl: row.listing.heroImageUrl,
-    stored: { price: row.listing.price, advertisedBeforeDoc: row.listing.advertisedBeforeDoc, websiteSalePrice: row.listing.websiteSalePrice },
+    stored: { price: row.listing.price, advertisedBeforeDoc: row.listing.advertisedBeforeDoc, websiteSalePrice: row.listing.websiteSalePrice, docFee: row.listing.docFee },
     vehicleType: conditionOfListing(row.listing.condition),
   };
 };
@@ -224,7 +225,8 @@ export default function PriceRulesView() {
 
   const preview = fixture ? fixture.preview : consistencyRows ? previewFromRows(consistencyRows) : null;
   const previewFee = effectiveFee(editing ? draft : stored);
-  const previewPrice = preview ? customerPrice(preview.stored, previewFee, policy.mode) : null;
+  const feeBasis = resolveFeeBasis(fixture ? { price_display_mode: policy.mode } : settings).basis;
+  const previewPrice = preview ? customerPrice(preview.stored, previewFee, policy.mode, feeBasis) : null;
   const previewCard = preview && previewPrice
     ? buildSalePriceCard({
         vehicleType: preview.vehicleType,

@@ -54,7 +54,7 @@ export const CONSISTENCY_ROWS: ConsistencyAssessment[] = [
 export const PRICE_RULES_FIXTURE: PriceRulesFixture = {
   policy: { stateCode: "CT", feeEnabled: true, feeAmount: 895, mode: "website_sale_price" },
   counts: { eligible: knownCount(48), archived: knownCount(12) },
-  preview: { title: "2024 Example Crossover", trim: "Premium", stock: "EX-1041", imageUrl: null, stored: { price: CONSISTENCY_ROWS[0].listing.price, advertisedBeforeDoc: CONSISTENCY_ROWS[0].listing.advertisedBeforeDoc, websiteSalePrice: CONSISTENCY_ROWS[0].listing.websiteSalePrice }, vehicleType: "used" },
+  preview: { title: "2024 Example Crossover", trim: "Premium", stock: "EX-1041", imageUrl: null, stored: { price: CONSISTENCY_ROWS[0].listing.price, advertisedBeforeDoc: CONSISTENCY_ROWS[0].listing.advertisedBeforeDoc, websiteSalePrice: CONSISTENCY_ROWS[0].listing.websiteSalePrice, docFee: CONSISTENCY_ROWS[0].listing.docFee }, vehicleType: "used" },
   consistency: { rows: CONSISTENCY_ROWS, truncated: false },
   websiteTerm: "Sale Price",
   // Review and Close stay inside the design fixtures, so the round trip can be exercised.
@@ -62,7 +62,9 @@ export const PRICE_RULES_FIXTURE: PriceRulesFixture = {
 };
 
 // The first row is the review's example vehicle; like the reference's, its
-// name fits the example table's 258px vehicle column on one line.
+// name fits the example table's 258px vehicle column on one line. Prices
+// include the fee, as on Price rules: the advertised total is kept and the
+// fee change moves the split.
 export const FEE_IMPACT_ROWS: FeeImpactRow[] = Array.from({ length: 60 }, (_, i) => {
   const n = i + 1;
   const selling = 18_000 + n * 525;
@@ -74,6 +76,7 @@ export const FEE_IMPACT_ROWS: FeeImpactRow[] = Array.from({ length: 60 }, (_, i)
     trim: n === 1 ? null : TRIMS[n % TRIMS.length],
     stock: `EX-${1000 + n}`,
     archived: n > 48,
+    price: selling + 895,
     advertised_price_before_doc: selling,
     doc_fee: 895,
     website_sale_price: selling + 895,
@@ -90,9 +93,10 @@ export const FEE_REVIEW_FIXTURE: FeeReviewFixture = {
   before: FEE_BEFORE,
   after: FEE_AFTER,
   mode: "website_sale_price",
+  basis: "includes_fee",
   scope: "active",
   version: { version: 12, source: "server" },
-  preview: { impact: buildFeeImpact(FEE_IMPACT_ROWS, FEE_AFTER, { includeArchived: false, sampleSize: 1 }), source: "server", version: 12, truncated: false, notes: [] },
+  preview: { impact: buildFeeImpact(FEE_IMPACT_ROWS, FEE_AFTER, { includeArchived: false, sampleSize: 1, basis: "includes_fee" }), source: "server", version: 12, truncated: false, notes: [], blocked: null },
   canManage: true,
   backHref: "/admin/design-fixture/05",
 };

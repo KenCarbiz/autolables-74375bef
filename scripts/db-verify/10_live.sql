@@ -194,7 +194,8 @@ SELECT t.expect('fee review', 'preview counts (eligible|unchanged|archived exclu
   '3|0|1|1|3|1');
 SELECT t.expect('fee review', 'preview warnings name the vehicles without a basis, the parse warning, and that verification dates are kept', 'owner',
   $q$SELECT r->'warnings' FROM public.admin_doc_fee_change_preview('b0000000-0000-4000-8000-000000000001', true, 900) r$q$,
-  '["1 active vehicle(s) have no advertised price basis and are not affected.", "1 active vehicle(s) carry a price parse warning; it is preserved.", "Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation."]');
+  CASE WHEN t.stage() = 'policy B' THEN '["Advertised prices exclude the fee: each vehicle price is kept and the fee is added on top.", ' ELSE '[' END
+  || '"1 active vehicle(s) have no advertised price basis and are not affected.", "1 active vehicle(s) carry a price parse warning; it is preserved.", "Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation."]');
 SELECT t.expect('fee review', 'preview with archived stock included counts the archived row as eligible', 'owner',
   $q$SELECT concat_ws('|', r->>'eligible', r->>'excluded_archived') FROM public.admin_doc_fee_change_preview('b0000000-0000-4000-8000-000000000001', true, 900, true) r$q$,
   '4|0');
@@ -317,6 +318,6 @@ SELECT t.check('fee recalculation', 'it reaches archived stock and restamps veri
      UPDATE public.dealer_profiles SET settings = settings || '{"doc_fee_amount": 900}' WHERE tenant_id = 'b0000000-0000-4000-8000-000000000001';;
      SELECT t.become('owner');;
      SELECT public.recalc_tenant_doc_fee('b0000000-0000-4000-8000-000000000001')$q$, 'ok',
-  $q$SELECT concat_ws('|', (SELECT doc_fee FROM public.vehicle_listings WHERE id = 'c0000000-0000-4000-8000-000000000004'),
+  $q$SELECT concat_ws('|', (SELECT doc_fee::numeric(12,2) FROM public.vehicle_listings WHERE id = 'c0000000-0000-4000-8000-000000000004'),
        (SELECT count(*) FROM public.vehicle_listings WHERE price_last_verified_at > now() - interval '1 minute'),
-       (SELECT count(*) FROM public.vehicle_listings WHERE price_parse_status = 'warning'))$q$, '900|4|0');
+       (SELECT count(*) FROM public.vehicle_listings WHERE price_parse_status = 'warning'))$q$, '900.00|4|0');

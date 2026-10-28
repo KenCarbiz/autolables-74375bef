@@ -104,7 +104,8 @@ describe("fee impact dry run", () => {
     expect(impact.samples).toHaveLength(1);
     expect(impact.samples[0]).toMatchObject({ vinSuffix: "000001", sellingPrice: 30_000, feeBefore: 895, feeAfter: 925, totalBefore: 30_895, totalAfter: 30_925 });
     expect(impact.parserWarnings).toBe(1);
-    expect(impact.warnings[0]).toMatch(/preserved/);
+    expect(impact.warnings[0]).toMatch(/^Advertised prices exclude the fee/);
+    expect(impact.warnings.some((w) => /parser warning.*preserved/.test(w))).toBe(true);
   });
 
   it("treats a disabled fee as a zero fee in the dry run", () => {

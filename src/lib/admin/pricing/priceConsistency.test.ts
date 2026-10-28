@@ -98,7 +98,7 @@ describe("price consistency on the fee-inclusive display basis", () => {
     expect(a.delta).toBe(895);
     expect(a.websiteBasis).toBe("as_shown");
     expect(a.breakdownDelta).toBe(895);
-    expect(a.detail).toBe("Website differs from the label by +$895 on the advertised total including the document fee. Stored breakdown ($39,525 before fee + $895 fee = $40,420) differs from the advertised total by +$895.");
+    expect(a.detail).toBe("Website differs from the label by +$895 on the advertised total including the document fee. Stored breakdown ($39,525 before fee + $895 fee = $40,420) differs from the advertised total by +$895. Stored website price $40,420 differs from the advertised total by +$895; it is kept for review.");
   });
 
   // A coherent fee-inclusive listing: the inventory price is the total, the stored breakdown is price before fee + fee.
@@ -141,7 +141,7 @@ describe("stored breakdown against the fee-inclusive total", () => {
   });
 
   it("with a zero fee, a total equal to the price before fee is consistent", () => {
-    const a = assessConsistency(listing({ price: 30_000, advertisedBeforeDoc: 30_000, docFee: 0 }), obs(30_000), 0, "website_sale_price");
+    const a = assessConsistency(listing({ price: 30_000, advertisedBeforeDoc: 30_000, docFee: 0, websiteSalePrice: 30_000 }), obs(30_000), 0, "website_sale_price");
     expect(a.breakdownDelta).toBe(0);
     expect(a.status).toBe("consistent");
   });
