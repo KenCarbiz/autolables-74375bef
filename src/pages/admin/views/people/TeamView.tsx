@@ -146,7 +146,7 @@ export default function TeamView() {
     // rest) keep every role and department on one line; below that the columns size to their content.
     // A long address wraps rather than truncating, since it is the member's only identifier.
     return (
-      <AdminTable caption="Team members" inset className="relative mx-[18px] mb-[18px] rounded-lg xl:min-h-[554px] 2xl:[&>table]:table-fixed">
+      <AdminTable caption="Team members" inset className="relative mx-[18px] mb-[18px] rounded-lg xl:min-h-[554px] 2xl:[&_table]:table-fixed">
         <thead>
           <tr>
             <SortableTh label="Employee" sortKey="employee" sort={sort} onSort={onSort} className="min-w-[190px] 2xl:min-w-0" />

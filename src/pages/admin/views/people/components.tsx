@@ -129,7 +129,7 @@ const MATRIX_HEAD = "px-[14px] py-[9px] text-[13px] leading-[18px] text-adm-ink"
 // The scroll wrapper is positioned so the cells' screen-reader text stays inside it on narrow
 // screens, where the table keeps a 640px width and scrolls inside its box.
 export const CapabilityMatrixTable = ({ matrix }: { matrix: CapabilityMatrix }) => (
-  <AdminTable caption="Role capabilities by task" inset className="relative mx-5 mb-[15px] rounded-lg [&>table]:min-w-[640px]">
+  <AdminTable caption="Role capabilities by task" inset className="relative mx-5 mb-[15px] rounded-lg [&_table]:min-w-[640px]">
     <thead>
       <tr>
         <Th className={MATRIX_HEAD}>Capability</Th>

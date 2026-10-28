@@ -51,7 +51,7 @@ export const ScrollRegion = ({
         role={scrollable ? "region" : undefined}
         aria-label={scrollable ? `${label} (scrolls sideways)` : undefined}
         tabIndex={scrollable ? 0 : undefined}
-        className={cn("overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary rounded-[inherit]", innerClassName)}
+        className={cn("relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary rounded-[inherit]", innerClassName)}
       >
         {children}
       </div>
