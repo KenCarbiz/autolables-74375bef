@@ -193,9 +193,15 @@ Every new policy follows the repository pattern: `(SELECT auth.uid())` and
 `TO authenticated`. Service role, cron, migrations and platform admins are
 unaffected by design.
 
-**RLS and RPC changes applied in this build:** none. Callers treat Postgres
-`42883` and PostgREST `PGRST202` as "pending migration" and fall back
-honestly (section I).
+**RLS and RPC changes applied:** migration 1 was applied by the owner
+through Lovable on 2026-10-28 at about 11:13 UTC and verified (section 4 of
+`ADMIN_V2_SERVER_AUTHORITY.md`, SQL checks, confirmed again read-only from
+this session: SECURITY DEFINER on every function, execute rights limited to
+`authenticated` and `service_role`, argument names matching the client
+calls, row security on the apply ledger, the version trigger present). The
+fee review, the feed's last-success read, the job status read and the policy
+version now run on the server. Migration 2 is not applied; its callers keep
+the honest fallbacks (section I).
 
 **Client gating.** Every V2 view and child derives its edit rights from
 `hasDealerCapability` over the same capability table the legacy tabs used
@@ -337,16 +343,18 @@ documents. Lovable reads `main`; there is no feature flag. The V2 route
 replaces `/admin` for every role at once; the legacy page remains in the tree
 as the embedded body of the unpictured tabs.
 
-**Migrations (not applied).** Apply through Lovable, on the owner's word,
-migration 1 then migration 2, verifying each with section 4 of
-`ADMIN_V2_SERVER_AUTHORITY.md` before the next; avoid the feed window
-(07:00 UTC) and the crawl window (07:20 UTC). Until applied every caller
-falls back honestly: the fee review computes its impact in the browser from
-at most 1000 rows, shows "pending migration" and the archived-rows and
-verification-stamp warnings, applies through the existing routine only after
-review and audits client-side; last feed success comes from a whole-ledger
-query; job status comes from `get_cron_job_status`; policy version falls
-back to the profile update stamp and Apply is blocked when neither reads.
+**Migrations.** Migration 1 is applied (2026-10-28, about 11:13 UTC,
+verified; the Lovable runner recorded it as
+`drizzle/migrations/0001_admin_v2_policy_apply.sql`, body unchanged, and
+wrote no `supabase_migrations.schema_migrations` row). Migration 2 waits on
+the owner's two role decisions and is applied the same way, outside the feed
+window (07:00 UTC) and the crawl window (07:20 UTC), verified with section 4
+of `ADMIN_V2_SERVER_AUTHORITY.md`. Until then its callers fall back
+honestly: settings writes are still accepted from any member by the server
+(the UI gates by capability), products and product rules keep the
+member-wide policies, and no server audit row is written for policy-class
+settings changes. The migration 1 fallbacks (browser-computed fee impact,
+whole-ledger feed success, `get_cron_job_status`) are no longer exercised.
 
 **Edge function (not deployed).** `supabase/functions/passport-lead-escalation`
 is rewritten on `supabase/functions/_shared/escalation.ts`. Deploying changes
@@ -376,7 +384,7 @@ migration 1 (additive: columns, ledger, functions), then migration 2
 
 | Item | Owner | Blocker | Safe current behaviour |
 |---|---|---|---|
-| Apply migration 1 and 2 | Owner, through Lovable | Authorization | Honest fallbacks listed in H; the UI gates by capability, the server accepts any member as before |
+| Apply migration 2 (migration 1 is applied and verified) | Owner, through Lovable, after the two role decisions below | Authorization | The UI gates by capability; the server accepts any member's settings, product and rule writes as before |
 | Deploy `passport-lead-escalation` | Owner, through Lovable | Authorization | The live sweep keeps its pre-existing behaviour (advances on any send attempt); the Administration child shows legacy rows as Attempted, never Accepted |
 | Visual parity below 97 on screens listed in F | Owner | The title-block exception and glyph rendering (F) | The screens pass their landmark and overflow gates where listed; the parity report itemises hotspots |
 | Price-column guard roles (`can_edit_inventory` holders, not only the four pricing roles) | Owner | Decision, `ADMIN_V2_SERVER_AUTHORITY.md` section 9.1 | Migration text uses the wider set so inventory surfaces keep working |

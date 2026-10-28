@@ -1,8 +1,8 @@
 # Administration V2: server authority and policy apply
 
-Prepared 2026-10-28. **Not applied.** Two migrations, applied only on the
-owner's explicit authorization, through the usual Lovable migration path,
-in this order:
+Prepared 2026-10-28. **Migration 1 applied; migration 2 not applied.** Two
+migrations, applied only on the owner's explicit authorization, through the
+usual Lovable migration path, in this order:
 
 1. `supabase/migrations/20261029000000_admin_v2_policy_apply.sql`
 2. `supabase/migrations/20261029001000_admin_v2_settings_authority.sql`
@@ -10,6 +10,32 @@ in this order:
 Migration 2 depends on migration 1 (`tenant_role_in`). Neither touches an
 existing migration. Both are re-runnable (`IF NOT EXISTS`, `OR REPLACE`,
 `DROP ... IF EXISTS` before each `CREATE POLICY` and `CREATE TRIGGER`).
+
+**Status, 2026-10-28.** Migration 1 was applied by the owner through Lovable
+at about 11:13 UTC, outside the feed and crawl windows. The applied file
+matched `main` at `6746a95` (same content hash); the runner recorded it under
+its own name, `drizzle/migrations/0001_admin_v2_policy_apply.sql`, with the
+body unchanged, and wrote no row to `supabase_migrations.schema_migrations`,
+so that ledger does not list it. Dry-run (section 3) before applying: 0
+members would lose direct `dealer_profiles` writes, 0 would lose `products`
+or `product_rules` writes, 0 legacy role values; listing impact at the
+current fee: the pilot rooftop carries 128 active and 197 archived listings
+with a fee basis, 0 would change, 3 active parse warnings; a second tenant
+carries 1 active listing. Verified after applying (section 4, SQL checks,
+confirmed again read-only from this session): all seven new functions plus
+the nine pre-existing `admin_%` functions show `prosecdef = true`; the new
+functions are executable by `authenticated` and `service_role` only; their
+argument names match the client calls (`p_tenant_id`, `p_enabled`,
+`p_amount`, `p_include_archived`, and `p_expected_version` plus
+`p_idempotency_key` on apply); `policy_version` is not null with default 1
+and both dealer profiles read 1; `price_recalculated_at` is null on all 331
+listings; `admin_policy_applications` has row security on, one tenant read
+policy, SELECT for `authenticated` and full rights for `service_role`, and
+no rows; the trigger `dealer_profiles_bump_policy_version` is present and
+enabled. The signed-in checks in section 4 (a pricing role calling the fee
+functions, a salesperson refused with `42501`) were not run by SQL; they are
+exercised through the application. Migration 2 waits on the two role
+decisions in section 9.
 
 Text-level tests live in `src/lib/admin/sql/` and run with
 `bunx vitest run src/lib/admin/sql`. They hold the SQL to the rules below;
@@ -342,6 +368,25 @@ Then, from the app:
 Roll back in reverse order: migration 2 first, then migration 1. Migration
 2's policies and trigger depend on `tenant_role_in`, so dropping the helper
 first fails with a dependency error (which is the right outcome).
+
+### 5.0 Grants snapshot before migration 2 (read 2026-10-28, after migration 1)
+
+The owner's read-only login could not read grant information during the
+dry-run; this is the snapshot from this session, which the rollback of
+migration 2 restores for the anon revoke:
+
+| Table | anon | authenticated | service_role |
+|---|---|---|---|
+| `dealer_profiles` | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE | all | all |
+| `products` | SELECT | all | all |
+| `product_rules` | none | all | all |
+| `vehicle_listings` | DELETE, INSERT, REFERENCES, TRIGGER, TRUNCATE, UPDATE (no SELECT) | all | all |
+| `admin_policy_applications` | none | SELECT | all |
+
+Row-level security, not these grants, is what keeps anon out of
+`dealer_profiles` and `vehicle_listings` today; migration 2 revokes the anon
+grants on `dealer_profiles` as a second line, and the rollback recommends
+leaving that revoke in place.
 
 ### 5.1 Rollback of migration 2
 
