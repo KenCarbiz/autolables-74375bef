@@ -42,8 +42,8 @@ export interface FeeReviewFixture {
 
 const APPLY_ROLES = new Set(["owner", "admin", "general_manager", "gsm"]);
 const FOCUSABLE = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
-// The dialog top sits 125px under the product header in the 1600x1000 protocol frame.
-const DIALOG_TOP = 125;
+// The dialog top sits 123px under the product header in the reference frame.
+const DIALOG_TOP = 123;
 
 type FeeState = ReviewApplyState<FeeDraft>;
 type FeeEvent = ReviewApplyEvent<FeeDraft>;
@@ -93,7 +93,7 @@ const StepItem = ({ n, label, status, trailing = false, className }: { n: number
 // Reference tile: a 48px circle with a 26px glyph, a 24px count, a 14px
 // label and a 13px hint, 112px tall.
 const Tile = ({ icon: Icon, tone, value, label, hint, filled = false }: { icon: typeof CarFront; tone: "success" | "neutral"; value: string; label: string; hint: string; filled?: boolean }) => (
-  <div data-landmark="fee-impact-tile" className="flex items-start gap-5 rounded-[8px] border border-adm-border bg-adm-workspace pl-[17px] pr-4 pt-[14px] pb-[11px] min-h-[113px]">
+  <div data-landmark="fee-impact-tile" className="flex items-start gap-5 rounded-[8px] border border-adm-border bg-adm-workspace pl-[17px] pr-4 pt-[14px] pb-[11px] min-h-[112px]">
     <span aria-hidden="true" className={cn("-mt-[2px] w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", tone === "success" ? "bg-adm-success-bg text-adm-success" : "bg-adm-border/50 text-adm-muted")}>
       <Icon className={cn("w-[26px] h-[26px]", filled && "fill-current")} />
     </span>
@@ -308,7 +308,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         )}
       </div>
       <div className="absolute inset-0 z-40 bg-[#626A75]/[0.64]" onClick={close} aria-hidden="true" />
-      {/* The reference draws the review 17px left of the content column centre on desktop; narrow widths centre it. */}
+      {/* The reference draws the review 18px left of the content column centre on desktop; narrow widths centre it. */}
       <div aria-hidden="true" data-landmark="fee-review-top" className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: DIALOG_TOP }} />
       <div
         ref={dialogRef}
@@ -318,7 +318,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         tabIndex={-1}
         onKeyDown={onKeyDown}
         style={{ top: DIALOG_TOP }}
-        className="absolute z-50 left-1/2 -translate-x-1/2 lg:left-[calc(50%-17px)] w-[min(915px,calc(100%-32px))] rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none px-[27px] pt-[22px] pb-6 text-adm-ink"
+        className="absolute z-50 left-1/2 -translate-x-1/2 lg:left-[calc(50%-18px)] w-[min(907px,calc(100%-32px))] rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none px-[26px] pt-[22px] pb-6 text-adm-ink"
       >
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -330,9 +330,9 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
           </button>
         </header>
         {/* At the reference width the circles sit at the measured x (116, 362 and 634px into the content box); narrower dialogs share the row evenly. */}
-        <ol className="mt-[18px] mx-auto xl:mx-0 xl:ml-[117px] flex items-center flex-wrap gap-y-3 w-full max-w-[640px] xl:max-w-none xl:w-auto" data-landmark="fee-review-steps" aria-label="Review steps">
-          <StepItem n={1} label="Edit" status={step > 1 ? "done" : "current"} trailing className="xl:flex-none xl:w-[248px]" />
-          <StepItem n={2} label="Review" status={step === 2 ? "current" : step > 2 ? "done" : "todo"} trailing className="xl:flex-none xl:w-[274px]" />
+        <ol className="mt-[18px] mx-auto xl:mx-0 xl:ml-[116px] flex items-center flex-wrap gap-y-3 w-full max-w-[640px] xl:max-w-none xl:w-auto" data-landmark="fee-review-steps" aria-label="Review steps">
+          <StepItem n={1} label="Edit" status={step > 1 ? "done" : "current"} trailing className="xl:flex-none xl:w-[246px]" />
+          <StepItem n={2} label="Review" status={step === 2 ? "current" : step > 2 ? "done" : "todo"} trailing className="xl:flex-none xl:w-[272px]" />
           <StepItem n={3} label="Apply" status={step === 3 ? (state.phase === "applied" ? "done" : "current") : "todo"} />
         </ol>
 
@@ -381,15 +381,15 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
             )}
             {state.error && state.phase === "reviewing" && <InlineNote tone="danger" className="mt-[31px]">{state.error}</InlineNote>}
 
-            <div className={cn("grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_315px] gap-7 items-start", state.phase === "conflict" || state.phase === "invalidated" || (state.error && state.phase === "reviewing") ? "mt-5" : "mt-[29px]")}>
+            <div className={cn("grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_312px] gap-7 items-start", state.phase === "conflict" || state.phase === "invalidated" || (state.error && state.phase === "reviewing") ? "mt-5" : "mt-7")}>
               <section aria-labelledby="fee-change-summary" data-landmark="fee-change-summary">
                 <h3 id="fee-change-summary" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Change summary</h3>
                 <div className="mt-3 rounded-[8px] border border-adm-border overflow-hidden">
-                  <AdminTable caption="Before and after" className={cn(TABLE_CLASS, "[&_td]:py-[10.5px]")}>
+                  <AdminTable caption="Before and after" className={cn(TABLE_CLASS, "[&_td]:py-[10px]")}>
                     <thead>
                       <tr>
-                        <Th className="w-[195px]">Field</Th>
-                        <Th className="w-[169px]">Before</Th>
+                        <Th className="w-[193px]">Field</Th>
+                        <Th className="w-[168px]">Before</Th>
                         <Th>After</Th>
                       </tr>
                     </thead>
@@ -424,12 +424,12 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               <h3 id="fee-sample-impact" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Example vehicle impact</h3>
               {impact && impact.samples.length > 0 ? (
                 <div className="mt-[11px] rounded-[8px] border border-adm-border overflow-hidden">
-                  <AdminTable caption="Example vehicles" className={cn(TABLE_CLASS, "[&_th]:pt-[9px] [&_th]:pb-[9px] [&_td]:py-[11.5px]")}>
+                  <AdminTable caption="Example vehicles" className={cn(TABLE_CLASS, "[&_th]:pt-[9px] [&_td]:py-[11px]")}>
                     <thead>
                       <tr>
-                        <Th className="w-[260px]">Vehicle</Th>
-                        <Th className="w-[169px]">Selling price</Th>
-                        <Th className="w-[194px]">Document fee</Th>
+                        <Th className="w-[258px]">Vehicle</Th>
+                        <Th className="w-[168px]">Selling price</Th>
+                        <Th className="w-[192px]">Document fee</Th>
                         <Th>Advertised total</Th>
                       </tr>
                     </thead>
@@ -461,7 +461,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               )}
             </section>
 
-            <div className="mt-[18px] space-y-[9px] [&>div]:py-[8px] [&>div>svg]:w-6 [&>div>svg]:h-6">
+            <div className="mt-[19px] space-y-[9px] [&>div]:py-[7.5px] [&>div>svg]:w-6 [&>div>svg]:h-6">
               {previewResult?.source === "client" ? (
                 <InlineNote tone="warning">Until the dedicated routine is installed, applying uses the existing recalculation, which also updates archived vehicles and refreshes each recalculated vehicle's verification stamp.</InlineNote>
               ) : (

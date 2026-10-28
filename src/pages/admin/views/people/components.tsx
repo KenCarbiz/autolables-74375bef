@@ -194,7 +194,7 @@ export const EnforcementRail = ({ rows }: { rows: EnforcementRow[] }) => (
         const meta = ENFORCEMENT_STATUS_META[r.status];
         const Icon = POINT_ICONS[r.point];
         return (
-          <li key={r.point} className="flex flex-wrap items-start gap-x-3 gap-y-3 pl-[17px] pr-[10px] pt-[23px] pb-[18px]">
+          <li key={r.point} className="flex flex-wrap items-start gap-x-3 gap-y-3 pl-[17px] pr-[10px] pt-[21px] pb-[20px]">
             <Icon className={cn(ROW_ICON, "mt-[2px] mr-[11px]")} aria-hidden="true" />
             <div className="min-w-[160px] flex-1">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.title}</p>
