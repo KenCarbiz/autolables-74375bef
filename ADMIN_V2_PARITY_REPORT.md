@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T21:33:20.227Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-28T22:15:05.834Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -193,12 +193,12 @@ Masks (3): member address in the capabilities description (fixture); mock-only a
 
 ## Screen 05
 
-Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 89.94% is below 95%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/05-pricing-products.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 89.87% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 90.71% | 69.79% | 89.94% | 65.57% | 90.46% (+9px) | 66.28% | 96.57% | 66.90% | 6.19% |
-| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 90.26% | 69.68% | 89.69% | 65.76% | n/a | n/a | n/a | n/a | 6.27% |
+| 1586x992 | `scripts/admin-parity/out/05-1586x992.png` | 90.65% | 69.82% | 89.87% | 65.62% | 90.40% (+9px) | 66.33% | 96.55% | 66.69% | 6.19% |
+| 1600x1000 | `scripts/admin-parity/out/05-1600x1000.png` | 90.22% | 69.71% | 89.64% | 65.79% | n/a | n/a | n/a | n/a | 6.27% |
 
 Rail stand-in: 228px (the mock's rail width); content region starts at x=231.
 Section row bottom: reference y=158, capture y=167 (title block offset +9px).
@@ -240,12 +240,12 @@ Masks (29): change impact counts (fixture inventory sizes); preview vehicle name
 
 ## Screen 06
 
-Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 94.16% is below 95%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 94.15% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 88.48% | 82.32% | 94.16% | 81.96% | 94.11% (+0px) | 81.82% | 98.15% | 84.96% | 4.12% |
-| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.37% | 73.51% | 90.34% | 70.94% | n/a | n/a | n/a | n/a | 4.05% |
+| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 88.47% | 82.33% | 94.15% | 81.98% | 94.10% (+0px) | 81.85% | 98.15% | 84.94% | 4.12% |
+| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.37% | 73.52% | 90.34% | 70.96% | n/a | n/a | n/a | n/a | 4.05% |
 
 Rail stand-in: 243px (the mock's rail width); content region starts at x=246.
 Body anchor (pinned in landmarks.json): reference y=187, capture y=187 (title block offset +0px).

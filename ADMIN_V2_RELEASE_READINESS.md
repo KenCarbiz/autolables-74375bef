@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | Not met; exceptions pending | Protocol v2 on `346ba3d`: 06 at 94.16% (individual review); 12 screens below 94%; mobile pass verified (section 10.7) | Owner visual review |
+| 16 | Visual acceptance | Not met; exceptions pending | Protocol v2 on `1dd1d4b`: 06 at 94.15% (individual review); 12 screens below 94%; mobile pass and 05 pricing correction verified (sections 10.7-10.8) | Owner visual review |
 
 ## 2. How the evidence was produced
 
@@ -623,6 +623,102 @@ Separated outcomes:
 Scores: 06 (94.16%) is in the individually reviewable band. The other 12
 are below 94% and not passed. 05 fell 0.77 points because the honest
 Mismatch rows and basis note now show.
+
+### 10.8 Screen 05 preview pricing, implementation commit `1dd1d4b`
+
+Owner-authorized, scoped correction (2026-10-28). Evidence:
+`scripts/admin-parity/evidence/pricing/05-preview-before-after.png`.
+
+Trace:
+- Stored `price`: on the fee-inclusive basis (`price_display_mode =
+  website_sale_price`) it is the advertised total including the document
+  fee. `resolveDisplayPrice` anchors on it, and Label and Passport show it.
+  On the `advertised_before_doc` basis the displayed price excludes the fee.
+- Fee-inclusion policy: there is no per-listing column. The tenant's
+  display mode decides; `advertised_excludes_doc_fee` is absent on
+  listings, as `priceBasis.ts` documents.
+- Saved fee change (`recalc_tenant_doc_fee`): sets `doc_fee` and
+  `website_sale_price = advertised_price_before_doc + fee`, and never
+  changes `price`.
+- Passport (`buildPassportSaleCard`): selling = price - fee when the price
+  includes the fee, otherwise price; total = selling + fee. The fee is
+  counted once.
+- The Admin preview before this fix: always total = before-fee price +
+  fee, which counted the fee twice on the fee-inclusive basis.
+
+Fix:
+- `src/lib/admin/pricing/previewPricing.ts` applies the Passport rule to
+  the stored fields, and applies a draft fee as the saved recalculation
+  would.
+- Price consistency also checks that, on the fee-inclusive basis, the
+  stored breakdown (price before fee + fee) equals the total. A breakdown
+  that does not add up is a Mismatch even without a website observation.
+- No inventory prices, fees or other products' pricing were changed.
+
+Examples (from the regression tests):
+
+| Case | Stored | Basis | Customer price |
+| --- | --- | --- | --- |
+| Coherent fee-inclusive | price $40,420, before-fee $39,525, fee $895 | includes fee | $39,525 + $895 = $40,420 |
+| Fee-exclusive | before-fee $39,525, fee $895 | before fee | $39,525 + $895 = $40,420 |
+| Screen 05 fixture | price $39,525, before-fee $39,525, fee $895 | includes fee | $38,630 + $895 = $39,525 (was $40,420) |
+| Zero or missing fee | price $30,000 | either | $30,000, no fee row |
+| Draft fee $925 | before-fee $39,525 | before fee | $40,450 |
+| Draft fee $925 | price $40,420 | includes fee | $40,420 (selling $39,495) |
+
+Visible mismatches on the fixture:
+- All three rows read Mismatch.
+- The website shows $40,420 against a $39,525 label.
+- Each stored breakdown ($X before fee + $895) does not add up to its
+  fee-inclusive total.
+
+Tests:
+- Fee-inclusive and fee-exclusive prices.
+- Zero, null and undefined fees.
+- Draft fees on both bases.
+- Parity with `buildPassportSaleCard` across bases and fees.
+- Website, Passport and breakdown mismatches, including one where website
+  and Passport agree but the breakdown does not.
+
+Screen 13 timeline:
+- The mobile cards and the desktop table map the same `timeline` array.
+- The inactive copy is `display: none`.
+- No duplicate IDs and no focus stops in either.
+- At 390 the accessibility tree exposes only the list; at 1600 only the
+  table.
+- Accepted as is.
+
+Light-only limitation: Administration keeps its light palette under the
+app's dark class. Dark-theme support is not claimed.
+
+Checks on `1dd1d4b`:
+- Typecheck clean.
+- Application tests: 55 files, 553 tests, all passing.
+- Harness tests: 10 of 10, separate.
+- Audit clean on all 13 screens.
+- 39 of 39 phone and tablet viewports with 0px page overflow.
+- Fee review dialog: 0 failing checks.
+
+Protocol v2 (agreed) with v1 historical:
+
+| # | **v2 content** | Band | v1 historical | Landmarks |
+| --- | --- | --- | --- | --- |
+| 01 | **92.99%** | below 94: not passed | 89.83% | pass |
+| 02 | **88.01%** | below 94: not passed | 87.40% | pass |
+| 03 | **90.70%** | below 94: not passed | 90.64% | pass |
+| 04 | **89.87%** | below 94: not passed | 88.96% | 7 fail (owner decision) |
+| 05 | **89.87%** | below 94: not passed | 89.64% | pass |
+| 06 | **94.15%** | 94.00-94.99: individual review | 90.34% | pass |
+| 07 | **87.83%** | below 94: not passed | 87.58% | pass |
+| 08 | **92.12%** | below 94: not passed | 89.66% | pass |
+| 09 | **86.53%** | below 94: not passed | 85.60% | pass |
+| 10 | **89.53%** | below 94: not passed | 86.76% | 3 fail (owner decision) |
+| 11 | **89.84%** | below 94: not passed | 89.09% | 1 fail (title block) |
+| 12 | **92.22%** | below 94: not passed | 90.50% | 1 fail (owner decision) |
+| 13 | **87.77%** | below 94: not passed | 87.23% | 3 fail (owner decision) |
+
+No screen reaches 95%. Only 06 (94.15%) is in the individually reviewable
+band; the other twelve are below 94% and not passed.
 
 ## 11. Approvals requested
 
