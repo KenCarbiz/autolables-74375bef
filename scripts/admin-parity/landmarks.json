@@ -73,13 +73,224 @@
     }
   },
   "02": {
-    "_rail": 252
+    "_rail": 252,
+    "_comment": "Section row bottom 205 (bluerows: underline y 201-203, border 204); yBody is measured from it. Card edges from scan columns x 265/1010/1030/1545 and rows y 295/590/690/885 at threshold 12 (the card borders are faint); control edges from edges.cjs at x 640/900/1160/1395 and hedges at y 430/490/580/700/830/930; text origins from bbox.cjs.",
+    "sectionNav": {
+      "selector": "nav[aria-label=\"Administration sections\"]",
+      "x": 278,
+      "yBody": -38,
+      "w": 1282,
+      "h": 38
+    },
+    "childTabs": {
+      "selector": "nav[aria-label=\"Dealership & Brand views\"]",
+      "x": 278,
+      "yBody": 24,
+      "w": 1282,
+      "h": 40
+    },
+    "identityCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Store identity",
+      "x": 277,
+      "yBody": 82,
+      "w": 742,
+      "h": 392
+    },
+    "nameInput": {
+      "selector": "#brand-name",
+      "x": 303,
+      "yBody": 202,
+      "w": 445,
+      "h": 37
+    },
+    "logoBox": {
+      "selector": "[data-landmark=\"brand-logo\"]",
+      "x": 792,
+      "yBody": 206,
+      "w": 203,
+      "h": 131
+    },
+    "appearanceCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Appearance",
+      "x": 277,
+      "yBody": 490,
+      "w": 742,
+      "h": 202
+    },
+    "previewCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Dealer header preview",
+      "x": 1032,
+      "yBody": 82,
+      "w": 528,
+      "h": 295
+    },
+    "previewBlock": {
+      "selector": "[aria-label=\"Application header preview\"]",
+      "x": 1055,
+      "yBody": 176,
+      "w": 483,
+      "h": 100
+    },
+    "readinessCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Contact readiness",
+      "x": 1032,
+      "yBody": 394,
+      "w": 528,
+      "h": 284
+    },
+    "readinessTable": {
+      "selector": "[data-admin-v2] table",
+      "index": 0,
+      "x": 1056,
+      "yBody": 482,
+      "w": 482,
+      "h": 170
+    },
+    "primaryAction": {
+      "selector": "[data-landmark=\"brand-review\"]",
+      "x": 1390,
+      "yBody": 703,
+      "w": 171,
+      "h": 42
+    }
   },
   "03": {
-    "_rail": 238
+    "_rail": 238,
+    "_comment": "Section row bottom 217 (bluerows: underline y 214-215, border 216); yBody is measured from it. The mock draws the child tabs as a 48px strip inside the card (y 238-286), so the card landmark is taken at the strip's bottom border (287), which is where the shell-drawn card starts here. Card, table and rail edges from scan columns x 262/980/1215/1245/1300/1540/1565 and rows y 245/300/330/365/400/440/834/895 at threshold 12; text origins from bbox.cjs.",
+    "sectionNav": {
+      "selector": "nav[aria-label=\"Administration sections\"]",
+      "x": 254,
+      "yBody": -39,
+      "w": 1315,
+      "h": 39
+    },
+    "childTabs": {
+      "selector": "nav[aria-label=\"People & Access views\"]",
+      "x": 254,
+      "yBody": 21,
+      "w": 1315,
+      "h": 48
+    },
+    "teamCard": {
+      "selector": "#team-card",
+      "x": 254,
+      "yBody": 70,
+      "w": 1315,
+      "h": 661
+    },
+    "searchInput": {
+      "selector": "[data-landmark=\"team-search\"]",
+      "x": 272,
+      "yBody": 94,
+      "w": 308,
+      "h": 43
+    },
+    "addEmployee": {
+      "selector": "[data-landmark=\"add-employee\"]",
+      "x": 1043,
+      "yBody": 95,
+      "w": 151,
+      "h": 42
+    },
+    "teamTable": {
+      "selector": "[data-admin-v2] table",
+      "index": 0,
+      "x": 273,
+      "yBody": 159,
+      "w": 920
+    },
+    "rail": {
+      "selector": "aside[aria-label=\"Role summary\"]",
+      "x": 1213,
+      "yBody": 70,
+      "w": 357
+    },
+    "viewPolicy": {
+      "selector": "[data-landmark=\"view-role-policy\"]",
+      "x": 1231,
+      "yBody": 595,
+      "w": 325,
+      "h": 44
+    },
+    "railNote": {
+      "selector": "aside[aria-label=\"Role summary\"] [role=\"status\"]",
+      "x": 1231,
+      "yBody": 655,
+      "w": 325,
+      "h": 45
+    }
   },
   "04": {
-    "_rail": 239
+    "_rail": 239,
+    "_comment": "Child page whose title carries a Policy draft chip the underline detector would pick (y 122), so the body row is pinned to the section row: underline y 239-241 with an anti-aliased row at 242 and the border at 243, so the first body row is 244. Card edges from scan columns x 268/600/1030/1050/1110/1460/1555 and rows y 355/447/600/905/920 at threshold 12; text origins and icon boxes from bbox.cjs.",
+    "_anchor": {
+      "reference": 244,
+      "selector": "nav[aria-label=\"Administration sections\"]"
+    },
+    "sectionNav": {
+      "selector": "nav[aria-label=\"Administration sections\"]",
+      "x": 258,
+      "yBody": -37,
+      "w": 1308,
+      "h": 37
+    },
+    "capabilitiesCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Role capabilities",
+      "x": 258,
+      "yBody": 20,
+      "w": 768,
+      "h": 623
+    },
+    "capabilityTable": {
+      "selector": "[data-admin-v2] table",
+      "index": 0,
+      "x": 279,
+      "yBody": 108,
+      "w": 726,
+      "h": 518
+    },
+    "enforcementCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Required enforcement",
+      "x": 1039,
+      "yBody": 20,
+      "w": 528,
+      "h": 623
+    },
+    "enforcementList": {
+      "selector": "ul[aria-label=\"Enforcement points\"]",
+      "x": 1058,
+      "yBody": 107,
+      "w": 494,
+      "h": 408
+    },
+    "bottomNote": {
+      "selector": "[data-admin-v2] [role=\"status\"]",
+      "index": 0,
+      "x": 262,
+      "yBody": 654,
+      "w": 879,
+      "h": 50
+    },
+    "testAccess": {
+      "selector": "[data-landmark=\"test-role-access\"]",
+      "x": 1167,
+      "yBody": 659,
+      "w": 169,
+      "h": 40
+    },
+    "primaryAction": {
+      "selector": "[data-landmark=\"review-policy\"]",
+      "x": 1349,
+      "yBody": 659,
+      "w": 218,
+      "h": 40
+    }
   },
   "05": {
     "_rail": 228,

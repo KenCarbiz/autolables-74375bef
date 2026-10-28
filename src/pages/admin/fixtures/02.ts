@@ -33,7 +33,7 @@ const brand: BrandFixture = {
     dealer_timezone: "America/New_York",
     dealer_logo_url: "",
     primary_color: "#2457D6",
-    dealer_website_url: "https://www.example-dealer.test",
+    dealer_website_url: "https://www.example.test",
     dealer_phone: "",
   },
 };

@@ -1,16 +1,17 @@
 import { useId, type ReactNode, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, Lock } from "lucide-react";
+import { ICON } from "@/components/admin/v2/primitives";
 import { cn } from "@/lib/utils";
 
-// Form controls drawn to the reference: 40px inputs, 6px radius, 1px lines,
-// labels in semibold 13px, hints in 12px. Every control has a real label.
+// Form controls drawn to the reference: 37px inputs, 6px radius, 1px lines,
+// labels in semibold 14px, hints in 12px. Every control has a real label.
 
 export const controlClass =
-  "h-10 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] leading-[20px] text-adm-ink placeholder:text-adm-muted/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary disabled:bg-adm-workspace disabled:text-adm-muted";
+  "h-[37px] w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] leading-[20px] text-adm-ink placeholder:text-adm-muted/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary disabled:bg-adm-workspace disabled:text-adm-muted";
 
 export const FieldLabel = ({ htmlFor, children, hint }: { htmlFor: string; children: ReactNode; hint?: ReactNode }) => (
-  <label htmlFor={htmlFor} className="block text-[13px] leading-[18px] font-semibold text-adm-ink">
+  <label htmlFor={htmlFor} className="block text-[14px] leading-[20px] font-semibold text-adm-ink">
     {children}
     {hint && <span className="ml-1 font-normal text-adm-muted">{hint}</span>}
   </label>
@@ -34,7 +35,7 @@ export const TextField = ({ label, value, onChange, hint, error, id, className, 
   return (
     <div className={className}>
       <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
-      <input id={fieldId} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={error ? true : undefined} className={cn(controlClass, "mt-1", error && "border-adm-danger")} {...rest} />
+      <input id={fieldId} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={error ? true : undefined} className={cn(controlClass, "mt-[7px]", error && "border-adm-danger")} {...rest} />
       {error ? <FieldHint error>{error}</FieldHint> : hint ? <FieldHint>{hint}</FieldHint> : null}
     </div>
   );
@@ -53,7 +54,7 @@ export const TextAreaField = ({ label, value, onChange, hint, id, className, row
   return (
     <div className={className}>
       <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
-      <textarea id={fieldId} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} className={cn(controlClass, "mt-1 h-auto py-2 resize-y")} {...rest} />
+      <textarea id={fieldId} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} className={cn(controlClass, "mt-[7px] h-auto py-2 resize-y")} {...rest} />
       {hint && <FieldHint>{hint}</FieldHint>}
     </div>
   );
@@ -69,6 +70,7 @@ type SelectFieldProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "onChange"
   inline?: boolean;
 };
 
+// Reference chevron ink is 12x7, which a 20px lucide box draws at 10x5; the 24px box matches it.
 export const SelectControl = ({ value, onChange, options, id, className, ...rest }: Omit<SelectFieldProps, "label" | "hint" | "inline">) => (
   <span className={cn("relative block", className)}>
     <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={cn(controlClass, "appearance-none pr-9")} {...rest}>
@@ -76,7 +78,7 @@ export const SelectControl = ({ value, onChange, options, id, className, ...rest
         <option key={o.value} value={o.value}>{o.label}</option>
       ))}
     </select>
-    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-adm-muted" aria-hidden="true" />
+    <ChevronDown className={cn(ICON.status, "pointer-events-none absolute right-[7px] top-1/2 -translate-y-1/2 text-adm-muted")} aria-hidden="true" />
   </span>
 );
 
@@ -94,16 +96,16 @@ export const SelectField = ({ label, hint, inline = false, id, className, ...res
   return (
     <div className={className}>
       <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
-      <SelectControl id={fieldId} className="mt-1" {...rest} />
+      <SelectControl id={fieldId} className="mt-[7px]" {...rest} />
       {hint && <FieldHint>{hint}</FieldHint>}
     </div>
   );
 };
 
-/** Label on the left, control on the right, as the reference's identity card. */
+/** Label on the left (118px column), control on the right, as the reference's identity card. */
 export const RowField = ({ label, htmlFor, children, className }: { label: ReactNode; htmlFor?: string; children: ReactNode; className?: string }) => (
-  <div className={cn("grid grid-cols-1 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-start gap-1 sm:gap-4", className)}>
-    <label htmlFor={htmlFor} className="text-[13px] leading-[18px] font-semibold text-adm-ink sm:pt-2.5">{label}</label>
+  <div className={cn("grid grid-cols-1 sm:grid-cols-[118px_minmax(0,1fr)] sm:items-start gap-1 sm:gap-4", className)}>
+    <label htmlFor={htmlFor} className="text-[14px] leading-[20px] font-semibold text-adm-ink sm:pt-[9px]">{label}</label>
     <div className="min-w-0">{children}</div>
   </div>
 );
@@ -112,7 +114,7 @@ export const ReadOnlyValue = ({ id, value, locked = false, editHref, editLabel, 
   <div className="flex items-center gap-2">
     <span className="relative block w-full">
       <input id={id} readOnly value={value || placeholder} aria-readonly="true" className={cn(controlClass, "bg-adm-workspace text-adm-muted", locked && "pr-9")} />
-      {locked && <Lock className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-adm-muted" aria-label="Read only" />}
+      {locked && <Lock className={cn(ICON.inline, "pointer-events-none absolute right-[10px] top-1/2 -translate-y-1/2 text-adm-muted")} aria-label="Read only" />}
     </span>
     {editHref && (
       <Link to={editHref} className="text-[13px] font-semibold text-adm-primary hover:underline whitespace-nowrap">{editLabel ?? "Edit"}</Link>
@@ -127,7 +129,7 @@ export const ReadOnlyField = ({ id, label, value, editHref, editLabel = "Edit", 
   return (
     <div className={className}>
       <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
-      <input id={fieldId} readOnly value={value || placeholder} aria-readonly="true" className={cn(controlClass, "mt-1 bg-adm-workspace text-adm-muted")} />
+      <input id={fieldId} readOnly value={value || placeholder} aria-readonly="true" className={cn(controlClass, "mt-[7px] bg-adm-workspace text-adm-muted")} />
       {editHref && (
         <FieldHint>
           <Link to={editHref} className="font-semibold text-adm-primary hover:underline">{editLabel}</Link>

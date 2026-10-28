@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink, Info, Upload } from "lucide-react";
-import { AdminButton, AdminCard, AdminTable, InlineNote, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminCard, AdminTable, ICON, InlineNote, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
 import { cn } from "@/lib/utils";
 import wordmarkPrimary from "@/assets/admin-v2/brand/wordmark-primary.svg";
 import wordmarkReverse from "@/assets/admin-v2/brand/wordmark-reverse.svg";
@@ -11,54 +11,63 @@ import { SelectControl, controlClass } from "./fields";
 // Cards shared by the brand views. None of them writes: the editable
 // Appearance card hands its value back to the owning form.
 
+/** Card titles and descriptions drawn to the reference (20px title, 14px description) inside AdminCard's header. */
+export const CardTitle = ({ children }: { children: ReactNode }) => <span className="block text-[20px] leading-[28px]">{children}</span>;
+export const CardDescription = ({ children }: { children: ReactNode }) => <span className="block pt-px text-[14px] leading-[20px]">{children}</span>;
+
+const FIELD_LABEL = "text-[14px] leading-[20px] font-semibold text-adm-ink flex items-center gap-1.5";
+/** The reference sets card titles 23px under the card edge; AdminCard's 20px header padding plus the 28px title line lands 4px lower. */
+export const CARD_HEADER = "pt-4";
+
 export const HeaderPreviewCard = ({ preview, draftDiffers }: { preview: HeaderPreview; draftDiffers: boolean }) => (
-  <AdminCard title="Dealer header preview" description="How this dealership appears in AutoLabels.">
-    <div className="rounded-[10px] bg-adm-sidebar px-8 py-6 flex items-center gap-5" aria-label="Application header preview">
-      <img src={wordmarkReverse} alt="AutoLabels" className="h-[26px] w-auto flex-shrink-0" />
+  <AdminCard title={<CardTitle>Dealer header preview</CardTitle>} description={<CardDescription>How this dealership appears in AutoLabels.</CardDescription>} headerClassName={CARD_HEADER} bodyClassName="px-[22px]">
+    <div className="mt-2 rounded-[10px] bg-adm-sidebar px-[36px] min-h-[100px] flex items-center gap-[22px]" aria-label="Application header preview">
+      <img src={wordmarkReverse} alt="AutoLabels" className="h-[21px] w-auto flex-shrink-0" />
       <span className="h-10 w-px bg-white/25 flex-shrink-0" aria-hidden="true" />
       <div className="min-w-0 text-white">
-        <p className="text-[18px] leading-[24px] font-semibold truncate">{preview.name || "Dealership name"}</p>
-        <p className="text-[13px] leading-[18px] text-white/80 truncate">{preview.location || "City, State"}</p>
+        <p className="text-[18px] leading-[24px] font-semibold truncate" data-parity="dealer-identity">{preview.name || "Dealership name"}</p>
+        <p className="text-[13px] leading-[18px] text-white/80 truncate" data-parity="dealer-identity">{preview.location || "City, State"}</p>
       </div>
     </div>
     {preview.documentName && preview.documentName !== preview.name && (
       <p className="mt-3 text-[12px] leading-[18px] text-adm-muted">
-        The header shows the {preview.nameSource === "store" ? "store name from Store settings" : "dealer group name"}. Documents print the dealership name saved here: {preview.documentName}.
+        The header shows the {preview.nameSource === "store" ? "store name from Store settings" : "dealer group name"}. Documents print the dealership name saved here: <span data-parity="dealer-identity">{preview.documentName}</span>.
       </p>
     )}
-    <InlineNote tone="info" className="mt-4">
+    <InlineNote tone="info" className="mt-[13px]">
       {draftDiffers ? "Preview reflects unsaved changes. Save to apply them." : "This preview shows how your dealership name and location appear in the application header."}
     </InlineNote>
   </AdminCard>
 );
 
+// Reference table: 36px header, 41px rows, 28px chips right-aligned 20px from the box.
 export const ContactReadinessCard = ({ rows }: { rows: ReadinessRow[] }) => (
-  <AdminCard title="Contact readiness" description="Key dealership contact details used in customer-facing content.">
+  <AdminCard title={<CardTitle>Contact readiness</CardTitle>} description={<CardDescription>Key dealership contact details used in customer-facing content.</CardDescription>} headerClassName={CARD_HEADER} bodyClassName="px-[22px] pb-8">
     <div className="rounded-md border border-adm-border overflow-hidden">
       <AdminTable caption="Contact readiness">
         <thead>
           <tr>
-            <Th>Contact type</Th>
-            <Th>Value</Th>
-            <Th>Status</Th>
+            <Th className="px-[15px] py-[9px] text-adm-ink">Contact type</Th>
+            <Th className="px-[15px] py-[9px] text-adm-ink">Value</Th>
+            <Th className="px-[15px] py-[9px] text-adm-ink">Status</Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.key}>
-              <Td className="whitespace-nowrap">{r.label}</Td>
-              <Td>
+              <Td className="px-[15px] py-[10px] whitespace-nowrap">{r.label}</Td>
+              <Td className="px-[15px] py-[10px]">
                 {r.state === "ready" && r.href ? (
-                  <a href={r.href} target={r.key === "website" ? "_blank" : undefined} rel={r.key === "website" ? "noreferrer" : undefined} className="inline-flex items-center gap-1.5 text-adm-primary hover:underline break-all">
+                  <a href={r.href} target={r.key === "website" ? "_blank" : undefined} rel={r.key === "website" ? "noreferrer" : undefined} className="inline-flex items-center gap-2 text-adm-primary hover:underline break-all" data-parity={r.key === "website" ? "dealer-identity" : undefined}>
                     {r.value}
-                    {r.key === "website" && <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />}
+                    {r.key === "website" && <ExternalLink className={cn(ICON.inline, "flex-shrink-0")} aria-hidden="true" />}
                   </a>
                 ) : (
                   <Link to={r.editHref} className="text-adm-danger hover:underline">{r.value}</Link>
                 )}
               </Td>
-              <Td className="text-right">
-                <StatusChip tone={r.state === "ready" ? "success" : "danger"}>{r.state === "ready" ? "Ready" : "Incomplete"}</StatusChip>
+              <Td className="px-[15px] pr-5 py-[6px] text-right">
+                <StatusChip tone={r.state === "ready" ? "success" : "danger"} className="py-[5px]">{r.state === "ready" ? "Ready" : "Incomplete"}</StatusChip>
               </Td>
             </tr>
           ))}
@@ -76,6 +85,9 @@ interface AppearanceCardProps {
   error?: string | null;
 }
 
+// Reference: 50px swatches on a 124px pitch, a divider 45px from a 240px accent column, a 39px control with a 23px colour dot (drawn at 24).
+const ACCENT_DOT = `${ICON.status} rounded-full border border-adm-border flex-shrink-0`;
+
 export const AppearanceCard = ({ accent, onChange, editHref, error }: AppearanceCardProps) => {
   const normalized = normalizeHex(accent || DEFAULT_ACCENT_HEX);
   const presetHex = ACCENT_PRESETS.find((p) => p.hex === normalized)?.hex;
@@ -86,15 +98,16 @@ export const AppearanceCard = ({ accent, onChange, editHref, error }: Appearance
   const custom = customMode || !presetHex;
   const selectValue = custom ? "custom" : presetHex;
   const options = useMemo(() => [...ACCENT_PRESETS.map((p) => ({ value: p.hex, label: `${p.label} (${p.hex})` })), { value: "custom", label: "Custom hex" }], []);
+  const dotStyle = { backgroundColor: isHexColor(normalized) ? normalized : DEFAULT_ACCENT_HEX };
 
   return (
-    <AdminCard title="Appearance" description="Choose the brand colors used in AutoLabels for this dealership.">
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto_minmax(240px,2fr)] xl:grid-cols-[minmax(0,1.2fr)_auto_minmax(240px,1fr)] gap-6 items-start">
-        <ul className="flex items-start gap-10 xl:gap-[76px] pl-1 pt-1" aria-label="Brand palette">
+    <AdminCard title={<CardTitle>Appearance</CardTitle>} description={<CardDescription>Choose the brand colors used in AutoLabels for this dealership.</CardDescription>} headerClassName={CARD_HEADER} bodyClassName="pb-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto_minmax(240px,2fr)] xl:grid-cols-[minmax(0,1fr)_auto_240px] gap-y-6 gap-x-[45px] items-start">
+        <ul className="flex items-start gap-10 xl:gap-[74px] pl-2 pt-0.5" aria-label="Brand palette">
           {BRAND_PALETTE.map((c) => (
-            <li key={c.hex} className="flex flex-col items-start gap-2">
+            <li key={c.hex} className="flex flex-col items-start gap-1.5">
               <span
-                className={cn("block w-12 h-12 rounded-md border", c.hex === "#FFFFFF" ? "border-adm-border" : "border-transparent")}
+                className={cn("block w-[50px] h-[50px] rounded-md border", c.hex === "#FFFFFF" ? "border-adm-border" : "border-transparent")}
                 style={{ backgroundColor: c.hex }}
                 aria-hidden="true"
               />
@@ -107,19 +120,20 @@ export const AppearanceCard = ({ accent, onChange, editHref, error }: Appearance
           ))}
         </ul>
         <span className="hidden lg:block w-px self-stretch bg-adm-border" aria-hidden="true" />
-        <div>
-          <p className="text-[13px] leading-[18px] font-semibold text-adm-ink inline-flex items-center gap-1.5">
+        <div className="pt-0.5">
+          <p className={FIELD_LABEL}>
             Workspace accent
-            <Info className="w-4 h-4 text-adm-muted" aria-label="Used where a dealer colour applies on documents and the Passport" />
+            <Info className={cn(ICON.inline, "text-adm-muted")} aria-label="Used where a dealer colour applies on documents and the Passport" />
           </p>
           {onChange ? (
-            <div className="mt-2 space-y-2">
+            <div className="mt-[11px] space-y-2">
               <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full border border-adm-border flex-shrink-0" style={{ backgroundColor: isHexColor(normalized) ? normalized : DEFAULT_ACCENT_HEX }} aria-hidden="true" />
+                <span className={ACCENT_DOT} style={dotStyle} aria-hidden="true" />
                 <SelectControl
                   aria-label="Workspace accent"
                   value={selectValue}
                   options={options}
+                  className="h-[39px] [&>select]:h-[39px]"
                   onChange={(v) => {
                     if (v === "custom") { setCustomMode(true); return; }
                     setCustomMode(false);
@@ -141,12 +155,12 @@ export const AppearanceCard = ({ accent, onChange, editHref, error }: Appearance
               <p className="text-[12px] leading-[18px] text-adm-muted">Leave blank to use the AutoLabels default.</p>
             </div>
           ) : (
-            <div className="mt-2 flex items-center gap-2">
-              <div className={cn(controlClass, "flex items-center gap-2 bg-adm-workspace text-adm-ink")}>
-                <span className="w-4 h-4 rounded-full border border-adm-border flex-shrink-0" style={{ backgroundColor: isHexColor(normalized) ? normalized : DEFAULT_ACCENT_HEX }} aria-hidden="true" />
+            <div className="mt-[11px]">
+              <div className={cn(controlClass, "h-[39px] flex items-center gap-[10px] bg-adm-workspace text-adm-ink")}>
+                <span className={ACCENT_DOT} style={dotStyle} aria-hidden="true" />
                 <span className="truncate">{accentLabel(accent)}</span>
               </div>
-              {editHref && <Link to={editHref} className="text-[13px] font-semibold text-adm-primary hover:underline whitespace-nowrap">Edit</Link>}
+              {editHref && <Link to={editHref} className="mt-1 inline-block text-[12px] leading-[18px] font-semibold text-adm-primary hover:underline">Edit</Link>}
             </div>
           )}
         </div>
@@ -163,20 +177,21 @@ interface LogoFieldProps {
   disabled?: boolean;
 }
 
+// Reference: a 131px dashed box 11px under the label, a 41px upload button, the hint 9px under it.
 export const LogoField = ({ logoUrl, uploading, onPick, onRemove, disabled }: LogoFieldProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   return (
     <div>
-      <p className="text-[13px] leading-[18px] font-semibold text-adm-ink inline-flex items-center gap-1.5">
+      <p className={FIELD_LABEL}>
         Logo
-        <Info className="w-4 h-4 text-adm-muted" aria-label="Shown on documents and the Passport; the AutoLabels lockup is only a placeholder" />
+        <Info className={cn(ICON.inline, "text-adm-muted")} aria-label="Shown on documents and the Passport; the AutoLabels lockup is only a placeholder" />
       </p>
-      <div className="mt-1 h-[132px] rounded-md border border-dashed border-adm-border bg-adm-surface flex items-center justify-center p-4">
+      <div className="mt-[11px] h-[131px] rounded-md border border-dashed border-adm-border bg-adm-surface flex items-center justify-center p-4" data-landmark="brand-logo">
         {logoUrl ? (
           <img src={logoUrl} alt="Dealership logo" className="max-h-full max-w-full object-contain" />
         ) : (
-          <img src={wordmarkPrimary} alt="No dealership logo uploaded; AutoLabels wordmark shown as a placeholder" className="h-[22px] w-auto" />
+          <img src={wordmarkPrimary} alt="No dealership logo uploaded; AutoLabels wordmark shown as a placeholder" className="h-6 w-auto" />
         )}
       </div>
       <input
@@ -195,11 +210,11 @@ export const LogoField = ({ logoUrl, uploading, onPick, onRemove, disabled }: Lo
           if (!problem) onPick(f);
         }}
       />
-      <AdminButton variant="secondary" className="mt-3 w-full" disabled={disabled || uploading} onClick={() => inputRef.current?.click()}>
-        <Upload className="w-4 h-4" aria-hidden="true" />
+      <AdminButton variant="secondary" className="mt-[10px] w-full min-h-[41px] sm:min-h-[41px]" disabled={disabled || uploading} onClick={() => inputRef.current?.click()}>
+        <Upload className={ICON.button} aria-hidden="true" />
         {uploading ? "Uploading…" : "Upload new logo"}
       </AdminButton>
-      <p className={cn("mt-1.5 text-[12px] leading-[18px]", fileError ? "text-adm-danger" : "text-adm-muted")}>{fileError ?? "PNG, JPG or SVG. Max 2 MB."}</p>
+      <p className={cn("mt-[9px] text-[12px] leading-[18px]", fileError ? "text-adm-danger" : "text-adm-muted")}>{fileError ?? "PNG, JPG or SVG. Max 2 MB."}</p>
       {logoUrl && onRemove && (
         <button type="button" onClick={onRemove} disabled={disabled} className="mt-1 text-[12px] font-semibold text-adm-muted hover:text-adm-danger">Remove logo</button>
       )}

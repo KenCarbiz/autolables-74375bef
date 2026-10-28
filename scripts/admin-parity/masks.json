@@ -21,6 +21,33 @@
     ],
     "rects": []
   },
+  "02": {
+    "selectors": [
+      {
+        "selector": "[data-admin-v2] [data-parity=\"dealer-identity\"]",
+        "reason": "dealership name, location and website address (fixture dealer)"
+      }
+    ],
+    "rects": []
+  },
+  "03": {
+    "selectors": [
+      {
+        "selector": "[data-admin-v2] [data-parity=\"member-name\"]",
+        "reason": "member names in the table and the rail (fixture addresses)"
+      }
+    ],
+    "rects": []
+  },
+  "04": {
+    "selectors": [
+      {
+        "selector": "[data-admin-v2] [data-parity=\"member-name\"]",
+        "reason": "member address in the capabilities description (fixture)"
+      }
+    ],
+    "rects": []
+  },
   "05": {
     "selectors": [
       {

@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { FileText, Play } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AdminSectionNav, ChildPageFrame } from "@/components/admin/v2/AdminShell";
-import { AdminButton, AdminCard, AdminLinkButton, EmptyState, InlineNote, SkeletonBlock, StatusChip } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminCard, AdminLinkButton, EmptyState, ICON, InlineNote, SkeletonBlock, StatusChip } from "@/components/admin/v2/primitives";
 import { buildAdminNavSections, filterNavSections } from "@/components/layout/adminNav";
 import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, visibleSections, type AdminVisibilityContext } from "@/lib/admin/sections";
 import { enforcementRows, policyFullyEnforced } from "@/lib/admin/enforcementMap";
 import { capabilityMatrixForRole, normalizeRole, teamReturnHref } from "@/lib/admin/people";
 import { getDealerCapabilities, hasAnyDealerCapability, hasDealerCapability, roleDisplayName, type DealerRole } from "@/lib/permissions/dealerRoleCapabilities";
-import { CapabilityMatrixTable, EnforcementRail, MemberRoleReviewDialog, OutlineBadge } from "@/pages/admin/views/people/components";
+import { CapabilityMatrixTable, CardDescription, CardTitle, EnforcementRail, MemberRoleReviewDialog, OutlineBadge } from "@/pages/admin/views/people/components";
 import { useTeamAuthority, useTeamMembers, useTeamWriters } from "@/pages/admin/views/people/useTeamMembers";
 
 // /admin/people/:memberId. The key is a member id (from Team) or a role value
@@ -138,9 +139,9 @@ export default function MemberRolePage() {
   }
 
   const badge = applied
-    ? <OutlineBadge title="Applied in this session; the list refreshes from the server.">Applied</OutlineBadge>
+    ? <OutlineBadge title="Applied in this session; the list refreshes from the server." icon={FileText}>Applied</OutlineBadge>
     : !policyFullyEnforced(rows)
-      ? <OutlineBadge title="The interface and the team procedures follow this policy; dealer settings and listing tables still allow any accepted member.">Policy draft</OutlineBadge>
+      ? <OutlineBadge title="The interface and the team procedures follow this policy; dealer settings and listing tables still allow any accepted member." icon={FileText}>Policy draft</OutlineBadge>
       : null;
   const canReview = !!member && authority.canWrite && member.role !== "owner";
   const reviewBlockedReason = !member
@@ -159,29 +160,29 @@ export default function MemberRolePage() {
       backLabel={backLabel}
       sectionNav={sectionNav}
     >
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-4 items-start">
-        <AdminCard title="Role capabilities" description={member ? `Applied to ${member.email}. Access scope: this rooftop.` : "Capability contract for this role. Access scope: this rooftop."} flush>
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_528px] gap-[14px]">
+        <AdminCard
+          title={<CardTitle>Role capabilities</CardTitle>}
+          description={<CardDescription>{member ? <>Applied to <span data-parity="member-name">{member.email}</span>. Access scope: this rooftop.</> : "Capability contract for this role. Access scope: this rooftop."}</CardDescription>}
+          flush
+        >
           <CapabilityMatrixTable matrix={matrix} />
         </AdminCard>
-        <AdminCard title="Required enforcement" description="Where this policy is enforced today.">
+        <AdminCard title={<CardTitle>Required enforcement</CardTitle>} description={<CardDescription>Where this policy is enforced today.</CardDescription>} bodyClassName="pl-[19px] pr-[15px]">
           <EnforcementRail rows={rows} />
         </AdminCard>
       </div>
-      <div className="mt-4 space-y-2">
-        <InlineNote
-          tone="info"
-          title="Preview as role uses test data."
-          action={
-            <div className="flex items-center gap-2">
-              <AdminButton onClick={() => setPreviewOpen(true)}>Test role access</AdminButton>
-              <AdminButton variant="primary" disabled={!canReview} onClick={() => setReviewOpen(true)}>Review policy changes</AdminButton>
-            </div>
-          }
-        >
-          Validate with a restricted account before release.
+      <div className="mt-3 flex flex-wrap items-center gap-x-[14px] gap-y-3">
+        <InlineNote tone="info" className="flex-1 min-w-[280px] py-[10px] sm:mr-[11px] [&>svg]:w-7 [&>svg]:h-7">
+          Preview as role uses test data. Validate with a restricted account before release.
         </InlineNote>
-        {!canReview && reviewBlockedReason && <p className="text-[12px] leading-[18px] text-adm-muted" role="status">{reviewBlockedReason}</p>}
+        <AdminButton variant="outline" className="min-h-[40px] sm:min-h-[40px] px-[17px]" data-landmark="test-role-access" onClick={() => setPreviewOpen(true)}>
+          <Play className={ICON.status} aria-hidden="true" />
+          Test role access
+        </AdminButton>
+        <AdminButton variant="primary" className="min-h-[40px] sm:min-h-[40px] px-[30px]" data-landmark="review-policy" disabled={!canReview} onClick={() => setReviewOpen(true)}>Review policy changes</AdminButton>
       </div>
+      {!canReview && reviewBlockedReason && <p className="mt-2 text-[12px] leading-[18px] text-adm-muted" role="status">{reviewBlockedReason}</p>}
 
       <RolePreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} role={role} />
       {member && (

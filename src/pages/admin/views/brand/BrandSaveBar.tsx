@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { AdminButton } from "@/components/admin/v2/primitives";
+import { cn } from "@/lib/utils";
 import { diffFields } from "@/lib/admin/reviewApply";
 import { describeValue, fieldLabel, type SettingsKey } from "./brandModel";
 import type { BrandForm } from "./useBrandForm";
@@ -32,9 +33,12 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
   })();
   const Icon = view.tone === "success" ? CheckCircle2 : status === "saving" ? Loader2 : AlertTriangle;
   const iconClass = view.tone === "success" ? "text-adm-success" : view.tone === "danger" ? "text-adm-danger" : view.tone === "warning" ? "text-adm-warning" : "text-adm-muted";
+  // Reference: a footer strip from the rail edge to the page edge, flush under the cards,
+  // with a 26px status mark 28px in and 42px buttons ending 26px from the edge.
+  const button = "min-h-[42px] sm:min-h-[42px]";
 
   return (
-    <div className="sticky bottom-0 z-10 mt-2 rounded-t-[10px] border border-b-0 border-adm-border bg-adm-surface">
+    <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 border-t border-adm-border bg-adm-surface">
       {reviewing && rows.length > 0 && (
         <div className="border-b border-adm-border px-4 sm:px-6 py-4" aria-label="Changes to apply">
           <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Review changes</p>
@@ -53,9 +57,9 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
           </dl>
         </div>
       )}
-      <div role="status" aria-live="polite" className="flex items-center justify-between gap-4 px-4 sm:px-6 py-3">
+      <div role="status" aria-live="polite" className="flex items-center justify-between gap-4 px-4 sm:pl-7 sm:pr-[26px] py-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Icon className={`w-6 h-6 flex-shrink-0 ${iconClass} ${status === "saving" ? "animate-spin" : ""}`} aria-hidden="true" />
+          <Icon className={cn("w-8 h-8 flex-shrink-0", iconClass, status === "saving" && "animate-spin")} aria-hidden="true" />
           <div className="min-w-0">
             <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{view.title}</p>
             <p className="text-[12px] leading-[18px] text-adm-muted truncate">{view.detail}</p>
@@ -63,15 +67,15 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {dirty && status !== "saving" && (
-            <AdminButton variant="secondary" onClick={() => { setReviewing(false); form.discard(); }}>Discard</AdminButton>
+            <AdminButton variant="secondary" className={button} onClick={() => { setReviewing(false); form.discard(); }}>Discard</AdminButton>
           )}
           {reviewing ? (
             <>
-              <AdminButton variant="secondary" onClick={() => setReviewing(false)} disabled={status === "saving"}>Keep editing</AdminButton>
-              <AdminButton variant="primary" onClick={() => void form.save()} disabled={!canSave} aria-disabled={!canSave}>Apply changes</AdminButton>
+              <AdminButton variant="secondary" className={button} onClick={() => setReviewing(false)} disabled={status === "saving"}>Keep editing</AdminButton>
+              <AdminButton variant="primary" className={cn(button, "px-[30px]")} data-landmark="brand-review" onClick={() => void form.save()} disabled={!canSave} aria-disabled={!canSave}>Apply changes</AdminButton>
             </>
           ) : (
-            <AdminButton variant="primary" onClick={() => setReviewing(true)} disabled={!canSave} aria-disabled={!canSave}>Review changes</AdminButton>
+            <AdminButton variant="primary" className={cn(button, "px-[30px]")} data-landmark="brand-review" onClick={() => setReviewing(true)} disabled={!canSave} aria-disabled={!canSave}>Review changes</AdminButton>
           )}
         </div>
       </div>

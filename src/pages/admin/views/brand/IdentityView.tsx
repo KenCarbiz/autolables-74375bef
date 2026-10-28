@@ -2,13 +2,18 @@ import { useMemo, useState } from "react";
 import { Info } from "lucide-react";
 import { toast } from "sonner";
 import { uploadPhoto } from "@/lib/storage";
-import { AdminCard } from "@/components/admin/v2/primitives";
+import { AdminCard, ICON } from "@/components/admin/v2/primitives";
 import { adminTabHref } from "@/lib/admin/sections";
 import { IDENTITY_KEYS, US_STATES, US_TIME_ZONES, contactReadiness, headerPreview, validateIdentity } from "./brandModel";
 import { useBrandForm } from "./useBrandForm";
 import { BrandSaveBar } from "./BrandSaveBar";
 import { ReadOnlyValue, RowField, SelectControl, TextField, controlClass } from "./fields";
-import { AppearanceCard, ContactReadinessCard, HeaderPreviewCard, LogoField } from "./cards";
+import { AppearanceCard, CARD_HEADER, CardDescription, CardTitle, ContactReadinessCard, HeaderPreviewCard, LogoField } from "./cards";
+
+// Composition from the reference: the branding note sits in the gap under the
+// child tabs so the cards start 82px below the section row; a 528px right
+// column with a 13px gutter; the identity form on a 52px row pitch beside a
+// 226px logo column behind a divider.
 
 const STATE_OPTIONS = [{ value: "", label: "Select a state" }, ...US_STATES.map((s) => ({ value: s.code, label: s.name }))];
 
@@ -51,18 +56,18 @@ export default function IdentityView() {
   };
 
   return (
-    <div className="space-y-4">
-      <p className="flex items-center justify-end gap-1.5 text-[12px] leading-[18px] text-adm-muted">
-        <Info className="w-4 h-4" aria-hidden="true" />
+    <div>
+      <p className="-mt-2 mb-1 flex items-center justify-end gap-1.5 text-[12px] leading-[18px] text-adm-muted">
+        <Info className={ICON.inline} aria-hidden="true" />
         Branding for this rooftop.
       </p>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_528px] gap-[13px] items-start">
         <div className="space-y-4">
-          <AdminCard title="Store identity" description="Basic information about this dealership. This appears across AutoLabels.">
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-6">
-              <div className="space-y-3">
-                <TextField label="Dealership name" value={draft.dealer_name} onChange={(v) => set("dealer_name", v)} error={nameError} autoComplete="organization" />
+          <AdminCard title={<CardTitle>Store identity</CardTitle>} description={<CardDescription>Basic information about this dealership. This appears across AutoLabels.</CardDescription>} headerClassName={CARD_HEADER} bodyClassName="pt-[23px]">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_226px] gap-y-6 md:gap-x-[22px]">
+              <div className="space-y-[15px]">
+                <TextField id="brand-name" label="Dealership name" value={draft.dealer_name} onChange={(v) => set("dealer_name", v)} error={nameError} autoComplete="organization" />
                 <RowField label="Group" htmlFor="brand-group">
                   <ReadOnlyValue id="brand-group" value={source.tenantName ?? ""} locked placeholder="No dealer group" />
                 </RowField>
@@ -77,13 +82,15 @@ export default function IdentityView() {
                   <SelectControl id="brand-timezone" value={draft.dealer_timezone || ""} options={zoneOptions} onChange={(v) => set("dealer_timezone", v)} />
                 </RowField>
               </div>
-              <LogoField
-                logoUrl={draft.dealer_logo_url}
-                uploading={uploading}
-                onPick={(f) => void pickLogo(f)}
-                onRemove={() => set("dealer_logo_url", "")}
-                disabled={!!form.blockedReason}
-              />
+              <div className="md:border-l md:border-adm-border md:pl-[22px]">
+                <LogoField
+                  logoUrl={draft.dealer_logo_url}
+                  uploading={uploading}
+                  onPick={(f) => void pickLogo(f)}
+                  onRemove={() => set("dealer_logo_url", "")}
+                  disabled={!!form.blockedReason}
+                />
+              </div>
             </div>
           </AdminCard>
 

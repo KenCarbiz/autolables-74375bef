@@ -17,14 +17,13 @@ const member = (id: string, email: string, role: string, acceptedAt: string | nu
   invited_email: email,
 });
 
+// The five accepted members the reference pictures, in its order.
 export const EXAMPLE_MEMBERS: TeamMemberRow[] = [
-  member("example-member-owner", "example.owner@example.test", "owner", "2026-01-12T14:00:00Z"),
-  member("example-member-gm", "example.general.manager@example.test", "general_manager", "2026-01-20T15:30:00Z"),
-  member("example-member-sales-manager", "example.sales.manager@example.test", "sales_manager", "2026-02-03T16:00:00Z"),
   member("example-member-salesperson", "example.salesperson@example.test", "salesperson", "2026-03-11T13:15:00Z"),
-  member("example-member-inventory", "example.inventory.manager@example.test", "inventory_manager", "2026-04-02T12:00:00Z"),
   member("example-member-service", "example.service.advisor@example.test", "service_advisor", "2026-05-19T17:45:00Z"),
-  member("example-member-office", "example.office@example.test", "office", null),
+  member("example-member-inventory", "example.inventory.manager@example.test", "inventory_manager", "2026-04-02T12:00:00Z"),
+  member("example-member-office", "example.office@example.test", "office", "2026-06-08T14:30:00Z"),
+  member("example-member-gm", "example.general.manager@example.test", "general_manager", "2026-01-20T15:30:00Z"),
 ];
 
 const PEOPLE: PeopleFixture = {

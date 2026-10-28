@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AdminFixtureProvider } from "@/lib/admin/dataSource";
@@ -40,12 +40,13 @@ describe("TeamView", () => {
     renderTeam("/admin?tab=team");
     expect(screen.getAllByText("example.salesperson@example.test")).toHaveLength(2);
     expect(screen.getByText("example.office@example.test")).toBeTruthy();
+    expect(screen.getAllByText("Member")).toHaveLength(5);
     expect(screen.getByRole("complementary", { name: "Role summary" })).toBeTruthy();
     expect(screen.getByText("View assigned customers")).toBeTruthy();
     expect(screen.getByText("Change dealer pricing")).toBeTruthy();
     expect(screen.getByText("Role preview does not grant permissions.")).toBeTruthy();
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
-    expect(screen.getByText("Invitation pending")).toBeTruthy();
+    expect(screen.queryByText("Invitation pending")).toBeNull();
     expect(rpcMock).not.toHaveBeenCalled();
     expect(fromMock).not.toHaveBeenCalled();
     expect(logMock).not.toHaveBeenCalled();
@@ -55,7 +56,7 @@ describe("TeamView", () => {
     renderTeam("/admin?tab=team&dept=Service&sel=example-member-service");
     expect(screen.getAllByText("example.service.advisor@example.test").length).toBe(2);
     expect(screen.queryByText("example.salesperson@example.test")).toBeNull();
-    expect(screen.getByText("Showing 1 of 7.")).toBeTruthy();
+    expect(screen.getByText("Showing 1 of 5.")).toBeTruthy();
     expect((screen.getByLabelText("Department") as HTMLSelectElement).value).toBe("Service");
     const rail = screen.getByRole("complementary", { name: "Role summary" });
     expect(rail.textContent).toContain("example.service.advisor@example.test");
@@ -70,16 +71,22 @@ describe("TeamView", () => {
     expect(rpcMock).toHaveBeenCalledWith("list_tenant_members", { p_tenant_id: "tenant-example" });
   });
 
-  it("renders live members and shows the empty filter state without clearing the team", async () => {
+  it("renders live members, including a pending invitation, and shows the empty filter state without clearing the team", async () => {
     rpcMock.mockResolvedValue({
-      data: [{ id: "m1", user_id: "u1", email: "example.gm@example.test", role: "general_manager", accepted_at: "2026-09-01T00:00:00Z", invited_email: null }],
+      data: [
+        { id: "m1", user_id: "u1", email: "example.gm@example.test", role: "general_manager", accepted_at: "2026-09-01T00:00:00Z", invited_email: null },
+        { id: "m2", user_id: null, email: null, role: "salesperson", accepted_at: null, invited_email: "example.invited@example.test" },
+      ],
       error: null,
     });
     renderTeam("/admin?tab=team", false);
     await screen.findByText("example.gm@example.test");
+    expect(screen.getByText("example.invited@example.test")).toBeTruthy();
+    expect(screen.getByText("Invitation pending")).toBeTruthy();
+    expect(within(screen.getByRole("table", { name: "Team members" })).getByText("Invited")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Department"), { target: { value: "Service" } });
     await waitFor(() => expect(screen.getByText("No team members match these filters")).toBeTruthy());
-    expect(screen.getByText("1 member is on this rooftop.")).toBeTruthy();
+    expect(screen.getByText("2 members are on this rooftop.")).toBeTruthy();
     expect(rpcMock).toHaveBeenCalledTimes(1);
   });
 });

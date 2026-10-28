@@ -1,11 +1,11 @@
 import { Fragment, useEffect, useMemo, useReducer, useState, type FormEvent, type ReactNode } from "react";
-import { Check, X } from "lucide-react";
+import { AlertTriangle, Ban, Building2, Car, Check, CheckCircle2, Code, Database, FileText, Link, Monitor, Share2, Tag, Users, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AdminButton, AdminLinkButton, AdminTable, InlineNote, KeyValueList, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminLinkButton, AdminTable, ICON, ICON_BOX, InlineNote, KeyValueList, Td, Th } from "@/components/admin/v2/primitives";
 import { useAudit } from "@/contexts/AuditContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { ENFORCEMENT_STATUS_META, AREA_LABEL, type EnforcementRow } from "@/lib/admin/enforcementMap";
+import { ENFORCEMENT_STATUS_META, AREA_LABEL, type EnforcementPoint, type EnforcementRow } from "@/lib/admin/enforcementMap";
 import {
   assignableRoleValues,
   departmentForRole,
@@ -26,21 +26,30 @@ import { useTenantId, type TeamAuthority, type TeamWriters } from "./useTeamMemb
 export const INPUT_CLASS = "h-9 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] leading-[20px] text-adm-ink placeholder:text-adm-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary";
 export const SELECT_CLASS = "h-9 rounded-md border border-adm-border bg-adm-surface px-2.5 text-[14px] leading-[20px] text-adm-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary disabled:opacity-50";
 
-export const MemberAvatar = ({ initials, size = "sm" }: { initials: string; size?: "sm" | "md" }) => (
-  <span aria-hidden="true" className={cn("inline-flex items-center justify-center rounded-full bg-adm-selected text-adm-primary font-semibold flex-shrink-0", size === "sm" ? "w-8 h-8 text-[12px]" : "w-11 h-11 text-[14px]")}>
+// Reference: 52px circles with 18px initials in the team table (measured 48px of ink plus
+// anti-aliasing, sized to the owner's 52), a 56px circle with 20px initials in the rail.
+const AVATAR_SIZE = { sm: `${ICON_BOX.avatar} text-[14px]`, md: `${ICON_BOX.avatarLg} text-[18px]`, lg: `${ICON_BOX.circle} text-[20px]` };
+
+export const MemberAvatar = ({ initials, size = "sm" }: { initials: string; size?: keyof typeof AVATAR_SIZE }) => (
+  <span aria-hidden="true" className={cn("inline-flex items-center justify-center bg-adm-selected text-adm-primary font-semibold flex-shrink-0", AVATAR_SIZE[size])}>
     {initials}
   </span>
 );
 
+/** Card titles and descriptions drawn to the reference (20px title, 14px description) inside AdminCard's header. */
+export const CardTitle = ({ children }: { children: ReactNode }) => <span className="block text-[20px] leading-[28px]">{children}</span>;
+export const CardDescription = ({ children }: { children: ReactNode }) => <span className="block pt-px text-[14px] leading-[20px]">{children}</span>;
+
 export const MemberStatusText = ({ status }: { status: MemberStatus }) => (
   <span className="inline-flex items-center gap-2 text-[14px] leading-[20px] text-adm-ink whitespace-nowrap">
-    <span aria-hidden="true" className={cn("w-2 h-2 rounded-full", status === "active" ? "bg-adm-success" : "bg-adm-warning")} />
+    <span aria-hidden="true" className={cn("w-2.5 h-2.5 rounded-full", status === "active" ? "bg-adm-success" : "bg-adm-warning")} />
     {status === "active" ? "Active" : "Invited"}
   </span>
 );
 
-export const OutlineBadge = ({ children, title }: { children: ReactNode; title?: string }) => (
-  <span title={title} className="inline-flex items-center rounded-md border border-adm-border px-2 py-[3px] text-[12px] leading-[18px] font-semibold text-adm-muted whitespace-nowrap">
+export const OutlineBadge = ({ children, title, icon: Icon }: { children: ReactNode; title?: string; icon?: typeof FileText }) => (
+  <span title={title} className="inline-flex items-center gap-1.5 rounded-md border border-adm-primary/40 bg-adm-surface px-2.5 h-[35px] text-[14px] leading-[20px] font-semibold text-adm-primary whitespace-nowrap">
+    {Icon && <Icon className={ICON.inline} aria-hidden="true" />}
     {children}
   </span>
 );
@@ -78,58 +87,99 @@ export const RoleSelect = ({
   );
 };
 
+// Reference: a 32px tinted square holding a 13px check or cross (a 20px lucide box).
 const Mark = ({ on, label }: { on: boolean; label: string }) => (
-  <span className="inline-flex items-center justify-center">
-    {on ? <Check className="w-4 h-4 text-adm-success" aria-hidden="true" /> : <X className="w-4 h-4 text-adm-muted" aria-hidden="true" />}
+  <span className={cn("inline-flex w-8 h-8 items-center justify-center rounded-md", on ? "bg-adm-success-bg text-adm-success" : "bg-adm-danger-bg text-adm-danger")}>
+    {on ? <Check className={ICON.inSquare} aria-hidden="true" /> : <X className={ICON.inSquare} aria-hidden="true" />}
     <span className="sr-only">{label}: {on ? "allowed" : "not allowed"}</span>
   </span>
 );
 
+const MATRIX_ROW_ICONS: Record<string, typeof Users> = {
+  assigned_customers: Users,
+  inventory: Car,
+  connect_card: Share2,
+  passport_share: FileText,
+  price_rules: Tag,
+  publishing_policy: FileText,
+};
+
+const MATRIX_HEAD = "px-[14px] py-[9px] text-[13px] leading-[18px] text-adm-ink";
+
+// The scroll wrapper is positioned so the cells' screen-reader text stays inside it on narrow
+// screens, where the table keeps a 640px width and scrolls inside its box.
 export const CapabilityMatrixTable = ({ matrix }: { matrix: CapabilityMatrix }) => (
-  <AdminTable caption="Role capabilities by task">
+  <AdminTable caption="Role capabilities by task" inset className="relative mx-5 mb-[17px] rounded-lg [&>table]:min-w-[640px]">
     <thead>
       <tr>
-        <Th>Capability</Th>
-        <Th className="text-center w-[100px]">Read</Th>
-        <Th className="text-center w-[120px]">Create or act</Th>
-        <Th className="text-center w-[100px]">Manage</Th>
+        <Th className={MATRIX_HEAD}>Capability</Th>
+        <Th className={cn(MATRIX_HEAD, "text-center w-[120px]")}>Read</Th>
+        <Th className={cn(MATRIX_HEAD, "text-center w-[120px]")}>Create or act</Th>
+        <Th className={cn(MATRIX_HEAD, "text-center w-[118px]")}>Manage</Th>
       </tr>
     </thead>
     <tbody>
       {matrix.map((g) => (
         <Fragment key={g.group}>
           <tr>
-            <td colSpan={4} className="px-3 py-2 border-b border-adm-border bg-adm-workspace/60 text-[12px] leading-[18px] font-semibold text-adm-muted">{g.group}</td>
+            <td colSpan={4} className="px-[14px] py-[7px] border-b border-adm-border bg-adm-workspace text-[14px] leading-[18px] font-semibold text-adm-ink">{g.group}</td>
           </tr>
-          {g.rows.map((r) => (
-            <tr key={r.id}>
-              <Td>
-                <span className="block font-semibold text-adm-ink">{r.label}</span>
-                <span className="block text-[12px] leading-[18px] text-adm-muted">{r.detail}</span>
-              </Td>
-              <Td className="text-center"><Mark on={r.read} label={`${r.label} read`} /></Td>
-              <Td className="text-center"><Mark on={r.act} label={`${r.label} create or act`} /></Td>
-              <Td className="text-center"><Mark on={r.manage} label={`${r.label} manage`} /></Td>
-            </tr>
-          ))}
+          {g.rows.map((r) => {
+            const Icon = MATRIX_ROW_ICONS[r.id] ?? FileText;
+            return (
+              <tr key={r.id}>
+                <Td className="py-[9px] pl-[15px]">
+                  <span className="flex items-center gap-[18px]">
+                    <Icon className={cn(ICON.panel, "flex-shrink-0 text-adm-ink")} strokeWidth={1.75} aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="block text-[14px] leading-[21px] font-semibold text-adm-ink">{r.label}</span>
+                      <span className="block text-[13px] leading-[18px] text-adm-muted">{r.detail}</span>
+                    </span>
+                  </span>
+                </Td>
+                <Td className="py-[9px] text-center"><Mark on={r.read} label={`${r.label} read`} /></Td>
+                <Td className="py-[9px] text-center"><Mark on={r.act} label={`${r.label} create or act`} /></Td>
+                <Td className="py-[9px] text-center"><Mark on={r.manage} label={`${r.label} manage`} /></Td>
+              </tr>
+            );
+          })}
         </Fragment>
       ))}
     </tbody>
   </AdminTable>
 );
 
+const POINT_ICONS: Record<EnforcementPoint, typeof Monitor> = { interface: Monitor, direct_url: Link, api: Code, database: Database };
+
+const ENFORCEMENT_CHIP: Record<"success" | "warning", string> = {
+  success: "bg-adm-success-bg border-[#BFE3CF] text-adm-success",
+  warning: "bg-adm-warning-bg border-[#F1D58A] text-adm-warning",
+};
+
+const EnforcementChip = ({ tone, children }: { tone: "success" | "warning"; children: ReactNode }) => {
+  const Icon = tone === "success" ? CheckCircle2 : AlertTriangle;
+  return (
+    <span className={cn("ml-auto inline-flex items-center gap-[6px] rounded-lg border px-2 py-[4px] text-[13px] leading-[16px] font-semibold flex-shrink-0", ENFORCEMENT_CHIP[tone])}>
+      <Icon className={cn(ICON.status, "flex-shrink-0")} aria-hidden="true" />
+      <span className="max-w-[76px]">{children}</span>
+    </span>
+  );
+};
+
 export const EnforcementRail = ({ rows }: { rows: EnforcementRow[] }) => (
   <div>
-    <ul className="divide-y divide-adm-border -mt-2">
+    <ul aria-label="Enforcement points" className="rounded-lg border border-adm-border divide-y divide-adm-border">
       {rows.map((r) => {
         const meta = ENFORCEMENT_STATUS_META[r.status];
+        const Icon = POINT_ICONS[r.point];
         return (
-          <li key={r.point} className="py-3 flex items-start justify-between gap-3">
-            <div className="min-w-0">
+          <li key={r.point} className="flex flex-wrap items-start gap-x-[21px] gap-y-3 pl-[18px] pr-[18px] py-[22px]">
+            <Icon className={cn(ICON.panel, "flex-shrink-0 text-adm-ink")} strokeWidth={1.75} aria-hidden="true" />
+            <div className="min-w-[160px] flex-1 max-w-[260px]">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.title}</p>
-              <p className="text-[12px] leading-[18px] text-adm-muted">{r.description}</p>
+              <p className="text-[13px] leading-[18px] text-adm-muted">{r.description}</p>
             </div>
-            <StatusChip tone={meta.tone} icon>{meta.label}</StatusChip>
+            <EnforcementChip tone={meta.tone}>{meta.label}</EnforcementChip>
           </li>
         );
       })}
@@ -154,51 +204,66 @@ export const EnforcementRail = ({ rows }: { rows: EnforcementRow[] }) => (
   </div>
 );
 
-export const RoleSummaryRail = ({ member, policyHref, onClose }: { member: TeamMember; policyHref: string; onClose: () => void }) => {
+const RAIL_HEADING = "text-[14px] leading-[20px] font-semibold text-adm-ink";
+// 24px marks on a 30px pitch: 3px above and below the mark.
+const RAIL_ITEM = "flex items-center gap-[21px] py-[3px] text-[14px] leading-[20px] text-adm-ink";
+
+// The rail is a column of the team card, drawn to the reference rhythm: a rule between each block.
+export const RoleSummaryRail = ({ member, policyHref, onClose, className }: { member: TeamMember; policyHref: string; onClose: () => void; className?: string }) => {
   const summary = roleSummary(member.role);
   return (
-    <aside aria-label="Role summary" className="rounded-[10px] border border-adm-border bg-adm-surface">
-      <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-adm-border">
-        <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">Role summary</h3>
-        <button type="button" onClick={onClose} aria-label="Close role summary" className="w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace">
-          <X className="w-4 h-4" aria-hidden="true" />
-        </button>
-      </header>
-      <div className="px-5 py-4 space-y-4">
-        <div className="flex items-center gap-3">
-          <MemberAvatar initials={member.initials} size="md" />
+    <aside aria-label="Role summary" className={cn("relative min-w-0 bg-adm-surface", className)}>
+      <button type="button" onClick={onClose} aria-label="Close role summary" className="absolute right-[5px] top-[7px] w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace">
+        <X className={ICON.status} aria-hidden="true" />
+      </button>
+      <div className="pl-[18px] pr-[14px] pt-[26px] pb-[17px]">
+        <h3 className="pr-10 text-[20px] leading-[28px] font-semibold text-adm-ink">Role summary</h3>
+        <div className="mt-[17px] flex items-center gap-[13px]">
+          <MemberAvatar initials={member.initials} size="lg" />
           <div className="min-w-0">
-            <p className="text-[14px] font-semibold text-adm-ink truncate">{member.email}</p>
-            <p className="text-[12px] leading-[18px] text-adm-muted">{member.roleLabel}</p>
+            <p className="text-[18px] leading-[24px] font-semibold text-adm-ink truncate" data-parity="member-name">{member.email}</p>
+            <p className="flex items-center gap-2 text-[14px] leading-[20px] text-adm-muted">
+              {member.roleLabel}
+              <span aria-hidden="true">·</span>
+              <MemberStatusText status={member.status} />
+            </p>
           </div>
         </div>
-        <KeyValueList rows={[{ label: "Access scope", value: "This rooftop" }, { label: "Status", value: <MemberStatusText status={member.status} /> }]} />
-        <div>
-          <p className="text-[12px] leading-[18px] font-semibold text-adm-muted">Key permissions (example)</p>
-          {summary.keyPermissions.length === 0 ? (
-            <p className="mt-1 text-[13px] text-adm-muted">No task permissions in this summary.</p>
-          ) : (
-            <ul className="mt-2 space-y-1.5">
-              {summary.keyPermissions.map((p) => (
-                <li key={p} className="flex items-center gap-2 text-[14px] leading-[20px] text-adm-ink"><Check className="w-4 h-4 text-adm-success flex-shrink-0" aria-hidden="true" />{p}</li>
-              ))}
-            </ul>
-          )}
+      </div>
+      <div className="border-t border-adm-border pl-[18px] pr-[14px] pt-[17px] pb-5">
+        <div className="flex items-start gap-5">
+          <Building2 className={cn(ICON.panel, "flex-shrink-0 text-adm-ink")} strokeWidth={1.75} aria-hidden="true" />
+          <dl className="text-[14px] leading-[20px] text-adm-ink">
+            <dt className="font-semibold">Access scope</dt>
+            <dd>This rooftop</dd>
+          </dl>
         </div>
-        <div>
-          <p className="text-[12px] leading-[18px] font-semibold text-adm-muted">Restricted (example)</p>
-          {summary.restricted.length === 0 ? (
-            <p className="mt-1 text-[13px] text-adm-muted">No restrictions in this summary.</p>
-          ) : (
-            <ul className="mt-2 space-y-1.5">
-              {summary.restricted.map((p) => (
-                <li key={p} className="flex items-center gap-2 text-[14px] leading-[20px] text-adm-ink"><X className="w-4 h-4 text-adm-muted flex-shrink-0" aria-hidden="true" />{p}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <AdminLinkButton to={policyHref} variant="secondary" className="w-full">View role policy</AdminLinkButton>
-        <InlineNote tone="info">Role preview does not grant permissions.</InlineNote>
+      </div>
+      <div className="border-t border-adm-border pl-[18px] pr-[14px] pt-[15px] pb-[14px]">
+        <p className={RAIL_HEADING}>Key permissions (example)</p>
+        {summary.keyPermissions.length === 0 ? (
+          <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">No task permissions in this summary.</p>
+        ) : (
+          <ul className="mt-[9px] pl-[9px]">
+            {summary.keyPermissions.map((p) => (
+              <li key={p} className={RAIL_ITEM}><Check className={cn(ICON.status, "text-adm-success flex-shrink-0")} aria-hidden="true" />{p}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="border-t border-adm-border pl-[18px] pr-[14px] pt-[14px] pb-[30px]">
+        <p className={RAIL_HEADING}>Restricted (example)</p>
+        {summary.restricted.length === 0 ? (
+          <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">No restrictions in this summary.</p>
+        ) : (
+          <ul className="mt-[9px] pl-[9px]">
+            {summary.restricted.map((p) => (
+              <li key={p} className={RAIL_ITEM}><Ban className={cn(ICON.status, "text-adm-danger flex-shrink-0")} aria-hidden="true" />{p}</li>
+            ))}
+          </ul>
+        )}
+        <AdminLinkButton to={policyHref} variant="outline" className="mt-[22px] w-full min-h-[44px] sm:min-h-[44px]" data-landmark="view-role-policy">View role policy</AdminLinkButton>
+        <InlineNote tone="info" className="mt-4 px-[14px] py-[9px] [&>div>span]:text-[12px]">Role preview does not grant permissions.</InlineNote>
       </div>
     </aside>
   );
