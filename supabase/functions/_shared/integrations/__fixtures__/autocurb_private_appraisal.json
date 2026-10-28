@@ -1,0 +1,27 @@
+{
+  "event_id": "2d45ee4f-75df-40eb-87fb-cedcfd161a91",
+  "event_type": "autocurb.appraisal.recorded",
+  "schema_version": "1.0.0",
+  "producer": "autocurb",
+  "source_record_id": "appraisal_fixture_001",
+  "source_version": 1,
+  "idempotency_key": "autocurb:appraisal_fixture_001:v1",
+  "correlation_id": "case-d001",
+  "causation_id": null,
+  "occurred_at": "2026-10-28T19:00:00Z",
+  "observed_at": "2026-10-28T18:55:00Z",
+  "sent_at": "2026-10-28T19:01:00Z",
+  "vin": "1HGCM82633A004352",
+  "tenant_ref": "TENANT_FIXTURE_A",
+  "instance_ref": null,
+  "visibility": "tenant_private",
+  "evidence_refs": [],
+  "payload_checksum": "011747b7ed5801a418818a77baf24ff7e1e5734f4620f83967c2f7354a28562c",
+  "payload": {
+    "appraisal_id": "appraisal_fixture_001",
+    "appraised_amount_usd": 17500,
+    "offer_status": "proposed",
+    "customer_reference": "LOCAL_OPAQUE_REF_ONLY",
+    "public_price_fairness_influence": false
+  }
+}

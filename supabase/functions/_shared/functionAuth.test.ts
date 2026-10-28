@@ -544,6 +544,12 @@ describe("edge function gateway configuration", () => {
       // Signal House mints no Supabase JWT; the function authenticates the
       // delivery itself against SIGNALHOUSE_WEBHOOK_SECRET.
       "signalhouse-webhook": false,
+      // RooftopOS spine: each authenticates in code and is dormant unless
+      // ROOFTOP_INTEGRATIONS_ENABLED is "true".
+      "integration-ingest": false,
+      "integration-apply": false,
+      "integration-dispatch": false,
+      "integration-health": false,
     });
   });
 

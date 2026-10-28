@@ -87,3 +87,21 @@ verify_jwt = true
 # src/lib/market/... guards and supabase/functions/_shared/functionAuth.ts.
 [functions.market-valuation-write]
 verify_jwt = false
+
+# RooftopOS integration spine. All four return 503 integrations_disabled unless
+# ROOFTOP_INTEGRATIONS_ENABLED is "true" and authenticate in code, so the gateway
+# JWT check is off. integration-ingest verifies an HMAC signature over the raw body
+# (X-Rooftop-* headers; the sender is another app and mints no Supabase JWT);
+# integration-apply and integration-dispatch accept only the service role or the
+# cron secret; integration-health requires a platform-admin user JWT.
+[functions.integration-ingest]
+verify_jwt = false
+
+[functions.integration-apply]
+verify_jwt = false
+
+[functions.integration-dispatch]
+verify_jwt = false
+
+[functions.integration-health]
+verify_jwt = false
