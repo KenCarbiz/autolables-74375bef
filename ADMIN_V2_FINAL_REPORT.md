@@ -259,14 +259,23 @@ as an offset, instead of shifting every pixel below it.
    not a layout difference. Each screen's remaining hotspots are itemised in
    the parity report.
 
-**Per-screen results.** The table below is the last full run before the
-per-screen tuning pass (the four parity streams were still running when this
-revision was committed); it is replaced by the final run in the next revision.
-Screen 01 reflects its tuning pass.
+**Per-screen results.** Measured on the merged main with screens 01, 05, 06, 07, 11, 12 and 13 tuned (the People, Customer Experience and Publishing tuning streams were still running when this revision was committed; the final run replaces this table).
 
 | Screen | Reference | Capture | Viewport | Masked regions | Content parity | Body parity (aligned) | Structure | Landmarks | Page overflow | Exceptions |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 01 | `scripts/admin-parity/reference/01-admin-overview.png` | `scripts/admin-parity/out/01-1586x992.png` | 1586x992 (also 1600x1000) | recent activity relative times; summary tile counts | 90.69% | 90.01% | 69.61% | 10 of 10 within 16px | none | none |
+| 01 | `scripts/admin-parity/reference/01-admin-overview.png` | `scripts/admin-parity/out/01-1586x992.png` | 1586x992 (also 1600x1000) | recent activity relative times; summary tile counts | 90.36% | 89.61% | 67.97% | 10 of 10 within 16px | none | none |
+| 02 | `scripts/admin-parity/reference/02-dealership-brand.png` | `scripts/admin-parity/out/02-1586x992.png` | 1586x992 (also 1600x1000) | none | 87.19% | 91.45% | 63.50% | none declared | none | title block (+33px) |
+| 03 | `scripts/admin-parity/reference/03-people-access.png` | `scripts/admin-parity/out/03-1586x992.png` | 1586x992 (also 1600x1000) | none | 90.65% | 90.19% | 69.18% | none declared | 1024x768, 390x844 | title block (+21px) |
+| 04 | `scripts/admin-parity/reference/04-salesperson-role-child.png` | `scripts/admin-parity/out/04-1586x992.png` | 1586x992 (also 1600x1000) | none | 89.03% | 88.50% | 66.43% | none declared | 390x844 | title block (+96px) |
+| 05 | `scripts/admin-parity/reference/05-pricing-products.png` | `scripts/admin-parity/out/05-1586x992.png` | 1586x992 (also 1600x1000) | change impact counts (fixture inventory sizes); preview vehicle name, trim, stock and prices (fixture vehicle); vehicle names, stock numbers and prices (fixture vehicles); vehicles-shown count | 88.77% | 90.41% | 65.34% | 8 of 8 within 16px | none | title block (+80px) |
+| 06 | `scripts/admin-parity/reference/06-fee-change-review-child.png` | `scripts/admin-parity/out/06-1586x992.png` | 1586x992 (also 1600x1000) | example vehicle name, stock, VIN suffix, selling price and totals (fixture vehicle); the fee column is policy data and stays; expected impact counts (fixture inventory sizes) | 92.51% | 92.32% | 75.37% | 11 of 11 within 16px | none | none |
+| 07 | `scripts/admin-parity/reference/07-product-applicability-child.png` | `scripts/admin-parity/out/07-1586x992.png` | 1586x992 (also 1600x1000) | product price (fixture value); sample vehicle names and mileage (fixture vehicles) | 90.40% | 90.11% | 70.85% | 9 of 9 within 16px | none | title block (-2px) |
+| 08 | `scripts/admin-parity/reference/08-customer-contact-routing.png` | `scripts/admin-parity/out/08-1586x992.png` | 1586x992 (also 1600x1000) | none | 88.44% | 90.25% | 65.10% | none declared | none | title block (+66px) |
+| 09 | `scripts/admin-parity/reference/09-escalation-delivery-child.png` | `scripts/admin-parity/out/09-1586x992.png` | 1586x992 (also 1600x1000) | none | 85.34% | nan% | 62.18% | none declared | none | none |
+| 10 | `scripts/admin-parity/reference/10-publishing-policy.png` | `scripts/admin-parity/out/10-1586x992.png` | 1586x992 (also 1600x1000) | none | 86.65% | 84.67% | 63.82% | none declared | none | title block (-7px) |
+| 11 | `scripts/admin-parity/reference/11-documents-service.png` | `scripts/admin-parity/out/11-1586x992.png` | 1586x992 (also 1600x1000) | policy change provenance (relative time and fixture name); readiness detail values (relative times and counts) | 91.17% | 91.37% | 71.92% | 5 of 8 within 16px | none | title block (+4px) |
+| 12 | `scripts/admin-parity/reference/12-integrations-feed-health.png` | `scripts/admin-parity/out/12-1586x992.png` | 1586x992 (also 1600x1000) | attempt count in the pager summary; fixture provider domain; rooftop pin identifier; run timestamps (tile values and attempt times) | 79.36% | 92.49% | 64.88% | 11 of 12 within 16px | none | title block (+64px) |
+| 13 | `scripts/admin-parity/reference/13-sync-run-detail-child.png` | `scripts/admin-parity/out/13-1586x992.png` | 1586x992 (also 1600x1000) | event times and the last successful run time; fixture provider domain; run timestamp and run id under the title; technical evidence payload (run id, timestamps, domain) | 89.33% | 90.23% | 63.37% | 10 of 13 within 16px | none | title block (-18px) |
 
 ## G. Tests
 

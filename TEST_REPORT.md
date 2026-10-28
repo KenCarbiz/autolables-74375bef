@@ -95,3 +95,39 @@ bun run test
 
 The full suite takes several minutes; the two failures named above are the
 expected baseline until they are fixed in their own change.
+
+## 6. Administration V2 (2026-10-28)
+
+State of the suite after the Administration refresh merged (keystone
+`4ceac63` through the ending SHA named in `ADMIN_V2_FINAL_REPORT.md`). The
+two pre-existing failures in section 2 are unchanged; nothing in the
+Administration scope fails.
+
+| Run | Files | Tests | Result |
+|---|---|---|---|
+| Full suite (`bun run test`) on the merged main | 419 | 6984 (1 skipped) | 2 failed (section 2), 6981 passed |
+| Administration suites (`bunx vitest run src/lib/admin src/pages/admin src/components/admin src/contexts/DealerSettingsContext.test.tsx`) | 47 | 407 | all passed |
+| Parity harness unit tests (`node --test scripts/admin-parity/harness.test.cjs`) | 1 | 10 | all passed |
+| Typecheck, production build | | | clean; the development-only fixture page is absent from the bundle |
+
+Coverage by the handoff's test categories, mapped to files:
+
+| Required coverage | Test file(s) | State |
+|---|---|---|
+| Security and permissions: a salesperson lands nowhere in Administration, forbidden tabs fall back, visibility never widens, restricted roles read but cannot apply | `src/lib/admin/sections.test.ts`, `src/pages/admin/children/FeeReviewPage.test.tsx`, `src/pages/admin/views/documents/ApprovalRulesView.test.tsx`, `ServicePolicyView.test.tsx`, `src/pages/admin/children/MemberRolePage.test.tsx`, `src/lib/admin/people.test.ts`, `enforcementMap.test.ts` | covered |
+| Settings lifecycle: no write on mount, Review disabled when clean, changed keys only, refused writes never cached, re-baseline on load | `src/pages/admin/views/brand/brandViews.test.tsx`, `src/contexts/DealerSettingsContext.test.tsx`, `src/pages/admin/views/customer/customerViews.test.tsx`, `src/pages/admin/views/documents/*.test.tsx`, `src/lib/admin/reviewApply.test.ts` | covered |
+| Pricing: cent-exact dry run, zero fee when disabled, consistency, rule matching, review-gated apply, unknown counts block apply | `src/lib/admin/pricing/*.test.ts`, `src/pages/admin/views/pricing/pricingData.test.ts`, `PriceRulesView.test.tsx`, `ProductsView.test.tsx`, `ApplicabilityView.test.tsx`, `src/pages/admin/children/FeeReviewPage.test.tsx`, `ProductApplicabilityPage.test.tsx`, `src/lib/admin/sql/*.test.ts` | covered |
+| System health: HTTP-before-text classification, typed states, cron row alone is unknown, freshness, counts never zero on failure, RPC fallbacks, no reads or writes on mount | `src/lib/admin/health.test.ts`, `src/lib/admin/integrations/*.test.ts`, `src/pages/admin/views/integrations/*.test.tsx`, `src/pages/admin/children/SyncRunPage.test.tsx`, `src/lib/admin/attention.test.ts` | covered |
+| Routing: no route enabled without a destination, accepted-only advancement, audit without PII, dry run sends nothing | `src/lib/admin/routingDraft.test.ts`, `src/lib/admin/escalation.test.ts`, `src/lib/admin/effectivePolicy.test.ts`, `src/pages/admin/children/EscalationPage.test.tsx` | covered |
+| Publishing and documents: nested rules merged not replaced, warnings, service gates, saved print profile never reads Tested | `src/lib/admin/publishingPolicy.test.ts`, `src/lib/admin/documentPolicy.test.ts`, `src/pages/admin/views/publishing/*.test.tsx`, `src/pages/admin/views/documents/*.test.tsx` | covered |
+| Visual: every screen renders from its fixture, the harness scores, masks and landmarks behave | `src/pages/admin/fixtures/*.test.tsx`, `scripts/admin-parity/harness.test.cjs`, `bun run admin:parity` | covered; scores in `ADMIN_V2_PARITY_REPORT.md` |
+
+Reproduce:
+
+```
+bunx tsc -p tsconfig.app.json --noEmit
+bunx vitest run src/lib/admin src/pages/admin src/components/admin src/contexts/DealerSettingsContext.test.tsx
+node --test scripts/admin-parity/harness.test.cjs
+bun run admin:parity
+bun run test
+```
