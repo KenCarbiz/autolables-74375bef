@@ -216,6 +216,43 @@ describe("EscalationPage draft against live settings (screen 09)", () => {
     expect(h.invoked).toEqual([]);
   });
 
+  it("names a malformed destination address as not valid, with Change, and blocks review", () => {
+    renderLive();
+    fireEvent.click(screen.getByRole("button", { name: "Change BDC email" }));
+    fireEvent.change(screen.getByLabelText("BDC email"), { target: { value: "bdc@" } });
+    const alert = screen.getByText("Not a valid email address: bdc@").closest("[role='alert']") as HTMLElement;
+    expect(alert).toBeInTheDocument();
+    expect(screen.queryByText("bdc@", { selector: "[data-parity='destination-email']" })).toBeNull();
+    expect(review()).toBeDisabled();
+    expect(screen.getByText("Complete all required fields to review your changes.")).toBeInTheDocument();
+  });
+
+  it("offers Change on a stored malformed address, and review returns once it is fixed", () => {
+    h.settings.passport_contact_routing = { ...CONFIGURED_ROUTING, managerFallback: { enabled: true, managerEmail: "manager at example" } };
+    renderLive();
+    expect(screen.getByText("Not a valid email address: manager at example")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Change Sales manager email" }));
+    fireEvent.change(screen.getByLabelText("Sales manager email"), { target: { value: "manager@example.test" } });
+    expect(screen.queryByText(/Not a valid email address/)).toBeNull();
+    expect(review()).toBeEnabled();
+    expect(h.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("leaves Applying with a visible failure and keeps the draft when the save throws", async () => {
+    h.updateSettings.mockRejectedValueOnce(new Error("network down"));
+    renderLive();
+    fireEvent.change(managerAfter(), { target: { value: "15" } });
+    fireEvent.click(review());
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply changes" }));
+    expect(await within(dialog).findByText("Not applied.")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Applying…")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(managerAfter().value).toBe("15");
+    expect(screen.getByText("Keep draft")).toBeInTheDocument();
+  });
+
   it("shows a refused save as Not applied and keeps the draft for another try", async () => {
     h.updateSettings.mockResolvedValueOnce(false);
     renderLive();

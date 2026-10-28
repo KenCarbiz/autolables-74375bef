@@ -223,6 +223,22 @@ describe("ProductApplicabilityPage draft, review and save against live data", ()
     expect(rulesState.updateRule).not.toHaveBeenCalled();
   });
 
+  it("blocks review for a negative price and says why, and writes nothing", async () => {
+    live();
+    renderPage(ROUTE, null);
+    await ready();
+    fireEvent.change(screen.getByLabelText("Price"), { target: { value: "-250" } });
+    expect(screen.getByText("Price must be zero or more.")).toBeInTheDocument();
+    expect(review()).toBeDisabled();
+    fireEvent.click(review());
+    expect(screen.queryByText("Changes to apply")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Price"), { target: { value: "0" } });
+    expect(screen.queryByText("Price must be zero or more.")).toBeNull();
+    expect(review()).toBeEnabled();
+    expect(productWrites()).toEqual([]);
+    expect(rulesState.updateRule).not.toHaveBeenCalled();
+  });
+
   it("goes back from the review to editing with the draft kept, and Cancel leaves for the applicability tab without writing", async () => {
     live();
     renderRouted();

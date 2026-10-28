@@ -245,6 +245,18 @@ describe("Identity in live mode", () => {
     expect(h.ctx.updateSettings).not.toHaveBeenCalled();
   });
 
+  it("leaves Applying with a visible failure and keeps the draft when the save throws", async () => {
+    h.ctx.updateSettings.mockRejectedValue(new Error("network down"));
+    renderLive(IdentityView);
+    fireEvent.change(screen.getByLabelText("Dealership name"), { target: { value: "Example Motors Changed" } });
+    await reviewAndApply();
+    await waitFor(() => expect(screen.getByText("Couldn't save")).toBeTruthy());
+    expect(screen.queryByText("Applying...")).toBeNull();
+    expect(screen.getByText("The server did not accept the change. Nothing was saved.")).toBeTruthy();
+    expect((screen.getByLabelText("Dealership name") as HTMLInputElement).value).toBe("Example Motors Changed");
+    expect(screen.getByRole("button", { name: "Discard" })).toBeTruthy();
+  });
+
   it("re-baselines the draft when the settings load again for a tenant", () => {
     const view = renderLive(IdentityView);
     fireEvent.change(screen.getByLabelText("Dealership name"), { target: { value: "Example Motors Changed" } });

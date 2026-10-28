@@ -196,6 +196,25 @@ describe("RoutingView draft against live settings", () => {
     expect(review()).toBeEnabled();
   });
 
+  it("leaves Applying with a visible failure and keeps the draft when the save throws", async () => {
+    h.updateSettings.mockRejectedValueOnce(new Error("network down"));
+    renderWith(<RoutingView />, null);
+    fireEvent.click(smart());
+    fireEvent.click(review());
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply changes" }));
+    expect(await within(dialog).findByText("Not applied.")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Applying…")).toBeNull();
+    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+    expect(cancel).toBeEnabled();
+    fireEvent.click(cancel);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const bar = screen.getByText("Draft configuration").parentElement as HTMLElement;
+    expect(within(bar).getByText("The change was not saved. Nothing was applied.")).toBeInTheDocument();
+    expect(smart()).not.toBeChecked();
+    expect(review()).toBeEnabled();
+  });
+
   it("closes the review on Cancel without writing and keeps the draft", () => {
     renderWith(<RoutingView />, null);
     fireEvent.click(smart());

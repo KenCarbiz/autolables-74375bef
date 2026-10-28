@@ -267,6 +267,24 @@ describe("Publishing > Effective policy draft, review and apply against live set
     expect(screen.getByText("Enforced policy · no pending changes")).toBeInTheDocument();
   });
 
+  it("leaves Applying with Not applied, records nothing and keeps the draft when the save throws", async () => {
+    spies.updateSettings.mockRejectedValue(new Error("network down"));
+    renderView(false);
+    await ready();
+    const dialog = openEdit();
+    fireEvent.click(within(dialog).getByRole("switch", { name: APPROVAL }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Continue to review" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply policy" }));
+    expect(await within(dialog).findByText("Not applied")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Applying…")).toBeNull();
+    expect(spies.insert).not.toHaveBeenCalled();
+    const done = within(dialog).getByRole("button", { name: "Done" });
+    expect(done).toBeEnabled();
+    fireEvent.click(done);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByText("Draft proposal")).toBeInTheDocument();
+  });
+
   it("reports a refused save as Not applied, records nothing, and keeps the draft", async () => {
     spies.updateSettings.mockResolvedValue(false);
     renderView(false);
