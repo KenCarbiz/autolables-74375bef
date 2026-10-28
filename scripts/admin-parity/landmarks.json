@@ -71,5 +71,219 @@
       "y": 748,
       "w": 276
     }
+  },
+  "05": {
+    "_comment": "Section row bottom 158 (bluerows: underline y 155-156); yBody is measured from it. Card edges from edges.cjs at x 270/600/905/1300/1555 and hedges rows 230/300/535/585/737; text origins from bbox.cjs.",
+    "sectionNav": {
+      "selector": "nav[aria-label=\"Administration sections\"]",
+      "x": 257,
+      "yBody": -38,
+      "w": 1305,
+      "h": 38
+    },
+    "childTabs": {
+      "selector": "nav[aria-label=\"Pricing & Products views\"]",
+      "x": 257,
+      "yBody": 14,
+      "w": 1305,
+      "h": 36
+    },
+    "policyCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Price display policy",
+      "x": 257,
+      "yBody": 66,
+      "w": 704,
+      "h": 411
+    },
+    "previewCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Customer price preview",
+      "x": 975,
+      "yBody": 66,
+      "w": 587,
+      "h": 411
+    },
+    "scopeSelect": {
+      "selector": "select[aria-label=\"Change scope\"]",
+      "x": 366,
+      "yBody": 361,
+      "w": 252,
+      "h": 32
+    },
+    "reviewButton": {
+      "selector": "[data-landmark=\"price-review\"]",
+      "x": 795,
+      "yBody": 405,
+      "w": 146,
+      "h": 33
+    },
+    "consistencyCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Price consistency",
+      "x": 257,
+      "yBody": 492,
+      "w": 1305
+    },
+    "consistencyTable": {
+      "selector": "[data-admin-v2] section table",
+      "index": 0,
+      "x": 276,
+      "yBody": 560,
+      "w": 1267
+    }
+  },
+  "06": {
+    "_comment": "The mock dims the workspace and draws the dialog at x 443-1350, y 187-962 (edges.cjs at x 460/560/1200, hedges at y 200/296/395/660/895). The body row is pinned to the dialog top, which the view marks with a zero-height element whose bottom is that row; yBody is measured from 187.",
+    "_anchor": { "reference": 187, "selector": "[data-landmark=\"fee-review-top\"]" },
+    "dialog": {
+      "selector": "[role=\"dialog\"]",
+      "x": 443,
+      "yBody": 0,
+      "w": 907,
+      "h": 776
+    },
+    "title": {
+      "selector": "#fee-review-title",
+      "x": 471,
+      "yBody": 24,
+      "h": 28
+    },
+    "step1": {
+      "selector": "[data-landmark=\"fee-review-step\"]",
+      "index": 0,
+      "x": 586,
+      "yBody": 91,
+      "h": 38
+    },
+    "step3": {
+      "selector": "[data-landmark=\"fee-review-step\"]",
+      "index": 2,
+      "x": 1104,
+      "yBody": 91,
+      "h": 38
+    },
+    "summaryTable": {
+      "selector": "[data-landmark=\"fee-change-summary\"] table",
+      "x": 471,
+      "yBody": 191,
+      "w": 512,
+      "h": 160
+    },
+    "impactTile1": {
+      "selector": "[data-landmark=\"fee-impact-tile\"]",
+      "index": 0,
+      "x": 1011,
+      "yBody": 192,
+      "w": 312,
+      "h": 112
+    },
+    "impactTile2": {
+      "selector": "[data-landmark=\"fee-impact-tile\"]",
+      "index": 1,
+      "x": 1011,
+      "yBody": 312,
+      "w": 312,
+      "h": 112
+    },
+    "exampleTable": {
+      "selector": "[data-landmark=\"fee-example-impact\"] table",
+      "x": 471,
+      "yBody": 456,
+      "w": 852,
+      "h": 99
+    },
+    "warningNote": {
+      "selector": "[role=\"dialog\"] [role=\"status\"]",
+      "index": 0,
+      "x": 471,
+      "yBody": 574,
+      "w": 852,
+      "h": 41
+    },
+    "backButton": {
+      "selector": "[data-landmark=\"fee-back\"]",
+      "x": 471,
+      "yBody": 688,
+      "w": 156,
+      "h": 41
+    },
+    "applyButton": {
+      "selector": "[data-landmark=\"fee-apply\"]",
+      "x": 1092,
+      "yBody": 688,
+      "w": 231,
+      "h": 41
+    }
+  },
+  "07": {
+    "_comment": "Child page: no section row. The body row is pinned to the child tab row bottom, 228 in the mock (bluerows: underline y 226-227, border 227). Card and box edges from edges.cjs at x 280/300/700/1100/1500 and hedges at y 260/384/475/583/720/954; text origins from bbox.cjs.",
+    "_anchor": { "reference": 228, "selector": "nav[aria-label=\"Product views\"]" },
+    "childTabs": {
+      "selector": "nav[aria-label=\"Product views\"]",
+      "x": 267,
+      "yBody": -44,
+      "w": 1295,
+      "h": 44
+    },
+    "rulesCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Applicability rules",
+      "x": 267,
+      "yBody": 19,
+      "w": 701,
+      "h": 668
+    },
+    "rulesBox": {
+      "selector": "[data-landmark=\"applicability-rules\"]",
+      "x": 290,
+      "yBody": 103,
+      "w": 655,
+      "h": 289
+    },
+    "priceBox": {
+      "selector": "[data-landmark=\"price-treatment\"]",
+      "x": 290,
+      "yBody": 411,
+      "w": 655,
+      "h": 186
+    },
+    "evidenceCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Evidence checklist",
+      "x": 981,
+      "yBody": 19,
+      "w": 581,
+      "h": 358
+    },
+    "evidenceList": {
+      "selector": "[data-landmark=\"evidence-checklist\"]",
+      "x": 999,
+      "yBody": 103,
+      "w": 544,
+      "h": 259
+    },
+    "samplesCard": {
+      "selector": "[data-admin-v2] section",
+      "heading": "Sample vehicle results",
+      "x": 981,
+      "yBody": 388,
+      "w": 581,
+      "h": 299
+    },
+    "samplesTable": {
+      "selector": "[data-landmark=\"sample-results\"] table",
+      "x": 999,
+      "yBody": 472,
+      "w": 544,
+      "h": 197
+    },
+    "reviewButton": {
+      "selector": "[data-landmark=\"applicability-review\"]",
+      "x": 1408,
+      "yBody": 706,
+      "w": 155,
+      "h": 42
+    }
   }
 }

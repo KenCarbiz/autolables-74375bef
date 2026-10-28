@@ -60,15 +60,15 @@ describe("ProductApplicabilityPage with the 07 fixture", () => {
 
     const table = screen.getByRole("table", { name: "Sample vehicle results" });
     const rows = within(table).getAllByRole("row").slice(1);
-    expect(rows).toHaveLength(4);
-    expect(within(rows[0]).getByText("Eligible")).toBeInTheDocument();
+    expect(rows).toHaveLength(3);
+    expect(within(rows[0]).getByText("Yes")).toBeInTheDocument();
     expect(within(rows[0]).getByText("Proof attached")).toBeInTheDocument();
     expect(within(rows[0]).getByText("Ready for review")).toBeInTheDocument();
     expect(within(rows[1]).getByText("Missing proof")).toBeInTheDocument();
     expect(within(rows[1]).getByText("Blocked")).toBeInTheDocument();
-    expect(within(rows[2]).getByText("Not eligible")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("No")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("Excluded")).toBeInTheDocument();
     expect(within(rows[2]).getByText("Not published")).toBeInTheDocument();
-    expect(within(rows[3]).getByText("Not eligible")).toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: "Review changes" })).toBeDisabled();
     expect(writeCalls()).toEqual([]);

@@ -41,16 +41,18 @@ const listing = (n: number, over: Partial<ConsistencyListing> = {}): Consistency
 
 const observed = (price: number, capturedAt = "2026-10-21T06:05:00Z"): WebsiteObservation => ({ price, capturedAt, sourceUrl: "https://dealer.example/vdp", channel: "website" });
 
+// The reference depicts the fee-inclusive basis ("Advertised total includes
+// document fee"), so the fixture policy uses it.
 export const CONSISTENCY_ROWS: ConsistencyAssessment[] = [
-  assessConsistency(listing(41), observed(18_000 + 41 * 525 + 895), 895, "advertised_before_doc"),
-  assessConsistency(listing(32), observed(18_000 + 32 * 525 + 895, "2026-10-19T06:05:00Z"), 895, "advertised_before_doc"),
-  assessConsistency(listing(58), observed(18_000 + 58 * 525 + 2_195), 895, "advertised_before_doc"),
-  assessConsistency(listing(17), null, 895, "advertised_before_doc"),
-  assessConsistency(listing(46), observed(18_000 + 46 * 525 + 895), 895, "advertised_before_doc"),
+  assessConsistency(listing(41), observed(18_000 + 41 * 525 + 895), 895, "website_sale_price"),
+  assessConsistency(listing(32), observed(18_000 + 32 * 525 + 895, "2026-10-19T06:05:00Z"), 895, "website_sale_price"),
+  assessConsistency(listing(58), observed(18_000 + 58 * 525 + 2_195), 895, "website_sale_price"),
+  assessConsistency(listing(17), null, 895, "website_sale_price"),
+  assessConsistency(listing(46), observed(18_000 + 46 * 525 + 895), 895, "website_sale_price"),
 ];
 
 export const PRICE_RULES_FIXTURE: PriceRulesFixture = {
-  policy: { stateCode: "CT", feeEnabled: true, feeAmount: 895, mode: "advertised_before_doc" },
+  policy: { stateCode: "CT", feeEnabled: true, feeAmount: 895, mode: "website_sale_price" },
   counts: { eligible: knownCount(48), archived: knownCount(12) },
   preview: { title: "2024 Example Crossover", trim: "Premium", stock: "EX-1041", imageUrl: null, sellingPrice: 18_000 + 41 * 525, vehicleType: "used" },
   consistency: { rows: CONSISTENCY_ROWS, truncated: false },
@@ -71,20 +73,22 @@ export const FEE_IMPACT_ROWS: FeeImpactRow[] = Array.from({ length: 60 }, (_, i)
     advertised_price_before_doc: selling,
     doc_fee: 895,
     website_sale_price: selling + 895,
-    price_parse_status: n % 17 === 0 ? "warning" : "ok",
+    price_parse_status: "ok",
   };
 });
 
 const FEE_BEFORE: FeeDraft = { enabled: true, amount: 895, stateCode: "CT" };
 const FEE_AFTER: FeeDraft = { enabled: true, amount: 925, stateCode: "CT" };
 
+// The reference review shows one example vehicle; the live preview keeps the
+// routine's default sample size.
 export const FEE_REVIEW_FIXTURE: FeeReviewFixture = {
   before: FEE_BEFORE,
   after: FEE_AFTER,
-  mode: "advertised_before_doc",
+  mode: "website_sale_price",
   scope: "active",
   version: { version: 12, source: "server" },
-  preview: { impact: buildFeeImpact(FEE_IMPACT_ROWS, FEE_AFTER, { includeArchived: false }), source: "server", version: 12, truncated: false, notes: [] },
+  preview: { impact: buildFeeImpact(FEE_IMPACT_ROWS, FEE_AFTER, { includeArchived: false, sampleSize: 1 }), source: "server", version: 12, truncated: false, notes: [] },
   canManage: true,
 };
 
@@ -124,16 +128,17 @@ export const EXAMPLE_RULE: ProductRule = {
   mileage_max: 80_000,
 };
 
+// Three sampled vehicles, as the reference shows: one with proof, one without,
+// one outside the mileage limit.
 export const PRODUCT_APPLICABILITY_FIXTURE: ProductApplicabilityFixture = {
   product: EXAMPLE_PRODUCT,
   rule: EXAMPLE_RULE,
   vehicles: [
     { vin: vinOf(41), year: 2024, make: "Example", model: "Crossover", trim: "Premium", condition: "new", mileage: 12 },
     { vin: vinOf(32), year: 2023, make: "Example", model: "Sedan", trim: "Sport", condition: "used", mileage: 28_115 },
-    { vin: vinOf(58), year: 2019, make: "Example", model: "Pickup", trim: "Base", condition: "used", mileage: 64_220 },
     { vin: vinOf(17), year: 2022, make: "Example", model: "Hatch", trim: "Base", condition: "cpo", mileage: 96_480 },
   ],
-  proofs: { [vinOf(41)]: 1, [vinOf(32)]: 0, [vinOf(58)]: 0, [vinOf(17)]: 0 },
+  proofs: { [vinOf(41)]: 1, [vinOf(32)]: 0, [vinOf(17)]: 0 },
   policy: { requireManagerApproval: true, requireInstallVerification: true },
   rulesExist: true,
 };

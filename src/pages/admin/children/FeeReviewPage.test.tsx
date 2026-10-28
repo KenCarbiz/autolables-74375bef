@@ -76,7 +76,7 @@ describe("FeeReviewPage with the 06 fixture", () => {
     expect(within(d).getByText("active vehicles eligible")).toBeInTheDocument();
     expect(within(d).getByText("Rows will be updated only when values differ")).toBeInTheDocument();
     expect(within(d).getByText("No changes will be made to archived records")).toBeInTheDocument();
-    expect(within(within(d).getByRole("table", { name: "Example vehicles" })).getAllByRole("row")).toHaveLength(4);
+    expect(within(within(d).getByRole("table", { name: "Example vehicles" })).getAllByRole("row")).toHaveLength(2);
     expect(within(d).getByText("Source verification dates and mismatch flags will be preserved.")).toBeInTheDocument();
     expect(within(d).getByText("Archived records require a separate authorized action.")).toBeInTheDocument();
     expect(within(d).getByRole("button", { name: "Apply to 48 active vehicles" })).toBeEnabled();

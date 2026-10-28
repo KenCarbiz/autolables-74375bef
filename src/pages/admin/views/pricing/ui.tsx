@@ -25,12 +25,45 @@ export const Field = ({ label, hint, children, htmlFor, className }: { label: Re
   </div>
 );
 
-export const CheckRow = ({ checked, onChange, label, detail, disabled, name, type = "checkbox" }: { checked: boolean; onChange: (next: boolean) => void; label: ReactNode; detail?: ReactNode; disabled?: boolean; name?: string; type?: "checkbox" | "radio" }) => (
-  <label className={cn("flex items-start gap-3 rounded-md px-1 py-1.5", disabled ? "opacity-60" : "cursor-pointer")}>
-    <input type={type} name={name} checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} className="mt-[3px] h-4 w-4 accent-adm-primary" />
-    <span className="min-w-0">
-      <span className="block text-[14px] leading-[20px] text-adm-ink">{label}</span>
-      {detail && <span className="block text-[12px] leading-[18px] text-adm-muted">{detail}</span>}
-    </span>
-  </label>
-);
+export const CheckRow = ({
+  checked,
+  onChange,
+  label,
+  detail,
+  disabled,
+  name,
+  type = "checkbox",
+  size = "md",
+  title,
+  className,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: ReactNode;
+  detail?: ReactNode;
+  disabled?: boolean;
+  name?: string;
+  type?: "checkbox" | "radio";
+  /** The reference draws its 07 controls at 22px with 15px labels. */
+  size?: "md" | "lg";
+  title?: string;
+  className?: string;
+}) => {
+  const lg = size === "lg";
+  return (
+    <label title={title} className={cn("flex items-start rounded-md", lg ? "gap-3" : "gap-3 px-1 py-1.5", disabled ? "opacity-60" : "cursor-pointer", className)}>
+      <input
+        type={type}
+        name={name}
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className={cn("accent-adm-primary flex-shrink-0", lg ? "h-[22px] w-[22px] -mt-px" : "mt-[3px] h-4 w-4")}
+      />
+      <span className="min-w-0">
+        <span className={cn("block text-adm-ink", lg ? "text-[15px] leading-[20px]" : "text-[14px] leading-[20px]")}>{label}</span>
+        {detail && <span className={cn("block text-adm-muted", lg ? "text-[13px] leading-[18px]" : "text-[12px] leading-[18px]")}>{detail}</span>}
+      </span>
+    </label>
+  );
+};

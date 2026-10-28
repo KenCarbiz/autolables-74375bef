@@ -1,6 +1,6 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Info } from "lucide-react";
+import { AlertTriangle, Check, FileText, Globe, Info, Pencil, Tag } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -26,6 +26,7 @@ import { consistencyHeadline, conditionOfListing, summarizeConsistency, EVIDENCE
 import { feeReviewHref, tenantIdOf, useConsistency, useListingCounts, useWebsitePriceTerm, type FeeScope } from "./pricingData";
 import { AdminInput, AdminSelect, Field } from "./ui";
 import { AdminButton, AdminCard, AdminTable, InlineNote, StatusChip, Td, Th, type Tone } from "@/components/admin/v2/primitives";
+import { cn } from "@/lib/utils";
 
 // Price rules: the document-fee policy as a read-only statement with a
 // reviewable draft, the customer price preview built by the canonical price
@@ -53,8 +54,13 @@ export interface PriceRulesFixture {
   websiteTerm: string | null;
 }
 
-const EVIDENCE_TONE: Record<EvidenceState, Tone> = { same_version: "success", older_version: "warning", awaiting: "neutral" };
-const STATUS_TONE: Record<ConsistencyStatus, Tone> = { consistent: "success", mismatch: "danger", not_checked: "neutral" };
+// Reference marks: a 20px check, a 20px triangle and an 11px filled dot.
+const EvidenceMark = ({ state }: { state: EvidenceState }) => {
+  if (state === "awaiting") return <span aria-hidden="true" className="inline-block w-[11px] h-[11px] rounded-full bg-adm-muted flex-shrink-0" />;
+  const Icon = state === "same_version" ? Check : AlertTriangle;
+  return <Icon className={cn("w-5 h-5 flex-shrink-0", state === "same_version" ? "text-adm-success" : "text-adm-warning")} strokeWidth={2.5} aria-hidden="true" />;
+};
+const STATUS_TONE: Record<ConsistencyStatus, Tone> = { consistent: "success", mismatch: "warning", not_checked: "neutral" };
 
 const previewFromRows = (rows: ConsistencyAssessment[]): PreviewVehicle | null => {
   const row = rows.find((r) => r.sellingPrice != null && r.sellingPrice > 0) ?? null;
@@ -69,17 +75,52 @@ const previewFromRows = (rows: ConsistencyAssessment[]): PreviewVehicle | null =
   };
 };
 
-const Thumb = ({ url, className = "w-12 h-8" }: { url: string | null; className?: string }) => (
+const Thumb = ({ url, className = "w-16 h-[38px]" }: { url: string | null; className?: string }) => (
   <span className={`${className} rounded-md bg-adm-workspace overflow-hidden flex-shrink-0 inline-block`} aria-hidden="true">
     {url && <img src={url} alt="" className="w-full h-full object-cover" />}
   </span>
 );
 
-const ImpactTile = ({ value, label, hint }: { value: string; label: string; hint?: string }) => (
-  <div className="rounded-[10px] border border-adm-border bg-adm-workspace px-4 py-3">
-    <p className="text-[22px] leading-[28px] font-bold text-adm-ink tabular-nums">{value}</p>
-    <p className="text-[12px] leading-[18px] text-adm-muted">{label}</p>
-    {hint && <p className="text-[12px] leading-[18px] text-adm-muted">{hint}</p>}
+// Card with the reference's 18px title row; AdminCard fixes its title at 16px.
+const PanelCard = ({
+  id,
+  title,
+  description,
+  action,
+  children,
+  headerClassName,
+  headerBorder = true,
+}: {
+  id?: string;
+  title: string;
+  description?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  headerClassName?: string;
+  headerBorder?: boolean;
+}) => (
+  <AdminCard id={id} flush className="overflow-hidden">
+    <header className={cn("flex items-center justify-between gap-4 px-5 pt-3 pb-[11px]", headerBorder && "border-b border-adm-border", headerClassName)}>
+      <div className="min-w-0">
+        <h3 className="text-[18px] leading-[20px] font-bold text-adm-ink">{title}</h3>
+        {description && <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{description}</p>}
+      </div>
+      {action && <div className="flex-shrink-0 flex items-center gap-3">{action}</div>}
+    </header>
+    {children}
+  </AdminCard>
+);
+
+const ImpactStat = ({ tone, value, label, hint, className }: { tone: "success" | "neutral"; value: string; label: string; hint: string; className?: string }) => (
+  <div className={cn("flex items-start gap-3.5", className)}>
+    <span aria-hidden="true" className={cn("mt-[9px] w-[11px] h-[11px] rounded-full flex-shrink-0", tone === "success" ? "bg-adm-success" : "bg-adm-muted/60")} />
+    <div>
+      <p className="flex items-baseline gap-x-2.5 whitespace-nowrap">
+        <span data-landmark="impact-count" className="text-[24px] leading-[28px] font-bold text-adm-ink tabular-nums">{value}</span>
+        <span className="text-[14px] leading-[20px] text-adm-ink">{label}</span>
+      </p>
+      <p className="mt-0.5 text-[12px] leading-[18px] text-adm-muted">{hint}</p>
+    </div>
   </div>
 );
 
@@ -150,180 +191,224 @@ export default function PriceRulesView() {
     navigate(feeReviewHref(draft, scope));
   };
 
+  const pendingText = dirty ? (errors.length ? "Fix the draft before reviewing." : "Draft changes are reviewed before anything is applied.") : "No pending changes";
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-4 items-start">
-        <AdminCard
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-[14px]">
+        <PanelCard
           title="Price display policy"
+          description="Controls how pricing is calculated and presented across AutoLabels."
           action={
             editing ? (
               <AdminButton size="sm" onClick={() => { setEditing(false); setDraft(stored); }}>Discard</AdminButton>
             ) : (
-              <AdminButton size="sm" onClick={() => setEditing(true)}>Edit</AdminButton>
+              <AdminButton variant="outline" size="sm" onClick={() => setEditing(true)}>
+                <Pencil className="w-5 h-5" aria-hidden="true" />
+                Edit
+              </AdminButton>
             )
           }
         >
-          {editing ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-4 rounded-md border border-adm-border px-3 py-2.5">
-                <div>
-                  <p className="text-[14px] font-semibold text-adm-ink">Charge a document fee</p>
-                  <p className="text-[12px] text-adm-muted">When off, stored totals equal the selling price.</p>
+          <div className="px-5 pt-1 pb-4">
+            {editing ? (
+              <div className="mt-2 space-y-3">
+                <div className="flex items-center justify-between gap-4 rounded-md border border-adm-border px-3 py-2.5">
+                  <div>
+                    <p className="text-[14px] font-semibold text-adm-ink">Charge a document fee</p>
+                    <p className="text-[12px] text-adm-muted">When off, stored totals equal the selling price.</p>
+                  </div>
+                  <Switch checked={draft.enabled} onCheckedChange={(v) => setDraft({ ...draft, enabled: v })} aria-label="Charge a document fee" />
                 </div>
-                <Switch checked={draft.enabled} onCheckedChange={(v) => setDraft({ ...draft, enabled: v })} aria-label="Charge a document fee" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Jurisdiction" htmlFor="fee-state">
-                  <AdminSelect id="fee-state" value={draft.stateCode} onChange={(e) => setDraft({ ...draft, stateCode: e.target.value })}>
-                    <option value="">Not set</option>
-                    {STATE_DOC_FEES.map((s) => (
-                      <option key={s.stateCode} value={s.stateCode}>{s.state}</option>
-                    ))}
-                  </AdminSelect>
-                </Field>
-                <Field label="Document fee" htmlFor="fee-amount" hint={feeReference(draft.stateCode) ? `Called "${feeReference(draft.stateCode)?.terminology}" in ${jurisdictionLabel(draft.stateCode)}.` : undefined}>
-                  <AdminInput id="fee-amount" type="number" inputMode="decimal" step="0.01" min={0} value={Number.isFinite(draft.amount) ? draft.amount : ""} onChange={(e) => setDraft({ ...draft, amount: e.target.value === "" ? NaN : Number(e.target.value) })} disabled={!draft.enabled} />
-                </Field>
-              </div>
-              {errors.length > 0 && <InlineNote tone="danger">{errors.join(" ")}</InlineNote>}
-              {warnings.map((w) => (
-                <InlineNote key={w} tone="warning">{w}</InlineNote>
-              ))}
-            </div>
-          ) : (
-            <dl className="divide-y divide-adm-border">
-              {[
-                { label: "Jurisdiction", value: jurisdictionLabel(stored.stateCode) },
-                { label: "Document fee", value: stored.enabled ? fmtMoney(stored.amount) : "Disabled" },
-                { label: "Display basis", value: describePriceBasis(policy.mode) },
-                {
-                  label: "Source observation",
-                  value: (
-                    <span className="inline-flex items-center gap-1.5">
-                      Read only
-                      <Info className="w-3.5 h-3.5 text-adm-muted" aria-hidden="true" />
-                      <span className="sr-only">Website prices are observed by the nightly check and are never edited here.</span>
-                    </span>
-                  ),
-                },
-              ].map((row) => (
-                <div key={row.label} className="flex items-center justify-between gap-4 py-2.5 text-[14px] leading-[20px]">
-                  <dt className="text-adm-muted">{row.label}</dt>
-                  <dd className="text-adm-ink font-medium text-right">{row.value}</dd>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field label="Jurisdiction" htmlFor="fee-state">
+                    <AdminSelect id="fee-state" value={draft.stateCode} onChange={(e) => setDraft({ ...draft, stateCode: e.target.value })}>
+                      <option value="">Not set</option>
+                      {STATE_DOC_FEES.map((s) => (
+                        <option key={s.stateCode} value={s.stateCode}>{s.state}</option>
+                      ))}
+                    </AdminSelect>
+                  </Field>
+                  <Field label="Document fee" htmlFor="fee-amount" hint={feeReference(draft.stateCode) ? `Called "${feeReference(draft.stateCode)?.terminology}" in ${jurisdictionLabel(draft.stateCode)}.` : undefined}>
+                    <AdminInput id="fee-amount" type="number" inputMode="decimal" step="0.01" min={0} value={Number.isFinite(draft.amount) ? draft.amount : ""} onChange={(e) => setDraft({ ...draft, amount: e.target.value === "" ? NaN : Number(e.target.value) })} disabled={!draft.enabled} />
+                  </Field>
                 </div>
-              ))}
-            </dl>
-          )}
+                {errors.length > 0 && <InlineNote tone="danger">{errors.join(" ")}</InlineNote>}
+                {warnings.map((w) => (
+                  <InlineNote key={w} tone="warning">{w}</InlineNote>
+                ))}
+              </div>
+            ) : (
+              <dl className="px-2">
+                {[
+                  { label: "Jurisdiction", value: jurisdictionLabel(stored.stateCode) },
+                  { label: "Document fee", value: stored.enabled ? fmtMoney(stored.amount) : "Disabled" },
+                  { label: "Display basis", value: describePriceBasis(policy.mode) },
+                  {
+                    label: "Source observation",
+                    value: (
+                      <span className="inline-flex items-center gap-1.5">
+                        Read only
+                        <Info className="w-5 h-5 text-adm-muted" aria-hidden="true" />
+                        <span className="sr-only">Website prices are observed by the nightly check and are never edited here.</span>
+                      </span>
+                    ),
+                  },
+                ].map((row) => (
+                  <div key={row.label} className="grid grid-cols-[208px_minmax(0,1fr)] gap-x-4 text-[14px] leading-[24px]">
+                    <dt className="text-adm-ink">{row.label}</dt>
+                    <dd className="text-adm-ink min-w-0">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
 
-          <InlineNote tone="info" className="mt-4">Administrative recalculation does not verify source prices.</InlineNote>
+            <InlineNote tone="info" className="mt-[18px] px-3 py-[6px] gap-3 [&>svg]:w-5 [&>svg]:h-5 [&>svg]:text-adm-primary">Administrative recalculation does not verify source prices.</InlineNote>
 
-          <div className="mt-5 border-t border-adm-border pt-4">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h4 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Change impact</h4>
-              <label className="flex items-center gap-2 text-[12px] text-adm-muted">
-                Scope
-                <AdminSelect value={scope} onChange={(e) => setScope(e.target.value as FeeScope)} className="h-8 w-auto text-[13px]" aria-label="Change scope">
+            <div className="mt-[27px]">
+              <h4 className="text-[16px] leading-[22px] font-semibold text-adm-ink">Change impact</h4>
+              <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">Shows how many vehicles will be affected by a change to these settings.</p>
+              <label className="mt-2 flex items-center">
+                <span className="w-[90px] flex-shrink-0 text-[14px] leading-[20px] font-medium text-adm-ink">Scope</span>
+                <AdminSelect value={scope} onChange={(e) => setScope(e.target.value as FeeScope)} className="h-8 w-full max-w-[252px] text-[14px]" aria-label="Change scope">
                   <option value="active">Active inventory (default)</option>
                   <option value="all">Include archived records</option>
                 </AdminSelect>
               </label>
-            </div>
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <ImpactTile value={countValue(eligible)} label="eligible vehicles" hint="Active vehicles with an advertised price" />
-              <ImpactTile value={countValue(archived)} label={scope === "all" ? "archived vehicles included" : "archived vehicles excluded"} hint={scope === "all" ? "Archived records will be recalculated too" : "Archived records are not changed"} />
-            </div>
-            {!fixture && !tenantId && <p className="mt-2 text-[12px] text-adm-muted">Counts are unavailable without a dealership context.</p>}
-            <div className="mt-4 flex items-center gap-3 flex-wrap">
-              <AdminButton variant="primary" disabled={!dirty || errors.length > 0} onClick={reviewChanges}>Review changes</AdminButton>
-              <span className="text-[12px] text-adm-muted">{dirty ? (errors.length ? "Fix the draft before reviewing." : "Draft changes are reviewed before anything is applied.") : "No pending changes"}</span>
+              <div className="mt-3 flex items-stretch flex-wrap gap-y-4">
+                <ImpactStat tone="success" value={countValue(eligible)} label="eligible vehicles" hint="Active vehicles with a price" className="flex-1 pl-4" />
+                <ImpactStat
+                  tone="neutral"
+                  value={countValue(archived)}
+                  label={scope === "all" ? "archived vehicles included" : "archived vehicles excluded"}
+                  hint={scope === "all" ? "Archived records will be recalculated too" : "Archived records are not changed"}
+                  className="flex-1 pl-4 pr-3 border-l border-adm-border"
+                />
+                <div className="w-[146px] flex flex-col items-center">
+                  <AdminButton
+                    variant="primary"
+                    size="sm"
+                    className="w-full h-[33px] disabled:opacity-100 disabled:bg-adm-workspace disabled:text-adm-muted disabled:border-adm-border"
+                    disabled={!dirty || errors.length > 0}
+                    onClick={reviewChanges}
+                    data-landmark="price-review"
+                  >
+                    Review changes
+                  </AdminButton>
+                  <span className="mt-[5px] text-[12px] leading-[16px] text-adm-muted text-center">{pendingText}</span>
+                </div>
+              </div>
+              {!fixture && !tenantId && <p className="mt-2 text-[12px] text-adm-muted">Counts are unavailable without a dealership context.</p>}
             </div>
           </div>
-        </AdminCard>
+        </PanelCard>
 
-        <AdminCard title="Customer price preview">
+        <PanelCard title="Customer price preview" description="Illustrative example of how pricing is displayed to customers.">
           {previewCard && preview ? (
-            <div>
-              <Thumb url={preview.imageUrl} className="w-full h-[150px]" />
-              <p className="mt-3 text-[16px] leading-[22px] font-semibold text-adm-ink">{preview.title}</p>
-              <p className="text-[12px] leading-[18px] text-adm-muted">{[preview.trim, preview.stock ? `Stock ${preview.stock}` : null].filter(Boolean).join(" · ")}</p>
-              <dl className="mt-4 divide-y divide-adm-border text-[14px] leading-[20px]">
-                <div className="flex items-center justify-between py-2"><dt className="text-adm-muted">Selling price</dt><dd className="text-adm-ink tabular-nums">{fmtMoney(previewCard.vehicleSellingPrice)}</dd></div>
-                <div className="flex items-center justify-between py-2"><dt className="text-adm-muted">{previewCard.feeLabel ?? "Document fee"}</dt><dd className="text-adm-ink tabular-nums">{previewCard.feeAmount == null ? "None" : fmtMoney(previewCard.feeAmount)}</dd></div>
-                <div className="flex items-center justify-between py-2"><dt className="font-semibold text-adm-ink">Advertised total</dt><dd className="font-bold text-adm-ink tabular-nums">{fmtMoney(previewCard.totalAdvertisedPrice)}</dd></div>
-              </dl>
-              <p className="mt-2 text-[12px] leading-[18px] text-adm-muted">Taxes and registration are separate.</p>
-              <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">Passport shows: {describePriceBasis(policy.mode).toLowerCase()}.</p>
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_253px] gap-x-[35px] gap-y-4 items-center pl-[15px] pr-6 pt-[27px] pb-6">
+              <Thumb url={preview.imageUrl} className="w-full h-[130px]" />
+              <div className="min-w-0">
+                <p className="text-[18px] leading-[24px] font-semibold text-adm-ink">{preview.title}</p>
+                <p className="text-[13px] leading-[18px] text-adm-muted">{[preview.trim, preview.stock ? `Stock ${preview.stock}` : null].filter(Boolean).join(" · ")}</p>
+                <dl className="mt-[21px] text-[15px] leading-[20px]">
+                  <div className="flex items-center justify-between gap-3 h-8"><dt className="text-adm-ink">Selling price</dt><dd className="font-semibold text-adm-ink tabular-nums">{fmtMoney(previewCard.vehicleSellingPrice)}</dd></div>
+                  <div className="flex items-center justify-between gap-3 h-8"><dt className="text-adm-ink">{previewCard.feeLabel ?? "Document fee"}</dt><dd className="font-semibold text-adm-ink tabular-nums">{previewCard.feeAmount == null ? "None" : fmtMoney(previewCard.feeAmount)}</dd></div>
+                  <div className="mt-2 border-t border-adm-border pt-[7px]">
+                    <div className="flex items-center justify-between gap-3 h-8"><dt className="text-[16px] font-bold text-adm-ink">Advertised total</dt><dd className="text-[18px] font-bold text-adm-ink tabular-nums">{fmtMoney(previewCard.totalAdvertisedPrice)}</dd></div>
+                  </div>
+                </dl>
+                <p className="mt-3 text-[12px] leading-[18px] text-adm-muted">Taxes and registration are separate.</p>
+                <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">Passport shows: {describePriceBasis(policy.mode).toLowerCase()}.</p>
+              </div>
             </div>
           ) : (
-            <p className="text-[13px] leading-[18px] text-adm-muted">{consistencyLoading ? "Loading a vehicle from inventory…" : "No priced vehicle is available to preview yet."}</p>
+            <p className="px-5 py-5 text-[13px] leading-[18px] text-adm-muted">{consistencyLoading ? "Loading a vehicle from inventory…" : "No priced vehicle is available to preview yet."}</p>
           )}
-        </AdminCard>
+        </PanelCard>
       </div>
 
-      <AdminCard
+      <PanelCard
         title="Price consistency"
         description="Website, label and Passport prices for active inventory, with the evidence behind each."
+        headerBorder={false}
+        headerClassName="pt-[14px] pb-0 items-start"
         action={
           <>
             <StatusChip tone={headline.tone} icon>{headline.label}</StatusChip>
-            <a href="#price-audit" className="text-[13px] font-semibold text-adm-primary hover:underline">Price audit</a>
+            <a href="#price-audit" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-adm-primary hover:underline">
+              <Info className="w-5 h-5" aria-hidden="true" />
+              Price audit
+            </a>
           </>
         }
-        flush
       >
         {consistencyLoading ? (
-          <p className="px-6 pb-6 text-[13px] text-adm-muted">Checking inventory…</p>
+          <p className="px-5 pt-3 pb-5 text-[13px] text-adm-muted">Checking inventory…</p>
         ) : consistencyFailed || !consistencyRows ? (
-          <p role="status" className="px-6 pb-6 text-[13px] text-adm-muted">Price consistency could not be read for this rooftop. It is Unknown, not reconciled.</p>
+          <p role="status" className="px-5 pt-3 pb-5 text-[13px] text-adm-muted">Price consistency could not be read for this rooftop. It is Unknown, not reconciled.</p>
         ) : consistencyRows.length === 0 ? (
-          <p className="px-6 pb-6 text-[13px] text-adm-muted">No active vehicle carries a price yet.</p>
+          <p className="px-5 pt-3 pb-5 text-[13px] text-adm-muted">No active vehicle carries a price yet.</p>
         ) : (
-          <AdminTable caption="Price consistency by vehicle">
+          <AdminTable
+            caption="Price consistency by vehicle"
+            inset
+            className="mx-5 mt-3 mb-0 rounded-[8px] [&_th]:py-[9.5px] [&_td]:py-[6px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0"
+          >
             <thead>
               <tr>
-                <Th>Vehicle</Th>
-                <Th align="right">Selling price</Th>
-                <Th align="right">Document fee</Th>
-                <Th align="right">Website</Th>
-                <Th align="right">Label</Th>
-                <Th align="right">Passport</Th>
-                <Th>Evidence</Th>
-                <Th>Status</Th>
+                <Th className="w-[265px]">Vehicle</Th>
+                <Th className="w-[113px]">Selling price</Th>
+                <Th className="w-[133px]">Document fee</Th>
+                <Th className="w-[130px]"><span className="flex items-center gap-2 h-[18px]"><Globe className="w-5 h-5" aria-hidden="true" />Website</span></Th>
+                <Th className="w-[130px]"><span className="flex items-center gap-2 h-[18px]"><Tag className="w-5 h-5" aria-hidden="true" />Label</span></Th>
+                <Th className="w-[119px]"><span className="flex items-center gap-2 h-[18px]"><FileText className="w-5 h-5" aria-hidden="true" />Passport</span></Th>
+                <Th className="w-[164px]">Evidence</Th>
+                <Th className="w-[126px]">Status</Th>
                 <Th>Action</Th>
               </tr>
             </thead>
             <tbody>
-              {consistencyRows.map((row) => (
-                <tr key={row.listing.id}>
-                  <Td>
-                    <div className="flex items-center gap-3">
-                      <Thumb url={row.listing.heroImageUrl} />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-adm-ink truncate">{row.vehicle}</p>
-                        <p className="text-[12px] leading-[18px] text-adm-muted truncate">{[row.listing.trim, row.listing.stock ? `Stock ${row.listing.stock}` : null].filter(Boolean).join(" · ") || "—"}</p>
+              {consistencyRows.map((row) => {
+                return (
+                  <tr key={row.listing.id}>
+                    <Td>
+                      <div className="flex items-center gap-4">
+                        <Thumb url={row.listing.heroImageUrl} />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-adm-ink truncate">{row.vehicle}</p>
+                          <p className="text-[12px] leading-[18px] text-adm-muted truncate">{[row.listing.trim, row.listing.stock ? `Stock ${row.listing.stock}` : null].filter(Boolean).join(" · ") || "—"}</p>
+                        </div>
                       </div>
-                    </div>
-                  </Td>
-                  <Td align="right">{fmtMoney(row.sellingPrice)}</Td>
-                  <Td align="right">{fmtMoney(row.docFee)}</Td>
-                  <Td align="right">{row.website == null ? <span className="text-adm-muted">—</span> : fmtMoney(row.website)}</Td>
-                  <Td align="right">{fmtMoney(row.label)}</Td>
-                  <Td align="right">{fmtMoney(row.passport)}</Td>
-                  <Td><StatusChip tone={EVIDENCE_TONE[row.evidence]}>{EVIDENCE_LABEL[row.evidence]}</StatusChip></Td>
-                  <Td><StatusChip tone={STATUS_TONE[row.status]} icon>{STATUS_LABEL[row.status]}</StatusChip></Td>
-                  <Td>{row.reviewHref ? <Link to={row.reviewHref} className="font-semibold text-adm-primary hover:underline">Review</Link> : <span className="text-adm-muted">—</span>}</Td>
-                </tr>
-              ))}
+                    </Td>
+                    <Td className="tabular-nums">{fmtMoney(row.sellingPrice)}</Td>
+                    <Td className="tabular-nums">{fmtMoney(row.docFee)}</Td>
+                    <Td className="tabular-nums">{row.website == null ? <span className="text-adm-muted">—</span> : fmtMoney(row.website)}</Td>
+                    <Td className="tabular-nums">{fmtMoney(row.label)}</Td>
+                    <Td className="tabular-nums">{fmtMoney(row.passport)}</Td>
+                    <Td>
+                      <span className="inline-flex items-center gap-2.5 whitespace-nowrap">
+                        <EvidenceMark state={row.evidence} />
+                        {EVIDENCE_LABEL[row.evidence]}
+                      </span>
+                    </Td>
+                    <Td><StatusChip tone={STATUS_TONE[row.status]} className="px-3 py-1.5 text-[13px] leading-[18px]">{STATUS_LABEL[row.status]}</StatusChip></Td>
+                    <Td>{row.reviewHref ? <Link to={row.reviewHref} className="font-semibold text-adm-primary hover:underline">Review</Link> : <span className="text-adm-muted">—</span>}</Td>
+                  </tr>
+                );
+              })}
             </tbody>
           </AdminTable>
         )}
         {consistencyRows && consistencyRows.length > 0 && (
-          <div className="flex items-center justify-between gap-4 px-6 py-3 text-[12px] leading-[18px] text-adm-muted">
+          <div className="flex items-center justify-between gap-4 px-5 py-4 text-[12px] leading-[18px] text-adm-muted">
             <span>{consistencyRows.length.toLocaleString()} vehicles shown{truncated ? " (first page)" : ""}</span>
-            <span>{summary && summary.mismatch > 0 ? `${summary.mismatch} ${summary.mismatch === 1 ? "mismatch needs" : "mismatches need"} review.` : dirty ? "Draft fee change pending review." : "No changes pending."}</span>
+            <span className="inline-flex items-center gap-2">
+              <Info className="w-5 h-5" aria-hidden="true" />
+              {summary && summary.mismatch > 0 ? `${summary.mismatch} ${summary.mismatch === 1 ? "mismatch needs" : "mismatches need"} review.` : dirty ? "Draft fee change pending review." : "No changes pending."}
+            </span>
           </div>
         )}
-      </AdminCard>
+      </PanelCard>
 
       <AdminCard id="price-presentation" title="Customer price presentation" description="Wording and comparison policy. These change presentation only; prices are never recalculated here.">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

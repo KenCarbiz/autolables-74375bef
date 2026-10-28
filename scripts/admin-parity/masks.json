@@ -7,5 +7,28 @@
       { "selector": "[data-admin-v2] section", "heading": "Recent activity", "inner": "li span.block.text-\\[11px\\]", "reason": "recent activity detail lines (fixture names)" }
     ],
     "rects": []
+  },
+  "05": {
+    "selectors": [
+      { "selector": "[data-admin-v2] [data-landmark=\"impact-count\"]", "reason": "change impact counts (fixture inventory sizes)" },
+      { "selector": "[data-admin-v2] section", "heading": "Customer price preview", "inner": ".grid > div > p:nth-child(-n+2), .grid dd", "reason": "preview vehicle name, trim, stock and prices (fixture vehicle)" },
+      { "selector": "[data-admin-v2] section", "heading": "Price consistency", "inner": "tbody td:nth-child(-n+6)", "reason": "vehicle names, stock numbers and prices (fixture vehicles)" },
+      { "selector": "[data-admin-v2] section", "heading": "Price consistency", "inner": "section > div > div:last-child > span:first-child", "reason": "vehicles-shown count" }
+    ],
+    "rects": []
+  },
+  "06": {
+    "selectors": [
+      { "selector": "[role=\"dialog\"] [data-landmark=\"impact-count\"]", "reason": "expected impact counts (fixture inventory sizes)" },
+      { "selector": "[data-landmark=\"fee-example-impact\"] tbody td:not(:nth-child(3))", "reason": "example vehicle name, stock, VIN suffix, selling price and totals (fixture vehicle); the fee column is policy data and stays" }
+    ],
+    "rects": []
+  },
+  "07": {
+    "selectors": [
+      { "selector": "[data-landmark=\"sample-results\"] tbody td:first-child", "reason": "sample vehicle names and mileage (fixture vehicles)" },
+      { "selector": "#product-price", "reason": "product price (fixture value)" }
+    ],
+    "rects": []
   }
 }
