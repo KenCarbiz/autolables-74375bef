@@ -215,16 +215,16 @@ export default function ApprovalRulesView() {
           <hr className="mt-5 mb-[21px] border-adm-border" />
 
           <p className={SECTION_LABEL}>Readiness</p>
-          <div className="mt-[9px] grid grid-cols-3 xl:grid-cols-[148px_144px_minmax(0,1fr)] divide-x divide-adm-border">
+          <div className="mt-[9px] grid grid-cols-3 xl:grid-cols-[144px_140px_minmax(0,1fr)] divide-x divide-adm-border">
             {readiness.items.map((item) => {
               const Icon = TILE_ICON[item.key];
               return (
                 <div key={item.key} className="pt-[5px] pl-[13px] pr-2 first:pl-0 last:pr-0 min-w-0">
-                  <div className="flex items-center gap-3 text-[12px] leading-[18px] font-medium text-adm-ink">
+                  <div className="flex items-center gap-2.5 text-[12px] leading-[18px] font-medium text-adm-ink">
                     <Icon className="w-5 h-5 text-adm-ink flex-shrink-0" aria-hidden="true" />
                     <span className="min-w-0 break-words">{item.label}</span>
                   </div>
-                  <div className="sm:pl-8">
+                  <div className="sm:pl-[30px]">
                     <StatusChip tone={TILE_TONE[item.key][item.state]} className="mt-1.5 h-[26px] sm:px-[11px] font-medium">{item.chip}</StatusChip>
                     <p className="mt-[7px] text-[12px] leading-[18px] text-adm-muted">{item.detailLabel}</p>
                     <p data-parity="readiness-detail" className="text-[13px] leading-[18px] text-adm-ink">{item.detailValue}</p>

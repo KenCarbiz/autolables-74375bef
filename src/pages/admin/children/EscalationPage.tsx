@@ -130,14 +130,14 @@ const DestinationSelect = ({ label, tier, missing }: { label: string; tier: stri
   </div>
 );
 
-// The mark is a filled 19x14 triangle in the reference; drawn with a white
-// stroke it loses about 2px of fill per side, so it is rendered at 24px.
+// The reference's mark is a filled 12x12 triangle on a 16px line, so the
+// state line keeps the tier pitch at the mock's 115 to 119px.
 const DestinationState = ({ label, email, editing, onEdit }: { label: string; email: string; editing: boolean; onEdit: () => void }) => {
   const missing = email.trim().length === 0;
   if (missing) {
     return (
       <p role="alert" className="min-h-4 flex flex-wrap items-center gap-x-1.5 text-[12px] leading-[16px] text-adm-danger">
-        <AlertTriangle className={cn(ICON.status, "fill-current stroke-white flex-shrink-0")} aria-hidden="true" />
+        <AlertTriangle className="w-4 h-4 fill-current stroke-white flex-shrink-0" aria-hidden="true" />
         <span>Destination required</span>
         {!editing && <button type="button" aria-label={`Add ${label} email`} onClick={onEdit} className="ml-1 font-semibold text-adm-primary hover:underline">Add email</button>}
       </p>
@@ -146,7 +146,7 @@ const DestinationState = ({ label, email, editing, onEdit }: { label: string; em
   if (!isEmail(email)) {
     return (
       <p role="alert" className="min-h-4 flex flex-wrap items-center gap-x-1.5 text-[12px] leading-[16px] text-adm-danger min-w-0">
-        <AlertTriangle className={cn(ICON.status, "fill-current stroke-white flex-shrink-0")} aria-hidden="true" />
+        <AlertTriangle className="w-4 h-4 fill-current stroke-white flex-shrink-0" aria-hidden="true" />
         <span className="min-w-0 [overflow-wrap:anywhere]">Not a valid email address: {email}</span>
         {!editing && <button type="button" aria-label={`Change ${label} email`} onClick={onEdit} className="ml-1 font-semibold text-adm-primary hover:underline">Change</button>}
       </p>
