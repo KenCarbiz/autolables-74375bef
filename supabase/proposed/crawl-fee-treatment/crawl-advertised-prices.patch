@@ -1,0 +1,384 @@
+diff -ruN a/supabase/functions/_shared/feeTreatment.ts b/supabase/functions/_shared/feeTreatment.ts
+--- a/supabase/functions/_shared/feeTreatment.ts	1970-01-01 00:00:00.000000000 +0000
++++ b/supabase/functions/_shared/feeTreatment.ts	2026-10-29 03:58:42.655280653 +0000
+@@ -0,0 +1,278 @@
++// PROPOSED, NOT DEPLOYED. Per-page document fee treatment for the advertised
++// price crawler (crawl-advertised-prices). Lives outside supabase/functions so
++// it cannot ship with a function deploy; wiring it in is a separate, approved
++// change (crawl-advertised-prices.patch beside this file, which moves this
++// module to supabase/functions/_shared/feeTreatment.ts).
++//
++// Today the crawler applies one tenant-wide setting (advertised_includes_doc_fee)
++// to every page. On a dealership whose new-vehicle pages show the price before
++// the fee while used/CPO pages show it with the fee, that subtracts the fee from
++// new-vehicle prices that never contained it. This module decides the treatment
++// for ONE page from what that page and its source say, and refuses to decide
++// when the evidence is missing or disagrees.
++//
++// Rules:
++//  - A number never decides on its own. Arithmetic between the page figure and
++//    another price is not evidence of fee treatment; only labelled structure on
++//    the page (a fee line and a labelled total), disclosure wording, a
++//    condition-specific dealer setting, a price label, or a source that states
++//    its own basis for the same figure counts.
++//  - Page structure and disclosure wording decide. A condition-specific dealer
++//    setting decides only with at least one corroborating item. A label or the
++//    feed's own basis for an identical figure only corroborates.
++//  - The tenant-wide setting is not condition-specific; it never decides, and
++//    when page evidence contradicts it the page is left unresolved so the
++//    dealer can declare the condition-specific treatment.
++//  - Any two items that disagree leave the page unresolved.
++
++export type PageCondition = "new" | "used" | "cpo";
++export type FeeTreatment = "includes_fee" | "excludes_fee";
++export type Strength = "decisive" | "declared" | "corroborating";
++
++export interface FeeEvidence {
++  kind: "price_stack" | "disclosure" | "condition_setting" | "tenant_setting" | "label" | "source_basis";
++  says: FeeTreatment;
++  strength: Strength | "context";
++  detail: string;
++}
++
++export type UnresolvedReason =
++  | "condition_unknown"
++  | "condition_conflict"
++  | "no_fee_configured"
++  | "no_evidence"
++  | "insufficient_evidence"
++  | "contradictory";
++
++export type FeeTreatmentDecision =
++  | { status: "decided"; treatment: FeeTreatment; condition: PageCondition; evidence: FeeEvidence[] }
++  | { status: "unresolved"; reason: UnresolvedReason; condition: PageCondition | null; evidence: FeeEvidence[] };
++
++export interface DealerFeeSettings {
++  doc_fee_enabled?: unknown;
++  doc_fee_amount?: unknown;
++  /** Tenant-wide; context only, never decides. */
++  advertised_includes_doc_fee?: unknown;
++  /** Proposed: { new?: boolean, used?: boolean, cpo?: boolean }. */
++  advertised_includes_doc_fee_by_condition?: unknown;
++}
++
++export interface PageFeeInput {
++  url: string;
++  /** Visible page text (tags removed), as the crawler's price evidence sees it. */
++  text: string;
++  /** The figure the extractor took as the advertised price. */
++  extractedPrice: number;
++  /** The label the extractor matched for that figure, if any. */
++  matchedLabel?: string | null;
++  /** Condition of the listing the page was crawled for. */
++  listingCondition?: string | null;
++  settings: DealerFeeSettings;
++  /** The feed's own statement about its price, for an identical figure only. */
++  feed?: { price: number | null; includesFees: boolean | null } | null;
++}
++
++const TOLERANCE = 1;
++const near = (a: number, b: number) => Math.abs(a - b) <= TOLERANCE;
++
++const asBool = (v: unknown): boolean | null => {
++  if (v === true || v === "true") return true;
++  if (v === false || v === "false") return false;
++  return null;
++};
++
++export const configuredFee = (s: DealerFeeSettings): number => {
++  if (asBool(s.doc_fee_enabled) !== true) return 0;
++  const n = Number(s.doc_fee_amount);
++  return Number.isFinite(n) && n > 0 ? n : 0;
++};
++
++const normCondition = (v: string | null | undefined): PageCondition | null => {
++  const s = String(v ?? "").trim().toLowerCase();
++  if (s === "new") return "new";
++  if (s === "used" || s === "pre-owned" || s === "preowned") return "used";
++  if (s === "cpo" || s === "certified" || s === "certified pre-owned" || s === "certified-pre-owned") return "cpo";
++  return null;
++};
++
++export const conditionFromUrl = (url: string): PageCondition | null => {
++  let path: string;
++  try {
++    path = new URL(url).pathname.toLowerCase();
++  } catch {
++    return null;
++  }
++  const segs = path.split("/").filter(Boolean);
++  if (segs.some((s) => s === "cpo" || s.startsWith("certified"))) return "cpo";
++  if (segs.some((s) => s === "used" || s === "pre-owned" || s === "preowned")) return "used";
++  if (segs.some((s) => s === "new")) return "new";
++  return null;
++};
++
++export const resolveCondition = (url: string, listingCondition?: string | null):
++  { condition: PageCondition | null; conflict: boolean } => {
++  const fromUrl = conditionFromUrl(url);
++  const fromListing = normCondition(listingCondition);
++  if (fromUrl && fromListing && fromUrl !== fromListing) return { condition: null, conflict: true };
++  return { condition: fromUrl ?? fromListing, conflict: false };
++};
++
++const FEE_NOUN = String.raw`(?:doc(?:ument(?:ation)?)?|conveyance|dealer(?:\s+doc(?:ument(?:ation)?)?)?|processing|administrative|admin)\s+fees?`;
++const MONEY = String.raw`\$\s?(\d{1,3}(?:,\d{3})+|\d{1,6})(?:\.\d{2})?`;
++const money = (s: string) => Number(s.replace(/,/g, ""));
++
++const EXCLUDE_BEFORE = new RegExp(
++  String.raw`\b(?:plus|excluding|excludes|exclusive of|not including|does not include|do not include|doesn't include|don't include|before)\b[^.;]{0,80}?\b${FEE_NOUN}\b`, "gi");
++const EXCLUDE_AFTER = new RegExp(
++  String.raw`\b${FEE_NOUN}\b[^.;]{0,50}?\b(?:not included|is not included|are not included|additional|extra|is extra|are extra|not part of)\b`, "gi");
++const INCLUDE_BEFORE = new RegExp(
++  String.raw`\b(?:includes|including|inclusive of|incl\.?)\s[^.;]{0,80}?\b${FEE_NOUN}\b`, "gi");
++const INCLUDE_AFTER = new RegExp(
++  String.raw`\b${FEE_NOUN}\b[^.;]{0,40}?\b(?:included|is included|are included)\b`, "gi");
++const NEGATION_OR_EXCLUSION = /\b(?:not|n't|no|excluding|excludes|except|plus|additional|extra)\b/i;
++
++const clip = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, 160);
++
++export const disclosureEvidence = (text: string): FeeEvidence[] => {
++  const out: FeeEvidence[] = [];
++  const t = text.replace(/\s+/g, " ");
++  for (const re of [EXCLUDE_BEFORE, EXCLUDE_AFTER]) {
++    for (const m of t.matchAll(re)) {
++      out.push({ kind: "disclosure", says: "excludes_fee", strength: "decisive", detail: clip(m[0]) });
++    }
++  }
++  for (const m of t.matchAll(INCLUDE_BEFORE)) {
++    // "includes all rebates; excludes ... conveyance fee" must not read as an
++    // inclusion: the span between the verb and the fee noun must not negate it.
++    if (NEGATION_OR_EXCLUSION.test(m[0].slice(m[0].indexOf(" ")))) continue;
++    const before = t.slice(Math.max(0, (m.index ?? 0) - 12), m.index ?? 0);
++    if (/\b(?:not|n't|does|do)\s*$/i.test(before)) continue;
++    out.push({ kind: "disclosure", says: "includes_fee", strength: "decisive", detail: clip(m[0]) });
++  }
++  for (const m of t.matchAll(INCLUDE_AFTER)) {
++    if (NEGATION_OR_EXCLUSION.test(m[0])) continue;
++    out.push({ kind: "disclosure", says: "includes_fee", strength: "decisive", detail: clip(m[0]) });
++  }
++  return out;
++};
++
++const FEE_LINE = new RegExp(String.raw`\b${FEE_NOUN}\b[^$]{0,40}${MONEY}`, "gi");
++const TOTAL_LINE = new RegExp(
++  String.raw`\b(total price|total|out[- ]the[- ]door(?: price)?|price (?:with|including|incl\.?) fees|final price)\b[^$]{0,40}${MONEY}`, "gi");
++
++// A fee line and a labelled total on the same page show where the fee sits:
++// a total equal to the advertised figure plus the fee means the advertised
++// figure is before the fee; a total equal to the figure itself, with a fee line
++// shown, means the figure already carries it. The fee line must state the
++// configured amount, so an unrelated fee cannot stand in for the document fee.
++export const priceStackEvidence = (text: string, extracted: number, fee: number, matchedLabel?: string | null): FeeEvidence[] => {
++  const t = text.replace(/\s+/g, " ");
++  const feeLines = [...t.matchAll(FEE_LINE)].map((m) => money(m[1])).filter((v) => near(v, fee));
++  if (!feeLines.length) return [];
++  const labelIsTotal = /\b(total|out[- ]the[- ]door|with fees|including fees|final price)\b/i.test(matchedLabel ?? "");
++  const out: FeeEvidence[] = [];
++  for (const m of t.matchAll(TOTAL_LINE)) {
++    const total = money(m[2]);
++    if (near(total, extracted + fee)) {
++      out.push({ kind: "price_stack", says: "excludes_fee", strength: "decisive", detail: `fee line ${fee}; "${clip(m[1])}" ${total} = ${extracted} + ${fee}` });
++    } else if (near(total, extracted) && !labelIsTotal) {
++      out.push({ kind: "price_stack", says: "includes_fee", strength: "decisive", detail: `fee line ${fee}; "${clip(m[1])}" ${total} = advertised figure` });
++    }
++  }
++  return out;
++};
++
++export const labelEvidence = (label: string | null | undefined): FeeEvidence[] => {
++  const l = String(label ?? "").toLowerCase();
++  if (!l) return [];
++  if (/\b(before fees|plus fees|\+ ?fees|excl\.?|excluding fees)\b/.test(l)) {
++    return [{ kind: "label", says: "excludes_fee", strength: "corroborating", detail: label as string }];
++  }
++  if (/\b(incl\.?|including fees|with fees|out[- ]the[- ]door|all[- ]in)\b/.test(l)) {
++    return [{ kind: "label", says: "includes_fee", strength: "corroborating", detail: label as string }];
++  }
++  return [];
++};
++
++// The feed states the basis of ITS price. When the page shows that very
++// figure, the statement carries over; a page figure that differs from the
++// feed is not compared at all.
++export const sourceBasisEvidence = (extracted: number, feed: PageFeeInput["feed"]): FeeEvidence[] => {
++  if (!feed || feed.price == null || feed.includesFees == null || !near(extracted, feed.price)) return [];
++  return [{
++    kind: "source_basis",
++    says: feed.includesFees ? "includes_fee" : "excludes_fee",
++    strength: "corroborating",
++    detail: `page figure equals the feed price ${feed.price}, which the feed marks ${feed.includesFees ? "fee-inclusive" : "before fees"}`,
++  }];
++};
++
++export const settingEvidence = (s: DealerFeeSettings, condition: PageCondition): FeeEvidence[] => {
++  const out: FeeEvidence[] = [];
++  const map = s.advertised_includes_doc_fee_by_condition;
++  if (map && typeof map === "object" && !Array.isArray(map)) {
++    const v = asBool((map as Record<string, unknown>)[condition]);
++    if (v != null) {
++      out.push({ kind: "condition_setting", says: v ? "includes_fee" : "excludes_fee", strength: "declared",
++        detail: `dealer setting for ${condition} pages: ${v ? "includes" : "excludes"} the fee` });
++    }
++  }
++  const wide = asBool(s.advertised_includes_doc_fee);
++  if (wide != null) {
++    out.push({ kind: "tenant_setting", says: wide ? "includes_fee" : "excludes_fee", strength: "context",
++      detail: `tenant-wide setting: ${wide ? "includes" : "excludes"} the fee (all conditions)` });
++  }
++  return out;
++};
++
++export function decideFeeTreatment(input: PageFeeInput): FeeTreatmentDecision {
++  const { condition, conflict } = resolveCondition(input.url, input.listingCondition);
++  if (conflict) return { status: "unresolved", reason: "condition_conflict", condition: null, evidence: [] };
++  if (!condition) return { status: "unresolved", reason: "condition_unknown", condition: null, evidence: [] };
++  const fee = configuredFee(input.settings);
++  if (fee <= 0) return { status: "unresolved", reason: "no_fee_configured", condition, evidence: [] };
++
++  const evidence: FeeEvidence[] = [
++    ...priceStackEvidence(input.text, input.extractedPrice, fee, input.matchedLabel),
++    ...disclosureEvidence(input.text),
++    ...settingEvidence(input.settings, condition),
++    ...labelEvidence(input.matchedLabel),
++    ...sourceBasisEvidence(input.extractedPrice, input.feed),
++  ];
++
++  const conditionSpecific = evidence.some((e) => e.kind === "condition_setting");
++  const weighed = evidence.filter((e) => e.strength !== "context" || !conditionSpecific);
++  const says = new Set(weighed.map((e) => e.says));
++  if (says.size > 1) return { status: "unresolved", reason: "contradictory", condition, evidence };
++
++  const counted = weighed.filter((e) => e.strength !== "context");
++  if (!counted.length) return { status: "unresolved", reason: "no_evidence", condition, evidence };
++  const treatment = counted[0].says;
++  const decisive = counted.some((e) => e.strength === "decisive");
++  const declared = counted.some((e) => e.strength === "declared");
++  const corroborating = counted.some((e) => e.strength === "corroborating" || e.strength === "decisive");
++  if (decisive || (declared && corroborating)) return { status: "decided", treatment, condition, evidence };
++  return { status: "unresolved", reason: "insufficient_evidence", condition, evidence };
++}
++
++export interface FeeBreakdown {
++  advertised_price_before_doc: number;
++  doc_fee: number;
++  website_sale_price: number;
++}
++
++// The split the crawler would store for a decided page; null for an
++// unresolved one, which writes no breakdown and keeps the stored values.
++export function breakdownFor(decision: FeeTreatmentDecision, extracted: number, fee: number): FeeBreakdown | null {
++  if (decision.status !== "decided" || fee <= 0) return null;
++  return decision.treatment === "includes_fee"
++    ? { advertised_price_before_doc: extracted - fee, doc_fee: fee, website_sale_price: extracted }
++    : { advertised_price_before_doc: extracted, doc_fee: fee, website_sale_price: extracted + fee };
++}
++
++export function decisionNote(d: FeeTreatmentDecision): string {
++  const ev = d.evidence.map((e) => `${e.kind}:${e.says}`).join(", ") || "none";
++  return d.status === "decided"
++    ? `Fee treatment for ${d.condition} page: ${d.treatment} (evidence: ${ev}).`
++    : `Fee treatment unresolved (${d.reason}) for ${d.condition ?? "unknown"} page; breakdown not written (evidence: ${ev}).`;
++}
+diff -ruN a/supabase/functions/crawl-advertised-prices/index.ts b/supabase/functions/crawl-advertised-prices/index.ts
+--- a/supabase/functions/crawl-advertised-prices/index.ts	2026-10-29 03:58:05.060678072 +0000
++++ b/supabase/functions/crawl-advertised-prices/index.ts	2026-10-29 03:58:33.173360325 +0000
+@@ -7,6 +7,7 @@
+   type CrawlUrlSource, type RenderedPageVerdictDetail,
+ } from "../_shared/crawlUrlPolicy.ts";
+ import { judgeAboveFeed, parseFeedTimestamp } from "../_shared/priceGuard.ts";
++import { breakdownFor, decideFeeTreatment, decisionNote, type DealerFeeSettings } from "../_shared/feeTreatment.ts";
+ import { fetchCreditUsage, pickRenderKey, selectRenderKey, type RenderKeyCandidate } from "../_shared/renderKey.ts";
+ import {
+   createRenderPacer, deriveRenderBudget, parseRetryAfter, resolveRendersPerMinute,
+@@ -661,6 +662,9 @@
+   price_parse_status: "ok" | "warning" | "pending";
+   price_parse_notes: string;
+ }
++// Leaves the breakdown stage without writing; the observation is still recorded.
++class FeeTreatmentUnresolved extends Error {}
++
+ const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, configuredDocFee: number, includesDocFee = false): PriceBreakdown => {
+   // The dealer's CONFIGURED doc fee (from admin) is authoritative for the
+   // amount; the page's conveyance fee line is a parse CHECK against it. When
+@@ -1079,7 +1083,7 @@
+   // dealer_profiles.settings.vdp_price_labels (comma-separated, priority
+   // order) and .vdp_strip_finance_params (default true) configure the
+   // extractor. Cached in a Map so the per-row loop doesn't refetch.
+-  const settingsCache = new Map<string, { labels: string[]; stripFinance: boolean; docFee: number; inclDocFee: boolean }>();
++  const settingsCache = new Map<string, { labels: string[]; stripFinance: boolean; docFee: number; inclDocFee: boolean; feeSettings: DealerFeeSettings }>();
+   const getTenantScrapeSettings = async (tenantId: string) => {
+     const cached = settingsCache.get(tenantId);
+     if (cached) return cached;
+@@ -1100,7 +1104,13 @@
+       return true;
+     });
+     const stripFinance = s.vdp_strip_finance_params !== false;
+-    const out = { labels, stripFinance, docFee, inclDocFee };
++    const feeSettings: DealerFeeSettings = {
++      doc_fee_enabled: s.doc_fee_enabled,
++      doc_fee_amount: s.doc_fee_amount,
++      advertised_includes_doc_fee: s.advertised_includes_doc_fee,
++      advertised_includes_doc_fee_by_condition: s.advertised_includes_doc_fee_by_condition,
++    };
++    const out = { labels, stripFinance, docFee, inclDocFee, feeSettings };
+     settingsCache.set(tenantId, out);
+     return out;
+   };
+@@ -1766,7 +1776,46 @@
+       let componentsChanged = false;
+       try {
+         const comp = extractPriceComponents(priceEvidenceHtml(html));
+-        const bd = buildBreakdown(newPrice, comp, cfg.docFee, cfg.inclDocFee);
++        // The fee treatment is decided for THIS page (its condition, wording,
++        // price stack and label, the dealer's condition-specific setting, and
++        // the feed's own basis for an identical figure), never from the
++        // tenant-wide setting alone. An unresolved page writes no breakdown:
++        // the stored split is kept, the observation below is still recorded,
++        // and the reason is audited for a person to settle.
++        const { data: crow } = await admin.from("vehicle_listings")
++          .select("condition, price, feed_includes:mc_raw->>price_includes_fees")
++          .eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
++        const feedIncludes = (crow as { feed_includes?: unknown } | null)?.feed_includes;
++        const feeDecision = decideFeeTreatment({
++          url: fetchUrl,
++          text: priceEvidenceHtml(html).replace(/<[^>]+>/g, " ").replace(/&nbsp;?/gi, " "),
++          extractedPrice: newPrice,
++          matchedLabel: result.matched_label ?? null,
++          listingCondition: (crow as { condition?: string | null } | null)?.condition ?? null,
++          settings: cfg.feeSettings,
++          feed: {
++            price: crow?.price != null ? Number(crow.price) : null,
++            includesFees: feedIncludes === "true" ? true : feedIncludes === "false" ? false : null,
++          },
++        });
++        const split = breakdownFor(feeDecision, newPrice, cfg.docFee);
++        if (!split) {
++          await admin.from("vehicle_listings").update({
++            price_parse_status: "warning",
++            price_parse_notes: decisionNote(feeDecision),
++          }).eq("tenant_id", row.tenant_id).eq("vin", row.vin);
++          await admin.from("audit_log").insert({
++            action: "advertised_price_fee_treatment_unresolved", entity_type: "advertised_price",
++            entity_id: row.vin, store_id: row.tenant_id,
++            details: { vin: row.vin, url: fetchUrl, extracted_price: newPrice, decision: feeDecision, screenshot_path: screenshot?.path ?? null },
++          }).then(() => undefined, () => undefined);
++          throw new FeeTreatmentUnresolved();
++        }
++        const bd = {
++          ...buildBreakdown(split.advertised_price_before_doc, comp, cfg.docFee, false),
++          ...split,
++          price_parse_notes: decisionNote(feeDecision),
++        };
+         // A fee or discount that moved is a change in what the shopper was
+         // shown even when the headline price held, so it earns a screenshot.
+         try {
+@@ -1864,7 +1913,7 @@
+             .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+         }
+         if (misparse) { skipped++; continue; }
+-      } catch { /* price breakdown columns may not be migrated yet */ }
++      } catch { /* price breakdown columns may not be migrated yet, or the fee treatment is unresolved */ }
+ 
+       // Second stage: the evidence screenshot. Rendered only when there is
+       // something new to evidence -- the price or a fee component moved, or

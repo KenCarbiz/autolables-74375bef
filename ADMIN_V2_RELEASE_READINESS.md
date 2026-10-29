@@ -1176,6 +1176,61 @@ Lovable prompt for (b), only if authorized:
 4. MarketCheck before the quota reset: choose (a) or (b).
 5. Approve or defer the crawler fee-treatment fix.
 
+### 10.12 Owner decisions of 2026-10-29: outcomes
+
+Aggregate only. The per-vehicle detail is in the restricted report, outside
+the repository.
+
+| Decision | Outcome |
+|---|---|
+| 1. Pause `marketcheck-sync` and `marketcheck-incentives` | Done by Lovable 03:51 UTC. Verified read-only: both inactive, schedules and command hashes unchanged, every other job's state unchanged, no run and no MarketCheck call after the pause. Not resumed on November 1 without approval. |
+| 2. Class A correction | Deferred. The guarded correction and reverse remain prepared, not run. |
+| 3. New-vehicle disclosure | Not yet verified. The stored evidence is consistent with new-vehicle "Selling Price" before the fee and used/CPO with it, but the crawler keeps no page text and every page uses the same label. The dealer site is not reachable from the session and the screenshots are in a private bucket. |
+| 4. B2 review | 25 vehicles. The gap is stable on every weekly crawl from mid-September to 27 October, so an offer that ended in October is unlikely. The feed price equals the page "Selling Price" minus $10,000 (QX80) or $4,000 (QX60), plus the fee, which explains the $9,105 and $3,105. The dealer's own pages label $4,000 as retail cash on other QX60s. Incentive-shaped, cause high confidence; whether the incentive is conditional is unknown. No paid call made. |
+| 4. Compliance flag | The Passport shows the feed figure (`website_sale_price` display, fee-inclusive basis), so all 25 show a price $9,105 or $3,105 below the dealer's own page. Flagged for compliance review; nothing rewritten. |
+| 5. Crawler fee treatment | Built and tested in isolation; not deployed (below). |
+
+**Paid-call paths still open after the pause** (budget-guarded, no schedule
+change requested):
+- `specs-backfill` (daily) and `factory-sticker-sweep` call `marketcheck-specs`.
+  These write decode data, not prices.
+- A dealer's on-demand enrichment calls `vehicle-enrich`, which can write
+  `price`.
+- `enrich-sweep-nightly` is already paused.
+
+#### Per-page fee treatment (decision 5), development only
+
+- `supabase/proposed/crawl-fee-treatment/feeTreatment.ts` is a pure module that
+  decides one page's fee treatment for new, used and CPO pages.
+- The page condition comes from the page address and the listing; if they
+  disagree, the page is unresolved.
+- What counts as evidence:
+  - **Decisive:** a fee line for the configured amount with a labelled total,
+    or disclosure wording such as "plus conveyance fee" or "price includes the
+    documentation fee".
+  - **Declared:** a dealer setting for that condition
+    (`advertised_includes_doc_fee_by_condition`, proposed, not added). It
+    decides only when something corroborates it.
+  - **Corroborating:** a price label, or the feed's own fee basis when the page
+    shows the identical figure.
+- A figure that merely differs from another price by the fee is not evidence.
+- The tenant-wide setting never decides. Where the page contradicts it, the
+  page stays unresolved until the dealer declares the condition-specific
+  treatment.
+- Missing or contradictory evidence leaves the page unresolved. An unresolved
+  page writes no price split: stored values are kept, the website observation
+  is still recorded, and the reason and evidence are audited.
+- `crawl-advertised-prices.patch` beside the module wires it into the crawler.
+  It applies cleanly to current `main` and is NOT applied. The module is under
+  `supabase/proposed`, so no function deploy can pick it up.
+- Tests: `src/lib/admin/pricing/proposedCrawlFeeTreatment.test.ts`, 23 cases,
+  all passing. The module typechecks under strict mode and the patched crawler
+  parses.
+- With today's settings and stored evidence, this dealership's pages would be
+  unresolved: no condition-specific setting exists and no page text is stored.
+  The crawler would stop writing price splits, so the split it currently writes
+  on new-vehicle pages from the tenant-wide setting would stop.
+
 ## 11. Approvals requested
 
 1. Done: the fee preview fix was applied and verified (section 4).
