@@ -1,0 +1,131 @@
+{
+ "num_found": 4,
+ "listings": [
+  {
+   "id": "syn-000001",
+   "vin": "1EXMP0005S9000001",
+   "price": 19000,
+   "msrp": null,
+   "miles": 31000,
+   "inventory_type": "used",
+   "stock_no": "S1",
+   "vdp_url": "https://feed.example.test/vehicle/1exmp0005s9000001",
+   "source": "feed.example.test",
+   "first_seen_at": 1793000000,
+   "last_seen_at": 1793250000,
+   "scraped_at": 1793250000,
+   "vehicle_status": "active",
+   "build": {
+    "year": 2024,
+    "make": "Example",
+    "model": "Alpha",
+    "trim": "Base",
+    "body_type": "SUV"
+   },
+   "dealer": {
+    "street": "1 Example Way",
+    "zip": "00001",
+    "state": "CT",
+    "city": "Exampleton",
+    "seller_name": "Feed Example Motors"
+   },
+   "mc_dealership": {
+    "mc_rooftop_id": "rt-example-1"
+   }
+  },
+  {
+   "id": "syn-000002",
+   "vin": "1EXMP0007S9000002",
+   "price": 40000,
+   "msrp": 42500,
+   "miles": 12,
+   "inventory_type": "new",
+   "stock_no": "S2",
+   "vdp_url": "https://feed.example.test/vehicle/1exmp0007s9000002",
+   "source": "feed.example.test",
+   "first_seen_at": 1793000000,
+   "last_seen_at": 1793250000,
+   "scraped_at": 1793250000,
+   "vehicle_status": "active",
+   "build": {
+    "year": 2024,
+    "make": "Example",
+    "model": "Beta",
+    "trim": "Base",
+    "body_type": "SUV"
+   },
+   "dealer": {
+    "street": "1 Example Way",
+    "zip": "00001",
+    "state": "CT",
+    "city": "Exampleton",
+    "seller_name": "Feed Example Motors"
+   },
+   "mc_dealership": {
+    "mc_rooftop_id": "rt-example-1"
+   }
+  },
+  {
+   "id": "syn-000004",
+   "vin": "1EXMP0000S9000004",
+   "price": 25000,
+   "msrp": null,
+   "miles": 18000,
+   "inventory_type": "used",
+   "stock_no": "S4",
+   "vdp_url": "https://feed.example.test/vehicle/1exmp0000s9000004",
+   "source": "feed.example.test",
+   "first_seen_at": 1793000000,
+   "last_seen_at": 1793250000,
+   "scraped_at": 1793250000,
+   "vehicle_status": "active",
+   "build": {
+    "year": 2024,
+    "make": "Example",
+    "model": "Delta",
+    "trim": "Base",
+    "body_type": "SUV"
+   },
+   "dealer": {
+    "street": "1 Example Way",
+    "zip": "00001",
+    "state": "CT",
+    "city": "Exampleton",
+    "seller_name": "Feed Example Motors"
+   },
+   "mc_dealership": {
+    "mc_rooftop_id": "rt-example-1"
+   }
+  },
+  {
+   "id": "syn-000005",
+   "vin": "1EXMP0002S9000005",
+   "price": 22000,
+   "msrp": null,
+   "miles": 40000,
+   "inventory_type": "used",
+   "stock_no": "S5",
+   "vdp_url": "https://feed.example.test/vehicle/1exmp0002s9000005",
+   "source": "feed.example.test",
+   "first_seen_at": 1793000000,
+   "last_seen_at": 1793250000,
+   "scraped_at": 1793250000,
+   "vehicle_status": "active",
+   "build": {
+    "year": 2024,
+    "make": "Example",
+    "model": "Echo",
+    "trim": "Base",
+    "body_type": "SUV"
+   },
+   "dealer": {
+    "street": "9 Other Rd",
+    "zip": "00009",
+    "state": "CT"
+   },
+   "mc_dealership": {
+    "mc_rooftop_id": "rt-other-9"
+   }
+  }
+ ]
+}

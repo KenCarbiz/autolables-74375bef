@@ -2327,3 +2327,103 @@ vehicles.
 | `policy_version` increment and `admin_policy_applications` logging | none: both profiles still at 1; 0 application rows | Same replica. Apply a synthetic fee policy through the review-and-apply RPC. Assert `policy_version` 1 to 2, one application row with the idempotency key, a replay with the same key is a no-op, and a stale version is refused. |
 | Successful inventory sync after quota recovery | none since 3 October; job paused | Run `marketcheck-sync` locally against a recorded feed payload (no network), into a replica. Assert counts, price fields, the fee basis and the run row. The live first sync stays gated on your resume decision after quota is confirmed. |
 
+
+## Follow-up to the check-in: evidence, write-path trace and isolated runs (2026-10-29)
+
+Production was not changed: no price correction, job change, paid provider
+call, message, deployment or migration. Hosted reads were catalogue,
+metadata and log reads only. The per-vehicle detail (VINs, prices, URLs) is
+in the restricted file outside the repository;
+`scripts/crawl-verify/evidence-queries.sql` rebuilds it read-only.
+
+### A. The nine crawl screenshots: not viewed (blocked)
+
+The images are in the private `price-evidence` bucket. Reading one needs a
+service-role key or a signed-in dealership session; this session has
+neither and must not handle keys. Storage metadata confirms 8 PNG objects
+(3.9 to 4.8 MB) matching the recorded paths, and none for the ninth update.
+
+What the records do establish, without the images:
+
+| Item | Evidence | Status |
+| --- | --- | --- |
+| VIN | The rendered page used for the price contained the target VIN (verdict `vehicle`, not redirected). | Price render: evidenced. Screenshot: see next row. |
+| Screenshot is the same page | 2 of 8 screenshots come from the same render as the price. 6 come from a second render 11 to 18 s later, which the code never checks for VIN, redirect or challenge. | Unsupported for 6 until viewed. |
+| Page identity | For the 7 used and certified updates the rendered page's title was a third-party listing platform's name, on the dealer's own domain, not redirected. | Not determined. |
+| Amount and label | Observation, listing and notes agree; the stored label is "Selling Price" on all 9. Which element supplied it is not recorded. | Unsupported until viewed. |
+| Fee inclusion | None. It comes from the tenant setting, not the page. The note "includes the doc fee" and parse status `ok` are written identically whether or not the page showed a fee line. | No evidence for any of the 9. |
+| Ninth update | No image: the evidence render gave up (`out_of_time`), and the price had already been written. | Insufficient evidence. |
+
+Two figures need the images before anything is corrected. In one case the
+page figure equals the stale feed price exactly, so it may be pre-fee. In
+another (a new vehicle) the page figure equals the feed MSRP; the guard
+compared the figure minus the fee with the MSRP, so its at-or-above-MSRP
+test did not fire.
+
+To clear the block, either:
+- an admin downloads the 8 objects (paths in the restricted file); or
+- the owner provides signed URLs.
+
+### B. Crawler write path, as traced (`crawl-advertised-prices/index.ts`, main)
+
+| Step | What the code does | Consequence |
+| --- | --- | --- |
+| VIN, direct fetch | Refuses only if the page shows VINs and none is the target. A page with no VIN passes. | A page with no VIN at all still yields a price (T1). Not used in this run: every direct fetch got 403. |
+| VIN, rendered page | `classifyRenderedPage`: `vehicle` only if the target VIN is in the HTML or final URL; otherwise `other_vehicle`, `no_vehicle` or `challenge`. | Sound for the price render (T3, T3n, T3b, T3c). The VIN pattern is uppercase-only, so these lowercase dealer URLs never supply the match; an uppercase URL would (T2b, T3u). |
+| Price | JSON-LD offer, then og meta, then configured and default labels. For labels, the first "selling price" in the page text, within 80 characters, wins. | A card earlier on the page wins the label (T4). The code already notes this as an open defect. |
+| Fee | `buildBreakdown` takes inclusion from `advertised_includes_doc_fee`. The page's fee line is only a cross-check, and a missing line counts as "ok". | Fee inclusion is never evidenced by the page (T5, T5b, T5c). |
+| Feed guard | Compares the figure minus the fee with the feed price and MSRP. A stale feed relaxes it. A drop below the feed is always written. | A page figure equal to the MSRP passes for a fee-inclusive tenant (T6, T6b). No lower bound (T7). |
+| Writes | `vehicle_listings` is updated before the evidence screenshot is taken and before the observation insert. The service role bypasses the priced-columns guard. | A failed screenshot or insert leaves the listing already changed. The second-render screenshot is not page-checked. |
+
+The guard functions and classifier ran from shared modules as they are, and
+the extraction code was cut out of the function unmodified:
+`scripts/crawl-verify/run.sh`, **15 of 15 cases describe the code
+correctly**. Two of my first hypotheses (that the URL supplies the VIN for
+these pages) were wrong and are recorded as such in T2 and T3.
+
+### C. Isolated runs (local PostgreSQL 16, synthetic data, no hosted connection)
+
+| Run | Result |
+| --- | --- |
+| Settings writes and `policy_version` / `admin_policy_applications` (`scripts/db-verify/run.sh`) | **673 of 679**. All 6 failures are the "live" fee-preview `22P02` cases: the defect fixed on 2026-10-28, reproduced from the pre-fix definition. With the fix, fee review passes **29 of 29**. Covered and passing: settings authority 126 (18 principals); persistence 7 (save bumps the version, one audit row); direct writes 10; idempotent replay; stale-version conflict; settings save between review and apply makes the apply conflict; short key refused. |
+| Escalation (`scripts/escalation-verify/run.sh`, source identical to the deployed commit) | **22 of 22**. Checked: credentials refused; per-tenant recipients; a refused send retried and then accepted; no address in audit; per-tenant hash chain intact; no lead column outside escalation changed. |
+| Inventory sync (`scripts/sync-verify/run.sh`, new) | **20 of 20**. Details below. |
+
+How the sync run is built:
+- the full migration chain (470 of 522 apply on local stand-ins);
+- the touched columns aligned to the hosted catalogue;
+- 10 of 13 called database functions identical to hosted by fingerprint (prune, revive, pin, price guard and others); the other 3 taken from the hosted definitions;
+- the function run unmodified apart from the provider base URL and two import mappings, with network limited to 127.0.0.1.
+
+Feeds served from recorded synthetic responses:
+- **Clean.** A price drop was written with a change-history row and a medium exception. The new vehicle was added as a draft. The vehicle missing from the feed was archived. The bystander tenant was untouched. Fee basis: feed price treated as before the fee, fee added once.
+- **Another rooftop's car in the pinned feed.** Purity 0.75 against 0.95: the run failed and nothing was written.
+- **Provider 429.** Retried twice; the run failed; nothing was written.
+- **Monthly budget at cap.** No inventory request was sent; nothing was written.
+
+Findings from the sync run:
+1. The dealership lookup (`/dealerships/car`) is a provider request that bypasses the budget gate and the ledger. It was sent even with the budget at cap. Each clean run made 3 provider requests, of which the ledger recorded 2.
+2. A budget refusal is reported as "MarketCheck rate-limited or over quota (HTTP 429)", although nothing reached the provider.
+3. The run's `new_vehicles` counts new vehicle files, not new listings. Listings without a file are counted as new.
+4. A new vehicle triggers `factory-sticker-orchestrate` and `generate-vehicle-forms` (stubbed here). Whether these spend provider credit is not measured.
+
+Not demonstrated: a hosted sync after quota recovery (still gated on your
+resume decision); the evidence render path against a real renderer.
+
+### D. Addendum applicability fix and 07 fixture write block
+
+- Status:
+  - Implemented in b211121, evidence in f56fe68, on `main`.
+  - Rerun today: **44 of 44** across the five suites. These cover the real addendum builder with the real rules hook, the 72-case agreement with screen 07, "is preview only" and the writer refusals.
+- Not deployed to production by this work. `main` feeds only the Lovable preview.
+- Effect on hosted data today: none. `product_rules` has 0 rows, so no addendum changes until a dealer saves a rule.
+
+### E. Restricted evidence storage (blocked)
+
+The restricted file is in this session's scratchpad, which does not survive
+the session. Keeping it beyond that needs a store you approve:
+- Git is excluded.
+- This session has no Remote Control computer folder (the list is empty).
+- Publishing it as an artifact, document or email would place restricted data with an outside service without your approval.
+
+Until you name a location, the regeneration queries in `scripts/crawl-verify/` are the durable copy.
