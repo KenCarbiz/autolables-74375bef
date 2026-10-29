@@ -1,10 +1,9 @@
-// PROPOSED, NOT DEPLOYED. Per-page document fee treatment for the advertised
-// price crawler (crawl-advertised-prices), for pages that show a single
-// labelled figure. A page with an itemised price stack is read by
-// priceStack.ts instead, which places the fee by the stack's own lines. Lives outside supabase/functions so
-// it cannot ship with a function deploy; wiring it in is a separate, approved
-// change (crawl-advertised-prices.patch beside this file, which moves this
-// module to supabase/functions/_shared/feeTreatment.ts).
+// Per-page document fee evidence for the advertised price crawler
+// (crawl-advertised-prices), for pages that show a single labelled figure. A
+// page with an itemised price stack is read by priceStack.ts instead, which
+// places the fee by the stack's own lines. feeBasis.ts combines this page
+// evidence with the dealer's configured interpretation; decideFeeTreatment
+// below is the earlier single-decision form, kept for its tests.
 //
 // Today the crawler applies one tenant-wide setting (advertised_includes_doc_fee)
 // to every page. On a dealership whose new-vehicle pages show the price before
@@ -124,7 +123,7 @@ const MONEY = String.raw`\$\s?(\d{1,3}(?:,\d{3})+|\d{1,6})(?:\.\d{2})?`;
 const money = (s: string) => Number(s.replace(/,/g, ""));
 
 const EXCLUDE_BEFORE = new RegExp(
-  String.raw`\b(?:plus|excluding|excludes|exclusive of|not including|does not include|do not include|doesn't include|don't include|before)\b[^.;]{0,80}?\b${FEE_NOUN}\b`, "gi");
+  String.raw`\b(?:plus|excluding|excludes|exclude|exclusive of|not including|does not include|do not include|doesn't include|don't include|before)\b[^.;]{0,80}?\b${FEE_NOUN}\b`, "gi");
 const EXCLUDE_AFTER = new RegExp(
   String.raw`\b${FEE_NOUN}\b[^.;]{0,50}?\b(?:not included|is not included|are not included|additional|extra|is extra|are extra|not part of)\b`, "gi");
 const INCLUDE_BEFORE = new RegExp(

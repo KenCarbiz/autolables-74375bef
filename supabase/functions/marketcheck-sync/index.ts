@@ -147,6 +147,26 @@ const OWNED_PARAMS = new Set([
 // domain filter — so we search the dealer's area, then EXACT-match the domain
 // against each dealer's source / inventory_url. Returns null (with a clear
 // diagnostic) rather than guessing the wrong rooftop.
+// The dealer lookups (dealers search, dealership resolve, the operator's
+// dealer finder) are provider requests like the inventory pull: each passes
+// the monthly budget gate and is written to the call ledger. They are not
+// essential, so they can never spend the reserve kept for the inventory feed.
+async function gatedProviderGet(url: string, timeoutMs: number): Promise<{ res: Response | null; budgetDenied: boolean }> {
+  recordCall(callMeter, url);
+  const gate = budgetCtx
+    ? await admitProviderCall(budgetCtx.admin, { url, caller: "marketcheck-sync", essential: false, tenantId: budgetCtx.tenantId })
+    : null;
+  if (gate && !gate.admitted) return { res: null, budgetDenied: true };
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
+    return { res, budgetDenied: false };
+  } catch {
+    if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, null);
+    return { res: null, budgetDenied: false };
+  }
+}
+
 async function resolveDealerId(
   source: string, zip?: string | null, state?: string | null,
 ): Promise<{ id: string | null; found: number; status: number; matchedName?: string | null }> {
@@ -154,7 +174,8 @@ async function resolveDealerId(
     const geo = zip ? `&zip=${encodeURIComponent(zip)}&radius=20`
       : state ? `&state=${encodeURIComponent(state)}` : "";
     const url = `${DEALERS_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}&rows=50${geo}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    const { res } = await gatedProviderGet(url, 20000);
+    if (!res) return { id: null, found: 0, status: 0 };
     if (!res.ok) return { id: null, found: 0, status: res.status };
     // deno-lint-ignore no-explicit-any
     const data: any = await res.json().catch(() => ({}));
@@ -173,6 +194,9 @@ async function resolveDealerId(
 // as a string) and returns the listings array + http status.
 // Per-run call meter. Operator-facing only: these are public list prices, not a
 // bill, and the figures never reach a dealer-visible surface.
+// One page of a provider feed as mcFetch returns it.
+type FeedPage = { listings: MCListing[]; numFound: number; http: number; refused?: boolean; budgetDenied?: boolean; endpoint?: string };
+
 let callMeter = newCallMeter();
 // The run's database client and the tenant whose feed is being pulled, for
 // the budget ledger. Every sync call is essential: the feed and its rooftop
@@ -199,7 +223,9 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
     const gate = budgetCtx
       ? await admitProviderCall(budgetCtx.admin, { url, caller: "marketcheck-sync", essential: true, tenantId: budgetCtx.tenantId })
       : null;
-    if (gate && !gate.admitted) return { listings: [], numFound: 0, http: 429, refused: true, budgetDenied: true, endpoint: base };
+    // Refused by our own budget: nothing was sent, so there is no HTTP status
+    // to report, and it must never read as the provider's 429.
+    if (gate && !gate.admitted) return { listings: [], numFound: 0, http: 0, refused: true, budgetDenied: true, endpoint: base };
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
       if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
@@ -267,6 +293,8 @@ const syndPage = (
 
 interface Dealership {
   name: string; state: string; http: number;
+  /** The local budget refused the lookup; no request was sent. */
+  budgetDenied?: boolean;
   // Canonical syndication probes (param -> value), highest-confidence first.
   probes: Array<{ param: string; value: string }>;
 }
@@ -281,8 +309,8 @@ async function resolveDealership(domain: string): Promise<Dealership> {
   if (!domain) return empty;
   try {
     const url = `${DEALERSHIPS_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}&inventory_url=${encodeURIComponent(domain)}&rows=5`;
-    recordCall(callMeter, DEALERSHIPS_ENDPOINT);
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const { res, budgetDenied } = await gatedProviderGet(url, 15000);
+    if (!res) return { ...empty, budgetDenied };
     if (!res.ok) return { ...empty, http: res.status };
     // deno-lint-ignore no-explicit-any
     const data: any = await res.json().catch(() => ({}));
@@ -558,7 +586,9 @@ serve(async (req) => {
     if (!zip && !state) return json(400, { error: "zip_or_state_required" });
     const geo = zip ? `&zip=${encodeURIComponent(zip)}&radius=25` : `&state=${encodeURIComponent(state)}`;
     const url = `${DEALERS_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}&rows=50${geo}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    const { res, budgetDenied } = await gatedProviderGet(url, 20000);
+    if (budgetDenied) return json(200, { ok: false, budget_refused: true, http: null, dealers: [], note: "The monthly provider budget refused the lookup; no request was sent to MarketCheck." });
+    if (!res) return json(200, { ok: false, http: 0, dealers: [] });
     if (!res.ok) return json(200, { ok: false, http: res.status, dealers: [] });
     // deno-lint-ignore no-explicit-any
     const data: any = await res.json().catch(() => ({}));
@@ -644,7 +674,7 @@ serve(async (req) => {
     });
   }
 
-  let tenantsSynced = 0, newVehicles = 0, listingsUpserted = 0, pricesRecorded = 0, seen = 0;
+  let tenantsSynced = 0, newVehicles = 0, newListings = 0, listingsUpserted = 0, pricesRecorded = 0, seen = 0;
   const errors: Array<{ tenant_id: string; error: string }> = [];
   const diagnostics: Array<Record<string, unknown>> = [];
   // Vehicles to fully enrich (MarketCheck pricing/comps/recalls + Black Book)
@@ -666,7 +696,9 @@ serve(async (req) => {
     // A domain OR a chosen dealer_id is enough — the finder gives an id even
     // when MarketCheck has no website on file for the rooftop.
     if (!source && !manualDealerId) continue;
-    let tenantSeen = 0, tenantNew = 0, tenantPrices = 0;
+    // tenantNew counts vehicle files created (the inventory-of-record entity);
+    // tenantNewListings and tenantUpdatedListings count dealership listings.
+    let tenantSeen = 0, tenantNew = 0, tenantPrices = 0, tenantNewListings = 0, tenantUpdatedListings = 0;
     let firstWriteErr: string | null = null;
     const liveVins = new Set<string>();
     const updatedListingIds: Array<{ id: string; vin: string }> = [];
@@ -820,6 +852,7 @@ serve(async (req) => {
       // Set when the provider rate-limited, blocked or timed out mid-walk. The
       // run is then incomplete by evidence, not by inference.
       let providerRefused = 0;
+      let budgetRefused = false;
       // New units ingested this run — the signal the coverage backstop watches.
       let newTypeSeen = 0;
       // Only tenants that have ever carried new inventory get the backstop, so
@@ -856,7 +889,7 @@ serve(async (req) => {
       let httpStatus = 0;
 
       const attempts: Array<Record<string, unknown>> = [];
-      const hits: Array<{ param: string; value: string; r: { listings: MCListing[]; numFound: number; http: number }; purity: number }> = [];
+      const hits: Array<{ param: string; value: string; r: FeedPage; purity: number }> = [];
       // Validate every feed against the dealer's domain/state. source= and the
       // mc_website_id resolved from the domain are trusted single-rooftop scopes;
       // any other id must be predominantly THIS rooftop's cars or it's rejected.
@@ -864,7 +897,7 @@ serve(async (req) => {
       // and mc_website_id, which used to be accepted unconditionally. That
       // blanket trust is why a wrong feed could win once and then stick.
       const minPurity = strict ? 0.95 : 0.6;
-      const recordHit = (param: string, value: string, r: { listings: MCListing[]; numFound: number; http: number }, label: string) => {
+      const recordHit = (param: string, value: string, r: FeedPage, label: string) => {
         let match = 0, mismatch = 0, unknown = 0;
         for (const l of r.listings) {
           const c = classifyListing(listingIdentity(l), rooftop);
@@ -887,7 +920,7 @@ serve(async (req) => {
       // because a silent fallback is exactly how the wrong store's cars arrived.
       const pinnedParam = (cfg.mc_scope_param || "").trim();
       const pinnedValue = (cfg.mc_scope_value || "").trim();
-      let sample = { listings: [] as MCListing[], numFound: 0, http: 0 };
+      let sample: FeedPage = { listings: [] as MCListing[], numFound: 0, http: 0 };
       let pinBroken = false;
       let pinnedOutcome: PinnedFeedOutcome | null = null;
 
@@ -898,7 +931,7 @@ serve(async (req) => {
         // back off the attempt it just recorded rather than deciding twice.
         const a = attempts[attempts.length - 1] ?? {};
         pinnedOutcome = classifyPinnedFeed({
-          refused: r.refused === true, http: r.http, got: r.listings.length,
+          refused: r.refused === true, budgetDenied: r.budgetDenied === true, http: r.http, got: r.listings.length,
           match: Number(a.match ?? 0), purity: Number(a.purity ?? 0), minPurity,
         }, { param: pinnedParam, value: pinnedValue }, { street: rooftop.street, zip: rooftop.zip });
         if (hits.length === 0) pinBroken = true;
@@ -963,7 +996,7 @@ serve(async (req) => {
       });
       const best = hits[0] || null;
       const chosen: { param: string; value: string } | null = best ? { param: best.param, value: best.value } : null;
-      const firstPage = best ? best.r : { listings: [] as MCListing[], numFound: 0, http: 0 };
+      const firstPage: FeedPage = best ? best.r : { listings: [] as MCListing[], numFound: 0, http: 0 };
       httpStatus = best ? firstPage.http : ((attempts[0]?.http as number) ?? 0);
       const probe = {
         chosen: chosen ? { feed: "syndication", param: chosen.param, id: chosen.value, purity: best?.purity } : null,
@@ -1135,6 +1168,7 @@ serve(async (req) => {
           const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
           if (!error) {
             listingsUpserted++;
+            tenantUpdatedListings++;
             updatedListingIds.push({ id: vl.id, vin });
             // A VIN that left the feed is retired, not deleted, so a car
             // that comes back is an UPDATE now where it used to be a fresh
@@ -1158,6 +1192,8 @@ serve(async (req) => {
           }).select("id").maybeSingle();
           if (!ins.error) {
             listingsUpserted++;
+            tenantNewListings++;
+            newListings++;
             // New car → auto-preload its Get-Ready QR + OEM window sticker.
             await autoPreload(admin, supabaseUrl, serviceKey, {
               tenantId: cfg.tenant_id, vin, ymm, listingId: ins.data?.id ?? null,
@@ -1497,6 +1533,7 @@ serve(async (req) => {
         // An empty page from a provider that REFUSED is not the end of the
         // feed. Leaving feedWalked false blocks the prune, so a rate limit can
         // never again be read as the dealer selling the rest of the lot.
+        if (pageData.budgetDenied) { budgetRefused = true; break; }
         if (pageData.refused) { providerRefused = pageData.http || 429; break; }
         if (listings.length === 0) break;
 
@@ -1518,8 +1555,8 @@ serve(async (req) => {
             // misled a whole analysis before anyone checked it against the
             // fetch. A label that can drift from execution will.
             await admin.rpc("record_provider_payload_shape", {
-              _provider: providerLabelFor(pageData.endpoint),
-              _endpoint: pageData.endpoint,
+              _provider: providerLabelFor(pageData.endpoint ?? SYND_ENDPOINT),
+              _endpoint: pageData.endpoint ?? SYND_ENDPOINT,
               _shape_hash: hash,
               _key_names: shape.keys,
               _dependency_types: shape.dependencyTypes,
@@ -1796,7 +1833,7 @@ serve(async (req) => {
       );
 
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, description_refresh: descriptionRefresh, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, provider_refused: providerRefused || null, prune_skipped: pruneSkipped,
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNewListings, new_listings: tenantNewListings, updated_listings: tenantUpdatedListings, new_vehicle_files: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, description_refresh: descriptionRefresh, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName, rooftop_strict: strict, rooftop_street: rooftop.street, rooftop_zip: rooftop.zip, rejected_other_rooftop: rejected, feed_walked: feedWalked, provider_refused: providerRefused || null, budget_refused: budgetRefused || null, prune_skipped: pruneSkipped,
         segments: { new: { accepted: segAccepted.new, reported: segReported.new, prior: priorSegVins.new.size, skipped: segSkipped.new, gate: segGateDecision.new }, rest: { accepted: segAccepted.rest, reported: segReported.rest, prior: priorSegVins.rest.size, skipped: segSkipped.rest, gate: segGateDecision.rest } }, pinned: cleanRun, canary_no_prune: noPrune,
         new_units: { primary_feed: primaryNewUnits, total: newTypeSeen }, supplemental_new: supplementalNew,
         // Operator-only. Public list prices, so an estimate rather than a bill.
@@ -1829,12 +1866,15 @@ serve(async (req) => {
           : "success";
       await logSyncRun({
         tenant_id: cfg.tenant_id, started_at: runStartedAt, status: runStatus,
-        num_found: numFound, seen: tenantSeen, new_vehicles: tenantNew,
-        updated_vehicles: Math.max(0, listingsUpserted - tenantNew),
+        // new_vehicles counts new dealership listings; new vehicle files (a
+        // VIN the platform had no file for) are reported separately in raw.
+        num_found: numFound, seen: tenantSeen, new_vehicles: tenantNewListings,
+        updated_vehicles: tenantUpdatedListings,
         prices_recorded: tenantPrices, removed: pruned?.listings_deleted ?? 0,
         http_status: httpStatus, matched_dealer: verifiedName || null,
         error_summary: firstWriteErr,
-        raw: { source, dealer_id: manualId, mc_param: chosen.param, mc_value: chosen.value, ...probe, pruned, new_units: { primary_feed: primaryNewUnits, total: newTypeSeen }, supplemental_new: supplementalNew },
+        raw: { source, dealer_id: manualId, mc_param: chosen.param, mc_value: chosen.value, ...probe, pruned,
+          new_listings: tenantNewListings, updated_listings: tenantUpdatedListings, new_vehicle_files: tenantNew, new_units: { primary_feed: primaryNewUnits, total: newTypeSeen }, supplemental_new: supplementalNew },
         errors: firstWriteErr ? [{ code: "write_error", message: firstWriteErr }] : [],
       });
     } catch (err) {
@@ -1842,7 +1882,7 @@ serve(async (req) => {
       errors.push({ tenant_id: cfg.tenant_id, error: msg });
       await logSyncRun({
         tenant_id: cfg.tenant_id, started_at: runStartedAt, status: "failed",
-        seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices,
+        seen: tenantSeen, new_vehicles: tenantNewListings, prices_recorded: tenantPrices,
         error_summary: msg, raw: { exception: msg },
         errors: [{ code: "exception", message: msg }],
       });
@@ -1903,7 +1943,9 @@ serve(async (req) => {
   drainArtifactPosts();
   return json(200, {
     ok: true, tenants_due: due.length, tenants_synced: tenantsSynced,
-    listings_seen: seen, new_vehicles: newVehicles,
+    // new_vehicles: new dealership listings. new_vehicle_files: VINs the
+    // platform had no vehicle file for (counted as new_vehicles before).
+    listings_seen: seen, new_vehicles: newListings, new_listings: newListings, new_vehicle_files: newVehicles,
     listings_upserted: listingsUpserted, prices_recorded: pricesRecorded,
     enrich_queued: enrichQueue.length, enriched, errors, diagnostics,
     // Why each considered tenant was passed over, so an empty run can be read

@@ -14,10 +14,12 @@ import { join } from "node:path";
 // are reconstructed here from the deployed source -- the same approach as
 // cpoBadge.test.ts and dealerVdpBadges.test.ts.
 
+// The description strip lives in vdpPrice.ts since the crawler's price reader
+// moved there; the badge detectors stay in the crawler.
 const SRC = readFileSync(
   join(__dirname, "../../../supabase/functions/crawl-advertised-prices/index.ts"),
   "utf8",
-);
+) + "\n" + readFileSync(join(__dirname, "../../../supabase/functions/_shared/vdpPrice.ts"), "utf8");
 const FIXTURE = readFileSync(
   join(__dirname, "__fixtures__/harte-vdp-1c6srfft2nn400176.html"),
   "utf8",
@@ -102,22 +104,19 @@ describe("navigation is deliberately NOT stripped for prices", () => {
 });
 
 describe("the extractors are actually wired to it", () => {
-  it("every VDP price extraction call passes through priceEvidenceHtml", () => {
+  it("every VDP price extraction call passes through the description strip", () => {
     // The fix that was missed the first time: evidenceHtml was applied to the
     // three badge detectors and to nothing else, so the price path -- the one
-    // that persists and renders -- kept reading raw HTML.
-    expect(SRC).toContain("const comp = extractPriceComponents(priceEvidenceHtml(html));");
-    const rawAdvertised = [...SRC.matchAll(/extractAdvertised\(\s*(\w+)[.\w]*\s*,/g)]
-      .map((m) => m[1]);
-    // Discovery calls (empty VIN) may read raw HTML; every VIN-scoped call must not.
-    for (const m of SRC.matchAll(/extractAdvertised\(([^)]*)\)/g)) {
-      const args = m[1];
-      if (/\bvin\b/.test(args) && !/""/.test(args)) {
-        expect(args, `VIN-scoped extractAdvertised must strip description: ${args}`)
-          .toContain("priceEvidenceHtml");
-      }
-    }
-    expect(rawAdvertised.length).toBeGreaterThan(0);
+    // that persists and renders -- kept reading raw HTML. The price reader now
+    // strips the description itself, and the widget reader is handed the
+    // stripped page.
+    const reader = readFileSync(join(__dirname, "../../../supabase/functions/_shared/vdpPrice.ts"), "utf8");
+    expect(reader).toContain("const scopedHtml = stripDescriptionBlocks(scope?.html ?? html);");
+    expect(SRC).toContain("const stack = readPriceStack(stripDescriptionBlocks(scope.html), vin, {");
+    // Page-wide component patterns no longer feed any listing field.
+    expect(SRC).not.toContain("extractPriceComponents(");
+    // Every price read in the crawler goes through extractVehiclePrice.
+    expect(SRC).not.toMatch(/extractAdvertised\(/);
   });
 
   it("keeps the badge detectors on the stricter strip", () => {

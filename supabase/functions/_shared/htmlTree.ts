@@ -1,5 +1,5 @@
-// PROPOSED, NOT DEPLOYED. A small, dependency-free HTML element tree for the
-// price-stack reader: element ranges over the raw page, so a price can be
+// A small, dependency-free HTML element tree for the price-stack reader and
+// the crawler's vehicle scoping: element ranges over the raw page, so a price can be
 // attributed to the page component that contains it rather than to whatever
 // VIN happens to be nearest in the text. Tolerant of unclosed tags; it never
 // throws on malformed markup.

@@ -9,10 +9,12 @@ import { join } from "node:path";
 // or lemon". A regression that made it fire on "title loans" or on a financing
 // disclaimer would put an unearned title claim in front of a shopper.
 
+// The description strip lives in vdpPrice.ts since the crawler's price reader
+// moved there; the badge detectors stay in the crawler.
 const SRC = readFileSync(
   join(__dirname, "../../../supabase/functions/crawl-advertised-prices/index.ts"),
   "utf8",
-);
+) + "\n" + readFileSync(join(__dirname, "../../../supabase/functions/_shared/vdpPrice.ts"), "utf8");
 
 const literal = (name: string): RegExp => {
   const m = new RegExp(`const ${name} =\\s*\\n?\\s*(/.*?/[a-z]*);`, "s").exec(SRC);

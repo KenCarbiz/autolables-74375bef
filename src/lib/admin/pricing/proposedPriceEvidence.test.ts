@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { buildEvidenceRecords, canonical } from "../../../../supabase/proposed/crawl-fee-treatment/priceEvidence";
-import { readPriceStack } from "../../../../supabase/proposed/crawl-fee-treatment/priceStack";
+import { buildEvidenceRecords, canonical } from "../../../../supabase/functions/_shared/priceEvidence";
+import { readPriceStack } from "../../../../supabase/functions/_shared/priceStack";
 import { DEALER_LABEL, TARGET_VIN, stack, vdpPage, type Row } from "./fixtures/priceStackPages";
 
 const ROWS: Row[] = [

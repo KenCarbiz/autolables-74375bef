@@ -1,0 +1,106 @@
+{
+ "vins": {
+  "card": "1EXMP0008S9000011",
+  "redirect": "1EXMP000XS9000012",
+  "setting": "1EXMP0001S9000013",
+  "conflict": "1EXMP0003S9000014",
+  "evidence": "1EXMP0005S9000015",
+  "partial": "1EXMP0007S9000016",
+  "ambiguous": "1EXMP0009S9000017",
+  "title": "1EXMP0000S9000018",
+  "other": "1EXMP0000S9000021",
+  "other2": "1EXMP0002S9000022"
+ },
+ "pages": {
+  "1EXMP0008S9000011": {
+   "what": "a similar-vehicle card with another VIN and a lower Selling Price comes first; the vehicle's own block shows a fee line and a total",
+   "html": "<!doctype html><html><head><title>2024 Example SUV | Example Motors</title></head><body><div class=\"card\"><a href=\"/viewdetails/used/1exmp0000s9000021/x\">2023 Other</a><span>Selling Price $19,900</span></div><main><section class=\"vdp-hero\"><h1>2024 Example SUV</h1><div class=\"specs\">VIN: 1EXMP0008S9000011</div><div class=\"price\">Selling Price $30,000</div><div class=\"price-detail\">Documentation Fee $900 <span>Total Price $30,000</span></div></section></main></body></html>",
+   "finalUrl": "https://dealer.example.test/viewdetails/used/1exmp0008s9000011/2024-example-suv"
+  },
+  "1EXMP000XS9000012": {
+   "what": "the address redirects to another car's page (no VIN in the final address); this vehicle appears only in that page's related strip",
+   "html": "<!doctype html><html><head><title>2024 Example SUV | Example Motors</title></head><body><main><h1>2023 Other SUV</h1><div>VIN: 1EXMP0002S9000022</div><div>Selling Price $29,500</div></main><section class=\"related-vehicles\"><div>VIN 1EXMP000XS9000012 Selling Price $27,000</div></section></body></html>",
+   "finalUrl": "https://dealer.example.test/inventory/used/12345"
+  },
+  "1EXMP0001S9000013": {
+   "what": "one labelled figure and nothing on the page about the fee (like the nine production updates)",
+   "html": "<!doctype html><html><head><title>2024 Example SUV | Example Motors</title></head><body><main><section class=\"vdp-hero\"><h1>2024 Example SUV</h1><div class=\"specs\">VIN: 1EXMP0001S9000013</div><div class=\"price\">Selling Price $25,572</div></section></main></body></html>",
+   "finalUrl": "https://dealer.example.test/viewdetails/used/1exmp0001s9000013/2024-example-suv"
+  },
+  "1EXMP0003S9000014": {
+   "what": "the page states the price excludes the fee; the dealership's setting says it includes it",
+   "html": "<!doctype html><html><head><title>2024 Example SUV | Example Motors</title></head><body><main><section class=\"vdp-hero\"><h1>2024 Example SUV</h1><div class=\"specs\">VIN: 1EXMP0003S9000014</div><div class=\"price\">Selling Price $22,000</div><p class=\"price-note\">Selling Price plus documentation fee, tax, title and registration.</p></section></main></body></html>",
+   "finalUrl": "https://dealer.example.test/viewdetails/used/1exmp0003s9000014/2024-example-suv"
+  },
+  "1EXMP0005S9000015": {
+   "what": "a page-verified price whose screenshot cannot be stored",
+   "html": "<!doctype html><html><head><title>2024 Example SUV | Example Motors</title></head><body><main><section class=\"vdp-hero\"><h1>2024 Example SUV</h1><div class=\"specs\">VIN: 1EXMP0005S9000015</div><div class=\"price\">Selling Price $33,000</div><div class=\"price-detail\">Documentation Fee $900 <span>Total Price $33,000</span></div></section></main></body></html>",
+   "finalUrl": "https://dealer.example.test/viewdetails/used/1exmp0005s9000015/2024-example-suv"
+  },
+  "1EXMP0007S9000016": {
+   "what": "a page-verified price whose listing write fails in the database",
+   "html": "<!doctype html><html><head><title>2024 Example SUV | Example Motors</title></head><body><main><section class=\"vdp-hero\"><h1>2024 Example SUV</h1><div class=\"specs\">VIN: 1EXMP0007S9000016</div><div class=\"price\">Selling Price $28,000</div><div class=\"price-detail\">Documentation Fee $900 <span>Total Price $28,000</span></div></section></main></body></html>",
+   "finalUrl": "https://dealer.example.test/viewdetails/used/1exmp0007s9000016/2024-example-suv"
+  },
+  "1EXMP0009S9000017": {
+   "what": "two unattributed Selling Price figures that disagree",
+   "html": "<!doctype html><html><head><title>2024 Example SUV | Example Motors</title></head><body><div><span>Selling Price $18,500</span></div><main><section class=\"vdp-hero\"><h1>2024 Example SUV</h1><div class=\"specs\">VIN: 1EXMP0009S9000017</div><div class=\"price\">Selling Price $21,000</div></section></main></body></html>",
+   "finalUrl": "https://dealer.example.test/viewdetails/used/1exmp0009s9000017/2024-example-suv"
+  },
+  "1EXMP0000S9000018": {
+   "what": "no document title; an embedded panel's SVG title is the only <title> on the page",
+   "html": "<!doctype html><html><head></head><body><main><section class=\"vdp-hero\"><h1>2024 Example SUV</h1><div class=\"specs\">VIN: 1EXMP0000S9000018</div><div class=\"price\">Selling Price $26,000</div><div class=\"price-detail\">Documentation Fee $900 <span>Total Price $26,000</span></div></section></main><div class=\"history-panel\"><svg><title>PanelCo</title></svg></div></body></html>",
+   "finalUrl": "https://dealer.example.test/viewdetails/used/1exmp0000s9000018/2024-example-suv"
+  }
+ },
+ "listings": [
+  {
+   "key": "card",
+   "vin": "1EXMP0008S9000011",
+   "source_url": "https://dealer.example.test/viewdetails/used/1exmp0008s9000011/2024-example-suv",
+   "feed_price": 31000
+  },
+  {
+   "key": "redirect",
+   "vin": "1EXMP000XS9000012",
+   "source_url": "https://dealer.example.test/viewdetails/used/1exmp000xs9000012/2024-example-suv",
+   "feed_price": 27000
+  },
+  {
+   "key": "setting",
+   "vin": "1EXMP0001S9000013",
+   "source_url": "https://dealer.example.test/viewdetails/used/1exmp0001s9000013/2024-example-suv",
+   "feed_price": 25892
+  },
+  {
+   "key": "conflict",
+   "vin": "1EXMP0003S9000014",
+   "source_url": "https://dealer.example.test/viewdetails/used/1exmp0003s9000014/2024-example-suv",
+   "feed_price": 22500
+  },
+  {
+   "key": "evidence",
+   "vin": "1EXMP0005S9000015",
+   "source_url": "https://dealer.example.test/viewdetails/used/1exmp0005s9000015/2024-example-suv",
+   "feed_price": 34000
+  },
+  {
+   "key": "partial",
+   "vin": "1EXMP0007S9000016",
+   "source_url": "https://dealer.example.test/viewdetails/used/1exmp0007s9000016/2024-example-suv",
+   "feed_price": 29000
+  },
+  {
+   "key": "ambiguous",
+   "vin": "1EXMP0009S9000017",
+   "source_url": "https://dealer.example.test/viewdetails/used/1exmp0009s9000017/2024-example-suv",
+   "feed_price": 21000
+  },
+  {
+   "key": "title",
+   "vin": "1EXMP0000S9000018",
+   "source_url": "https://dealer.example.test/viewdetails/used/1exmp0000s9000018/2024-example-suv",
+   "feed_price": 27000
+  }
+ ]
+}

@@ -1,4 +1,4 @@
-// PROPOSED, NOT DEPLOYED. One immutable evidence record per price component
+// One immutable evidence record per price component
 // read from a dealer page, for the append-only table proposed in
 // supabase/proposed/20261101000000_price_component_evidence.sql. Each record
 // carries hashes of the page and of the vehicle's widget, so a later reader can

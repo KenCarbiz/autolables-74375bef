@@ -6,8 +6,8 @@ import { extractAdvertised, extractPriceComponents, buildBreakdown, priceEvidenc
 import { classifyRenderedPage } from "./crawlUrlPolicy.ts";
 import { judgeAboveFeed } from "./priceGuard.ts";
 
-const TARGET = "1HGCM82633A000001";
-const OTHER = "1HGCM82633A000002";
+const TARGET = "1EXMP0005S9000001";
+const OTHER = "1EXMP0007S9000002";
 const URL_T = `https://dealer.example.test/viewdetails/used/${TARGET.toLowerCase()}/example-suv`;
 const page = (body: string, title = "Example Dealer") => `<html><head><title>${title}</title></head><body>${body}</body></html>`;
 const results: string[] = [];

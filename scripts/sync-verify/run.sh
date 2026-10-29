@@ -68,14 +68,23 @@ log-level = "error"
 EOF
 "$POSTGREST" "$WORK/pgrst.conf" >"$WORK/pgrst.log" 2>&1 & PIDS+=($!)
 
+# SYNC_SOURCE_REV runs the function as it was at a git revision (the pre-fix
+# stage); by default the working tree is used.
 mkdir -p "$WORK/functions"
-cp -r supabase/functions/_shared supabase/functions/marketcheck-sync "$WORK/functions/"
+if [[ -n "${SYNC_SOURCE_REV:-}" ]]; then
+  git archive "$SYNC_SOURCE_REV" supabase/functions/_shared supabase/functions/marketcheck-sync | tar -x -C "$WORK"
+  mv "$WORK/supabase/functions/_shared" "$WORK/supabase/functions/marketcheck-sync" "$WORK/functions/"
+  SRC_LABEL="$SYNC_SOURCE_REV:supabase/functions/marketcheck-sync/index.ts $(git rev-parse "$SYNC_SOURCE_REV:supabase/functions/marketcheck-sync/index.ts")"
+else
+  cp -r supabase/functions/_shared supabase/functions/marketcheck-sync "$WORK/functions/"
+  SRC_LABEL="working tree supabase/functions/marketcheck-sync/index.ts $(git hash-object supabase/functions/marketcheck-sync/index.ts)"
+fi
 ORIGINAL='const MC_BASE = "https://api.marketcheck.com/v2";'
 REPLACED="const MC_BASE = \"http://127.0.0.1:$GATEWAY_PORT/mc/v2\";"
 grep -qxF "$ORIGINAL" "$WORK/functions/marketcheck-sync/index.ts" || { echo "provider base URL line not found"; exit 2; }
 sed -i "s|^$ORIGINAL\$|$REPLACED|" "$WORK/functions/marketcheck-sync/index.ts"
-echo "== Function under test: supabase/functions/marketcheck-sync/index.ts $(git hash-object supabase/functions/marketcheck-sync/index.ts)"
-diff <(cat supabase/functions/marketcheck-sync/index.ts) "$WORK/functions/marketcheck-sync/index.ts" | sed 's/^/   /' || true
+echo "== Function under test: $SRC_LABEL"
+grep -n "^const MC_BASE" "$WORK/functions/marketcheck-sync/index.ts" | sed 's/^/   substituted: /' 
 cat > "$WORK/import_map.json" <<EOF
 { "imports": {
   "https://esm.sh/@supabase/supabase-js@2.45.0": "npm:@supabase/supabase-js@$(node -p 'require("./node_modules/@supabase/supabase-js/package.json").version')",

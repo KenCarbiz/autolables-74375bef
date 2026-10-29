@@ -1,6 +1,6 @@
 -- PROPOSED, NOT APPLIED. Append-only evidence for every price component read
 -- from a dealer page by the proposed price-stack reader
--- (supabase/proposed/crawl-fee-treatment/priceEvidence.ts).
+-- (supabase/functions/_shared/priceEvidence.ts).
 --
 -- A row is never updated or deleted: a later reading is a new row. The
 -- record hash is the row's identity, so the same reading is stored once.

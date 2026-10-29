@@ -2427,3 +2427,128 @@ the session. Keeping it beyond that needs a store you approve:
 - Publishing it as an artifact, document or email would place restricted data with an outside service without your approval.
 
 Until you name a location, the regeneration queries in `scripts/crawl-verify/` are the durable copy.
+
+## Correction of the confirmed crawler and sync defects (2026-10-29), implemented and verified in isolation
+
+Not deployed, not migrated. Edge functions here deploy only when the Lovable
+agent deploys a named function from a named commit (ROLLOUT_AND_ROLLBACK.md);
+pushing to `main` rebuilds only the UI preview. The new schema is in
+`supabase/proposed/`, which nothing applies. No price, job, provider call or
+customer communication was made. Hosted reads in this round: catalogue
+(columns, function and trigger fingerprints and three function bodies), job
+schedule and storage metadata only.
+
+### 1. What changed
+
+| Defect | Change | Files |
+|---|---|---|
+| A matching VIN elsewhere on the page let a similar-vehicle card's price through | Each other vehicle's card (the largest element naming only that VIN) and every section marked similar/related/recommended/recently viewed is blanked before reading. Prices are read inside the vehicle's own price widget first. Candidates that disagree are refused as `ambiguous_price` (before: first match, or the lowest of equals). JSON-LD offers count only for this VIN, or as the page's only offer. | `_shared/vdpIdentity.ts`, `_shared/vdpPrice.ts` |
+| A page with no VIN passed (direct fetch) | Identity on every path: the target VIN must be on the page (any letter case), outside other vehicles' sections; the final address and canonical address must not name another vehicle; a redirect must land on an address naming this vehicle. Refusals are `vin_mismatch` or `identity_unverified`. | same |
+| Badges, hero photo, stock number and history link were read from any page | Read only from a page that passed identity. | `crawl-advertised-prices/index.ts` |
+| "Carstory" title | Recorded as a finding, never decisive. The old title reader took the first `<title>` anywhere, including an SVG or widget title in the body. The new reader takes the `<head>` title and records embedded titles separately (`embedded_title_present`, `page_title_unrecognized`). This is a possible explanation, unconfirmed until the screenshots are seen. | `vdpIdentity.ts` |
+| A dealer setting was written as if the page proved it | Fee basis record with four parts kept apart: observed figure and label; the dealership's interpretation (read exactly as `public.doc_fee_basis` reads it); the page's own fee evidence (widget stack, fee line with a labelled total, wording next to the price; page-wide wording is context only); derived values naming the basis used. Statuses: `page_verified`, `not_applicable`, `dealer_configured_unverified`, `conflict`, `held_for_review`, `unresolved`. Only `page_verified` and `not_applicable` may change a listing. The tenant's settings and the doc-fee basis policy are read, never written. | `_shared/feeBasis.ts` (with `feeTreatment.ts`, `priceStack.ts`) |
+| The listing was written before the evidence and the observation | Order is now: evidence, then the observation row (fee basis record, identity, evidence status, idempotency key), then a guarded listing update that changes nothing if the listing's pricing moved meanwhile. A screenshot from a separate load counts only after the VIN, final address, figure and label are revalidated. A held basis spends no evidence render. Outcomes are named in the observation, the attempt ledger and an audit row: `promoted`, `unchanged`, `held_fee_basis`, `held_evidence`, `held_schema`, `observation_failed`, `promotion_failed`, `promotion_conflict`, `duplicate`. A mis-parse refused by the feed guard no longer writes a warning to the listing either. | `_shared/crawlCommit.ts`, `index.ts`; proposed `20261102000000_crawl_observation_basis.sql` (+ rollback) |
+| Discovery stored `captured_by: "discovery"` into a uuid column | Now null, with `captured_method` and the identity check. Production refuses that value (`captured_by` is uuid there) and the insert result was never checked, so any such refusal was silent. | `index.ts` |
+| Dealer lookups bypassed the budget gate and ledger | The dealerships resolve, the dealers search and the operator's dealer finder go through `admitProviderCall` and `recordProviderCall` as non-essential `dealer_api` calls. | `marketcheck-sync/index.ts` |
+| A local budget refusal read as "MarketCheck ... HTTP 429" | A refusal now carries no HTTP status and is classified `budget_refused`: "nothing was sent to MarketCheck". | `_shared/pinnedFeedOutcome.ts`, `marketcheck-sync/index.ts` |
+| `new_vehicles` counted new vehicle files | `new_vehicles` is new dealership listings. `new_listings`, `updated_listings` and `new_vehicle_files` are reported separately (response, `last_status`, run row `raw`). | `marketcheck-sync/index.ts` |
+
+The proposed price-stack reader (decision 5) moved from `supabase/proposed/` into `_shared` and is used for the vehicle's widget. Its unapplied patch is retired.
+
+### 2. Verification (local only)
+
+Each pre-fix stage is a deliberate reproduction: it runs the source of
+`3836dc3` (the last commit before this fix) against the corrected checks, and
+its failures are the defects. Corrected-stage results are reported separately.
+
+| Run | Pre-fix stage | Corrected stage |
+|---|---|---|
+| Crawler end to end (`scripts/crawl-verify/e2e/run.sh`). Replica, stub renderer and evidence bucket, network limited to loopback, eight synthetic pages, injected storage and database failures, two runs. | 7 of 19 (12 failures = the defects) | Without the proposed migration: 4 of 4 (no listing pricing changes; every stored observation `held_schema`). With it: **19 of 19**. |
+| Inventory sync (`scripts/sync-verify/run.sh`, `SYNC_SOURCE_REV=3836dc3` for the pre-fix stage) | 20 of 26 (6 failures = the defects) | **26 of 26** |
+| Before/after on identical synthetic pages (`scripts/crawl-verify/run.sh`) | 15 of 15 cases describe the old behaviour | 12 of 12 cases describe the new behaviour |
+| Unit tests: identity, scoping, fee basis, evidence revalidation, commit pipeline (fake store with injected failures), budget refusal | n/a | 177 of 177 across the 7 targeted files |
+| Full suite | n/a | 7,313 passed, 2 failed. Both failures (`complianceData`, `complianceRedTeam`) fail the same way at `3836dc3`, so they are not caused by this change. |
+| App typecheck | n/a | clean |
+| Deno check | n/a | crawler clean; sync 9 errors, all in lines this change does not touch. The unmodified file has 12 under local supabase-js typings; 3 are fixed here. |
+
+The fixed stage was rerun after the evidence-render change: still 19 of 19.
+
+Earlier db-verify result, restated with stages separated:
+- `live` stage: 329 of 335. The 6 failures are a deliberate reproduction of the fee-preview defect from its pre-fix definition.
+- The fix is `supabase/migrations/20261029120000_fix_fee_preview_warnings.sql`. It was applied locally in the `preview fix` stage: 335 of 335 (fee review 29 of 29). It was applied in production on 2026-10-28 on your approval.
+- `fee conflict (deployed)` stage: 9 of 9.
+
+The addendum correction and the fixture-write block are intact: 44 of 44
+locally. Production deployment of the UI change remains pending.
+
+How each case behaved in the corrected stage, with the pre-fix behaviour in brackets:
+- **Card:** promoted 29,100 | 900 | 30,000. [The card's 19,000 | 900 | 19,900 was written.]
+- **Redirect:** refused `vin_mismatch`; nothing written or stored. [Another car's 29,500 was written.]
+- **Setting only:** held, observation stored. [The setting-derived split was written.]
+- **Conflict:** held as `conflict`. [Written.]
+- **Evidence failure:** `held_evidence`, then promoted on run 2 with its evidence. [Written without a screenshot.]
+- **Partial failure:** `promotion_failed` named, listing unchanged, then promoted on run 2. [The refused write was silent; the run counted "updated".]
+- **Ambiguous:** refused. [The first of two figures was written.]
+- **Embedded title:** page price promoted, `title=` no longer reports the panel's title. [The ledger recorded `title="PanelCo"`.]
+
+### 3. Downstream paid usage (read-only trace; nothing invoked)
+
+Reached from the sync for new or updated vehicles.
+
+Checked in source (each file has the outbound call and no `admitProviderCall`):
+- **`oem-window-sticker`:** VinAudit or MonroneyLabels, called for every new VIN.
+- **Firecrawl search:** in `oem-brochure` and `oem-owners-manual`.
+- **Black Book:** `blackbook-values`, reached through `vehicle-enrich`.
+- **MarketCheck:** in `marketcheck-specs` and `vehicle-enrich`, gated, but the gate fails open when its RPC errors. This is a documented choice in `providerBudget.ts`.
+
+From the background trace, not re-checked:
+- Resend or SendGrid email for the title request (unless `title_email_on_intake` is "false") and the ingest notifications.
+- Firecrawl search is limited by link caches and per-isolate caps.
+- `factory-sticker-orchestrate` makes no paid call on this path.
+
+Not determined: whether those keys are set in production (secrets were not read), and what `planVisit` and `decideShadowRequest` decide in practice.
+
+### 4. Screenshot access: admin checklist (no keys, no public links)
+
+1. Sign in to the Lovable Cloud backend (or the Supabase dashboard) with an admin account that can see Storage.
+2. Open the private bucket `price-evidence`. Do not change its public setting or policies.
+3. Open the folder for the dealership's tenant id, then each VIN folder named in the restricted file. Download the eight objects named there. Do not create signed or public links.
+4. Check each file's SHA-256 against the `screenshot_sha256` recorded for it (`shasum -a 256 <file>`). Note any mismatch.
+5. Hand the files over as private attachments in a channel you approve, or put them in a folder you name. Tell me where; nothing is uploaded on my side.
+
+Screenshot review stays blocked until the files arrive. None of the nine updates is independently verified.
+
+### 5. Evidence retention
+
+The restricted file stays outside Git and outside every external service.
+`scripts/crawl-verify/evidence-queries.sql` rebuilds the record read-only, with these limits (also in the file):
+- Observation rows, audit rows and storage metadata are durable.
+- Listing columns show the listing as it is when queried, not as it was after the crawl.
+- The attempt ledger keeps one row per vehicle and channel, and every attempt overwrites it.
+
+The crawl job `autolabels_crawl_advertised_prices` is active at 07:20 UTC daily. Its next run (2026-10-30 07:20 UTC) will:
+- overwrite the price-read detail for the vehicles it visits, so the restricted file is the only copy of the 2026-10-29 render detail;
+- run the deployed (old) crawler, which keeps writing setting-derived splits.
+
+Pausing the job or deploying the fix is your decision. No job was changed.
+
+### 6. Remaining blockers
+
+- **Screenshots:** the eight files (see 4).
+- **Restricted storage:** a destination you approve.
+- **Renderer:** a real check of the new crawler against the dealer's pages needs renderer credits (paid) and access to the dealer's domain (blocked from this session).
+- **Policy question:** for this dealership the new crawler will hold nearly every vehicle, because its pages show no fee evidence. That reflects the dealer's pages, not a defect. Moving forward needs page-level fee statements, or an accepted policy for dealer-configured bases, which would be a separate decision.
+- **Paid paths still ungated (section 3):** budget gating for those is not part of this change.
+
+### 7. Rollout and rollback proposal (for later approval)
+
+| Step | Action | Verify (read-only) | Roll back |
+|---|---|---|---|
+| 0 | Decide on the 07:20 crawl job: pause it until step 3, or leave it running the old crawler | `cron.job` row | Re-enable |
+| 1 | Apply `20261101000000_price_component_evidence.sql`, then `20261102000000_crawl_observation_basis.sql` (additive) | Columns, check constraint and unique index exist; no row changed | The two `.rollback.sql` files, after step 3 is rolled back |
+| 2 | Deploy `marketcheck-sync` from the fix commit. The jobs stay paused; it takes effect at the next authorized sync | Function hash matches the commit | Redeploy the `3836dc3` version |
+| 3 | Deploy `crawl-advertised-prices` from the fix commit, then one authorized crawl run (renderer credits) | `listing_outcomes` in the run summary; `advertised_prices.listing_promotion` and `observation` on the run's rows; no listing pricing change except `promoted` rows, each with a screenshot hash | Redeploy the `3836dc3` version. Promoted rows can be reverted from the observation records; observations are kept |
+| 4 | Review held vehicles with you and the dealer before any policy change on dealer-configured bases | `held_fee_basis` reasons | n/a |
+
+Order matters: the crawler may be deployed before the migration and is safe
+(`held_schema`, nothing promoted), but it promotes nothing until step 1.

@@ -5,6 +5,22 @@
 -- the output outside the repository.
 --
 --   psql -v tenant="'<uuid>'" -v from="'2026-10-29 07:15'" -v to="'2026-10-29 07:35'" -f evidence-queries.sql
+--
+-- What these can and cannot rebuild later:
+--   advertised_prices (1)  durable: observation rows are not updated or
+--                          deleted by the crawler or the sync. The joined
+--                          vehicle_listings columns are the listing as it is
+--                          WHEN THE QUERY RUNS, not as it was after the crawl:
+--                          a later crawl, feed sync or person changes them.
+--   attempts ledger (2)    NOT durable: one row per vehicle and channel,
+--                          overwritten by every later attempt. The render
+--                          formats, page verdict and title for a window are
+--                          lost as soon as the vehicle is crawled again.
+--   audit_log (3)          durable (append-only, hash-chained).
+--   storage.objects (4)    durable unless an object is deleted; metadata only,
+--                          never the image.
+-- So the per-vehicle price-read detail of a window can be rebuilt exactly
+-- only until the next crawl of that vehicle. Keep the restricted export.
 
 -- 1. Observations, with the listing fields the crawl wrote.
 SELECT p.vin, p.captured_at, p.advertised_price, p.source_url, p.captured_method,

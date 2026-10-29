@@ -95,6 +95,10 @@ check("clean feed: inventory pulled through the pinned rooftop scope",
 note("clean feed: provider requests", [(r["path"], {k: v for k, v in r["params"].items() if k in ("mc_rooftop_id", "inventory_url", "rows", "start", "owned", "car_type")}) for r in reqs])
 note("clean feed: provider ledger (outcome|product|caller|essential)",
      sql("SELECT string_agg(outcome || '|' || product || '|' || caller || '|' || essential, ' ; ' ORDER BY id) FROM public.provider_call_events"))
+check("clean feed: every provider request is in the call ledger, the dealership lookup included",
+      len(reqs), int(sql("SELECT count(*) FROM public.provider_call_events WHERE outcome <> 'budget_denied'")))
+check("clean feed: the dealership lookup is ledgered as a non-essential dealer_api call",
+      "1|false", sql("SELECT count(*) || '|' || bool_or(essential) FROM public.provider_call_events WHERE product = 'dealer_api'"))
 after = listings(T1)
 note("clean feed: inventory after", after)
 check("clean feed: price change written to vehicle 1, vehicle 2 kept, vehicle 4 added as draft",
@@ -102,6 +106,10 @@ check("clean feed: price change written to vehicle 1, vehicle 2 kept, vehicle 4 
       sorted(p for p in after.split() if p[0] in "124"))
 note("clean feed: vehicle 3 (absent from the feed)", [p for p in after.split() if p[0] == "3"])
 note("clean feed: run row (status|seen|new|updated|prices|removed|error)", last_run())
+check("clean feed: new dealership listings and new vehicle files are reported separately (response new|files)",
+      "1|3", f"{body.get('new_listings')}|{body.get('new_vehicle_files')}")
+check("clean feed: the run row counts listings: 1 new, 2 updated (seen|new|updated)",
+      "3|1|2", "|".join(last_run().split("|")[1:4]))
 note("clean feed: change history (vin suffix|field|previous>new|origin)",
      sql("SELECT string_agg(right(vin, 1) || '|' || field_key || '|' || coalesce(previous_value, '-') || '>' || coalesce(new_value, '-') || '|' || change_origin, ' ; ' ORDER BY changed_at, field_key) FROM public.vehicle_change_history"))
 note("clean feed: vehicle 1 price fields (price|before_doc|doc_fee|website_sale|parse_status)",
@@ -142,10 +150,12 @@ check("budget exhausted: status", 200, status)
 note("budget exhausted: response", json.dumps(body)[:400])
 reqs = gw("/__provider"); gw("/__functions")
 check("budget exhausted: no inventory request reached the provider", [], [r["path"] for r in reqs if r["path"] == "/dealerships/inventory"])
-note("budget exhausted: requests that still reached the provider (not budget-gated)", [r["path"] for r in reqs])
+check("budget exhausted: no request of any kind reached the provider (the dealership lookup included)", [], [r["path"] for r in reqs])
 check("budget exhausted: inventory unchanged", after_clean, checksum(T1))
 note("budget exhausted: ledger refusals", sql("SELECT count(*) FROM public.provider_call_events WHERE outcome = 'budget_denied'"))
 note("budget exhausted: run row", last_run())
+check("budget exhausted: reported as our own budget refusal, not the provider's 429",
+      ["budget_refused", False], [body.get("diagnostics", [{}])[0].get("kind"), "429" in last_run()])
 check("throughout: the other dealership's inventory is unchanged", bystander, checksum(T2))
 
 failed = results.count(False)

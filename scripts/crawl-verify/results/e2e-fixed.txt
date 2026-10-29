@@ -1,0 +1,116 @@
+======== Stage fixed: working tree supabase/functions/crawl-advertised-prices/index.ts f62c21fb6acc1b4b5bf01a2bb4d397bdca27556f
+   substituted: 453:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
+   substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
+== Stage contract; observation columns present: True
+
+== Before any run (before-fee|fee|sale, as the feed left them)
+  card       30100|900|31000   page: a similar-vehicle card with another VIN and a lower Selling Price comes first; the vehicle's own block shows a fee line and a total
+  redirect   26100|900|27000   page: the address redirects to another car's page (no VIN in the final address); this vehicle appears only in that page's related strip
+  setting    24992|900|25892   page: one labelled figure and nothing on the page about the fee (like the nine production updates)
+  conflict   21600|900|22500   page: the page states the price excludes the fee; the dealership's setting says it includes it
+  evidence   33100|900|34000   page: a page-verified price whose screenshot cannot be stored
+  partial    28100|900|29000   page: a page-verified price whose listing write fails in the database
+  ambiguous  20100|900|21000   page: two unattributed Selling Price figures that disagree
+  title      26100|900|27000   page: no document title; an embedded panel's SVG title is the only <title> on the page
+
+== Run 1: HTTP 200; updated 6 unchanged 0 skipped 2 failed 0 listing_outcomes {'promoted': 2, 'held_fee_basis': 2, 'held_evidence': 1, 'promotion_failed': 1}
+   renders 9; storage writes [('1EXMP0008S9000011', 200), ('1EXMP000XS9000012', 200), ('1EXMP0001S9000013', 200), ('1EXMP0003S9000014', 200), ('1EXMP0005S9000015', 500), ('1EXMP0005S9000015', 500), ('1EXMP0007S9000016', 200), ('1EXMP0009S9000017', 200), ('1EXMP0000S9000018', 200)]
+
+== After run 1 (failures injected)
+  card       listing 29100|900|30000    observations [30000|t|promoted|page_verified|same_render]
+             ledger captured | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  redirect   listing 26100|900|27000    observations [-]
+             ledger vin_mismatch | [paced_wait_ms=1044 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected ur
+  setting    listing 24992|900|25892    observations [25572|t|held_fee_basis|dealer_configured_unverified|same_render]
+             ledger held_fee_basis | dealer_configured_unverified: no fee evidence on the page; derived from the dealership's setting (advertised_includes_doc_fee), not verified by the page
+  conflict   listing 21600|900|22500    observations [22000|t|held_fee_basis|conflict|same_render]
+             ledger held_fee_basis | conflict: the page shows the price excludes the fee; the dealership's setting (advertised_includes_doc_fee) says includes_fee
+  evidence   listing 33100|900|34000    observations [33000|f|held_evidence|page_verified|not_captured]
+             ledger held_evidence | the evidence screenshot could not be stored
+  partial    listing 28100|900|29000    observations [28000|t|promotion_failed|page_verified|same_render]
+             ledger promotion_failed | injected failure: listing pricing write refused for 1EXMP0007S9000016
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger ambiguous_price | [paced_wait_ms=1014 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  title      listing 25100|900|26000    observations [26000|t|promoted|page_verified|same_render]
+             ledger captured | [paced_wait_ms=997 rate_limit_retries=0 formats=html+screenshot] page=vehicle findings=embedded_title_present,page_title_missing url_source=listing
+
+== Run 2: HTTP 200; updated 0 unchanged 6 skipped 2 failed 0 listing_outcomes {'unchanged': 2, 'held_fee_basis': 2, 'promoted': 2}
+
+== After run 2 (failures removed)
+  card       listing 29100|900|30000    observations [30000|t|promoted|page_verified|same_render ; 30000|f|not_required|page_verified|not_captured]
+             ledger captured | [paced_wait_ms=1079 rate_limit_retries=0 formats=html] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  redirect   listing 26100|900|27000    observations [-]
+             ledger vin_mismatch | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url_s
+  setting    listing 24992|900|25892    observations [25572|t|held_fee_basis|dealer_configured_unverified|same_render ; 25572|f|held_fee_basis|dealer_configured_unverified|not_captured]
+             ledger held_fee_basis | dealer_configured_unverified: no fee evidence on the page; derived from the dealership's setting (advertised_includes_doc_fee), not verified by the page
+  conflict   listing 21600|900|22500    observations [22000|t|held_fee_basis|conflict|same_render ; 22000|f|held_fee_basis|conflict|not_captured]
+             ledger held_fee_basis | conflict: the page shows the price excludes the fee; the dealership's setting (advertised_includes_doc_fee) says includes_fee
+  evidence   listing 32100|900|33000    observations [33000|f|held_evidence|page_verified|not_captured ; 33000|t|promoted|page_verified|same_render]
+             ledger captured | [paced_wait_ms=1084 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  partial    listing 27100|900|28000    observations [28000|t|promotion_failed|page_verified|same_render ; 28000|t|promoted|page_verified|revalidated_render]
+             ledger captured | [paced_wait_ms=989 rate_limit_retries=0 formats=html] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger ambiguous_price | [paced_wait_ms=1064 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  title      listing 25100|900|26000    observations [26000|t|promoted|page_verified|same_render ; 26000|f|not_required|page_verified|not_captured]
+             ledger captured | [paced_wait_ms=968 rate_limit_retries=0 formats=html] page=vehicle findings=embedded_title_present,page_title_missing url_source=listing
+
+PASS  card: the vehicle's own price is applied, not the similar-vehicle card's
+      expected '29100|900|30000'
+      actual   '29100|900|30000'
+PASS  redirect: another car's page reached through a redirect writes nothing
+      expected '26100|900|27000'
+      actual   '26100|900|27000'
+PASS  redirect: no observation is stored from another car's page
+      expected ''
+      actual   ''
+PASS  setting only: a dealer setting without page evidence never changes the listing
+      expected '24992|900|25892'
+      actual   '24992|900|25892'
+PASS  setting only: the raw observation is still stored
+      expected True
+      actual   True
+PASS  conflict: page and dealer setting disagree; the listing is left alone
+      expected '21600|900|22500'
+      actual   '21600|900|22500'
+PASS  evidence failure: the listing is unchanged while its screenshot could not be stored
+      expected '33100|900|34000'
+      actual   '33100|900|34000'
+PASS  evidence failure: the outcome is named in the ledger
+      expected True
+      actual   True
+PASS  partial failure: the listing is unchanged when its write is refused
+      expected '28100|900|29000'
+      actual   '28100|900|29000'
+PASS  partial failure: the outcome is named in the ledger
+      expected True
+      actual   True
+PASS  ambiguous prices: nothing is written or stored
+      expected ['20100|900|21000', '']
+      actual   ['20100|900|21000', '']
+PASS  embedded title: the page price is applied
+      expected '25100|900|26000'
+      actual   '25100|900|26000'
+PASS  embedded title: the panel's SVG title is not recorded as the page title
+      expected False
+      actual   False
+PASS  fee basis record stored with each observation (four parts kept apart)
+      expected 'observed,dealer,page,derived'
+      actual   'observed,dealer,page,derived'
+PASS  every promoted price carries accepted evidence (a stored screenshot hash)
+      expected {'card': True, 'title': True}
+      actual   {'card': True, 'title': True}
+PASS  run 2: the refused write is retried and applied once the database accepts it
+      expected '27100|900|28000'
+      actual   '27100|900|28000'
+PASS  run 2: the vehicle whose screenshot failed is applied once evidence is stored
+      expected '32100|900|33000'
+      actual   '32100|900|33000'
+PASS  run 2: the dealer-setting-only vehicle is still unchanged
+      expected '24992|900|25892'
+      actual   '24992|900|25892'
+PASS  no vehicle has more than one observation per run
+      expected True
+      actual   True
+
+19 checks, 0 failed
+== Stage fixed exit 0

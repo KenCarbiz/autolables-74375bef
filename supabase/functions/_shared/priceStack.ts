@@ -1,6 +1,5 @@
-// PROPOSED, NOT DEPLOYED. Source-evidenced price-component model for a dealer
-// vehicle page. Lives outside supabase/functions so no function deploy can
-// pick it up; crawl-advertised-prices.patch beside this file wires it in.
+// Source-evidenced price-component model for a dealer vehicle page, used by
+// crawl-advertised-prices.
 //
 // A dealer page can carry several prices for one vehicle, each a stage of one
 // calculation:

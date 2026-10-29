@@ -9,10 +9,12 @@ import { join } from "node:path";
 // it fire on "certified technicians" would put an unearned warranty claim into
 // customer-facing copy.
 
+// The description strip lives in vdpPrice.ts since the crawler's price reader
+// moved there; the badge detectors stay in the crawler.
 const SRC = readFileSync(
   join(__dirname, "../../../supabase/functions/crawl-advertised-prices/index.ts"),
   "utf8",
-);
+) + "\n" + readFileSync(join(__dirname, "../../../supabase/functions/_shared/vdpPrice.ts"), "utf8");
 
 function buildDetector() {
   const cpo = SRC.match(/const CPO_RE = new RegExp\(\s*\[([\s\S]*?)\]\.join\("\|"\),\s*"i",\s*\)/);

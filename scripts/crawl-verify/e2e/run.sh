@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Isolated end-to-end run of crawl-advertised-prices against synthetic dealer
+# pages, in three stages on fresh copies of one replica:
+#
+#   prefix    the crawler as it was at CRAWL_PREFIX_REV (default 3836dc3, the
+#             last commit before the fix), on the hosted schema: a deliberate
+#             reproduction; the corrected-contract checks are expected to fail
+#   noschema  the fixed crawler before its proposed migration is applied
+#   fixed     the fixed crawler with supabase/proposed/20261101000000 and
+#             20261102000000 applied
+#
+# The replica is the full migration chain on local stand-ins, aligned to the
+# hosted catalogue, with the hosted definitions of the functions the crawler
+# and the listing triggers call. A local PostgREST and a gateway stand in for
+# the hosted project, the renderer and the evidence bucket. The crawler runs
+# with network access limited to 127.0.0.1 and three substitutions, printed:
+# the renderer's two endpoints (pointed at the gateway) and two imports through
+# an import map (supabase-js from npm; std's serve() as a Deno.serve shim).
+#
+#   PGHOST=/path/to/socket PGPORT=54329 DENO=/path/deno POSTGREST=/path/postgrest \
+#     scripts/crawl-verify/e2e/run.sh [prefix] [noschema] [fixed]
+set -euo pipefail
+cd "$(dirname "$0")/../../.."
+DENO=${DENO:-deno}
+POSTGREST=${POSTGREST:-postgrest}
+PREFIX_REV=${CRAWL_PREFIX_REV:-3836dc3}
+STAGES=("$@"); [[ ${#STAGES[@]} -eq 0 ]] && STAGES=(prefix noschema fixed)
+WORK=$(mktemp -d)
+PIDS=()
+stop() { for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null || true; done; PIDS=(); sleep 1; }
+trap 'stop; rm -rf "$WORK"' EXIT
+PSQL=(psql -X -q -v ON_ERROR_STOP=1 -U "${PGUSER:-postgres}")
+BASE=crawl_verify_base
+
+EXT=$(pg_config --sharedir 2>/dev/null || echo /usr/share/postgresql/16)/extension
+for x in pg_cron pg_net; do
+  [[ -f $EXT/$x.control ]] || { printf "comment = 'local stand-in'\ndefault_version = '1.0'\nrelocatable = false\n" > "$EXT/$x.control"; echo "-- stand-in" > "$EXT/$x--1.0.sql"; }
+done
+
+"${PSQL[@]}" -d postgres -c "DROP DATABASE IF EXISTS $BASE" -c "CREATE DATABASE $BASE" >/dev/null 2>&1
+"${PSQL[@]}" -d "$BASE" -f scripts/db-verify/00_platform.sql >/dev/null 2>&1
+"${PSQL[@]}" -d "$BASE" -f scripts/sync-verify/platform.sql >/dev/null 2>&1
+applied=0; failed=0
+for f in supabase/migrations/*.sql; do
+  if "${PSQL[@]}" -d "$BASE" -1 -f "$f" >/dev/null 2>&1; then applied=$((applied+1)); else failed=$((failed+1)); fi
+done
+echo "== Migration chain: $applied applied, $failed did not apply on the local stand-ins"
+for f in scripts/sync-verify/align.sql scripts/sync-verify/hosted-functions.sql scripts/crawl-verify/e2e/hosted-functions.sql scripts/crawl-verify/e2e/fixture.sql; do
+  "${PSQL[@]}" -d "$BASE" -f "$f" >/dev/null 2>"$WORK/err" || { cat "$WORK/err"; exit 2; }
+done
+
+SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+SERVICE_KEY=$(python3 - "$SECRET" <<'EOF'
+import base64, hashlib, hmac, json, sys, time
+b = lambda d: base64.urlsafe_b64encode(json.dumps(d, separators=(",", ":")).encode()).rstrip(b"=")
+head, body = b({"alg": "HS256", "typ": "JWT"}), b({"role": "service_role", "iss": "local-verify", "iat": int(time.time()), "exp": int(time.time()) + 3600})
+sig = base64.urlsafe_b64encode(hmac.new(sys.argv[1].encode(), head + b"." + body, hashlib.sha256).digest()).rstrip(b"=")
+print((head + b"." + body + b"." + sig).decode())
+EOF
+)
+PGRST_PORT=54420; GATEWAY_PORT=54421; FN_PORT=8000
+cat > "$WORK/import_map.json" <<EOF
+{ "imports": {
+  "https://esm.sh/@supabase/supabase-js@2.45.0": "npm:@supabase/supabase-js@$(node -p 'require("./node_modules/@supabase/supabase-js/package.json").version')",
+  "https://deno.land/std@0.168.0/http/server.ts": "$(pwd)/scripts/sync-verify/serve-shim.ts" } }
+EOF
+
+overall=0
+for STAGE in "${STAGES[@]}"; do
+  DB=crawl_verify_$STAGE
+  "${PSQL[@]}" -d postgres -c "DROP DATABASE IF EXISTS $DB" -c "CREATE DATABASE $DB TEMPLATE $BASE" >/dev/null
+  if [[ $STAGE == fixed ]]; then
+    for f in supabase/proposed/20261101000000_price_component_evidence.sql supabase/proposed/20261102000000_crawl_observation_basis.sql; do
+      "${PSQL[@]}" -d "$DB" -f "$f" >/dev/null
+    done
+    "${PSQL[@]}" -d "$DB" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role" >/dev/null
+  fi
+
+  SRC="$WORK/src-$STAGE"; mkdir -p "$SRC/functions"
+  if [[ $STAGE == prefix ]]; then
+    git archive "$PREFIX_REV" supabase/functions/_shared supabase/functions/crawl-advertised-prices | tar -x -C "$SRC"
+    mv "$SRC/supabase/functions/_shared" "$SRC/supabase/functions/crawl-advertised-prices" "$SRC/functions/"
+    LABEL="$PREFIX_REV:supabase/functions/crawl-advertised-prices/index.ts $(git rev-parse "$PREFIX_REV:supabase/functions/crawl-advertised-prices/index.ts")"
+  else
+    cp -r supabase/functions/_shared supabase/functions/crawl-advertised-prices "$SRC/functions/"
+    LABEL="working tree supabase/functions/crawl-advertised-prices/index.ts $(git hash-object supabase/functions/crawl-advertised-prices/index.ts)"
+  fi
+  sed -i "s|^const FIRECRAWL_ENDPOINT = \"https://api.firecrawl.dev/v2/scrape\";\$|const FIRECRAWL_ENDPOINT = \"http://127.0.0.1:$GATEWAY_PORT/fc/v2/scrape\";|" "$SRC/functions/crawl-advertised-prices/index.ts"
+  sed -i "s|^export const CREDIT_USAGE_ENDPOINT = \"https://api.firecrawl.dev/v2/team/credit-usage\";\$|export const CREDIT_USAGE_ENDPOINT = \"http://127.0.0.1:$GATEWAY_PORT/fc/v2/team/credit-usage\";|" "$SRC/functions/_shared/renderKey.ts"
+  echo
+  echo "======== Stage $STAGE: $LABEL"
+  grep -n "^const FIRECRAWL_ENDPOINT" "$SRC/functions/crawl-advertised-prices/index.ts" | sed 's/^/   substituted: /'
+  grep -n "^export const CREDIT_USAGE_ENDPOINT" "$SRC/functions/_shared/renderKey.ts" | sed 's/^/   substituted: /'
+
+  cat > "$WORK/pgrst-$STAGE.conf" <<EOF
+db-uri = "postgres://authenticator@/$DB?host=${PGHOST:-/tmp}&port=${PGPORT:-5432}"
+db-schemas = "public"
+db-anon-role = "anon"
+jwt-secret = "$SECRET"
+server-host = "127.0.0.1"
+server-port = $PGRST_PORT
+log-level = "error"
+EOF
+  "$POSTGREST" "$WORK/pgrst-$STAGE.conf" >"$WORK/pgrst-$STAGE.log" 2>&1 & PIDS+=($!)
+  PGRST_URL=http://127.0.0.1:$PGRST_PORT GATEWAY_PORT=$GATEWAY_PORT PAGES_JSON=$(pwd)/scripts/crawl-verify/e2e/pages.json \
+    "$DENO" run --quiet --allow-net=127.0.0.1 --allow-env --allow-read scripts/crawl-verify/e2e/gateway.ts >"$WORK/gateway-$STAGE.log" 2>&1 & PIDS+=($!)
+  SUPABASE_URL=http://127.0.0.1:$GATEWAY_PORT SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY \
+    FIRECRAWL_API_KEY=synthetic-not-a-key FIRECRAWL_RPM=60 MARKETCHECK_CRON_SECRET=local-cron-secret \
+    "$DENO" run --quiet --allow-net=127.0.0.1 --allow-env --allow-read --import-map="$WORK/import_map.json" \
+    "$SRC/functions/crawl-advertised-prices/index.ts" >"$WORK/fn-$STAGE.log" 2>&1 & PIDS+=($!)
+  for i in $(seq 1 120); do
+    if curl -s -o /dev/null "http://127.0.0.1:$PGRST_PORT/" && curl -s -o /dev/null "http://127.0.0.1:$GATEWAY_PORT/__renders" \
+       && curl -s -o /dev/null -X OPTIONS "http://127.0.0.1:$FN_PORT/"; then break; fi
+    sleep 1
+    [[ $i == 120 ]] && { echo "services did not start"; tail -n 20 "$WORK"/*-$STAGE.log; exit 2; }
+  done
+  status=0
+  STAGE=$([[ $STAGE == noschema ]] && echo noschema || echo contract) FN_URL=http://127.0.0.1:$FN_PORT/ \
+    GATEWAY_URL=http://127.0.0.1:$GATEWAY_PORT SERVICE_KEY=$SERVICE_KEY DB=$DB PAGES_JSON=$(pwd)/scripts/crawl-verify/e2e/pages.json \
+    python3 -I scripts/crawl-verify/e2e/drive.py || status=$?
+  if [[ -n "${CRAWL_VERIFY_LOGS:-}" ]]; then cp "$WORK"/*-$STAGE.log "$CRAWL_VERIFY_LOGS"/ 2>/dev/null || true; fi
+  echo "== Stage $STAGE exit $status"
+  stop
+  # The pre-fix stage is a reproduction: its failures are the defects.
+  [[ $STAGE != prefix && $status != 0 ]] && overall=1
+done
+exit $overall

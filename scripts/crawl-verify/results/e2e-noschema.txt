@@ -1,0 +1,71 @@
+======== Stage noschema: working tree supabase/functions/crawl-advertised-prices/index.ts 43325ea2fa2188bb20d58ce13abd87ef51ed1e62
+   substituted: 453:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
+   substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
+== Stage noschema; observation columns present: False
+
+== Before any run (before-fee|fee|sale, as the feed left them)
+  card       30100|900|31000   page: a similar-vehicle card with another VIN and a lower Selling Price comes first; the vehicle's own block shows a fee line and a total
+  redirect   26100|900|27000   page: the address redirects to another car's page (no VIN in the final address); this vehicle appears only in that page's related strip
+  setting    24992|900|25892   page: one labelled figure and nothing on the page about the fee (like the nine production updates)
+  conflict   21600|900|22500   page: the page states the price excludes the fee; the dealership's setting says it includes it
+  evidence   33100|900|34000   page: a page-verified price whose screenshot cannot be stored
+  partial    28100|900|29000   page: a page-verified price whose listing write fails in the database
+  ambiguous  20100|900|21000   page: two unattributed Selling Price figures that disagree
+  title      26100|900|27000   page: no document title; an embedded panel's SVG title is the only <title> on the page
+
+== Run 1: HTTP 200; updated 6 unchanged 0 skipped 2 failed 0 listing_outcomes {'held_schema': 6}
+   renders 9; storage writes [('1EXMP0008S9000011', 200), ('1EXMP000XS9000012', 200), ('1EXMP0001S9000013', 200), ('1EXMP0003S9000014', 200), ('1EXMP0005S9000015', 500), ('1EXMP0005S9000015', 500), ('1EXMP0007S9000016', 200), ('1EXMP0009S9000017', 200), ('1EXMP0000S9000018', 200)]
+
+== After run 1 (failures injected)
+  card       listing 30100|900|31000    observations [30000|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  redirect   listing 26100|900|27000    observations [-]
+             ledger vin_mismatch | [paced_wait_ms=971 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url
+  setting    listing 24992|900|25892    observations [25572|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  conflict   listing 21600|900|22500    observations [22000|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  evidence   listing 33100|900|34000    observations [33000|f]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  partial    listing 28100|900|29000    observations [28000|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger ambiguous_price | [paced_wait_ms=1103 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  title      listing 26100|900|27000    observations [26000|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+
+== Run 2: HTTP 200; updated 0 unchanged 6 skipped 2 failed 0 listing_outcomes {'held_schema': 6}
+
+== After run 2 (failures removed)
+  card       listing 30100|900|31000    observations [30000|t ; 30000|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  redirect   listing 26100|900|27000    observations [-]
+             ledger vin_mismatch | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url_s
+  setting    listing 24992|900|25892    observations [25572|t ; 25572|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  conflict   listing 21600|900|22500    observations [22000|t ; 22000|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  evidence   listing 33100|900|34000    observations [33000|f ; 33000|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  partial    listing 28100|900|29000    observations [28000|t ; 28000|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger ambiguous_price | [paced_wait_ms=1030 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  title      listing 26100|900|27000    observations [26000|t ; 26000|t]
+             ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
+
+PASS  run 1: no listing's pricing changed before the migration
+      expected {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}
+      actual   {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}
+PASS  run 2: no listing's pricing changed before the migration
+      expected {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}
+      actual   {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}
+PASS  observations are still stored the old way (one per read vehicle in run 1)
+      expected {'card': True, 'redirect': False, 'setting': True, 'conflict': True, 'evidence': True, 'partial': True, 'ambiguous': False, 'title': True}
+      actual   {'card': True, 'redirect': False, 'setting': True, 'conflict': True, 'evidence': True, 'partial': True, 'ambiguous': False, 'title': True}
+PASS  each stored observation is reported as held for the schema
+      expected ['card', 'conflict', 'evidence', 'partial', 'setting', 'title']
+      actual   ['card', 'conflict', 'evidence', 'partial', 'setting', 'title']
+
+4 checks, 0 failed
+== Stage noschema exit 0

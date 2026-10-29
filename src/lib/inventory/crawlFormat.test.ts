@@ -73,17 +73,18 @@ describe("the screenshot is its own decision", () => {
     const loop = between("for (const row of rows) {", "// ── Discovery:");
     // First stage: only when the row was already known to need evidence.
     expect(loop).toMatch(/if \(evidenceDue\) \{[\s\S]*?screenshot = await captureScreenshot\(/);
-    // Second stage: only when the price or a component moved, there is no
-    // prior screenshot, or the caller forced it.
-    expect(loop).toMatch(/priceChanged \|\| componentsChanged \|\| evidenceDue \|\| \(!cheapFailed && await shouldCaptureEvidence\(row\)\)/);
-    expect(loop).toMatch(/if \(ev\.render\?\.ok\) \{\s*screenshot = await captureScreenshot\(/);
+    // Second stage: only when the price moved, a listing change could be
+    // applied, there is no prior screenshot, or the caller forced it; and the
+    // picture is kept only after the second load is revalidated.
+    expect(loop).toMatch(/const wantEvidence = priceChanged \|\| \(basis\.promote && listingWouldChange\) \|\| evidenceDue \|\| \(!cheapFailed && await shouldCaptureEvidence\(row\)\);/);
+    expect(loop).toMatch(/if \(evidence\.status === "revalidated_render"\) \{\s*evidenceShot = await captureScreenshot\(/);
   });
 
   it("is captured on render success, not parse success", () => {
     const loop = between("for (const row of rows) {", "// ── Discovery:");
     expect(loop).not.toMatch(/if \(result\.price != null\) \{\s*screenshot = await captureScreenshot/);
     const first = loop.indexOf("if (evidenceDue) {");
-    const parse = loop.indexOf("result = extractAdvertised(priceEvidenceHtml(r.html)");
+    const parse = loop.indexOf("read = readVehiclePage(r.html,");
     expect(first).toBeGreaterThan(0);
     expect(first).toBeLessThan(parse);
   });
@@ -111,7 +112,7 @@ describe("an unchanged price is still an observation", () => {
   });
 
   it("counts unchanged only after the observation row is written", () => {
-    const insert = loop.indexOf('admin.from("advertised_prices").insert(insRow)');
+    const insert = loop.indexOf("const commit = await commitObservation(commitDb,");
     const count = loop.indexOf("if (priceChanged) updated++; else unchanged++;");
     expect(insert).toBeGreaterThan(0);
     expect(count).toBeGreaterThan(insert);
@@ -201,7 +202,8 @@ describe("what must survive the change", () => {
   });
 
   it("keeps the MSRP plausibility guard in the extractor", () => {
-    expect(SRC).toMatch(/msrp != null && best < msrp \* 0\.3/);
+    const reader = readFileSync(join(__dirname, "../../../supabase/functions/_shared/vdpPrice.ts"), "utf8");
+    expect(reader).toMatch(/msrp != null && v < msrp \* 0\.3/);
   });
 });
 
@@ -241,7 +243,7 @@ describe("the price never depends on the screenshot", () => {
   });
 
   it("does not spend the second-stage render asking for the same refused picture", () => {
-    expect(loop).toMatch(/if \(!screenshot && !evidenceRefused && renderBudget > 0 && \(priceChanged/);
+    expect(loop).toMatch(/if \(!evidenceShot && !evidenceRefused && renderBudget > 0 && wantEvidence\)/);
   });
 
   it("leaves a 429 to the pacer's retry, not the fallback", () => {
@@ -319,17 +321,21 @@ describe("a rejected price is not a captured one", () => {
   // The Rogue canary (5N1BT3BB2TC779545) read $36,100 off a page whose feed
   // price was $34,390; the guard refused it and wrote nothing, while the
   // ledger row said "captured".
-  const misparse = between('if (misparse) {\n          await admin.from("vehicle_listings").update({', "} else if (bd.advertised_price_before_doc != null) {");
+  const misparse = between("if (guard.misparse) {", "if (guard.feedStale) basis.reasons.push(guard.note);");
 
   it("re-records the ledger with price_rejected after the guard refuses", () => {
     expect(misparse).toContain('_outcome: "price_rejected"');
     // The guard's reason and the stale-feed flag ride behind the two figures.
-    expect(misparse).toMatch(/_detail: `advertised_above_feed scraped=\$\{bd\.advertised_price_before_doc\} feed=\$\{feedPrice\} reason=\$\{guard\.reason\}/);
+    expect(misparse).toMatch(/_detail: `advertised_above_feed scraped=\$\{guardFigure\} feed=\$\{listingCtx\?\.feedPrice \?\? null\} reason=\$\{guard\.reason\}/);
     expect(misparse).toContain("_source_label: observationChannel(row.source_label)");
   });
 
   it("names the screenshot that may already have been taken", () => {
     expect(misparse).toContain("screenshot_path: screenshot?.path ?? null");
+  });
+
+  it("leaves the listing untouched: a refused price writes no warning either", () => {
+    expect(misparse).not.toContain('from("vehicle_listings")');
   });
 });
 

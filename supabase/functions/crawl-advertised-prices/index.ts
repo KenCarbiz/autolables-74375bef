@@ -7,6 +7,17 @@ import {
   type CrawlUrlSource, type RenderedPageVerdictDetail,
 } from "../_shared/crawlUrlPolicy.ts";
 import { judgeAboveFeed, parseFeedTimestamp } from "../_shared/priceGuard.ts";
+import { identitySummary, scopeToVehicle } from "../_shared/vdpIdentity.ts";
+import {
+  cleanWebsitePriceTerm, DEFAULT_PRICE_LABELS, extractVehiclePrice, refusedResult, stripDescriptionBlocks, visibleText,
+  type VehiclePriceResult,
+} from "../_shared/vdpPrice.ts";
+import { decideFeeBasis, sectionAround } from "../_shared/feeBasis.ts";
+import { readPriceStack, type PriceStackResult } from "../_shared/priceStack.ts";
+import { buildEvidenceRecords } from "../_shared/priceEvidence.ts";
+import {
+  commitObservation, observationKey, revalidateEvidence, sha256OfText as sha256Text, supabaseCommitDb, type EvidenceDecision,
+} from "../_shared/crawlCommit.ts";
 import { fetchCreditUsage, pickRenderKey, selectRenderKey, type RenderKeyCandidate } from "../_shared/renderKey.ts";
 import {
   createRenderPacer, deriveRenderBudget, parseRetryAfter, resolveRendersPerMinute,
@@ -63,6 +74,32 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+interface TenantScrapeSettings {
+  labels: string[];
+  stripFinance: boolean;
+  docFee: number;
+  inclDocFee: boolean;
+  /** The dealership's settings as stored; feeBasis.ts reads its fee interpretation from them. */
+  settings: Record<string, unknown>;
+  stackLabels: { dealer: string[]; final: string[] };
+}
+
+interface VehicleRead {
+  result: VehiclePriceResult;
+  stack: PriceStackResult;
+}
+
+interface ListingContext {
+  ymm: string | null;
+  condition: string | null;
+  feedPrice: number | null;
+  feedMsrp: number | null;
+  feedLastSeen: unknown;
+  feedScraped: unknown;
+  feedIncludesFees: boolean | null;
+  pricing: { advertised_price_before_doc: number | null; doc_fee: number | null; website_sale_price: number | null };
+}
 
 interface LatestRow {
   id: string;
@@ -140,22 +177,7 @@ const looksLikeChallenge = (html: string, headers: Headers, status: number): boo
   return false;
 };
 
-const VIN_RE = /\b([A-HJ-NPR-Z0-9]{17})\b/g;
 const normVin = (s: unknown) => String(s || "").toUpperCase().trim();
-const collectVins = (html: string, url: string): Set<string> => {
-  const vins = new Set<string>();
-  let m: RegExpExecArray | null;
-  VIN_RE.lastIndex = 0;
-  while ((m = VIN_RE.exec(`${html}\n${url}`))) vins.add(m[1].toUpperCase());
-  return vins;
-};
-
-const norm = (raw: unknown): number | null => {
-  if (raw == null) return null;
-  const n = parseFloat(String(raw).replace(/[,$\s ]/g, "").replace(/usd/i, ""));
-  return Number.isFinite(n) ? n : null;
-};
-const sane = (n: number | null): n is number => n != null && n >= 1000 && n <= 500000;
 
 // Pull the dealer's hero photo (og:image / twitter:image) off the VDP so the
 // inventory thumbnail and vehicle-file hero show the real car. Handles both
@@ -276,41 +298,12 @@ const stripNavigationLinks = (html: string): string =>
 // The lazy close means a description container with nested elements leaves a
 // tail behind. That is the tolerable direction of failure for a strip whose
 // purpose is to REMOVE evidence, and the detectors it feeds are positive-only.
-const DESCRIPTION_BLOCK_RE = new RegExp(
-  String.raw`<(div|section|article|p)\b[^>]*(?:class|id)=["'][^"']*\b` +
-    String.raw`(?:vehicle-description|vdp-description|inventory-description|` +
-    String.raw`description-(?:text|content|body|section)|vehicle-comments?|seller-comments?)` +
-    String.raw`\b[^"']*["'][^>]*>[\s\S]{0,20000}?</\1>`,
-  "gi",
-);
-const stripDescriptionBlocks = (html: string): string =>
-  html.replace(DESCRIPTION_BLOCK_RE, " ");
 
 // Everything a badge detector is allowed to read: the published page minus its
 // own navigation and minus any free-text description block.
 const evidenceHtml = (html: string): string =>
   stripDescriptionBlocks(stripNavigationLinks(html));
 
-// What a PRICE extractor is allowed to read: the page minus description prose,
-// with navigation left in place.
-//
-// The narrower strip is deliberate. Description blocks are where AutoLabels'
-// own generated copy lands after it syndicates to the dealer's site, and that
-// copy talks about money -- "the original window sticker lists a total MSRP of
-// $56,945", "savings", "discount". `extractPriceComponents` matches labels
-// first-match-wins with no rejection list at all, and what it extracts persists
-// to `dealer_discount` / `website_sale_price` and renders a "Dealer Discount"
-// line on the customer passport. So a sentence we wrote could put a discount
-// figure in front of a shopper.
-//
-// Navigation is NOT stripped here, because a listing or search page carries its
-// real prices inside exactly the anchors that strip removes. Taking them out
-// would break discovery to fix a problem discovery does not have.
-//
-// (Similar-vehicle cards on a VDP also carry prices and are not removed by
-// either strip. That is a separate defect -- a card price winning the label
-// scoring -- and is tracked as its own fix, not smuggled in here.)
-const priceEvidenceHtml = (html: string): string => stripDescriptionBlocks(html);
 
 // One-owner badge on the dealer's own VDP. Provider context (CARFAX/
 // AutoCheck within range, or badge image alt/title) is REQUIRED so loose
@@ -403,31 +396,6 @@ const detectCleanTitleBadge = (rawHtml: string): boolean => {
   return false;
 };
 
-// Generic selling-price labels appended after each dealer's configured labels.
-// These are advertised-price brands (never MSRP/retail), so running them in the
-// custom-label tier is safe and lets common sites resolve without per-dealer
-// setup. Dealer-specific brands (e.g. "Harte Deal") still come from config.
-const DEFAULT_PRICE_LABELS = [
-  "Your Price", "Sale Price", "Selling Price", "Internet Price",
-  "Special Price", "E-Price", "ePrice", "Deal Price", "Our Price",
-];
-
-const REJECT_PRICE_TYPES = ["msrp", "listprice", "invoiceprice", "strikethroughprice", "regularprice"];
-const MSRP_PRICE_TYPES = ["msrp", "listprice", "regularprice", "strikethroughprice"];
-// deno-lint-ignore no-explicit-any
-const priceTypeOf = (o: any): string =>
-  String(o?.priceType || o?.priceSpecification?.priceType || "")
-    .toLowerCase().replace(/.*\//, "").replace(/[^a-z]/g, "");
-
-interface PriceCandidate { value: number; label: string; source: string; }
-interface AdResult {
-  price: number | null;
-  source: "jsonld" | "og_meta" | "dom_label" | "none";
-  gated: boolean;
-  reason: string | null;
-  msrp: number | null;
-  candidates: PriceCandidate[];
-}
 
 // Normalize a dealer VDP URL before fetching: strip view-mode params that
 // flip the page to incentive-conditional pricing (?type=finance / ?type=lease
@@ -452,286 +420,6 @@ const normalizeVdpUrl = (raw: string): string => {
 };
 
 
-// Structured, VIN-gated, priceType-aware price extractor. Replaces the old
-// "largest dollar on the page" heuristic, which grabbed the MSRP off a price
-// stack and produced false "ad != sticker" drift on every discounted car.
-// For Call-for-Price pages it records nothing rather than guess the MSRP.
-//
-// `customLabels` are dealer-configured price labels in priority order
-// ("Harte Deal", "Internet Price", …). They run BEFORE the generic DOM
-// heuristic and short-circuit on the first label that has a dollar amount
-// adjacent — that's the dealer's brand for the advertised selling price.
-const extractAdvertised = (
-  html: string,
-  url: string,
-  targetVin: string,
-  customLabels: string[] = [],
-): AdResult & { matched_label?: string | null } => {
-  const target = normVin(targetVin);
-  const pageVins = collectVins(html, url);
-  const candidates: PriceCandidate[] = [];
-  let msrp: number | null = null;
-  if (target && pageVins.size > 0 && !pageVins.has(target)) {
-    return { price: null, source: "none", gated: false, reason: "vin_mismatch", msrp: null, candidates };
-  }
-
-  // Tier A: schema.org JSON-LD — VIN-gated, priceType-aware.
-  const ldMatches = html.match(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi) || [];
-  let jsonldPrice: number | null = null;
-  for (const block of ldMatches) {
-    const inner = block.replace(/<script[^>]*>/i, "").replace(/<\/script>/i, "").trim();
-    // deno-lint-ignore no-explicit-any
-    let parsed: any;
-    try { parsed = JSON.parse(inner); } catch { continue; }
-    // deno-lint-ignore no-explicit-any
-    const nodes: any[] = [];
-    // deno-lint-ignore no-explicit-any
-    const push = (x: any) => { if (x && typeof x === "object") nodes.push(x); };
-    // deno-lint-ignore no-explicit-any
-    (Array.isArray(parsed) ? parsed : [parsed]).forEach((p: any) => {
-      push(p);
-      if (Array.isArray(p?.["@graph"])) p["@graph"].forEach(push);
-    });
-    for (const node of nodes) {
-      const nodeVin = normVin(node?.vehicleIdentificationNumber);
-      if (target && nodeVin && nodeVin !== target) continue;
-      const offers = node?.offers;
-      if (!offers) continue;
-      const list = Array.isArray(offers) ? offers : [offers];
-      for (const o of list) {
-        const cur = String(o?.priceCurrency || "USD").toUpperCase();
-        if (cur && cur !== "USD") continue;
-        const pt = priceTypeOf(o);
-        if (o?.["@type"] === "AggregateOffer" || o?.lowPrice != null) {
-          const lp = norm(o?.lowPrice);
-          if (sane(lp)) { candidates.push({ value: lp, label: "AggregateOffer.lowPrice", source: "jsonld" }); if (jsonldPrice == null) jsonldPrice = lp; }
-          const hp = norm(o?.highPrice);
-          if (sane(hp) && msrp == null) msrp = hp;
-          continue;
-        }
-        const p = norm(o?.price);
-        if (MSRP_PRICE_TYPES.includes(pt)) {
-          if (sane(p) && msrp == null) msrp = p;
-          continue;
-        }
-        if (REJECT_PRICE_TYPES.includes(pt)) continue;
-        if (sane(p)) {
-          candidates.push({ value: p, label: `Offer.price${pt ? ` [${pt}]` : ""}`, source: "jsonld" });
-          if (jsonldPrice == null) jsonldPrice = p;
-        }
-      }
-    }
-  }
-  if (jsonldPrice != null) {
-    if (msrp != null && jsonldPrice < msrp * 0.3) {
-      return { price: null, source: "none", gated: false, reason: "implausible_vs_msrp", msrp, candidates };
-    }
-    return { price: jsonldPrice, source: "jsonld", gated: false, reason: null, msrp, candidates };
-  }
-
-  // Tier B: og:price / product:price meta (USD only).
-  const curMeta = html.match(/<meta[^>]+(?:og:price:currency|product:price:currency)[^>]+content=["']([^"']+)["']/i);
-  if (!curMeta || curMeta[1].toUpperCase() === "USD") {
-    const meta = html.match(/<meta[^>]+(?:og:price:amount|product:price:amount)[^>]+content=["']([^"']+)["']/i);
-    const v = meta ? norm(meta[1]) : null;
-    if (sane(v)) {
-      candidates.push({ value: v, label: "og:price:amount", source: "og_meta" });
-      if (msrp != null && v < msrp * 0.3) {
-        return { price: null, source: "none", gated: false, reason: "implausible_vs_msrp", msrp, candidates };
-      }
-      return { price: v, source: "og_meta", gated: false, reason: null, msrp, candidates };
-    }
-  }
-
-  // Tier C0: dealer-configured custom labels (e.g. "Harte Deal"). First label
-  // with a dollar amount within 80 chars wins — short-circuits BEFORE the
-  // generic heuristic so a brand-specific label like "Harte Deal" can't lose
-  // to "MSRP" or anything else on the page.
-  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase();
-  const labels = (customLabels || [])
-    .map((l) => l.trim().toLowerCase()).filter(Boolean);
-  for (const lbl of labels) {
-    // Escape regex metacharacters in the user-supplied label.
-    const esc = lbl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`${esc}[^$]{0,80}\\$\\s?(\\d{1,3}(?:,\\d{3})+|\\d{4,6})(?:\\.\\d{2})?`, "i");
-    const m = text.match(re);
-    const v = m ? norm(m[1]) : null;
-    if (sane(v)) {
-      candidates.push({ value: v, label: `custom:${lbl}`, source: "dom_label" });
-      if (msrp != null && v < msrp * 0.3) {
-        return { price: null, source: "none", gated: false, reason: "implausible_vs_msrp", msrp, candidates, matched_label: lbl };
-      }
-      return { price: v, source: "dom_label", gated: false, reason: null, msrp, candidates, matched_label: lbl };
-    }
-  }
-
-  // Tier C: labeled DOM price — the price-stack final line, by LABEL not size.
-  const GATE = ["call for price", "please call", "contact us for price", "unlock price", "click for price", "sign in to see price"];
-  const MONTHLY = ["/mo", "per month", "mo.", "lease", " apr", "due at signing", "est. payment", "for 24", "for 36", "for 48", "for 60", "for 72", "for 84"];
-  const GOOD = ["internet price", "sale price", "final price", "your price", "e-price", "eprice", "selling price", "special price"];
-  const BAD = ["msrp", "retail", " was ", "original", "list price", "sticker", "as built",
-               "down payment", "down ", "savings", "save $", "you save", "off msrp", "rebate",
-               "discount", "incentive", "trade-in", "cash back", " bonus", "due at", "deposit"];
-  const moneyRe = /([a-z .,'-]{0,40})\$\s?(\d{1,3}(?:,\d{3})+|\d{4,6})(?:\.\d{2})?/g;
-  let best: number | null = null;
-  let bestScore = -1;
-  let bestLabel = "";
-  let mm: RegExpExecArray | null;
-  moneyRe.lastIndex = 0;
-  while ((mm = moneyRe.exec(text))) {
-    const ctx = mm[1];
-    const val = norm(mm[2]);
-    if (!sane(val)) continue;
-    if (BAD.some((b) => ctx.includes(b))) {
-      if (msrp == null && (ctx.includes("msrp") || ctx.includes("list price") || ctx.includes("sticker"))) msrp = val;
-      continue;
-    }
-    if (MONTHLY.some((b) => ctx.includes(b))) continue;
-    const idx = GOOD.findIndex((g) => ctx.includes(g));
-    const s = idx === -1 ? 0 : 10 - idx;
-    candidates.push({ value: val, label: ctx.trim() || "(unlabeled)", source: "dom_label" });
-    if (s > bestScore || (s === bestScore && best != null && val < best)) {
-      best = val; bestScore = s; bestLabel = ctx.trim();
-    }
-  }
-  if (best != null) {
-    if (msrp != null && best < msrp * 0.3) {
-      return { price: null, source: "none", gated: false, reason: "implausible_vs_msrp", msrp, candidates };
-    }
-    // If we only matched an unlabeled price (score 0) without an MSRP anchor
-    // to sanity-check against, that's not safe enough — flag for manual entry.
-    if (bestScore === 0 && msrp == null) {
-      return { price: null, source: "none", gated: false, reason: "unlabeled_price_only", msrp, candidates };
-    }
-    return { price: best, source: "dom_label", gated: false, reason: null, msrp, candidates, matched_label: bestLabel || null };
-  }
-
-  // Tier D: gate / give up — never guess MSRP.
-  if (GATE.some((g) => text.includes(g))) return { price: null, source: "none", gated: true, reason: "price_gated", msrp, candidates };
-  return { price: null, source: "none", gated: false, reason: "no_price_extracted", msrp, candidates };
-};
-
-// ── Price components: doc/conveyance fee, displayed sale price, retail cash,
-// dealer discount ──────────────────────────────────────────────────────────
-// Parsed SEPARATELY from the advertised price so we can store each field and
-// validate the calculation (advertised + doc fee === displayed sale price).
-// Fees/cash live in a different magnitude band than a car price, so they use
-// their own sanity windows (a $895 fee would fail the $1k car-price floor).
-const saneFee = (n: number | null): n is number => n != null && n >= 1 && n <= 10000;
-const saneCash = (n: number | null): n is number => n != null && n >= 1 && n <= 60000;
-
-// First dollar amount appearing within 0..60 chars AFTER a label match.
-const valueForLabel = (text: string, labelSrc: string): number | null => {
-  const re = new RegExp(`(?:${labelSrc})[^$]{0,60}\\$\\s?(\\d{1,3}(?:,\\d{3})+|\\d{1,6})(?:\\.\\d{2})?`, "i");
-  const m = text.match(re);
-  return m ? norm(m[1]) : null;
-};
-
-interface PriceComponents {
-  docFee: number | null;
-  salePrice: number | null;   // the dealer site's displayed final "Sale Price"
-  retailCash: number | null;
-  dealerDiscount: number | null;
-}
-const extractPriceComponents = (html: string): PriceComponents => {
-  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase();
-  const docRaw = valueForLabel(text, "conveyance fee|documentation fee|doc(?:ument)? fee|dealer doc(?:ument)?(?:ation)? fee|processing fee");
-  const saleRaw = valueForLabel(text, "sale price|total price|price after savings|net price|final price");
-  const cashRaw = valueForLabel(text, "retail cash|customer cash|consumer cash|bonus cash|cash allowance");
-  const discRaw = valueForLabel(text, "dealer discount|total savings|you save|savings|discount");
-  return {
-    docFee: saneFee(docRaw) ? docRaw : null,
-    salePrice: sane(saleRaw) ? saleRaw : null,
-    retailCash: saneCash(cashRaw) ? cashRaw : null,
-    dealerDiscount: saneCash(discRaw) ? discRaw : null,
-  };
-};
-
-// Reconcile parsed components into the canonical breakdown. The advertised
-// price is BEFORE the doc fee: if the extractor grabbed the displayed sale
-// price (which already includes the fee), back the fee out so we never
-// double-count it. website_sale_price = advertised_before_doc + doc_fee, added
-// exactly once. Returns the fields written to vehicle_listings + a parse status.
-interface PriceBreakdown {
-  advertised_price_before_doc: number | null;
-  doc_fee: number;
-  website_sale_price: number | null;
-  retail_cash: number | null;
-  dealer_discount: number | null;
-  price_parse_status: "ok" | "warning" | "pending";
-  price_parse_notes: string;
-}
-const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, configuredDocFee: number, includesDocFee = false): PriceBreakdown => {
-  // The dealer's CONFIGURED doc fee (from admin) is authoritative for the
-  // amount; the page's conveyance fee line is a parse CHECK against it. When
-  // the dealer hasn't set a fee, fall back to whatever the page shows.
-  const parsedFee = comp.docFee;
-  const docFee = configuredDocFee > 0 ? configuredDocFee : (parsedFee ?? 0);
-  // Dealer's displayed price ALREADY includes the doc fee: the extracted price
-  // is the fee-inclusive website sale price, and before-doc is derived. Never
-  // add the fee on top.
-  if (includesDocFee && docFee > 0 && extractedPrice != null) {
-    const beforeDoc = extractedPrice - docFee;
-    const feeMatch = parsedFee == null || Math.abs(parsedFee - docFee) <= 1;
-    return {
-      advertised_price_before_doc: beforeDoc,
-      doc_fee: docFee,
-      website_sale_price: extractedPrice,
-      retail_cash: comp.retailCash,
-      dealer_discount: comp.dealerDiscount,
-      price_parse_status: feeMatch ? "ok" : "warning",
-      price_parse_notes: feeMatch
-        ? `Advertised price ${extractedPrice} includes the ${docFee} doc fee; before-doc ${beforeDoc}.`
-        : `Advertised price includes doc fee, but page conveyance fee ${parsedFee} != configured ${docFee}. Review source page.`,
-    };
-  }
-  let advertised = extractedPrice;
-  // If the extractor picked the final sale price (== displayed sale), strip the
-  // fee to recover the advertised-before-doc price.
-  if (advertised != null && comp.salePrice != null && docFee > 0 && Math.abs(advertised - comp.salePrice) <= 1) {
-    advertised = advertised - docFee;
-  }
-  if (advertised == null) {
-    return { advertised_price_before_doc: null, doc_fee: docFee, website_sale_price: null, retail_cash: comp.retailCash, dealer_discount: comp.dealerDiscount, price_parse_status: "pending", price_parse_notes: "No advertised price parsed." };
-  }
-  const websiteSale = advertised + docFee;
-
-  // Two reconcile checks: (1) page conveyance fee matches the configured doc
-  // fee; (2) advertised + doc fee matches the page's displayed sale price.
-  const issues: string[] = [];
-  const verified: string[] = [];
-  if (parsedFee != null && configuredDocFee > 0) {
-    if (Math.abs(parsedFee - configuredDocFee) > 1) issues.push(`page conveyance fee ${parsedFee} != configured doc fee ${configuredDocFee}`);
-    else verified.push(`doc fee ${docFee} matches the page`);
-  }
-  if (comp.salePrice != null) {
-    if (Math.abs(comp.salePrice - websiteSale) > 1) issues.push(`displayed sale ${comp.salePrice} != advertised ${advertised} + doc fee ${docFee} = ${websiteSale}`);
-    else verified.push(`sale price ${websiteSale} matches the page`);
-  }
-  const status: PriceBreakdown["price_parse_status"] = issues.length ? "warning" : "ok";
-  const notes = issues.length
-    ? `Price parse mismatch: ${issues.join("; ")}. Review source page.`
-    : (verified.length ? `Verified: ${verified.join("; ")}.` : `Advertised ${advertised} + doc fee ${docFee} = sale ${websiteSale}.`);
-  return { advertised_price_before_doc: advertised, doc_fee: docFee, website_sale_price: websiteSale, retail_cash: comp.retailCash, dealer_discount: comp.dealerDiscount, price_parse_status: status, price_parse_notes: notes };
-};
-
-// Clean the label text the extractor found next to the price (e.g. "SALE
-// PRICE:", "  internet price ") into a human-readable term for the passport
-// ("Sale Price", "Internet Price"). Returns null when it's not a sensible price
-// term — no letters, or a bare number — so we never store junk. Title-cases each
-// word, strips a trailing colon, collapses whitespace, and caps at ~24 chars.
-const cleanWebsitePriceTerm = (raw: string | null | undefined): string | null => {
-  const s = String(raw ?? "").replace(/[:\s]+$/, "").replace(/\s+/g, " ").trim();
-  if (!s) return null;
-  if (!/[A-Za-z]/.test(s)) return null;           // bare number / symbols only
-  if (/^\$?[\d,.]+$/.test(s)) return null;         // a price, not a label
-  const titled = s.split(" ").map((w) =>
-    /[A-Z]/.test(w) && w === w.toUpperCase() && w.length > 1
-      ? w.charAt(0) + w.slice(1).toLowerCase()     // ALL-CAPS → Title
-      : w.charAt(0).toUpperCase() + w.slice(1)
-  ).join(" ");
-  return titled.slice(0, 24).trim();
-};
 
 // Browser-like UA shared by the seeded crawl and discovery fetches.
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -1079,7 +767,7 @@ serve(async (req) => {
   // dealer_profiles.settings.vdp_price_labels (comma-separated, priority
   // order) and .vdp_strip_finance_params (default true) configure the
   // extractor. Cached in a Map so the per-row loop doesn't refetch.
-  const settingsCache = new Map<string, { labels: string[]; stripFinance: boolean; docFee: number; inclDocFee: boolean }>();
+  const settingsCache = new Map<string, TenantScrapeSettings>();
   const getTenantScrapeSettings = async (tenantId: string) => {
     const cached = settingsCache.get(tenantId);
     if (cached) return cached;
@@ -1100,11 +788,60 @@ serve(async (req) => {
       return true;
     });
     const stripFinance = s.vdp_strip_finance_params !== false;
-    const out = { labels, stripFinance, docFee, inclDocFee };
+    // The dealer's own names for the price-widget stages (proposed setting
+    // price_stack_labels: { dealer_price: [...], final_price: [...] }).
+    const listOf = (v: unknown) => Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : [];
+    const stackLabels = { dealer: listOf(s.price_stack_labels?.dealer_price), final: listOf(s.price_stack_labels?.final_price) };
+    const out: TenantScrapeSettings = { labels, stripFinance, docFee, inclDocFee, settings: s, stackLabels };
     settingsCache.set(tenantId, out);
     return out;
   };
   const maybeNormalize = (url: string, stripFinance: boolean) => stripFinance ? normalizeVdpUrl(url) : url;
+
+  // One vehicle page, read once: the page scoped to this vehicle, the
+  // vehicle's own price widget if it has one, and the price read inside that
+  // scope (widget first).
+  const readVehiclePage = (pageHtml: string, vin: string, requestedUrl: string, finalUrl: string | null, cfg: TenantScrapeSettings, ymm: string | null): VehicleRead => {
+    const scope = scopeToVehicle(pageHtml, vin);
+    const stack = readPriceStack(stripDescriptionBlocks(scope.html), vin, {
+      dealerPriceLabels: cfg.stackLabels.dealer, finalPriceLabels: cfg.stackLabels.final, configuredFee: cfg.docFee,
+      observedAt: new Date(), pageUrl: finalUrl ?? requestedUrl,
+      // Verified offer records are the only source of general availability;
+      // none exist until that intake is approved, so every offer is unverified.
+      programRecords: [],
+    });
+    const result = extractVehiclePrice(pageHtml, {
+      targetVin: vin, requestedUrl, finalUrl, labels: cfg.labels, ymm, scope, widgetRange: stack.widgetRange,
+    });
+    return { result, stack };
+  };
+
+  // What the crawler needs to know about the listing it is pricing, read once
+  // per row: description fields for the identity finding, the feed baseline
+  // for the guard, and the pricing fields a promotion would change.
+  const readListingContext = async (tenantId: string, vin: string): Promise<ListingContext | null> => {
+    try {
+      const { data } = await admin.from("vehicle_listings")
+        .select("ymm, condition, price, advertised_price_before_doc, doc_fee, website_sale_price, feed_msrp:mc_raw->>msrp, feed_last_seen:mc_raw->>last_seen_at, feed_scraped:mc_raw->>scraped_at, feed_includes:mc_raw->>price_includes_fees")
+        .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
+      if (!data) return null;
+      // deno-lint-ignore no-explicit-any
+      const d = data as any;
+      return {
+        ymm: d.ymm ?? null,
+        condition: d.condition ?? null,
+        feedPrice: Number(d.price) || null,
+        feedMsrp: Number(d.feed_msrp) || null,
+        feedLastSeen: d.feed_last_seen ?? null,
+        feedScraped: d.feed_scraped ?? null,
+        feedIncludesFees: d.feed_includes === "true" ? true : d.feed_includes === "false" ? false : null,
+        pricing: { advertised_price_before_doc: d.advertised_price_before_doc, doc_fee: d.doc_fee, website_sale_price: d.website_sale_price },
+      };
+    } catch { return null; }
+  };
+  const runId = crypto.randomUUID();
+  const commitDb = supabaseCommitDb(admin);
+  const listingOutcomes: Record<string, number> = {};
 
   // When the feed last answered for a tenant, for the above-feed guard: a
   // listing that carries no provider timestamp borrows the tenant's last
@@ -1153,9 +890,13 @@ serve(async (req) => {
       const challenged = looksLikeChallenge(raw, r.headers, r.status);
       html = (!r.ok || challenged) ? "" : raw;
     } catch { /* fall through */ }
-    let result: AdResult & { matched_label?: string | null } = html
-      ? extractAdvertised(html, fetchUrl, "", cfg.labels)
-      : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
+    // The dealer's "Test" button checks labels on any page: identity is
+    // checked only when the caller names the vehicle.
+    const testVin = body.vin ? normVin(body.vin) : null;
+    const testRead = (pageHtml: string, finalUrl: string | null) => testVin
+      ? readVehiclePage(pageHtml, testVin, fetchUrl, finalUrl, cfg, null).result
+      : extractVehiclePrice(pageHtml, { targetVin: null, requestedUrl: fetchUrl, finalUrl, labels: cfg.labels });
+    let result: VehiclePriceResult = html ? testRead(html, null) : refusedResult("bot_challenge", fetchUrl);
     let pacedWaitMs = 0;
     let rateLimitRetries = 0;
     let testPage: RenderedPageVerdictDetail | null = null;
@@ -1178,8 +919,8 @@ serve(async (req) => {
             isChallenge: (h, s) => looksLikeChallenge(h, new Headers(), s),
           });
           result = testPage.verdict === "challenge"
-            ? { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null }
-            : extractAdvertised(fr.html, fetchUrl, "", cfg.labels);
+            ? refusedResult("bot_challenge", fetchUrl)
+            : testRead(fr.html, fr.finalUrl ?? null);
         }
       }
     }
@@ -1206,6 +947,8 @@ serve(async (req) => {
         fetch_url: fetchUrl,
         final_url: finalUrl,
         page: testPage,
+        identity: identitySummary(result.identity),
+        section: result.section,
       },
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
@@ -1289,7 +1032,7 @@ serve(async (req) => {
   try {
     let mq = admin.from("advertised_price_crawl_attempts")
       .select("tenant_id, vin, attempts, source_url, last_attempt_at")
-      .eq("outcome", "vin_mismatch")
+      .in("outcome", ["vin_mismatch", "identity_unverified"])
       .gte("last_attempt_at", new Date(Date.now() - REJECTED_BACKOFF_MS).toISOString())
       .limit(5000);
     if (body.tenant_id) mq = mq.eq("tenant_id", body.tenant_id);
@@ -1471,6 +1214,7 @@ serve(async (req) => {
       // like a real browser and gets past the wall.
       let html = "";
       let cheapStatus: number | null = null;
+      let cheapFinalUrl: string | null = null;
       try {
         const res = await fetch(fetchUrl, {
           method: "GET",
@@ -1478,19 +1222,25 @@ serve(async (req) => {
           signal: AbortSignal.timeout(12000),
         });
         cheapStatus = res.status;
+        cheapFinalUrl = res.url || null;
         const raw = res.ok ? await res.text() : "";
         html = (res.ok && !looksLikeChallenge(raw, res.headers, res.status)) ? raw : "";
       } catch { html = ""; }
-      let result: AdResult & { matched_label?: string | null } = html
-        ? extractAdvertised(priceEvidenceHtml(html), fetchUrl, row.vin, cfg.labels)
-        : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
+      // Identity first, on every path: the page must be this vehicle's, and it
+      // is read only with other vehicles' cards, related-vehicle sections and
+      // description prose blanked out (vdpIdentity.ts, vdpPrice.ts).
+      const listingCtx = await readListingContext(row.tenant_id, row.vin);
+      let read: VehicleRead | null = html ? readVehiclePage(html, row.vin, fetchUrl, cheapFinalUrl, cfg, listingCtx?.ymm ?? null) : null;
+      let result: VehiclePriceResult = read?.result ?? refusedResult("bot_challenge", fetchUrl);
+      let pageFinalUrl: string | null = read ? cheapFinalUrl : null;
 
       // Escalate to Firecrawl when the cheap path is walled or empty — this is
       // what makes JS-rendered dealer sites + marketplaces return a real price.
       // Html only, unless this row is already known to need an evidence
-      // screenshot, in which case the one render carries both so a second
-      // request is not spent on the same page.
+      // screenshot, in which case the one render carries both: the screenshot
+      // is then of the same page state the price is read from.
       let screenshot: CapturedScreenshot | null = null;
+      let screenshotFromPriceRender = false;
       let renderSource: string | null = null;
       let renderStatus: number | null = null;
       let renderError: string | null = null;
@@ -1502,7 +1252,6 @@ serve(async (req) => {
       // taken from a plain html retry instead. The second stage then does not
       // spend another render asking for the same refused picture.
       let evidenceRefused: { status: number | null; error: string | null } | null = null;
-      let page: RenderedPageVerdictDetail | null = null;
       const cheapFailed = result.price == null && result.reason !== "vin_mismatch" && !result.gated;
       if (cheapFailed && renderBudget > 0) {
         renderBudget--;
@@ -1531,29 +1280,24 @@ serve(async (req) => {
           renderSource = "firecrawl";
           if (evidenceDue) {
             // On render success, not parse success: a page we could not read
-            // is exactly the one a person needs to look at.
+            // is exactly the one a person needs to look at. It becomes the
+            // observation's evidence only if this same page passes identity.
             screenshot = await captureScreenshot(admin, r.screenshotUrl, row.tenant_id, row.vin);
-            if (screenshot) evidenceRenders++;
+            if (screenshot) { evidenceRenders++; screenshotFromPriceRender = true; }
           }
           if (r.html) {
-            // What came back: the vehicle, a challenge page, another vehicle,
-            // or a landing page with no vehicle on it. The last two mean the
-            // url is dead, and the price must not be read off them.
-            page = classifyRenderedPage({
-              html: r.html, requestedUrl: fetchUrl, finalUrl: r.finalUrl, pageStatus: r.pageStatus, targetVin: row.vin,
-              isChallenge: (h, s) => looksLikeChallenge(h, new Headers(), s),
-            });
-            if (page.verdict === "challenge") {
-              result = { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
-            } else if (page.verdict === "other_vehicle" || page.verdict === "no_vehicle") {
-              result = { price: null, source: "none", gated: false, reason: "vin_mismatch", msrp: null, candidates: [], matched_label: null };
+            if (looksLikeChallenge(r.html, new Headers(), r.pageStatus ?? 200)) {
+              result = refusedResult("bot_challenge", fetchUrl);
             } else {
               html = r.html;
-              result = extractAdvertised(priceEvidenceHtml(r.html), fetchUrl, row.vin, cfg.labels);
+              pageFinalUrl = r.finalUrl ?? null;
+              read = readVehiclePage(r.html, row.vin, fetchUrl, pageFinalUrl, cfg, listingCtx?.ymm ?? null);
+              result = read.result;
             }
           }
         }
       }
+      const identity = result.identity;
       const pacing = {
         paced_wait_ms: pacedWaitMs,
         rate_limit_retries: rateLimitRetries,
@@ -1564,10 +1308,8 @@ serve(async (req) => {
 
       // Ledger every attempt, won or lost. advertised_prices records only
       // successes, so before this a total outage looked exactly like a quiet
-      // market: fifteen days of failure left nothing to query and the cause
-      // had to be found by invoking this function's test mode by hand.
-      // Wrapped and best-effort — a ledger that can fail a price run would be
-      // worse than no ledger.
+      // market. Wrapped and best-effort — a ledger that can fail a price run
+      // would be worse than no ledger.
       try {
         const cls = classifyCrawlOutcome({
           captured: result.price != null,
@@ -1578,10 +1320,11 @@ serve(async (req) => {
           renderError,
           renderConfigured: !!FIRECRAWL_KEY,
         });
-        // The pacer's decision rides on the ledger detail so a canary run can
-        // prove the renderer was paced, not just that it answered.
-        const pageNote = page
-          ? `page=${page.verdict}${page.redirected ? " redirected" : ""}${page.title ? ` title="${page.title.slice(0, 60)}"` : ""} url_source=${row.url_source || "snapshot"}`
+        // The page's identity verdict, the document title and any recorded
+        // finding (an embedded widget title, an unrecognised title) ride on
+        // the ledger detail.
+        const pageNote = identity.verdict !== "unchecked"
+          ? `page=${identity.verdict}${identity.redirected ? " redirected" : ""}${identity.documentTitle ? ` title="${identity.documentTitle.slice(0, 60)}"` : ""}${identity.findings.length ? ` findings=${identity.findings.join(",")}` : ""} url_source=${row.url_source || "snapshot"}`
           : (row.url_source ? `url_source=${row.url_source}` : null);
         const pacingNote = renderFormats
           ? `[paced_wait_ms=${pacedWaitMs} rate_limit_retries=${rateLimitRetries} formats=${renderFormats.map((f) => typeof f === "string" ? f : f.type).join("+")}${evidenceRefused ? ` evidence_refused=${evidenceRefused.status ?? "err"}` : ""}]`
@@ -1598,107 +1341,87 @@ serve(async (req) => {
         });
       } catch { /* never fail a price run over telemetry */ }
 
-      // Capture the dealer's hero photo for the vehicle file — isolated so a
-      // not-yet-migrated hero_image_url column can never affect price logic.
-      try {
-        const hero = extractHeroImage(html, fetchUrl);
-        if (hero) {
-          await admin.from("vehicle_listings").update({ hero_image_url: hero })
-            .eq("tenant_id", row.tenant_id).eq("vin", row.vin).is("hero_image_url", null);
-        }
-      } catch { /* hero_image_url column may not be migrated yet */ }
-
-      // The dealer's stock number, when their own page states one and our
-      // record doesn't. Website channel only — a marketplace listing shows the
-      // marketplace's id, not the dealership's.
-      //
-      // Gap-fill only: stock_number is left alone when it already has a value,
-      // so the DMS number on the syndication feed always wins over a scrape.
-      // The file row exists for every synced VIN (marketcheck-sync creates it),
-      // so this updates and never inserts.
-      try {
-        if (String(row.source_label || "") === "website") {
-          const stock = extractStockNumber(html, row.vin);
-          if (stock) {
-            await admin.from("vehicle_files").update({ stock_number: stock })
-              .eq("tenant_id", row.tenant_id).eq("vin", row.vin)
-              .or("stock_number.is.null,stock_number.eq.");
+      // Hero photo, stock number, history link and badges are read only from
+      // a page that passed the identity check: before, a cheap fetch that
+      // landed on another car's page could give this vehicle that car's
+      // photo, report link or certification.
+      if (identity.verdict === "vehicle") {
+        // Capture the dealer's hero photo for the vehicle file — isolated so a
+        // not-yet-migrated hero_image_url column can never affect price logic.
+        try {
+          const hero = extractHeroImage(html, fetchUrl);
+          if (hero) {
+            await admin.from("vehicle_listings").update({ hero_image_url: hero })
+              .eq("tenant_id", row.tenant_id).eq("vin", row.vin).is("hero_image_url", null);
           }
-        }
-      } catch { /* stock number is a nicety — never fail a price run over it */ }
+        } catch { /* hero_image_url column may not be migrated yet */ }
 
-      // Harvest the dealer's own CARFAX/AutoCheck report link off their VDP —
-      // website channel only (marketplace pages embed the marketplace's own
-      // links, not the dealer's subscription link). First-seen wins; the
-      // dealer can clear/replace it from the vehicle file.
-      try {
-        if (String(row.source_label || "") === "website") {
-          const link = extractHistoryReportLink(html, row.vin);
-          if (link) {
-            await admin.from("vehicle_listings").update({ history_report_url: link })
-              .eq("tenant_id", row.tenant_id).eq("vin", row.vin).is("history_report_url", null);
-          }
-
-          // One-owner badge on the dealer's VDP → the carfax_1_owner flag the
-          // passport already trusts (owner chip, Why Buy, buying score). Only
-          // fills the gap — never overwrites a real MarketCheck owner_count or
-          // an existing flag, and only ever asserts the positive.
-          // Certification confirmed on the page the dealer publishes. Recorded
-          // with its own source so the description engine can tell an
-          // independent confirmation from the feed flag that set `condition`.
-          // `program` stays unset: the page says certified, not which program,
-          // and naming one we did not read would be the fabrication this
-          // pipeline exists to prevent.
-          if (detectCpoBadge(html)) {
-            const { data: curCert } = await admin.from("vehicle_listings")
-              .select("certification").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
-            const cert = (curCert?.certification ?? {}) as Record<string, unknown>;
-            if (!cert.source) {
-              await admin.from("vehicle_listings")
-                .update({ certification: { ...cert, certified: true, source: "dealer_vdp", verified_at: new Date().toISOString() } })
-                .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+        // The dealer's stock number, when their own page states one and our
+        // record doesn't. Website channel only. Gap-fill only: the DMS number
+        // on the syndication feed always wins over a scrape.
+        try {
+          if (String(row.source_label || "") === "website") {
+            const stock = extractStockNumber(html, row.vin);
+            if (stock) {
+              await admin.from("vehicle_files").update({ stock_number: stock })
+                .eq("tenant_id", row.tenant_id).eq("vin", row.vin)
+                .or("stock_number.is.null,stock_number.eq.");
             }
           }
+        } catch { /* stock number is a nicety — never fail a price run over it */ }
 
-          if (detectOneOwnerBadge(html)) {
-            const { data: cur } = await admin.from("vehicle_listings")
-              .select("mc_attributes").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
-            const mc = (cur?.mc_attributes ?? {}) as Record<string, unknown>;
-            // Gap-fill only. `!== true` also passed when the feed had said
-            // FALSE, so a badge scraped off the page overwrote the provider's
-            // explicit "not a one-owner" -- and since the column holds one
-            // value per flag, that destroyed the candidate the precedence
-            // engine would have used to overrule the badge. Nothing downstream
-            // could recover it. Only an absent value is a gap.
-            if (mc.owner_count == null && mc.carfax_1_owner == null) {
-              await admin.from("vehicle_listings")
-                .update({ mc_attributes: { ...mc, carfax_1_owner: true, one_owner_source: "dealer_vdp" } })
-                .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+        // The dealer's own CARFAX/AutoCheck link and the certification,
+        // one-owner and clean-title badges, website channel only, gap-fill
+        // and positive-only (see detectCpoBadge, detectOneOwnerBadge,
+        // detectCleanTitleBadge).
+        try {
+          if (String(row.source_label || "") === "website") {
+            const link = extractHistoryReportLink(html, row.vin);
+            if (link) {
+              await admin.from("vehicle_listings").update({ history_report_url: link })
+                .eq("tenant_id", row.tenant_id).eq("vin", row.vin).is("history_report_url", null);
+            }
+            // `program` stays unset: the page says certified, not which
+            // program, and naming one we did not read would be fabrication.
+            if (detectCpoBadge(html)) {
+              const { data: curCert } = await admin.from("vehicle_listings")
+                .select("certification").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
+              const cert = (curCert?.certification ?? {}) as Record<string, unknown>;
+              if (!cert.source) {
+                await admin.from("vehicle_listings")
+                  .update({ certification: { ...cert, certified: true, source: "dealer_vdp", verified_at: new Date().toISOString() } })
+                  .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+              }
+            }
+            // Gap-fill only: an absent value is a gap; a feed `false` is not.
+            if (detectOneOwnerBadge(html)) {
+              const { data: cur } = await admin.from("vehicle_listings")
+                .select("mc_attributes").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
+              const mc = (cur?.mc_attributes ?? {}) as Record<string, unknown>;
+              if (mc.owner_count == null && mc.carfax_1_owner == null) {
+                await admin.from("vehicle_listings")
+                  .update({ mc_attributes: { ...mc, carfax_1_owner: true, one_owner_source: "dealer_vdp" } })
+                  .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+              }
+            }
+            // Positive-only: a feed `false`, or a title brand that is not
+            // clean, contradicts the page and wins.
+            if (detectCleanTitleBadge(html)) {
+              const { data: curTitle } = await admin.from("vehicle_listings")
+                .select("mc_attributes").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
+              const mct = (curTitle?.mc_attributes ?? {}) as Record<string, unknown>;
+              const brand = String(mct.title_brand ?? mct.title_status ?? "").trim();
+              const contradicted = mct.carfax_clean_title === false
+                || (brand !== "" && !/^(?:clean|clear|none|no\b)/i.test(brand));
+              if (mct.carfax_clean_title !== true && !contradicted) {
+                await admin.from("vehicle_listings")
+                  .update({ mc_attributes: { ...mct, carfax_clean_title: true, clean_title_source: "dealer_vdp" } })
+                  .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+              }
             }
           }
-
-          // Clean-title badge on the dealer's VDP → the carfax_clean_title flag
-          // the passport already trusts. MarketCheck never sends this field, so
-          // without the dealer's own page the title module stays unverified.
-          // mc_attributes is re-read here rather than reused from the one-owner
-          // block above so a write that block just made is not spread back over.
-          // Gap-fill and positive-only: a feed `false`, or any title brand on
-          // the row that is not itself clean, contradicts the page and wins.
-          if (detectCleanTitleBadge(html)) {
-            const { data: curTitle } = await admin.from("vehicle_listings")
-              .select("mc_attributes").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
-            const mct = (curTitle?.mc_attributes ?? {}) as Record<string, unknown>;
-            const brand = String(mct.title_brand ?? mct.title_status ?? "").trim();
-            const contradicted = mct.carfax_clean_title === false
-              || (brand !== "" && !/^(?:clean|clear|none|no\b)/i.test(brand));
-            if (mct.carfax_clean_title !== true && !contradicted) {
-              await admin.from("vehicle_listings")
-                .update({ mc_attributes: { ...mct, carfax_clean_title: true, clean_title_source: "dealer_vdp" } })
-                .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
-            }
-          }
-        }
-      } catch { /* history_report_url column may not be migrated yet */ }
+        } catch { /* history_report_url column may not be migrated yet */ }
+      }
 
       if (result.reason === "bot_challenge" && result.price == null) {
         skipped++;
@@ -1709,13 +1432,13 @@ serve(async (req) => {
         }).then(() => undefined, () => undefined);
         continue;
       }
-      // vin_mismatch (redirect / wrong car) or price_gated ("call for price"):
-      // record the reason but DO NOT write — preserve the prior good snapshot.
-      if (result.reason === "vin_mismatch" || result.gated) {
+      // Another vehicle's page, no vehicle on the page, conflicting prices for
+      // this vehicle, or "call for price": record the reason and write nothing.
+      if (result.reason === "vin_mismatch" || result.reason === "identity_unverified" || result.reason === "ambiguous_price" || result.gated) {
         skipped++;
         // A discovered address that keeps answering with the wrong page is
         // dropped, so the queue falls back to the feed's url for this VIN.
-        if (result.reason === "vin_mismatch" && row.url_source === "scrape") {
+        if ((result.reason === "vin_mismatch" || result.reason === "identity_unverified") && row.url_source === "scrape") {
           const led = mismatchLedger.get(row.tenant_id + "|" + normVin(row.vin));
           const prior = led && sameUrl(led.source_url, fetchUrl) ? led.attempts : 0;
           if (prior + 1 >= MISMATCH_BACKOFF_ATTEMPTS) {
@@ -1728,7 +1451,11 @@ serve(async (req) => {
           entity_type: "advertised_price",
           entity_id: row.vin,
           store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, reason: result.reason },
+          details: {
+            vin: row.vin, url: row.source_url, reason: result.reason, identity: identitySummary(identity),
+            candidates: result.reason === "ambiguous_price" ? result.candidates.slice(0, 12) : undefined,
+            screenshot_path: screenshot?.path ?? null,
+          },
         }).then(() => undefined, () => undefined);
         continue;
       }
@@ -1757,130 +1484,119 @@ serve(async (req) => {
         }).then(() => undefined, () => undefined);
         continue;
       }
-      // Parse the doc/conveyance fee, displayed sale price, retail cash and
-      // dealer discount off the rendered page, reconcile to the canonical
-      // breakdown (advertised BEFORE doc; sale = advertised + doc fee), and
-      // store each field on vehicle_listings. Isolated so a not-yet-migrated
-      // column can never fail the price write. price_parse_status = 'warning'
-      // when the displayed sale price disagrees with advertised + doc fee.
-      let componentsChanged = false;
-      try {
-        const comp = extractPriceComponents(priceEvidenceHtml(html));
-        const bd = buildBreakdown(newPrice, comp, cfg.docFee, cfg.inclDocFee);
-        // A fee or discount that moved is a change in what the shopper was
-        // shown even when the headline price held, so it earns a screenshot.
-        try {
-          const { data: prev } = await admin.from("vehicle_listings")
-            .select("doc_fee, retail_cash, dealer_discount, website_sale_price")
-            .eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
-          const differs = (a: unknown, b: unknown) => {
-            const x = a == null ? null : Number(a);
-            const y = b == null ? null : Number(b);
-            if (x == null && y == null) return false;
-            if (x == null || y == null) return true;
-            return Math.abs(x - y) >= 1;
-          };
-          componentsChanged = !!prev && (
-            differs(prev.doc_fee, bd.doc_fee)
-            || differs(prev.retail_cash, bd.retail_cash)
-            || differs(prev.dealer_discount, bd.dealer_discount)
-            || differs(prev.website_sale_price, bd.website_sale_price)
-          );
-        } catch { /* breakdown columns may not be migrated yet */ }
-        // FTC-critical guard: the advertised price the platform stores and
-        // protects must never land ABOVE the dealer's own inventory/feed price.
-        // A scrape above the feed means the extractor grabbed the sticker/MSRP
-        // or a lease/finance figure, not the sale price (seen on a QX60 that
-        // scraped $62,225 against a $55,598 feed). A real website price DROP is
-        // below the feed and is still written. On a mis-parse we record a
-        // warning and leave the good price untouched rather than corrupt the
-        // advertised-price evidence.
-        // How old the feed baseline is decides how strict the guard can be:
-        // the provider's own last-seen stamp on the listing, else the tenant's
-        // last successful feed run (priceGuard.ts).
-        const { data: lrow } = await admin.from("vehicle_listings")
-          .select("price, feed_msrp:mc_raw->>msrp, feed_last_seen:mc_raw->>last_seen_at, feed_scraped:mc_raw->>scraped_at")
-          .eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
-        const feedPrice = Number(lrow?.price) || null;
-        const feedMsrp = Number((lrow as { feed_msrp?: unknown } | null)?.feed_msrp) || null;
-        const feedSeenAt = parseFeedTimestamp((lrow as { feed_last_seen?: unknown } | null)?.feed_last_seen)
-          ?? parseFeedTimestamp((lrow as { feed_scraped?: unknown } | null)?.feed_scraped)
-          ?? await lastFeedSuccessAt(row.tenant_id);
-        const guard = judgeAboveFeed({
-          scraped: bd.advertised_price_before_doc, feedPrice, feedMsrp,
-          feedAgeMs: feedSeenAt != null ? Date.now() - feedSeenAt : null, freshMs: FEED_FRESH_MS,
-        });
-        const misparse = guard.misparse;
-        if (misparse) {
-          await admin.from("vehicle_listings").update({
-            price_parse_status: "warning",
-            price_parse_notes: guard.note,
-            price_last_verified_at: new Date().toISOString(),
-          }).eq("tenant_id", row.tenant_id).eq("vin", row.vin);
-          await admin.from("audit_log").insert({
-            action: "advertised_price_crawl_skipped", entity_type: "advertised_price",
-            entity_id: row.vin, store_id: row.tenant_id,
-            details: {
-              vin: row.vin, reason: "advertised_above_feed", scraped: bd.advertised_price_before_doc, feed: feedPrice, url: fetchUrl,
-              guard_reason: guard.reason, feed_msrp: feedMsrp, feed_stale: guard.feedStale,
-              feed_age_days: feedSeenAt != null ? Math.round((Date.now() - feedSeenAt) / 86_400_000) : null,
-              // The evidence render may already have run; name the picture so
-              // it is not an orphan in the bucket.
-              screenshot_path: screenshot?.path ?? null,
-            },
-          }).then(() => undefined, () => undefined);
-          // The ledger row above says "captured" because a price was read.
-          // Nothing was written, so the ledger must say so too.
-          try {
-            await admin.rpc("record_advertised_price_crawl_attempt", {
-              _tenant_id: row.tenant_id,
-              _vin: row.vin,
-              _source_label: observationChannel(row.source_label),
-              _source_url: fetchUrl,
-              _outcome: "price_rejected",
-              _http_status: cheapStatus,
-              _render_status: renderStatus,
-              _detail: `advertised_above_feed scraped=${bd.advertised_price_before_doc} feed=${feedPrice} reason=${guard.reason}${guard.feedStale ? " feed_stale" : ""}`,
-            });
-          } catch { /* never fail a price run over telemetry */ }
-        } else if (bd.advertised_price_before_doc != null) {
-          // The terminology the dealer's own VDP uses next to its price, cleaned
-          // for the passport's "Match my website" label option. Only written on
-          // this clean (non-misparse) branch, and only when it's a real term.
-          const websiteTerm = cleanWebsitePriceTerm(result.matched_label);
-          const cleanUpdate: Record<string, unknown> = {
-            advertised_price_before_doc: bd.advertised_price_before_doc,
-            doc_fee: bd.doc_fee,
-            website_sale_price: bd.website_sale_price,
-            retail_cash: bd.retail_cash,
-            dealer_discount: bd.dealer_discount,
-            price_source_url: fetchUrl,
-            price_parse_status: bd.price_parse_status,
-            price_parse_notes: guard.feedStale ? `${bd.price_parse_notes} ${guard.note}` : bd.price_parse_notes,
-            price_last_verified_at: new Date().toISOString(),
-          };
-          if (websiteTerm) cleanUpdate.website_price_term = websiteTerm;
-          await admin.from("vehicle_listings").update(cleanUpdate)
-            .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
-        }
-        if (misparse) { skipped++; continue; }
-      } catch { /* price breakdown columns may not be migrated yet */ }
 
-      // Second stage: the evidence screenshot. Rendered only when there is
-      // something new to evidence -- the price or a fee component moved, or
-      // this VIN+channel has no screenshot-backed observation yet, or the
-      // caller asked -- and not already taken by the escalation render above.
-      // A price that came off the cheap fetch spends a render here too: a
-      // change the dealer's page shows deserves the picture of it.
+      // ── Fee basis: four parts kept apart (feeBasis.ts) ─────────────────
+      // The figure and label as read; the dealership's configured
+      // interpretation; what the page itself shows about the fee (the
+      // vehicle's widget, or the text around the figure); and the values
+      // derived from one of them, with the basis named. Only a page-verified
+      // basis may change the listing.
+      const stack = read?.stack ?? null;
+      const scoped = result.scopedHtml;
+      const widget = stack?.widgetRange ?? null;
+      const texts = widget
+        ? { section: visibleText(scoped.slice(widget[0], widget[1])), rest: visibleText(scoped.slice(0, widget[0]) + " " + scoped.slice(widget[1])) }
+        : (() => { const t = visibleText(scoped); const s = sectionAround(t, newPrice); return { section: s.section, rest: s.rest }; })();
+      const websiteTerm = cleanWebsitePriceTerm(result.matched_label);
+      const basis = decideFeeBasis({
+        observed: { amount: newPrice, label: websiteTerm, source: result.source, section: result.section },
+        settings: cfg.settings,
+        pageUrl: fetchUrl,
+        listingCondition: listingCtx?.condition ?? null,
+        sectionText: texts.section,
+        pageText: texts.rest,
+        stack,
+        feed: { price: listingCtx?.feedPrice ?? null, includesFees: listingCtx?.feedIncludesFees ?? null },
+      });
+      // Every component of the vehicle's own widget is appended to the
+      // evidence ledger, whether or not anything is written.
+      if (stack && (stack.lines.length || stack.disclaimers.length)) {
+        try {
+          const records = await buildEvidenceRecords(scoped, stack, {
+            tenantId: row.tenant_id, vin: row.vin, sourceUrl: fetchUrl, capturedAt: new Date().toISOString(),
+            screenshotSha256: screenshotFromPriceRender ? screenshot?.sha256 ?? null : null,
+          });
+          await admin.from("price_component_evidence").upsert(records, { onConflict: "record_sha256", ignoreDuplicates: true })
+            .then(() => undefined, () => undefined);
+        } catch { /* the evidence table may not be migrated yet */ }
+      }
+
+      // FTC-critical guard: the advertised price must never land ABOVE the
+      // dealer's own feed price; above it the extractor read a sticker, MSRP
+      // or lease figure (priceGuard.ts, aware of how old the feed is). On a
+      // mis-parse nothing is stored and the listing is left alone.
+      const feedSeenAt = parseFeedTimestamp(listingCtx?.feedLastSeen) ?? parseFeedTimestamp(listingCtx?.feedScraped)
+        ?? await lastFeedSuccessAt(row.tenant_id);
+      const guardFigure = basis.derived?.advertised_price_before_doc ?? newPrice;
+      const guard = judgeAboveFeed({
+        scraped: guardFigure, feedPrice: listingCtx?.feedPrice ?? null, feedMsrp: listingCtx?.feedMsrp ?? null,
+        feedAgeMs: feedSeenAt != null ? Date.now() - feedSeenAt : null, freshMs: FEED_FRESH_MS,
+      });
+      if (guard.misparse) {
+        skipped++;
+        await admin.from("audit_log").insert({
+          action: "advertised_price_crawl_skipped", entity_type: "advertised_price",
+          entity_id: row.vin, store_id: row.tenant_id,
+          details: {
+            vin: row.vin, reason: "advertised_above_feed", scraped: guardFigure, observed: newPrice, feed: listingCtx?.feedPrice ?? null, url: fetchUrl,
+            guard_reason: guard.reason, feed_msrp: listingCtx?.feedMsrp ?? null, feed_stale: guard.feedStale,
+            feed_age_days: feedSeenAt != null ? Math.round((Date.now() - feedSeenAt) / 86_400_000) : null,
+            fee_basis_status: basis.status,
+            screenshot_path: screenshot?.path ?? null,
+          },
+        }).then(() => undefined, () => undefined);
+        try {
+          await admin.rpc("record_advertised_price_crawl_attempt", {
+            _tenant_id: row.tenant_id, _vin: row.vin, _source_label: observationChannel(row.source_label),
+            _source_url: fetchUrl, _outcome: "price_rejected", _http_status: cheapStatus, _render_status: renderStatus,
+            _detail: `advertised_above_feed scraped=${guardFigure} feed=${listingCtx?.feedPrice ?? null} reason=${guard.reason}${guard.feedStale ? " feed_stale" : ""}`,
+          });
+        } catch { /* never fail a price run over telemetry */ }
+        continue;
+      }
+      if (guard.feedStale) basis.reasons.push(guard.note);
+      // A figure at the feed's MSRP reads as the sticker unless the page's own
+      // stack or fee statement says otherwise. It never promotes then anyway;
+      // the finding is recorded so a reviewer sees it.
+      if (listingCtx?.feedMsrp && newPrice >= listingCtx.feedMsrp * 0.995 && basis.status !== "page_verified") {
+        basis.reasons.push(`the observed figure ${newPrice} is at or above the feed MSRP ${listingCtx.feedMsrp}`);
+      }
+
+      // ── Evidence ──────────────────────────────────────────────────────
+      // The screenshot counts as evidence when it is of the very render the
+      // price was read from, or of a second render that independently shows
+      // the same vehicle, address, figure and label (crawlCommit.ts).
       const priceChanged = Math.abs(newPrice - row.advertised_price) >= 1;
-      if (!screenshot && !evidenceRefused && renderBudget > 0 && (priceChanged || componentsChanged || evidenceDue || (!cheapFailed && await shouldCaptureEvidence(row)))) {
+      const pricing = listingCtx?.pricing ?? null;
+      const differs = (a: unknown, b: unknown) => (a == null) !== (b == null) || (a != null && b != null && Math.abs(Number(a) - Number(b)) >= 1);
+      const listingWouldChange = !!basis.derived && (!pricing
+        || differs(pricing.advertised_price_before_doc, basis.derived.advertised_price_before_doc)
+        || differs(pricing.doc_fee, basis.derived.doc_fee)
+        || differs(pricing.website_sale_price, basis.derived.website_sale_price));
+      let evidence: EvidenceDecision = screenshotFromPriceRender && screenshot
+        ? { status: "same_render", reason: null }
+        : { status: "not_captured", reason: evidenceRefused ? `the renderer refused the screenshot (${evidenceRefused.status ?? evidenceRefused.error ?? "error"})` : null };
+      let evidenceShot: CapturedScreenshot | null = evidence.status === "same_render" ? screenshot : null;
+      // A listing change wants evidence only when it could actually be
+      // applied: a held fee basis never promotes, so it spends no render.
+      const wantEvidence = priceChanged || (basis.promote && listingWouldChange) || evidenceDue || (!cheapFailed && await shouldCaptureEvidence(row));
+      if (!evidenceShot && !evidenceRefused && renderBudget > 0 && wantEvidence) {
         renderBudget--;
         const ev = await pacedRender(fetchUrl, EVIDENCE_FORMATS, deadlineAt);
         pacedWaitMs += ev.pacedWaitMs;
         rateLimitRetries += ev.rateLimitRetries;
-        if (ev.render?.ok) {
-          screenshot = await captureScreenshot(admin, ev.render.screenshotUrl, row.tenant_id, row.vin);
-          if (screenshot) evidenceRenders++;
+        if (ev.render?.ok && ev.render.html) {
+          const second = looksLikeChallenge(ev.render.html, new Headers(), ev.render.pageStatus ?? 200)
+            ? null
+            : readVehiclePage(ev.render.html, row.vin, fetchUrl, ev.render.finalUrl ?? null, cfg, listingCtx?.ymm ?? null).result;
+          evidence = revalidateEvidence(result, pageFinalUrl, second, ev.render.finalUrl ?? null);
+          if (evidence.status === "revalidated_render") {
+            evidenceShot = await captureScreenshot(admin, ev.render.screenshotUrl, row.tenant_id, row.vin);
+            if (evidenceShot) evidenceRenders++;
+            else evidence = { status: "not_captured", reason: "the evidence screenshot could not be stored" };
+          }
+        } else {
+          evidence = { status: "not_captured", reason: ev.gaveUp ? `the evidence render gave up (${ev.gaveUp})` : `the evidence render failed (${ev.render?.status ?? ev.render?.error ?? "no response"})` };
         }
         await admin.from("audit_log").insert({
           action: "advertised_price_evidence_render",
@@ -1889,61 +1605,110 @@ serve(async (req) => {
           store_id: row.tenant_id,
           details: {
             vin: row.vin, fetch_url: fetchUrl,
-            trigger: priceChanged ? "price_changed" : componentsChanged ? "components_changed" : evidenceDue ? "no_prior_screenshot_or_forced" : "no_prior_screenshot",
+            trigger: priceChanged ? "price_changed" : listingWouldChange ? "components_changed" : evidenceDue ? "no_prior_screenshot_or_forced" : "no_prior_screenshot",
             render_status: ev.render?.status ?? null, render_error: ev.render?.error ?? null,
             paced_wait_ms: ev.pacedWaitMs, rate_limit_retries: ev.rateLimitRetries, gave_up: ev.gaveUp,
             render_formats: ev.formats, renders_per_minute: RENDERS_PER_MINUTE,
-            screenshot_path: screenshot?.path ?? null,
+            evidence_status: evidence.status, evidence_reason: evidence.reason,
+            screenshot_path: evidenceShot?.path ?? null,
           },
         }).then(() => undefined, () => undefined);
+      } else if (!evidenceShot && evidence.reason == null) {
+        evidence = { status: "not_captured", reason: renderBudget <= 0 ? "no render budget left for evidence" : "no evidence render was needed" };
       }
+      const evidenceOk = !!evidenceShot && (evidence.status === "same_render" || evidence.status === "revalidated_render");
 
-      // An unchanged price is still an observation and is still written. The
-      // work list is advertised_price_crawl_queue, ordered by the latest row's
-      // captured_at; skipping the write here would leave a held price's
-      // captured_at frozen, so the same stalest vehicles would be re-rendered
-      // every run and the rest of a walled lot never reached. Without a new
-      // screenshot the row carries none: a screenshot-less crawler observation
-      // is a valid dealer_vdp_observation (20260908280000).
-      const insRow: Record<string, unknown> = {
+      // ── Store, then promote ───────────────────────────────────────────
+      // The observation (with its fee basis record, identity and evidence) is
+      // stored first. The listing changes only after that, only on a
+      // page-verified basis with accepted evidence, and only if its pricing
+      // did not move meanwhile. An unchanged price is still an observation:
+      // the work queue is ordered by the latest captured_at.
+      const promote = basis.promote && (evidenceOk || !listingWouldChange);
+      const holdAs = !basis.promote ? "held_fee_basis" as const : !promote ? "held_evidence" as const : null;
+      const holdDetail = holdAs === "held_fee_basis"
+        ? `${basis.status}: ${basis.reasons.join("; ")}`.slice(0, 500)
+        : holdAs === "held_evidence" ? (evidence.reason ?? "no accepted evidence") : null;
+      const baseRow: Record<string, unknown> = {
         tenant_id: row.tenant_id,
         store_id: row.store_id || "",
         vin: row.vin,
         source_url: fetchUrl,
         source_channel: observationChannel(row.source_label),
-        // We fetched the dealer's page and read this number off it. That is a
-        // different act from the feed reporting a price, and the compliance
-        // packet must be able to tell them apart by column, not by note text.
+        // We fetched the dealer's page and read this number off it: a
+        // different act from the feed reporting a price.
         captured_method: "dealer_vdp_observation",
         advertised_price: newPrice,
         captured_by: null,
-        screenshot_url: screenshot?.path ?? null,
-        screenshot_sha256: screenshot?.sha256 ?? null,
-        screenshot_bucket: screenshot?.bucket ?? PRICE_EVIDENCE_BUCKET,
-        notes: row.seed
-          ? `First crawl (${result.source})${result.matched_label ? ` · ${result.matched_label}` : ""} · $${newPrice.toLocaleString()}`
+        screenshot_url: evidenceShot?.path ?? null,
+        screenshot_sha256: evidenceShot?.sha256 ?? null,
+        screenshot_bucket: evidenceShot?.bucket ?? PRICE_EVIDENCE_BUCKET,
+        notes: (row.seed
+          ? `First crawl (${result.source})${websiteTerm ? ` · ${websiteTerm}` : ""} · $${newPrice.toLocaleString()}`
           : priceChanged
             ? `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`
-            : `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · unchanged $${newPrice.toLocaleString()}`,
+            : `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · unchanged $${newPrice.toLocaleString()}`)
+          + ` · fee basis ${basis.status}`,
       };
-      let insErr = (await admin.from("advertised_prices").insert(insRow)).error;
-      // Resilient to a not-yet-applied column, so a deploy that lands ahead of
-      // its migration degrades instead of losing the price entirely.
-      if (insErr && /screenshot_(url|sha256|bucket)|captured_method/i.test(insErr.message || "")) {
-        const { screenshot_url, screenshot_sha256, screenshot_bucket, captured_method, ...rest } = insRow;
-        void screenshot_url; void screenshot_sha256; void screenshot_bucket; void captured_method;
-        insErr = (await admin.from("advertised_prices").insert(rest)).error;
-      }
-      if (insErr) {
+      const observation = {
+        run_id: runId,
+        fee_basis: basis,
+        identity: identitySummary(identity),
+        extraction: { source: result.source, section: result.section, matched_label: result.matched_label, candidates: result.candidates.slice(0, 12) },
+        evidence: { status: evidence.status, reason: evidence.reason, screenshot_sha256: evidenceShot?.sha256 ?? null, screenshot_path: evidenceShot?.path ?? null },
+      };
+      const key = await observationKey({
+        tenantId: row.tenant_id, vin: row.vin, url: `${runId}|${fetchUrl}`, amount: newPrice, label: websiteTerm,
+        basisStatus: basis.status, derived: basis.derived, screenshotSha256: evidenceShot?.sha256 ?? null,
+        pageSha256: await sha256Text(texts.section || visibleText(scoped)),
+      });
+      const patch: Record<string, unknown> = basis.derived ? {
+        advertised_price_before_doc: basis.derived.advertised_price_before_doc,
+        doc_fee: basis.derived.doc_fee,
+        website_sale_price: basis.derived.website_sale_price,
+        ...(basis.derivedFrom === "stack" ? { retail_cash: basis.derived.retail_cash ?? null, dealer_discount: basis.derived.dealer_discount ?? null } : {}),
+        price_source_url: fetchUrl,
+        price_parse_status: "ok",
+        price_parse_notes: `Fee basis verified by the page (${basis.derivedFrom}): ${basis.reasons.join("; ")}`.slice(0, 500),
+        price_last_verified_at: new Date().toISOString(),
+        ...(websiteTerm ? { website_price_term: websiteTerm } : {}),
+      } : {};
+      const commit = await commitObservation(commitDb, {
+        tenantId: row.tenant_id, vin: row.vin, key,
+        row: { ...baseRow, observation }, legacyRow: baseRow,
+        promote, holdAs, holdDetail, patch,
+      });
+      listingOutcomes[commit.outcome] = (listingOutcomes[commit.outcome] ?? 0) + 1;
+      await admin.from("audit_log").insert({
+        action: "advertised_price_observation_committed", entity_type: "advertised_price",
+        entity_id: row.vin, store_id: row.tenant_id,
+        details: {
+          vin: row.vin, url: fetchUrl, outcome: commit.outcome, detail: commit.detail, observation_id: commit.observationId,
+          fee_basis_status: basis.status, derived_from: basis.derivedFrom, evidence_status: evidence.status,
+          identity_findings: identity.findings,
+        },
+      }).then(() => undefined, () => undefined);
+      if (commit.outcome === "observation_failed") {
         failed++;
         await admin.from("audit_log").insert({
           action: "advertised_price_crawl_error",
           entity_type: "advertised_price",
           entity_id: row.vin,
           store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, fetch_url: fetchUrl, reason: "insert_failed", error: insErr.message, extracted_price: newPrice },
+          details: { vin: row.vin, url: row.source_url, fetch_url: fetchUrl, reason: "insert_failed", error: commit.detail, extracted_price: newPrice },
         }).then(() => undefined, () => undefined);
         continue;
+      }
+      // Held and failed promotions are named in the attempt ledger, so a
+      // vehicle whose price was read but not applied never reads "captured".
+      if (commit.outcome !== "promoted" && commit.outcome !== "unchanged" && commit.outcome !== "duplicate") {
+        try {
+          await admin.rpc("record_advertised_price_crawl_attempt", {
+            _tenant_id: row.tenant_id, _vin: row.vin, _source_label: observationChannel(row.source_label),
+            _source_url: fetchUrl, _outcome: commit.outcome, _http_status: cheapStatus, _render_status: renderStatus,
+            _detail: commit.detail,
+          });
+        } catch { /* never fail a price run over telemetry */ }
       }
       if (priceChanged) updated++; else unchanged++;
     } catch (err) {
@@ -2104,16 +1869,26 @@ serve(async (req) => {
             const r = await fetch(fetchVdp, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
             const html = r.ok ? await r.text() : "";
             if (!r.ok || looksLikeChallenge(html, r.headers, r.status)) { crawledThisTenant++; continue; }
-            const result = extractAdvertised(priceEvidenceHtml(html), fetchVdp, vin, cfg.labels);
-            if (result.gated || result.reason === "vin_mismatch" || result.price == null) { crawledThisTenant++; continue; }
+            // Same identity check and scoping as the nightly pass. Discovery
+            // stores an observation only; it never has evidence, so it never
+            // changes a listing.
+            const result = readVehiclePage(html, vin, fetchVdp, r.url || null, cfg, null).result;
+            if (result.gated || result.price == null) { crawledThisTenant++; continue; }
             const k = `${vin}|${channel}`;
             const prev = latestByVinChannel.get(k);
             if (prev != null && Math.abs(result.price - prev) < 1) { crawledThisTenant++; continue; }
-            await admin.from("advertised_prices").insert({
+            // captured_by is a user id; discovery is not a person.
+            const discoveryRow: Record<string, unknown> = {
               tenant_id: tenantId, store_id: "", vin, source_url: vdp, source_channel: channel,
-              advertised_price: result.price, captured_by: "discovery",
+              advertised_price: result.price, captured_by: null, captured_method: "dealer_vdp_observation",
               notes: `Discovered on ${channel} (${result.source})${prev != null ? ` · was $${prev.toLocaleString()}` : ""}`,
+            };
+            const { error: discErr } = await admin.from("advertised_prices").insert({
+              ...discoveryRow,
+              observation: { run_id: runId, identity: identitySummary(result.identity), extraction: { source: result.source, section: result.section, matched_label: result.matched_label }, evidence: { status: "not_captured", reason: "discovery takes no screenshot" } },
+              listing_promotion: "held_evidence", listing_promotion_detail: "discovery observation without evidence",
             });
+            if (discErr) await commitDb.insertLegacyObservation(discoveryRow);
             latestByVinChannel.set(k, result.price);
             discovered++;
             crawledThisTenant++;
@@ -2169,6 +1944,7 @@ serve(async (req) => {
     details: {
       depth, picked: rows.length, processed, queue_depth: queueDepth, unvisited: Math.max(queueDepth - processed, 0),
       ran_out_of_time: ranOutOfTime, updated, unchanged, failed, skipped, discovered,
+      listing_outcomes: listingOutcomes, run_id: runId,
       backoff_skipped: backoffSkipped, mismatch_backoff_skipped: mismatchBackoffSkipped,
       urls_recorded: urlsRecorded, urls_confirmed: urlsConfirmed, discovery_renders: discoveryRenders, discovery: discoveryReport,
       elapsed_ms: Date.now() - startedAt, render_pacing: renderPacing, next_link: nextLink,
@@ -2191,6 +1967,9 @@ serve(async (req) => {
     failed,
     skipped,
     discovered,
+    // What each stored observation did to its listing: promoted, unchanged,
+    // held (fee basis, evidence, schema) or failed (promotion, conflict).
+    listing_outcomes: listingOutcomes,
     // Vehicles left alone because the guard refused their page price inside
     // the backoff window.
     backoff_skipped: backoffSkipped,

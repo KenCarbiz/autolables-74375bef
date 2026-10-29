@@ -1,7 +1,7 @@
 // Emits evidence records for a synthetic dealer page as JSON, for
 // price-evidence-verify.sh. Synthetic data only.
-import { buildEvidenceRecords } from "../../supabase/proposed/crawl-fee-treatment/priceEvidence.ts";
-import { readPriceStack } from "../../supabase/proposed/crawl-fee-treatment/priceStack.ts";
+import { buildEvidenceRecords } from "../../supabase/functions/_shared/priceEvidence.ts";
+import { readPriceStack } from "../../supabase/functions/_shared/priceStack.ts";
 import { DEALER_LABEL, TARGET_VIN, stack, vdpPage } from "../../src/lib/admin/pricing/fixtures/priceStackPages.ts";
 
 const url = `https://dealer.example.test/viewdetails/new/${TARGET_VIN.toLowerCase()}/2027-suv`;

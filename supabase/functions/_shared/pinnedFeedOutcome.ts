@@ -5,6 +5,8 @@
 // can leave the validation with no usable hit, and for 24 nights in October
 // 2026 they were all reported as one of them:
 //
+//   budget_refused     our own monthly provider budget refused the request, so
+//                      nothing was sent. Not the provider, not the rooftop.
 //   provider_refused   the provider answered 429 / 401 / 403 / 5xx or timed out.
 //                      The feed said nothing about the rooftop. This is an
 //                      account, quota or rate condition, and clearing the pin
@@ -19,11 +21,13 @@
 // no, and because the refusal path also skipped the run row, the 24 refusals
 // left no trace in inventory_sync_runs at all.
 
-export type PinnedFeedOutcomeKind = "validated" | "provider_refused" | "empty_answer" | "scope_mismatch";
+export type PinnedFeedOutcomeKind = "validated" | "budget_refused" | "provider_refused" | "empty_answer" | "scope_mismatch";
 
 export interface PinnedFeedSample {
   /** The provider refused or never answered (mcFetch's `refused`). */
   refused: boolean;
+  /** Our own budget gate refused it; nothing was sent (mcFetch's `budgetDenied`). */
+  budgetDenied?: boolean;
   /** HTTP status; 0 when the request never completed. */
   http: number;
   /** Rows the page carried. */
@@ -61,6 +65,16 @@ export function classifyPinnedFeed(
   rooftop: { street: string; zip: string },
 ): PinnedFeedOutcome {
   const pinLabel = `${pin.param}=${pin.value}`;
+  if (sample.budgetDenied) {
+    return {
+      kind: "budget_refused",
+      error: "budget_refused",
+      note: `The monthly provider budget refused the request for the pinned feed ${pinLabel}; nothing was sent to MarketCheck. ` +
+        "Inventory left untouched. This is AutoLabels' own spend limit, not a provider or rooftop condition: " +
+        "do not clear the pin. Review provider_call_budgets and this month's provider_call_events.",
+      runStatus: "failed",
+    };
+  }
   if (sample.refused) {
     return {
       kind: "provider_refused",

@@ -6,7 +6,7 @@ import {
   disclosureEvidence,
   type DealerFeeSettings,
   type PageFeeInput,
-} from "../../../../supabase/proposed/crawl-fee-treatment/feeTreatment";
+} from "../../../../supabase/functions/_shared/feeTreatment";
 
 const NEW_URL = "https://www.example-dealer.test/viewdetails/new/5n1test0000000001/2027-suv";
 const USED_URL = "https://www.example-dealer.test/viewdetails/used/1hgtest0000000002/2019-sedan";

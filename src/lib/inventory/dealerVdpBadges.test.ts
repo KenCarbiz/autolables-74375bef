@@ -12,10 +12,12 @@ import { join } from "node:path";
 // `include`, so they are reconstructed here from the deployed source text --
 // the same approach as cpoBadge.test.ts and cleanTitleBadge.test.ts.
 
+// The description strip lives in vdpPrice.ts since the crawler's price reader
+// moved there; the badge detectors stay in the crawler.
 const SRC = readFileSync(
   join(__dirname, "../../../supabase/functions/crawl-advertised-prices/index.ts"),
   "utf8",
-);
+) + "\n" + readFileSync(join(__dirname, "../../../supabase/functions/_shared/vdpPrice.ts"), "utf8");
 const VDP = readFileSync(
   join(__dirname, "__fixtures__/harte-vdp-1c6srfft2nn400176.html"),
   "utf8",

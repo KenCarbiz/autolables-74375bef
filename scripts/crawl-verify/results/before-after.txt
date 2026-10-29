@@ -1,0 +1,88 @@
+== Before: 3836dc3:supabase/functions/crawl-advertised-prices/index.ts c04a65b5427594f2124ba7f613884230e4fb9c6e, 340 lines cut
+PASS  T1 cheap path: a page with no VIN anywhere still yields a price (absence passes the gate)
+      expected [24500,null]
+      actual   [24500,null]
+PASS  T2 cheap path: body shows only another VIN, lowercase target in URL -> refused
+      expected [null,"vin_mismatch"]
+      actual   [null,"vin_mismatch"]
+PASS  T2b cheap path: same page, UPPERCASE target in URL -> URL supplies the VIN, price accepted
+      expected [31000,null]
+      actual   [31000,null]
+PASS  T3 render path: other vehicle in body, not redirected, lowercase URL -> verdict
+      expected "other_vehicle"
+      actual   "other_vehicle"
+PASS  T3n render path: page with no VIN at all -> verdict
+      expected "no_vehicle"
+      actual   "no_vehicle"
+PASS  T3u render path: other vehicle in body, UPPERCASE final URL -> verdict
+      expected "vehicle"
+      actual   "vehicle"
+PASS  T3b render path: same page, provider returns no final URL -> verdict
+      expected "other_vehicle"
+      actual   "other_vehicle"
+PASS  T3c render path: redirected to another vehicle's URL -> verdict
+      expected "other_vehicle"
+      actual   "other_vehicle"
+PASS  T4 label tier: a similar-vehicle card earlier in the page wins the label
+      expected [19900,"selling price"]
+      actual   [19900,"selling price"]
+PASS  T5 inclusive tenant, page shows no fee line -> before-doc, status
+      expected [23600,24500,"ok"]
+      actual   [23600,24500,"ok"]
+PASS  T5b inclusive tenant, page shows a matching fee line -> identical result and identical note
+      expected [23600,"ok",true]
+      actual   [23600,"ok",true]
+PASS  T5c same page, tenant flag off -> fee added on top instead
+      expected [24500,25400]
+      actual   [24500,25400]
+PASS  T6 page figure == feed MSRP, inclusive tenant, stale feed -> misparse?
+      expected [49100,false,null]
+      actual   [49100,false,null]
+PASS  T6b same figure judged before the fee is subtracted -> misparse?
+      expected [true,"at_or_above_msrp"]
+      actual   [true,"at_or_above_msrp"]
+PASS  T7 website $5,000 below a fresh feed price -> misparse?
+      expected false
+      actual   false
+
+15 checks, 0 failed
+
+== After: working tree supabase/functions/_shared (vdpIdentity, vdpPrice, feeBasis, priceGuard)
+PASS  T1 a page with no VIN anywhere -> refused (before: $24,500 accepted)
+      expected [null,"identity_unverified"]
+      actual   [null,"identity_unverified"]
+PASS  T2 body shows only another VIN, lowercase URL -> refused (unchanged)
+      expected [null,"vin_mismatch"]
+      actual   [null,"vin_mismatch"]
+PASS  T2b same page, UPPERCASE URL -> refused (before: the URL supplied the VIN and $31,000 was accepted)
+      expected [null,"vin_mismatch"]
+      actual   [null,"vin_mismatch"]
+PASS  T3u other vehicle in body, UPPERCASE final URL -> refused (before: classifyRenderedPage said vehicle)
+      expected ["vin_mismatch","vehicle"]
+      actual   ["vin_mismatch","vehicle"]
+PASS  T4 similar-vehicle card first (same page as before) -> the vehicle's own $24,500 (before: the card's $19,900)
+      expected 24500
+      actual   24500
+PASS  T4c an unmarked card that links another VIN -> removed with that vehicle, $24,500
+      expected 24500
+      actual   24500
+PASS  T4b an unattributed conflicting price -> refused as ambiguous (before: first match won)
+      expected [null,"ambiguous_price"]
+      actual   [null,"ambiguous_price"]
+PASS  T5 inclusive setting, page shows no fee line -> derived but held, not page-verified (before: written, status ok)
+      expected ["dealer_configured_unverified",23600,false]
+      actual   ["dealer_configured_unverified",23600,false]
+PASS  T5b a fee line alone is not evidence of inclusion -> still held (before: identical note to T5)
+      expected ["dealer_configured_unverified",false]
+      actual   ["dealer_configured_unverified",false]
+PASS  T5c a fee line and a labelled total that agree with the setting -> page-verified
+      expected ["page_verified",true]
+      actual   ["page_verified",true]
+PASS  T6 page figure == feed MSRP, inclusive setting, stale feed -> the guard still passes it, but it is held (before: written)
+      expected [false,"dealer_configured_unverified",false]
+      actual   [false,"dealer_configured_unverified",false]
+PASS  T7 website $5,000 below a fresh feed price -> still not a mis-parse (unchanged: no lower bound)
+      expected false
+      actual   false
+
+12 checks, 0 failed

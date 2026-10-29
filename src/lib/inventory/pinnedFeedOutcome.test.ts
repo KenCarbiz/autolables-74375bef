@@ -79,3 +79,17 @@ describe("validation", () => {
     expect(o.kind).toBe("provider_refused");
   });
 });
+
+describe("our own budget refusal is never reported as the provider's 429", () => {
+  it("classifies a local budget refusal as budget_refused, with no HTTP status and no provider blamed", () => {
+    const o = classifyPinnedFeed(sample({ refused: true, budgetDenied: true, http: 0 }), PIN, ROOFTOP);
+    expect(o.kind).toBe("budget_refused");
+    expect(o.error).toBe("budget_refused");
+    expect(o.runStatus).toBe("failed");
+    expect(o.note).toMatch(/nothing was sent to MarketCheck/);
+    expect(o.note).not.toMatch(/HTTP 429|rate-limited/);
+  });
+  it("a provider 429 is still a provider refusal", () => {
+    expect(classifyPinnedFeed(sample({ refused: true, http: 429 }), PIN, ROOFTOP).kind).toBe("provider_refused");
+  });
+});

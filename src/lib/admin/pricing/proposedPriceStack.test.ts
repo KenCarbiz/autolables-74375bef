@@ -5,7 +5,7 @@ import {
   readPriceStack,
   stageOf,
   type PriceStackConfig,
-} from "../../../../supabase/proposed/crawl-fee-treatment/priceStack";
+} from "../../../../supabase/functions/_shared/priceStack";
 import {
   DEALER_LABEL,
   OTHER_VIN,
