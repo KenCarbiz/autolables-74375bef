@@ -14,6 +14,9 @@
 #   policy B      plus the proposed fee basis migration (--policy-b), with
 #                 two-session concurrency, a reload export and the SQL/TypeScript
 #                 parity grid
+#   root cause    the read-only per-vehicle review's root-cause patterns and
+#                 the guarded correction with its reverse, on synthetic
+#                 look-alikes of the October 2026 classes
 #   rollback      the data revert from an apply's audit row, then the code
 #                 rollback in a fresh database checked against the hosted
 #                 fingerprints and the hosted cases
@@ -86,6 +89,8 @@ if [[ " $* " == *" --policy-b "* ]]; then
   "${PSQL[@]}" -d "$DB" -f scripts/db-verify/41_parity_export.sql > "${PARITY_EXPORT:-scripts/admin-parity/evidence/pricing/policy-b-sql-plans.json}"
   scripts/db-verify/40_concurrency.sh "$DB" "${RELOAD_EXPORT:-scripts/admin-parity/evidence/pricing/policy-b-reload.json}"
   scripts/db-verify/42_revert_and_rollback.sh "$DB"
+  # Last: it commits synthetic corrections and audit rows to this throwaway database.
+  scripts/db-verify/43_root_cause_and_correction.sh "$DB"
 fi
 
 if [[ " $* " == *" --proposed "* ]]; then

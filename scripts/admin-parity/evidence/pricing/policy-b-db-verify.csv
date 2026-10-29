@@ -1388,3 +1388,21 @@ seq,stage,area,label,principal,expected,actual,probe_expected,probe_actual,pass
 1387,rollback,hosted cases after rollback: fee recalculation,anon cannot call it,anon,error 42501,error 42501,,,t
 1388,rollback,hosted cases after rollback: fee recalculation,"known gap: an invitation not yet accepted, for a general manager, can recalculate",pending_manager,ok,ok rows=1,4,4,t
 1389,rollback,hosted cases after rollback: fee recalculation,"it reaches archived stock and restamps verification, unlike the reviewed apply",owner,ok,ok rows=1,900.00|4|0,900.00|4|0,t
+1390,root cause,root cause,the review writes nothing,postgres,101d07e1b9e90cef31f66e3e9560a9e3,101d07e1b9e90cef31f66e3e9560a9e3,,,t
+1391,root cause,root cause,each pattern is named (vin suffix:root cause),postgres,050501:double_fee_subtraction 050502:incentive_gap_suspected 050503:repricing_after_feed_freeze,050501:double_fee_subtraction 050502:incentive_gap_suspected 050503:repricing_after_feed_freeze,,,t
+1392,root cause,root cause,"only class A gets a candidate correction, on the before-fee price alone",postgres,"050501:{""to"": 60000.00, ""from"": 59105}","050501:{""to"": 60000.00, ""from"": 59105}",,,t
+1393,root cause,root cause,"archived and unpriced vehicles are reported, not proposed for change",postgres,050504:archived: left untouched; outside fee changes unless explicitly included 050505:quarantined: no usable price; never corrected automatically,050504:archived: left untouched; outside fee changes unless explicitly included 050505:quarantined: no usable price; never corrected automatically,,,t
+1394,root cause,root cause,a consistent vehicle whose page agrees with the feed is not listed,postgres,0,0,,,t
+1395,root cause,root cause,"after a feed write that makes the stored fields agree, the website-versus-feed gap is still reported (disagreement|root cause|gap)",postgres,consistent|incentive_gap_suspected|10000.00,consistent|incentive_gap_suspected|10000.00,,,t
+1396,root cause,correction,an approved class A plan applies,postgres,"{""result"": ""APPLIED"", ""batch_id"": ""rc-batch-0001"", ""vehicles"": 1}","{""result"": ""APPLIED"", ""batch_id"": ""rc-batch-0001"", ""vehicles"": 1}",,,t
+1397,root cause,correction,only the before-fee price moved (price|before-fee|fee|sale price),postgres,60895.00|60000|895|60000,60895.00|60000|895|60000,,,t
+1398,root cause,correction,"verification stamp, parse status, notes and recalculation stamp untouched",postgres,null|ok|Doc fee updated in a|null,null|ok|Doc fee updated in a|null,,,t
+1399,root cause,correction,"the audit row keeps before, after and evidence",postgres,59105>60000|page 60000 = feed 60895 - fee 895; feed price_includes_fees,59105>60000|page 60000 = feed 60895 - fee 895; feed price_includes_fees,,,t
+1400,root cause,correction,the same batch cannot be applied twice,postgres,refused,refused,,,t
+1401,root cause,correction,the batch reverts,postgres,"{""result"": ""REVERTED"", ""batch_id"": ""rc-batch-0001"", ""vehicles"": 1}","{""result"": ""REVERTED"", ""batch_id"": ""rc-batch-0001"", ""vehicles"": 1}",,,t
+1402,root cause,correction,after the revert the row is exactly as before,postgres,60895.00|59105|895|60000,60895.00|59105|895|60000,,,t
+1403,root cause,correction,a batch cannot be reverted twice,postgres,refused,refused,,,t
+1404,root cause,correction,"a plan made against values that have since moved is refused, nothing written",postgres,refused|60895.00|59105|895|60000,refused|60895.00|59105|895|60000,,,t
+1405,root cause,correction,"a plan touching an archived or unpriced vehicle is refused whole, the good vehicle included (archived|quarantined|row 501)",postgres,archived|quarantined|60895.00|59105|895|60000,archived|quarantined|60895.00|59105|895|60000,,,t
+1406,root cause,correction,a plan naming a non-price field is refused,postgres,refused,refused,,,t
+1407,root cause,correction,"a revert after a later write is refused, nothing written (refused|row)",postgres,refused|60895.00|60000|895|60895,refused|60895.00|60000|895|60895,,,t

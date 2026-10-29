@@ -1045,6 +1045,137 @@ authorized):**
 > return the row verbatim:
 > `SELECT public.doc_fee_change_review(tenant_id, 895, false) FROM public.dealer_profiles;`
 
+### 10.11 Pricing root cause (2026-10-29), owner summary
+
+**Scope.** This section covers the 43 active tenant-1 conflicts. The per-vehicle
+evidence is in a restricted report kept outside this repository. Production
+was only read, with SELECTs. No price, migration, job or deployment changed.
+The tenant-wide fee Apply stays blocked.
+
+#### What is happening
+
+1. **The fee basis differs by page type, and the crawler assumes one basis.**
+   - The MarketCheck feed marks its price fee-inclusive on 41 of the 43
+     vehicles (`price_includes_fees: true`, `fees: 895`); the flag is null on
+     2 CPO vehicles.
+   - New-vehicle pages show a "Selling Price" before the fee. On all 9 new
+     class A vehicles it equals MSRP and equals feed price minus $895.
+   - Used and CPO pages showed the same figure as the fee-inclusive feed
+     price on 9 September 2026.
+   - `crawl-advertised-prices` applies one dealership flag
+     (`advertised_includes_doc_fee`) to every page. On new-vehicle pages it
+     therefore subtracts the fee from a price that never contained it.
+2. **The feed has been frozen since 1-3 October.** MarketCheck refused 45 of
+   46 October calls for quota. Meanwhile the crawler kept reading the
+   dealer's pages: 27-28 October, with screenshots.
+
+#### Classes (counts only)
+
+| Class | Vehicles | Root cause | Confidence | Proposed field change |
+| --- | --- | --- | --- | --- |
+| A | 10 (9 new, 1 CPO) | The derived before-fee price lost the fee twice. Two sources agree to the dollar: page = feed - $895, and page = MSRP on the new ones. | High | `advertised_price_before_doc` = total - fee on all 10. Nothing else changes. The change is prepared, dry-run and reversible, and not run. |
+| B2 | 25 (all new INFINITI) | The page's before-fee price is exactly $10,000 (14 vehicles), $4,000 (10) or $2,000 (1) above the feed's. That is consistent with an incentive or conditional offer included in the feed price but not in the page's Selling Price, or an offer that has since ended. Their stored before-fee price also carries the class A double subtraction. | Systematic: high. Cause: medium. Which price to advertise: unknown. | None until the incentive treatment is confirmed from the screenshots or OEM incentive data. |
+| B1 | 8 used/CPO (7 lower by $721-$2,602, 1 higher by $488) | Dealer repricing after the feed froze. Page and feed agreed to the dollar on 9 Sep; the gaps are not fee- or incentive-shaped. | Medium-high | None now. The November feed refresh should catch up; any remaining gap needs dealer confirmation and a per-vehicle approval. |
+
+The B2 count of 26 in 10.10 included one used vehicle. It behaves like B1,
+so it has moved there.
+
+**B2 compliance note (not legal advice).** If the feed price includes
+conditional incentives not available to every buyer, the Label and Passport
+currently show that lower figure, while the dealer's page shows $10,000 or
+$4,000 more.
+
+**Archived and no-price records** are untouched and quarantined. The
+correction template refuses archived and unpriced vehicles outright.
+
+**After A1, tenant 1 stays blocked.** The 10 class A vehicles' page
+observations show total - fee, which contradicts a fee-inclusive basis. That
+is a basis decision for new-vehicle pages, not a further price change.
+
+#### Tools added (synthetic tests only; nothing ran against production)
+
+- **Root-cause review.** `scripts/db-verify/fee-basis-vehicle-review.sql`
+  gains `root_cause`, `website_minus_total` and
+  `website_minus_feed_before_fee`. The root cause is one of:
+  - `double_fee_subtraction`
+  - `incentive_gap_suspected`
+  - `repricing_after_feed_freeze`
+  - `unexplained`
+
+  It compares the latest page observation with the feed, so a B2-style gap is
+  still reported after a feed write makes the stored fields agree with each
+  other.
+- **Guarded correction and its reverse.** `scripts/db-verify/pricing-correction.template.sql`
+  and `pricing-correction-revert.template.sql` are paste-safe. Each run:
+  - is all or nothing;
+  - applies only if all four price fields still hold the reviewed values;
+  - refuses archived or unpriced vehicles, non-price fields and repeated
+    batches;
+  - writes an audit row per vehicle with before, after and evidence;
+  - never touches verification stamps, parse status or notes.
+
+  A revert works only while each vehicle still holds the corrected values.
+- **Isolated database:** a new `root cause` stage runs on synthetic
+  look-alikes of each class (`05_root_cause_fixture.sql`,
+  `43_root_cause_and_correction.sh`). 18 cases, all passing. Full run: 1,407
+  cases; the only 6 failures are the documented pre-fix `live` cases.
+
+#### Proposed code fix (not written to `supabase/functions`, not deployed)
+
+- In `crawl-advertised-prices` `buildBreakdown`, decide each page's fee
+  treatment instead of applying the dealership flag. When the feed says its
+  price includes the fee and the page figure equals feed price minus fee,
+  treat the page figure as the before-fee price. Otherwise keep today's rule.
+- Record the decision in the observation notes.
+- Apply it to new-vehicle pages first. Add a test with the class A shape.
+- This changes the writer for every vehicle, so it needs its own approval.
+
+#### MarketCheck: November refresh readiness (no calls made)
+
+| Item | State |
+| --- | --- |
+| `marketcheck-sync` | Scheduled and active, hourly at :07. It is calling now and being refused for quota (last call 03:07 UTC on 29 Oct). |
+| `marketcheck-incentives` | Scheduled and active, daily at 03:30. |
+| `enrich-sweep-nightly` | Paused. |
+| Call budget | `provider_call_budgets`: cap of 5,000 calls a month, 250 reserved for essential calls, enabled. `market_provider_budgets`: disabled. |
+| October | 46 calls: 45 refused for quota, 1 with no result. |
+| November quota | Not confirmed. This needs the MarketCheck account. |
+
+**Consequence.** No restart is needed for paid calls to resume: the two
+active jobs will start succeeding as soon as the quota resets. The first
+successful sync rewrites `price`, `advertised_price_before_doc`,
+`website_sale_price`, `doc_fee`, `price_parse_status` and
+`price_last_verified_at` on every vehicle it returns. That probably resolves
+class A and most of B1. B2 would then look consistent in the stored fields,
+although the new review still reports it.
+
+**Decision needed before the reset**, both owner-authorized:
+- **(a)** let the jobs resume on their own; or
+- **(b)** pause `marketcheck-sync` and `marketcheck-incentives` until quota
+  and budget are confirmed.
+
+Lovable prompt for (b), only if authorized:
+
+> In the AutoLabels project, do not change any code, migration or data. Run
+> exactly this through the database tool and return the result:
+> `SELECT jobname, cron.alter_job(jobid, active := false) FROM cron.job WHERE jobname IN ('marketcheck-sync', 'marketcheck-incentives');`
+> then `SELECT jobname, active FROM cron.job WHERE jobname IN ('marketcheck-sync', 'marketcheck-incentives');`.
+> To resume later, run the first statement with `active := true`.
+
+#### Decisions requested
+
+1. Approve, reject or defer A1, the 10-vehicle before-fee correction. It is
+   prepared, dry-run and reversible.
+2. Decide the fee treatment of new-vehicle pages. A dealer or screenshot
+   check confirms whether the page "Selling Price" excludes the fee. This
+   decides whether the evidence block on those vehicles reflects a real
+   basis conflict.
+3. B2: check the screenshots for an offer line, or authorize an OEM incentive
+   lookup (a paid MarketCheck call). Then decide which price the dealership
+   advertises.
+4. MarketCheck before the quota reset: choose (a) or (b).
+5. Approve or defer the crawler fee-treatment fix.
+
 ## 11. Approvals requested
 
 1. Done: the fee preview fix was applied and verified (section 4).
