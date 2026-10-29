@@ -2181,49 +2181,149 @@ usability fixes (`2d7954d`) and the strengthened acceptance register
 
 ## Scheduled check-in, 2026-10-29
 
-Read-only queries at about 07:58 UTC, after the check-in fired at 07:41 UTC.
-Counts only. Nothing was invoked, no flag was changed, no migration was
-applied and no provider was called.
+Read-only monitoring. The first pass was at about 07:58 UTC and the
+clarification at about 10:00 UTC (database clock).
+- **Not done:** no job enabled or changed, no function invoked, no provider
+  call, no production setting saved, no inventory changed.
+- **Records:** counts and redacted references only. The per-vehicle detail
+  (tenant, VIN, URL, prices) is in a restricted file outside the
+  repository.
+- **Scope:** separate from the screen 07 fixture-write block and the
+  addendum applicability fix (10.22). It approves no screen, deployment or
+  pricing migration.
 
-1. **Inventory feed** (`inventory_sync_runs`): no runs since 06:30 UTC. The
-   latest run started at 03:07 UTC and failed with HTTP 429: MarketCheck
-   rate limited or over quota on the pinned feed, inventory left untouched.
-   This is the expected provider limit until Nov 1, not a migration effect.
-2. **Website price crawl, since 07:00 UTC.**
+### 1. Website price crawl (07:20-07:25 UTC, 4 chained runs)
 
-   | Source | Result |
-   | --- | --- |
-   | `advertised_price_crawl_attempts` | 17: 10 captured, 7 VIN mismatch (last at 07:24) |
-   | `advertised_price_crawl_run` audit rows | 4 runs (07:21, 07:23, 07:24, 07:25 UTC) |
-   | Picked / processed / updated / failed | 54 / 25 / 9 / 0 |
+**Counting scopes.**
 
-   The service-role crawl wrote prices (9 updates) under the priced-column
-   guard trigger.
-3. **Settings writes since migration 2** (2026-10-28 11:16 UTC):
-   - 0 audit rows for `pricing_policy_changed`, `routing_policy_changed`,
-     `publishing_policy_changed`, `addon_policy_changed` and
-     `doc_fee_policy_applied`;
-   - `dealer_profiles.policy_version` is 1 on both profiles.
+| Count | Scope | Value |
+| --- | --- | --- |
+| Picked | queue items taken per run, summed. The first three runs ran out of time, so the next run re-picked what was left; a vehicle can be picked more than once | 25 + 17 + 10 + 2 = 54 |
+| Processed | vehicles crawled before the time budget ran out: updated + unchanged + skipped | 8 + 7 + 8 + 2 = 25 |
+| Updated | observation rows whose price was new or changed | 1 + 3 + 4 + 1 = 9 |
+| Unchanged | captured, same price as before | 1 |
+| Skipped | processed without a write | 15 |
+| Attempt rows | `advertised_price_crawl_attempts` keeps one row per vehicle, upserted; rows with a last attempt after 07:00 | 17 (10 captured, 7 VIN mismatch) |
+| Failed | | 0 |
 
-   No settings write has gone through `merge_dealer_settings` yet.
-4. **`admin_policy_applications`:** 0 rows.
-5. **Escalation sweep** (audit rows with actions containing "escalat" or
-   "lead" since 2026-10-28 11:46 UTC): 0 rows. With no rows, there is
-   nothing to check for a missing `store_id` or an email address.
-6. **MarketCheck spend protection.**
-   - `provider_call_events` since 2026-10-28 11:00 UTC holds 3 calls, all
-     from `marketcheck-sync` (`dealer_inventory_syndication`) at 03:07 UTC
-     today.
-   - All 3 were refused for quota (HTTP 429). The ledger's estimate is
-     $3.00 for the three, but they returned no data. Whether the provider
-     bills a refused call cannot be read from here.
-   - No other caller and no successful paid call.
-   - Cron:
-     - `enrich-sweep-nightly` is inactive; last start 2026-10-27 03:15 UTC.
-     - `marketcheck-sync` is inactive now; last start 2026-10-29 03:07 UTC
-       (it ran hourly until then).
-     - `marketcheck-incentives` is inactive; last start 2026-10-29 03:30
-       UTC.
-     - `specs-backfill` is active; last start 2026-10-29 03:45 UTC, with no
-       provider call recorded in the ledger.
-   - `tenant_incentive_settings` with incentives enabled: 0.
+**Reconciliation.**
+- The 17 attempt rows are the 10 captured (9 updated + 1 unchanged) and 7 of
+  the 15 skipped (the page redirected to another vehicle).
+- The other 8 skipped vehicles were processed without an attempt row after
+  07:00. The run log does not list them per vehicle, so their skip reasons
+  are not recorded.
+
+**What was written.** Nine `advertised_prices` observation rows: 7 price
+changes and 2 first captures (both new vehicles). The same crawl updated
+these `vehicle_listings` fields on those vehicles:
+- `website_sale_price`;
+- `advertised_price_before_doc` (the page figure minus the $895 fee);
+- `doc_fee`;
+- `website_price_term` ("Selling Price", read from the page label);
+- the parse status and notes;
+- `price_last_verified_at`;
+- `price_source_url`.
+
+The selling `price` column was not changed by the crawl.
+
+**Why the writes passed the guard.**
+- `vehicle_listings_guard_priced_columns()` returns immediately when
+  `current_user <> 'authenticated'`.
+- The crawl runs as the service role, so no role check ran. The writes
+  passed because the guard exempts service-role writers by design, not
+  because a pricing role authorized them.
+- `vehicle_change_history` recorded none of them. The "old" values come from
+  the crawler's own notes.
+
+**Write succeeded is not correct price verified.**
+- All 9 writes succeeded.
+- None of the 9 prices was independently verified. The screenshots are in a
+  private bucket and were not opened.
+- Flags (one vehicle can carry more than one):
+  - 1 update has no screenshot and no hash on its observation row:
+    insufficient evidence.
+  - 2 updates are new vehicles whose fee basis is undecided (10.12, item 3).
+    The crawler treated the page "Selling Price" as fee-inclusive. If
+    new-vehicle pages show the price before the fee, the stored before-doc
+    figures are $895 low.
+  - The remaining 6 have a screenshot and hash, and their values are
+    unverified.
+  - In 3 of the used/CPO updates the page price differs from the stored feed
+    `price` by $1,780 to $5,118. The feed has been stale since 3 October.
+
+### 2. MarketCheck spend
+
+- **Ledger, since 2026-10-28 11:00 UTC:** 3 calls, all from `marketcheck-sync`
+  (`dealer_inventory_syndication`) between 03:07:08 and 03:07:13 UTC on
+  29 October.
+- All 3 were refused for quota (HTTP 429) and returned no data.
+- Our ledger estimates $3.00 for them. That is an internal estimate, not
+  confirmed spend: whether MarketCheck bills a refused call is unknown.
+- No other caller and no call that returned data.
+
+### 3. Scheduled jobs
+
+In the table:
+- "Last attempt" is the latest `cron.job_run_details` start.
+- "Last dispatch OK" is the latest run cron marked succeeded. It means the
+  HTTP request was queued, not that the function succeeded.
+- "Last function success" is filled only where a run log exists.
+
+| Job | Enabled | Last attempt (UTC) | Last dispatch OK | Last function success |
+| --- | --- | --- | --- | --- |
+| `marketcheck-sync` (hourly :07) | **no** | 10-29 03:07 | 10-29 03:07 | **10-03 03:08** (`inventory_sync_runs`) |
+| `marketcheck-incentives` (daily 03:30) | **no** | 10-29 03:30 | 10-29 03:30 | no run log; unknown |
+| `enrich-sweep-nightly` (daily 03:15) | **no** | 10-27 03:15 | 10-27 03:15 | no run log; unknown |
+| `specs-backfill` (daily 03:45) | yes | 10-29 03:45 | 10-29 03:45 | no run log; idle (below) |
+| `autolabels_crawl_advertised_prices` (daily 07:20) | yes | 10-29 07:20 | 10-29 07:20 | 10-29 07:25 (4 runs, 0 failed) |
+| `passport-lead-escalation-every-5-min` | yes | 10-29 10:00 | 10-29 10:00 | no audit rows; unknown |
+| 16 other jobs (forms, digests, descriptions, EPA, equipment proof, factory sticker, get-ready, intake, ingest, OEM documents, packet backfill, passport delivery, price-drop re-engage, title reminders, CARFAX links) | yes | latest within the last day | each latest dispatch OK | not checked |
+
+**Why sync and incentives are disabled.**
+- Owner decision of 2026-10-29: option (b), pause until quota and budget
+  are confirmed (10.11).
+- Lovable ran it at about 03:51 UTC; this is recorded in 10.12.
+- The cron history is consistent with that: last attempts at 03:07 and
+  03:30, and no 04:07 sync.
+- The database has no audit row for the change, and `cron.job` keeps no
+  change timestamp. The repository record is the only evidence of when and
+  why.
+
+**`specs-backfill` is idle, neither useful nor blocked.**
+- All 131 published vehicles already have a build sheet, and none holds an
+  unasked generic sheet. Each daily run finds no candidates and exits.
+- No `specs-backfill` or `marketcheck-specs` call has ever been recorded in
+  `provider_call_events`.
+- The last per-vehicle specs attempt stamp is 3 October.
+- Its state is unchanged.
+
+### 4. Inventory feed freshness
+
+- **Last successful sync:** 2026-10-03, 03:07-03:08 UTC. It saw 128
+  vehicles, added 12, updated 116, removed 3 and recorded 30 prices.
+- **Feed-derived inventory age:** about 26 days at 10:00 UTC on 29 October.
+- **Since then:**
+  - 4-26 October: only "skipped: ran N h ago" rows were written, and no row
+    for the daily 03:07 attempt itself, so those attempts' outcomes are not
+    in `inventory_sync_runs`;
+  - 27-29 October: three refused attempts (HTTP 429);
+  - the job has been paused since 29 October.
+- **Website prices:** 85 of 131 active vehicles were last price-checked more
+  than 7 days ago, and 2 never were.
+
+"No runs since 06:30" means only that the job is paused. It does not mean the
+feed is current.
+
+### 5. Still unverified (open), with isolated tests proposed
+
+No production activity was or will be created to clear these. Each proposed
+test runs on a replica or local database with synthetic tenants, users and
+vehicles.
+
+| Path | Real activity so far | Proposed isolated test |
+| --- | --- | --- |
+| Escalation tenant scoping and recipient handling | none: no lead, no escalation audit row | Two synthetic tenants, each with a lead past its window. Run the deployed function source against the replica with a capturing mail stub. Assert: each audit row's `store_id` equals its tenant; recipients come only from that tenant's routing; no address in audit details; a tenant without a destination is skipped and logged. Extends the 22-check run in 7. |
+| First settings write through migration 2 (`merge_dealer_settings`) | none | Replica copy of the migrated schema. As each role in the 3.1 matrix, merge one key per family. Assert refusals for the wrong roles and acceptance for the right ones. |
+| `policy_version` increment and `admin_policy_applications` logging | none: both profiles still at 1; 0 application rows | Same replica. Apply a synthetic fee policy through the review-and-apply RPC. Assert `policy_version` 1 to 2, one application row with the idempotency key, a replay with the same key is a no-op, and a stale version is refused. |
+| Successful inventory sync after quota recovery | none since 3 October; job paused | Run `marketcheck-sync` locally against a recorded feed payload (no network), into a replica. Assert counts, price fields, the fee basis and the run row. The live first sync stays gated on your resume decision after quota is confirmed. |
+
