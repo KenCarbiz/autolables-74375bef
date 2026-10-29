@@ -118,7 +118,7 @@ const Tile = ({ icon: Icon, tone, value, label, hint, filled = false }: { icon: 
   </div>
 );
 
-const MISMATCH_NOTE = "The website shows a different price; it is kept for review.";
+const MISMATCH_NOTE = "The stored sale price differs from this total; its source is not verified and it is kept for review.";
 
 // The vehicle price before the fee. On a fee-inclusive basis it is the part
 // of the kept total that the fee does not take, so it moves when the fee does.
@@ -196,7 +196,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
   const { user, isAdmin } = useAuth();
   const { member } = useEntitlements();
   const { tenant } = useTenant();
-  const { settings, updateSettings, reload } = useDealerSettings();
+  const { settings, reload } = useDealerSettings();
   const audit = useAudit();
   const tenantId = tenantIdOf(tenant);
   const live = !fixture;
@@ -310,31 +310,11 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
       expectedVersion: state.impact.version,
       idempotencyKey: state.idempotencyKey,
       includeArchived: scope === "all",
-      updateSettings: (patch) => updateSettings(patch),
     });
     if (outcome.kind === "conflict") { dispatch({ type: "conflict", changedFields: ["doc_fee"] }); return; }
-    if (outcome.path === "fallback" && outcome.result.status !== "failed") {
-      audit.log({
-        store_id: tenantId,
-        user_id: user?.id ?? "",
-        action: "settings_updated",
-        entity_type: "doc_fee_policy",
-        entity_id: tenantId,
-        details: {
-          before: state.original,
-          after: state.draft,
-          scope,
-          idempotency_key: state.idempotencyKey,
-          expected_version: state.impact.version,
-          affected: outcome.result.affected,
-          path: "recalc_tenant_doc_fee",
-          status: outcome.result.status,
-        },
-      });
-    }
     dispatch({ type: "result", result: outcome.result });
     qc.invalidateQueries({ queryKey: ["admin-v2"] });
-    if (outcome.path === "server") void reload?.();
+    void reload?.();
   };
 
   const ctx = useMemo<AdminVisibilityContext>(() => ({ role, isAdmin, features: { feature_product_rules: settings.feature_product_rules, feature_invoicing: settings.feature_invoicing, feature_warranty: settings.feature_warranty } }), [role, isAdmin, settings.feature_product_rules, settings.feature_invoicing, settings.feature_warranty]);
@@ -541,9 +521,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
             </section>
 
             <div className="mt-[19px] space-y-[9px] [&>div]:py-[7.5px] [&>div>svg]:w-6 [&>div>svg]:h-6">
-              {previewResult?.source === "client" ? (
-                <InlineNote tone="warning">Until the dedicated routine is installed, applying uses the existing recalculation, which also updates archived vehicles and refreshes each recalculated vehicle's verification stamp.</InlineNote>
-              ) : (
+              {previewResult?.source === "client" ? null : (
                 <InlineNote tone="warning" className="border-[#FCE3B6]">Source verification dates and mismatch flags will be preserved.</InlineNote>
               )}
               {blocked && <InlineNote tone="danger" title="This change cannot be applied yet.">{blocked}</InlineNote>}
@@ -551,7 +529,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               {impact?.warnings.filter((w) => w !== describeFeeBasis("includes_fee") && w !== describeFeeBasis("before_fee")).map((w) => (
                 <InlineNote key={w} tone="warning">{w}</InlineNote>
               ))}
-              {previewResult?.notes.filter((n) => !/existing recalculation/.test(n)).map((n) => (
+              {previewResult?.notes.map((n) => (
                 <InlineNote key={n} tone="info">{n}</InlineNote>
               ))}
               {impact?.exclusions.filter((x) => !/^Archived records/.test(x)).map((x) => (

@@ -5,7 +5,7 @@ import { renderAdmin } from "@/test/adminRender";
 import { resetSupabaseSpy, rpcCalls, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
 import { SCREEN_06 } from "@/pages/admin/fixtures/06";
 import { FEE_REVIEW_FIXTURE } from "@/pages/admin/fixtures/pricingFixtureData";
-import { LEGACY_SPLIT_BLOCK } from "@/pages/admin/views/pricing/pricingData";
+import { FALLBACK_APPLY_WARNING, LEGACY_SPLIT_BLOCK } from "@/pages/admin/views/pricing/pricingData";
 
 vi.mock("@/integrations/supabase/client", async () => {
   const m = await import("@/test/mocks/supabaseSpy");
@@ -18,13 +18,13 @@ const roleState = vi.hoisted(() => ({ role: "owner" }));
 vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ member: { role: roleState.role }, loading: false }) }));
 const auditState = vi.hoisted(() => ({ log: vi.fn() }));
 vi.mock("@/contexts/AuditContext", () => ({ useAudit: () => ({ log: auditState.log, entries: [] }) }));
-const settingsState = vi.hoisted(() => ({ updateSettings: vi.fn(async () => true), reload: vi.fn(async () => {}) }));
+const settingsState = vi.hoisted(() => ({ updateSettings: vi.fn(async () => true), reload: vi.fn(async () => {}), basis: { advertised_includes_doc_fee: false } as Record<string, unknown> }));
 vi.mock("@/contexts/DealerSettingsContext", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/contexts/DealerSettingsContext")>();
   return {
     ...mod,
     useDealerSettings: () => ({
-      settings: { ...mod.DEFAULT_SETTINGS, doc_fee_enabled: true, doc_fee_amount: 895, doc_fee_state: "CT", dealer_name: "Example Motors" },
+      settings: { ...mod.DEFAULT_SETTINGS, doc_fee_enabled: true, doc_fee_amount: 895, doc_fee_state: "CT", dealer_name: "Example Motors", ...settingsState.basis },
       updateSettings: settingsState.updateSettings,
       reload: settingsState.reload,
       loading: false,
@@ -144,26 +144,33 @@ describe("FeeReviewPage against live data without the server contracts", () => {
     expect(rpcCalls()).toEqual([]);
   });
 
-  it("reviews with the browser-side impact, states the fallback consequence, and applies through the existing routine only after review", async () => {
+  it("reviews with the browser-side impact but refuses to apply without the atomic routine, saving nothing", async () => {
     spyResponses.tables.vehicle_listings = { data: listingRows, count: 3, error: null };
     spyResponses.tables.dealer_profiles = { data: { updated_at: "2026-10-20T00:00:00Z" }, error: null };
-    spyResponses.rpcs.recalc_tenant_doc_fee = { data: 3, error: null };
     renderPage("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active", null);
     fireEvent.click(within(dialog()).getByRole("button", { name: "Review changes" }));
 
     const apply = await within(dialog()).findByRole("button", { name: "Apply to 3 active vehicles" });
-    expect(within(dialog()).getByText(/Until the dedicated routine is installed/)).toBeInTheDocument();
     expect(within(dialog()).getByText("archived vehicles excluded").parentElement).toHaveTextContent(/^1archived vehicles excluded/);
-    expect(rpcCalls()).toEqual(["admin_doc_fee_change_preview", "admin_policy_version"]);
-    expect(settingsState.updateSettings).not.toHaveBeenCalled();
-    expect(apply).toBeEnabled();
-
+    expect(within(dialog()).getAllByText(FALLBACK_APPLY_WARNING).length).toBeGreaterThan(0);
+    expect(apply).toBeDisabled();
     fireEvent.click(apply);
-    expect(await within(dialog()).findByText("Applied")).toBeInTheDocument();
-    expect(within(dialog()).getByText(/through the existing recalculation routine/)).toBeInTheDocument();
-    expect(settingsState.updateSettings).toHaveBeenCalledWith({ doc_fee_enabled: true, doc_fee_amount: 925, doc_fee_state: "CT" });
-    expect(rpcCalls()).toContain("recalc_tenant_doc_fee");
-    expect(auditState.log).toHaveBeenCalledWith(expect.objectContaining({ action: "settings_updated", entity_type: "doc_fee_policy", details: expect.objectContaining({ path: "recalc_tenant_doc_fee", affected: 3 }) }));
+    expect(rpcCalls()).toEqual(["admin_doc_fee_change_preview", "admin_policy_version"]);
+    expect(writeCalls().filter((c) => c.kind === "table")).toEqual([]);
+    expect(settingsState.updateSettings).not.toHaveBeenCalled();
+    expect(auditState.log).not.toHaveBeenCalled();
+  });
+
+  it("holds Apply when the dealership has not stated whether its prices include the fee", async () => {
+    spyResponses.rpcs.admin_doc_fee_change_preview = { data: { version: 4, eligible: 3, unchanged: 0, excluded_archived: 0, samples: [], warnings: [] }, error: null };
+    spyResponses.rpcs.admin_policy_version = { data: 4, error: null };
+    settingsState.basis = {};
+    renderPage("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active", null);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Review changes" }));
+    const apply = await within(dialog()).findByRole("button", { name: "Apply to 3 active vehicles" });
+    expect(apply).toBeDisabled();
+    expect(within(dialog()).getAllByText(/has not set whether its advertised prices include the document fee/).length).toBeGreaterThan(0);
+    settingsState.basis = { advertised_includes_doc_fee: false };
   });
 
   it("blocks apply when the impact cannot be computed", async () => {

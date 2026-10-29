@@ -1,5 +1,5 @@
 import { resolveDisplayPrice, type PriceDisplayMode } from "@/lib/priceModel";
-import { planFeeChange, type FeeBasis } from "./feeBasis";
+import { isDecidedBasis, planFeeChange, type FeeBasis } from "./feeBasis";
 
 // The customer price the Passport would show for one listing once a fee is
 // saved, with the document fee counted exactly once. The fee is applied
@@ -37,7 +37,7 @@ export function customerPrice(
   mode: PriceDisplayMode,
   basis: FeeBasis = defaultFeeBasis(mode),
 ): CustomerPrice | null {
-  if (basis === "conflict") return null;
+  if (!isDecidedBasis(basis)) return null;
   const draftFee = fee != null && Number.isFinite(fee) && fee > 0 ? fee : 0;
   const plan = planFeeChange(basis, { ...stored, advertisedBeforeDoc: stored.advertisedBeforeDoc ?? stored.price, docFee: stored.docFee ?? draftFee }, draftFee);
   if (plan.status === "invalid") return null;

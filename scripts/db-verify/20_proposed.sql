@@ -170,15 +170,6 @@ BEGIN
   END LOOP;
 END $$;
 
--- ── 5. Fee recalculation needs an accepted membership ───────────────────
-SELECT t.check('fee recalculation', 'an invitation not yet accepted, for a general manager, can no longer recalculate', 'pending_manager',
-  $q$RESET ROLE;;
-     UPDATE public.tenant_members SET role = 'general_manager' WHERE user_id = t.u('pending_manager');;
-     SELECT t.become('pending_manager');;
-     SELECT public.recalc_tenant_doc_fee('b0000000-0000-4000-8000-000000000001')$q$, 'error P0001');
-SELECT t.check('fee recalculation', 'an accepted general manager still can', 'general_manager',
-  $q$SELECT public.recalc_tenant_doc_fee('b0000000-0000-4000-8000-000000000001')$q$, 'ok');
-SELECT t.check('fee recalculation', 'a delegated used-car manager cannot (dealer-wide, not delegable)', 'general_manager',
-  $q$SELECT public.admin_grant_pricing_delegation('b0000000-0000-4000-8000-000000000001', t.u('used_car_manager'), 'all', now() + interval '30 days', 'Used desk');;
-     SELECT t.become('used_car_manager');;
-     SELECT public.recalc_tenant_doc_fee('b0000000-0000-4000-8000-000000000001')$q$, 'error P0001');
+-- ── 5. Fee recalculation ────────────────────────────────────────────────
+-- This proposal no longer redefines recalc_tenant_doc_fee; the fee basis
+-- proposal retires it (scripts/db-verify/30_fee_basis.sql checks that).

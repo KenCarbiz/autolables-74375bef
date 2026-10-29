@@ -1,0 +1,442 @@
+-- ROLLBACK for supabase/proposed/20261031000000_doc_fee_basis_policy_b.sql.
+-- Restores the four redefined functions to their hosted definitions, copied
+-- verbatim from the files they are applied from, and drops the functions the
+-- proposal adds. Verified in the isolated database: after this file the four
+-- function fingerprints equal the ones taken just before the proposal
+-- (scripts/db-verify/run.sh --policy-b, stage 'rollback').
+--
+-- It restores code only. Vehicle rows written by a policy B apply are not
+-- reverted here: each apply's audit row (doc_fee_policy_applied) holds the
+-- before and after of every vehicle it wrote, and
+-- scripts/db-verify/fee-change-revert-from-audit.sql restores them from it.
+--
+--   admin_doc_fee_change_preview  supabase/migrations/20261029120000_fix_fee_preview_warnings.sql
+--   admin_doc_fee_change_apply    supabase/migrations/20261029000000_admin_v2_policy_apply.sql
+--   merge_dealer_settings         supabase/migrations/20261029001000_admin_v2_settings_authority.sql
+--   recalc_tenant_doc_fee         the hosted body (read 2026-10-28), as in scripts/db-verify/01_prestate.sql
+
+-- ── admin_doc_fee_change_preview ────────────────────────────────
+CREATE OR REPLACE FUNCTION public.admin_doc_fee_change_preview(
+  p_tenant_id uuid,
+  p_enabled boolean,
+  p_amount numeric,
+  p_include_archived boolean DEFAULT false
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_fee numeric;
+  v_version bigint;
+  v_eligible integer;
+  v_unchanged integer;
+  v_archived_changed integer;
+  v_no_basis integer;
+  v_parse_warnings integer;
+  v_samples jsonb;
+  v_warnings text[] := ARRAY[]::text[];
+BEGIN
+  IF NOT (
+    public.has_role((SELECT auth.uid()), 'admin'::public.app_role)
+    OR public.tenant_role_in(p_tenant_id, ARRAY['owner','admin','general_manager','gsm'])
+  ) THEN
+    RAISE EXCEPTION 'not authorized for tenant %', p_tenant_id USING ERRCODE = '42501';
+  END IF;
+  IF p_amount IS NULL OR p_amount < 0 THEN
+    RAISE EXCEPTION 'fee amount must be zero or more';
+  END IF;
+
+  v_fee := CASE WHEN p_enabled THEN round(p_amount, 2) ELSE 0 END;
+  v_version := coalesce((SELECT policy_version FROM public.dealer_profiles WHERE tenant_id = p_tenant_id), 1);
+
+  SELECT
+    count(*) FILTER (WHERE (archived_at IS NULL OR p_include_archived)
+                       AND (doc_fee IS DISTINCT FROM v_fee
+                            OR website_sale_price IS DISTINCT FROM advertised_price_before_doc + v_fee)),
+    count(*) FILTER (WHERE (archived_at IS NULL OR p_include_archived)
+                       AND NOT (doc_fee IS DISTINCT FROM v_fee
+                                OR website_sale_price IS DISTINCT FROM advertised_price_before_doc + v_fee)),
+    count(*) FILTER (WHERE archived_at IS NOT NULL AND NOT p_include_archived
+                       AND (doc_fee IS DISTINCT FROM v_fee
+                            OR website_sale_price IS DISTINCT FROM advertised_price_before_doc + v_fee)),
+    count(*) FILTER (WHERE archived_at IS NULL AND price_parse_status = 'warning')
+  INTO v_eligible, v_unchanged, v_archived_changed, v_parse_warnings
+  FROM public.vehicle_listings
+  WHERE tenant_id = p_tenant_id
+    AND advertised_price_before_doc IS NOT NULL;
+
+  SELECT count(*) INTO v_no_basis
+  FROM public.vehicle_listings
+  WHERE tenant_id = p_tenant_id
+    AND archived_at IS NULL
+    AND advertised_price_before_doc IS NULL;
+
+  SELECT coalesce(jsonb_agg(s), '[]'::jsonb) INTO v_samples
+  FROM (
+    SELECT jsonb_build_object(
+      'vin_suffix', right(vin, 6),
+      'selling_price', advertised_price_before_doc,
+      'fee_before', doc_fee,
+      'fee_after', v_fee,
+      'total_before', website_sale_price,
+      'total_after', advertised_price_before_doc + v_fee,
+      'archived', archived_at IS NOT NULL
+    ) AS s
+    FROM public.vehicle_listings
+    WHERE tenant_id = p_tenant_id
+      AND advertised_price_before_doc IS NOT NULL
+      AND (archived_at IS NULL OR p_include_archived)
+      AND (doc_fee IS DISTINCT FROM v_fee
+           OR website_sale_price IS DISTINCT FROM advertised_price_before_doc + v_fee)
+    ORDER BY archived_at NULLS FIRST, price_last_verified_at DESC NULLS LAST, vin
+    LIMIT 5
+  ) q;
+
+  IF v_no_basis > 0 THEN
+    v_warnings := v_warnings || format('%s active vehicle(s) have no advertised price basis and are not affected.', v_no_basis);
+  END IF;
+  IF v_parse_warnings > 0 THEN
+    v_warnings := v_warnings || format('%s active vehicle(s) carry a price parse warning; it is preserved.', v_parse_warnings);
+  END IF;
+  IF p_include_archived THEN
+    v_warnings := v_warnings || 'Archived vehicles are included by explicit request.'::text;
+  END IF;
+  v_warnings := v_warnings || 'Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation.'::text;
+
+  RETURN jsonb_build_object(
+    'version', v_version,
+    'computed_at', now(),
+    'fee', v_fee,
+    'eligible', v_eligible,
+    'unchanged', v_unchanged,
+    'excluded_archived', v_archived_changed,
+    'no_price_basis', v_no_basis,
+    'samples', v_samples,
+    'warnings', to_jsonb(v_warnings)
+  );
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.admin_doc_fee_change_preview(uuid, boolean, numeric, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_doc_fee_change_preview(uuid, boolean, numeric, boolean) TO authenticated, service_role;
+
+-- ── admin_doc_fee_change_apply ──────────────────────────────────
+CREATE OR REPLACE FUNCTION public.admin_doc_fee_change_apply(
+  p_tenant_id uuid,
+  p_enabled boolean,
+  p_amount numeric,
+  p_expected_version bigint,
+  p_idempotency_key text,
+  p_include_archived boolean DEFAULT false
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_uid uuid := (SELECT auth.uid());
+  v_fee numeric;
+  v_current bigint;
+  v_prev jsonb;
+  v_count integer;
+  v_audit_id uuid;
+  v_result jsonb;
+  v_existing jsonb;
+  v_requested jsonb;
+BEGIN
+  IF NOT (
+    public.has_role(v_uid, 'admin'::public.app_role)
+    OR public.tenant_role_in(p_tenant_id, ARRAY['owner','admin','general_manager','gsm'])
+  ) THEN
+    RAISE EXCEPTION 'not authorized for tenant %', p_tenant_id USING ERRCODE = '42501';
+  END IF;
+  IF p_idempotency_key IS NULL OR length(trim(p_idempotency_key)) < 8 THEN
+    RAISE EXCEPTION 'idempotency key required';
+  END IF;
+  IF p_amount IS NULL OR p_amount < 0 THEN
+    RAISE EXCEPTION 'fee amount must be zero or more';
+  END IF;
+  IF p_expected_version IS NULL THEN
+    RAISE EXCEPTION 'expected policy version required';
+  END IF;
+
+  -- A repeated key is the same operation: return what happened, change nothing.
+  SELECT result INTO v_existing
+  FROM public.admin_policy_applications
+  WHERE idempotency_key = p_idempotency_key;
+  IF v_existing IS NOT NULL THEN
+    RETURN v_existing || jsonb_build_object('status', 'duplicate', 'original_status', v_existing->>'status');
+  END IF;
+
+  v_fee := CASE WHEN p_enabled THEN round(p_amount, 2) ELSE 0 END;
+  v_requested := jsonb_build_object(
+    'enabled', p_enabled, 'amount', p_amount, 'include_archived', p_include_archived,
+    'expected_version', p_expected_version);
+
+  -- The policy row is the lock. A tenant that never saved settings gets one.
+  INSERT INTO public.dealer_profiles (tenant_id, settings, updated_by)
+  VALUES (p_tenant_id, '{}'::jsonb, v_uid)
+  ON CONFLICT (tenant_id) DO NOTHING;
+
+  SELECT policy_version, coalesce(settings, '{}'::jsonb)
+    INTO v_current, v_prev
+  FROM public.dealer_profiles
+  WHERE tenant_id = p_tenant_id
+  FOR UPDATE;
+
+  -- Under the lock the ledger is authoritative: a same-key call that finished
+  -- while this one waited is answered as a duplicate, not as a conflict.
+  SELECT result INTO v_existing
+  FROM public.admin_policy_applications
+  WHERE idempotency_key = p_idempotency_key;
+  IF v_existing IS NOT NULL THEN
+    RETURN v_existing || jsonb_build_object('status', 'duplicate', 'original_status', v_existing->>'status');
+  END IF;
+
+  IF v_current IS DISTINCT FROM p_expected_version THEN
+    RETURN jsonb_build_object('status', 'conflict', 'affected', 0, 'version', v_current, 'audit_id', NULL);
+  END IF;
+
+  UPDATE public.dealer_profiles
+  SET settings = coalesce(settings, '{}'::jsonb)
+                 || jsonb_build_object('doc_fee_enabled', p_enabled, 'doc_fee_amount', p_amount),
+      updated_by = v_uid
+  WHERE tenant_id = p_tenant_id
+  RETURNING policy_version INTO v_current;
+
+  -- Changed rows only. Active stock unless archived is asked for. The
+  -- verification stamp and the parse status are not touched: recalculation
+  -- is not an observation of the dealer's price.
+  UPDATE public.vehicle_listings
+  SET doc_fee = v_fee,
+      website_sale_price = advertised_price_before_doc + v_fee,
+      price_recalculated_at = now()
+  WHERE tenant_id = p_tenant_id
+    AND advertised_price_before_doc IS NOT NULL
+    AND (archived_at IS NULL OR p_include_archived)
+    AND (doc_fee IS DISTINCT FROM v_fee
+         OR website_sale_price IS DISTINCT FROM advertised_price_before_doc + v_fee);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+
+  INSERT INTO public.audit_log (action, entity_type, entity_id, store_id, user_id, details)
+  VALUES (
+    'doc_fee_policy_applied', 'tenant', p_tenant_id::text, p_tenant_id::text, v_uid,
+    jsonb_build_object(
+      'prev', jsonb_build_object('doc_fee_enabled', v_prev->'doc_fee_enabled', 'doc_fee_amount', v_prev->'doc_fee_amount'),
+      'next', jsonb_build_object('doc_fee_enabled', p_enabled, 'doc_fee_amount', p_amount),
+      'fee_applied', v_fee,
+      'affected', v_count,
+      'include_archived', p_include_archived,
+      'expected_version', p_expected_version,
+      'version', v_current,
+      'idempotency_key', p_idempotency_key))
+  RETURNING id INTO v_audit_id;
+
+  v_result := jsonb_build_object('status', 'applied', 'affected', v_count, 'version', v_current, 'audit_id', v_audit_id);
+
+  INSERT INTO public.admin_policy_applications (idempotency_key, tenant_id, policy, requested, result, applied_by)
+  VALUES (p_idempotency_key, p_tenant_id, 'doc_fee', v_requested, v_result, v_uid);
+
+  RETURN v_result;
+EXCEPTION
+  WHEN unique_violation THEN
+    -- A concurrent call with the same key finished first; its result stands
+    -- and this call's work is rolled back with the exception.
+    SELECT result INTO v_existing
+    FROM public.admin_policy_applications
+    WHERE idempotency_key = p_idempotency_key;
+    RETURN coalesce(v_existing, jsonb_build_object('status', 'failed', 'affected', 0, 'version', NULL, 'audit_id', NULL))
+           || jsonb_build_object('status', 'duplicate');
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.admin_doc_fee_change_apply(uuid, boolean, numeric, bigint, text, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_doc_fee_change_apply(uuid, boolean, numeric, bigint, text, boolean) TO authenticated, service_role;
+
+-- ── merge_dealer_settings ───────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.merge_dealer_settings(_tenant_id uuid, _patch jsonb)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_uid uuid := (SELECT auth.uid());
+  v_role text;
+  v_admin boolean;
+  v_keys text[];
+  v_touched text[];
+  v_class record;
+  -- Compliance and signer-authority keys: policy, settings-managing roles plus the service manager.
+  v_service_keys text[] := ARRAY[
+    'k208_authority_roles','k208_authorized_users',
+    'require_safety_inspection','require_k208_licensee_certification',
+    'service_failure_photo_required','service_reinspection_managers_only',
+    'service_pass_all_enabled','service_overdue_hours'];
+  v_service_roles text[] := ARRAY['owner','general_manager','gsm','admin','manager','service_manager'];
+  -- Price basis and customer price presentation: the same roles the fee apply RPC accepts.
+  v_pricing_keys text[] := ARRAY[
+    'doc_fee_enabled','doc_fee_amount','doc_fee_state',
+    'price_display_mode','price_label','comp_settings',
+    'todays_price_mode','todays_price_custom','financing_disclosure_apr',
+    'title_policy_no_branded'];
+  v_pricing_roles text[] := ARRAY['owner','admin','general_manager','gsm'];
+  -- Customer routing: settings managers and the roles that manage deals.
+  v_routing_keys text[] := ARRAY[
+    'passport_contact_routing','passport_agents','vehicle_agent_assignments','passport_rotation_state'];
+  v_routing_roles text[] := ARRAY['owner','admin','general_manager','gsm','manager','sales_manager','used_car_manager','finance'];
+  -- Publication and document policy.
+  v_publishing_keys text[] := ARRAY[
+    'ingest_auto_publish','document_rules','require_install_verification',
+    'ingest_recon_dispatch','ingest_detail_dispatch','factory_sticker',
+    'packet_module_defaults','passport_version','history_report_links_enabled'];
+  -- Benefit, warranty and product presentation claims: roles that hold can_manage_addons.
+  v_addon_keys text[] := ARRAY[
+    'dealer_programs','oem_factory_warranties','cpo_programs',
+    'product_default_mode','allow_type_override_at_signing'];
+  v_addon_roles text[] := ARRAY['owner','admin','general_manager','gsm','manager','sales_manager','used_car_manager','finance','office','compliance'];
+  -- Workspace preferences any member may save from the pages that use them.
+  v_member_keys text[] := ARRAY['label_defaults','used_sticker_options','inventory_show_quick_actions'];
+  -- Everything else is dealership identity, brand, feature and notification
+  -- configuration: roles that hold can_manage_settings.
+  v_settings_roles text[] := ARRAY['owner','admin','general_manager','gsm','manager'];
+BEGIN
+  SELECT lower(trim(tm.role)) INTO v_role
+    FROM public.tenant_members tm
+    WHERE tm.tenant_id = _tenant_id AND tm.user_id = v_uid AND tm.accepted_at IS NOT NULL
+    LIMIT 1;
+  v_admin := public.has_role(v_uid, 'admin'::public.app_role);
+  IF v_role IS NULL AND NOT v_admin THEN
+    RAISE EXCEPTION 'not authorized' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT coalesce(array_agg(k), ARRAY[]::text[]) INTO v_keys
+    FROM jsonb_object_keys(coalesce(_patch, '{}'::jsonb)) AS t(k);
+
+  IF NOT v_admin THEN
+    FOR v_class IN
+      SELECT * FROM (VALUES
+        ('service',    v_service_keys,    v_service_roles),
+        ('pricing',    v_pricing_keys,    v_pricing_roles),
+        ('routing',    v_routing_keys,    v_routing_roles),
+        ('publishing', v_publishing_keys, v_settings_roles),
+        ('addon',      v_addon_keys,      v_addon_roles)
+      ) AS c(name, keys, roles)
+    LOOP
+      IF v_keys && v_class.keys AND NOT (v_role = ANY (v_class.roles)) THEN
+        RAISE EXCEPTION 'not_authorized_for_policy_keys' USING ERRCODE = '42501', DETAIL = v_class.name;
+      END IF;
+    END LOOP;
+
+    SELECT coalesce(array_agg(k), ARRAY[]::text[]) INTO v_touched
+      FROM unnest(v_keys) AS t(k)
+      WHERE NOT (k = ANY (v_service_keys || v_pricing_keys || v_routing_keys || v_publishing_keys || v_addon_keys || v_member_keys));
+    IF array_length(v_touched, 1) > 0 AND NOT (v_role = ANY (v_settings_roles)) THEN
+      RAISE EXCEPTION 'not_authorized_for_settings_keys' USING ERRCODE = '42501', DETAIL = array_to_string(v_touched, ',');
+    END IF;
+  END IF;
+
+  -- Every policy-class change leaves an audit row with the keys, the values
+  -- before and the values after. The service action name is unchanged so its
+  -- existing readers keep working.
+  FOR v_class IN
+    SELECT * FROM (VALUES
+      ('service_policy_changed',    v_service_keys),
+      ('pricing_policy_changed',    v_pricing_keys),
+      ('routing_policy_changed',    v_routing_keys),
+      ('publishing_policy_changed', v_publishing_keys),
+      ('addon_policy_changed',      v_addon_keys)
+    ) AS c(action, keys)
+  LOOP
+    SELECT array_agg(k) INTO v_touched
+      FROM unnest(v_keys) AS t(k)
+      WHERE k = ANY (v_class.keys);
+    IF v_touched IS NOT NULL THEN
+      INSERT INTO public.audit_log (action, entity_type, entity_id, store_id, user_id, details)
+      VALUES (v_class.action, 'tenant', _tenant_id::text, _tenant_id::text, v_uid,
+              jsonb_build_object('keys', to_jsonb(v_touched),
+                'prev', (SELECT jsonb_object_agg(k, dp.settings -> k)
+                         FROM unnest(v_touched) AS k, public.dealer_profiles dp
+                         WHERE dp.tenant_id = _tenant_id),
+                'next', (SELECT jsonb_object_agg(k, _patch -> k) FROM unnest(v_touched) AS k)));
+    END IF;
+  END LOOP;
+
+  INSERT INTO public.dealer_profiles (tenant_id, settings, updated_by)
+  VALUES (_tenant_id, coalesce(_patch, '{}'::jsonb), v_uid)
+  ON CONFLICT (tenant_id) DO UPDATE
+    SET settings   = coalesce(dealer_profiles.settings, '{}'::jsonb) || coalesce(_patch, '{}'::jsonb),
+        updated_by = v_uid;
+
+  RETURN true;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.merge_dealer_settings(uuid, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.merge_dealer_settings(uuid, jsonb) TO authenticated, service_role;
+
+-- ── recalc_tenant_doc_fee ───────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.recalc_tenant_doc_fee(p_tenant_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_fee   numeric;
+  v_count integer;
+BEGIN
+  IF NOT (
+    EXISTS (
+      SELECT 1 FROM public.tenant_members
+      WHERE tenant_id = p_tenant_id AND user_id = (SELECT auth.uid())
+        AND lower(coalesce(role, '')) IN ('owner','admin','general_manager','gsm')
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.user_roles
+      WHERE user_id = (SELECT auth.uid()) AND role = 'admin'
+    )
+  ) THEN
+    RAISE EXCEPTION 'not authorized for tenant %', p_tenant_id;
+  END IF;
+
+  SELECT CASE
+           WHEN (settings->>'doc_fee_enabled')::boolean
+           THEN COALESCE((settings->>'doc_fee_amount')::numeric, 0)
+           ELSE 0
+         END
+    INTO v_fee
+  FROM public.dealer_profiles
+  WHERE tenant_id = p_tenant_id;
+  v_fee := COALESCE(v_fee, 0);
+
+  UPDATE public.vehicle_listings
+  SET doc_fee                = v_fee,
+      website_sale_price     = advertised_price_before_doc + v_fee,
+      price_parse_status     = 'ok',
+      price_parse_notes      = 'Doc fee updated in admin; sale price = advertised + doc fee.',
+      price_last_verified_at = now()
+  WHERE tenant_id = p_tenant_id
+    AND advertised_price_before_doc IS NOT NULL
+    AND (doc_fee IS DISTINCT FROM v_fee
+         OR website_sale_price IS DISTINCT FROM advertised_price_before_doc + v_fee);
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$function$
+;
+
+REVOKE ALL ON FUNCTION public.recalc_tenant_doc_fee(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.recalc_tenant_doc_fee(uuid) TO authenticated, service_role;
+
+-- ── Functions the proposal added ────────────────────────────────────
+DROP FUNCTION IF EXISTS public.doc_fee_change_review(uuid, numeric, boolean);
+DROP FUNCTION IF EXISTS public.doc_fee_evidence_contradicts(text, numeric, numeric, numeric);
+DROP FUNCTION IF EXISTS public.doc_fee_row_plan(text, numeric, numeric, numeric, numeric, numeric);
+DROP FUNCTION IF EXISTS public.doc_fee_basis(jsonb);
+DROP FUNCTION IF EXISTS public.doc_fee_setting_bool(jsonb);

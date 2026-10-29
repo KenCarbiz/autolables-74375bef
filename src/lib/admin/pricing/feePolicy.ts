@@ -1,6 +1,6 @@
 import { STATE_DOC_FEES, type DocFeeConfig } from "@/data/docFees";
 import type { PriceDisplayMode } from "@/lib/priceModel";
-import { describeFeeBasis, planFeeChange, type FeeBasis } from "./feeBasis";
+import { describeFeeBasis, isDecidedBasis, planFeeChange, reviewFeeChange, type FeeBasis } from "./feeBasis";
 
 // The documentation-fee policy as a reviewable draft, plus the pure dry-run
 // that mirrors the server's recalculation predicate. Nothing here writes.
@@ -71,6 +71,8 @@ export interface FeeImpactRow {
   doc_fee: number | null;
   website_sale_price: number | null;
   price_parse_status: string | null;
+  /** The latest website observation for the VIN, when it was read. */
+  observed_price?: number | null;
 }
 
 export interface FeeImpactSample {
@@ -85,7 +87,7 @@ export interface FeeImpactSample {
   totalBefore: number | null;
   totalAfter: number;
   basis: FeeBasis;
-  /** A stored website price that disagrees with the advertised total; preserved. */
+  /** The stored sale price differs from the advertised total; its source is not verified. */
   sourceMismatch: boolean;
 }
 
@@ -97,10 +99,16 @@ export interface FeeImpact {
   includedArchived: number;
   noPrice: number;
   invalid: number;
-  /** Fee-inclusive rows whose stored before-fee price does not add up to the total; skipped. */
+  /** Stored before-fee prices that do not add up to the total. */
   splitMismatches: number;
+  /** Stored sale prices (website_sale_price) that differ from the total. */
   sourceMismatches: number;
+  /** Website observations that contradict the configured basis. */
+  evidenceConflicts: number;
   parserWarnings: number;
+  /** The dealership-level block: nothing may be applied while it holds. */
+  blocked: boolean;
+  blockReasons: string[];
   samples: FeeImpactSample[];
   warnings: string[];
   exclusions: string[];
@@ -114,9 +122,8 @@ const storedOf = (r: Pick<FeeImpactRow, "price" | "advertised_price_before_doc" 
 });
 
 /**
- * The server predicate, cent for cent (doc_fee_row_plan): a row is touched
- * only when its fee or a derived price would change. Rows with nothing to
- * anchor on are never touched.
+ * The server predicate, cent for cent (doc_fee_row_plan): a row is written
+ * only when its fee or a derived price would change.
  */
 export function rowNeedsUpdate(row: Pick<FeeImpactRow, "price" | "advertised_price_before_doc" | "doc_fee" | "website_sale_price">, fee: number, basis: FeeBasis = "before_fee"): boolean {
   return planFeeChange(basis, storedOf(row), fee).status === "change";
@@ -128,27 +135,17 @@ export const vehicleLabel = (r: Pick<FeeImpactRow, "year" | "make" | "model" | "
 export function buildFeeImpact(rows: FeeImpactRow[], draft: FeeDraft, opts: { includeArchived?: boolean; sampleSize?: number; basis?: FeeBasis } = {}): FeeImpact {
   const fee = effectiveFee(draft);
   const basis = opts.basis ?? "before_fee";
+  const includeArchived = !!opts.includeArchived;
   const sampleSize = opts.sampleSize ?? 3;
-  let eligible = 0;
-  let unchanged = 0;
-  let excludedArchived = 0;
+  const review = reviewFeeChange(basis, rows.map((r) => ({ ...storedOf(r), archived: r.archived, observed: r.observed_price ?? null })), fee, includeArchived);
   let includedArchived = 0;
-  let noPrice = 0;
-  let invalid = 0;
-  let splitMismatches = 0;
-  let sourceMismatches = 0;
   let parserWarnings = 0;
   const samples: FeeImpactSample[] = [];
   for (const r of rows) {
+    if (r.archived && !includeArchived) continue;
     const plan = planFeeChange(basis, storedOf(r), fee);
-    if (plan.status === "no_basis") { if (!r.archived) noPrice += 1; continue; }
-    if (r.archived && !opts.includeArchived) { if (plan.status === "change") excludedArchived += 1; continue; }
-    if (plan.sourceMismatch) sourceMismatches += 1;
-    if (plan.status === "invalid") { invalid += 1; continue; }
-    if (plan.status === "split_mismatch") { splitMismatches += 1; continue; }
-    if (plan.status !== "change") { unchanged += 1; continue; }
+    if (plan.status !== "change") continue;
     if (r.archived) includedArchived += 1;
-    eligible += 1;
     if (r.price_parse_status === "warning") parserWarnings += 1;
     if (samples.length < sampleSize) {
       samples.push({
@@ -162,20 +159,33 @@ export function buildFeeImpact(rows: FeeImpactRow[], draft: FeeDraft, opts: { in
         totalBefore: plan.totalBefore,
         totalAfter: plan.totalAfter as number,
         basis,
-        sourceMismatch: plan.sourceMismatch,
+        sourceMismatch: plan.salePriceDiffers,
       });
     }
   }
-  const warnings: string[] = [describeFeeBasis(basis)];
-  if (invalid > 0) warnings.push(`${invalid} ${invalid === 1 ? "vehicle" : "vehicles"} would be left with no vehicle price under this fee and ${invalid === 1 ? "is" : "are"} skipped.`);
-  if (splitMismatches > 0) warnings.push(`${splitMismatches} ${splitMismatches === 1 ? "vehicle has" : "vehicles have"} a stored before-fee price that does not add up to the advertised total; ${splitMismatches === 1 ? "it is" : "they are"} skipped and left as stored for review.`);
-  if (sourceMismatches > 0) warnings.push(`${sourceMismatches} ${sourceMismatches === 1 ? "vehicle carries" : "vehicles carry"} a website price that differs from the advertised total; it is preserved for review and not used to reprice.`);
+  const warnings: string[] = isDecidedBasis(basis) ? [describeFeeBasis(basis)] : [];
   if (parserWarnings > 0) warnings.push(`${parserWarnings} eligible ${parserWarnings === 1 ? "vehicle carries" : "vehicles carry"} a price parser warning; the warning and its source observation date are preserved.`);
   const exclusions: string[] = [];
-  if (!opts.includeArchived) exclusions.push("Archived records are excluded and require a separate authorized action.");
-  if (noPrice > 0) exclusions.push(`${noPrice} ${noPrice === 1 ? "vehicle has" : "vehicles have"} no advertised price and cannot be recalculated.`);
-  if (basis === "conflict") return { basis, eligible: 0, unchanged, excludedArchived: 0, includedArchived: 0, noPrice, invalid: 0, splitMismatches: 0, sourceMismatches: 0, parserWarnings: 0, samples: [], warnings, exclusions };
-  return { basis, eligible, unchanged, excludedArchived, includedArchived, noPrice, invalid, splitMismatches, sourceMismatches, parserWarnings, samples, warnings, exclusions };
+  if (!includeArchived) exclusions.push("Archived records are excluded and require a separate authorized action.");
+  if (review.noPrice > 0) exclusions.push(`${review.noPrice} ${review.noPrice === 1 ? "vehicle has" : "vehicles have"} no advertised price and cannot be recalculated.`);
+  return {
+    basis,
+    eligible: review.change,
+    unchanged: review.unchanged,
+    excludedArchived: review.archivedExcluded,
+    includedArchived,
+    noPrice: review.noPrice,
+    invalid: review.invalid,
+    splitMismatches: review.splitMismatches,
+    sourceMismatches: review.salePriceDiffers,
+    evidenceConflicts: review.evidenceConflicts,
+    parserWarnings,
+    blocked: review.blocked,
+    blockReasons: review.blockReasons,
+    samples: isDecidedBasis(basis) ? samples : [],
+    warnings,
+    exclusions,
+  };
 }
 
 export interface FeeDiffRow {

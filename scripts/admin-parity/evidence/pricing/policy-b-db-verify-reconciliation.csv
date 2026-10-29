@@ -1,11 +1,15 @@
-kind,tenant_id,basis,basis_source,action,listing_id,vin_suffix,archived,price,before_fee,doc_fee,website_sale_price,configured_fee,policy_before_fee,policy_total,findings,vehicles
-row,b0000000-0000-4000-8000-000000000001,before_fee,price_display_mode,no price to anchor on; no change,c0000000-0000-4000-8000-000000000005,000005,f,,,,,895.00,,,no_basis,
-row,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,no price to anchor on; no change,c0000000-0000-4000-8000-000000000305,000000,f,,,,,895.00,,,no_basis,
-row,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,"review source mismatch; observed prices kept, no automatic change",c0000000-0000-4000-8000-000000000302,030000,f,30000.00,29105,895,30500,895.00,29105.00,30000.00,website_price_differs_from_total,
-row,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,"review: before-fee price and total disagree; skipped by fee changes, no automatic change",c0000000-0000-4000-8000-000000000303,020000,f,20000.00,20000,895,20000,895.00,19105.00,20000.00,derived_split_stale,
-summary,b0000000-0000-4000-8000-000000000001,before_fee,price_display_mode,consistent,,,,,,,,,,,,4
-summary,b0000000-0000-4000-8000-000000000001,before_fee,price_display_mode,no price to anchor on; no change,,,,,,,,,,,,1
-summary,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,consistent,,,,,,,,,,,,3
-summary,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,no price to anchor on; no change,,,,,,,,,,,,1
-summary,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,"review source mismatch; observed prices kept, no automatic change",,,,,,,,,,,,1
-summary,b0000000-0000-4000-8000-000000000003,includes_fee,advertised_includes_doc_fee,"review: before-fee price and total disagree; skipped by fee changes, no automatic change",,,,,,,,,,,,1
+kind,tenant_id,basis,action,listing_id,vin_suffix,archived,price,before_fee,doc_fee,website_sale_price,observed,configured_fee,policy_before_fee,policy_total,findings,vehicles
+row,b0000000-0000-4000-8000-000000000001,unconfigured,set the dealership fee basis explicitly first; no change,c0000000-0000-4000-8000-000000000001,000001,f,20000.00,20000,895,20895,,895.00,20000,,basis_unconfigured,
+row,b0000000-0000-4000-8000-000000000001,unconfigured,set the dealership fee basis explicitly first; no change,c0000000-0000-4000-8000-000000000002,000002,f,40000.00,40000,895,40895,,895.00,40000,,basis_unconfigured,
+row,b0000000-0000-4000-8000-000000000001,unconfigured,set the dealership fee basis explicitly first; no change,c0000000-0000-4000-8000-000000000003,000003,f,15000.00,15000,895,15895,,895.00,15000,,basis_unconfigured,
+row,b0000000-0000-4000-8000-000000000001,unconfigured,set the dealership fee basis explicitly first; no change,c0000000-0000-4000-8000-000000000004,000004,t,18000.00,18000,895,18895,,895.00,18000,,basis_unconfigured,
+row,b0000000-0000-4000-8000-000000000001,unconfigured,set the dealership fee basis explicitly first; no change,c0000000-0000-4000-8000-000000000005,000005,f,,,,,,895.00,,,basis_unconfigured,
+row,b0000000-0000-4000-8000-000000000003,includes_fee,no price to anchor on; no change,c0000000-0000-4000-8000-000000000305,000000,f,,,,,,895.00,,,no_basis,
+row,b0000000-0000-4000-8000-000000000004,includes_fee,review: stored prices disagree; blocks fee changes; no automatic change,c0000000-0000-4000-8000-000000000403,020000,f,20000.00,20000,895,20000,,895.00,19105.00,20000.00,split_mismatch,
+row,b0000000-0000-4000-8000-000000000004,includes_fee,review: stored prices disagree; blocks fee changes; no automatic change,c0000000-0000-4000-8000-000000000402,030000,f,30000.00,29105,895,30500,,895.00,29105.00,30000.00,sale_price_field_differs_from_total,
+row,b0000000-0000-4000-8000-000000000004,includes_fee,review: stored prices disagree; blocks fee changes; no automatic change,c0000000-0000-4000-8000-000000000408,050000,f,50000.00,49105,895,50000,49105,895.00,49105.00,50000.00,website_observation_contradicts_basis,
+summary,b0000000-0000-4000-8000-000000000001,unconfigured,set the dealership fee basis explicitly first; no change,,,,,,,,,,,,,5
+summary,b0000000-0000-4000-8000-000000000003,includes_fee,consistent,,,,,,,,,,,,,3
+summary,b0000000-0000-4000-8000-000000000003,includes_fee,no price to anchor on; no change,,,,,,,,,,,,,1
+summary,b0000000-0000-4000-8000-000000000004,includes_fee,consistent,,,,,,,,,,,,,1
+summary,b0000000-0000-4000-8000-000000000004,includes_fee,review: stored prices disagree; blocks fee changes; no automatic change,,,,,,,,,,,,,3

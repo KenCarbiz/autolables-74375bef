@@ -25,7 +25,11 @@ BEGIN
   ) AS f(name, patch, allowed)
   LOOP
     FOREACH p IN ARRAY principals LOOP
-      v_expect := CASE WHEN p = ANY (fam.allowed) THEN 'ok' ELSE 'error 42501' END;
+      -- Under policy B a changed fee on a dealership with priced vehicles goes
+      -- through the reviewed apply, so even the allowed roles are refused here.
+      v_expect := CASE WHEN NOT (p = ANY (fam.allowed)) THEN 'error 42501'
+                       WHEN t.stage() = 'policy B' AND fam.name = 'pricing' THEN 'error 55000'
+                       ELSE 'ok' END;
       PERFORM t.check(
         'settings authority', fam.name || ' key', p,
         format('SELECT public.merge_dealer_settings(%L::uuid, %L::jsonb)', t1, fam.patch),
@@ -39,12 +43,12 @@ END $$;
 
 -- ── 2. Settings persistence: values, version, audit ─────────────────────
 SELECT t.check('settings persistence', 'owner saves the doc fee: value stored, version +1, one pricing audit row with before and after', 'owner',
-  $q$SELECT public.merge_dealer_settings('b0000000-0000-4000-8000-000000000001', '{"doc_fee_amount": 900}')$q$, 'ok',
+  $q$SELECT public.merge_dealer_settings('b0000000-0000-4000-8000-000000000001', '{"doc_fee_amount": 900}')$q$, CASE WHEN t.stage() = 'policy B' THEN 'error 55000' ELSE 'ok' END,
   $q$SELECT concat_ws('|', dp.settings->>'doc_fee_amount', dp.policy_version,
        (SELECT count(*) FROM public.audit_log a WHERE a.action = 'pricing_policy_changed' AND a.store_id = dp.tenant_id::text
           AND a.details->'prev'->>'doc_fee_amount' = '895' AND a.details->'next'->>'doc_fee_amount' = '900'))
      FROM public.dealer_profiles dp WHERE dp.tenant_id = 'b0000000-0000-4000-8000-000000000001'$q$,
-  '900|2|1');
+  CASE WHEN t.stage() = 'policy B' THEN '895|1|0' ELSE '900|2|1' END);
 SELECT t.check('settings persistence', 'a merge keeps every key it does not name', 'owner',
   $q$SELECT public.merge_dealer_settings('b0000000-0000-4000-8000-000000000001', '{"dealer_name": "Renamed"}')$q$, 'ok',
   $q$SELECT concat_ws('|', settings->>'dealer_name', settings->>'doc_fee_amount', settings->>'doc_fee_state', jsonb_array_length(settings->'dealer_programs'))
@@ -228,7 +232,7 @@ SELECT t.check('fee review', 'owner applies: active rows only, archived and unba
        (SELECT count(*) FROM public.vehicle_listings WHERE id = 'c0000000-0000-4000-8000-000000000005' AND doc_fee IS NULL),
        (SELECT count(*) FROM public.vehicle_listings WHERE price_last_verified_at IN ('2026-10-01 12:00+00','2026-10-02 12:00+00','2026-10-03 12:00+00')),
        (SELECT count(*) FROM public.vehicle_listings WHERE price_recalculated_at IS NOT NULL),
-       (SELECT count(*) FROM public.vehicle_listings WHERE price_parse_status = 'warning'),
+       (SELECT count(*) FROM public.vehicle_listings WHERE price_parse_status = 'warning' AND tenant_id = 'b0000000-0000-4000-8000-000000000001'),
        (SELECT count(*) FROM public.audit_log WHERE action = 'doc_fee_policy_applied' AND (details->>'affected')::int = 3),
        (SELECT count(*) FROM public.admin_policy_applications),
        (SELECT policy_version FROM public.dealer_profiles WHERE tenant_id = 'b0000000-0000-4000-8000-000000000001'),
@@ -289,6 +293,10 @@ SELECT t.check('health reads', 'anon cannot read job status', 'anon',
 SELECT t.check('health reads', 'the apply ledger is readable by members only', 'other_tenant_owner',
   $q$SELECT * FROM public.admin_policy_applications$q$, 'ok rows=0');
 
+SELECT t.stage() = 'policy B' AS policy_b \gset
+\if :policy_b
+-- Retired under policy B; scripts/db-verify/30_fee_basis.sql checks the refusal.
+\else
 -- ── 9. The fee recalculation behind the Review & Apply fallback ──────────
 SELECT t.check('fee recalculation', 'owner recalculates from the stored fee', 'owner',
   $q$RESET ROLE;;
@@ -321,3 +329,4 @@ SELECT t.check('fee recalculation', 'it reaches archived stock and restamps veri
   $q$SELECT concat_ws('|', (SELECT doc_fee::numeric(12,2) FROM public.vehicle_listings WHERE id = 'c0000000-0000-4000-8000-000000000004'),
        (SELECT count(*) FROM public.vehicle_listings WHERE price_last_verified_at > now() - interval '1 minute'),
        (SELECT count(*) FROM public.vehicle_listings WHERE price_parse_status = 'warning'))$q$, '900.00|4|0');
+\endif

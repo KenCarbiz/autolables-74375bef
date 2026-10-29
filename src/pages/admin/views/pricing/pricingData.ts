@@ -14,8 +14,8 @@ import type { PriceDisplayMode } from "@/lib/priceModel";
 // is tenant-scoped, bounded, and answers a failed read with a thrown error so
 // a view renders Unknown rather than zero. The shared server contracts are
 // called by name; when a contract is not installed yet (Postgres 42883 or the
-// PostgREST schema-cache miss) the caller gets the honest fallback described
-// alongside it, never a fabricated result.
+// PostgREST schema-cache miss) a read falls back as described alongside it,
+// and a write is refused: nothing is saved without the atomic routine.
 
 type Db = {
   from: (table: string) => any;
@@ -40,7 +40,7 @@ export const isMissingFunction = (error: DbError | null | undefined): boolean =>
 export const PENDING_MIGRATION_COPY = "The dedicated server routine for this step is not installed yet (pending migration).";
 
 export const FALLBACK_APPLY_WARNING =
-  "Until the dedicated routine is installed, applying uses the existing recalculation, which also updates archived vehicles and refreshes each recalculated vehicle's verification stamp.";
+  "The reviewed fee change routine is not installed, so this change cannot be applied. Nothing will be saved until it is: a dealership-wide fee is never saved without its vehicles.";
 
 export type FeeScope = "active" | "all";
 
@@ -158,6 +158,9 @@ interface ServerPreview {
   invalid?: number | null;
   split_mismatches?: number | null;
   source_mismatches?: number | null;
+  evidence_conflicts?: number | null;
+  blocked?: boolean | null;
+  block_reasons?: string[] | null;
   samples?: Array<{ vin_suffix: string; selling_price: number; selling_before?: number | null; fee_before: number; fee_after: number; total_before: number | null; total_after: number; source_mismatch?: boolean }>;
   warnings?: string[];
 }
@@ -180,6 +183,9 @@ const impactFromServer = (p: ServerPreview, includeArchived: boolean): FeeImpact
     noPrice: p.no_price_basis ?? 0,
     invalid: p.invalid ?? 0,
     splitMismatches: p.split_mismatches ?? 0,
+    evidenceConflicts: p.evidence_conflicts ?? 0,
+    blocked: !!p.blocked,
+    blockReasons: p.block_reasons ?? [],
     sourceMismatches: p.source_mismatches ?? 0,
     parserWarnings: 0,
     samples: (p.samples ?? []).map((s) => ({
@@ -205,7 +211,7 @@ const impactFromServer = (p: ServerPreview, includeArchived: boolean): FeeImpact
  * from its settings (resolveFeeBasis); it decides whether the routine that
  * answered may be used at all.
  */
-export async function loadFeePreview(tenantId: string, draft: FeeDraft, includeArchived: boolean, tenantBasis: FeeBasis = "before_fee"): Promise<FeePreviewResult> {
+export async function loadFeePreview(tenantId: string, draft: FeeDraft, includeArchived: boolean, tenantBasis: FeeBasis = "unconfigured"): Promise<FeePreviewResult> {
   const { data, error } = await db().rpc("admin_doc_fee_change_preview", {
     p_tenant_id: tenantId,
     p_enabled: draft.enabled,
@@ -214,19 +220,30 @@ export async function loadFeePreview(tenantId: string, draft: FeeDraft, includeA
   });
   if (!error && data && typeof data === "object") {
     const p = data as ServerPreview;
-    const blocked = p.basis === "conflict" || (p.basis == null && tenantBasis === "conflict") ? CONFLICT_BLOCK
-      : p.basis == null && tenantBasis === "includes_fee" ? LEGACY_SPLIT_BLOCK : null;
-    return { impact: impactFromServer(p, includeArchived), source: "server", version: p.version ?? null, truncated: false, notes: [], blocked };
+    const impact = impactFromServer(p, includeArchived);
+    return { impact, source: "server", version: p.version ?? null, truncated: false, notes: [], blocked: previewBlock(p, impact, tenantBasis) };
   }
   if (error && !isMissingFunction(error)) throw readError(error, "The change preview could not be computed.");
   const { rows, truncated } = await loadFeeImpactRows(tenantId);
   const impact = buildFeeImpact(rows, draft, { includeArchived, basis: tenantBasis });
   const notes = [
     `${PENDING_MIGRATION_COPY} Counts were computed in the browser from inventory rows${truncated ? ` (first ${FEE_ROW_LIMIT.toLocaleString()} vehicles only)` : ""}.`,
-    FALLBACK_APPLY_WARNING,
   ];
-  const blocked = tenantBasis === "conflict" ? CONFLICT_BLOCK : tenantBasis === "includes_fee" ? LEGACY_SPLIT_BLOCK : null;
-  return { impact, source: "client", version: null, truncated, notes, blocked };
+  return { impact, source: "client", version: null, truncated, notes, blocked: FALLBACK_APPLY_WARNING };
+}
+
+/**
+ * Why the reviewed change may not be applied. The fee basis routine answers
+ * with its own block; the routine installed before it does not know the
+ * basis, so the dealership's own setting decides: only a stated fee-exclusive
+ * basis may use it.
+ */
+function previewBlock(p: ServerPreview, impact: FeeImpact, tenantBasis: FeeBasis): string | null {
+  if (p.basis === "conflict" || p.basis === "unconfigured") return `Nothing can be applied yet. ${describeFeeBasis(p.basis)}`;
+  if (p.basis != null) return impact.blocked ? `Nothing can be applied yet. ${impact.blockReasons.join(" ")}` : null;
+  if (tenantBasis === "includes_fee") return LEGACY_SPLIT_BLOCK;
+  if (tenantBasis !== "before_fee") return `Nothing can be applied yet. ${describeFeeBasis(tenantBasis)}`;
+  return null;
 }
 
 export interface PolicyVersion {
@@ -254,15 +271,11 @@ export interface ApplyFeeArgs {
   expectedVersion: string | number | null;
   idempotencyKey: string;
   includeArchived: boolean;
-  updateSettings: (patch: { doc_fee_enabled: boolean; doc_fee_amount: number; doc_fee_state: string }) => Promise<boolean>;
 }
 
 export type ApplyFeeOutcome =
-  | { kind: "result"; path: "server" | "fallback"; result: ApplyResult }
-  | { kind: "conflict"; path: "server" | "fallback" };
-
-const fallbackAppliedCopy = (affected: number | null): string =>
-  `${affected == null ? "Applied" : `${affected.toLocaleString()} ${affected === 1 ? "vehicle" : "vehicles"} updated`} through the existing recalculation routine. This path also touched archived vehicles and refreshed each recalculated vehicle's verification stamp; the dedicated routine that preserves both is pending migration.`;
+  | { kind: "result"; path: "server"; result: ApplyResult }
+  | { kind: "conflict"; path: "server" };
 
 export async function applyFeeChange(a: ApplyFeeArgs): Promise<ApplyFeeOutcome> {
   const { data, error } = await db().rpc("admin_doc_fee_change_apply", {
@@ -284,29 +297,20 @@ export async function applyFeeChange(a: ApplyFeeArgs): Promise<ApplyFeeOutcome> 
         return { kind: "result", path: "server", result: { status: "applied", affected, message: "This change had already been applied under the same review key; nothing was changed again.", auditEventId } };
       case "applied":
         return { kind: "result", path: "server", result: { status: "applied", affected, message: `${affected == null ? "Vehicles were" : `${affected.toLocaleString()} ${affected === 1 ? "vehicle was" : "vehicles were"}`} updated. Verification dates and mismatch flags were preserved.`, auditEventId } };
+      case "blocked":
+        return { kind: "result", path: "server", result: { status: "failed", affected: 0, message: r.message || "Nothing was changed: pricing conflicts must be resolved first.", auditEventId } };
       case "partial":
         return { kind: "result", path: "server", result: { status: "partial", affected, message: r.message || "Some vehicles were updated and some were not. Review the inventory before relying on the new fee.", auditEventId } };
       default:
         return { kind: "result", path: "server", result: { status: "failed", affected: null, message: r.message || "The server did not apply the change.", auditEventId } };
     }
   }
-  if (error && !isMissingFunction(error)) {
-    return { kind: "result", path: "server", result: { status: "failed", affected: null, message: error.message || "The change could not be applied." } };
+  // No fallback: saving the dealership fee without the atomic routine would
+  // leave the vehicles under the previous fee.
+  if (error && isMissingFunction(error)) {
+    return { kind: "result", path: "server", result: { status: "failed", affected: null, message: FALLBACK_APPLY_WARNING } };
   }
-  if (a.expectedVersion != null) {
-    const current = await loadPolicyVersion(a.tenantId);
-    if (current.version !== a.expectedVersion) return { kind: "conflict", path: "fallback" };
-  }
-  const saved = await a.updateSettings({ doc_fee_enabled: a.draft.enabled, doc_fee_amount: a.draft.amount, doc_fee_state: a.draft.stateCode });
-  if (!saved) {
-    return { kind: "result", path: "fallback", result: { status: "failed", affected: null, message: "The fee policy could not be saved, so no vehicle was recalculated." } };
-  }
-  const recalc = await db().rpc("recalc_tenant_doc_fee", { p_tenant_id: a.tenantId });
-  if (recalc.error) {
-    return { kind: "result", path: "fallback", result: { status: "partial", affected: null, message: `The fee policy was saved but the recalculation failed (${recalc.error.message || "unknown error"}). Stored vehicle prices still carry the previous fee.` } };
-  }
-  const affected = num(recalc.data);
-  return { kind: "result", path: "fallback", result: { status: "applied", affected, message: fallbackAppliedCopy(affected) } };
+  return { kind: "result", path: "server", result: { status: "failed", affected: null, message: error?.message || "The change could not be applied." } };
 }
 
 const countOf = async (q: PromiseLike<{ count: number | null; error: unknown }>): Promise<CountValue> => {

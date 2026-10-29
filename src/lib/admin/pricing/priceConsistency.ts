@@ -127,9 +127,10 @@ export function assessConsistency(
     ? listing.advertisedBeforeDoc + docFee - label
     : 0;
   const breakdownAgrees = Math.abs(breakdownDifference) < TOLERANCE;
-  // On the fee-inclusive basis website_sale_price is an observation of the
-  // dealer's total, never derived from it, so disagreeing with the label is a
-  // source mismatch to review. It is reported, not reconciled.
+  // On the fee-inclusive basis website_sale_price should equal the total.
+  // Earlier fee recalculations wrote it as well as the crawl, so its column
+  // name is not evidence of a website observation: a difference is reported
+  // for review and never reconciled here.
   const storedWebsiteDifference = basis === "includes_fee" && label != null && listing.websiteSalePrice != null
     ? listing.websiteSalePrice - label
     : 0;
@@ -139,7 +140,7 @@ export function assessConsistency(
       : `Stored breakdown (${money(listing.advertisedBeforeDoc)} before fee + ${money(docFee)} fee = ${money(listing.advertisedBeforeDoc + docFee)}) differs from the advertised total by ${signedMoney(breakdownDifference)}.`,
     Math.abs(storedWebsiteDifference) < TOLERANCE
       ? null
-      : `Stored website price ${money(listing.websiteSalePrice as number)} differs from the advertised total by ${signedMoney(storedWebsiteDifference)}; it is kept for review.`,
+      : `Stored sale price ${money(listing.websiteSalePrice as number)} differs from the advertised total by ${signedMoney(storedWebsiteDifference)}; its source is not verified and it is kept for review.`,
   ].filter(Boolean).join(" ") || null;
 
   if (website == null || label == null) {

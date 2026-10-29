@@ -11,7 +11,12 @@
 #   pricing       plus the proposed pricing-authority migration (--proposed)
 #   fee conflict  a fee-inclusive tenant through the deployed fee functions,
 #                 and the read-only reconciliation report
-#   policy B      plus the proposed fee basis migration (--policy-b)
+#   policy B      plus the proposed fee basis migration (--policy-b), with
+#                 two-session concurrency, a reload export and the SQL/TypeScript
+#                 parity grid
+#   rollback      the data revert from an apply's audit row, then the code
+#                 rollback in a fresh database checked against the hosted
+#                 fingerprints and the hosted cases
 #
 # Nothing here connects to a hosted project.
 #
@@ -62,8 +67,8 @@ CHECKSUM="SELECT md5(string_agg(t::text, ',' ORDER BY id)) FROM public.vehicle_l
   -c "INSERT INTO t.recon_checksums $CHECKSUM"
 "${PSQL[@]}" -d "$DB" --csv -f scripts/db-verify/fee-basis-reconciliation.sql > "$RECON"
 "${PSQL[@]}" -d "$DB" -c "INSERT INTO t.recon_checksums $CHECKSUM" \
-  -c "CREATE TABLE t.recon (kind text, tenant_id uuid, basis text, basis_source text, action text, listing_id text, vin_suffix text, archived boolean,
-        price numeric, before_fee numeric, doc_fee numeric, website_sale_price numeric, configured_fee numeric, policy_before_fee numeric, policy_total numeric,
+  -c "CREATE TABLE t.recon (kind text, tenant_id uuid, basis text, action text, listing_id text, vin_suffix text, archived boolean,
+        price numeric, before_fee numeric, doc_fee numeric, website_sale_price numeric, observed numeric, configured_fee numeric, policy_before_fee numeric, policy_total numeric,
         findings text, vehicles bigint); GRANT SELECT ON t.recon TO authenticated" \
   -c "\\copy t.recon FROM '$RECON' WITH CSV HEADER"
 cp "$RECON" "${OUT%.csv}-reconciliation.csv"; rm -f "$RECON"
@@ -72,8 +77,15 @@ run scripts/db-verify/32_fee_reconciliation.sql
 if [[ " $* " == *" --policy-b "* ]]; then
   stage 'policy B'
   run supabase/proposed/20261031000000_doc_fee_basis_policy_b.sql
+  # Example Motors states its basis explicitly (before the fee), without a
+  # version step, so the hosted cases keep their expected versions.
+  "${PSQL[@]}" -d "$DB" -c "SET session_replication_role = replica" \
+    -c "UPDATE public.dealer_profiles SET settings = settings || '{\"advertised_includes_doc_fee\": false}' WHERE tenant_id = 'b0000000-0000-4000-8000-000000000001'"
   run scripts/db-verify/10_live.sql
   run scripts/db-verify/30_fee_basis.sql
+  "${PSQL[@]}" -d "$DB" -f scripts/db-verify/41_parity_export.sql > "${PARITY_EXPORT:-scripts/admin-parity/evidence/pricing/policy-b-sql-plans.json}"
+  scripts/db-verify/40_concurrency.sh "$DB" "${RELOAD_EXPORT:-scripts/admin-parity/evidence/pricing/policy-b-reload.json}"
+  scripts/db-verify/42_revert_and_rollback.sh "$DB"
 fi
 
 if [[ " $* " == *" --proposed "* ]]; then

@@ -672,365 +672,719 @@ seq,stage,area,label,principal,expected,actual,probe_expected,probe_actual,pass
 671,fee conflict (deployed),fee conflict (deployed),dry-run sample for the traced vehicle (selling|fee|total before>after),fee_owner,39525|895>925.00|40420>40450.00,39525|895>925.00|40420>40450.00,,,t
 672,fee conflict (deployed),fee conflict (deployed),"apply splits the total: price kept, website_sale_price moved by the fee (price|before-fee|fee|website_sale_price)",fee_owner,ok,ok rows=1,40420.00|39525|925.00|40450.00,40420.00|39525|925.00|40450.00,t
 673,fee conflict (deployed),fee reconciliation,the report changed no row (vehicle_listings checksum before = after),owner,true,true,,,t
-674,fee conflict (deployed),fee reconciliation,"a website price that disagrees with the advertised total is listed for review, not repriced",owner,"includes_fee|review source mismatch; observed prices kept, no automatic change|website_price_differs_from_total|30000.00|30500|30000.00","includes_fee|review source mismatch; observed prices kept, no automatic change|website_price_differs_from_total|30000.00|30500|30000.00",,,t
-675,fee conflict (deployed),fee reconciliation,"a before-fee price that does not add up to the total is listed for review, with the contract value shown but not applied",owner,"review: before-fee price and total disagree; skipped by fee changes, no automatic change|derived_split_stale|20000|19105.00|20000.00","review: before-fee price and total disagree; skipped by fee changes, no automatic change|derived_split_stale|20000|19105.00|20000.00",,,t
-676,fee conflict (deployed),fee reconciliation,vehicles without a price are listed as having no basis (tenant suffixes),owner,1:000005 3:000000,1:000005 3:000000,,,t
-677,fee conflict (deployed),fee reconciliation,"consistent vehicles are counted, not listed (tenant:basis:count)",owner,1:before_fee:4 3:includes_fee:3,1:before_fee:4 3:includes_fee:3,,,t
-678,policy B,settings authority,pricing key,owner,ok,ok rows=1,true,true,t
-679,policy B,settings authority,pricing key,general_manager,ok,ok rows=1,true,true,t
-680,policy B,settings authority,pricing key,gsm,ok,ok rows=1,true,true,t
-681,policy B,settings authority,pricing key,admin,ok,ok rows=1,true,true,t
-682,policy B,settings authority,pricing key,manager,error 42501,error 42501,,false,t
-683,policy B,settings authority,pricing key,sales_manager,error 42501,error 42501,,false,t
-684,policy B,settings authority,pricing key,used_car_manager,error 42501,error 42501,,false,t
-685,policy B,settings authority,pricing key,inventory_manager,error 42501,error 42501,,false,t
-686,policy B,settings authority,pricing key,salesperson,error 42501,error 42501,,false,t
-687,policy B,settings authority,pricing key,service_manager,error 42501,error 42501,,false,t
-688,policy B,settings authority,pricing key,finance,error 42501,error 42501,,false,t
-689,policy B,settings authority,pricing key,office,error 42501,error 42501,,false,t
-690,policy B,settings authority,pricing key,compliance,error 42501,error 42501,,false,t
-691,policy B,settings authority,pricing key,readonly,error 42501,error 42501,,false,t
-692,policy B,settings authority,pricing key,pending_manager,error 42501,error 42501,,false,t
-693,policy B,settings authority,pricing key,other_tenant_owner,error 42501,error 42501,,false,t
-694,policy B,settings authority,pricing key,platform_admin,ok,ok rows=1,true,true,t
-695,policy B,settings authority,pricing key,anon,error 42501,error 42501,,false,t
-696,policy B,settings authority,routing key,owner,ok,ok rows=1,true,true,t
-697,policy B,settings authority,routing key,general_manager,ok,ok rows=1,true,true,t
-698,policy B,settings authority,routing key,gsm,ok,ok rows=1,true,true,t
-699,policy B,settings authority,routing key,admin,ok,ok rows=1,true,true,t
-700,policy B,settings authority,routing key,manager,ok,ok rows=1,true,true,t
-701,policy B,settings authority,routing key,sales_manager,ok,ok rows=1,true,true,t
-702,policy B,settings authority,routing key,used_car_manager,ok,ok rows=1,true,true,t
-703,policy B,settings authority,routing key,inventory_manager,error 42501,error 42501,,false,t
-704,policy B,settings authority,routing key,salesperson,error 42501,error 42501,,false,t
-705,policy B,settings authority,routing key,service_manager,error 42501,error 42501,,false,t
-706,policy B,settings authority,routing key,finance,ok,ok rows=1,true,true,t
-707,policy B,settings authority,routing key,office,error 42501,error 42501,,false,t
-708,policy B,settings authority,routing key,compliance,error 42501,error 42501,,false,t
-709,policy B,settings authority,routing key,readonly,error 42501,error 42501,,false,t
-710,policy B,settings authority,routing key,pending_manager,error 42501,error 42501,,false,t
-711,policy B,settings authority,routing key,other_tenant_owner,error 42501,error 42501,,false,t
-712,policy B,settings authority,routing key,platform_admin,ok,ok rows=1,true,true,t
-713,policy B,settings authority,routing key,anon,error 42501,error 42501,,false,t
-714,policy B,settings authority,publishing key,owner,ok,ok rows=1,true,true,t
-715,policy B,settings authority,publishing key,general_manager,ok,ok rows=1,true,true,t
-716,policy B,settings authority,publishing key,gsm,ok,ok rows=1,true,true,t
-717,policy B,settings authority,publishing key,admin,ok,ok rows=1,true,true,t
-718,policy B,settings authority,publishing key,manager,ok,ok rows=1,true,true,t
-719,policy B,settings authority,publishing key,sales_manager,error 42501,error 42501,,false,t
-720,policy B,settings authority,publishing key,used_car_manager,error 42501,error 42501,,false,t
-721,policy B,settings authority,publishing key,inventory_manager,error 42501,error 42501,,false,t
-722,policy B,settings authority,publishing key,salesperson,error 42501,error 42501,,false,t
-723,policy B,settings authority,publishing key,service_manager,error 42501,error 42501,,false,t
-724,policy B,settings authority,publishing key,finance,error 42501,error 42501,,false,t
-725,policy B,settings authority,publishing key,office,error 42501,error 42501,,false,t
-726,policy B,settings authority,publishing key,compliance,error 42501,error 42501,,false,t
-727,policy B,settings authority,publishing key,readonly,error 42501,error 42501,,false,t
-728,policy B,settings authority,publishing key,pending_manager,error 42501,error 42501,,false,t
-729,policy B,settings authority,publishing key,other_tenant_owner,error 42501,error 42501,,false,t
-730,policy B,settings authority,publishing key,platform_admin,ok,ok rows=1,true,true,t
-731,policy B,settings authority,publishing key,anon,error 42501,error 42501,,false,t
-732,policy B,settings authority,dealer programs (master list) key,owner,ok,ok rows=1,true,true,t
-733,policy B,settings authority,dealer programs (master list) key,general_manager,ok,ok rows=1,true,true,t
-734,policy B,settings authority,dealer programs (master list) key,gsm,ok,ok rows=1,true,true,t
-735,policy B,settings authority,dealer programs (master list) key,admin,ok,ok rows=1,true,true,t
-736,policy B,settings authority,dealer programs (master list) key,manager,ok,ok rows=1,true,true,t
-737,policy B,settings authority,dealer programs (master list) key,sales_manager,ok,ok rows=1,true,true,t
-738,policy B,settings authority,dealer programs (master list) key,used_car_manager,ok,ok rows=1,true,true,t
-739,policy B,settings authority,dealer programs (master list) key,inventory_manager,error 42501,error 42501,,true,t
-740,policy B,settings authority,dealer programs (master list) key,salesperson,error 42501,error 42501,,true,t
-741,policy B,settings authority,dealer programs (master list) key,service_manager,error 42501,error 42501,,true,t
-742,policy B,settings authority,dealer programs (master list) key,finance,ok,ok rows=1,true,true,t
-743,policy B,settings authority,dealer programs (master list) key,office,ok,ok rows=1,true,true,t
-744,policy B,settings authority,dealer programs (master list) key,compliance,ok,ok rows=1,true,true,t
-745,policy B,settings authority,dealer programs (master list) key,readonly,error 42501,error 42501,,true,t
-746,policy B,settings authority,dealer programs (master list) key,pending_manager,error 42501,error 42501,,true,t
-747,policy B,settings authority,dealer programs (master list) key,other_tenant_owner,error 42501,error 42501,,true,t
-748,policy B,settings authority,dealer programs (master list) key,platform_admin,ok,ok rows=1,true,true,t
-749,policy B,settings authority,dealer programs (master list) key,anon,error 42501,error 42501,,true,t
-750,policy B,settings authority,service key,owner,ok,ok rows=1,true,true,t
-751,policy B,settings authority,service key,general_manager,ok,ok rows=1,true,true,t
-752,policy B,settings authority,service key,gsm,ok,ok rows=1,true,true,t
-753,policy B,settings authority,service key,admin,ok,ok rows=1,true,true,t
-754,policy B,settings authority,service key,manager,ok,ok rows=1,true,true,t
-755,policy B,settings authority,service key,sales_manager,error 42501,error 42501,,false,t
-756,policy B,settings authority,service key,used_car_manager,error 42501,error 42501,,false,t
-757,policy B,settings authority,service key,inventory_manager,error 42501,error 42501,,false,t
-758,policy B,settings authority,service key,salesperson,error 42501,error 42501,,false,t
-759,policy B,settings authority,service key,service_manager,ok,ok rows=1,true,true,t
-760,policy B,settings authority,service key,finance,error 42501,error 42501,,false,t
-761,policy B,settings authority,service key,office,error 42501,error 42501,,false,t
-762,policy B,settings authority,service key,compliance,error 42501,error 42501,,false,t
-763,policy B,settings authority,service key,readonly,error 42501,error 42501,,false,t
-764,policy B,settings authority,service key,pending_manager,error 42501,error 42501,,false,t
-765,policy B,settings authority,service key,other_tenant_owner,error 42501,error 42501,,false,t
-766,policy B,settings authority,service key,platform_admin,ok,ok rows=1,true,true,t
-767,policy B,settings authority,service key,anon,error 42501,error 42501,,false,t
-768,policy B,settings authority,workspace key,owner,ok,ok rows=1,true,true,t
-769,policy B,settings authority,workspace key,general_manager,ok,ok rows=1,true,true,t
-770,policy B,settings authority,workspace key,gsm,ok,ok rows=1,true,true,t
-771,policy B,settings authority,workspace key,admin,ok,ok rows=1,true,true,t
-772,policy B,settings authority,workspace key,manager,ok,ok rows=1,true,true,t
-773,policy B,settings authority,workspace key,sales_manager,ok,ok rows=1,true,true,t
-774,policy B,settings authority,workspace key,used_car_manager,ok,ok rows=1,true,true,t
-775,policy B,settings authority,workspace key,inventory_manager,ok,ok rows=1,true,true,t
-776,policy B,settings authority,workspace key,salesperson,ok,ok rows=1,true,true,t
-777,policy B,settings authority,workspace key,service_manager,ok,ok rows=1,true,true,t
-778,policy B,settings authority,workspace key,finance,ok,ok rows=1,true,true,t
-779,policy B,settings authority,workspace key,office,ok,ok rows=1,true,true,t
-780,policy B,settings authority,workspace key,compliance,ok,ok rows=1,true,true,t
-781,policy B,settings authority,workspace key,readonly,ok,ok rows=1,true,true,t
-782,policy B,settings authority,workspace key,pending_manager,error 42501,error 42501,,false,t
-783,policy B,settings authority,workspace key,other_tenant_owner,error 42501,error 42501,,false,t
-784,policy B,settings authority,workspace key,platform_admin,ok,ok rows=1,true,true,t
-785,policy B,settings authority,workspace key,anon,error 42501,error 42501,,false,t
-786,policy B,settings authority,identity and brand key,owner,ok,ok rows=1,true,true,t
-787,policy B,settings authority,identity and brand key,general_manager,ok,ok rows=1,true,true,t
-788,policy B,settings authority,identity and brand key,gsm,ok,ok rows=1,true,true,t
-789,policy B,settings authority,identity and brand key,admin,ok,ok rows=1,true,true,t
-790,policy B,settings authority,identity and brand key,manager,ok,ok rows=1,true,true,t
-791,policy B,settings authority,identity and brand key,sales_manager,error 42501,error 42501,,false,t
-792,policy B,settings authority,identity and brand key,used_car_manager,error 42501,error 42501,,false,t
-793,policy B,settings authority,identity and brand key,inventory_manager,error 42501,error 42501,,false,t
-794,policy B,settings authority,identity and brand key,salesperson,error 42501,error 42501,,false,t
-795,policy B,settings authority,identity and brand key,service_manager,error 42501,error 42501,,false,t
-796,policy B,settings authority,identity and brand key,finance,error 42501,error 42501,,false,t
-797,policy B,settings authority,identity and brand key,office,error 42501,error 42501,,false,t
-798,policy B,settings authority,identity and brand key,compliance,error 42501,error 42501,,false,t
-799,policy B,settings authority,identity and brand key,readonly,error 42501,error 42501,,false,t
-800,policy B,settings authority,identity and brand key,pending_manager,error 42501,error 42501,,false,t
-801,policy B,settings authority,identity and brand key,other_tenant_owner,error 42501,error 42501,,false,t
-802,policy B,settings authority,identity and brand key,platform_admin,ok,ok rows=1,true,true,t
-803,policy B,settings authority,identity and brand key,anon,error 42501,error 42501,,false,t
-804,policy B,settings persistence,"owner saves the doc fee: value stored, version +1, one pricing audit row with before and after",owner,ok,ok rows=1,900|2|1,900|2|1,t
-805,policy B,settings persistence,a merge keeps every key it does not name,owner,ok,ok rows=1,Renamed|895|CT|1,Renamed|895|CT|1,t
-806,policy B,settings persistence,a workspace key saves without a policy audit row,salesperson,ok,ok rows=1,4x6|0,4x6|0,t
-807,policy B,settings persistence,a refused save writes nothing and audits nothing,salesperson,error 42501,error 42501,895|1|0,895|1|0,t
-808,policy B,settings persistence,routing saves write a routing audit row,sales_manager,ok,ok rows=1,1,1,t
-809,policy B,settings persistence,a member reads the saved settings back,salesperson,ok rows=1,ok rows=1,,,t
-810,policy B,settings persistence,another tenant's owner cannot read this tenant's settings,other_tenant_owner,ok rows=0,ok rows=0,,,t
-811,policy B,direct settings writes,direct update of dealer_profiles matches no row,owner,ok rows=0,ok rows=0,,,t
-812,policy B,direct settings writes,direct insert of a dealer profile is refused,owner,error 42501,error 42501,,,t
-813,policy B,direct settings writes,direct update of dealer_profiles matches no row,manager,ok rows=0,ok rows=0,,,t
-814,policy B,direct settings writes,direct insert of a dealer profile is refused,manager,error 42501,error 42501,,,t
-815,policy B,direct settings writes,direct update of dealer_profiles matches no row,salesperson,ok rows=0,ok rows=0,,,t
-816,policy B,direct settings writes,direct insert of a dealer profile is refused,salesperson,error 42501,error 42501,,,t
-817,policy B,direct settings writes,platform administrator may write directly,platform_admin,ok rows=1,ok rows=1,,,t
-818,policy B,direct settings writes,anon cannot update dealer profiles,anon,error 42501,error 42501,,,t
-819,policy B,direct settings writes,anon cannot call the settings writer,anon,error 42501,error 42501,,,t
-820,policy B,direct settings writes,anon reads no dealer profile,anon,ok rows=0,ok rows=0,,,t
-821,policy B,products and rules,create a product,owner,ok rows=1,ok rows=1,,,t
-822,policy B,products and rules,change a product price,owner,ok rows=1,ok rows=1,595.00,595.00,t
-823,policy B,products and rules,delete a product,owner,ok rows=1,ok rows=1,,,t
-824,policy B,products and rules,create an applicability rule,owner,ok rows=1,ok rows=1,,,t
-825,policy B,products and rules,change an applicability rule,owner,ok rows=1,ok rows=1,,,t
-826,policy B,products and rules,create a product,general_manager,ok rows=1,ok rows=1,,,t
-827,policy B,products and rules,change a product price,general_manager,ok rows=1,ok rows=1,595.00,595.00,t
-828,policy B,products and rules,delete a product,general_manager,ok rows=1,ok rows=1,,,t
-829,policy B,products and rules,create an applicability rule,general_manager,ok rows=1,ok rows=1,,,t
-830,policy B,products and rules,change an applicability rule,general_manager,ok rows=1,ok rows=1,,,t
-831,policy B,products and rules,create a product,gsm,ok rows=1,ok rows=1,,,t
-832,policy B,products and rules,change a product price,gsm,ok rows=1,ok rows=1,595.00,595.00,t
-833,policy B,products and rules,delete a product,gsm,ok rows=1,ok rows=1,,,t
-834,policy B,products and rules,create an applicability rule,gsm,ok rows=1,ok rows=1,,,t
-835,policy B,products and rules,change an applicability rule,gsm,ok rows=1,ok rows=1,,,t
-836,policy B,products and rules,create a product,manager,ok rows=1,ok rows=1,,,t
-837,policy B,products and rules,change a product price,manager,ok rows=1,ok rows=1,595.00,595.00,t
-838,policy B,products and rules,delete a product,manager,ok rows=1,ok rows=1,,,t
-839,policy B,products and rules,create an applicability rule,manager,ok rows=1,ok rows=1,,,t
-840,policy B,products and rules,change an applicability rule,manager,ok rows=1,ok rows=1,,,t
-841,policy B,products and rules,create a product,sales_manager,ok rows=1,ok rows=1,,,t
-842,policy B,products and rules,change a product price,sales_manager,ok rows=1,ok rows=1,595.00,595.00,t
-843,policy B,products and rules,delete a product,sales_manager,ok rows=1,ok rows=1,,,t
-844,policy B,products and rules,create an applicability rule,sales_manager,ok rows=1,ok rows=1,,,t
-845,policy B,products and rules,change an applicability rule,sales_manager,ok rows=1,ok rows=1,,,t
-846,policy B,products and rules,create a product,used_car_manager,ok rows=1,ok rows=1,,,t
-847,policy B,products and rules,change a product price,used_car_manager,ok rows=1,ok rows=1,595.00,595.00,t
-848,policy B,products and rules,delete a product,used_car_manager,ok rows=1,ok rows=1,,,t
-849,policy B,products and rules,create an applicability rule,used_car_manager,ok rows=1,ok rows=1,,,t
-850,policy B,products and rules,change an applicability rule,used_car_manager,ok rows=1,ok rows=1,,,t
-851,policy B,products and rules,create a product,finance,ok rows=1,ok rows=1,,,t
-852,policy B,products and rules,change a product price,finance,ok rows=1,ok rows=1,595.00,595.00,t
-853,policy B,products and rules,delete a product,finance,ok rows=1,ok rows=1,,,t
-854,policy B,products and rules,create an applicability rule,finance,ok rows=1,ok rows=1,,,t
-855,policy B,products and rules,change an applicability rule,finance,ok rows=1,ok rows=1,,,t
-856,policy B,products and rules,create a product,office,ok rows=1,ok rows=1,,,t
-857,policy B,products and rules,change a product price,office,ok rows=1,ok rows=1,595.00,595.00,t
-858,policy B,products and rules,delete a product,office,ok rows=1,ok rows=1,,,t
-859,policy B,products and rules,create an applicability rule,office,ok rows=1,ok rows=1,,,t
-860,policy B,products and rules,change an applicability rule,office,ok rows=1,ok rows=1,,,t
-861,policy B,products and rules,create a product,compliance,ok rows=1,ok rows=1,,,t
-862,policy B,products and rules,change a product price,compliance,ok rows=1,ok rows=1,595.00,595.00,t
-863,policy B,products and rules,delete a product,compliance,ok rows=1,ok rows=1,,,t
-864,policy B,products and rules,create an applicability rule,compliance,ok rows=1,ok rows=1,,,t
-865,policy B,products and rules,change an applicability rule,compliance,ok rows=1,ok rows=1,,,t
-866,policy B,products and rules,create a product,inventory_manager,error 42501,error 42501,,,t
-867,policy B,products and rules,change a product price,inventory_manager,ok rows=0,ok rows=0,495.00,495.00,t
-868,policy B,products and rules,delete a product,inventory_manager,ok rows=0,ok rows=0,,,t
-869,policy B,products and rules,create an applicability rule,inventory_manager,error 42501,error 42501,,,t
-870,policy B,products and rules,change an applicability rule,inventory_manager,ok rows=0,ok rows=0,,,t
-871,policy B,products and rules,create a product,salesperson,error 42501,error 42501,,,t
-872,policy B,products and rules,change a product price,salesperson,ok rows=0,ok rows=0,495.00,495.00,t
-873,policy B,products and rules,delete a product,salesperson,ok rows=0,ok rows=0,,,t
-874,policy B,products and rules,create an applicability rule,salesperson,error 42501,error 42501,,,t
-875,policy B,products and rules,change an applicability rule,salesperson,ok rows=0,ok rows=0,,,t
-876,policy B,products and rules,create a product,service_manager,error 42501,error 42501,,,t
-877,policy B,products and rules,change a product price,service_manager,ok rows=0,ok rows=0,495.00,495.00,t
-878,policy B,products and rules,delete a product,service_manager,ok rows=0,ok rows=0,,,t
-879,policy B,products and rules,create an applicability rule,service_manager,error 42501,error 42501,,,t
-880,policy B,products and rules,change an applicability rule,service_manager,ok rows=0,ok rows=0,,,t
-881,policy B,products and rules,create a product,readonly,error 42501,error 42501,,,t
-882,policy B,products and rules,change a product price,readonly,ok rows=0,ok rows=0,495.00,495.00,t
-883,policy B,products and rules,delete a product,readonly,ok rows=0,ok rows=0,,,t
-884,policy B,products and rules,create an applicability rule,readonly,error 42501,error 42501,,,t
-885,policy B,products and rules,change an applicability rule,readonly,ok rows=0,ok rows=0,,,t
-886,policy B,products and rules,create a product,other_tenant_owner,error 42501,error 42501,,,t
-887,policy B,products and rules,change a product price,other_tenant_owner,ok rows=0,ok rows=0,495.00,495.00,t
-888,policy B,products and rules,delete a product,other_tenant_owner,ok rows=0,ok rows=0,,,t
-889,policy B,products and rules,create an applicability rule,other_tenant_owner,error 42501,error 42501,,,t
-890,policy B,products and rules,change an applicability rule,other_tenant_owner,ok rows=0,ok rows=0,,,t
-891,policy B,products and rules,platform administrator (not a member) can create a product for a dealership,platform_admin,ok rows=1,ok rows=1,,,t
-892,policy B,products and rules,"platform administrator (not a member) cannot see, so cannot change, a dealership product",platform_admin,ok rows=0,ok rows=0,,,t
-893,policy B,products and rules,platform administrator (not a member) cannot create an applicability rule,platform_admin,error 42501,error 42501,,,t
-894,policy B,products and rules,a salesperson still reads the catalog,salesperson,ok rows=1,ok rows=1,,,t
-895,policy B,products and rules,a tenantless product cannot be created by a dealer role,owner,error 42501,error 42501,,,t
-896,policy B,vehicle prices (live),change a vehicle price,owner,ok rows=1,ok rows=1,20100.00,20100.00,t
-897,policy B,vehicle prices (live),change a vehicle doc fee column,owner,ok rows=1,ok rows=1,,,t
-898,policy B,vehicle prices (live),override a recall hold,owner,ok rows=1,ok rows=1,,,t
-899,policy B,vehicle prices (live),edit a non-priced field (description),owner,ok rows=1,ok rows=1,,,t
-900,policy B,vehicle prices (live),change a vehicle price,general_manager,ok rows=1,ok rows=1,20100.00,20100.00,t
-901,policy B,vehicle prices (live),change a vehicle doc fee column,general_manager,ok rows=1,ok rows=1,,,t
-902,policy B,vehicle prices (live),override a recall hold,general_manager,ok rows=1,ok rows=1,,,t
-903,policy B,vehicle prices (live),edit a non-priced field (description),general_manager,ok rows=1,ok rows=1,,,t
-904,policy B,vehicle prices (live),change a vehicle price,gsm,ok rows=1,ok rows=1,20100.00,20100.00,t
-905,policy B,vehicle prices (live),change a vehicle doc fee column,gsm,ok rows=1,ok rows=1,,,t
-906,policy B,vehicle prices (live),override a recall hold,gsm,ok rows=1,ok rows=1,,,t
-907,policy B,vehicle prices (live),edit a non-priced field (description),gsm,ok rows=1,ok rows=1,,,t
-908,policy B,vehicle prices (live),change a vehicle price,admin,ok rows=1,ok rows=1,20100.00,20100.00,t
-909,policy B,vehicle prices (live),change a vehicle doc fee column,admin,ok rows=1,ok rows=1,,,t
-910,policy B,vehicle prices (live),override a recall hold,admin,ok rows=1,ok rows=1,,,t
-911,policy B,vehicle prices (live),edit a non-priced field (description),admin,ok rows=1,ok rows=1,,,t
-912,policy B,vehicle prices (live),change a vehicle price,manager,ok rows=1,ok rows=1,20100.00,20100.00,t
-913,policy B,vehicle prices (live),change a vehicle doc fee column,manager,ok rows=1,ok rows=1,,,t
-914,policy B,vehicle prices (live),override a recall hold,manager,ok rows=1,ok rows=1,,,t
-915,policy B,vehicle prices (live),edit a non-priced field (description),manager,ok rows=1,ok rows=1,,,t
-916,policy B,vehicle prices (live),change a vehicle price,inventory_manager,ok rows=1,ok rows=1,20100.00,20100.00,t
-917,policy B,vehicle prices (live),change a vehicle doc fee column,inventory_manager,ok rows=1,ok rows=1,,,t
-918,policy B,vehicle prices (live),override a recall hold,inventory_manager,error 42501,error 42501,,,t
-919,policy B,vehicle prices (live),edit a non-priced field (description),inventory_manager,ok rows=1,ok rows=1,,,t
-920,policy B,vehicle prices (live),change a vehicle price,used_car_manager,ok rows=1,ok rows=1,20100.00,20100.00,t
-921,policy B,vehicle prices (live),change a vehicle doc fee column,used_car_manager,ok rows=1,ok rows=1,,,t
-922,policy B,vehicle prices (live),override a recall hold,used_car_manager,error 42501,error 42501,,,t
-923,policy B,vehicle prices (live),edit a non-priced field (description),used_car_manager,ok rows=1,ok rows=1,,,t
-924,policy B,vehicle prices (live),change a vehicle price,sales_manager,error 42501,error 42501,20000.00,20000.00,t
-925,policy B,vehicle prices (live),change a vehicle doc fee column,sales_manager,error 42501,error 42501,,,t
-926,policy B,vehicle prices (live),override a recall hold,sales_manager,error 42501,error 42501,,,t
-927,policy B,vehicle prices (live),edit a non-priced field (description),sales_manager,ok rows=1,ok rows=1,,,t
-928,policy B,vehicle prices (live),change a vehicle price,salesperson,error 42501,error 42501,20000.00,20000.00,t
-929,policy B,vehicle prices (live),change a vehicle doc fee column,salesperson,error 42501,error 42501,,,t
-930,policy B,vehicle prices (live),override a recall hold,salesperson,error 42501,error 42501,,,t
-931,policy B,vehicle prices (live),edit a non-priced field (description),salesperson,ok rows=1,ok rows=1,,,t
-932,policy B,vehicle prices (live),change a vehicle price,service_manager,error 42501,error 42501,20000.00,20000.00,t
-933,policy B,vehicle prices (live),change a vehicle doc fee column,service_manager,error 42501,error 42501,,,t
-934,policy B,vehicle prices (live),override a recall hold,service_manager,error 42501,error 42501,,,t
-935,policy B,vehicle prices (live),edit a non-priced field (description),service_manager,ok rows=1,ok rows=1,,,t
-936,policy B,vehicle prices (live),change a vehicle price,finance,error 42501,error 42501,20000.00,20000.00,t
-937,policy B,vehicle prices (live),change a vehicle doc fee column,finance,error 42501,error 42501,,,t
-938,policy B,vehicle prices (live),override a recall hold,finance,ok rows=1,ok rows=1,,,t
-939,policy B,vehicle prices (live),edit a non-priced field (description),finance,ok rows=1,ok rows=1,,,t
-940,policy B,vehicle prices (live),change a vehicle price,office,error 42501,error 42501,20000.00,20000.00,t
-941,policy B,vehicle prices (live),change a vehicle doc fee column,office,error 42501,error 42501,,,t
-942,policy B,vehicle prices (live),override a recall hold,office,ok rows=1,ok rows=1,,,t
-943,policy B,vehicle prices (live),edit a non-priced field (description),office,ok rows=1,ok rows=1,,,t
-944,policy B,vehicle prices (live),change a vehicle price,compliance,error 42501,error 42501,20000.00,20000.00,t
-945,policy B,vehicle prices (live),change a vehicle doc fee column,compliance,error 42501,error 42501,,,t
-946,policy B,vehicle prices (live),override a recall hold,compliance,ok rows=1,ok rows=1,,,t
-947,policy B,vehicle prices (live),edit a non-priced field (description),compliance,ok rows=1,ok rows=1,,,t
-948,policy B,vehicle prices (live),change a vehicle price,readonly,error 42501,error 42501,20000.00,20000.00,t
-949,policy B,vehicle prices (live),change a vehicle doc fee column,readonly,error 42501,error 42501,,,t
-950,policy B,vehicle prices (live),override a recall hold,readonly,error 42501,error 42501,,,t
-951,policy B,vehicle prices (live),edit a non-priced field (description),readonly,ok rows=1,ok rows=1,,,t
-952,policy B,vehicle prices (live),"platform administrator (not a member) cannot see, so cannot change, a dealership vehicle",platform_admin,ok rows=0,ok rows=0,,,t
-953,policy B,vehicle prices (live),another tenant's owner matches no listing,other_tenant_owner,ok rows=0,ok rows=0,,,t
-954,policy B,vehicle prices (live),"service jobs (feed, crawl) still write prices",service_role,ok rows=1,ok rows=1,,,t
-955,policy B,vehicle prices (live),known gap: a salesperson can set a price when creating a listing (the guard covers updates only),salesperson,ok rows=1,ok rows=1,,,t
-956,policy B,dealer programs,salesperson views the approved programs,salesperson,ok rows=1,ok rows=1,,,t
-957,policy B,dealer programs,salesperson cannot add a program to the master list,salesperson,error 42501,error 42501,1,1,t
-958,policy B,dealer programs,salesperson cannot edit a program in the master list,salesperson,error 42501,error 42501,,,t
-959,policy B,dealer programs,salesperson cannot delete programs from the master list,salesperson,error 42501,error 42501,,,t
-960,policy B,dealer programs,inventory manager cannot change the master list,inventory_manager,error 42501,error 42501,,,t
-961,policy B,dealer programs,sales manager (add-on role) edits the master list and it is audited,sales_manager,ok,ok rows=1,1,1,t
-962,policy B,dealer programs,salesperson applies or withholds a program on one vehicle,salesperson,ok rows=1,ok rows=1,"[""program-1""]","[""program-1""]",t
-963,policy B,fee review,"owner previews a fee change: 3 active vehicles change, 1 archived excluded, 1 without basis, nothing written",owner,ok rows=1,ok rows=1,0|1|0,0|1|0,t
-964,policy B,fee review,preview counts (eligible|unchanged|archived excluded|no basis|samples|version),owner,3|0|1|1|3|1,3|0|1|1|3|1,,,t
-965,policy B,fee review,"preview warnings name the vehicles without a basis, the parse warning, and that verification dates are kept",owner,"[""Advertised prices exclude the fee: each vehicle price is kept and the fee is added on top."", ""1 active vehicle(s) have no advertised price basis and are not affected."", ""1 active vehicle(s) carry a price parse warning; it is preserved."", ""Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation.""]","[""Advertised prices exclude the fee: each vehicle price is kept and the fee is added on top."", ""1 active vehicle(s) have no advertised price basis and are not affected."", ""1 active vehicle(s) carry a price parse warning; it is preserved."", ""Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation.""]",,,t
-966,policy B,fee review,preview with archived stock included counts the archived row as eligible,owner,4|0,4|0,,,t
-967,policy B,fee review,preview at the current fee changes nothing (eligible|unchanged),owner,0|3,0|3,,,t
-968,policy B,fee review,"preview samples show the selling price, the fee before and after, and the totals",gsm,000001 20000 895>900.00 20895>20900.00,000001 20000 895>900.00 20895>20900.00,,,t
-969,policy B,fee review,preview refused,manager,error 42501,error 42501,,,t
-970,policy B,fee review,"apply refused, nothing written",manager,error 42501,error 42501,0|0,0|0,t
-971,policy B,fee review,preview refused,used_car_manager,error 42501,error 42501,,,t
-972,policy B,fee review,"apply refused, nothing written",used_car_manager,error 42501,error 42501,0|0,0|0,t
-973,policy B,fee review,preview refused,inventory_manager,error 42501,error 42501,,,t
-974,policy B,fee review,"apply refused, nothing written",inventory_manager,error 42501,error 42501,0|0,0|0,t
-975,policy B,fee review,preview refused,sales_manager,error 42501,error 42501,,,t
-976,policy B,fee review,"apply refused, nothing written",sales_manager,error 42501,error 42501,0|0,0|0,t
-977,policy B,fee review,preview refused,salesperson,error 42501,error 42501,,,t
-978,policy B,fee review,"apply refused, nothing written",salesperson,error 42501,error 42501,0|0,0|0,t
-979,policy B,fee review,preview refused,other_tenant_owner,error 42501,error 42501,,,t
-980,policy B,fee review,"apply refused, nothing written",other_tenant_owner,error 42501,error 42501,0|0,0|0,t
-981,policy B,fee review,anon cannot preview,anon,error 42501,error 42501,,,t
-982,policy B,fee review,"owner applies: active rows only, archived and unbased untouched, verification stamps kept, recalculation stamped, one audit row, one ledger row, version +1",owner,ok,ok rows=1,3|895|1|3|3|1|1|1|2|900,3|895|1|3|3|1|1|1|2|900,t
-983,policy B,fee review,the same idempotency key twice changes nothing more (duplicate returned),owner,ok,ok rows=1,0|1|1|2,0|1|1|2,t
-984,policy B,fee review,a review against an old version is a conflict and writes nothing,owner,ok,ok rows=1,0|0|0,0|0|0,t
-985,policy B,fee review,"a settings save after the review moves the version, so the reviewed apply conflicts",owner,ok,ok rows=1,0|895,0|895,t
-986,policy B,fee review,GSM applies,gsm,ok,ok rows=1,3,3,t
-987,policy B,fee review,including archived stock is explicit and reaches the archived row,owner,ok,ok rows=1,4,4,t
-988,policy B,fee review,disabling the fee sets it to zero and the total to the selling price,owner,ok,ok rows=1,3,3,t
-989,policy B,fee review,a short idempotency key is refused,owner,error P0001,error P0001,,,t
-990,policy B,fee review,a negative amount is refused,owner,error P0001,error P0001,,,t
-991,policy B,fee review,"the apply passes the price guard (definer context), so an owner's reviewed change is not blocked by it",owner,ok,ok rows=1,3,3,t
-992,policy B,health reads,a member reads the policy version,salesperson,ok rows=1,ok rows=1,,,t
-993,policy B,health reads,another tenant's owner cannot read the policy version,other_tenant_owner,error 42501,error 42501,,,t
-994,policy B,health reads,a pending invitation cannot read the policy version,pending_manager,error 42501,error 42501,,,t
-995,policy B,health reads,"last feed success is the newest success or partial over the whole ledger, not the newest run",salesperson,2026-10-22 07:00,2026-10-22 07:00,,,t
-996,policy B,health reads,job status lists the scheduled jobs and never returns a URL or bearer key from their commands,salesperson,feed=t crawl=t url=f bearer=f secret=f,feed=t crawl=t url=f bearer=f secret=f,,,t
-997,policy B,health reads,another tenant's owner cannot read feed health,other_tenant_owner,error 42501,error 42501,,,t
-998,policy B,health reads,another tenant's owner cannot read job status,other_tenant_owner,error 42501,error 42501,,,t
-999,policy B,health reads,anon cannot read job status,anon,error 42501,error 42501,,,t
-1000,policy B,health reads,the apply ledger is readable by members only,other_tenant_owner,ok rows=0,ok rows=0,,,t
-1001,policy B,fee recalculation,owner recalculates from the stored fee,owner,ok,ok rows=1,4,4,t
-1002,policy B,fee recalculation,recalculation refused,manager,error P0001,error P0001,,,t
-1003,policy B,fee recalculation,recalculation refused,used_car_manager,error P0001,error P0001,,,t
-1004,policy B,fee recalculation,recalculation refused,inventory_manager,error P0001,error P0001,,,t
-1005,policy B,fee recalculation,recalculation refused,sales_manager,error P0001,error P0001,,,t
-1006,policy B,fee recalculation,recalculation refused,salesperson,error P0001,error P0001,,,t
-1007,policy B,fee recalculation,recalculation refused,finance,error P0001,error P0001,,,t
-1008,policy B,fee recalculation,recalculation refused,readonly,error P0001,error P0001,,,t
-1009,policy B,fee recalculation,recalculation refused,other_tenant_owner,error P0001,error P0001,,,t
-1010,policy B,fee recalculation,anon cannot call it,anon,error 42501,error 42501,,,t
-1011,policy B,fee recalculation,"known gap: an invitation not yet accepted, for a general manager, can recalculate",pending_manager,ok,ok rows=1,4,4,t
-1012,policy B,fee recalculation,"it reaches archived stock and restamps verification, unlike the reviewed apply",owner,ok,ok rows=1,900.00|4|0,900.00|4|0,t
-1013,policy B,fee basis,"basis rule: includes setting, excludes setting, display-mode fallback, default, contradiction",owner,includes_fee:advertised_includes_doc_fee before_fee:advertised_includes_doc_fee includes_fee:advertised_excludes_doc_fee includes_fee:price_display_mode before_fee:price_display_mode conflict:settings_conflict before_fee:price_display_mode,includes_fee:advertised_includes_doc_fee before_fee:advertised_includes_doc_fee includes_fee:advertised_excludes_doc_fee includes_fee:price_display_mode before_fee:price_display_mode conflict:settings_conflict before_fee:price_display_mode,,,t
-1014,policy B,fee basis: includes fee,dry-run counts (basis|eligible|unchanged|archived excluded|no basis|invalid|split mismatches|source mismatches),fee_owner,includes_fee|2|0|1|1|1|1|1,includes_fee|2|0|1|1|1|1|1,,,t
-1015,policy B,fee basis: includes fee,dry-run sample for the traced vehicle keeps the total and moves the split (selling before>after|fee|total before>after),fee_owner,39525.00>39495.00|895>925.00|40420.00>40420.00,39525.00>39495.00|895>925.00|40420.00>40420.00,,,t
-1016,policy B,fee basis: includes fee,the dry-run writes nothing,fee_owner,ok rows=1,ok rows=1,0|1|0,0|1|0,t
-1017,policy B,fee basis: includes fee,apply keeps the advertised total: traced row (price|before-fee|fee|website_sale_price),fee_owner,ok,ok rows=1,40420.00|39495.00|925.00|40420,40420.00|39495.00|925.00|40420,t
-1018,policy B,fee basis: includes fee,apply result (status|affected|basis|skipped invalid|skipped split mismatch|source mismatches),fee_owner,ok,ok rows=1,partial|2|includes_fee|1|1|1,partial|2|includes_fee|1|1|1,t
-1019,policy B,fee basis: includes fee,"apply after reload: Label (price) = Passport total; Passport selling = price - fee = stored before-fee, for every changed row",fee_owner,ok,ok rows=1,2/2,2/2,t
-1020,policy B,fee basis: includes fee,"a genuine source mismatch is preserved: website $30,500 kept, total $30,000 kept, split moved",fee_owner,ok,ok rows=1,30000.00|29075.00|925.00|30500,30000.00|29075.00|925.00|30500,t
-1021,policy B,fee basis: includes fee,a split that already disagrees with the total is skipped and left exactly as stored (no observation overwritten),fee_owner,ok,ok rows=1,20000.00|20000|895|20000,20000.00|20000|895|20000,t
-1022,policy B,fee basis: includes fee,"a fee larger than the total is skipped, not written (price|before-fee|fee|website)",fee_owner,ok,ok rows=1,900.00|5|895|900,900.00|5|895|900,t
-1023,policy B,fee basis: includes fee,archived and unbased rows untouched; verification stamps and parse status kept; audit names the basis,fee_owner,ok,ok rows=1,895|1|4|5|includes_fee:1,895|1|4|5|includes_fee:1,t
-1024,policy B,fee basis: includes fee,reload: a second dry-run at the saved fee finds nothing to change (eligible|unchanged),fee_owner,ok,ok rows=1,0|2,0|2,t
-1025,policy B,fee basis: includes fee,changing back to $895 restores the original split exactly,fee_owner,ok,ok rows=1,40420.00|39525.00|895.00|40420,40420.00|39525.00|895.00|40420,t
-1026,policy B,fee basis: values,"a fee of 925.555 is rounded to cents once: 925.56, before-fee 39,494.44, total 40,420",fee_owner,ok,ok rows=1,40420.00|39494.44|925.56|40420,40420.00|39494.44|925.56|40420,t
-1027,policy B,fee basis: values,a fee of 925.554 rounds down (fee|selling),fee_owner,925.55|39494.45,925.55|39494.45,,,t
-1028,policy B,fee basis: values,a negative fee is refused and nothing is written,fee_owner,error P0001,error P0001,0,0,t
-1029,policy B,fee basis: values,a missing fee is refused,fee_owner,error P0001,error P0001,,,t
-1030,policy B,fee basis: values,disabling the fee on an inclusive tenant keeps the total and makes the whole total the vehicle price,fee_owner,ok,ok rows=1,40420.00|40420.00|0|40420,40420.00|40420.00|0|40420,t
-1031,policy B,fee basis: values,contradicting basis settings: apply refused before any write (status|fee setting|version|rows at 925),fee_owner,ok,ok rows=1,failed|895|2|0,failed|895|2|0,t
-1032,policy B,fee basis: values,contradicting basis settings: the dry-run reports the conflict and counts nothing as eligible,fee_owner,ok,ok rows=1,conflict|0,conflict|0,t
-1033,policy B,fee basis: before fee,"traced vehicle on a before-fee tenant: before-fee 39,525 kept, total 40,420 -> 40,450 (price|before-fee|fee|website_sale_price)",owner,ok,ok rows=1,39525.00|39525|925.00|40450.00,39525.00|39525|925.00|40450.00,t
-1034,policy B,fee basis: before fee,before-fee dry-run sample (basis|selling before>after|total before>after),owner,before_fee|20000>20000|20895>20925.00,before_fee|20000>20000|20895>20925.00,,,t
-1035,policy B,fee basis: legacy recalc,recalc_tenant_doc_fee on an inclusive tenant keeps the total and the website observation,fee_owner,ok,ok rows=1,030000|30000.00|29075.00|925.00|30500 040420|40420.00|39495.00|925.00|40420,030000|30000.00|29075.00|925.00|30500 040420|40420.00|39495.00|925.00|40420,t
+674,fee conflict (deployed),fee reconciliation,"a stored sale price that disagrees with the total is listed for review under its column name, not as website evidence",owner,includes_fee|review: stored prices disagree; blocks fee changes; no automatic change|sale_price_field_differs_from_total|30000.00|30500|30000.00,includes_fee|review: stored prices disagree; blocks fee changes; no automatic change|sale_price_field_differs_from_total|30000.00|30500|30000.00,,,t
+675,fee conflict (deployed),fee reconciliation,"a before-fee price that does not add up to the total is listed for review, with the contract value shown but not applied",owner,review: stored prices disagree; blocks fee changes; no automatic change|split_mismatch|20000|19105.00|20000.00,review: stored prices disagree; blocks fee changes; no automatic change|split_mismatch|20000|19105.00|20000.00,,,t
+676,fee conflict (deployed),fee reconciliation,a website observation showing the total minus the fee contradicts a fee-inclusive basis,owner,website_observation_contradicts_basis|49105|50000.00,website_observation_contradicts_basis|49105|50000.00,,,t
+677,fee conflict (deployed),fee reconciliation,a dealership without an explicit fee basis is reported as such for every vehicle (tenant:count),owner,1:5,1:5,,,t
+678,fee conflict (deployed),fee reconciliation,vehicles without a price are listed as having no basis (tenant:suffix),owner,3:000000,3:000000,,,t
+679,fee conflict (deployed),fee reconciliation,"consistent vehicles are counted, not listed (tenant:basis:count)",owner,3:includes_fee:3 4:includes_fee:1,3:includes_fee:3 4:includes_fee:1,,,t
+680,policy B,settings authority,pricing key,owner,error 55000,error 55000,,false,t
+681,policy B,settings authority,pricing key,general_manager,error 55000,error 55000,,false,t
+682,policy B,settings authority,pricing key,gsm,error 55000,error 55000,,false,t
+683,policy B,settings authority,pricing key,admin,error 55000,error 55000,,false,t
+684,policy B,settings authority,pricing key,manager,error 42501,error 42501,,false,t
+685,policy B,settings authority,pricing key,sales_manager,error 42501,error 42501,,false,t
+686,policy B,settings authority,pricing key,used_car_manager,error 42501,error 42501,,false,t
+687,policy B,settings authority,pricing key,inventory_manager,error 42501,error 42501,,false,t
+688,policy B,settings authority,pricing key,salesperson,error 42501,error 42501,,false,t
+689,policy B,settings authority,pricing key,service_manager,error 42501,error 42501,,false,t
+690,policy B,settings authority,pricing key,finance,error 42501,error 42501,,false,t
+691,policy B,settings authority,pricing key,office,error 42501,error 42501,,false,t
+692,policy B,settings authority,pricing key,compliance,error 42501,error 42501,,false,t
+693,policy B,settings authority,pricing key,readonly,error 42501,error 42501,,false,t
+694,policy B,settings authority,pricing key,pending_manager,error 42501,error 42501,,false,t
+695,policy B,settings authority,pricing key,other_tenant_owner,error 42501,error 42501,,false,t
+696,policy B,settings authority,pricing key,platform_admin,error 55000,error 55000,,false,t
+697,policy B,settings authority,pricing key,anon,error 42501,error 42501,,false,t
+698,policy B,settings authority,routing key,owner,ok,ok rows=1,true,true,t
+699,policy B,settings authority,routing key,general_manager,ok,ok rows=1,true,true,t
+700,policy B,settings authority,routing key,gsm,ok,ok rows=1,true,true,t
+701,policy B,settings authority,routing key,admin,ok,ok rows=1,true,true,t
+702,policy B,settings authority,routing key,manager,ok,ok rows=1,true,true,t
+703,policy B,settings authority,routing key,sales_manager,ok,ok rows=1,true,true,t
+704,policy B,settings authority,routing key,used_car_manager,ok,ok rows=1,true,true,t
+705,policy B,settings authority,routing key,inventory_manager,error 42501,error 42501,,false,t
+706,policy B,settings authority,routing key,salesperson,error 42501,error 42501,,false,t
+707,policy B,settings authority,routing key,service_manager,error 42501,error 42501,,false,t
+708,policy B,settings authority,routing key,finance,ok,ok rows=1,true,true,t
+709,policy B,settings authority,routing key,office,error 42501,error 42501,,false,t
+710,policy B,settings authority,routing key,compliance,error 42501,error 42501,,false,t
+711,policy B,settings authority,routing key,readonly,error 42501,error 42501,,false,t
+712,policy B,settings authority,routing key,pending_manager,error 42501,error 42501,,false,t
+713,policy B,settings authority,routing key,other_tenant_owner,error 42501,error 42501,,false,t
+714,policy B,settings authority,routing key,platform_admin,ok,ok rows=1,true,true,t
+715,policy B,settings authority,routing key,anon,error 42501,error 42501,,false,t
+716,policy B,settings authority,publishing key,owner,ok,ok rows=1,true,true,t
+717,policy B,settings authority,publishing key,general_manager,ok,ok rows=1,true,true,t
+718,policy B,settings authority,publishing key,gsm,ok,ok rows=1,true,true,t
+719,policy B,settings authority,publishing key,admin,ok,ok rows=1,true,true,t
+720,policy B,settings authority,publishing key,manager,ok,ok rows=1,true,true,t
+721,policy B,settings authority,publishing key,sales_manager,error 42501,error 42501,,false,t
+722,policy B,settings authority,publishing key,used_car_manager,error 42501,error 42501,,false,t
+723,policy B,settings authority,publishing key,inventory_manager,error 42501,error 42501,,false,t
+724,policy B,settings authority,publishing key,salesperson,error 42501,error 42501,,false,t
+725,policy B,settings authority,publishing key,service_manager,error 42501,error 42501,,false,t
+726,policy B,settings authority,publishing key,finance,error 42501,error 42501,,false,t
+727,policy B,settings authority,publishing key,office,error 42501,error 42501,,false,t
+728,policy B,settings authority,publishing key,compliance,error 42501,error 42501,,false,t
+729,policy B,settings authority,publishing key,readonly,error 42501,error 42501,,false,t
+730,policy B,settings authority,publishing key,pending_manager,error 42501,error 42501,,false,t
+731,policy B,settings authority,publishing key,other_tenant_owner,error 42501,error 42501,,false,t
+732,policy B,settings authority,publishing key,platform_admin,ok,ok rows=1,true,true,t
+733,policy B,settings authority,publishing key,anon,error 42501,error 42501,,false,t
+734,policy B,settings authority,dealer programs (master list) key,owner,ok,ok rows=1,true,true,t
+735,policy B,settings authority,dealer programs (master list) key,general_manager,ok,ok rows=1,true,true,t
+736,policy B,settings authority,dealer programs (master list) key,gsm,ok,ok rows=1,true,true,t
+737,policy B,settings authority,dealer programs (master list) key,admin,ok,ok rows=1,true,true,t
+738,policy B,settings authority,dealer programs (master list) key,manager,ok,ok rows=1,true,true,t
+739,policy B,settings authority,dealer programs (master list) key,sales_manager,ok,ok rows=1,true,true,t
+740,policy B,settings authority,dealer programs (master list) key,used_car_manager,ok,ok rows=1,true,true,t
+741,policy B,settings authority,dealer programs (master list) key,inventory_manager,error 42501,error 42501,,true,t
+742,policy B,settings authority,dealer programs (master list) key,salesperson,error 42501,error 42501,,true,t
+743,policy B,settings authority,dealer programs (master list) key,service_manager,error 42501,error 42501,,true,t
+744,policy B,settings authority,dealer programs (master list) key,finance,ok,ok rows=1,true,true,t
+745,policy B,settings authority,dealer programs (master list) key,office,ok,ok rows=1,true,true,t
+746,policy B,settings authority,dealer programs (master list) key,compliance,ok,ok rows=1,true,true,t
+747,policy B,settings authority,dealer programs (master list) key,readonly,error 42501,error 42501,,true,t
+748,policy B,settings authority,dealer programs (master list) key,pending_manager,error 42501,error 42501,,true,t
+749,policy B,settings authority,dealer programs (master list) key,other_tenant_owner,error 42501,error 42501,,true,t
+750,policy B,settings authority,dealer programs (master list) key,platform_admin,ok,ok rows=1,true,true,t
+751,policy B,settings authority,dealer programs (master list) key,anon,error 42501,error 42501,,true,t
+752,policy B,settings authority,service key,owner,ok,ok rows=1,true,true,t
+753,policy B,settings authority,service key,general_manager,ok,ok rows=1,true,true,t
+754,policy B,settings authority,service key,gsm,ok,ok rows=1,true,true,t
+755,policy B,settings authority,service key,admin,ok,ok rows=1,true,true,t
+756,policy B,settings authority,service key,manager,ok,ok rows=1,true,true,t
+757,policy B,settings authority,service key,sales_manager,error 42501,error 42501,,false,t
+758,policy B,settings authority,service key,used_car_manager,error 42501,error 42501,,false,t
+759,policy B,settings authority,service key,inventory_manager,error 42501,error 42501,,false,t
+760,policy B,settings authority,service key,salesperson,error 42501,error 42501,,false,t
+761,policy B,settings authority,service key,service_manager,ok,ok rows=1,true,true,t
+762,policy B,settings authority,service key,finance,error 42501,error 42501,,false,t
+763,policy B,settings authority,service key,office,error 42501,error 42501,,false,t
+764,policy B,settings authority,service key,compliance,error 42501,error 42501,,false,t
+765,policy B,settings authority,service key,readonly,error 42501,error 42501,,false,t
+766,policy B,settings authority,service key,pending_manager,error 42501,error 42501,,false,t
+767,policy B,settings authority,service key,other_tenant_owner,error 42501,error 42501,,false,t
+768,policy B,settings authority,service key,platform_admin,ok,ok rows=1,true,true,t
+769,policy B,settings authority,service key,anon,error 42501,error 42501,,false,t
+770,policy B,settings authority,workspace key,owner,ok,ok rows=1,true,true,t
+771,policy B,settings authority,workspace key,general_manager,ok,ok rows=1,true,true,t
+772,policy B,settings authority,workspace key,gsm,ok,ok rows=1,true,true,t
+773,policy B,settings authority,workspace key,admin,ok,ok rows=1,true,true,t
+774,policy B,settings authority,workspace key,manager,ok,ok rows=1,true,true,t
+775,policy B,settings authority,workspace key,sales_manager,ok,ok rows=1,true,true,t
+776,policy B,settings authority,workspace key,used_car_manager,ok,ok rows=1,true,true,t
+777,policy B,settings authority,workspace key,inventory_manager,ok,ok rows=1,true,true,t
+778,policy B,settings authority,workspace key,salesperson,ok,ok rows=1,true,true,t
+779,policy B,settings authority,workspace key,service_manager,ok,ok rows=1,true,true,t
+780,policy B,settings authority,workspace key,finance,ok,ok rows=1,true,true,t
+781,policy B,settings authority,workspace key,office,ok,ok rows=1,true,true,t
+782,policy B,settings authority,workspace key,compliance,ok,ok rows=1,true,true,t
+783,policy B,settings authority,workspace key,readonly,ok,ok rows=1,true,true,t
+784,policy B,settings authority,workspace key,pending_manager,error 42501,error 42501,,false,t
+785,policy B,settings authority,workspace key,other_tenant_owner,error 42501,error 42501,,false,t
+786,policy B,settings authority,workspace key,platform_admin,ok,ok rows=1,true,true,t
+787,policy B,settings authority,workspace key,anon,error 42501,error 42501,,false,t
+788,policy B,settings authority,identity and brand key,owner,ok,ok rows=1,true,true,t
+789,policy B,settings authority,identity and brand key,general_manager,ok,ok rows=1,true,true,t
+790,policy B,settings authority,identity and brand key,gsm,ok,ok rows=1,true,true,t
+791,policy B,settings authority,identity and brand key,admin,ok,ok rows=1,true,true,t
+792,policy B,settings authority,identity and brand key,manager,ok,ok rows=1,true,true,t
+793,policy B,settings authority,identity and brand key,sales_manager,error 42501,error 42501,,false,t
+794,policy B,settings authority,identity and brand key,used_car_manager,error 42501,error 42501,,false,t
+795,policy B,settings authority,identity and brand key,inventory_manager,error 42501,error 42501,,false,t
+796,policy B,settings authority,identity and brand key,salesperson,error 42501,error 42501,,false,t
+797,policy B,settings authority,identity and brand key,service_manager,error 42501,error 42501,,false,t
+798,policy B,settings authority,identity and brand key,finance,error 42501,error 42501,,false,t
+799,policy B,settings authority,identity and brand key,office,error 42501,error 42501,,false,t
+800,policy B,settings authority,identity and brand key,compliance,error 42501,error 42501,,false,t
+801,policy B,settings authority,identity and brand key,readonly,error 42501,error 42501,,false,t
+802,policy B,settings authority,identity and brand key,pending_manager,error 42501,error 42501,,false,t
+803,policy B,settings authority,identity and brand key,other_tenant_owner,error 42501,error 42501,,false,t
+804,policy B,settings authority,identity and brand key,platform_admin,ok,ok rows=1,true,true,t
+805,policy B,settings authority,identity and brand key,anon,error 42501,error 42501,,false,t
+806,policy B,settings persistence,"owner saves the doc fee: value stored, version +1, one pricing audit row with before and after",owner,error 55000,error 55000,895|1|0,895|1|0,t
+807,policy B,settings persistence,a merge keeps every key it does not name,owner,ok,ok rows=1,Renamed|895|CT|1,Renamed|895|CT|1,t
+808,policy B,settings persistence,a workspace key saves without a policy audit row,salesperson,ok,ok rows=1,4x6|0,4x6|0,t
+809,policy B,settings persistence,a refused save writes nothing and audits nothing,salesperson,error 42501,error 42501,895|1|0,895|1|0,t
+810,policy B,settings persistence,routing saves write a routing audit row,sales_manager,ok,ok rows=1,1,1,t
+811,policy B,settings persistence,a member reads the saved settings back,salesperson,ok rows=1,ok rows=1,,,t
+812,policy B,settings persistence,another tenant's owner cannot read this tenant's settings,other_tenant_owner,ok rows=0,ok rows=0,,,t
+813,policy B,direct settings writes,direct update of dealer_profiles matches no row,owner,ok rows=0,ok rows=0,,,t
+814,policy B,direct settings writes,direct insert of a dealer profile is refused,owner,error 42501,error 42501,,,t
+815,policy B,direct settings writes,direct update of dealer_profiles matches no row,manager,ok rows=0,ok rows=0,,,t
+816,policy B,direct settings writes,direct insert of a dealer profile is refused,manager,error 42501,error 42501,,,t
+817,policy B,direct settings writes,direct update of dealer_profiles matches no row,salesperson,ok rows=0,ok rows=0,,,t
+818,policy B,direct settings writes,direct insert of a dealer profile is refused,salesperson,error 42501,error 42501,,,t
+819,policy B,direct settings writes,platform administrator may write directly,platform_admin,ok rows=1,ok rows=1,,,t
+820,policy B,direct settings writes,anon cannot update dealer profiles,anon,error 42501,error 42501,,,t
+821,policy B,direct settings writes,anon cannot call the settings writer,anon,error 42501,error 42501,,,t
+822,policy B,direct settings writes,anon reads no dealer profile,anon,ok rows=0,ok rows=0,,,t
+823,policy B,products and rules,create a product,owner,ok rows=1,ok rows=1,,,t
+824,policy B,products and rules,change a product price,owner,ok rows=1,ok rows=1,595.00,595.00,t
+825,policy B,products and rules,delete a product,owner,ok rows=1,ok rows=1,,,t
+826,policy B,products and rules,create an applicability rule,owner,ok rows=1,ok rows=1,,,t
+827,policy B,products and rules,change an applicability rule,owner,ok rows=1,ok rows=1,,,t
+828,policy B,products and rules,create a product,general_manager,ok rows=1,ok rows=1,,,t
+829,policy B,products and rules,change a product price,general_manager,ok rows=1,ok rows=1,595.00,595.00,t
+830,policy B,products and rules,delete a product,general_manager,ok rows=1,ok rows=1,,,t
+831,policy B,products and rules,create an applicability rule,general_manager,ok rows=1,ok rows=1,,,t
+832,policy B,products and rules,change an applicability rule,general_manager,ok rows=1,ok rows=1,,,t
+833,policy B,products and rules,create a product,gsm,ok rows=1,ok rows=1,,,t
+834,policy B,products and rules,change a product price,gsm,ok rows=1,ok rows=1,595.00,595.00,t
+835,policy B,products and rules,delete a product,gsm,ok rows=1,ok rows=1,,,t
+836,policy B,products and rules,create an applicability rule,gsm,ok rows=1,ok rows=1,,,t
+837,policy B,products and rules,change an applicability rule,gsm,ok rows=1,ok rows=1,,,t
+838,policy B,products and rules,create a product,manager,ok rows=1,ok rows=1,,,t
+839,policy B,products and rules,change a product price,manager,ok rows=1,ok rows=1,595.00,595.00,t
+840,policy B,products and rules,delete a product,manager,ok rows=1,ok rows=1,,,t
+841,policy B,products and rules,create an applicability rule,manager,ok rows=1,ok rows=1,,,t
+842,policy B,products and rules,change an applicability rule,manager,ok rows=1,ok rows=1,,,t
+843,policy B,products and rules,create a product,sales_manager,ok rows=1,ok rows=1,,,t
+844,policy B,products and rules,change a product price,sales_manager,ok rows=1,ok rows=1,595.00,595.00,t
+845,policy B,products and rules,delete a product,sales_manager,ok rows=1,ok rows=1,,,t
+846,policy B,products and rules,create an applicability rule,sales_manager,ok rows=1,ok rows=1,,,t
+847,policy B,products and rules,change an applicability rule,sales_manager,ok rows=1,ok rows=1,,,t
+848,policy B,products and rules,create a product,used_car_manager,ok rows=1,ok rows=1,,,t
+849,policy B,products and rules,change a product price,used_car_manager,ok rows=1,ok rows=1,595.00,595.00,t
+850,policy B,products and rules,delete a product,used_car_manager,ok rows=1,ok rows=1,,,t
+851,policy B,products and rules,create an applicability rule,used_car_manager,ok rows=1,ok rows=1,,,t
+852,policy B,products and rules,change an applicability rule,used_car_manager,ok rows=1,ok rows=1,,,t
+853,policy B,products and rules,create a product,finance,ok rows=1,ok rows=1,,,t
+854,policy B,products and rules,change a product price,finance,ok rows=1,ok rows=1,595.00,595.00,t
+855,policy B,products and rules,delete a product,finance,ok rows=1,ok rows=1,,,t
+856,policy B,products and rules,create an applicability rule,finance,ok rows=1,ok rows=1,,,t
+857,policy B,products and rules,change an applicability rule,finance,ok rows=1,ok rows=1,,,t
+858,policy B,products and rules,create a product,office,ok rows=1,ok rows=1,,,t
+859,policy B,products and rules,change a product price,office,ok rows=1,ok rows=1,595.00,595.00,t
+860,policy B,products and rules,delete a product,office,ok rows=1,ok rows=1,,,t
+861,policy B,products and rules,create an applicability rule,office,ok rows=1,ok rows=1,,,t
+862,policy B,products and rules,change an applicability rule,office,ok rows=1,ok rows=1,,,t
+863,policy B,products and rules,create a product,compliance,ok rows=1,ok rows=1,,,t
+864,policy B,products and rules,change a product price,compliance,ok rows=1,ok rows=1,595.00,595.00,t
+865,policy B,products and rules,delete a product,compliance,ok rows=1,ok rows=1,,,t
+866,policy B,products and rules,create an applicability rule,compliance,ok rows=1,ok rows=1,,,t
+867,policy B,products and rules,change an applicability rule,compliance,ok rows=1,ok rows=1,,,t
+868,policy B,products and rules,create a product,inventory_manager,error 42501,error 42501,,,t
+869,policy B,products and rules,change a product price,inventory_manager,ok rows=0,ok rows=0,495.00,495.00,t
+870,policy B,products and rules,delete a product,inventory_manager,ok rows=0,ok rows=0,,,t
+871,policy B,products and rules,create an applicability rule,inventory_manager,error 42501,error 42501,,,t
+872,policy B,products and rules,change an applicability rule,inventory_manager,ok rows=0,ok rows=0,,,t
+873,policy B,products and rules,create a product,salesperson,error 42501,error 42501,,,t
+874,policy B,products and rules,change a product price,salesperson,ok rows=0,ok rows=0,495.00,495.00,t
+875,policy B,products and rules,delete a product,salesperson,ok rows=0,ok rows=0,,,t
+876,policy B,products and rules,create an applicability rule,salesperson,error 42501,error 42501,,,t
+877,policy B,products and rules,change an applicability rule,salesperson,ok rows=0,ok rows=0,,,t
+878,policy B,products and rules,create a product,service_manager,error 42501,error 42501,,,t
+879,policy B,products and rules,change a product price,service_manager,ok rows=0,ok rows=0,495.00,495.00,t
+880,policy B,products and rules,delete a product,service_manager,ok rows=0,ok rows=0,,,t
+881,policy B,products and rules,create an applicability rule,service_manager,error 42501,error 42501,,,t
+882,policy B,products and rules,change an applicability rule,service_manager,ok rows=0,ok rows=0,,,t
+883,policy B,products and rules,create a product,readonly,error 42501,error 42501,,,t
+884,policy B,products and rules,change a product price,readonly,ok rows=0,ok rows=0,495.00,495.00,t
+885,policy B,products and rules,delete a product,readonly,ok rows=0,ok rows=0,,,t
+886,policy B,products and rules,create an applicability rule,readonly,error 42501,error 42501,,,t
+887,policy B,products and rules,change an applicability rule,readonly,ok rows=0,ok rows=0,,,t
+888,policy B,products and rules,create a product,other_tenant_owner,error 42501,error 42501,,,t
+889,policy B,products and rules,change a product price,other_tenant_owner,ok rows=0,ok rows=0,495.00,495.00,t
+890,policy B,products and rules,delete a product,other_tenant_owner,ok rows=0,ok rows=0,,,t
+891,policy B,products and rules,create an applicability rule,other_tenant_owner,error 42501,error 42501,,,t
+892,policy B,products and rules,change an applicability rule,other_tenant_owner,ok rows=0,ok rows=0,,,t
+893,policy B,products and rules,platform administrator (not a member) can create a product for a dealership,platform_admin,ok rows=1,ok rows=1,,,t
+894,policy B,products and rules,"platform administrator (not a member) cannot see, so cannot change, a dealership product",platform_admin,ok rows=0,ok rows=0,,,t
+895,policy B,products and rules,platform administrator (not a member) cannot create an applicability rule,platform_admin,error 42501,error 42501,,,t
+896,policy B,products and rules,a salesperson still reads the catalog,salesperson,ok rows=1,ok rows=1,,,t
+897,policy B,products and rules,a tenantless product cannot be created by a dealer role,owner,error 42501,error 42501,,,t
+898,policy B,vehicle prices (live),change a vehicle price,owner,ok rows=1,ok rows=1,20100.00,20100.00,t
+899,policy B,vehicle prices (live),change a vehicle doc fee column,owner,ok rows=1,ok rows=1,,,t
+900,policy B,vehicle prices (live),override a recall hold,owner,ok rows=1,ok rows=1,,,t
+901,policy B,vehicle prices (live),edit a non-priced field (description),owner,ok rows=1,ok rows=1,,,t
+902,policy B,vehicle prices (live),change a vehicle price,general_manager,ok rows=1,ok rows=1,20100.00,20100.00,t
+903,policy B,vehicle prices (live),change a vehicle doc fee column,general_manager,ok rows=1,ok rows=1,,,t
+904,policy B,vehicle prices (live),override a recall hold,general_manager,ok rows=1,ok rows=1,,,t
+905,policy B,vehicle prices (live),edit a non-priced field (description),general_manager,ok rows=1,ok rows=1,,,t
+906,policy B,vehicle prices (live),change a vehicle price,gsm,ok rows=1,ok rows=1,20100.00,20100.00,t
+907,policy B,vehicle prices (live),change a vehicle doc fee column,gsm,ok rows=1,ok rows=1,,,t
+908,policy B,vehicle prices (live),override a recall hold,gsm,ok rows=1,ok rows=1,,,t
+909,policy B,vehicle prices (live),edit a non-priced field (description),gsm,ok rows=1,ok rows=1,,,t
+910,policy B,vehicle prices (live),change a vehicle price,admin,ok rows=1,ok rows=1,20100.00,20100.00,t
+911,policy B,vehicle prices (live),change a vehicle doc fee column,admin,ok rows=1,ok rows=1,,,t
+912,policy B,vehicle prices (live),override a recall hold,admin,ok rows=1,ok rows=1,,,t
+913,policy B,vehicle prices (live),edit a non-priced field (description),admin,ok rows=1,ok rows=1,,,t
+914,policy B,vehicle prices (live),change a vehicle price,manager,ok rows=1,ok rows=1,20100.00,20100.00,t
+915,policy B,vehicle prices (live),change a vehicle doc fee column,manager,ok rows=1,ok rows=1,,,t
+916,policy B,vehicle prices (live),override a recall hold,manager,ok rows=1,ok rows=1,,,t
+917,policy B,vehicle prices (live),edit a non-priced field (description),manager,ok rows=1,ok rows=1,,,t
+918,policy B,vehicle prices (live),change a vehicle price,inventory_manager,ok rows=1,ok rows=1,20100.00,20100.00,t
+919,policy B,vehicle prices (live),change a vehicle doc fee column,inventory_manager,ok rows=1,ok rows=1,,,t
+920,policy B,vehicle prices (live),override a recall hold,inventory_manager,error 42501,error 42501,,,t
+921,policy B,vehicle prices (live),edit a non-priced field (description),inventory_manager,ok rows=1,ok rows=1,,,t
+922,policy B,vehicle prices (live),change a vehicle price,used_car_manager,ok rows=1,ok rows=1,20100.00,20100.00,t
+923,policy B,vehicle prices (live),change a vehicle doc fee column,used_car_manager,ok rows=1,ok rows=1,,,t
+924,policy B,vehicle prices (live),override a recall hold,used_car_manager,error 42501,error 42501,,,t
+925,policy B,vehicle prices (live),edit a non-priced field (description),used_car_manager,ok rows=1,ok rows=1,,,t
+926,policy B,vehicle prices (live),change a vehicle price,sales_manager,error 42501,error 42501,20000.00,20000.00,t
+927,policy B,vehicle prices (live),change a vehicle doc fee column,sales_manager,error 42501,error 42501,,,t
+928,policy B,vehicle prices (live),override a recall hold,sales_manager,error 42501,error 42501,,,t
+929,policy B,vehicle prices (live),edit a non-priced field (description),sales_manager,ok rows=1,ok rows=1,,,t
+930,policy B,vehicle prices (live),change a vehicle price,salesperson,error 42501,error 42501,20000.00,20000.00,t
+931,policy B,vehicle prices (live),change a vehicle doc fee column,salesperson,error 42501,error 42501,,,t
+932,policy B,vehicle prices (live),override a recall hold,salesperson,error 42501,error 42501,,,t
+933,policy B,vehicle prices (live),edit a non-priced field (description),salesperson,ok rows=1,ok rows=1,,,t
+934,policy B,vehicle prices (live),change a vehicle price,service_manager,error 42501,error 42501,20000.00,20000.00,t
+935,policy B,vehicle prices (live),change a vehicle doc fee column,service_manager,error 42501,error 42501,,,t
+936,policy B,vehicle prices (live),override a recall hold,service_manager,error 42501,error 42501,,,t
+937,policy B,vehicle prices (live),edit a non-priced field (description),service_manager,ok rows=1,ok rows=1,,,t
+938,policy B,vehicle prices (live),change a vehicle price,finance,error 42501,error 42501,20000.00,20000.00,t
+939,policy B,vehicle prices (live),change a vehicle doc fee column,finance,error 42501,error 42501,,,t
+940,policy B,vehicle prices (live),override a recall hold,finance,ok rows=1,ok rows=1,,,t
+941,policy B,vehicle prices (live),edit a non-priced field (description),finance,ok rows=1,ok rows=1,,,t
+942,policy B,vehicle prices (live),change a vehicle price,office,error 42501,error 42501,20000.00,20000.00,t
+943,policy B,vehicle prices (live),change a vehicle doc fee column,office,error 42501,error 42501,,,t
+944,policy B,vehicle prices (live),override a recall hold,office,ok rows=1,ok rows=1,,,t
+945,policy B,vehicle prices (live),edit a non-priced field (description),office,ok rows=1,ok rows=1,,,t
+946,policy B,vehicle prices (live),change a vehicle price,compliance,error 42501,error 42501,20000.00,20000.00,t
+947,policy B,vehicle prices (live),change a vehicle doc fee column,compliance,error 42501,error 42501,,,t
+948,policy B,vehicle prices (live),override a recall hold,compliance,ok rows=1,ok rows=1,,,t
+949,policy B,vehicle prices (live),edit a non-priced field (description),compliance,ok rows=1,ok rows=1,,,t
+950,policy B,vehicle prices (live),change a vehicle price,readonly,error 42501,error 42501,20000.00,20000.00,t
+951,policy B,vehicle prices (live),change a vehicle doc fee column,readonly,error 42501,error 42501,,,t
+952,policy B,vehicle prices (live),override a recall hold,readonly,error 42501,error 42501,,,t
+953,policy B,vehicle prices (live),edit a non-priced field (description),readonly,ok rows=1,ok rows=1,,,t
+954,policy B,vehicle prices (live),"platform administrator (not a member) cannot see, so cannot change, a dealership vehicle",platform_admin,ok rows=0,ok rows=0,,,t
+955,policy B,vehicle prices (live),another tenant's owner matches no listing,other_tenant_owner,ok rows=0,ok rows=0,,,t
+956,policy B,vehicle prices (live),"service jobs (feed, crawl) still write prices",service_role,ok rows=1,ok rows=1,,,t
+957,policy B,vehicle prices (live),known gap: a salesperson can set a price when creating a listing (the guard covers updates only),salesperson,ok rows=1,ok rows=1,,,t
+958,policy B,dealer programs,salesperson views the approved programs,salesperson,ok rows=1,ok rows=1,,,t
+959,policy B,dealer programs,salesperson cannot add a program to the master list,salesperson,error 42501,error 42501,1,1,t
+960,policy B,dealer programs,salesperson cannot edit a program in the master list,salesperson,error 42501,error 42501,,,t
+961,policy B,dealer programs,salesperson cannot delete programs from the master list,salesperson,error 42501,error 42501,,,t
+962,policy B,dealer programs,inventory manager cannot change the master list,inventory_manager,error 42501,error 42501,,,t
+963,policy B,dealer programs,sales manager (add-on role) edits the master list and it is audited,sales_manager,ok,ok rows=1,1,1,t
+964,policy B,dealer programs,salesperson applies or withholds a program on one vehicle,salesperson,ok rows=1,ok rows=1,"[""program-1""]","[""program-1""]",t
+965,policy B,fee review,"owner previews a fee change: 3 active vehicles change, 1 archived excluded, 1 without basis, nothing written",owner,ok rows=1,ok rows=1,0|1|0,0|1|0,t
+966,policy B,fee review,preview counts (eligible|unchanged|archived excluded|no basis|samples|version),owner,3|0|1|1|3|1,3|0|1|1|3|1,,,t
+967,policy B,fee review,"preview warnings name the vehicles without a basis, the parse warning, and that verification dates are kept",owner,"[""Advertised prices exclude the fee: each vehicle price is kept and the fee is added on top."", ""1 active vehicle(s) have no advertised price basis and are not affected."", ""1 active vehicle(s) carry a price parse warning; it is preserved."", ""Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation.""]","[""Advertised prices exclude the fee: each vehicle price is kept and the fee is added on top."", ""1 active vehicle(s) have no advertised price basis and are not affected."", ""1 active vehicle(s) carry a price parse warning; it is preserved."", ""Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation.""]",,,t
+968,policy B,fee review,preview with archived stock included counts the archived row as eligible,owner,4|0,4|0,,,t
+969,policy B,fee review,preview at the current fee changes nothing (eligible|unchanged),owner,0|3,0|3,,,t
+970,policy B,fee review,"preview samples show the selling price, the fee before and after, and the totals",gsm,000001 20000 895>900.00 20895>20900.00,000001 20000 895>900.00 20895>20900.00,,,t
+971,policy B,fee review,preview refused,manager,error 42501,error 42501,,,t
+972,policy B,fee review,"apply refused, nothing written",manager,error 42501,error 42501,0|0,0|0,t
+973,policy B,fee review,preview refused,used_car_manager,error 42501,error 42501,,,t
+974,policy B,fee review,"apply refused, nothing written",used_car_manager,error 42501,error 42501,0|0,0|0,t
+975,policy B,fee review,preview refused,inventory_manager,error 42501,error 42501,,,t
+976,policy B,fee review,"apply refused, nothing written",inventory_manager,error 42501,error 42501,0|0,0|0,t
+977,policy B,fee review,preview refused,sales_manager,error 42501,error 42501,,,t
+978,policy B,fee review,"apply refused, nothing written",sales_manager,error 42501,error 42501,0|0,0|0,t
+979,policy B,fee review,preview refused,salesperson,error 42501,error 42501,,,t
+980,policy B,fee review,"apply refused, nothing written",salesperson,error 42501,error 42501,0|0,0|0,t
+981,policy B,fee review,preview refused,other_tenant_owner,error 42501,error 42501,,,t
+982,policy B,fee review,"apply refused, nothing written",other_tenant_owner,error 42501,error 42501,0|0,0|0,t
+983,policy B,fee review,anon cannot preview,anon,error 42501,error 42501,,,t
+984,policy B,fee review,"owner applies: active rows only, archived and unbased untouched, verification stamps kept, recalculation stamped, one audit row, one ledger row, version +1",owner,ok,ok rows=1,3|895|1|3|3|1|1|1|2|900,3|895|1|3|3|1|1|1|2|900,t
+985,policy B,fee review,the same idempotency key twice changes nothing more (duplicate returned),owner,ok,ok rows=1,0|1|1|2,0|1|1|2,t
+986,policy B,fee review,a review against an old version is a conflict and writes nothing,owner,ok,ok rows=1,0|0|0,0|0|0,t
+987,policy B,fee review,"a settings save after the review moves the version, so the reviewed apply conflicts",owner,ok,ok rows=1,0|895,0|895,t
+988,policy B,fee review,GSM applies,gsm,ok,ok rows=1,3,3,t
+989,policy B,fee review,including archived stock is explicit and reaches the archived row,owner,ok,ok rows=1,4,4,t
+990,policy B,fee review,disabling the fee sets it to zero and the total to the selling price,owner,ok,ok rows=1,3,3,t
+991,policy B,fee review,a short idempotency key is refused,owner,error P0001,error P0001,,,t
+992,policy B,fee review,a negative amount is refused,owner,error P0001,error P0001,,,t
+993,policy B,fee review,"the apply passes the price guard (definer context), so an owner's reviewed change is not blocked by it",owner,ok,ok rows=1,3,3,t
+994,policy B,health reads,a member reads the policy version,salesperson,ok rows=1,ok rows=1,,,t
+995,policy B,health reads,another tenant's owner cannot read the policy version,other_tenant_owner,error 42501,error 42501,,,t
+996,policy B,health reads,a pending invitation cannot read the policy version,pending_manager,error 42501,error 42501,,,t
+997,policy B,health reads,"last feed success is the newest success or partial over the whole ledger, not the newest run",salesperson,2026-10-22 07:00,2026-10-22 07:00,,,t
+998,policy B,health reads,job status lists the scheduled jobs and never returns a URL or bearer key from their commands,salesperson,feed=t crawl=t url=f bearer=f secret=f,feed=t crawl=t url=f bearer=f secret=f,,,t
+999,policy B,health reads,another tenant's owner cannot read feed health,other_tenant_owner,error 42501,error 42501,,,t
+1000,policy B,health reads,another tenant's owner cannot read job status,other_tenant_owner,error 42501,error 42501,,,t
+1001,policy B,health reads,anon cannot read job status,anon,error 42501,error 42501,,,t
+1002,policy B,health reads,the apply ledger is readable by members only,other_tenant_owner,ok rows=0,ok rows=0,,,t
+1003,policy B,fee basis,"basis rule (inc true | inc ""false"" | legacy exc false | display mode alone | nothing | contradiction | unreadable | both agree | null)",owner,includes_fee:advertised_includes_doc_fee before_fee:advertised_includes_doc_fee includes_fee:advertised_excludes_doc_fee unconfigured:not_set unconfigured:not_set conflict:settings_conflict unconfigured:unreadable_setting includes_fee:advertised_includes_doc_fee unconfigured:not_set,includes_fee:advertised_includes_doc_fee before_fee:advertised_includes_doc_fee includes_fee:advertised_excludes_doc_fee unconfigured:not_set unconfigured:not_set conflict:settings_conflict unconfigured:unreadable_setting includes_fee:advertised_includes_doc_fee unconfigured:not_set,,,t
+1004,policy B,fee basis: includes fee,dry-run (basis|eligible|unchanged|archived excluded|no price|split|invalid|sale price differs|evidence|blocked),fee_owner,includes_fee|2|0|1|1|0|0|0|0|false,includes_fee|2|0|1|1|0|0|0|0|false,,,t
+1005,policy B,fee basis: includes fee,dry-run sample for the traced vehicle keeps the total and moves the split (selling before>after|fee|total before>after),fee_owner,39525.00>39495.00|895>925.00|40420.00>40420.00,39525.00>39495.00|895>925.00|40420.00>40420.00,,,t
+1006,policy B,fee basis: includes fee,the dry-run writes nothing (rows|version|audit rows),fee_owner,ok rows=1,ok rows=1,t|1|0,t|1|0,t
+1007,policy B,fee basis: includes fee,apply keeps the advertised total: traced row (price|before-fee|fee|website_sale_price),fee_owner,ok,ok rows=1,40420.00|39495.00|925.00|40420,40420.00|39495.00|925.00|40420,t
+1008,policy B,fee basis: includes fee,apply result (status|affected|basis),fee_owner,ok,ok rows=1,applied|2|includes_fee,applied|2|includes_fee,t
+1009,policy B,fee basis: includes fee,"after reload: Label (price) = Passport total and Passport selling = price - fee = stored before-fee, every changed row",fee_owner,ok,ok rows=1,2/2,2/2,t
+1010,policy B,fee basis: includes fee,"evidence untouched: verification stamps, parse status and notes, archived and unpriced rows, website observations (stamps|warning|notes|archived fee|unpriced fee|observations)",fee_owner,ok,ok rows=1,3|warning|Advertised price 40420 i|895|null|2,3|warning|Advertised price 40420 i|895|null|2,t
+1011,policy B,fee basis: includes fee,the audit row keeps before and after for each written vehicle (count|traced before>after),fee_owner,ok,ok rows=1,2|39525>39495.00,2|39525>39495.00,t
+1012,policy B,fee basis: includes fee,reload: a second dry-run at the saved fee finds nothing to change (eligible|unchanged|blocked),fee_owner,ok,ok rows=1,0|2|false,0|2|false,t
+1013,policy B,fee basis: includes fee,changing back to $895 restores the original split exactly,fee_owner,ok,ok rows=1,40420.00|39525.00|895.00|40420,40420.00|39525.00|895.00|40420,t
+1014,policy B,fee basis: includes fee,archived stock moves only when explicitly included,fee_owner,ok,ok rows=1,18000.00|17075.00|925.00|18000,18000.00|17075.00|925.00|18000,t
+1015,policy B,fee basis: values,"a fee of 925.555 is rounded to cents once: 925.56, before-fee 39,494.44, total 40,420",fee_owner,ok,ok rows=1,40420.00|39494.44|925.56|40420,40420.00|39494.44|925.56|40420,t
+1016,policy B,fee basis: values,a fee of 925.554 rounds down (fee|selling),fee_owner,925.55|39494.45,925.55|39494.45,,,t
+1017,policy B,fee basis: values,a negative fee is refused and nothing is written,fee_owner,error P0001,error P0001,true,true,t
+1018,policy B,fee basis: values,a missing fee is refused,fee_owner,error P0001,error P0001,,,t
+1019,policy B,fee basis: values,disabling the fee keeps the total and makes the whole total the vehicle price,fee_owner,ok,ok rows=1,40420.00|40420.00|0|40420,40420.00|40420.00|0|40420,t
+1020,policy B,fee basis: authority,"no setting (display mode alone does not decide): apply blocked, nothing written (status|basis|fee setting|version|rows same|blocked audit|ledger)",fee_owner,ok,ok rows=1,blocked|unconfigured|895|2|t|1|0,blocked|unconfigured|895|2|t|1|0,t
+1021,policy B,fee basis: authority,"contradicting settings: apply blocked, nothing written (status|basis|fee setting|version|rows same|blocked audit|ledger)",fee_owner,ok,ok rows=1,blocked|conflict|895|2|t|1|0,blocked|conflict|895|2|t|1|0,t
+1022,policy B,fee basis: authority,"an unreadable setting: apply blocked, nothing written (status|basis|fee setting|version|rows same|blocked audit|ledger)",fee_owner,ok,ok rows=1,blocked|unconfigured|895|2|t|1|0,blocked|unconfigured|895|2|t|1|0,t
+1023,policy B,fee basis: authority,a website observation showing the total minus the fee blocks a fee-inclusive change (blocked|evidence|reason),fee_owner,ok,ok rows=1,true|1|1 vehicle(s) have a website observation that contradicts the configured fee basis.,true|1|1 vehicle(s) have a website observation that contradicts the configured fee basis.,t
+1024,policy B,fee basis: dealership block,dry-run on the conflicted dealership (blocked|eligible|split|invalid|sale price differs|evidence|reasons),conflict_owner,true|2|1|1|1|1|4,true|2|1|1|1|1|4,,,t
+1025,policy B,fee basis: dealership block,"apply refuses the whole change: no fee setting, no vehicle, no ledger; the refusal is audited (status|fee setting|version|rows same|ledger|blocked audit)",conflict_owner,ok,ok rows=1,blocked|895|1|t|0|1,blocked|895|1|t|0|1,t
+1026,policy B,fee basis: dealership block,a conflict on one archived vehicle blocks only a change that includes archived stock (active only|with archived),fee_owner,ok,ok rows=1,false|true,false|true,t
+1027,policy B,fee basis: before fee,"traced vehicle on a before-fee dealership: before-fee 39,525 kept, total 40,420 -> 40,450",owner,ok,ok rows=1,39525.00|39525|925.00|40450.00,39525.00|39525|925.00|40450.00,t
+1028,policy B,fee basis: before fee,an inventory price that differs from the before-fee price blocks a fee-exclusive change,owner,ok,ok rows=1,blocked|895,blocked|895,t
+1029,policy B,fee basis: settings,a changed fee through the settings save is refused once the dealership has priced vehicles,fee_owner,error 55000,error 55000,895,895,t
+1030,policy B,fee basis: settings,disabling the fee through the settings save is refused too,fee_owner,error 55000,error 55000,,,t
+1031,policy B,fee basis: settings,resending the saved fee (a whole-settings save) is not a change and passes,fee_owner,ok,ok rows=1,,,t
+1032,policy B,fee basis: settings,a dealership without priced vehicles may set its fee directly,other_tenant_owner,ok,ok rows=1,500,500,t
+1033,policy B,fee basis: settings,the fee basis is a pricing key: a manager can no longer change it,fee_manager,error 42501,error 42501,,,t
+1034,policy B,fee basis: settings,"an owner can set it, and the change is audited as a pricing change",fee_owner,ok,ok rows=1,1,1,t
+1035,policy B,fee basis: legacy recalc,recalc_tenant_doc_fee refuses every caller and writes nothing,owner,error 0A000,error 0A000,0,0,t
+1036,policy B,fee basis: legacy recalc,recalc_tenant_doc_fee refuses every caller and writes nothing,general_manager,error 0A000,error 0A000,0,0,t
+1037,policy B,fee basis: legacy recalc,recalc_tenant_doc_fee refuses every caller and writes nothing,platform_admin,error 0A000,error 0A000,0,0,t
+1038,policy B,fee basis: legacy recalc,recalc_tenant_doc_fee refuses every caller and writes nothing,pending_manager,error 0A000,error 0A000,0,0,t
+1039,policy B,fee basis: legacy recalc,recalc_tenant_doc_fee refuses every caller and writes nothing,salesperson,error 0A000,error 0A000,0,0,t
+1040,policy B,fee basis: repeats,the same review key twice writes once (second status|fee|ledger|applied audits),fee_owner,ok,ok rows=1,duplicate|925.00|1|1,duplicate|925.00|1|1,t
+1041,policy B,fee basis: repeats,a second review against the old version is a conflict and writes nothing more,fee_owner,ok,ok rows=1,conflict|925.00,conflict|925.00,t
+1042,policy B,concurrency,"two reviews of the same version applied at once: the first applies, the second waits and conflicts (first|second)",fee_owner,applied|conflict,applied|conflict,,,t
+1043,policy B,concurrency,"after them: one fee, one version step, one ledger row, every split adds up (fee|version|keys|rows off)",fee_owner,925.00|2|conc-a-000001|0,925.00|2|conc-a-000001|0,,,t
+1044,policy B,concurrency,"the same review key applied twice at once: applied once, answered once as a duplicate (first|second)",fee_owner,applied|duplicate,applied|duplicate,,,t
+1045,policy B,concurrency,after them: one more version step and one more ledger row (fee|version|keys|rows off),fee_owner,"940.00|3|conc-a-000001,conc-c-000001|0","940.00|3|conc-a-000001,conc-c-000001|0",,,t
+1046,policy B,concurrency,a third review on the current version applies,fee_owner,applied,applied,,,t
+1047,rollback,data revert,"per-vehicle outcome (a later writer changed 025000, so it is skipped)",postgres,025000|skipped: changed since the apply 040420|reverted,025000|skipped: changed since the apply 040420|reverted,,,t
+1048,rollback,data revert,the traced vehicle is back at its before values (price|before-fee|fee|sale price),postgres,40420.00|39480.00|940.00|40420,40420.00|39480.00|940.00|40420,,,t
+1049,rollback,data revert,the later writers values are kept,postgres,25100.00|24175|925.00|25100,25100.00|24175|925.00|25100,,,t
+1050,rollback,data revert,the fee setting is back and the revert is audited (amount|reverted|skipped),postgres,"940|[""040420""]|[""025000""]","940|[""040420""]|[""025000""]",,,t
+1051,rollback,data revert,verification stamps and parse status untouched by the revert,postgres,2026-10-05|ok,2026-10-05|ok,,,t
+1052,rollback,code rollback,policy B changes all four functions,postgres,true,true,,,t
+1053,rollback,code rollback,after the rollback the four definitions and grants equal the hosted ones,postgres,"admin_doc_fee_change_apply:259360533c2c5778e71c14bebf65efc2:{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres} admin_doc_fee_change_preview:2a1468b9a62a9177b20193a345c77ce6:{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres} merge_dealer_settings:d10f008ed8da583f91d4d2b519e7b708:{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres} recalc_tenant_doc_fee:5bd0ef323bab43efcffcd924037aa4d2:{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}","admin_doc_fee_change_apply:259360533c2c5778e71c14bebf65efc2:{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres} admin_doc_fee_change_preview:2a1468b9a62a9177b20193a345c77ce6:{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres} merge_dealer_settings:d10f008ed8da583f91d4d2b519e7b708:{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres} recalc_tenant_doc_fee:5bd0ef323bab43efcffcd924037aa4d2:{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",,,t
+1054,rollback,code rollback,no function the proposal added is left,postgres,0,0,,,t
+1055,rollback,hosted cases after rollback: settings authority,pricing key,owner,ok,ok rows=1,true,true,t
+1056,rollback,hosted cases after rollback: settings authority,pricing key,general_manager,ok,ok rows=1,true,true,t
+1057,rollback,hosted cases after rollback: settings authority,pricing key,gsm,ok,ok rows=1,true,true,t
+1058,rollback,hosted cases after rollback: settings authority,pricing key,admin,ok,ok rows=1,true,true,t
+1059,rollback,hosted cases after rollback: settings authority,pricing key,manager,error 42501,error 42501,,false,t
+1060,rollback,hosted cases after rollback: settings authority,pricing key,sales_manager,error 42501,error 42501,,false,t
+1061,rollback,hosted cases after rollback: settings authority,pricing key,used_car_manager,error 42501,error 42501,,false,t
+1062,rollback,hosted cases after rollback: settings authority,pricing key,inventory_manager,error 42501,error 42501,,false,t
+1063,rollback,hosted cases after rollback: settings authority,pricing key,salesperson,error 42501,error 42501,,false,t
+1064,rollback,hosted cases after rollback: settings authority,pricing key,service_manager,error 42501,error 42501,,false,t
+1065,rollback,hosted cases after rollback: settings authority,pricing key,finance,error 42501,error 42501,,false,t
+1066,rollback,hosted cases after rollback: settings authority,pricing key,office,error 42501,error 42501,,false,t
+1067,rollback,hosted cases after rollback: settings authority,pricing key,compliance,error 42501,error 42501,,false,t
+1068,rollback,hosted cases after rollback: settings authority,pricing key,readonly,error 42501,error 42501,,false,t
+1069,rollback,hosted cases after rollback: settings authority,pricing key,pending_manager,error 42501,error 42501,,false,t
+1070,rollback,hosted cases after rollback: settings authority,pricing key,other_tenant_owner,error 42501,error 42501,,false,t
+1071,rollback,hosted cases after rollback: settings authority,pricing key,platform_admin,ok,ok rows=1,true,true,t
+1072,rollback,hosted cases after rollback: settings authority,pricing key,anon,error 42501,error 42501,,false,t
+1073,rollback,hosted cases after rollback: settings authority,routing key,owner,ok,ok rows=1,true,true,t
+1074,rollback,hosted cases after rollback: settings authority,routing key,general_manager,ok,ok rows=1,true,true,t
+1075,rollback,hosted cases after rollback: settings authority,routing key,gsm,ok,ok rows=1,true,true,t
+1076,rollback,hosted cases after rollback: settings authority,routing key,admin,ok,ok rows=1,true,true,t
+1077,rollback,hosted cases after rollback: settings authority,routing key,manager,ok,ok rows=1,true,true,t
+1078,rollback,hosted cases after rollback: settings authority,routing key,sales_manager,ok,ok rows=1,true,true,t
+1079,rollback,hosted cases after rollback: settings authority,routing key,used_car_manager,ok,ok rows=1,true,true,t
+1080,rollback,hosted cases after rollback: settings authority,routing key,inventory_manager,error 42501,error 42501,,false,t
+1081,rollback,hosted cases after rollback: settings authority,routing key,salesperson,error 42501,error 42501,,false,t
+1082,rollback,hosted cases after rollback: settings authority,routing key,service_manager,error 42501,error 42501,,false,t
+1083,rollback,hosted cases after rollback: settings authority,routing key,finance,ok,ok rows=1,true,true,t
+1084,rollback,hosted cases after rollback: settings authority,routing key,office,error 42501,error 42501,,false,t
+1085,rollback,hosted cases after rollback: settings authority,routing key,compliance,error 42501,error 42501,,false,t
+1086,rollback,hosted cases after rollback: settings authority,routing key,readonly,error 42501,error 42501,,false,t
+1087,rollback,hosted cases after rollback: settings authority,routing key,pending_manager,error 42501,error 42501,,false,t
+1088,rollback,hosted cases after rollback: settings authority,routing key,other_tenant_owner,error 42501,error 42501,,false,t
+1089,rollback,hosted cases after rollback: settings authority,routing key,platform_admin,ok,ok rows=1,true,true,t
+1090,rollback,hosted cases after rollback: settings authority,routing key,anon,error 42501,error 42501,,false,t
+1091,rollback,hosted cases after rollback: settings authority,publishing key,owner,ok,ok rows=1,true,true,t
+1092,rollback,hosted cases after rollback: settings authority,publishing key,general_manager,ok,ok rows=1,true,true,t
+1093,rollback,hosted cases after rollback: settings authority,publishing key,gsm,ok,ok rows=1,true,true,t
+1094,rollback,hosted cases after rollback: settings authority,publishing key,admin,ok,ok rows=1,true,true,t
+1095,rollback,hosted cases after rollback: settings authority,publishing key,manager,ok,ok rows=1,true,true,t
+1096,rollback,hosted cases after rollback: settings authority,publishing key,sales_manager,error 42501,error 42501,,false,t
+1097,rollback,hosted cases after rollback: settings authority,publishing key,used_car_manager,error 42501,error 42501,,false,t
+1098,rollback,hosted cases after rollback: settings authority,publishing key,inventory_manager,error 42501,error 42501,,false,t
+1099,rollback,hosted cases after rollback: settings authority,publishing key,salesperson,error 42501,error 42501,,false,t
+1100,rollback,hosted cases after rollback: settings authority,publishing key,service_manager,error 42501,error 42501,,false,t
+1101,rollback,hosted cases after rollback: settings authority,publishing key,finance,error 42501,error 42501,,false,t
+1102,rollback,hosted cases after rollback: settings authority,publishing key,office,error 42501,error 42501,,false,t
+1103,rollback,hosted cases after rollback: settings authority,publishing key,compliance,error 42501,error 42501,,false,t
+1104,rollback,hosted cases after rollback: settings authority,publishing key,readonly,error 42501,error 42501,,false,t
+1105,rollback,hosted cases after rollback: settings authority,publishing key,pending_manager,error 42501,error 42501,,false,t
+1106,rollback,hosted cases after rollback: settings authority,publishing key,other_tenant_owner,error 42501,error 42501,,false,t
+1107,rollback,hosted cases after rollback: settings authority,publishing key,platform_admin,ok,ok rows=1,true,true,t
+1108,rollback,hosted cases after rollback: settings authority,publishing key,anon,error 42501,error 42501,,false,t
+1109,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,owner,ok,ok rows=1,true,true,t
+1110,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,general_manager,ok,ok rows=1,true,true,t
+1111,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,gsm,ok,ok rows=1,true,true,t
+1112,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,admin,ok,ok rows=1,true,true,t
+1113,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,manager,ok,ok rows=1,true,true,t
+1114,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,sales_manager,ok,ok rows=1,true,true,t
+1115,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,used_car_manager,ok,ok rows=1,true,true,t
+1116,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,inventory_manager,error 42501,error 42501,,true,t
+1117,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,salesperson,error 42501,error 42501,,true,t
+1118,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,service_manager,error 42501,error 42501,,true,t
+1119,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,finance,ok,ok rows=1,true,true,t
+1120,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,office,ok,ok rows=1,true,true,t
+1121,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,compliance,ok,ok rows=1,true,true,t
+1122,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,readonly,error 42501,error 42501,,true,t
+1123,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,pending_manager,error 42501,error 42501,,true,t
+1124,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,other_tenant_owner,error 42501,error 42501,,true,t
+1125,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,platform_admin,ok,ok rows=1,true,true,t
+1126,rollback,hosted cases after rollback: settings authority,dealer programs (master list) key,anon,error 42501,error 42501,,true,t
+1127,rollback,hosted cases after rollback: settings authority,service key,owner,ok,ok rows=1,true,true,t
+1128,rollback,hosted cases after rollback: settings authority,service key,general_manager,ok,ok rows=1,true,true,t
+1129,rollback,hosted cases after rollback: settings authority,service key,gsm,ok,ok rows=1,true,true,t
+1130,rollback,hosted cases after rollback: settings authority,service key,admin,ok,ok rows=1,true,true,t
+1131,rollback,hosted cases after rollback: settings authority,service key,manager,ok,ok rows=1,true,true,t
+1132,rollback,hosted cases after rollback: settings authority,service key,sales_manager,error 42501,error 42501,,false,t
+1133,rollback,hosted cases after rollback: settings authority,service key,used_car_manager,error 42501,error 42501,,false,t
+1134,rollback,hosted cases after rollback: settings authority,service key,inventory_manager,error 42501,error 42501,,false,t
+1135,rollback,hosted cases after rollback: settings authority,service key,salesperson,error 42501,error 42501,,false,t
+1136,rollback,hosted cases after rollback: settings authority,service key,service_manager,ok,ok rows=1,true,true,t
+1137,rollback,hosted cases after rollback: settings authority,service key,finance,error 42501,error 42501,,false,t
+1138,rollback,hosted cases after rollback: settings authority,service key,office,error 42501,error 42501,,false,t
+1139,rollback,hosted cases after rollback: settings authority,service key,compliance,error 42501,error 42501,,false,t
+1140,rollback,hosted cases after rollback: settings authority,service key,readonly,error 42501,error 42501,,false,t
+1141,rollback,hosted cases after rollback: settings authority,service key,pending_manager,error 42501,error 42501,,false,t
+1142,rollback,hosted cases after rollback: settings authority,service key,other_tenant_owner,error 42501,error 42501,,false,t
+1143,rollback,hosted cases after rollback: settings authority,service key,platform_admin,ok,ok rows=1,true,true,t
+1144,rollback,hosted cases after rollback: settings authority,service key,anon,error 42501,error 42501,,false,t
+1145,rollback,hosted cases after rollback: settings authority,workspace key,owner,ok,ok rows=1,true,true,t
+1146,rollback,hosted cases after rollback: settings authority,workspace key,general_manager,ok,ok rows=1,true,true,t
+1147,rollback,hosted cases after rollback: settings authority,workspace key,gsm,ok,ok rows=1,true,true,t
+1148,rollback,hosted cases after rollback: settings authority,workspace key,admin,ok,ok rows=1,true,true,t
+1149,rollback,hosted cases after rollback: settings authority,workspace key,manager,ok,ok rows=1,true,true,t
+1150,rollback,hosted cases after rollback: settings authority,workspace key,sales_manager,ok,ok rows=1,true,true,t
+1151,rollback,hosted cases after rollback: settings authority,workspace key,used_car_manager,ok,ok rows=1,true,true,t
+1152,rollback,hosted cases after rollback: settings authority,workspace key,inventory_manager,ok,ok rows=1,true,true,t
+1153,rollback,hosted cases after rollback: settings authority,workspace key,salesperson,ok,ok rows=1,true,true,t
+1154,rollback,hosted cases after rollback: settings authority,workspace key,service_manager,ok,ok rows=1,true,true,t
+1155,rollback,hosted cases after rollback: settings authority,workspace key,finance,ok,ok rows=1,true,true,t
+1156,rollback,hosted cases after rollback: settings authority,workspace key,office,ok,ok rows=1,true,true,t
+1157,rollback,hosted cases after rollback: settings authority,workspace key,compliance,ok,ok rows=1,true,true,t
+1158,rollback,hosted cases after rollback: settings authority,workspace key,readonly,ok,ok rows=1,true,true,t
+1159,rollback,hosted cases after rollback: settings authority,workspace key,pending_manager,error 42501,error 42501,,false,t
+1160,rollback,hosted cases after rollback: settings authority,workspace key,other_tenant_owner,error 42501,error 42501,,false,t
+1161,rollback,hosted cases after rollback: settings authority,workspace key,platform_admin,ok,ok rows=1,true,true,t
+1162,rollback,hosted cases after rollback: settings authority,workspace key,anon,error 42501,error 42501,,false,t
+1163,rollback,hosted cases after rollback: settings authority,identity and brand key,owner,ok,ok rows=1,true,true,t
+1164,rollback,hosted cases after rollback: settings authority,identity and brand key,general_manager,ok,ok rows=1,true,true,t
+1165,rollback,hosted cases after rollback: settings authority,identity and brand key,gsm,ok,ok rows=1,true,true,t
+1166,rollback,hosted cases after rollback: settings authority,identity and brand key,admin,ok,ok rows=1,true,true,t
+1167,rollback,hosted cases after rollback: settings authority,identity and brand key,manager,ok,ok rows=1,true,true,t
+1168,rollback,hosted cases after rollback: settings authority,identity and brand key,sales_manager,error 42501,error 42501,,false,t
+1169,rollback,hosted cases after rollback: settings authority,identity and brand key,used_car_manager,error 42501,error 42501,,false,t
+1170,rollback,hosted cases after rollback: settings authority,identity and brand key,inventory_manager,error 42501,error 42501,,false,t
+1171,rollback,hosted cases after rollback: settings authority,identity and brand key,salesperson,error 42501,error 42501,,false,t
+1172,rollback,hosted cases after rollback: settings authority,identity and brand key,service_manager,error 42501,error 42501,,false,t
+1173,rollback,hosted cases after rollback: settings authority,identity and brand key,finance,error 42501,error 42501,,false,t
+1174,rollback,hosted cases after rollback: settings authority,identity and brand key,office,error 42501,error 42501,,false,t
+1175,rollback,hosted cases after rollback: settings authority,identity and brand key,compliance,error 42501,error 42501,,false,t
+1176,rollback,hosted cases after rollback: settings authority,identity and brand key,readonly,error 42501,error 42501,,false,t
+1177,rollback,hosted cases after rollback: settings authority,identity and brand key,pending_manager,error 42501,error 42501,,false,t
+1178,rollback,hosted cases after rollback: settings authority,identity and brand key,other_tenant_owner,error 42501,error 42501,,false,t
+1179,rollback,hosted cases after rollback: settings authority,identity and brand key,platform_admin,ok,ok rows=1,true,true,t
+1180,rollback,hosted cases after rollback: settings authority,identity and brand key,anon,error 42501,error 42501,,false,t
+1181,rollback,hosted cases after rollback: settings persistence,"owner saves the doc fee: value stored, version +1, one pricing audit row with before and after",owner,ok,ok rows=1,900|2|1,900|2|1,t
+1182,rollback,hosted cases after rollback: settings persistence,a merge keeps every key it does not name,owner,ok,ok rows=1,Renamed|895|CT|1,Renamed|895|CT|1,t
+1183,rollback,hosted cases after rollback: settings persistence,a workspace key saves without a policy audit row,salesperson,ok,ok rows=1,4x6|0,4x6|0,t
+1184,rollback,hosted cases after rollback: settings persistence,a refused save writes nothing and audits nothing,salesperson,error 42501,error 42501,895|1|0,895|1|0,t
+1185,rollback,hosted cases after rollback: settings persistence,routing saves write a routing audit row,sales_manager,ok,ok rows=1,1,1,t
+1186,rollback,hosted cases after rollback: settings persistence,a member reads the saved settings back,salesperson,ok rows=1,ok rows=1,,,t
+1187,rollback,hosted cases after rollback: settings persistence,another tenant's owner cannot read this tenant's settings,other_tenant_owner,ok rows=0,ok rows=0,,,t
+1188,rollback,hosted cases after rollback: direct settings writes,direct update of dealer_profiles matches no row,owner,ok rows=0,ok rows=0,,,t
+1189,rollback,hosted cases after rollback: direct settings writes,direct insert of a dealer profile is refused,owner,error 42501,error 42501,,,t
+1190,rollback,hosted cases after rollback: direct settings writes,direct update of dealer_profiles matches no row,manager,ok rows=0,ok rows=0,,,t
+1191,rollback,hosted cases after rollback: direct settings writes,direct insert of a dealer profile is refused,manager,error 42501,error 42501,,,t
+1192,rollback,hosted cases after rollback: direct settings writes,direct update of dealer_profiles matches no row,salesperson,ok rows=0,ok rows=0,,,t
+1193,rollback,hosted cases after rollback: direct settings writes,direct insert of a dealer profile is refused,salesperson,error 42501,error 42501,,,t
+1194,rollback,hosted cases after rollback: direct settings writes,platform administrator may write directly,platform_admin,ok rows=1,ok rows=1,,,t
+1195,rollback,hosted cases after rollback: direct settings writes,anon cannot update dealer profiles,anon,error 42501,error 42501,,,t
+1196,rollback,hosted cases after rollback: direct settings writes,anon cannot call the settings writer,anon,error 42501,error 42501,,,t
+1197,rollback,hosted cases after rollback: direct settings writes,anon reads no dealer profile,anon,ok rows=0,ok rows=0,,,t
+1198,rollback,hosted cases after rollback: products and rules,create a product,owner,ok rows=1,ok rows=1,,,t
+1199,rollback,hosted cases after rollback: products and rules,change a product price,owner,ok rows=1,ok rows=1,595.00,595.00,t
+1200,rollback,hosted cases after rollback: products and rules,delete a product,owner,ok rows=1,ok rows=1,,,t
+1201,rollback,hosted cases after rollback: products and rules,create an applicability rule,owner,ok rows=1,ok rows=1,,,t
+1202,rollback,hosted cases after rollback: products and rules,change an applicability rule,owner,ok rows=1,ok rows=1,,,t
+1203,rollback,hosted cases after rollback: products and rules,create a product,general_manager,ok rows=1,ok rows=1,,,t
+1204,rollback,hosted cases after rollback: products and rules,change a product price,general_manager,ok rows=1,ok rows=1,595.00,595.00,t
+1205,rollback,hosted cases after rollback: products and rules,delete a product,general_manager,ok rows=1,ok rows=1,,,t
+1206,rollback,hosted cases after rollback: products and rules,create an applicability rule,general_manager,ok rows=1,ok rows=1,,,t
+1207,rollback,hosted cases after rollback: products and rules,change an applicability rule,general_manager,ok rows=1,ok rows=1,,,t
+1208,rollback,hosted cases after rollback: products and rules,create a product,gsm,ok rows=1,ok rows=1,,,t
+1209,rollback,hosted cases after rollback: products and rules,change a product price,gsm,ok rows=1,ok rows=1,595.00,595.00,t
+1210,rollback,hosted cases after rollback: products and rules,delete a product,gsm,ok rows=1,ok rows=1,,,t
+1211,rollback,hosted cases after rollback: products and rules,create an applicability rule,gsm,ok rows=1,ok rows=1,,,t
+1212,rollback,hosted cases after rollback: products and rules,change an applicability rule,gsm,ok rows=1,ok rows=1,,,t
+1213,rollback,hosted cases after rollback: products and rules,create a product,manager,ok rows=1,ok rows=1,,,t
+1214,rollback,hosted cases after rollback: products and rules,change a product price,manager,ok rows=1,ok rows=1,595.00,595.00,t
+1215,rollback,hosted cases after rollback: products and rules,delete a product,manager,ok rows=1,ok rows=1,,,t
+1216,rollback,hosted cases after rollback: products and rules,create an applicability rule,manager,ok rows=1,ok rows=1,,,t
+1217,rollback,hosted cases after rollback: products and rules,change an applicability rule,manager,ok rows=1,ok rows=1,,,t
+1218,rollback,hosted cases after rollback: products and rules,create a product,sales_manager,ok rows=1,ok rows=1,,,t
+1219,rollback,hosted cases after rollback: products and rules,change a product price,sales_manager,ok rows=1,ok rows=1,595.00,595.00,t
+1220,rollback,hosted cases after rollback: products and rules,delete a product,sales_manager,ok rows=1,ok rows=1,,,t
+1221,rollback,hosted cases after rollback: products and rules,create an applicability rule,sales_manager,ok rows=1,ok rows=1,,,t
+1222,rollback,hosted cases after rollback: products and rules,change an applicability rule,sales_manager,ok rows=1,ok rows=1,,,t
+1223,rollback,hosted cases after rollback: products and rules,create a product,used_car_manager,ok rows=1,ok rows=1,,,t
+1224,rollback,hosted cases after rollback: products and rules,change a product price,used_car_manager,ok rows=1,ok rows=1,595.00,595.00,t
+1225,rollback,hosted cases after rollback: products and rules,delete a product,used_car_manager,ok rows=1,ok rows=1,,,t
+1226,rollback,hosted cases after rollback: products and rules,create an applicability rule,used_car_manager,ok rows=1,ok rows=1,,,t
+1227,rollback,hosted cases after rollback: products and rules,change an applicability rule,used_car_manager,ok rows=1,ok rows=1,,,t
+1228,rollback,hosted cases after rollback: products and rules,create a product,finance,ok rows=1,ok rows=1,,,t
+1229,rollback,hosted cases after rollback: products and rules,change a product price,finance,ok rows=1,ok rows=1,595.00,595.00,t
+1230,rollback,hosted cases after rollback: products and rules,delete a product,finance,ok rows=1,ok rows=1,,,t
+1231,rollback,hosted cases after rollback: products and rules,create an applicability rule,finance,ok rows=1,ok rows=1,,,t
+1232,rollback,hosted cases after rollback: products and rules,change an applicability rule,finance,ok rows=1,ok rows=1,,,t
+1233,rollback,hosted cases after rollback: products and rules,create a product,office,ok rows=1,ok rows=1,,,t
+1234,rollback,hosted cases after rollback: products and rules,change a product price,office,ok rows=1,ok rows=1,595.00,595.00,t
+1235,rollback,hosted cases after rollback: products and rules,delete a product,office,ok rows=1,ok rows=1,,,t
+1236,rollback,hosted cases after rollback: products and rules,create an applicability rule,office,ok rows=1,ok rows=1,,,t
+1237,rollback,hosted cases after rollback: products and rules,change an applicability rule,office,ok rows=1,ok rows=1,,,t
+1238,rollback,hosted cases after rollback: products and rules,create a product,compliance,ok rows=1,ok rows=1,,,t
+1239,rollback,hosted cases after rollback: products and rules,change a product price,compliance,ok rows=1,ok rows=1,595.00,595.00,t
+1240,rollback,hosted cases after rollback: products and rules,delete a product,compliance,ok rows=1,ok rows=1,,,t
+1241,rollback,hosted cases after rollback: products and rules,create an applicability rule,compliance,ok rows=1,ok rows=1,,,t
+1242,rollback,hosted cases after rollback: products and rules,change an applicability rule,compliance,ok rows=1,ok rows=1,,,t
+1243,rollback,hosted cases after rollback: products and rules,create a product,inventory_manager,error 42501,error 42501,,,t
+1244,rollback,hosted cases after rollback: products and rules,change a product price,inventory_manager,ok rows=0,ok rows=0,495.00,495.00,t
+1245,rollback,hosted cases after rollback: products and rules,delete a product,inventory_manager,ok rows=0,ok rows=0,,,t
+1246,rollback,hosted cases after rollback: products and rules,create an applicability rule,inventory_manager,error 42501,error 42501,,,t
+1247,rollback,hosted cases after rollback: products and rules,change an applicability rule,inventory_manager,ok rows=0,ok rows=0,,,t
+1248,rollback,hosted cases after rollback: products and rules,create a product,salesperson,error 42501,error 42501,,,t
+1249,rollback,hosted cases after rollback: products and rules,change a product price,salesperson,ok rows=0,ok rows=0,495.00,495.00,t
+1250,rollback,hosted cases after rollback: products and rules,delete a product,salesperson,ok rows=0,ok rows=0,,,t
+1251,rollback,hosted cases after rollback: products and rules,create an applicability rule,salesperson,error 42501,error 42501,,,t
+1252,rollback,hosted cases after rollback: products and rules,change an applicability rule,salesperson,ok rows=0,ok rows=0,,,t
+1253,rollback,hosted cases after rollback: products and rules,create a product,service_manager,error 42501,error 42501,,,t
+1254,rollback,hosted cases after rollback: products and rules,change a product price,service_manager,ok rows=0,ok rows=0,495.00,495.00,t
+1255,rollback,hosted cases after rollback: products and rules,delete a product,service_manager,ok rows=0,ok rows=0,,,t
+1256,rollback,hosted cases after rollback: products and rules,create an applicability rule,service_manager,error 42501,error 42501,,,t
+1257,rollback,hosted cases after rollback: products and rules,change an applicability rule,service_manager,ok rows=0,ok rows=0,,,t
+1258,rollback,hosted cases after rollback: products and rules,create a product,readonly,error 42501,error 42501,,,t
+1259,rollback,hosted cases after rollback: products and rules,change a product price,readonly,ok rows=0,ok rows=0,495.00,495.00,t
+1260,rollback,hosted cases after rollback: products and rules,delete a product,readonly,ok rows=0,ok rows=0,,,t
+1261,rollback,hosted cases after rollback: products and rules,create an applicability rule,readonly,error 42501,error 42501,,,t
+1262,rollback,hosted cases after rollback: products and rules,change an applicability rule,readonly,ok rows=0,ok rows=0,,,t
+1263,rollback,hosted cases after rollback: products and rules,create a product,other_tenant_owner,error 42501,error 42501,,,t
+1264,rollback,hosted cases after rollback: products and rules,change a product price,other_tenant_owner,ok rows=0,ok rows=0,495.00,495.00,t
+1265,rollback,hosted cases after rollback: products and rules,delete a product,other_tenant_owner,ok rows=0,ok rows=0,,,t
+1266,rollback,hosted cases after rollback: products and rules,create an applicability rule,other_tenant_owner,error 42501,error 42501,,,t
+1267,rollback,hosted cases after rollback: products and rules,change an applicability rule,other_tenant_owner,ok rows=0,ok rows=0,,,t
+1268,rollback,hosted cases after rollback: products and rules,platform administrator (not a member) can create a product for a dealership,platform_admin,ok rows=1,ok rows=1,,,t
+1269,rollback,hosted cases after rollback: products and rules,"platform administrator (not a member) cannot see, so cannot change, a dealership product",platform_admin,ok rows=0,ok rows=0,,,t
+1270,rollback,hosted cases after rollback: products and rules,platform administrator (not a member) cannot create an applicability rule,platform_admin,error 42501,error 42501,,,t
+1271,rollback,hosted cases after rollback: products and rules,a salesperson still reads the catalog,salesperson,ok rows=1,ok rows=1,,,t
+1272,rollback,hosted cases after rollback: products and rules,a tenantless product cannot be created by a dealer role,owner,error 42501,error 42501,,,t
+1273,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,owner,ok rows=1,ok rows=1,20100.00,20100.00,t
+1274,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,owner,ok rows=1,ok rows=1,,,t
+1275,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,owner,ok rows=1,ok rows=1,,,t
+1276,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),owner,ok rows=1,ok rows=1,,,t
+1277,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,general_manager,ok rows=1,ok rows=1,20100.00,20100.00,t
+1278,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,general_manager,ok rows=1,ok rows=1,,,t
+1279,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,general_manager,ok rows=1,ok rows=1,,,t
+1280,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),general_manager,ok rows=1,ok rows=1,,,t
+1281,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,gsm,ok rows=1,ok rows=1,20100.00,20100.00,t
+1282,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,gsm,ok rows=1,ok rows=1,,,t
+1283,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,gsm,ok rows=1,ok rows=1,,,t
+1284,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),gsm,ok rows=1,ok rows=1,,,t
+1285,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,admin,ok rows=1,ok rows=1,20100.00,20100.00,t
+1286,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,admin,ok rows=1,ok rows=1,,,t
+1287,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,admin,ok rows=1,ok rows=1,,,t
+1288,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),admin,ok rows=1,ok rows=1,,,t
+1289,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,manager,ok rows=1,ok rows=1,20100.00,20100.00,t
+1290,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,manager,ok rows=1,ok rows=1,,,t
+1291,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,manager,ok rows=1,ok rows=1,,,t
+1292,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),manager,ok rows=1,ok rows=1,,,t
+1293,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,inventory_manager,ok rows=1,ok rows=1,20100.00,20100.00,t
+1294,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,inventory_manager,ok rows=1,ok rows=1,,,t
+1295,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,inventory_manager,error 42501,error 42501,,,t
+1296,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),inventory_manager,ok rows=1,ok rows=1,,,t
+1297,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,used_car_manager,ok rows=1,ok rows=1,20100.00,20100.00,t
+1298,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,used_car_manager,ok rows=1,ok rows=1,,,t
+1299,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,used_car_manager,error 42501,error 42501,,,t
+1300,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),used_car_manager,ok rows=1,ok rows=1,,,t
+1301,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,sales_manager,error 42501,error 42501,20000.00,20000.00,t
+1302,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,sales_manager,error 42501,error 42501,,,t
+1303,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,sales_manager,error 42501,error 42501,,,t
+1304,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),sales_manager,ok rows=1,ok rows=1,,,t
+1305,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,salesperson,error 42501,error 42501,20000.00,20000.00,t
+1306,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,salesperson,error 42501,error 42501,,,t
+1307,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,salesperson,error 42501,error 42501,,,t
+1308,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),salesperson,ok rows=1,ok rows=1,,,t
+1309,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,service_manager,error 42501,error 42501,20000.00,20000.00,t
+1310,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,service_manager,error 42501,error 42501,,,t
+1311,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,service_manager,error 42501,error 42501,,,t
+1312,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),service_manager,ok rows=1,ok rows=1,,,t
+1313,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,finance,error 42501,error 42501,20000.00,20000.00,t
+1314,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,finance,error 42501,error 42501,,,t
+1315,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,finance,ok rows=1,ok rows=1,,,t
+1316,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),finance,ok rows=1,ok rows=1,,,t
+1317,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,office,error 42501,error 42501,20000.00,20000.00,t
+1318,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,office,error 42501,error 42501,,,t
+1319,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,office,ok rows=1,ok rows=1,,,t
+1320,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),office,ok rows=1,ok rows=1,,,t
+1321,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,compliance,error 42501,error 42501,20000.00,20000.00,t
+1322,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,compliance,error 42501,error 42501,,,t
+1323,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,compliance,ok rows=1,ok rows=1,,,t
+1324,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),compliance,ok rows=1,ok rows=1,,,t
+1325,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle price,readonly,error 42501,error 42501,20000.00,20000.00,t
+1326,rollback,hosted cases after rollback: vehicle prices (live),change a vehicle doc fee column,readonly,error 42501,error 42501,,,t
+1327,rollback,hosted cases after rollback: vehicle prices (live),override a recall hold,readonly,error 42501,error 42501,,,t
+1328,rollback,hosted cases after rollback: vehicle prices (live),edit a non-priced field (description),readonly,ok rows=1,ok rows=1,,,t
+1329,rollback,hosted cases after rollback: vehicle prices (live),"platform administrator (not a member) cannot see, so cannot change, a dealership vehicle",platform_admin,ok rows=0,ok rows=0,,,t
+1330,rollback,hosted cases after rollback: vehicle prices (live),another tenant's owner matches no listing,other_tenant_owner,ok rows=0,ok rows=0,,,t
+1331,rollback,hosted cases after rollback: vehicle prices (live),"service jobs (feed, crawl) still write prices",service_role,ok rows=1,ok rows=1,,,t
+1332,rollback,hosted cases after rollback: vehicle prices (live),known gap: a salesperson can set a price when creating a listing (the guard covers updates only),salesperson,ok rows=1,ok rows=1,,,t
+1333,rollback,hosted cases after rollback: dealer programs,salesperson views the approved programs,salesperson,ok rows=1,ok rows=1,,,t
+1334,rollback,hosted cases after rollback: dealer programs,salesperson cannot add a program to the master list,salesperson,error 42501,error 42501,1,1,t
+1335,rollback,hosted cases after rollback: dealer programs,salesperson cannot edit a program in the master list,salesperson,error 42501,error 42501,,,t
+1336,rollback,hosted cases after rollback: dealer programs,salesperson cannot delete programs from the master list,salesperson,error 42501,error 42501,,,t
+1337,rollback,hosted cases after rollback: dealer programs,inventory manager cannot change the master list,inventory_manager,error 42501,error 42501,,,t
+1338,rollback,hosted cases after rollback: dealer programs,sales manager (add-on role) edits the master list and it is audited,sales_manager,ok,ok rows=1,1,1,t
+1339,rollback,hosted cases after rollback: dealer programs,salesperson applies or withholds a program on one vehicle,salesperson,ok rows=1,ok rows=1,"[""program-1""]","[""program-1""]",t
+1340,rollback,hosted cases after rollback: fee review,"owner previews a fee change: 3 active vehicles change, 1 archived excluded, 1 without basis, nothing written",owner,ok rows=1,ok rows=1,0|1|0,0|1|0,t
+1341,rollback,hosted cases after rollback: fee review,preview counts (eligible|unchanged|archived excluded|no basis|samples|version),owner,3|0|1|1|3|1,3|0|1|1|3|1,,,t
+1342,rollback,hosted cases after rollback: fee review,"preview warnings name the vehicles without a basis, the parse warning, and that verification dates are kept",owner,"[""1 active vehicle(s) have no advertised price basis and are not affected."", ""1 active vehicle(s) carry a price parse warning; it is preserved."", ""Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation.""]","[""1 active vehicle(s) have no advertised price basis and are not affected."", ""1 active vehicle(s) carry a price parse warning; it is preserved."", ""Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation.""]",,,t
+1343,rollback,hosted cases after rollback: fee review,preview with archived stock included counts the archived row as eligible,owner,4|0,4|0,,,t
+1344,rollback,hosted cases after rollback: fee review,preview at the current fee changes nothing (eligible|unchanged),owner,0|3,0|3,,,t
+1345,rollback,hosted cases after rollback: fee review,"preview samples show the selling price, the fee before and after, and the totals",gsm,000001 20000 895>900.00 20895>20900.00,000001 20000 895>900.00 20895>20900.00,,,t
+1346,rollback,hosted cases after rollback: fee review,preview refused,manager,error 42501,error 42501,,,t
+1347,rollback,hosted cases after rollback: fee review,"apply refused, nothing written",manager,error 42501,error 42501,0|0,0|0,t
+1348,rollback,hosted cases after rollback: fee review,preview refused,used_car_manager,error 42501,error 42501,,,t
+1349,rollback,hosted cases after rollback: fee review,"apply refused, nothing written",used_car_manager,error 42501,error 42501,0|0,0|0,t
+1350,rollback,hosted cases after rollback: fee review,preview refused,inventory_manager,error 42501,error 42501,,,t
+1351,rollback,hosted cases after rollback: fee review,"apply refused, nothing written",inventory_manager,error 42501,error 42501,0|0,0|0,t
+1352,rollback,hosted cases after rollback: fee review,preview refused,sales_manager,error 42501,error 42501,,,t
+1353,rollback,hosted cases after rollback: fee review,"apply refused, nothing written",sales_manager,error 42501,error 42501,0|0,0|0,t
+1354,rollback,hosted cases after rollback: fee review,preview refused,salesperson,error 42501,error 42501,,,t
+1355,rollback,hosted cases after rollback: fee review,"apply refused, nothing written",salesperson,error 42501,error 42501,0|0,0|0,t
+1356,rollback,hosted cases after rollback: fee review,preview refused,other_tenant_owner,error 42501,error 42501,,,t
+1357,rollback,hosted cases after rollback: fee review,"apply refused, nothing written",other_tenant_owner,error 42501,error 42501,0|0,0|0,t
+1358,rollback,hosted cases after rollback: fee review,anon cannot preview,anon,error 42501,error 42501,,,t
+1359,rollback,hosted cases after rollback: fee review,"owner applies: active rows only, archived and unbased untouched, verification stamps kept, recalculation stamped, one audit row, one ledger row, version +1",owner,ok,ok rows=1,3|895|1|3|3|1|1|1|2|900,3|895|1|3|3|1|1|1|2|900,t
+1360,rollback,hosted cases after rollback: fee review,the same idempotency key twice changes nothing more (duplicate returned),owner,ok,ok rows=1,0|1|1|2,0|1|1|2,t
+1361,rollback,hosted cases after rollback: fee review,a review against an old version is a conflict and writes nothing,owner,ok,ok rows=1,0|0|0,0|0|0,t
+1362,rollback,hosted cases after rollback: fee review,"a settings save after the review moves the version, so the reviewed apply conflicts",owner,ok,ok rows=1,0|895,0|895,t
+1363,rollback,hosted cases after rollback: fee review,GSM applies,gsm,ok,ok rows=1,3,3,t
+1364,rollback,hosted cases after rollback: fee review,including archived stock is explicit and reaches the archived row,owner,ok,ok rows=1,4,4,t
+1365,rollback,hosted cases after rollback: fee review,disabling the fee sets it to zero and the total to the selling price,owner,ok,ok rows=1,3,3,t
+1366,rollback,hosted cases after rollback: fee review,a short idempotency key is refused,owner,error P0001,error P0001,,,t
+1367,rollback,hosted cases after rollback: fee review,a negative amount is refused,owner,error P0001,error P0001,,,t
+1368,rollback,hosted cases after rollback: fee review,"the apply passes the price guard (definer context), so an owner's reviewed change is not blocked by it",owner,ok,ok rows=1,3,3,t
+1369,rollback,hosted cases after rollback: health reads,a member reads the policy version,salesperson,ok rows=1,ok rows=1,,,t
+1370,rollback,hosted cases after rollback: health reads,another tenant's owner cannot read the policy version,other_tenant_owner,error 42501,error 42501,,,t
+1371,rollback,hosted cases after rollback: health reads,a pending invitation cannot read the policy version,pending_manager,error 42501,error 42501,,,t
+1372,rollback,hosted cases after rollback: health reads,"last feed success is the newest success or partial over the whole ledger, not the newest run",salesperson,2026-10-22 07:00,2026-10-22 07:00,,,t
+1373,rollback,hosted cases after rollback: health reads,job status lists the scheduled jobs and never returns a URL or bearer key from their commands,salesperson,feed=t crawl=t url=f bearer=f secret=f,feed=t crawl=t url=f bearer=f secret=f,,,t
+1374,rollback,hosted cases after rollback: health reads,another tenant's owner cannot read feed health,other_tenant_owner,error 42501,error 42501,,,t
+1375,rollback,hosted cases after rollback: health reads,another tenant's owner cannot read job status,other_tenant_owner,error 42501,error 42501,,,t
+1376,rollback,hosted cases after rollback: health reads,anon cannot read job status,anon,error 42501,error 42501,,,t
+1377,rollback,hosted cases after rollback: health reads,the apply ledger is readable by members only,other_tenant_owner,ok rows=0,ok rows=0,,,t
+1378,rollback,hosted cases after rollback: fee recalculation,owner recalculates from the stored fee,owner,ok,ok rows=1,4,4,t
+1379,rollback,hosted cases after rollback: fee recalculation,recalculation refused,manager,error P0001,error P0001,,,t
+1380,rollback,hosted cases after rollback: fee recalculation,recalculation refused,used_car_manager,error P0001,error P0001,,,t
+1381,rollback,hosted cases after rollback: fee recalculation,recalculation refused,inventory_manager,error P0001,error P0001,,,t
+1382,rollback,hosted cases after rollback: fee recalculation,recalculation refused,sales_manager,error P0001,error P0001,,,t
+1383,rollback,hosted cases after rollback: fee recalculation,recalculation refused,salesperson,error P0001,error P0001,,,t
+1384,rollback,hosted cases after rollback: fee recalculation,recalculation refused,finance,error P0001,error P0001,,,t
+1385,rollback,hosted cases after rollback: fee recalculation,recalculation refused,readonly,error P0001,error P0001,,,t
+1386,rollback,hosted cases after rollback: fee recalculation,recalculation refused,other_tenant_owner,error P0001,error P0001,,,t
+1387,rollback,hosted cases after rollback: fee recalculation,anon cannot call it,anon,error 42501,error 42501,,,t
+1388,rollback,hosted cases after rollback: fee recalculation,"known gap: an invitation not yet accepted, for a general manager, can recalculate",pending_manager,ok,ok rows=1,4,4,t
+1389,rollback,hosted cases after rollback: fee recalculation,"it reaches archived stock and restamps verification, unlike the reviewed apply",owner,ok,ok rows=1,900.00|4|0,900.00|4|0,t

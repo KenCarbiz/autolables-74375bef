@@ -837,6 +837,214 @@ transaction. A counts-only summary was read from the hosted database on
 - Full 88.44% (was 88.47%).
 - Landmarks ok.
 
+### 10.10 Policy B hardened for deployment review (2026-10-29)
+
+**Status.** The policy B design is approved. The production migration is
+**not** approved, and nothing here was applied, deployed or backfilled. The
+only production access was read-only SELECTs.
+
+#### What changed since 10.9
+
+1. **The legacy evidence writer is retired.**
+   - `recalc_tenant_doc_fee` refused every call in the proposal (`0A000`).
+     It used to restamp `price_last_verified_at`, reset parser warnings and
+     reach archived vehicles.
+   - The browser fallback no longer saves a dealership fee or recalculates.
+     If `admin_doc_fee_change_apply` is missing, Apply is refused and nothing
+     is written.
+   - The delegation proposal (`20261030000000_pricing_authority_delegation.sql`)
+     no longer redefines `recalc_tenant_doc_fee`. If it had, applying it would
+     have brought the old writer back.
+   - The reviewed apply never writes verification stamps, parse status or
+     notes, and touches archived stock only on explicit request.
+2. **Provenance is classified, never assumed.** `website_sale_price` is no
+   longer called website evidence. Admin copy now says "stored sale price ...
+   its source is not verified". The per-vehicle review classifies each price
+   from its writer's stamp and the observation tables:
+   - `verified_website_observation`: equals the latest `advertised_prices`
+     row;
+   - `dealer_feed`: equals `mc_raw.price`;
+   - `derived_calculation`;
+   - `legacy_recalculation`: stamped by `recalc_tenant_doc_fee`;
+   - `uncertain_provenance`.
+3. **Only an explicit setting decides the fee basis.**
+   - `doc_fee_basis` reads only `advertised_includes_doc_fee` (or the legacy
+     `advertised_excludes_doc_fee`). The display mode is no longer used to
+     guess.
+   - Missing or unreadable is `unconfigured`; contradictory is `conflict`.
+     Both block a fee change.
+   - A latest website observation that contradicts the basis also blocks
+     (`doc_fee_evidence_contradicts`).
+   - The basis keys moved into the pricing role class.
+   - SQL and TypeScript use identical rules. The parity test runs the SQL
+     functions' own answers through the TypeScript contract: 15 basis cases,
+     288 row plans and 18 evidence cases, all identical.
+4. **There are no partial dealership-wide fee changes.**
+   - `doc_fee_change_review` blocks the entire change, writing nothing, while
+     any vehicle in scope has one of these conflicts:
+     - a before-fee price that does not add up to the total;
+     - a fee that would leave no vehicle price;
+     - on a fee-inclusive basis, a stored sale price that differs from the
+       total;
+     - a contradicting website observation.
+   - The refusal is audited as `doc_fee_policy_blocked`.
+   - `merge_dealer_settings` refuses a changed `doc_fee_enabled` or
+     `doc_fee_amount` once a dealership has priced vehicles, so the fee only
+     moves through the reviewed apply.
+   - Vehicles are row-locked for the length of an apply.
+   - Each apply's audit row keeps before and after for every vehicle it
+     writes.
+   - There is no exception path. Any exception needs separate owner approval.
+5. **The fee-inclusive Apply block in the client stays.** Against the
+   installed routine, Apply is held unless the dealership has explicitly
+   stated a fee-exclusive basis.
+
+#### Verification
+
+**Isolated local Postgres** (`scripts/db-verify/run.sh --policy-b`): 1,389
+cases. Results are in `scripts/admin-parity/evidence/pricing/policy-b-db-verify.csv`.
+
+| Stage | Cases | Result |
+| --- | --- | --- |
+| Deployed behaviour (the traced conflict reproduced) and the reconciliation summary | 9 | pass |
+| Policy B: hosted cases rerun (settings, products, prices, fee review, health) | 323 | pass |
+| Policy B: basis authority, includes and before fee, values and rounding, dealership block, settings guard, retired recalculation, repeats | 39 | pass |
+| Two real sessions: concurrent applies with different keys and with the same key | 5 | pass |
+| Data revert from an apply's audit row (a later writer's values kept) | 5 | pass |
+| Code rollback in a fresh database: four definitions and grants equal to hosted, nothing left behind; then the hosted cases | 3 + 335 | pass |
+| `live` stage: the documented pre-fix preview defect (section 4) | 6 | fail, as before |
+
+**Screens and reload.** `policyBReload.test.ts` reads the rows the isolated
+database saved after the concurrent applies, and checks that the following
+agree after reload:
+- Screen 05 (`customerPrice`);
+- Screen 06 (the database's own dry-run JSON, through `loadFeePreview`);
+- Label (`price`);
+- Passport (`buildPassportSaleCard`).
+
+**Application tests.**
+- Admin suites: 56 files and 588 tests, plus 6 reload tests and 17 parity
+  tests. All pass.
+- Harness: 10 of 10. Typecheck: clean.
+- Screen 05 measures 89.87% content and screen 06 94.11%. Both are unchanged.
+
+**Staging kit** (`scripts/db-verify/staging/policy-b/S00`–`S09`):
+- Built from the same files by `build-policy-b-kit.sh`. It is paste-safe,
+  with no psql meta-commands.
+- Every step except the read-only S00 starts with a guard that refuses any
+  database holding non-synthetic dealerships or vehicles.
+- Run end to end on a fresh database: S00 PASS, 41 staging cases with 0
+  failed, S09 rollback check PASS.
+- Not yet run on a Lovable Cloud staging project. The two-session concurrency
+  cases cannot run through a one-statement SQL tool; they ran locally only.
+
+**RooftopOS / draft PR #36.**
+- No file overlaps: 55 files against 30 here. No table or function overlaps
+  either: its migration creates only new integration tables and functions and
+  alters nothing existing.
+- One naming hazard: PR #36's migration and the unapplied delegation proposal
+  both use version `20261030000000`. Renumber the delegation proposal before
+  it is ever promoted.
+- The policy B kit's S00 refuses a project that holds the RooftopOS staging
+  tables, so the two staging runs cannot mix.
+
+#### Existing conflicts: read-only classification (counts only)
+
+The per-vehicle report is restricted and is not in this repository. Counts:
+
+| Tenant | Scope | Class | Vehicles | Recommended handling |
+| --- | --- | --- | --- | --- |
+| 1 | active | A: fee subtracted twice by an earlier crawl; the website observation (Oct 3) equals total - fee | 10 | Candidate correction prepared, not run: before-fee = total - $895; legacy-derived sale price = total. |
+| 1 | active | B1: newer website observation (Oct 27-28, screenshot) below the feed total; the feed is paused until Nov 1 | 7 | Dealer confirms the current price. Changing the advertised total needs per-vehicle approval. |
+| 1 | active | B2: newer website observation above the feed total (+$9,105 x14, +$3,105 x10, +$1,105, +$488) | 26 | No proposal. Check each screenshot: a figure above the feed may include add-ons, MSRP or a misread. It is never adopted automatically. |
+| 1 | active | C: no usable price | 2 | None. These do not block a fee change. |
+| 1 | archived | E: legacy-recalculated split mismatch | 12 | None. These are outside fee changes unless archived stock is explicitly included. |
+| 1 | archived | C: no usable price | 3 | None. |
+| 2 | active | D: fee ($895) exceeds the stored total ($171); legacy-recalculated | 1 | Confirm the real price or unpublish. No automatic change. |
+
+A dealership-level block holds for tenant 1 while any of its 43 active
+conflicts remain. The class A correction alone does not lift it: those 10
+vehicles' latest website observations show total - fee, which contradicts the
+fee-inclusive setting until a newer observation or a basis decision supersedes
+them.
+
+#### Remediation process (nothing runs without explicit approval)
+
+1. **Review.** The owner reviews the restricted per-vehicle report:
+   - generated by `scripts/db-verify/fee-basis-vehicle-review.sql`;
+   - read-only;
+   - lists provenance, dates, stored fields, the disagreement and a
+     recommendation.
+2. **Approve by class.** For each class, approve, reject or defer. Class A
+   has a guarded correction ready:
+   - each update applies only if the row still holds the reviewed values;
+   - it writes before and after to `audit_log` as
+     `pricing_reconciliation_applied`;
+   - it never touches `price`, observations, stamps or parser warnings.
+3. **Confirm B1 and B2 with the dealer.** Use the screenshots and the DMS,
+   and repeat after the feed resumes on Nov 1. Any change to an advertised
+   total is a per-vehicle approval.
+4. **Apply through Lovable.** Run approved corrections through Lovable's SQL
+   tool, one transaction each. Then rerun the read-only review.
+5. **Repeat** until the review shows no active conflicts. Only then can a fee
+   change pass the dealership block.
+
+#### Staged deployment and rollback plan (each stage needs the owner's go)
+
+| Stage | Action | Check | Stop and roll back if |
+| --- | --- | --- | --- |
+| 0 | Staging on a new, empty Lovable Cloud project: run S00-S09 (prompt below). | S00 PASS; S07 failed = 0; S09 PASS. | Any step errors or fails. |
+| 1 | Production read-only pre-check: rerun the per-vehicle review and `SELECT public.doc_fee_basis(settings) FROM dealer_profiles`. Confirm both tenants state their basis. | Counts match the table above or are explained. | An unexplained change. |
+| 2 | Apply the migration through Lovable, verbatim from `supabase/proposed/20261031000000_doc_fee_basis_policy_b.sql`. | `SELECT public.doc_fee_change_review('<tenant 1>', 895, false)` returns `blocked: true` with the three reasons the review predicts: split mismatches, stored sale prices that differ from the total, and contradicting website observations. Preview and apply exist with the new definitions. | Any error, or the review is not blocked. |
+| 3 | Watch for one business day. No fee change is possible while tenant 1 is blocked. | `audit_log` has no `doc_fee_policy_applied`; any refusal shows as `doc_fee_policy_blocked`. | Unexpected writes. |
+| 4 | Remediation (above), class by class, each approved separately. | The review reruns clean. | Any guarded update affects other than the expected rows. |
+| R | Rollback: run `supabase/proposed/20261031000000_doc_fee_basis_policy_b.rollback.sql` through Lovable. If an apply ran, run `scripts/db-verify/fee-change-revert-from-audit.sql` with its audit id. | S09-equivalent fingerprint check PASS. | Not applicable. |
+
+The client changes in this commit only make Apply stricter. They work
+against both the installed routines and the proposed ones, so they need no
+rollback of their own. Reverting the commit is enough if wanted.
+
+#### Lovable prompts (copy and paste)
+
+**Staging (new project; never the AutoLabels project):**
+
+> Create a NEW, empty Lovable Cloud project named "AutoLabels policy B
+> staging". Do not connect it to the AutoLabels project or its database,
+> and do not add edge functions, cron jobs or secrets. In that new project
+> only, run each of the following SQL files with the database tool, one file
+> per call, exactly as written and in this order:
+> S00_isolation_check.sql, S01_hosted_prestate.sql,
+> S02_applied_migrations.sql, S03_harness_and_fixtures.sql,
+> S04_deployed_cases.sql, S00_isolation_check.sql (again),
+> S05_policy_b.sql, S06_policy_b_cases.sql, S07_results.sql,
+> S08_rollback.sql, S09_rollback_check.sql.
+> The files are in the GitHub repository KenCarbiz/autolables-74375bef on
+> main, under scripts/db-verify/staging/policy-b/. After each call, reply
+> with the returned row verbatim. Stop at the first error and report it. Do
+> not change any file, and do not create migrations in any other project.
+
+**Production pre-check (read-only, AutoLabels project; only when stage 1 is
+authorized):**
+
+> In the AutoLabels project, run this read-only query with the database tool
+> and return the rows verbatim. Do not create a migration and do not change
+> any data:
+> `SELECT tenant_id, (public.doc_fee_basis(settings)).* FROM public.dealer_profiles;`
+> Note: this needs the stage 2 functions. Before stage 2, run
+> scripts/db-verify/fee-basis-vehicle-review.sql instead, without its
+> psql lines (`\set`, `\if`, `BEGIN`, `ROLLBACK`).
+
+**Production migration (AutoLabels project; only when stage 2 is
+authorized):**
+
+> Create a database migration whose content is exactly the file
+> supabase/proposed/20261031000000_doc_fee_basis_policy_b.sql from the
+> GitHub repository KenCarbiz/autolables-74375bef on main, unchanged. Do not
+> edit, reformat or split it, do not change any other file, and do not
+> deploy edge functions. After it applies, run this read-only check and
+> return the row verbatim:
+> `SELECT public.doc_fee_change_review(tenant_id, 895, false) FROM public.dealer_profiles;`
+
 ## 11. Approvals requested
 
 1. Done: the fee preview fix was applied and verified (section 4).

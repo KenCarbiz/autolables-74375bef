@@ -1,0 +1,122 @@
+{
+ "preview_at_saved_fee": {
+  "basis": "includes_fee",
+  "basis_source": "advertised_includes_doc_fee",
+  "block_reasons": [],
+  "blocked": false,
+  "eligible": 0,
+  "evidence_conflicts": 0,
+  "excluded_archived": 1,
+  "fee": 925.0,
+  "invalid": 0,
+  "no_price_basis": 1,
+  "parse_warnings": 0,
+  "samples": [],
+  "source_mismatches": 0,
+  "split_mismatches": 0,
+  "unchanged": 2,
+  "version": 4,
+  "warnings": [
+   "Advertised prices include the fee: each advertised total is kept and the fee is taken out of the vehicle price.",
+   "1 active vehicle(s) have no advertised price basis and are not affected.",
+   "Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation."
+  ]
+ },
+ "preview_draft_950": {
+  "basis": "includes_fee",
+  "basis_source": "advertised_includes_doc_fee",
+  "block_reasons": [],
+  "blocked": false,
+  "eligible": 2,
+  "evidence_conflicts": 0,
+  "excluded_archived": 1,
+  "fee": 950.0,
+  "invalid": 0,
+  "no_price_basis": 1,
+  "parse_warnings": 1,
+  "samples": [
+   {
+    "archived": false,
+    "basis": "includes_fee",
+    "fee_after": 950.0,
+    "fee_before": 925.0,
+    "selling_after": 24050.0,
+    "selling_before": 24075.0,
+    "selling_price": 24050.0,
+    "source_mismatch": false,
+    "total_after": 25000.0,
+    "total_before": 25000.0,
+    "vin_suffix": "025000"
+   },
+   {
+    "archived": false,
+    "basis": "includes_fee",
+    "fee_after": 950.0,
+    "fee_before": 925.0,
+    "selling_after": 39470.0,
+    "selling_before": 39495.0,
+    "selling_price": 39470.0,
+    "source_mismatch": false,
+    "total_after": 40420.0,
+    "total_before": 40420.0,
+    "vin_suffix": "040420"
+   }
+  ],
+  "source_mismatches": 0,
+  "split_mismatches": 0,
+  "unchanged": 0,
+  "version": 4,
+  "warnings": [
+   "Advertised prices include the fee: each advertised total is kept and the fee is taken out of the vehicle price.",
+   "1 active vehicle(s) have no advertised price basis and are not affected.",
+   "1 active vehicle(s) carry a price parse warning; it is preserved.",
+   "Source verification dates and mismatch flags are preserved; recalculation is not a fresh observation."
+  ]
+ },
+ "rows": [
+  {
+   "advertised_price_before_doc": null,
+   "archived": false,
+   "condition": "used",
+   "doc_fee": null,
+   "price": null,
+   "vin_suffix": "000000",
+   "website_sale_price": null
+  },
+  {
+   "advertised_price_before_doc": 17105,
+   "archived": true,
+   "condition": "used",
+   "doc_fee": 895,
+   "price": 18000.0,
+   "vin_suffix": "018000",
+   "website_sale_price": 18000
+  },
+  {
+   "advertised_price_before_doc": 24075.0,
+   "archived": false,
+   "condition": "new",
+   "doc_fee": 925.0,
+   "price": 25000.0,
+   "vin_suffix": "025000",
+   "website_sale_price": 25000
+  },
+  {
+   "advertised_price_before_doc": 39495.0,
+   "archived": false,
+   "condition": "used",
+   "doc_fee": 925.0,
+   "price": 40420.0,
+   "vin_suffix": "040420",
+   "website_sale_price": 40420
+  }
+ ],
+ "settings": {
+  "advertised_includes_doc_fee": true,
+  "doc_fee_amount": 925,
+  "doc_fee_enabled": true,
+  "doc_fee_state": "CT",
+  "price_display_mode": "website_sale_price"
+ },
+ "tenant": "Third Example Motors (synthetic)"
+}

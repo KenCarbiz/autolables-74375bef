@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { customerPrice, type StoredListingPrice } from "@/lib/admin/pricing/previewPricing";
-import { resolveFeeBasis } from "@/lib/admin/pricing/feeBasis";
+import { customerPrice, defaultFeeBasis, type StoredListingPrice } from "@/lib/admin/pricing/previewPricing";
+import { describeFeeBasis, isDecidedBasis, resolveFeeBasis, type FeeBasis } from "@/lib/admin/pricing/feeBasis";
 import vehiclePlaceholder from "@/assets/admin-v2/artwork/vehicle-placeholder.svg";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Check, FileText, Globe, Info, Pencil, Tag } from "lucide-react";
@@ -50,7 +50,7 @@ export interface PreviewVehicle {
 }
 
 export interface PriceRulesFixture {
-  policy: { stateCode: string; feeEnabled: boolean; feeAmount: number; mode: PriceDisplayMode };
+  policy: { stateCode: string; feeEnabled: boolean; feeAmount: number; mode: PriceDisplayMode; feeBasis?: FeeBasis };
   counts: { eligible: CountValue | null; archived: CountValue | null };
   preview: PreviewVehicle | null;
   /** Null means the read failed: the table reports Unknown. */
@@ -225,8 +225,15 @@ export default function PriceRulesView() {
 
   const preview = fixture ? fixture.preview : consistencyRows ? previewFromRows(consistencyRows) : null;
   const previewFee = effectiveFee(editing ? draft : stored);
-  const feeBasis = resolveFeeBasis(fixture ? { price_display_mode: policy.mode } : settings).basis;
-  const previewPrice = preview ? customerPrice(preview.stored, previewFee, policy.mode, feeBasis) : null;
+  const feeBasis = fixture ? fixture.policy.feeBasis ?? "unconfigured" : resolveFeeBasis(settings).basis;
+  // Without a stated basis no fee change can be computed, so the preview keeps
+  // what customers see today: the saved fee, read the way the Passport reads it.
+  const basisDecided = isDecidedBasis(feeBasis);
+  const previewPrice = preview
+    ? basisDecided
+      ? customerPrice(preview.stored, previewFee, policy.mode, feeBasis)
+      : customerPrice(preview.stored, effectiveFee(stored), policy.mode, defaultFeeBasis(policy.mode))
+    : null;
   const previewCard = preview && previewPrice
     ? buildSalePriceCard({
         vehicleType: preview.vehicleType,
@@ -372,6 +379,7 @@ export default function PriceRulesView() {
                   </div>
                 </dl>
                 <p className="mt-[9px] text-[12px] leading-[18px] text-adm-muted">Taxes and registration are separate.</p>
+                {!basisDecided && editing && <p className="text-[12px] leading-[18px] text-adm-warning">{describeFeeBasis(feeBasis)} The preview shows today's price.</p>}
                 {previewCard.feeLabel && previewCard.feeLabel.toLowerCase() !== "document fee" && (
                   <p className="text-[12px] leading-[18px] text-adm-muted">{previewCard.feeLabel} is what {jurisdictionLabel((editing ? draft : stored).stateCode)} calls the document fee; customers see that term.</p>
                 )}

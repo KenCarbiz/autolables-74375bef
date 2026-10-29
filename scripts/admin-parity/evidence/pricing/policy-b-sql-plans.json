@@ -1,0 +1,5423 @@
+{
+    "basis": [
+        {
+            "basis": "includes_fee",
+            "source": "advertised_includes_doc_fee",
+            "settings": {
+                "advertised_includes_doc_fee": true
+            }
+        },
+        {
+            "basis": "before_fee",
+            "source": "advertised_includes_doc_fee",
+            "settings": {
+                "advertised_includes_doc_fee": "false"
+            }
+        },
+        {
+            "basis": "includes_fee",
+            "source": "advertised_includes_doc_fee",
+            "settings": {
+                "advertised_includes_doc_fee": " TRUE "
+            }
+        },
+        {
+            "basis": "includes_fee",
+            "source": "advertised_excludes_doc_fee",
+            "settings": {
+                "advertised_excludes_doc_fee": false
+            }
+        },
+        {
+            "basis": "before_fee",
+            "source": "advertised_excludes_doc_fee",
+            "settings": {
+                "advertised_excludes_doc_fee": "true"
+            }
+        },
+        {
+            "basis": "unconfigured",
+            "source": "not_set",
+            "settings": {
+                "price_display_mode": "website_sale_price"
+            }
+        },
+        {
+            "basis": "unconfigured",
+            "source": "not_set",
+            "settings": {
+            }
+        },
+        {
+            "basis": "conflict",
+            "source": "settings_conflict",
+            "settings": {
+                "advertised_excludes_doc_fee": true,
+                "advertised_includes_doc_fee": true
+            }
+        },
+        {
+            "basis": "conflict",
+            "source": "settings_conflict",
+            "settings": {
+                "advertised_excludes_doc_fee": false,
+                "advertised_includes_doc_fee": false
+            }
+        },
+        {
+            "basis": "unconfigured",
+            "source": "unreadable_setting",
+            "settings": {
+                "advertised_includes_doc_fee": "yes"
+            }
+        },
+        {
+            "basis": "unconfigured",
+            "source": "unreadable_setting",
+            "settings": {
+                "advertised_includes_doc_fee": 1
+            }
+        },
+        {
+            "basis": "before_fee",
+            "source": "advertised_excludes_doc_fee",
+            "settings": {
+                "advertised_excludes_doc_fee": true,
+                "advertised_includes_doc_fee": null
+            }
+        },
+        {
+            "basis": "unconfigured",
+            "source": "unreadable_setting",
+            "settings": {
+                "advertised_excludes_doc_fee": "maybe",
+                "advertised_includes_doc_fee": true
+            }
+        },
+        {
+            "basis": "unconfigured",
+            "source": "not_set",
+            "settings": null
+        },
+        {
+            "basis": "unconfigured",
+            "source": "not_set",
+            "settings": [
+            ]
+        }
+    ],
+    "plans": [
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 0,
+            "adv_after": 39525,
+            "wsp_after": 39525.00,
+            "total_after": 39525.00,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "before_fee",
+            "status": "unchanged",
+            "new_fee": 895,
+            "adv_after": 39525,
+            "wsp_after": 40420.00,
+            "total_after": 40420.00,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925,
+            "adv_after": 39525,
+            "wsp_after": 40450.00,
+            "total_after": 40450.00,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925.554,
+            "adv_after": 39525,
+            "wsp_after": 40450.55,
+            "total_after": 40450.55,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925.555,
+            "adv_after": 39525,
+            "wsp_after": 40450.56,
+            "total_after": 40450.56,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 50000,
+            "adv_after": 39525,
+            "wsp_after": 89525.00,
+            "total_after": 89525.00,
+            "total_before": 40420,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": 30500,
+            "total_before": 30500,
+            "selling_after": 29105,
+            "selling_before": 29105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": 30500,
+            "total_before": 30500,
+            "selling_after": 29105,
+            "selling_before": 29105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": 30500,
+            "total_before": 30500,
+            "selling_after": 29105,
+            "selling_before": 29105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": 30500,
+            "total_before": 30500,
+            "selling_after": 29105,
+            "selling_before": 29105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": 30500,
+            "total_before": 30500,
+            "selling_after": 29105,
+            "selling_before": 29105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": 30500,
+            "total_before": 30500,
+            "selling_after": 29105,
+            "selling_before": 29105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 0,
+            "adv_after": 20000,
+            "wsp_after": 20000.00,
+            "total_after": 20000.00,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 895,
+            "adv_after": 20000,
+            "wsp_after": 20895.00,
+            "total_after": 20895.00,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925,
+            "adv_after": 20000,
+            "wsp_after": 20925.00,
+            "total_after": 20925.00,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925.554,
+            "adv_after": 20000,
+            "wsp_after": 20925.55,
+            "total_after": 20925.55,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925.555,
+            "adv_after": 20000,
+            "wsp_after": 20925.56,
+            "total_after": 20925.56,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 50000,
+            "adv_after": 20000,
+            "wsp_after": 70000.00,
+            "total_after": 70000.00,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": 5,
+            "selling_before": 5,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": 5,
+            "selling_before": 5,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": 5,
+            "selling_before": 5,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": 5,
+            "selling_before": 5,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": 5,
+            "selling_before": 5,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": 5,
+            "selling_before": 5,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 0,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 895,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 925,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 925.554,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 925.555,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 50000,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 0,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 895,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 925,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 925.554,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 925.555,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "before_fee",
+            "status": "no_price",
+            "new_fee": 50000,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 25376,
+            "total_before": 25376,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 25376,
+            "total_before": 25376,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 25376,
+            "total_before": 25376,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 25376,
+            "total_before": 25376,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 25376,
+            "total_before": 25376,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 25376,
+            "total_before": 25376,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 56845,
+            "total_before": 56845,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 56845,
+            "total_before": 56845,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 56845,
+            "total_before": 56845,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 56845,
+            "total_before": 56845,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 56845,
+            "total_before": 56845,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 56845,
+            "total_before": 56845,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 0,
+            "adv_after": 171,
+            "wsp_after": 171.00,
+            "total_after": 171.00,
+            "total_before": 1066,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "before_fee",
+            "status": "unchanged",
+            "new_fee": 895,
+            "adv_after": 171,
+            "wsp_after": 1066.00,
+            "total_after": 1066.00,
+            "total_before": 1066,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925,
+            "adv_after": 171,
+            "wsp_after": 1096.00,
+            "total_after": 1096.00,
+            "total_before": 1066,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925.554,
+            "adv_after": 171,
+            "wsp_after": 1096.55,
+            "total_after": 1096.55,
+            "total_before": 1066,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925.555,
+            "adv_after": 171,
+            "wsp_after": 1096.56,
+            "total_after": 1096.56,
+            "total_before": 1066,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 50000,
+            "adv_after": 171,
+            "wsp_after": 50171.00,
+            "total_after": 50171.00,
+            "total_before": 1066,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 0,
+            "adv_after": 0.1,
+            "wsp_after": 0.10,
+            "total_after": 0.10,
+            "total_before": null,
+            "selling_after": 0.1,
+            "selling_before": 0.1,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 895,
+            "adv_after": 0.1,
+            "wsp_after": 895.10,
+            "total_after": 895.10,
+            "total_before": null,
+            "selling_after": 0.1,
+            "selling_before": 0.1,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925,
+            "adv_after": 0.1,
+            "wsp_after": 925.10,
+            "total_after": 925.10,
+            "total_before": null,
+            "selling_after": 0.1,
+            "selling_before": 0.1,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925.554,
+            "adv_after": 0.1,
+            "wsp_after": 925.65,
+            "total_after": 925.65,
+            "total_before": null,
+            "selling_after": 0.1,
+            "selling_before": 0.1,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 925.555,
+            "adv_after": 0.1,
+            "wsp_after": 925.66,
+            "total_after": 925.66,
+            "total_before": null,
+            "selling_after": 0.1,
+            "selling_before": 0.1,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "before_fee",
+            "status": "change",
+            "new_fee": 50000,
+            "adv_after": 0.1,
+            "wsp_after": 50000.10,
+            "total_after": 50000.10,
+            "total_before": null,
+            "selling_after": 0.1,
+            "selling_before": 0.1,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "before_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "conflict",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 0,
+            "adv_after": 40420.00,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 40420.00,
+            "selling_before": 39525.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "unchanged",
+            "new_fee": 895,
+            "adv_after": 39525.00,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39525.00,
+            "selling_before": 39525.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 925,
+            "adv_after": 39495.00,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39495.00,
+            "selling_before": 39525.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 925.554,
+            "adv_after": 39494.45,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39494.45,
+            "selling_before": 39525.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 925.555,
+            "adv_after": 39494.44,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39494.44,
+            "selling_before": 39525.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 50000,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": -9580.00,
+            "selling_before": 39525.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 39525,
+            "total_before": 39525,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 39525,
+            "total_before": 39525,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 39525,
+            "total_before": 39525,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 39525,
+            "total_before": 39525,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 39525,
+            "total_before": 39525,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": 39525,
+            "total_before": 39525,
+            "selling_after": 39525,
+            "selling_before": 39525,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 0,
+            "adv_after": 30000.00,
+            "wsp_after": 30500,
+            "total_after": 30000,
+            "total_before": 30000,
+            "selling_after": 30000.00,
+            "selling_before": 29105.00,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "includes_fee",
+            "status": "unchanged",
+            "new_fee": 895,
+            "adv_after": 29105.00,
+            "wsp_after": 30500,
+            "total_after": 30000,
+            "total_before": 30000,
+            "selling_after": 29105.00,
+            "selling_before": 29105.00,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 925,
+            "adv_after": 29075.00,
+            "wsp_after": 30500,
+            "total_after": 30000,
+            "total_before": 30000,
+            "selling_after": 29075.00,
+            "selling_before": 29105.00,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 925.554,
+            "adv_after": 29074.45,
+            "wsp_after": 30500,
+            "total_after": 30000,
+            "total_before": 30000,
+            "selling_after": 29074.45,
+            "selling_before": 29105.00,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 925.555,
+            "adv_after": 29074.44,
+            "wsp_after": 30500,
+            "total_after": 30000,
+            "total_before": 30000,
+            "selling_after": 29074.44,
+            "selling_before": 29105.00,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 50000,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": 30000,
+            "total_before": 30000,
+            "selling_after": -20000.00,
+            "selling_before": 29105.00,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": 20000,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": 20000,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": 20000,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": 20000,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": 20000,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": 20000,
+            "total_before": 20000,
+            "selling_after": 20000,
+            "selling_before": 20000,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 0,
+            "adv_after": 900.00,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": 900.00,
+            "selling_before": 5.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "includes_fee",
+            "status": "unchanged",
+            "new_fee": 895,
+            "adv_after": 5.00,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": 5.00,
+            "selling_before": 5.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 925,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": -25.00,
+            "selling_before": 5.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 925.554,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": -25.55,
+            "selling_before": 5.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 925.555,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": -25.56,
+            "selling_before": 5.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 50000,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": 900,
+            "total_before": 900,
+            "selling_after": -49100.00,
+            "selling_before": 5.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "includes_fee",
+            "status": "no_price",
+            "new_fee": 0,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "includes_fee",
+            "status": "no_price",
+            "new_fee": 895,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "includes_fee",
+            "status": "no_price",
+            "new_fee": 925,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "includes_fee",
+            "status": "no_price",
+            "new_fee": 925.554,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "includes_fee",
+            "status": "no_price",
+            "new_fee": 925.555,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "includes_fee",
+            "status": "no_price",
+            "new_fee": 50000,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 0,
+            "adv_after": 40420.00,
+            "wsp_after": null,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 40420.00,
+            "selling_before": 40420.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 895,
+            "adv_after": 39525.00,
+            "wsp_after": null,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39525.00,
+            "selling_before": 40420.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 925,
+            "adv_after": 39495.00,
+            "wsp_after": null,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39495.00,
+            "selling_before": 40420.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 925.554,
+            "adv_after": 39494.45,
+            "wsp_after": null,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39494.45,
+            "selling_before": 40420.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 925.555,
+            "adv_after": 39494.44,
+            "wsp_after": null,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": 39494.44,
+            "selling_before": 40420.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 50000,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": 40420,
+            "total_before": 40420,
+            "selling_after": -9580.00,
+            "selling_before": 40420.00,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 26876,
+            "total_before": 26876,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 26876,
+            "total_before": 26876,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 26876,
+            "total_before": 26876,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 26876,
+            "total_before": 26876,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 26876,
+            "total_before": 26876,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": 26876,
+            "total_before": 26876,
+            "selling_after": 24481,
+            "selling_before": 24481,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 57740,
+            "total_before": 57740,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 57740,
+            "total_before": 57740,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 57740,
+            "total_before": 57740,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 57740,
+            "total_before": 57740,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 57740,
+            "total_before": 57740,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": 57740,
+            "total_before": 57740,
+            "selling_after": 55950,
+            "selling_before": 55950,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": 171,
+            "total_before": 171,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": 171,
+            "total_before": 171,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": 171,
+            "total_before": 171,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": 171,
+            "total_before": 171,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": 171,
+            "total_before": 171,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": 171,
+            "total_before": 171,
+            "selling_after": 171,
+            "selling_before": 171,
+            "sale_price_differs": true
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "includes_fee",
+            "status": "change",
+            "new_fee": 0,
+            "adv_after": 0.10,
+            "wsp_after": null,
+            "total_after": 0.1,
+            "total_before": 0.1,
+            "selling_after": 0.10,
+            "selling_before": 0.10,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 895,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": 0.1,
+            "total_before": 0.1,
+            "selling_after": -894.90,
+            "selling_before": 0.10,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 925,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": 0.1,
+            "total_before": 0.1,
+            "selling_after": -924.90,
+            "selling_before": 0.10,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 925.554,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": 0.1,
+            "total_before": 0.1,
+            "selling_after": -925.45,
+            "selling_before": 0.10,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 925.555,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": 0.1,
+            "total_before": 0.1,
+            "selling_after": -925.46,
+            "selling_before": 0.10,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "includes_fee",
+            "status": "invalid",
+            "new_fee": 50000,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": 0.1,
+            "total_before": 0.1,
+            "selling_after": -49999.90,
+            "selling_before": 0.10,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 0,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 895,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.554,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 925.555,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "includes_fee",
+            "status": "split_mismatch",
+            "new_fee": 50000,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": 25000,
+            "total_before": 25000,
+            "selling_after": 24105,
+            "selling_before": 24105,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 39525,
+                "fee": 895,
+                "wsp": 40420,
+                "price": 39525
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 39525,
+            "wsp_after": 40420,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 29105,
+                "fee": 895,
+                "wsp": 30500,
+                "price": 30000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 29105,
+            "wsp_after": 30500,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 20000,
+                "fee": 895,
+                "wsp": 20000,
+                "price": 20000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 20000,
+            "wsp_after": 20000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 5,
+                "fee": 895,
+                "wsp": 900,
+                "price": 900
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 5,
+            "wsp_after": 900,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": null
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": null,
+                "fee": null,
+                "wsp": null,
+                "price": 40420
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": null,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24481,
+                "fee": 895,
+                "wsp": 25376,
+                "price": 26876
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 24481,
+            "wsp_after": 25376,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 55950,
+                "fee": 895,
+                "wsp": 56845,
+                "price": 57740
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 55950,
+            "wsp_after": 56845,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 171,
+                "fee": 895,
+                "wsp": 1066,
+                "price": 171
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 171,
+            "wsp_after": 1066,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 0.1,
+                "fee": null,
+                "wsp": null,
+                "price": 0.1
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 0.1,
+            "wsp_after": null,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 0,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 895,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.554,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 925.555,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        },
+        {
+            "row": {
+                "adv": 24105,
+                "fee": 925,
+                "wsp": 25000,
+                "price": 25000
+            },
+            "basis": "unconfigured",
+            "status": "blocked_basis",
+            "new_fee": 50000,
+            "adv_after": 24105,
+            "wsp_after": 25000,
+            "total_after": null,
+            "total_before": null,
+            "selling_after": null,
+            "selling_before": null,
+            "sale_price_differs": false
+        }
+    ],
+    "evidence": [
+        {
+            "fee": 895,
+            "basis": "before_fee",
+            "price": 40420,
+            "observed": 40420,
+            "contradicts": false
+        },
+        {
+            "fee": 895,
+            "basis": "before_fee",
+            "price": 40420,
+            "observed": 39525,
+            "contradicts": true
+        },
+        {
+            "fee": 895,
+            "basis": "before_fee",
+            "price": 40420,
+            "observed": 41315,
+            "contradicts": false
+        },
+        {
+            "fee": 895,
+            "basis": "before_fee",
+            "price": 40420,
+            "observed": 38000,
+            "contradicts": false
+        },
+        {
+            "fee": 895,
+            "basis": "before_fee",
+            "price": 39525,
+            "observed": 38630,
+            "contradicts": true
+        },
+        {
+            "fee": 895,
+            "basis": "before_fee",
+            "price": 39525,
+            "observed": 40420,
+            "contradicts": false
+        },
+        {
+            "fee": 0,
+            "basis": "before_fee",
+            "price": 40420,
+            "observed": 39525,
+            "contradicts": false
+        },
+        {
+            "fee": 895,
+            "basis": "before_fee",
+            "price": 40420,
+            "observed": null,
+            "contradicts": false
+        },
+        {
+            "fee": 895,
+            "basis": "before_fee",
+            "price": 40420,
+            "observed": 39525.5,
+            "contradicts": true
+        },
+        {
+            "fee": 895,
+            "basis": "includes_fee",
+            "price": 40420,
+            "observed": 40420,
+            "contradicts": false
+        },
+        {
+            "fee": 895,
+            "basis": "includes_fee",
+            "price": 40420,
+            "observed": 39525,
+            "contradicts": true
+        },
+        {
+            "fee": 895,
+            "basis": "includes_fee",
+            "price": 40420,
+            "observed": 41315,
+            "contradicts": true
+        },
+        {
+            "fee": 895,
+            "basis": "includes_fee",
+            "price": 40420,
+            "observed": 38000,
+            "contradicts": false
+        },
+        {
+            "fee": 895,
+            "basis": "includes_fee",
+            "price": 39525,
+            "observed": 38630,
+            "contradicts": true
+        },
+        {
+            "fee": 895,
+            "basis": "includes_fee",
+            "price": 39525,
+            "observed": 40420,
+            "contradicts": true
+        },
+        {
+            "fee": 0,
+            "basis": "includes_fee",
+            "price": 40420,
+            "observed": 39525,
+            "contradicts": false
+        },
+        {
+            "fee": 895,
+            "basis": "includes_fee",
+            "price": 40420,
+            "observed": null,
+            "contradicts": false
+        },
+        {
+            "fee": 895,
+            "basis": "includes_fee",
+            "price": 40420,
+            "observed": 39525.5,
+            "contradicts": true
+        }
+    ]
+}

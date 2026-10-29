@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { resetSupabaseSpy, rpcCalls, spyCalls, spyResponses } from "@/test/mocks/supabaseSpy";
+import { resetSupabaseSpy, rpcCalls, spyCalls, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
 
 vi.mock("@/integrations/supabase/client", async () => {
   const m = await import("@/test/mocks/supabaseSpy");
   return { supabase: m.supabaseSpy };
 });
 
-import { applyFeeChange, feeReviewHref, isMissingFunction, LEGACY_SPLIT_BLOCK, loadFeePreview, loadPolicyVersion, parseFeeReviewParams } from "./pricingData";
+import { applyFeeChange, FALLBACK_APPLY_WARNING, feeReviewHref, isMissingFunction, LEGACY_SPLIT_BLOCK, loadFeePreview, loadPolicyVersion, parseFeeReviewParams } from "./pricingData";
 
 const draft = { enabled: true, amount: 925, stateCode: "CT" };
 const rows = [
@@ -68,6 +68,21 @@ describe("fee preview", () => {
     expect(p.impact.samples[0]).toMatchObject({ sellingBefore: 39_525, sellingPrice: 39_495, totalBefore: 40_420, totalAfter: 40_420 });
   });
 
+  it("holds a change on the installed routine unless the dealership states a fee-exclusive basis", async () => {
+    spyResponses.rpcs.admin_doc_fee_change_preview = { data: { version: 3, eligible: 1, samples: [], warnings: [] }, error: null };
+    expect((await loadFeePreview("tenant-1", draft, false, "unconfigured")).blocked).toMatch(/has not set whether its advertised prices include/);
+    expect((await loadFeePreview("tenant-1", draft, false, "conflict")).blocked).toMatch(/contradict/);
+    expect((await loadFeePreview("tenant-1", draft, false, "before_fee")).blocked).toBeNull();
+  });
+
+  it("passes on the fee basis routine's own dealership-level block", async () => {
+    spyResponses.rpcs.admin_doc_fee_change_preview = { data: { version: 3, basis: "includes_fee", eligible: 2, split_mismatches: 1, blocked: true,
+      block_reasons: ["1 vehicle(s) have a stored vehicle price that does not add up to the advertised total."], samples: [], warnings: [] }, error: null };
+    const p = await loadFeePreview("tenant-1", draft, false, "includes_fee");
+    expect(p.impact).toMatchObject({ blocked: true, splitMismatches: 1 });
+    expect(p.blocked).toBe("Nothing can be applied yet. 1 vehicle(s) have a stored vehicle price that does not add up to the advertised total.");
+  });
+
   it("holds every change while the basis settings contradict each other", async () => {
     spyResponses.rpcs.admin_doc_fee_change_preview = { data: { version: 3, basis: "conflict", eligible: 0, samples: [], warnings: [] }, error: null };
     expect((await loadFeePreview("tenant-1", draft, false, "includes_fee")).blocked).toMatch(/contradict/);
@@ -75,12 +90,12 @@ describe("fee preview", () => {
 
   it("computes the impact in the browser when the contract is not installed and says so", async () => {
     spyResponses.tables.vehicle_listings = { data: rows, error: null };
-    const p = await loadFeePreview("tenant-1", draft, false);
+    const p = await loadFeePreview("tenant-1", draft, false, "before_fee");
     expect(p.source).toBe("client");
     expect(p.version).toBeNull();
     expect(p.impact).toMatchObject({ eligible: 1, unchanged: 1, excludedArchived: 1 });
     expect(p.notes[0]).toMatch(/pending migration/);
-    expect(p.notes[1]).toMatch(/archived vehicles and refreshes/);
+    expect(p.blocked).toBe(FALLBACK_APPLY_WARNING);
   });
 
   it("surfaces any other server error instead of inventing a result", async () => {
@@ -113,49 +128,25 @@ describe("policy version", () => {
 describe("apply", () => {
   const base = { tenantId: "tenant-1", draft, expectedVersion: 12 as string | number | null, idempotencyKey: "k1", includeArchived: false };
 
-  it("maps the server statuses and never falls back on a non-missing error", async () => {
-    const updateSettings = vi.fn(async () => true);
+  it("maps the server statuses, including a dealership-level block", async () => {
     spyResponses.rpcs.admin_doc_fee_change_apply = { data: { status: "conflict" }, error: null };
-    expect(await applyFeeChange({ ...base, updateSettings })).toEqual({ kind: "conflict", path: "server" });
+    expect(await applyFeeChange(base)).toEqual({ kind: "conflict", path: "server" });
     spyResponses.rpcs.admin_doc_fee_change_apply = { data: { status: "duplicate", affected: 3, audit_id: "a1" }, error: null };
-    expect(await applyFeeChange({ ...base, updateSettings })).toMatchObject({ kind: "result", path: "server", result: { status: "applied", affected: 3, auditEventId: "a1" } });
+    expect(await applyFeeChange(base)).toMatchObject({ kind: "result", path: "server", result: { status: "applied", affected: 3, auditEventId: "a1" } });
     spyResponses.rpcs.admin_doc_fee_change_apply = { data: { status: "applied", affected: 48, audit_id: "a2" }, error: null };
-    expect(await applyFeeChange({ ...base, updateSettings })).toMatchObject({ kind: "result", result: { status: "applied", affected: 48 } });
-    spyResponses.rpcs.admin_doc_fee_change_apply = { data: { status: "partial", affected: 2 }, error: null };
-    expect(await applyFeeChange({ ...base, updateSettings })).toMatchObject({ kind: "result", result: { status: "partial" } });
+    expect(await applyFeeChange(base)).toMatchObject({ kind: "result", result: { status: "applied", affected: 48 } });
+    spyResponses.rpcs.admin_doc_fee_change_apply = { data: { status: "blocked", affected: 0, audit_id: "a3", message: "Nothing was changed. 1 vehicle(s) have a stored vehicle price that does not add up to the advertised total." }, error: null };
+    expect(await applyFeeChange(base)).toMatchObject({ kind: "result", result: { status: "failed", affected: 0, auditEventId: "a3", message: expect.stringMatching(/^Nothing was changed/) } });
     spyResponses.rpcs.admin_doc_fee_change_apply = { data: null, error: { code: "42501", message: "denied" } };
-    expect(await applyFeeChange({ ...base, updateSettings })).toMatchObject({ kind: "result", path: "server", result: { status: "failed", message: "denied" } });
-    expect(updateSettings).not.toHaveBeenCalled();
-    expect(rpcCalls()).not.toContain("recalc_tenant_doc_fee");
+    expect(await applyFeeChange(base)).toMatchObject({ kind: "result", path: "server", result: { status: "failed", message: "denied" } });
   });
 
-  it("falls back to the existing routine only after the policy is saved, and states what that path touches", async () => {
-    const updateSettings = vi.fn(async () => true);
+  it("never saves the dealership fee or recalculates when the atomic routine is missing", async () => {
+    spyResponses.rpcs.admin_doc_fee_change_apply = { data: null, error: { code: "42883", message: "function does not exist" } };
     spyResponses.tables.dealer_profiles = { data: { updated_at: "v-1" }, error: null };
-    spyResponses.rpcs.recalc_tenant_doc_fee = { data: 3, error: null };
-    const outcome = await applyFeeChange({ ...base, expectedVersion: "v-1", updateSettings });
-    expect(updateSettings).toHaveBeenCalledWith({ doc_fee_enabled: true, doc_fee_amount: 925, doc_fee_state: "CT" });
-    expect(rpcCalls()).toEqual(["admin_doc_fee_change_apply", "admin_policy_version", "recalc_tenant_doc_fee"]);
-    expect(outcome).toMatchObject({ kind: "result", path: "fallback", result: { status: "applied", affected: 3 } });
-    expect(outcome.kind === "result" ? outcome.result.message : "").toMatch(/archived vehicles/);
-  });
-
-  it("does not recalculate when the policy save fails, and reports partial when the recalculation fails", async () => {
-    spyResponses.tables.dealer_profiles = { data: { updated_at: "v-1" }, error: null };
-    const failedSave = await applyFeeChange({ ...base, expectedVersion: "v-1", updateSettings: vi.fn(async () => false) });
-    expect(failedSave).toMatchObject({ kind: "result", path: "fallback", result: { status: "failed" } });
-    expect(rpcCalls()).not.toContain("recalc_tenant_doc_fee");
-    resetSupabaseSpy();
-    spyResponses.tables.dealer_profiles = { data: { updated_at: "v-1" }, error: null };
-    spyResponses.rpcs.recalc_tenant_doc_fee = { data: null, error: { message: "boom" } };
-    const partial = await applyFeeChange({ ...base, expectedVersion: "v-1", updateSettings: vi.fn(async () => true) });
-    expect(partial).toMatchObject({ kind: "result", path: "fallback", result: { status: "partial" } });
-  });
-
-  it("refuses the fallback when the profile changed after the review", async () => {
-    spyResponses.tables.dealer_profiles = { data: { updated_at: "v-2" }, error: null };
-    const updateSettings = vi.fn(async () => true);
-    expect(await applyFeeChange({ ...base, expectedVersion: "v-1", updateSettings })).toEqual({ kind: "conflict", path: "fallback" });
-    expect(updateSettings).not.toHaveBeenCalled();
+    const outcome = await applyFeeChange({ ...base, expectedVersion: "v-1" });
+    expect(outcome).toMatchObject({ kind: "result", path: "server", result: { status: "failed", message: FALLBACK_APPLY_WARNING } });
+    expect(rpcCalls()).toEqual(["admin_doc_fee_change_apply"]);
+    expect(writeCalls().filter((c) => c.kind === "table")).toEqual([]);
   });
 });
