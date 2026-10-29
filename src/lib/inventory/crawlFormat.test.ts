@@ -58,7 +58,7 @@ describe("the routine render is html only", () => {
 
   it("the test button also renders html only", () => {
     const testMode = between("if (body.test_url) {", "const limit = Math.max(");
-    expect(testMode).toContain("pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt)");
+    expect(testMode).toContain("pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt,");
   });
 });
 
@@ -162,8 +162,17 @@ describe("the renderer is paced", () => {
     const pacedFn = between("async function pacedRender(", "serve(async (req)");
     expect(pacedFn).toMatch(/if \(last\?\.status !== 429\) return/);
     expect(pacedFn).toMatch(/parseRetryAfter\(last\.retryAfterHeader, last\.error/);
-    expect(pacedFn).toMatch(/> deadlineAt\) return \{[^}]*gaveUp: "out_of_time"/);
-    expect(pacedFn).toMatch(/attempt === MAX_RATE_LIMIT_RETRIES\) return \{[^}]*gaveUp: "rate_limited"/);
+    expect(pacedFn).toMatch(/> deadlineAt\) return done\(\{[^}]*gaveUp: "out_of_time"/);
+    expect(pacedFn).toMatch(/attempt === MAX_RATE_LIMIT_RETRIES\) return done\(\{[^}]*gaveUp: "rate_limited"/);
+  });
+
+  it("asks the dealership's provider budget before every render it is given one for", () => {
+    const pacedFn = between("async function pacedRender(", "serve(async (req)");
+    expect(pacedFn.indexOf("admitProviderCall(budget.admin")).toBeLessThan(pacedFn.indexOf("await firecrawlRender(url, formats)"));
+    expect(pacedFn).toMatch(/if \(!gate\.admitted\) return \{[^}]*gaveUp: "budget_refused"/);
+    const calls = [...SRC.matchAll(/await pacedRender\(([^;]*?)\);/gs)].map((m) => m[1]);
+    expect(calls.length).toBe(5);
+    for (const c of calls) expect(c).toMatch(/tenantId|renderGate/);
   });
 
   it("derives the render budget from the wall clock and the paced rate", () => {
@@ -238,7 +247,7 @@ describe("the price never depends on the screenshot", () => {
     expect(loop).toMatch(/if \(evidenceDue && pr\.render && !pr\.render\.ok && pr\.render\.status !== 429 && pr\.gaveUp == null && renderBudget > 0\) \{/);
     const fallback = between("evidenceRefused = { status: pr.render.status, error: pr.render.error };", "const r = pr.render;");
     expect(fallback).toContain("renderBudget--;");
-    expect(fallback).toContain("pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt);");
+    expect(fallback).toContain("pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt, renderGate);");
     expect(fallback).toContain("evidenceDue = false;");
   });
 
@@ -351,7 +360,7 @@ describe("one request never tries to hold the whole list", () => {
 
   it("does not start a render it cannot finish inside the budget", () => {
     const pacedFn = between("async function pacedRender(", "serve(async (req)");
-    expect(pacedFn).toMatch(/if \(now \+ wait \+ RENDER_HEADROOM_MS > deadlineAt\) return \{[^}]*gaveUp: "out_of_time"/);
+    expect(pacedFn).toMatch(/if \(now \+ wait \+ RENDER_HEADROOM_MS > deadlineAt\) return done\(\{[^}]*gaveUp: "out_of_time"/);
     const loop = between("for (const row of rows) {", "// ── Discovery:");
     expect(loop).toMatch(/Date\.now\(\) - startedAt > RUN_BUDGET_MS - RENDER_HEADROOM_MS\) \{ ranOutOfTime = true; break; \}/);
   });

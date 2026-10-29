@@ -12,6 +12,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 
 const VINAUDIT_KEY = Deno.env.get("VINAUDIT_WINDOW_STICKER_KEY") || "";
 const MONRONEY_KEY = Deno.env.get("MONRONEY_LABELS_KEY") || "";
@@ -20,10 +21,11 @@ const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 const extFor = (ct: string) => (ct.includes("pdf") ? "pdf" : ct.includes("png") ? "png" : ct.includes("jpeg") || ct.includes("jpg") ? "jpg" : "bin");
 
 interface Fetched { bytes: Uint8Array; contentType: string }
+interface FetchFailed { error: string; status: number | null }
 
 // VinAudit returns the rendered sticker as binary (PNG/PDF) directly, or a JSON
 // error envelope. We detect success by content-type.
-async function fromVinAudit(vin: string): Promise<Fetched | { error: string }> {
+async function fromVinAudit(vin: string): Promise<Fetched | FetchFailed> {
   const url = `https://windowstickers.vinaudit.com/v1/windowsticker?key=${encodeURIComponent(VINAUDIT_KEY)}&vin=${encodeURIComponent(vin)}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
   const ct = res.headers.get("content-type") || "";
@@ -32,12 +34,12 @@ async function fromVinAudit(vin: string): Promise<Fetched | { error: string }> {
   }
   // Error path — try to surface the provider's message.
   const body = await res.json().catch(() => null);
-  return { error: (body && (body.error || body.message)) || `no_sticker (${res.status})` };
+  return { error: (body && (body.error || body.message)) || `no_sticker (${res.status})`, status: res.ok ? 404 : res.status };
 }
 
 // MonroneyLabels returns JSON with a hosted PDF/JPG URL; we fetch that URL's
 // bytes so everything is served from our own bucket.
-async function fromMonroney(vin: string): Promise<Fetched | { error: string }> {
+async function fromMonroney(vin: string): Promise<Fetched | FetchFailed> {
   const res = await fetch(`https://monroneylabels.com/api/v1/cars?vin=${encodeURIComponent(vin)}`, {
     headers: { Authorization: `Bearer ${MONRONEY_KEY}` },
     signal: AbortSignal.timeout(20000),
@@ -46,9 +48,9 @@ async function fromMonroney(vin: string): Promise<Fetched | { error: string }> {
   // deno-lint-ignore no-explicit-any
   const car: any = body?.data?.[0] ?? body?.data ?? body;
   const link = car?.pdf || car?.jpg || car?.image || car?.url;
-  if (!res.ok || !link) return { error: `no_sticker (${res.status})` };
+  if (!res.ok || !link) return { error: `no_sticker (${res.status})`, status: res.ok ? 404 : res.status };
   const img = await fetch(link, { signal: AbortSignal.timeout(20000) });
-  if (!img.ok) return { error: "fetch_render_failed" };
+  if (!img.ok) return { error: "fetch_render_failed", status: img.status };
   return { bytes: new Uint8Array(await img.arrayBuffer()), contentType: img.headers.get("content-type") || "application/pdf" };
 }
 
@@ -86,10 +88,20 @@ Deno.serve(async (req) => {
   }
 
 
-  let fetched: Fetched | { error: string };
-  let provider = "";
-  if (VINAUDIT_KEY) { provider = "vinaudit"; fetched = await fromVinAudit(vin); }
-  else { provider = "monroneylabels"; fetched = await fromMonroney(vin); }
+  const provider = VINAUDIT_KEY ? "vinaudit" : "monroneylabels";
+  const gate = await admitProviderCall(admin, {
+    url: VINAUDIT_KEY ? "https://windowstickers.vinaudit.com/v1/windowsticker" : "https://monroneylabels.com/api/v1/cars",
+    caller: "oem-window-sticker", provider, product: "window_sticker", tenantId, vin,
+  });
+  if (!gate.admitted) return json(200, { ok: false, error: "budget_refused", reason: gate.reason, provider });
+  let fetched: Fetched | FetchFailed;
+  try {
+    fetched = VINAUDIT_KEY ? await fromVinAudit(vin) : await fromMonroney(vin);
+  } catch (err) {
+    await recordProviderCall(admin, gate.eventId, null, err instanceof Error ? err.message : String(err));
+    return json(502, { ok: false, error: "provider_unreachable", provider });
+  }
+  await recordProviderCall(admin, gate.eventId, "error" in fetched ? fetched.status : 200, "error" in fetched ? fetched.error : null);
 
   if ("error" in fetched) return json(200, { ok: false, error: fetched.error, provider });
 

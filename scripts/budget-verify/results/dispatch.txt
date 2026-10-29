@@ -1,0 +1,97 @@
+== Function under test: working tree supabase/functions/provider-budget-alerts/index.ts 8cdd7b1bf1e7beeb76716d307ad6824cef480fe1
+== Both channels off
+PASS  off: alerts are queued at 50%, 100% and on the first refusal
+      expected 'call_denied|0|threshold|50|threshold|100'
+      actual   'call_denied|0|threshold|50|threshold|100'
+PASS  off: nothing is sent
+      expected 0
+      actual   0
+PASS  off: each alert is settled as off on both channels
+      expected 'call_denied|0|disabled|disabled|0|t ; threshold|50|disabled|disabled|0|t ; threshold|100|disabled|disabled|0|t'
+      actual   'call_denied|0|disabled|disabled|0|t ; threshold|50|disabled|disabled|0|t ; threshold|100|disabled|disabled|0|t'
+
+== Email only
+PASS  email only: one email per alert, no text messages
+      expected (3, 0)
+      actual   (3, 0)
+PASS  email only: sent to the saved address
+      expected [['ops@example.test'], ['ops@example.test'], ['ops@example.test']]
+      actual   [['ops@example.test'], ['ops@example.test'], ['ops@example.test']]
+PASS  email only: text recorded as off
+      expected 'call_denied|0|sent|disabled|1|t ; threshold|50|sent|disabled|1|t ; threshold|100|sent|disabled|1|t'
+      actual   'call_denied|0|sent|disabled|1|t ; threshold|50|sent|disabled|1|t ; threshold|100|sent|disabled|1|t'
+PASS  email only: subjects name the dealership, provider and level
+      expected ['AutoLabels budget alert - Synthetic Email Motors: firecrawl budget at 100%', 'AutoLabels budget alert - Synthetic Email Motors: firecrawl budget at 50%', 'AutoLabels budget alert - Synthetic Email Motors: firecrawl budget reached, calls are being refused']
+      actual   ['AutoLabels budget alert - Synthetic Email Motors: firecrawl budget at 100%', 'AutoLabels budget alert - Synthetic Email Motors: firecrawl budget at 50%', 'AutoLabels budget alert - Synthetic Email Motors: firecrawl budget reached, calls are being refused']
+PASS  email only: the message carries no dealership id
+      expected False
+      actual   False
+
+== Text message only
+PASS  text only: one text per alert to each saved number, no email
+      expected (0, 6)
+      actual   (0, 6)
+PASS  text only: both numbers receive every alert
+      expected {'+15550100001': 3, '+15550100002': 3}
+      actual   {'+15550100001': 3, '+15550100002': 3}
+PASS  text only: the text links to the budgets screen
+      expected True
+      actual   True
+PASS  text only: email recorded as off
+      expected 'call_denied|0|disabled|sent|1|t ; threshold|50|disabled|sent|1|t ; threshold|100|disabled|sent|1|t'
+      actual   'call_denied|0|disabled|sent|1|t ; threshold|50|disabled|sent|1|t ; threshold|100|disabled|sent|1|t'
+
+== Both at the same time, with the text channel failing once
+PASS  both: email and text attempted together
+      expected (3, 6)
+      actual   (3, 6)
+PASS  both: email sent, text failed, alert kept for a retry
+      expected 'call_denied|0|sent|failed|1|f ; threshold|50|sent|failed|1|f ; threshold|100|sent|failed|1|f'
+      actual   'call_denied|0|sent|failed|1|f ; threshold|50|sent|failed|1|f ; threshold|100|sent|failed|1|f'
+PASS  retry: only the failed text is sent again; the email is not repeated
+      expected (0, 6)
+      actual   (0, 6)
+PASS  retry: delivered
+      expected 'call_denied|0|sent|sent|2|t ; threshold|50|sent|sent|2|t ; threshold|100|sent|sent|2|t'
+      actual   'call_denied|0|sent|sent|2|t ; threshold|50|sent|sent|2|t ; threshold|100|sent|sent|2|t'
+
+== A channel that keeps failing
+PASS  retry limit: five attempts per alert, then it stops
+      expected 15
+      actual   15
+PASS  retry limit: settled as failed after five attempts
+      expected 'call_denied|0|failed|disabled|5|t ; threshold|50|failed|disabled|5|t ; threshold|100|failed|disabled|5|t'
+      actual   'call_denied|0|failed|disabled|5|t ; threshold|50|failed|disabled|5|t ; threshold|100|failed|disabled|5|t'
+
+== Who may call it
+PASS  auth: no session is refused
+      expected 401
+      actual   401
+PASS  auth: a dealer user is refused
+      expected 403
+      actual   403
+PASS  auth: a dealer user cannot send a test
+      expected 403
+      actual   403
+PASS  auth: a platform admin may run delivery
+      expected 200
+      actual   200
+PASS  auth: the cron (service role) cannot send a test
+      expected 403
+      actual   403
+
+== Test message
+PASS  test: sent on both channels to the saved recipients
+      expected (200, {'email': 'sent', 'sms': 'sent'}, 1, 2)
+      actual   (200, {'email': 'sent', 'sms': 'sent'}, 1, 2)
+PASS  test: text only when email is switched off for the test
+      expected (0, 2)
+      actual   (0, 2)
+PASS  test: each test is audited with the admin who sent it
+      expected '2|b1000000-0000-4000-8000-000000000001'
+      actual   '2|b1000000-0000-4000-8000-000000000001'
+PASS  test: a test writes no alert rows
+      expected '15'
+      actual   '15'
+
+27 checks, 0 failed

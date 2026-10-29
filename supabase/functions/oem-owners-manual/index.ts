@@ -23,6 +23,7 @@
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 import { resolveOemMake } from "../_shared/oemDocKey.ts";
+import { gatedSearchFetch, SearchBudgetRefused, searchTenant, type SearchGate } from "../_shared/firecrawlSearchGate.ts";
 
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
 
@@ -79,13 +80,8 @@ const hostAllowed = (url: string, domains: string[]): boolean => {
 
 interface Hit { url: string; title?: string; description?: string }
 
-async function firecrawlSearch(query: string): Promise<Hit[]> {
-  const res = await fetch("https://api.firecrawl.dev/v1/search", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${FIRECRAWL_KEY}` },
-    body: JSON.stringify({ query, limit: 8 }),
-    signal: AbortSignal.timeout(25000),
-  });
+async function firecrawlSearch(query: string, gate: SearchGate): Promise<Hit[]> {
+  const res = await gatedSearchFetch(gate, FIRECRAWL_KEY, query);
   if (!res.ok) return [];
   const body = await res.json().catch(() => null);
   const data = body?.data;
@@ -123,20 +119,23 @@ const yearOf = (h: Hit): number | null => {
   return m ? Number.parseInt(m[0], 10) : null;
 };
 
-Deno.serve(async (req) => {
+async function handle(req: Request): Promise<Response> {
   const pf = preflight(req);
   if (pf) return pf;
 
   const admin = adminClient();
   const privileged = isServiceOrCron(req);
+  let userId: string | null = null;
   if (!privileged) {
     const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     if (!jwt) return json(401, { error: "missing bearer token" });
     const { data: ures } = await admin.auth.getUser(jwt);
     if (!ures?.user?.id) return json(401, { error: "unauthorized" });
+    userId = ures.user.id;
   }
 
   const body = await req.json().catch(() => ({}));
+  const gate: SearchGate = { admin, tenantId: await searchTenant(admin, privileged, userId, body.tenant_id), caller: "oem-owners-manual" };
   const make = String(body.make || "").trim();
   const model = String(body.model || "").trim();
   const year = Number.parseInt(String(body.year ?? ""), 10) || null;
@@ -188,7 +187,7 @@ Deno.serve(async (req) => {
   ];
   let hits: Hit[] = [];
   for (const q of queries) {
-    hits = (await firecrawlSearch(q)).filter((h) => hostAllowed(h.url, domains));
+    hits = (await firecrawlSearch(q, gate)).filter((h) => hostAllowed(h.url, domains));
     if (hits.length) break;
   }
 
@@ -258,4 +257,13 @@ Deno.serve(async (req) => {
 
 
   return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: manualYear, source });
+}
+
+Deno.serve(async (req) => {
+  try {
+    return await handle(req);
+  } catch (err) {
+    if (err instanceof SearchBudgetRefused) return json(200, { ok: false, error: "budget_refused", reason: err.reason });
+    throw err;
+  }
 });

@@ -105,6 +105,7 @@ export function crawlOutcomeToCall(outcome: string | null): string | null {
       return "refused_rate";
     case "render_cost_refused":
     case "blocked_no_render_budget":
+    case "render_budget_refused":
       return "budget_denied";
     case "render_auth_failed":
       return "refused_auth";

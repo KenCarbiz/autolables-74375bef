@@ -1,0 +1,78 @@
+== Hosted provider_call_admit fingerprint on the replica: 9750c907de55ae223a0abf0bda565f8d
+
+======== Stage hosted
+ n | result |                                       label                                        | detail 
+---+--------+------------------------------------------------------------------------------------+--------
+ 1 | PASS   | platform rule: sweep calls stop at the reserve, the feed at the cap                | 
+ 2 | PASS   | platform rule: the feed takes the reserved call, then everyone stops               | 
+ 3 | PASS   | reproduction: without the migration a dealership has no limit on Firecrawl renders | 
+
+       summary        
+----------------------
+ 3 of 3 checks passed
+
+== Stage hosted exit 0
+
+======== Stage proposed
+ n  | result |                                        label                                         | detail 
+----+--------+--------------------------------------------------------------------------------------+--------
+  1 | PASS   | platform rule: sweep calls stop at the reserve, the feed at the cap                  | 
+  2 | PASS   | platform rule: the feed takes the reserved call, then everyone stops                 | 
+  3 | PASS   | enforce: three calls admitted, the fourth and fifth refused for the dealership       | 
+  4 | PASS   | enforce: refusals are ledgered as budget_denied and named                            | 
+  5 | PASS   | enforce: refusals do not count as use                                                | 
+  6 | PASS   | enforce: alerts at 50% and 100%, and one "calls refused" alert for two refusals      | 
+  7 | PASS   | enforce: the 100% alert records the use that reached it                              | 
+  8 | PASS   | enforce: other providers for the same dealership are not limited                     | 
+  9 | PASS   | no budget: another dealership is not limited                                         | 
+ 10 | PASS   | no budget: no alerts are queued for it                                               | 
+ 11 | PASS   | all providers: two calls across two providers use the combined limit                 | 
+ 12 | PASS   | all providers: the essential feed still passes an enforced limit                     | 
+ 13 | PASS   | all providers: with "also stop the inventory feed" the essential call is refused too | 
+ 14 | PASS   | alert only: calls past the limit are admitted                                        | 
+ 15 | PASS   | alert only: each alert point is queued once for the month                            | 
+ 16 | PASS   | dollar limit: $0.50 calls admitted up to $1.00 and refused past it                   | 
+ 17 | PASS   | dollar limit: the price per call is recorded on each event                           | 
+ 18 | PASS   | dollar limit: alerts at 50% and 100% by dollars                                      | 
+ 19 | PASS   | month: last month's calls do not count against this month                            | 
+ 20 | PASS   | platform refusal: refused by the platform cap, and no dealership alert queued        | 
+ 21 | PASS   | read: a dealer user sees no budgets                                                  | 
+ 22 | PASS   | read: a dealer user sees no alerts or alert recipients                               | 
+ 23 | PASS   | read: a platform admin sees every budget                                             | 
+ 24 | PASS   | write: even a platform admin cannot write the table directly                         | 
+ 25 | PASS   | write: a dealer user cannot raise a budget through the function                      | 
+ 26 | PASS   | read: a dealer user cannot read the overview                                         | 
+ 27 | PASS   | gate: a signed-in user cannot call the gate itself                                   | 
+ 28 | PASS   | write: a platform admin sets a budget; the thresholds are sorted and de-duplicated   | 
+ 29 | PASS   | write: the change is audited with who made it and the before/after                   | 
+ 30 | PASS   | write: an enforced budget with no limit is refused                                   | 
+ 31 | PASS   | write: an alert point of 0% is refused                                               | 
+ 32 | PASS   | write: an unknown provider name is refused                                           | 
+ 33 | PASS   | write: removing a budget is audited                                                  | 
+ 34 | PASS   | alerts: email switched on with no address is refused                                 | 
+ 35 | PASS   | alerts: a phone number not in +15551234567 form is refused                           | 
+ 36 | PASS   | alerts: email and text message both on, recipients cleaned                           | 
+ 37 | PASS   | alerts: a dealer user cannot change the recipients                                   | 
+ 38 | PASS   | alerts: the settings change is audited                                               | 
+ 39 | PASS   | overview: use and refusals per dealership and provider                               | 
+ 40 | PASS   | schedule: the delivery job is defined but not started                                | 
+
+        summary         
+------------------------
+ 40 of 40 checks passed
+
+== Stage proposed exit 0
+== Stage rollback: tables left 0; provider_call_admit fingerprint 9750c907de55ae223a0abf0bda565f8d (hosted 9750c907de55ae223a0abf0bda565f8d)
+
+======== Stage rollback
+ n | result |                                       label                                        | detail 
+---+--------+------------------------------------------------------------------------------------+--------
+ 1 | PASS   | platform rule: sweep calls stop at the reserve, the feed at the cap                | 
+ 2 | PASS   | platform rule: the feed takes the reserved call, then everyone stops               | 
+ 3 | PASS   | reproduction: without the migration a dealership has no limit on Firecrawl renders | 
+
+       summary        
+----------------------
+ 3 of 3 checks passed
+
+== Stage rollback exit 0

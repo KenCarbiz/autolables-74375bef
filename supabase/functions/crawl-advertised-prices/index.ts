@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { classifyCrawlOutcome } from "../_shared/crawlOutcome.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 import {
   classifyRenderedPage, discoverVdpUrls as discoverVdpUrlsShared, preferCrawlUrl, sameUrl,
   shouldBackoffMismatch, vinFromUrl as vinFromUrlShared,
@@ -550,7 +551,18 @@ interface PacedRender {
   formats: RenderFormat[];
   pacedWaitMs: number;
   rateLimitRetries: number;
-  gaveUp: "out_of_time" | "rate_limited" | null;
+  gaveUp: "out_of_time" | "rate_limited" | "budget_refused" | null;
+}
+
+// The dealership a render is spent for. Each paced render asks the provider
+// budget first (the dealership's budget, then the platform's); a refusal
+// spends nothing and is named in the ledger.
+interface RenderBudget {
+  // deno-lint-ignore no-explicit-any
+  admin: any;
+  tenantId: string | null;
+  vin?: string | null;
+  caller: string;
 }
 
 // One render, paced. Waits for the pacer's slot, retries a 429 for the wait
@@ -559,31 +571,45 @@ interface PacedRender {
 // included -- counts against the provider's per-minute window, so each is
 // recorded with the pacer before it is sent.
 const pacer = createRenderPacer({ rpm: RENDERS_PER_MINUTE });
-async function pacedRender(url: string, formats: RenderFormat[], deadlineAt: number): Promise<PacedRender> {
+async function pacedRender(url: string, formats: RenderFormat[], deadlineAt: number, budget?: RenderBudget): Promise<PacedRender> {
   let pacedWaitMs = 0;
   let rateLimitRetries = 0;
   let last: RenderResult | null = null;
+  let eventId: number | null = null;
+  if (budget && activeRenderKey) {
+    const gate = await admitProviderCall(budget.admin, {
+      url, caller: budget.caller, provider: "firecrawl",
+      product: formats.some((f) => typeof f !== "string" && f.type === "screenshot") ? "scrape_screenshot" : "scrape",
+      tenantId: budget.tenantId, vin: budget.vin ?? null,
+    });
+    if (!gate.admitted) return { render: null, formats, pacedWaitMs, rateLimitRetries, gaveUp: "budget_refused" };
+    eventId = gate.eventId;
+  }
+  const done = async (r: PacedRender): Promise<PacedRender> => {
+    if (budget) await recordProviderCall(budget.admin, eventId, r.render ? r.render.status : null, r.render?.error ?? null);
+    return r;
+  };
   for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
     const now = Date.now();
     const wait = pacer.waitBeforeRender(now);
-    if (now + wait + RENDER_HEADROOM_MS > deadlineAt) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "out_of_time" };
+    if (now + wait + RENDER_HEADROOM_MS > deadlineAt) return done({ render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "out_of_time" });
     if (wait > 0) { await sleep(wait); pacedWaitMs += wait; }
     pacer.noteRenderStarted(Date.now());
     last = await firecrawlRender(url, formats);
     if (last?.ok) {
       pacer.noteSuccess();
-      return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: null };
+      return done({ render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: null });
     }
-    if (last?.status !== 429) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: null };
+    if (last?.status !== 429) return done({ render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: null });
     const retryAfterMs = parseRetryAfter(last.retryAfterHeader, last.error, Date.now());
     const backoff = pacer.noteRateLimited(retryAfterMs);
-    if (attempt === MAX_RATE_LIMIT_RETRIES) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "rate_limited" };
-    if (Date.now() + backoff > deadlineAt) return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "out_of_time" };
+    if (attempt === MAX_RATE_LIMIT_RETRIES) return done({ render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "rate_limited" });
+    if (Date.now() + backoff > deadlineAt) return done({ render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "out_of_time" });
     await sleep(backoff);
     pacedWaitMs += backoff;
     rateLimitRetries++;
   }
-  return { render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "rate_limited" };
+  return done({ render: last, formats, pacedWaitMs, rateLimitRetries, gaveUp: "rate_limited" });
 }
 
 // Download Firecrawl's (ephemeral) screenshot and persist it to our private
@@ -903,7 +929,9 @@ serve(async (req) => {
     let finalUrl: string | null = null;
     if (result.price == null && renderBudget > 0) {
       renderBudget--;
-      const pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt);
+      const pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt,
+        { admin, tenantId: body.tenant_id ?? null, vin: testVin, caller: "crawl-advertised-prices:test" });
+      if (pr.gaveUp === "budget_refused") renderError = "dealership provider budget refused the render";
       const fr = pr.render;
       pacedWaitMs = pr.pacedWaitMs;
       rateLimitRetries = pr.rateLimitRetries;
@@ -1252,11 +1280,14 @@ serve(async (req) => {
       // taken from a plain html retry instead. The second stage then does not
       // spend another render asking for the same refused picture.
       let evidenceRefused: { status: number | null; error: string | null } | null = null;
+      let renderBudgetRefused = false;
       const cheapFailed = result.price == null && result.reason !== "vin_mismatch" && !result.gated;
       if (cheapFailed && renderBudget > 0) {
         renderBudget--;
         evidenceDue = await shouldCaptureEvidence(row);
-        let pr = await pacedRender(fetchUrl, evidenceDue ? EVIDENCE_FORMATS : HTML_ONLY_FORMATS, deadlineAt);
+        const renderGate: RenderBudget = { admin, tenantId: row.tenant_id, vin: row.vin, caller: "crawl-advertised-prices" };
+        let pr = await pacedRender(fetchUrl, evidenceDue ? EVIDENCE_FORMATS : HTML_ONLY_FORMATS, deadlineAt, renderGate);
+        renderBudgetRefused = pr.gaveUp === "budget_refused";
         pacedWaitMs += pr.pacedWaitMs;
         rateLimitRetries += pr.rateLimitRetries;
         // The price must never depend on the screenshot. When the bundle is
@@ -1268,7 +1299,7 @@ serve(async (req) => {
           evidenceRefused = { status: pr.render.status, error: pr.render.error };
           evidenceDue = false;
           renderBudget--;
-          pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt);
+          pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt, renderGate);
           pacedWaitMs += pr.pacedWaitMs;
           rateLimitRetries += pr.rateLimitRetries;
         }
@@ -1319,6 +1350,7 @@ serve(async (req) => {
           renderStatus,
           renderError,
           renderConfigured: !!FIRECRAWL_KEY,
+          renderBudgetRefused,
         });
         // The page's identity verdict, the document title and any recorded
         // finding (an embedded widget title, an unrecognised title) ride on
@@ -1582,7 +1614,8 @@ serve(async (req) => {
       const wantEvidence = priceChanged || (basis.promote && listingWouldChange) || evidenceDue || (!cheapFailed && await shouldCaptureEvidence(row));
       if (!evidenceShot && !evidenceRefused && renderBudget > 0 && wantEvidence) {
         renderBudget--;
-        const ev = await pacedRender(fetchUrl, EVIDENCE_FORMATS, deadlineAt);
+        const ev = await pacedRender(fetchUrl, EVIDENCE_FORMATS, deadlineAt,
+          { admin, tenantId: row.tenant_id, vin: row.vin, caller: "crawl-advertised-prices:evidence" });
         pacedWaitMs += ev.pacedWaitMs;
         rateLimitRetries += ev.rateLimitRetries;
         if (ev.render?.ok && ev.render.html) {
@@ -1822,7 +1855,9 @@ serve(async (req) => {
               && Date.now() + RENDER_HEADROOM_MS < deadlineAt) {
             discoveryRenders++;
             renderBudget--;
-            const pr = await pacedRender(src, HTML_ONLY_FORMATS, deadlineAt);
+            const pr = await pacedRender(src, HTML_ONLY_FORMATS, deadlineAt,
+              { admin, tenantId, caller: "crawl-advertised-prices:discovery" });
+            seedReport.budget_refused = pr.gaveUp === "budget_refused";
             const fr = pr.render;
             seedReport.rendered = !!fr?.ok;
             seedReport.render_status = fr?.status ?? null;

@@ -2552,3 +2552,162 @@ Pausing the job or deploying the fix is your decision. No job was changed.
 
 Order matters: the crawler may be deployed before the migration and is safe
 (`held_schema`, nothing promoted), but it promotes nothing until step 1.
+
+## Per-dealership provider budgets and super-admin alerts (2026-10-29), built and verified in isolation
+
+Nothing here is deployed, applied or scheduled. No provider was called and no
+email or text message was sent; every send in the runs below went to a local
+recorder.
+
+### 1. What it does
+
+- **A budget per dealership**, set by a platform admin. It covers one paid provider, or all of them combined ("All providers combined"). It can limit calls per month, dollars per month, or both.
+  - **Alert only**: nothing is refused. You are told at each alert point (80% and 100% by default; up to five points, 1–200%).
+  - **Enforce**: as alert only, and calls past the limit are refused before anything is sent to the provider. The inventory feed keeps running unless "Also stop the inventory feed" is ticked for that budget.
+  - **Off**: kept on file, does nothing.
+  - Dealerships without a budget are not limited, and the platform-wide MarketCheck rule is unchanged.
+- **Alerts to the super admins** by email, by text message, or both at once, each switched on or off separately.
+  - Recipients are saved in the panel; text messages need the +15551234567 form, and plain US numbers are converted.
+  - Each alert goes out once per dealership, provider, month and alert point. There is also one "calls are being refused" alert the first time an enforced budget refuses a call.
+  - A failed channel is retried on the next run, up to five attempts, without resending a channel that already went out.
+  - "Send a test" sends to the saved recipients on the channels that are switched on.
+- **Platform Admin, "Budgets & alerts" tab** (`/platform-admin?tab=budgets`, also in the command palette). It shows:
+  - each dealership's use this month against its limit;
+  - refused calls;
+  - the add, edit and remove controls;
+  - alert delivery settings;
+  - the price per call used for dollar limits;
+  - the last 25 alerts with what happened on each channel.
+
+  Until the migration is applied, the tab says so instead of showing empty tables.
+- **Security.**
+  - Only platform admins can read these tables, and nobody writes them directly.
+  - Every change goes through a function that checks the admin role again and writes an `audit_log` row with before and after.
+  - Dealer users cannot see budgets, alerts or recipients.
+
+### 2. Where the budget is enforced
+
+| Paid call | Dealership charged | Change |
+|---|---|---|
+| MarketCheck (sync, enrich, specs, comps) | already passed `tenant_id` | none; the existing gate now also checks the dealership |
+| Firecrawl page renders in `crawl-advertised-prices` (price read, evidence screenshot, discovery, test) | the listing's dealership | gated per render. A refusal is ledgered as the new crawl outcome `render_budget_refused`, shown as a budget refusal on the provider health card |
+| Firecrawl searches in `oem-brochure`, `oem-owners-manual` | `tenant_id` from intake (`fireOemHarvest` now sends it); a signed-in user can charge only a dealership they belong to | gated per search; answers `{ error: "budget_refused" }` |
+| VinAudit or MonroneyLabels in `oem-window-sticker` | `tenant_id` already in the body | gated; answers `{ error: "budget_refused" }` |
+| Black Book in `blackbook-values` | `tenant_id` from `vehicle-enrich` | gated; answers `{ available: false, reason: "budget_refused" }` |
+
+A refusal is never mistaken for an answer from the provider:
+
+- `packet-backfill` has a new `budget_refused` outcome. It is not charged to the run's own cap, does not stamp the vehicle as "no sticker on record", and does not cache "no brochure".
+- Intake parks the step and does not open an exception.
+
+**Not limited per dealership, and why:**
+
+- **Shopper trade-in values** (`trade-appraisal`, public, no dealership in the request). These count under the platform only; the caller is now named in the ledger.
+- **`packet-backfill` OEM link harvests.** The cache they fill is global per model, not per dealership.
+- **AI descriptions and market valuation.** They already have their own per-dealership budgets.
+- **Email and text sending.** Not metered here.
+
+**Unchanged design choice:** if the gate itself cannot be reached, the call proceeds and the reason is logged (`gate_unavailable`), as before.
+
+### 3. Files
+
+**Migration and rollback**
+
+- `supabase/proposed/20261103000000_provider_tenant_budgets.sql` (proposed, not applied).
+- Its `.rollback.sql`, which stops the schedule, restores the hosted `provider_call_admit` exactly, and drops the new tables and functions.
+
+**Shared modules**
+
+- `_shared/providerBudgetPolicy.ts`: the dealership rule and `tenant_budget`.
+- `_shared/providerBudget.ts`: product and price for non-MarketCheck providers.
+- `_shared/firecrawlSearchGate.ts`.
+- `_shared/budgetAlerts.ts`: message text and delivery plan.
+
+**Edge functions**
+
+- New: `provider-budget-alerts`.
+- Gated: the five functions in the table above, plus `vehicle-enrich` and `trade-appraisal` (callers).
+- `_shared/crawlOutcome.ts`, `_shared/packetBackfill.ts` and `_shared/intake-autoprovision.ts` change too.
+
+**Admin screen**
+
+- `src/components/admin/ProviderBudgetsPanel.tsx`.
+- `src/lib/admin/providerBudgets.ts`.
+- `PlatformAdmin.tsx`, `CommandPalette.tsx`.
+
+### 4. Verification (local only, synthetic data)
+
+**Unit and component tests: 58 of 58.**
+
+- `providerTenantBudget.test.ts` (20): the rule, alert planning for each switch combination, message escaping, the refusal outcomes, and the SQL text.
+- `providerBudgets.test.ts` (6): form rules.
+- `ProviderBudgetsPanel.test.tsx` (5):
+  - the migration-pending state;
+  - use against the limit;
+  - saving email and text together;
+  - test-send only on switched-on channels;
+  - adding a budget through the audited function.
+- The existing `providerBudget.test.ts` (11) and `crawlOutcome.test.ts` (16) also pass.
+
+**SQL, `scripts/budget-verify/run.sh`** (results in `scripts/budget-verify/results/sql-stages.txt`):
+
+- **hosted, 3 of 3.** The platform rule holds. The reproduction: a dealership's 25 Firecrawl calls are all admitted, with no limit.
+- **proposed, 40 of 40.**
+  - Enforcing a limit, and the refusal ledger.
+  - Refusals not counted as use.
+  - The alert points and the single "refused" alert.
+  - Other providers and other dealerships unaffected.
+  - All-providers budgets.
+  - Essential bypass, and "also stop the feed".
+  - Alert only.
+  - Dollar limits with a price per call.
+  - Last month not counted.
+  - No dealership alert for a call the platform refused.
+  - Who can read and write, admin-only writes with audit, input validation.
+  - The overview.
+  - The schedule defined but not started.
+- **rollback, 3 of 3.** No table left behind. The gate's definition matches the hosted one (same md5), and the platform rule still holds.
+
+**Alert sender, `scripts/budget-verify/dispatch/run.sh`: 27 of 27** (results in `results/dispatch.txt`).
+
+- Both channels off: nothing is sent, and the alerts are settled.
+- Email only.
+- Text only, to two numbers.
+- Both at once.
+- A failed text retried without repeating the email.
+- The five-attempt limit.
+- Who may call it: no session, a dealer user, or the service role sending a test are all refused.
+- The test message on both channels and on text only, audited, with no alert rows written.
+
+**Crawler, end to end** (`scripts/crawl-verify/e2e/run.sh`, new stages):
+
+- `budget` (the migration applied, no budget set): **19 of 19**, the same as `fixed`.
+- `refused` (Firecrawl enforced at zero for the dealership): **6 of 6**.
+  - No render sent in either run, and no pricing or observation changed.
+  - Every vehicle's ledger reads `render_budget_refused`.
+  - The provider ledger has refusals only.
+  - One alert was queued.
+
+**Inventory sync with the migration applied: 26 of 26**, unchanged (`scripts/sync-verify/results/fixed-with-budgets.txt`).
+
+**Full suite: 7,346 passed, 1 skipped, 2 failed.** The 2 failures (`complianceData`, `complianceRedTeam`) are the same two that already failed at `3836dc3`. App typecheck is clean. The touched edge functions type-check, except `marketcheck-specs`, which has the same 2 errors it had before this change.
+
+The pinned-text tests in `crawlFormat.test.ts` now expect the gated render. A new test there requires every render to carry the dealership and to ask the budget before the renderer is called. `intake-autoprovision.test.ts` now expects `tenant_id` in the harvest body.
+
+**Replica alignment, stated:** both budget harnesses grant `has_role` to signed-in users. That grant comes from hosted migration 20260626050347, which does not apply on the local stand-ins (it names a function they lack).
+
+### 5. Rollout and rollback proposal (for later approval)
+
+| Step | Action | Verify (read-only) | Roll back |
+|---|---|---|---|
+| 1 | Apply `20261103000000_provider_tenant_budgets.sql` (additive; replaces `provider_call_admit` with the same signature) | Four tables, functions, policies; `platform_alert_settings` has one row with both channels off; no budget rows, so behaviour is unchanged | `.rollback.sql` |
+| 2 | Deploy `provider-budget-alerts`, then the gated functions: `crawl-advertised-prices`, `oem-window-sticker`, `oem-brochure`, `oem-owners-manual`, `blackbook-values`, `vehicle-enrich`, `trade-appraisal`, `packet-backfill`, and the intake callers (`ingest-orchestrate`, `autocurb-sync`, `dms-webhook`, `oem-document-store`); the MarketCheck functions only when next authorized, their behaviour is unchanged | Function hashes match the commit. Firecrawl, VinAudit and Black Book calls now appear in `provider_call_events` (as `ungated` while no budget is set) | Redeploy the previous versions |
+| 3 | In the tab: save recipients, switch on email, text or both, press "Send a test" | The test arrives; an `audit_log` row `platform_alert_test_sent` | Switch the channels off |
+| 4 | Set budgets for the dealerships you want watched, starting with "Alert only" | Use appears against the limit | Remove the budget (audited) |
+| 5 | Start delivery: `SELECT public.schedule_provider_budget_alerts();` (every 10 minutes) | `cron.job` row `provider-budget-alerts`; alerts move to Sent | `SELECT public.unschedule_provider_budget_alerts();` |
+
+Order:
+
+- The functions are safe before the migration. The hosted gate answers "ungated", so nothing is refused.
+- Alerts queue from step 4 but are not sent until step 5. Step 5 should follow step 3, so the first real alert goes to recipients you have tested.
+- Text messages go through the existing `send-sms` (SignalHouse) and emails through `send-email` (Resend or SendGrid). They need those secrets set.

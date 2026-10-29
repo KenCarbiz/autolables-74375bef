@@ -98,7 +98,7 @@ async function valueTrade(vin: string, mileage: number, condition: Condition, zi
     const res = await fetch(`${SUPABASE_URL}/functions/v1/blackbook-values`, {
       method: "POST",
       headers: { Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ vin, mileage, zip: zip || undefined }),
+      body: JSON.stringify({ vin, mileage, zip: zip || undefined, caller: "trade-appraisal" }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return { ...empty, reason: `provider_${res.status}` };

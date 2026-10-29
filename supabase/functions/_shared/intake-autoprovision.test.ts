@@ -570,14 +570,14 @@ describe("ensureOemDocLinks", () => {
     expect(harvestUrls(fetchMock)).toEqual([OEM_BROCHURE_URL, OEM_MANUAL_URL]);
   });
 
-  it("sends the passport's key, verbatim, as the body", async () => {
+  it("sends the passport's key, verbatim, and the dealership the search is charged to", async () => {
     const fetchMock = harvestFetch({ ok: true, cached: false });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const { admin } = makeAdmin();
     await ensureOemDocLinks(admin, "https://x.supabase.co", "svc", "t1", "VIN1", YMM);
     await artifactPostsIdle();
     const call = fetchMock.mock.calls.find((c) => String(c[0]) === OEM_BROCHURE_URL)!;
-    expect(JSON.parse(String((call[1] as { body: string }).body))).toEqual(KEY);
+    expect(JSON.parse(String((call[1] as { body: string }).body))).toEqual({ ...KEY, tenant_id: "t1" });
   });
 
   it("spends nothing when the link cache already answers the passport", async () => {

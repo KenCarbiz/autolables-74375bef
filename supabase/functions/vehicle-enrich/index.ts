@@ -740,12 +740,12 @@ async function fetchNhtsaRecalls(identity: ResolvedIdentity): Promise<ModelRecal
 }
 
 // ── Black Book via blackbook-values ────────────────────────────
-async function fetchBlackBook(vin: string, miles: number | null, zip: string | null) {
+async function fetchBlackBook(vin: string, miles: number | null, zip: string | null, tenantId: string | null) {
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/blackbook-values`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`, "x-cron-secret": CRON_SECRET },
-      body: JSON.stringify({ vin, mileage: miles ?? 0, zip }),
+      body: JSON.stringify({ vin, mileage: miles ?? 0, zip, tenant_id: tenantId, caller: "vehicle-enrich" }),
       signal: AbortSignal.timeout(14000),
     });
     if (!res.ok) return null;
@@ -909,7 +909,7 @@ serve(async (req) => {
 
   // Black Book is a separate provider with its own rate limit, so it runs
   // alongside the MarketCheck chain rather than competing with it.
-  const blackbookP = wantBB ? fetchBlackBook(vin, miles, zip) : Promise.resolve(null);
+  const blackbookP = wantBB ? fetchBlackBook(vin, miles, zip, tenantId ?? null) : Promise.resolve(null);
 
   // MarketCheck calls run STRICTLY one-at-a-time. Firing them in parallel
   // bursts past MarketCheck's per-second limit and the heaviest call (comps

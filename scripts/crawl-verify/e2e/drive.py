@@ -104,12 +104,22 @@ sql("DELETE FROM crawl_verify.fail_listing_update")
 gw("/__fail_storage?vins=")
 status2, body2 = crawl()
 print(f"\n== Run 2: HTTP {status2}; updated {body2.get('updated')} unchanged {body2.get('unchanged')} skipped {body2.get('skipped')} failed {body2.get('failed')} listing_outcomes {body2.get('listing_outcomes')}")
-gw("/__renders"); gw("/__stored")
+renders2 = gw("/__renders"); gw("/__stored")
 snapshot("After run 2 (failures removed)")
 after2 = {k: pricing(k) for k in CASES}
 print()
 
-if STAGE == "noschema":
+if STAGE == "refused":
+    check("refused: no render was sent to the renderer in either run", 0, len(renders) + len(renders2))
+    check("refused: no listing's pricing changed", INITIAL, after2)
+    check("refused: no observation was stored", {k: "" for k in CASES}, {k: observations(k) for k in CASES})
+    check("refused: every vehicle's ledger names the dealership budget",
+          {k: True for k in CASES}, {k: ledger(k).startswith("render_budget_refused") for k in CASES})
+    check("refused: each refusal is in the provider ledger as budget_denied, none admitted",
+          "0|true", sql(f"SELECT count(*) FILTER (WHERE outcome <> 'budget_denied') || '|' || bool_and(note = 'tenant_budget:firecrawl') FROM public.provider_call_events WHERE provider = 'firecrawl' AND tenant_id = '{T}'"))
+    check("refused: one 'calls refused' alert is queued for the month",
+          "call_denied:1", sql(f"SELECT kind || ':' || count(*) FROM public.provider_budget_alerts WHERE tenant_id = '{T}' GROUP BY kind"))
+elif STAGE == "noschema":
     check("run 1: no listing's pricing changed before the migration", INITIAL, after1)
     check("run 2: no listing's pricing changed before the migration", INITIAL, after2)
     check("observations are still stored the old way (one per read vehicle in run 1)",

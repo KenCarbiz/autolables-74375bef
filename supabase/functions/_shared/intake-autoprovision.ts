@@ -479,7 +479,7 @@ async function recordHarvestVerdict(
 
 const LEDGER_HARVEST_STATUS: Record<string, LedgerStatus> = {
   found: "succeeded", cached: "succeeded",
-  unsupported: "skipped", not_configured: "parked", rate_limited: "parked",
+  unsupported: "skipped", not_configured: "parked", rate_limited: "parked", budget_refused: "parked",
   not_found: "failed", error: "failed",
 };
 
@@ -492,6 +492,7 @@ function harvestReason(
     case "cached": return `The OEM ${artifact} link for ${triple} was already cached; nothing was re-harvested.`;
     case "unsupported": return `${triple} is not in the OEM harvest allow-list, so no ${artifact} is searched for this vehicle.`;
     case "not_configured": return `The ${artifact} harvest has no provider key configured, so nothing was searched. This is an install problem, not a vehicle problem.`;
+    case "budget_refused": return `The dealership's provider budget for this month refused the ${artifact} search for ${triple}, so nothing was searched or charged. The packet backfill sweep re-attempts it.`;
     case "rate_limited": return `The platform throttled the ${artifact} harvest for ${triple}${retryAfterMs ? ` (asked for ${retryAfterMs}ms)` : ""}. Nothing was learned about this model; the packet backfill sweep re-attempts it.`;
     case "not_found": return `The manufacturer's own site had no ${artifact} for ${triple}.`;
     default: return `The ${artifact} harvest for ${triple} errored: ${error ?? "no detail recorded"}. The packet backfill sweep re-attempts it.`;
@@ -524,7 +525,7 @@ function fireOemHarvest(
 
     trackDetached((async () => {
       const res = await invokeFunction(`${supabaseUrl}/functions/v1/${spec.fn}`, serviceKey, {
-        body: { make: key.make, model: key.model, year: key.year },
+        body: { make: key.make, model: key.model, year: key.year, tenant_id: tenantId },
         // No retries: a retry re-runs the paid search for the same answer.
         timeoutMs: 120_000, maxRetries: 0, deadlineMs: 125_000,
       });
@@ -556,7 +557,7 @@ function fireOemHarvest(
       catch { /* the expiry still applies */ }
       // not_configured is an install problem, not a vehicle problem, and it is
       // true of every vehicle at once — reporting it per VIN is noise.
-      if (outcome === "not_configured") return;
+      if (outcome === "not_configured" || outcome === "budget_refused") return;
       await recordArtifactFailure(
         admin, tenantId, vin, spec.artifact,
         outcome === "rate_limited"

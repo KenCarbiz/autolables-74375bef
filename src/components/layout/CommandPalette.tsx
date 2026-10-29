@@ -28,6 +28,7 @@ import {
   CreditCard,
   Code,
   Printer,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -309,6 +310,10 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
               <CommandItem onSelect={() => go("/platform-admin?tab=audit")}>
                 <ShieldCheck className="w-4 h-4 mr-2" />
                 Platform Audit
+              </CommandItem>
+              <CommandItem onSelect={() => go("/platform-admin?tab=budgets")}>
+                <Wallet className="w-4 h-4 mr-2" />
+                Budgets & alerts
               </CommandItem>
               <CommandItem onSelect={() => go("/admin/command-center")}>
                 <ShieldCheck className="w-4 h-4 mr-2" />

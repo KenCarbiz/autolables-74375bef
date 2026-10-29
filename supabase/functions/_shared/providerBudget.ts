@@ -1,6 +1,6 @@
-// The call gate every MarketCheck caller passes through: ask the database
-// whether this month's budget admits the call, then record what the provider
-// answered. Fails OPEN when the gate is unreachable or not yet migrated, and
+// The call gate every paid provider caller passes through: ask the database
+// whether this month's budget (the dealership's, then the platform's) admits
+// the call, then record what the provider answered. Fails OPEN when the gate is unreachable or not yet migrated, and
 // says so, because a gate that is missing must never stop the feed.
 import { billingProductForUrl, MC_CALL_PRICE_USD } from "./mcCost.ts";
 import { outcomeForAnswer, parseAdmitRow, type AdmitResult, type ProviderCallOutcome } from "./providerBudgetPolicy.ts";
@@ -15,11 +15,15 @@ export interface AdmitArgs {
   tenantId?: string | null;
   vin?: string | null;
   provider?: string;
+  // For providers other than MarketCheck, whose product is not read from the
+  // URL. Without a price the database uses provider_unit_prices.
+  product?: string;
+  estimatedCostUsd?: number | null;
 }
 
 export async function admitProviderCall(admin: RpcClient, a: AdmitArgs): Promise<AdmitResult> {
   const provider = a.provider || "marketcheck";
-  const product = billingProductForUrl(a.url);
+  const product = a.product || billingProductForUrl(a.url);
   try {
     const { data, error } = await admin.rpc("provider_call_admit", {
       p_provider: provider,
@@ -28,7 +32,7 @@ export async function admitProviderCall(admin: RpcClient, a: AdmitArgs): Promise
       p_essential: a.essential === true,
       p_tenant_id: a.tenantId ?? null,
       p_vin: a.vin ?? null,
-      p_estimated_cost_usd: MC_CALL_PRICE_USD[product] ?? null,
+      p_estimated_cost_usd: a.estimatedCostUsd !== undefined ? a.estimatedCostUsd : provider === "marketcheck" ? MC_CALL_PRICE_USD[product] ?? null : null,
     });
     if (error) {
       console.warn(`provider budget gate unavailable (${a.caller}): ${String(error.message || error)}`);
@@ -40,7 +44,7 @@ export async function admitProviderCall(admin: RpcClient, a: AdmitArgs): Promise
       return { admitted: true, eventId: null, monthCalls: null, cap: null, reserve: null, reason: "gate_unavailable" };
     }
     if (!parsed.admitted) {
-      console.warn(`provider budget denied ${product} for ${a.caller}: ${parsed.reason} (${parsed.monthCalls}/${parsed.cap}, reserve ${parsed.reserve})`);
+      console.warn(`provider budget denied ${provider} ${product} for ${a.caller}: ${parsed.reason} (${parsed.monthCalls}/${parsed.cap}, reserve ${parsed.reserve})`);
     }
     return parsed;
   } catch (err) {

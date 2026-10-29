@@ -11,7 +11,8 @@ import StripeConfigPanel from "@/components/admin/StripeConfigPanel";
 import StickerTemplatesAdminPanel from "@/components/admin/StickerTemplatesAdminPanel";
 import PassportEngagementDashboard from "@/components/admin/PassportEngagementDashboard";
 import MarketcheckApiUsagePanel from "@/components/admin/MarketcheckApiUsagePanel";
-import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound, LayoutTemplate, Activity, DollarSign } from "lucide-react";
+import ProviderBudgetsPanel from "@/components/admin/ProviderBudgetsPanel";
+import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound, LayoutTemplate, Activity, DollarSign, Wallet } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
 // PlatformAdmin — cross-tenant surfaces (Tenants, Members,
@@ -23,8 +24,8 @@ import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound, Layo
 // whole route on isAdmin = true.
 // ──────────────────────────────────────────────────────────────
 
-type PlatformTab = "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing" | "stripe" | "templates" | "passport-engagement" | "api-usage";
-const VALID: PlatformTab[] = ["tenants", "members", "entitlements", "audit", "recalls", "billing", "stripe", "templates", "passport-engagement", "api-usage"];
+type PlatformTab = "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing" | "stripe" | "templates" | "passport-engagement" | "api-usage" | "budgets";
+const VALID: PlatformTab[] = ["tenants", "members", "entitlements", "audit", "recalls", "billing", "stripe", "templates", "passport-engagement", "api-usage", "budgets"];
 
 const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "tenants",      label: "Tenants",      icon: Store },
@@ -37,6 +38,7 @@ const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "templates",    label: "Sticker templates", icon: LayoutTemplate },
   { id: "passport-engagement", label: "Passport engagement", icon: Activity },
   { id: "api-usage",    label: "API usage & cost", icon: DollarSign },
+  { id: "budgets",      label: "Budgets & alerts", icon: Wallet },
 ];
 
 const PlatformAdmin = () => {
@@ -89,6 +91,7 @@ const PlatformAdmin = () => {
         {tab === "templates"    && <StickerTemplatesAdminPanel />}
         {tab === "passport-engagement" && <PassportEngagementDashboard />}
         {tab === "api-usage"    && <MarketcheckApiUsagePanel />}
+        {tab === "budgets"      && <ProviderBudgetsPanel />}
       </div>
     </div>
   );

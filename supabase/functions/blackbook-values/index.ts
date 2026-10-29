@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { adminClient } from "../_shared/supabase.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 
 // ──────────────────────────────────────────────────────────────
 // blackbook-values — VIN + mileage → Black Book UsedCar values.
@@ -11,6 +13,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 //
 // Auth: service-role bearer or the shared MARKETCHECK_CRON_SECRET header
 // (this is an internal enrichment endpoint, called by vehicle-enrich).
+// Each lookup passes the provider budget first, charged to tenant_id when the
+// caller names one.
 //
 // Config (Supabase secrets):
 //   BLACKBOOK_API_BASE   e.g. https://api.blackbookcloud.com   (no trailing slash)
@@ -61,7 +65,7 @@ serve(async (req) => {
 
   if (!BB_BASE || (!BB_KEY && !(BB_USER && BB_PASS))) return json(200, { available: false, reason: "not_configured" });
 
-  const body = await req.json().catch(() => ({})) as { vin?: string; mileage?: number; zip?: string; state?: string };
+  const body = await req.json().catch(() => ({})) as { vin?: string; mileage?: number; zip?: string; state?: string; tenant_id?: string; caller?: string };
   const vin = (body.vin || "").trim().toUpperCase();
   const mileage = num(body.mileage) ?? 0;
   if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) return json(400, { error: "valid vin required" });
@@ -79,7 +83,21 @@ serve(async (req) => {
     if (BB_KEY) headers["Authorization"] = `Bearer ${BB_KEY}`;
     else if (BB_USER && BB_PASS) headers["Authorization"] = `Basic ${btoa(`${BB_USER}:${BB_PASS}`)}`;
 
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
+    const admin = adminClient();
+    const tenantId = typeof body.tenant_id === "string" && /^[0-9a-f-]{36}$/i.test(body.tenant_id) ? body.tenant_id : null;
+    const gate = await admitProviderCall(admin, {
+      url: `${BB_BASE}/UsedCarWS/UsedCarVin`, caller: `blackbook-values:${String(body.caller || "direct").slice(0, 40)}`,
+      provider: "blackbook", product: "usedcar_vin", tenantId, vin,
+    });
+    if (!gate.admitted) return json(200, { available: false, reason: "budget_refused" });
+    let res: Response;
+    try {
+      res = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
+    } catch (err) {
+      await recordProviderCall(admin, gate.eventId, null, err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+    await recordProviderCall(admin, gate.eventId, res.status, res.ok ? null : await res.clone().text().catch(() => null));
     if (!res.ok) return json(200, { available: false, reason: `provider_${res.status}` });
     // deno-lint-ignore no-explicit-any
     const raw: any = await res.json().catch(() => ({}));

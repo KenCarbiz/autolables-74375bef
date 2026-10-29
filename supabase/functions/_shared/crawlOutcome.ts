@@ -32,6 +32,7 @@
 //   render_auth_failed    rotate the key
 //   render_unconfigured   set the key
 //   render_unreachable    check the provider
+//   render_budget_refused raise the dealership's budget, or wait for the month
 //   bot_challenge         call the website vendor
 //
 // "render_cost_refused" is deliberately not called "credits exhausted". A 402
@@ -50,6 +51,8 @@ export interface CrawlOutcomeInput {
   renderError: string | null;
   /** False when no renderer is configured at all. */
   renderConfigured: boolean;
+  /** True when our own provider budget refused the render; nothing was spent. */
+  renderBudgetRefused?: boolean;
 }
 
 export interface CrawlOutcome {
@@ -67,6 +70,7 @@ export const CRAWL_OUTCOMES = [
   "render_unreachable",
   "bot_challenge",
   "blocked_no_render_budget",
+  "render_budget_refused",
   // A price was read off the page and then refused by the misparse guard
   // (above the feed price: a sticker, MSRP or lease figure). Recorded by the
   // crawler after the guard, never by the classifier, so a ledger row can
@@ -84,10 +88,16 @@ const COST_TEXT = /\binsufficient credits\b|\bnot enough credits\b|\bcredit bala
 export function classifyCrawlOutcome(args: CrawlOutcomeInput): CrawlOutcome {
   const {
     captured, reason, cheapStatus, renderAttempted, renderStatus, renderError,
-    renderConfigured,
+    renderConfigured, renderBudgetRefused,
   } = args;
 
   if (captured) return { outcome: "captured", detail: null };
+  if (renderBudgetRefused) {
+    return {
+      outcome: "render_budget_refused",
+      detail: "The dealership's provider budget for this month refused the render; nothing was sent to the renderer",
+    };
+  }
 
   // ── Structured status first. A code is a contract. ──────────────────
   if (renderStatus === 429) {

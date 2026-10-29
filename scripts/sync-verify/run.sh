@@ -45,6 +45,12 @@ echo "== Migration chain: $applied applied, $failed did not apply on the local s
 for f in align hosted-functions fixture; do
   "${PSQL[@]}" -d "$DB" -f "scripts/sync-verify/$f.sql" >/dev/null 2>"$WORK/err" || { cat "$WORK/err"; exit 2; }
 done
+# SYNC_EXTRA_SQL applies further files (for example a proposed migration)
+# after the fixture, to check the sync is unchanged with them in place.
+for f in ${SYNC_EXTRA_SQL:-}; do
+  echo "== Also applied: $f"
+  "${PSQL[@]}" -d "$DB" -f "$f" >/dev/null 2>"$WORK/err" || { cat "$WORK/err"; exit 2; }
+done
 
 SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 SERVICE_KEY=$(python3 - "$SECRET" <<'EOF'

@@ -341,7 +341,7 @@ export interface InvokeLike {
 }
 
 export type HarvestOutcome =
-  | "found" | "cached" | "not_found" | "unsupported" | "not_configured" | "rate_limited" | "error";
+  | "found" | "cached" | "not_found" | "unsupported" | "not_configured" | "rate_limited" | "budget_refused" | "error";
 
 export function classifyHarvest(res: InvokeLike): HarvestOutcome {
   // A throttle is the platform declining to call the function at all, so no
@@ -350,6 +350,7 @@ export function classifyHarvest(res: InvokeLike): HarvestOutcome {
   if (res.ok) {
     const d = (res.data ?? {}) as { ok?: boolean; cached?: boolean; error?: string };
     if (d.error === "not_configured") return "not_configured";
+    if (d.error === "budget_refused") return "budget_refused";
     if (d.ok === true) return d.cached === true ? "cached" : "found";
     return "error";
   }
@@ -361,7 +362,7 @@ export function classifyHarvest(res: InvokeLike): HarvestOutcome {
   return "error";
 }
 
-export type StickerOutcome = "found" | "miss" | "not_configured" | "rate_limited" | "error";
+export type StickerOutcome = "found" | "miss" | "not_configured" | "rate_limited" | "budget_refused" | "error";
 
 export function classifySticker(res: InvokeLike): StickerOutcome {
   if (res.rateLimited) return "rate_limited";
@@ -369,6 +370,9 @@ export function classifySticker(res: InvokeLike): StickerOutcome {
   const d = (res.data ?? {}) as { ok?: boolean; error?: string };
   if (d.ok === true) return "found";
   if (d.error === "not_configured") return "not_configured";
+  // The dealership's provider budget refused the call: nothing was bought and
+  // nothing learned, so it must not stamp the VIN as having no sticker.
+  if (d.error === "budget_refused") return "budget_refused";
   // Anything else on a 200 is the provider answering "no sticker for this VIN"
   // — which it was paid to answer.
   return "miss";
@@ -402,7 +406,7 @@ export function persistedLinkOutcome(outcome: HarvestOutcome): AttemptOutcome | 
     case "error": return "error";
     // Nothing was learned about the triple; a throttle or a missing key must
     // never be remembered as "this vehicle has no brochure".
-    case "rate_limited": case "not_configured": return null;
+    case "rate_limited": case "not_configured": case "budget_refused": return null;
   }
 }
 

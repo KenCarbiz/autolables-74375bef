@@ -8,6 +8,10 @@
 #   noschema  the fixed crawler before its proposed migration is applied
 #   fixed     the fixed crawler with supabase/proposed/20261101000000 and
 #             20261102000000 applied
+#   budget    as fixed, plus 20261103000000 (per-dealership budgets) with no
+#             budget set: must behave exactly as fixed
+#   refused   as budget, with the dealership's Firecrawl budget enforced at
+#             zero: no render may be sent and nothing may change
 #
 # The replica is the full migration chain on local stand-ins, aligned to the
 # hosted catalogue, with the hosted definitions of the functions the crawler
@@ -69,11 +73,16 @@ overall=0
 for STAGE in "${STAGES[@]}"; do
   DB=crawl_verify_$STAGE
   "${PSQL[@]}" -d postgres -c "DROP DATABASE IF EXISTS $DB" -c "CREATE DATABASE $DB TEMPLATE $BASE" >/dev/null
-  if [[ $STAGE == fixed ]]; then
-    for f in supabase/proposed/20261101000000_price_component_evidence.sql supabase/proposed/20261102000000_crawl_observation_basis.sql; do
+  if [[ $STAGE == fixed || $STAGE == budget || $STAGE == refused ]]; then
+    MIGS=(supabase/proposed/20261101000000_price_component_evidence.sql supabase/proposed/20261102000000_crawl_observation_basis.sql)
+    [[ $STAGE != fixed ]] && MIGS+=(supabase/proposed/20261103000000_provider_tenant_budgets.sql)
+    for f in "${MIGS[@]}"; do
       "${PSQL[@]}" -d "$DB" -f "$f" >/dev/null
     done
     "${PSQL[@]}" -d "$DB" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role" >/dev/null
+  fi
+  if [[ $STAGE == refused ]]; then
+    "${PSQL[@]}" -d "$DB" -c "INSERT INTO public.provider_tenant_budgets (tenant_id, provider, mode, monthly_call_cap) VALUES ('c0000000-0000-4000-8000-000000000001', 'firecrawl', 'enforce', 0)" >/dev/null
   fi
 
   SRC="$WORK/src-$STAGE"; mkdir -p "$SRC/functions"
@@ -115,7 +124,7 @@ EOF
     [[ $i == 120 ]] && { echo "services did not start"; tail -n 20 "$WORK"/*-$STAGE.log; exit 2; }
   done
   status=0
-  STAGE=$([[ $STAGE == noschema ]] && echo noschema || echo contract) FN_URL=http://127.0.0.1:$FN_PORT/ \
+  STAGE=$(case $STAGE in noschema) echo noschema;; refused) echo refused;; *) echo contract;; esac) FN_URL=http://127.0.0.1:$FN_PORT/ \
     GATEWAY_URL=http://127.0.0.1:$GATEWAY_PORT SERVICE_KEY=$SERVICE_KEY DB=$DB PAGES_JSON=$(pwd)/scripts/crawl-verify/e2e/pages.json \
     python3 -I scripts/crawl-verify/e2e/drive.py || status=$?
   if [[ -n "${CRAWL_VERIFY_LOGS:-}" ]]; then cp "$WORK"/*-$STAGE.log "$CRAWL_VERIFY_LOGS"/ 2>/dev/null || true; fi
