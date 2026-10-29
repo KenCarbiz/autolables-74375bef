@@ -2,8 +2,8 @@
 
 Numbers match `annotated/03-*.png`, `04-*.png` and `07-*.png`. The full
 descriptions are in `focused-review-03-04-07/NN/DIFFERENCES.txt`; this list
-is the concise version with one correction. All three remain pending your
-review; nothing here is approved on your behalf.
+is the concise version with one correction. All three were accepted by the
+owner on 2026-10-29 with these exceptions, to be refined after release.
 
 **What changed since the 2d7954d package**
 - The desktop and phone captures of 03, 04 and 07 are byte-identical to the

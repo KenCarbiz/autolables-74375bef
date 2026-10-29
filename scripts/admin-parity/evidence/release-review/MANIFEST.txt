@@ -1,9 +1,9 @@
 Administration V2 release review package (2026-10-29)
 
 Screens: 02, 05, 09, 10, 11, 13 (new) and 03, 04, 07 (refreshed).
-Status: all nine PENDING your individual review. Accepted screens remain
-exactly 01, 06, 08 and 12; their captures were compared pixel by pixel
-with the accepted baselines in this round and are identical.
+Status: the owner accepted all nine on 2026-10-29, with the listed
+exceptions, for release, and asked for refinement afterwards. With 01, 06,
+08 and 12 (accepted earlier, captures unchanged), all 13 are accepted.
 
 Scores are protocol v2 masked reference-match scores: the fixture is
 captured at the references' native 1586x992 and compared pixel for pixel,

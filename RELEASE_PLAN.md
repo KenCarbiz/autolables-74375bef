@@ -63,7 +63,7 @@ migrated, applied or paid for. Production pricing is unchanged.
 | D5. A specs decode attempt is counted when the budget refuses the call | Dealer data quality | No, but fix **before** re-enabling enrichment | `factory-sticker-orchestrate/index.ts:514-527`; cap 3 (`sourceData.ts:36`) | Yes | Not implemented |
 | D6, D7. Refusals read as "No factory options found", "Sync complete — no new data", "No OEM window sticker found" | Dealer tools | No | `useVehicleSpecs.ts:32-34`, `OverviewTab.tsx:89-97`, `useOemSticker.ts:22-28` | Yes | Not implemented |
 | E. Publish control (automatic or manual) | Every frontend change | **Yes (process)** | Section 0 | n/a | Your answer needed |
-| F. Visual acceptance of nine screens | Administration appearance | Your acceptance gate. Not a functional dependency; Admin V2 is already serving | Section 2 | n/a | Packages ready; nothing approved on your behalf |
+| F. Visual acceptance of nine screens | Administration appearance | Your acceptance gate. Not a functional dependency; Admin V2 is already serving | Section 2 | n/a | Done: the owner accepted all nine on 2026-10-29 with the listed exceptions; refinement continues after release |
 | G. Administration usability fixes from this round | Admin 02, 05, 10, 11 | No | Section 2 | n/a | Implemented and tested on the branch; not on `main`, not live |
 | H. Pending migrations: 20261101/02/04 (crawl), 20261103/06 (budgets), 20261105 (fee-preview record) | Crawl evidence and controls; budgets; ledger | No, while crawling and enrichment are paused | Isolated harnesses pass; production unchanged | Yes | Prepared, not applied |
 | I. Policy B (fee basis) | Fee changes and price display | No, if no fee change is made at launch. Related to D1 and the 05 finding | `supabase/proposed/20261031000000` | n/a | Pending your decision |
@@ -85,7 +85,7 @@ Also found, harmless while MarketCheck is paused:
 - **No part of today's gap comes from the old 1600×1000 resampling.**
 - **Accepted, unchanged: 01, 06, 08 and 12.** Each capture is pixel-identical to its accepted baseline in this round's final run.
   - Screen 06 changed once mid-round, when a shared fixture changed. I reverted that and scoped the fix to 05.
-- **Pending: 02, 03, 04, 05, 07, 09, 10, 11, 13.** None is approved.
+- **02, 03, 04, 05, 07, 09, 10, 11 and 13: accepted by the owner on 2026-10-29** with the listed exceptions, for release, with refinement to follow. All 13 are now accepted; each has a recorded baseline in `scripts/admin-parity/acceptance.json`.
 
 **Where the missing points come from.** Every pixel the score counts as different was assigned to one cause:
 - **The method** (`scripts/admin-parity/decompose.cjs`) reads DOM line, icon and box positions from the same native capture.
@@ -283,7 +283,7 @@ Each batch needs one approval. Batches 1a and 2 are what launch needs; the rest 
 | Fix the two clock fixtures | Nothing | ~1 hour | Full suite green except the `functionAuth` load timeout, verified alone |
 | Release 1a + 1b | The above + your copy sign-off | Hours | Suite, build, parity identical for the accepted four, preview passport check |
 | Release 2 (fail-closed gate) | D-4 | ~0.5 day including verification | Blob hashes; 24-hour ledger watch |
-| Visual acceptance of the nine pending screens | Your review | In parallel | n/a |
+| Visual acceptance of the nine remaining screens | Done 2026-10-29 | 0 | Baselines recorded |
 
 **Technical critical path:** D1 (blocked on D-2), then release 1b, then release 2 and its 24-hour watch.
 - **Earliest launch-ready state:** about 3 working days, if D-2 is answered on day 1. Day 1–2 is the passport fixes; day 2 releases 1a/1b; days 2–3 are the fail-closed deploy and its watch.

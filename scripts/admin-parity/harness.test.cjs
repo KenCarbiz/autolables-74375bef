@@ -209,7 +209,7 @@ test("an accepted screen is checked against its baseline: score, contract and ca
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("the committed register accepts exactly 01, 06, 08 and 12", () => {
+test("the committed register accepts all 13 screens", () => {
   const reg = JSON.parse(fs.readFileSync(path.join(__dirname, "acceptance.json"), "utf8"));
-  assert.deepEqual(Object.keys(reg).filter((k) => !k.startsWith("_")).sort(), ["01", "06", "08", "12"]);
+  assert.deepEqual(Object.keys(reg).filter((k) => !k.startsWith("_")).sort(), ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13"]);
 });

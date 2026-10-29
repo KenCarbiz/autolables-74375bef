@@ -3329,3 +3329,9 @@ After the commit, the secret-scan test (`functionAuth`, which reads committed fi
 - **Policy B** (`20261031000000`): pending, not applied, untouched.
 - **Fee-preview reconciliation** (`20261105000000`): prepared, not applied. Production still `2a1468b9…`.
 - **Visual acceptance:** the register is unchanged. No visual tuning, and the accepted screens are untouched. Screenshot review is still blocked until the files are supplied.
+
+## Owner acceptance of the remaining nine screens (2026-10-29)
+
+- The owner accepted 02, 03, 04, 05, 07, 09, 10, 11 and 13 with the exceptions listed in `scripts/admin-parity/evidence/release-review/`, for release, and asked for refinement afterwards.
+- Each is recorded in `scripts/admin-parity/acceptance.json` at its masked reference-match score, with a baseline capture taken from `1acb5f1`. They are not frozen: a refined screen gets a new baseline.
+- All 13 screens are now accepted. Acceptance covers appearance only. It is not a 95% or 94% pass, and it does not authorize edge-function deploys, migrations or price changes.
