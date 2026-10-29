@@ -1,5 +1,5 @@
 /// <reference path="./signalhouse-sdk.d.ts" />
-import { SignalHouseSDK } from "npm:@signalhousellc/sdk@1.0.66";
+import { SignalHouseSDK } from "npm:@signalhousellc/sdk@1.6.0";
 
 // ──────────────────────────────────────────────────────────────
 // signalhouse · the SMS provider behind every outbound text.
