@@ -90,6 +90,9 @@ describe("the design tokens survive into Tailwind", () => {
 describe("the shell chrome renders on the tokens", () => {
   const shell = readFileSync(
     join(__dirname, "../../components/layout/AppShell.tsx"), "utf8");
+  // The rail rows moved out of AppShell with the global frame rebuild.
+  const rail = readFileSync(
+    join(__dirname, "../../components/layout/AppRail.tsx"), "utf8");
 
   it("puts the page title and subtitle on the type scale", () => {
     expect(shell).toMatch(/text-al-section/);
@@ -100,11 +103,13 @@ describe("the shell chrome renders on the tokens", () => {
   });
 
   it("puts navigation hover on the motion ladder", () => {
-    expect(shell).toMatch(/duration-hover ease-standard/);
+    expect(rail).toMatch(/duration-hover ease-standard/);
+    expect(rail).not.toMatch(/duration-\[120ms\]/);
     expect(shell).not.toMatch(/duration-\[120ms\]/);
   });
 
   it("keeps the reduced-motion escape", () => {
+    expect(rail).toMatch(/motion-reduce:transition-none/);
     expect(shell).toMatch(/motion-reduce:transition-none/);
   });
 });

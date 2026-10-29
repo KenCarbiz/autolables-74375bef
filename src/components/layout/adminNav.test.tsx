@@ -8,6 +8,7 @@ import {
   Columns3,
   Handshake,
   Headset,
+  House,
   LayoutDashboard,
   Printer,
   Rocket,
@@ -15,11 +16,12 @@ import {
   Settings,
   ShieldCheck,
   Radar,
-  Store,
   Tag,
+  Terminal,
   Users,
   Wrench,
 } from "lucide-react";
+import type { DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import {
   buildAdminNavSections,
   filterNavSections,
@@ -28,6 +30,16 @@ import {
   formatBadgeCount,
   badgeAriaLabel,
   navModeForRole,
+  groupHref,
+  isGroupActive,
+  isGroupExpanded,
+  groupBadgeCount,
+  groupBadgeAriaLabel,
+  groupLabel,
+  railRows,
+  navSectionsForViewer,
+  canOpenAdministration,
+  ReportsBarsIcon,
   type NavBadgeValues,
   type AdminNavItem,
   type NavPermissionContext,
@@ -35,6 +47,8 @@ import {
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ADMIN_ICON_PATHS } from "@/lib/design/adminIconPaths";
+import { dealerRoleCapabilityMap } from "@/lib/permissions/dealerRoleCapabilities";
+import { visibleSections } from "@/lib/admin/sections";
 
 const ZERO_BADGES: NavBadgeValues = {
   workQueue: 0,
@@ -64,50 +78,45 @@ const allItems = (badges: Partial<NavBadgeValues> = {}, anyAdminTab = true): Adm
 const byLabel = (label: string, badges: Partial<NavBadgeValues> = {}) =>
   allItems(badges).find((i) => i.label === label);
 
-describe("buildAdminNavSections — structure preserved", () => {
-  it("keeps the section order, keys, and titles", () => {
+describe("buildAdminNavSections — the rail's eight groups", () => {
+  it("keeps the group order, keys, and titles drawn in the mock", () => {
     const sections = build();
-    // The eight primary destinations the admin asset pack names: Home,
-    // Inventory, My Work, Get Ready, Customers, Compliance, Reports, Settings.
-    // CREATE is gone as a section -- Create is a global control, and the
-    // production surfaces belong to the vehicle, so they sit under Inventory.
-    // TITLES & INVOICES is gone too: Titles is a section of the compliance
-    // surface, and Invoices is a worklist.
+    // Mock 01: Today, Vehicles, Merchandising, Get Ready, Customers & Deals,
+    // Compliance, Reports, Administration, and Platform console pinned below.
     expect(sections.map((s) => s.key)).toEqual([
-      "main",
-      "inventory",
-      "mywork",
+      "today",
+      "vehicles",
+      "merchandising",
       "getready",
       "customers",
       "compliance",
       "reports",
-      "settings",
+      "administration",
       "platform",
     ]);
     expect(sections.map((s) => s.title)).toEqual([
-      "",
-      "INVENTORY",
-      "MY WORK",
-      "GET READY",
-      "CUSTOMERS",
-      "COMPLIANCE",
-      "REPORTS",
-      "SETTINGS",
-      "PLATFORM",
+      "Today",
+      "Vehicles",
+      "Merchandising",
+      "Get Ready",
+      "Customers & Deals",
+      "Compliance",
+      "Reports",
+      "Administration",
+      "Platform console",
     ]);
   });
 
-  it("preserves label order within each section", () => {
+  it("pins only the Platform console", () => {
+    expect(build().filter((s) => s.pinned).map((s) => s.key)).toEqual(["platform"]);
+  });
+
+  it("preserves leaf order within each group", () => {
     const sections = build();
     const get = (key: string) => sections.find((s) => s.key === key)!.items.map((i) => i.label);
-    expect(get("main")).toEqual(["Home"]);
-    expect(get("inventory")).toEqual([
-      "Inventory",
-      "Inventory Intelligence",
-      "OEM Window Sticker Studio",
-      "Description Operations",
-    ]);
-    expect(get("mywork")).toEqual(["Work Queue", "Print Center", "Invoices"]);
+    expect(get("today")).toEqual(["Today"]);
+    expect(get("vehicles")).toEqual(["Inventory", "Inventory Intelligence", "Work Queue"]);
+    expect(get("merchandising")).toEqual(["OEM Window Sticker Studio", "Description Operations", "Print Center"]);
     expect(get("getready")).toEqual([
       "Get Ready Command",
       "Service Writer Desk",
@@ -116,18 +125,130 @@ describe("buildAdminNavSections — structure preserved", () => {
       "Ready Board",
       "Recon Approvals",
     ]);
-    expect(get("customers")).toEqual(["Customers", "Deals"]);
+    expect(get("customers")).toEqual(["Customers", "Deals", "Invoices"]);
     // FIVE rows pointed at the one ComplianceShell: Compliance Center,
     // Compliance Tasks, Price Change Review, Audit Log and Titles. They are
     // sections of that surface, not destinations of their own.
     expect(get("compliance")).toEqual(["Compliance"]);
     expect(get("reports")).toEqual(["Reports"]);
+    expect(get("administration")).toEqual(["Administration"]);
+    expect(get("platform")).toEqual(["Platform console"]);
   });
 
-  it("omits Settings when no admin tab is permitted, includes it otherwise", () => {
-    expect(byLabel("Settings")).toBeDefined();
-    const noAdmin = build({}, false).flatMap((s) => s.items).find((i) => i.label === "Settings");
+  it("omits Administration when no admin tab is permitted, includes it otherwise", () => {
+    expect(byLabel("Administration")).toBeDefined();
+    const noAdmin = build({}, false).flatMap((s) => s.items).find((i) => i.label === "Administration");
     expect(noAdmin).toBeUndefined();
+    // ...and the emptied group is pruned rather than drawn with no leaf.
+    expect(filterNavSections(build({}, false), allowAll).find((s) => s.key === "administration")).toBeUndefined();
+  });
+
+  it("keeps every former destination reachable for a full-capability dealer", () => {
+    const paths = filterNavSections(build(), allowAll).flatMap((s) => s.items).map((i) => i.path);
+    for (const path of [
+      "/dashboard",
+      "/inventory",
+      "/inventory-intelligence",
+      "/window-sticker-studio",
+      "/description-operations",
+      "/queue",
+      "/print-center",
+      "/admin?tab=invoices",
+      "/get-ready-command",
+      "/service-desk",
+      "/service",
+      "/prep",
+      "/ready-board",
+      "/recon",
+      "/customers",
+      "/deals",
+      "/compliance",
+      "/dashboard/reports",
+      "/admin",
+      "/platform-admin",
+    ]) {
+      expect(paths).toContain(path);
+    }
+    // Paths stay unique, because the rail and the role preview key rows by path.
+    expect(new Set(paths).size).toBe(paths.length);
+  });
+});
+
+describe("rail groups", () => {
+  const only = (...caps: DealerCapability[]): NavPermissionContext => ({
+    isAdmin: false,
+    isManager: false,
+    can: (c) => caps.includes(c),
+    hasFeature: () => true,
+  });
+  const group = (ctx: NavPermissionContext, key: string) => filterNavSections(build(), ctx).find((s) => s.key === key);
+
+  it("opens a group on its first permitted leaf", () => {
+    const full = filterNavSections(build(), allowAll);
+    expect(full.map((s) => groupHref(s))).toEqual([
+      "/dashboard",
+      "/inventory",
+      "/window-sticker-studio",
+      "/get-ready-command",
+      "/customers",
+      "/compliance",
+      "/dashboard/reports",
+      "/admin",
+      "/platform-admin",
+    ]);
+    expect(groupHref(group(only("can_view_work_queue"), "vehicles")!)).toBe("/queue");
+    expect(groupHref(group(only("can_assign_service_work"), "getready")!)).toBe("/service-desk");
+    expect(groupHref(group(only("can_view_print_queue"), "merchandising")!)).toBe("/print-center");
+    expect(groupHref(group(only("can_manage_invoices"), "customers")!)).toBe("/admin?tab=invoices");
+  });
+
+  it("hides a group with no permitted leaf", () => {
+    const keys = filterNavSections(build(), only("can_view_dashboard", "can_view_inventory")).map((s) => s.key);
+    expect(keys).toEqual(["today", "vehicles", "administration"]);
+    expect(group(only("can_view_inventory"), "merchandising")).toBeUndefined();
+  });
+
+  it("is active exactly when one of its leaves is the current page", () => {
+    const sections = filterNavSections(build(), allowAll);
+    const activeGroups = (pathname: string, search = "") => {
+      const leaf = findActiveNavItem(sections, pathname, search);
+      return sections.filter((s) => isGroupActive(s, leaf)).map((s) => s.key);
+    };
+    expect(activeGroups("/vehicle-file/abc")).toEqual(["vehicles"]);
+    expect(activeGroups("/queue")).toEqual(["vehicles"]);
+    expect(activeGroups("/print-queue")).toEqual(["merchandising"]);
+    expect(activeGroups("/recon")).toEqual(["getready"]);
+    expect(activeGroups("/admin", "?tab=invoices")).toEqual(["customers"]);
+    expect(activeGroups("/admin", "?tab=team")).toEqual(["administration"]);
+    expect(activeGroups("/platform-admin")).toEqual(["platform"]);
+    expect(activeGroups("/nowhere")).toEqual([]);
+  });
+
+  it("lists the leaves only under the active group, and only when there is more than one", () => {
+    const sections = filterNavSections(build(), allowAll);
+    const expandedAt = (pathname: string) => {
+      const leaf = findActiveNavItem(sections, pathname, "");
+      return sections.filter((s) => isGroupExpanded(s, leaf)).map((s) => s.key);
+    };
+    expect(expandedAt("/dashboard")).toEqual([]);
+    expect(expandedAt("/compliance")).toEqual([]);
+    expect(expandedAt("/prep")).toEqual(["getready"]);
+    expect(expandedAt("/inventory")).toEqual(["vehicles"]);
+    // A group trimmed to one permitted leaf is that leaf, with nothing to list.
+    const narrow = filterNavSections(build(), only("can_view_work_queue"));
+    const leaf = findActiveNavItem(narrow, "/queue", "");
+    expect(leaf?.label).toBe("Work Queue");
+    expect(narrow.filter((s) => isGroupExpanded(s, leaf))).toEqual([]);
+  });
+
+  it("rolls the real leaf counts up onto a group", () => {
+    const getReady = build({ reconApprovals: 150 }).find((s) => s.key === "getready")!;
+    expect(groupBadgeCount(getReady)).toBe(150);
+    expect(formatBadgeCount(groupBadgeCount(getReady))).toBe("99+");
+    expect(groupBadgeAriaLabel(getReady.title, groupBadgeCount(getReady)!)).toBe("150 pending in Get Ready");
+    const customers = build({ leads: 2, returns: 3 }).find((s) => s.key === "customers")!;
+    expect(groupBadgeCount(customers)).toBe(5);
+    expect(groupBadgeCount(build().find((s) => s.key === "vehicles")!)).toBeUndefined();
   });
 });
 
@@ -188,7 +309,7 @@ describe("role-scoped navigation", () => {
 
 describe("icon mapping (lucide-react, one distinct icon per destination)", () => {
   const expected: Record<string, unknown> = {
-    Home: LayoutDashboard,
+    Today: LayoutDashboard,
     Inventory: CarFront,
     "Inventory Intelligence": Radar,
     "OEM Window Sticker Studio": Tag,
@@ -205,8 +326,8 @@ describe("icon mapping (lucide-react, one distinct icon per destination)", () =>
     Deals: Handshake,
     Compliance: ShieldCheck,
     Reports: BarChart3,
-    Settings: Settings,
-    "Platform Admin": Store,
+    Administration: Settings,
+    "Platform console": Terminal,
   };
 
   Object.entries(expected).forEach(([label, icon]) => {
@@ -218,6 +339,21 @@ describe("icon mapping (lucide-react, one distinct icon per destination)", () =>
   it("assigns a distinct icon to every destination", () => {
     const icons = allItems().map((i) => i.icon);
     expect(new Set(icons).size).toBe(icons.length);
+  });
+
+  it("draws each group with the glyph measured from the mock", () => {
+    const icon = (key: string) => build().find((s) => s.key === key)?.icon;
+    expect(icon("today")).toBe(House);
+    expect(icon("vehicles")).toBe(CarFront);
+    expect(icon("merchandising")).toBe(Tag);
+    expect(icon("getready")).toBe(Wrench);
+    expect(icon("customers")).toBe(Users);
+    expect(icon("compliance")).toBe(ShieldCheck);
+    expect(icon("reports")).toBe(ReportsBarsIcon);
+    expect(icon("administration")).toBe(Settings);
+    expect(icon("platform")).toBe(Terminal);
+    const groupIcons = build().map((s) => s.icon);
+    expect(new Set(groupIcons).size).toBe(groupIcons.length);
   });
 });
 
@@ -274,22 +410,22 @@ describe("active-route matching", () => {
     expect(activeLabel("/service-desk")).toBe("Service Writer Desk");
   });
 
-  it("keeps Home on the role boards and off the dashboard sub-pages", () => {
-    expect(activeLabel("/dashboard")).toBe("Home");
-    expect(activeLabel("/home/gm")).toBe("Home");
-    expect(activeLabel("/dashboard/classic")).toBe("Home");
+  it("keeps Today on the role boards and off the dashboard sub-pages", () => {
+    expect(activeLabel("/dashboard")).toBe("Today");
+    expect(activeLabel("/home/gm")).toBe("Today");
+    expect(activeLabel("/dashboard/classic")).toBe("Today");
     expect(activeLabel("/dashboard/reports")).toBe("Reports");
     expect(activeLabel("/dashboard/qr-analytics")).toBe("Reports");
   });
 
   it("distinguishes /admin tabs via the query string", () => {
-    expect(activeLabel("/admin")).toBe("Settings");
+    expect(activeLabel("/admin")).toBe("Administration");
     expect(activeLabel("/admin", "?tab=invoices")).toBe("Invoices");
-    // Settings is the hub for every other /admin tab, including the audit tab
-    // now that Audit Log is a section of the compliance surface.
-    expect(activeLabel("/admin", "?tab=team")).toBe("Settings");
-    expect(activeLabel("/admin", "?tab=audit")).toBe("Settings");
-    expect(activeLabel("/admin/inventory-sync")).toBe("Settings");
+    // Administration is the hub for every other /admin tab, including the
+    // audit tab now that Audit Log is a section of the compliance surface.
+    expect(activeLabel("/admin", "?tab=team")).toBe("Administration");
+    expect(activeLabel("/admin", "?tab=audit")).toBe("Administration");
+    expect(activeLabel("/admin/inventory-sync")).toBe("Administration");
   });
 
   it("marks at most one leaf active for any route", () => {
@@ -435,16 +571,16 @@ describe("navigation uses the admin asset pack", () => {
 
   it("uses the pack's own navigation icons for the top-level surfaces", () => {
     // The pack names exactly eight: Home, Inventory, My Work, Get Ready,
-    // Customers, Compliance, Reports, Settings.
+    // Customers, Compliance, Reports, Settings. They stay on those leaves.
     const id = (label: string) => byLabel(label)?.assetIcon;
-    expect(id("Home")).toBe("010AC");
+    expect(id("Today")).toBe("010AC");
     expect(id("Inventory")).toBe("011AC");
     expect(id("Work Queue")).toBe("012AC");
     expect(id("Get Ready Command")).toBe("013AC");
     expect(id("Customers")).toBe("014AC");
     expect(id("Compliance")).toBe("015AC");
     expect(id("Reports")).toBe("016AC");
-    expect(id("Settings")).toBe("017AC");
+    expect(id("Administration")).toBe("017AC");
   });
 
   it("keeps a lucide fallback on every row", () => {
@@ -456,8 +592,119 @@ describe("navigation uses the admin asset pack", () => {
   it("renders the pack inline, not as an <img>", () => {
     // currentColor does not inherit through <img>, so a file reference would
     // quietly turn every nav icon the same colour.
-    const shell = readFileSync(join(__dirname, "AppShell.tsx"), "utf8");
-    expect(shell).toMatch(/<AdminIcon id=\{item\.assetIcon\}/);
-    expect(shell).toMatch(/ADMIN_ICON_PATHS\[item\.assetIcon\]/);
+    const rail = readFileSync(join(__dirname, "AppRail.tsx"), "utf8");
+    expect(rail).toMatch(/<AdminIcon id=\{item\.assetIcon\}/);
+    expect(rail).toMatch(/ADMIN_ICON_PATHS\[item\.assetIcon\]/);
+  });
+});
+
+// ── What each real role sees ─────────────────────────────────────────
+//
+// The rail for a viewer comes from navSectionsForViewer, the one computation
+// AppShell draws. These rows are read off the real capability contract, so a
+// change to a role's capabilities shows up here as a changed rail.
+
+describe("role matrix: the rail each role is drawn, from the real capability contract", () => {
+  const ON = () => true;
+  const rail = (role: string | null, isAdmin = false, hasFeature: (k: string) => boolean = ON) =>
+    railRows(navSectionsForViewer({ role, isAdmin, badges: ZERO_BADGES, hasFeature })).map((r) => r.label);
+  const doors = (role: string | null, isAdmin = false) =>
+    navSectionsForViewer({ role, isAdmin, badges: ZERO_BADGES, hasFeature: ON }).map((s) => `${groupLabel(s)} ${groupHref(s)}`);
+  const ALL = ["Today", "Vehicles", "Merchandising", "Get Ready", "Customers & Deals", "Compliance", "Reports", "Administration"];
+
+  it("gives the full-authority dealer roles all eight groups and no Platform console", () => {
+    for (const role of ["owner", "general_manager", "gsm", "admin", "manager", "used_car_manager"]) {
+      expect(rail(role)).toEqual(ALL);
+    }
+  });
+
+  it("draws the narrower dealer roles from their own capabilities", () => {
+    expect(rail("sales_manager")).toEqual(["Today", "Vehicles", "Merchandising", "Customers & Deals", "Compliance", "Reports", "Administration"]);
+    expect(rail("salesperson")).toEqual(["Today", "Vehicles", "Merchandising", "Customers & Deals"]);
+    // staff is the legacy alias of salesperson.
+    expect(rail("staff")).toEqual(rail("salesperson"));
+    expect(rail("inventory_manager")).toEqual(["Today", "Vehicles", "Merchandising", "Get Ready", "Compliance", "Reports", "Administration"]);
+    expect(rail("service_manager")).toEqual(["Today", "Vehicles", "Get Ready", "Compliance", "Reports", "Administration"]);
+    expect(rail("office")).toEqual(["Today", "Vehicles", "Merchandising", "Customers & Deals", "Compliance", "Reports", "Administration"]);
+    expect(rail("finance")).toEqual(["Today", "Vehicles", "Merchandising", "Customers & Deals", "Compliance", "Reports", "Administration"]);
+    expect(rail("biller")).toEqual(["Today", "Customers & Deals", "Reports", "Administration"]);
+    expect(rail("readonly")).toEqual(["Today", "Vehicles", "Reports", "Administration"]);
+    // No membership row: the safe default capabilities only.
+    expect(rail(null)).toEqual(["Today", "Vehicles"]);
+  });
+
+  it("names a one-leaf group after the leaf it opens", () => {
+    // A service writer's Vehicles group holds only the Work Queue, and the
+    // compliance role's Customers & Deals group only Deals.
+    expect(doors("service_advisor")).toEqual(["Today /dashboard", "Work Queue /queue", "Get Ready /get-ready-command"]);
+    expect(doors("compliance")).toContain("Deals /deals");
+    expect(doors("compliance")).not.toContain("Customers & Deals /deals");
+    // Office and billing hold Deals and Invoices: a real group, opened on Deals.
+    expect(doors("office")).toContain("Customers & Deals /deals");
+    expect(doors("biller")).toContain("Customers & Deals /deals");
+  });
+
+  it("offers Administration exactly when Admin V2 has a tab the role may open", () => {
+    const roles = [...Object.keys(dealerRoleCapabilityMap), "staff", null];
+    for (const role of roles) {
+      if (navModeForRole(role) !== "dealer") continue;
+      const v2 = visibleSections({ role, isAdmin: false, features: {} }).length > 0;
+      expect(rail(role).includes("Administration")).toBe(v2);
+      expect(canOpenAdministration({ role, isAdmin: false, hasFeature: ON })).toBe(v2);
+    }
+    // The salesperson's only legacy tab (leads) now redirects out of
+    // Administration, so the door would open onto "not available".
+    expect(rail("salesperson")).not.toContain("Administration");
+  });
+
+  it("shows the Platform console to the platform-admin authority only", () => {
+    // isAdmin is user_roles.role = 'admin' (AuthContext), the same authority
+    // AdminGate checks on /platform-admin. A dealership "admin" role is not it.
+    for (const role of [...Object.keys(dealerRoleCapabilityMap), "staff", null]) {
+      expect(rail(role, false)).not.toContain("Platform console");
+    }
+    expect(rail("admin", true)).toEqual([...ALL, "Platform console"]);
+    expect(rail("salesperson", true)).toContain("Platform console");
+    expect(rail(null, true)).toContain("Platform console");
+    // Vendors and technicians are contained by role, platform admin or not.
+    expect(rail("third_party_vendor", true)).toEqual(["My Assignments"]);
+    expect(rail("detail", true)).toEqual(["My Work", "Ready Board"]);
+  });
+
+  it("gives the isolated roles their own rows", () => {
+    expect(rail("third_party_vendor")).toEqual(["My Assignments"]);
+    expect(rail("detail")).toEqual(["My Work", "Ready Board"]);
+  });
+
+  it("hides Invoices when invoicing is switched off, as Admin V2 does", () => {
+    const leaves = (hasFeature: (k: string) => boolean) =>
+      navSectionsForViewer({ role: "office", isAdmin: false, badges: ZERO_BADGES, hasFeature }).flatMap((s) => s.items.map((i) => i.label));
+    expect(leaves(ON)).toContain("Invoices");
+    expect(leaves((k) => k !== "feature_invoicing")).not.toContain("Invoices");
+  });
+
+  it("opens every group on a leaf the role holds", () => {
+    for (const role of [...Object.keys(dealerRoleCapabilityMap), "staff", null]) {
+      for (const section of navSectionsForViewer({ role, isAdmin: false, badges: ZERO_BADGES, hasFeature: ON })) {
+        expect(section.items.length).toBeGreaterThan(0);
+        expect(groupHref(section)).toBe(section.items[0].path);
+      }
+    }
+  });
+});
+
+describe("railRows (the rows the rail and the role preview draw)", () => {
+  it("draws one row per group, named as the rail names it, with the pages of a larger group", () => {
+    const rows = railRows(filterNavSections(build(), allowAll));
+    expect(rows.map((r) => r.label)).toEqual([
+      "Today", "Vehicles", "Merchandising", "Get Ready", "Customers & Deals", "Compliance", "Reports", "Administration", "Platform console",
+    ]);
+    expect(rows.find((r) => r.key === "today")?.leaves).toEqual([]);
+    expect(rows.find((r) => r.key === "vehicles")?.leaves).toEqual(["Inventory", "Inventory Intelligence", "Work Queue"]);
+    expect(rows.filter((r) => r.pinned).map((r) => r.label)).toEqual(["Platform console"]);
+  });
+
+  it("draws a flat list one row per page", () => {
+    expect(railRows(buildFor("detail")).map((r) => r.label)).toEqual(["My Work", "Ready Board"]);
   });
 });

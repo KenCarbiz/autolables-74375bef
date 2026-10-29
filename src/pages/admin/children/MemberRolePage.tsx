@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { AdminButton, AdminCard, AdminLinkButton, EmptyState, ICON, InlineNote, SkeletonBlock, StatusChip } from "@/components/admin/v2/primitives";
 import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
-import { buildAdminNavSections, filterNavSections } from "@/components/layout/adminNav";
+import { buildAdminNavSections, filterNavSections, railRows } from "@/components/layout/adminNav";
 import { adminTabHref, visibleSections } from "@/lib/admin/sections";
 import { enforcementRows, policyFullyEnforced } from "@/lib/admin/enforcementMap";
 import { capabilityMatrixForRole, normalizeRole, teamReturnHref } from "@/lib/admin/people";
@@ -24,12 +24,14 @@ const ZERO_BADGES = { workQueue: 0, leads: 0, reconApprovals: 0, priceChangeRevi
 const RolePreviewDialog = ({ open, onOpenChange, role }: { open: boolean; onOpenChange: (o: boolean) => void; role: DealerRole }) => {
   const label = roleDisplayName(role);
   const sections = useMemo(() => visibleSections({ role, isAdmin: false }), [role]);
-  const nav = useMemo(() => filterNavSections(buildAdminNavSections({ badges: ZERO_BADGES, anyAdminTab: sections.length > 0, role }), {
+  // The rows the rail draws for this role: one per group, named as the rail
+  // names it, with a group's pages listed under it.
+  const rows = useMemo(() => railRows(filterNavSections(buildAdminNavSections({ badges: ZERO_BADGES, anyAdminTab: sections.length > 0, role }), {
     isAdmin: false,
     isManager: hasAnyDealerCapability(role, ["can_manage_team", "can_manage_settings"]),
     can: (c) => hasDealerCapability(role, c),
     hasFeature: () => true,
-  }), [role, sections.length]);
+  })), [role, sections.length]);
   const capabilityCount = getDealerCapabilities(role).length;
   const onCloseAutoFocus = useReturnFocus(open);
 
@@ -47,14 +49,16 @@ const RolePreviewDialog = ({ open, onOpenChange, role }: { open: boolean; onOpen
         </DialogHeader>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-[12px] leading-[18px] font-semibold text-adm-muted">Navigation ({nav.reduce((n, s) => n + s.items.length, 0)} rows)</p>
-            <ul className="mt-2 space-y-2">
-              {nav.map((s) => (
-                <li key={s.key}>
-                  {s.title && <p className="text-[11px] leading-[16px] font-semibold text-adm-muted tracking-wide">{s.title}</p>}
-                  <ul className="text-[13px] text-adm-ink">
-                    {s.items.map((i) => <li key={i.path}>{i.label}</li>)}
-                  </ul>
+            <p className="text-[12px] leading-[18px] font-semibold text-adm-muted">Navigation ({rows.length} rows)</p>
+            <ul className="mt-2 space-y-1 text-[13px] text-adm-ink">
+              {rows.map((row) => (
+                <li key={row.key}>
+                  {row.label}
+                  {row.leaves.length > 0 && (
+                    <ul className="pl-3 text-[12px] leading-[18px] text-adm-muted">
+                      {row.leaves.map((leaf) => <li key={leaf}>{leaf}</li>)}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
