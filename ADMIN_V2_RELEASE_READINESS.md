@@ -2178,3 +2178,52 @@ usability fixes (`2d7954d`) and the strengthened acceptance register
 2. Decide the pricing matrix questions in `ADMIN_V2_SERVER_AUTHORITY.md`
    section 10.3; on approval the proposal is applied and the two screen
    changes are prepared.
+
+## Scheduled check-in, 2026-10-29
+
+Read-only queries at about 07:58 UTC, after the check-in fired at 07:41 UTC.
+Counts only. Nothing was invoked, no flag was changed, no migration was
+applied and no provider was called.
+
+1. **Inventory feed** (`inventory_sync_runs`): no runs since 06:30 UTC. The
+   latest run started at 03:07 UTC and failed with HTTP 429: MarketCheck
+   rate limited or over quota on the pinned feed, inventory left untouched.
+   This is the expected provider limit until Nov 1, not a migration effect.
+2. **Website price crawl, since 07:00 UTC.**
+
+   | Source | Result |
+   | --- | --- |
+   | `advertised_price_crawl_attempts` | 17: 10 captured, 7 VIN mismatch (last at 07:24) |
+   | `advertised_price_crawl_run` audit rows | 4 runs (07:21, 07:23, 07:24, 07:25 UTC) |
+   | Picked / processed / updated / failed | 54 / 25 / 9 / 0 |
+
+   The service-role crawl wrote prices (9 updates) under the priced-column
+   guard trigger.
+3. **Settings writes since migration 2** (2026-10-28 11:16 UTC):
+   - 0 audit rows for `pricing_policy_changed`, `routing_policy_changed`,
+     `publishing_policy_changed`, `addon_policy_changed` and
+     `doc_fee_policy_applied`;
+   - `dealer_profiles.policy_version` is 1 on both profiles.
+
+   No settings write has gone through `merge_dealer_settings` yet.
+4. **`admin_policy_applications`:** 0 rows.
+5. **Escalation sweep** (audit rows with actions containing "escalat" or
+   "lead" since 2026-10-28 11:46 UTC): 0 rows. With no rows, there is
+   nothing to check for a missing `store_id` or an email address.
+6. **MarketCheck spend protection.**
+   - `provider_call_events` since 2026-10-28 11:00 UTC holds 3 calls, all
+     from `marketcheck-sync` (`dealer_inventory_syndication`) at 03:07 UTC
+     today.
+   - All 3 were refused for quota (HTTP 429). The ledger's estimate is
+     $3.00 for the three, but they returned no data. Whether the provider
+     bills a refused call cannot be read from here.
+   - No other caller and no successful paid call.
+   - Cron:
+     - `enrich-sweep-nightly` is inactive; last start 2026-10-27 03:15 UTC.
+     - `marketcheck-sync` is inactive now; last start 2026-10-29 03:07 UTC
+       (it ran hourly until then).
+     - `marketcheck-incentives` is inactive; last start 2026-10-29 03:30
+       UTC.
+     - `specs-backfill` is active; last start 2026-10-29 03:45 UTC, with no
+       provider call recorded in the ledger.
+   - `tenant_incentive_settings` with incentives enabled: 0.
