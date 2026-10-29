@@ -2,10 +2,11 @@
 "use strict";
 // Screen 06 (fee change review) interaction states at desktop size, captured
 // for individual visual review: the review step as it opens (Apply enabled),
-// the review scrolled at a short desktop viewport, Back to edit, an unchanged
-// fee (Review changes disabled), the fee switched off (amount disabled), an
-// invalid amount (validation message), and the applied step. Each capture
-// records which buttons were enabled.
+// Back to edit, an unchanged fee (Review changes disabled), an invalid amount
+// (validation message), the fee switched off (amount disabled), and a short
+// desktop viewport (scrolled captures only when the review overflows). Apply
+// is not exercised: the design fixture performs no apply. Each capture records
+// which buttons were enabled.
 //
 //   node scripts/admin-parity/states-06.cjs --base-url http://127.0.0.1:5640 --out <dir>
 
@@ -61,19 +62,20 @@ async function main() {
   }
   await page.close();
 
-  page = await open(browser, 1586, 992);
-  await page.locator(`${DIALOG} [data-landmark="fee-apply"]`).click();
-  await page.waitForTimeout(400);
-  await shot(page, "06-desktop-06-applied", "Apply pressed on the fixture (no server; fixture result)");
-  await page.close();
+  // Apply is not captured: the design fixture performs no apply, so a capture
+  // after pressing it would only repeat the review step.
 
   page = await open(browser, 1366, 768);
   const body = page.locator("[data-fee-review-body]");
   const scroller = (await body.count()) ? body : page.locator(DIALOG);
   const { sh, ch } = await scroller.evaluate((el) => ({ sh: el.scrollHeight, ch: el.clientHeight }));
-  await shot(page, "06-desktop-1366x768-scroll-top", `Short desktop viewport, top (content ${sh}px in ${ch}px)`);
-  await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight; });
-  await shot(page, "06-desktop-1366x768-scroll-end", "Short desktop viewport, scrolled to the end");
+  if (sh <= ch + 1) {
+    await shot(page, "06-desktop-1366x768-fits", `Short desktop viewport (1366x768): the review fits without scrolling (content ${sh}px in a ${ch}px scroll area), so no scrolled capture exists`);
+  } else {
+    await shot(page, "06-desktop-1366x768-scroll-top", `Short desktop viewport (1366x768), top (content ${sh}px in ${ch}px)`);
+    await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    await shot(page, "06-desktop-1366x768-scroll-end", "Short desktop viewport (1366x768), scrolled to the end");
+  }
   await page.close();
 
   await browser.close();

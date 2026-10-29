@@ -46,32 +46,8 @@
     "messages": []
   },
   {
-    "capture": "06-desktop-06-applied.png",
-    "note": "Apply pressed on the fixture (no server; fixture result)",
-    "buttons": [
-      "Back to edit: enabled",
-      "Apply to 48 active vehicles: enabled"
-    ],
-    "messages": [
-      "$30",
-      "$30"
-    ]
-  },
-  {
-    "capture": "06-desktop-1366x768-scroll-top.png",
-    "note": "Short desktop viewport, top (content 574px in 574px)",
-    "buttons": [
-      "Back to edit: enabled",
-      "Apply to 48 active vehicles: enabled"
-    ],
-    "messages": [
-      "$30",
-      "$30"
-    ]
-  },
-  {
-    "capture": "06-desktop-1366x768-scroll-end.png",
-    "note": "Short desktop viewport, scrolled to the end",
+    "capture": "06-desktop-1366x768-fits.png",
+    "note": "Short desktop viewport (1366x768): the review fits without scrolling (content 574px in a 574px scroll area), so no scrolled capture exists",
     "buttons": [
       "Back to edit: enabled",
       "Apply to 48 active vehicles: enabled"

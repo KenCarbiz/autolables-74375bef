@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | Not met; 06 submitted for individual review | Protocol v2, all 13 screens measured on one revision (`7f4fa1a`, section 10.15): 06 at 94.11% (individual review); 12 screens below 94% | Owner visual review |
+| 16 | Visual acceptance | 06 approved individually (appearance only); 12 screens pending | Protocol v2, all 13 screens measured on `7f4fa1a` (section 10.15): 06 at 94.11%, approved by the owner on review of package `a085c74`; 12 screens below 94% | Owner visual review of the remaining 12 |
 
 ## 2. How the evidence was produced
 
@@ -1540,9 +1540,33 @@ table in 10.8 and 10.9 is superseded by this one.
   policy B migration is not applied in production, so the live dialog shows
   whatever the deployed server preview returns.
 
-**Approval status.** Screen 06 remains eligible for individual visual
-approval. Overall visual approval waits on the owner's review of the
-comparison package; the 94.11% score alone does not grant it.
+**Approval status (owner, 2026-10-29).**
+- Screen 06 is **individually approved for visual acceptance**, on review of
+  package `a085c74`, measuring implementation `7f4fa1a`.
+- The recorded score stays **94.11%**: below the 95% target and approved
+  individually, not rounded or reclassified.
+- The policy B pricing difference from the mock is accepted.
+- The approved visual direction for screen 06 is **frozen**. No further
+  pixel tuning.
+- The approval covers appearance only. These remain separate release checks:
+  - the policy B production migration;
+  - actual Apply behaviour;
+  - authorization in a browser;
+  - keyboard behaviour on a real device.
+- The other 12 screens remain pending. 01, 08 and 12 are next for focused
+  visual review; there is no broad typography tuning.
+
+**Evidence index correction** (after approval; images unchanged):
+- `states-06.json` in `a085c74` listed two captures that were never
+  delivered:
+  - an "applied" capture: the fixture performs no apply, so that capture
+    only repeated the review step;
+  - a 1366x768 scroll-end capture: the review fits at that size.
+- Both entries are removed. The 1366x768 capture is renamed
+  `06-desktop-1366x768-fits.png` and labelled as fitting without scrolling.
+- `states-06.cjs` no longer captures an Apply state, and takes scrolled
+  captures only when the review overflows.
+- Apply was not demonstrated in any capture.
 
 **Revisions.**
 - Measured implementation: `7f4fa1a`.
