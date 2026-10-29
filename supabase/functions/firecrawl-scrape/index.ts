@@ -9,7 +9,10 @@
 //
 // Requires the FIRECRAWL_API_KEY_1 (or legacy FIRECRAWL_API_KEY) secret.
 // Returns { error:"not_configured" } (HTTP 200) when unset so the client
-// falls back gracefully.
+// falls back gracefully. Every scrape passes the provider budget first; a
+// refusal (or a budget that cannot be read) answers { error:"budget_refused" }
+// and nothing is sent to Firecrawl.
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,13 +47,14 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   if (!jwt) return json(401, { error: "missing bearer token" });
+  if (!supabaseUrl || !serviceKey) return json(500, { error: "supabase not configured" });
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.45.0");
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  let tenantId: string | null = null;
   if (jwt !== serviceKey) {
-    if (!supabaseUrl || !serviceKey) return json(500, { error: "supabase not configured" });
     try {
-      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.45.0");
-      const admin = createClient(supabaseUrl, serviceKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
       const { data: userRes, error: userErr } = await admin.auth.getUser(jwt);
       if (userErr || !userRes?.user) return json(401, { error: "invalid token" });
       const { data: mem } = await admin
@@ -60,6 +64,7 @@ Deno.serve(async (req: Request) => {
         .not("accepted_at", "is", null)
         .limit(1);
       if (!mem || mem.length === 0) return json(403, { error: "no tenant membership" });
+      tenantId = mem[0].tenant_id;
     } catch {
       return json(401, { error: "invalid token" });
     }
@@ -74,12 +79,23 @@ Deno.serve(async (req: Request) => {
       return json(400, { error: "invalid_url" });
     }
 
-    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ url, formats: ["html"], onlyMainContent: false, waitFor: 3500, timeout: 30000 }),
-      signal: AbortSignal.timeout(35000),
+    const gate = await admitProviderCall(admin, {
+      url: "https://api.firecrawl.dev/v1/scrape", caller: "firecrawl-scrape", provider: "firecrawl", product: "scrape", tenantId,
     });
+    if (!gate.admitted) return json(200, { error: "budget_refused", reason: gate.reason });
+    let res: Response;
+    try {
+      res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ url, formats: ["html"], onlyMainContent: false, waitFor: 3500, timeout: 30000 }),
+        signal: AbortSignal.timeout(35000),
+      });
+    } catch (err) {
+      await recordProviderCall(admin, gate.eventId, null, err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+    await recordProviderCall(admin, gate.eventId, res.status, null);
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");

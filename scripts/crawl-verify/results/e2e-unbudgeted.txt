@@ -1,0 +1,85 @@
+======== Stage unbudgeted: working tree supabase/functions/crawl-advertised-prices/index.ts b3e017a76ca59c707fd04d322a9ca1ab58cb7b16
+   substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
+   substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
+== Stage unbudgeted; observation columns present: True
+
+== Before any run (before-fee|fee|sale, as the feed left them)
+  card       30100|900|31000   page: a similar-vehicle card with another VIN and a lower Selling Price comes first; the vehicle's own block shows a fee line and a total
+  redirect   26100|900|27000   page: the address redirects to another car's page (no VIN in the final address); this vehicle appears only in that page's related strip
+  setting    24992|900|25892   page: one labelled figure and nothing on the page about the fee (like the nine production updates)
+  conflict   21600|900|22500   page: the page states the price excludes the fee; the dealership's setting says it includes it
+  evidence   33100|900|34000   page: a page-verified price whose screenshot cannot be stored
+  partial    28100|900|29000   page: a page-verified price whose listing write fails in the database
+  ambiguous  20100|900|21000   page: two unattributed Selling Price figures that disagree
+  title      26100|900|27000   page: no document title; an embedded panel's SVG title is the only <title> on the page
+
+== Run 1: HTTP 200; updated 0 unchanged 0 skipped 8 failed 0 listing_outcomes {}
+   renders 0; storage writes []
+
+== After run 1 (failures injected)
+  card       listing 30100|900|31000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  redirect   listing 26100|900|27000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  setting    listing 24992|900|25892    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  conflict   listing 21600|900|22500    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  evidence   listing 33100|900|34000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  partial    listing 28100|900|29000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  title      listing 26100|900|27000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+
+== Run 2: HTTP 200; updated 0 unchanged 0 skipped 8 failed 0 listing_outcomes {}
+
+== After run 2 (failures removed)
+  card       listing 30100|900|31000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  redirect   listing 26100|900|27000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  setting    listing 24992|900|25892    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  conflict   listing 21600|900|22500    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  evidence   listing 33100|900|34000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  partial    listing 28100|900|29000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+  title      listing 26100|900|27000    observations [-]
+             ledger render_budget_refused | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] The dealership's provider budget for this month refused the render; nothing was sent to the rende
+
+PASS  unbudgeted: no render was sent to the renderer in either run
+      expected 0
+      actual   0
+PASS  unbudgeted: no listing's pricing changed
+      expected {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}
+      actual   {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}
+PASS  unbudgeted: no observation was stored
+      expected {'card': '', 'redirect': '', 'setting': '', 'conflict': '', 'evidence': '', 'partial': '', 'ambiguous': '', 'title': ''}
+      actual   {'card': '', 'redirect': '', 'setting': '', 'conflict': '', 'evidence': '', 'partial': '', 'ambiguous': '', 'title': ''}
+PASS  unbudgeted: every vehicle's ledger names the budget refusal
+      expected {'card': True, 'redirect': True, 'setting': True, 'conflict': True, 'evidence': True, 'partial': True, 'ambiguous': True, 'title': True}
+      actual   {'card': True, 'redirect': True, 'setting': True, 'conflict': True, 'evidence': True, 'partial': True, 'ambiguous': True, 'title': True}
+PASS  unbudgeted: each refusal is in the provider ledger as budget_denied (unconfigured:%), none admitted
+      expected '0|true'
+      actual   '0|true'
+
+5 checks, 0 failed
+== Stage unbudgeted exit 0
+NOTICE:  database "crawl_verify_lanesoff" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:41: NOTICE:  trigger "price_component_evidence_no_update" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:46: NOTICE:  trigger "price_component_evidence_no_truncate" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:57: NOTICE:  policy "Tenant members read price evidence" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261104000000_crawl_control.sql:36: NOTICE:  policy "crawl_control platform admin read" for relation "public.crawl_control" does not exist, skipping
+psql:supabase/proposed/20261103000000_provider_tenant_budgets.sql:101: NOTICE:  policy "provider_tenant_budgets platform admin read" for relation "public.provider_tenant_budgets" does not exist, skipping
+psql:supabase/proposed/20261103000000_provider_tenant_budgets.sql:107: NOTICE:  policy "provider_unit_prices platform admin read" for relation "public.provider_unit_prices" does not exist, skipping
+psql:supabase/proposed/20261103000000_provider_tenant_budgets.sql:113: NOTICE:  policy "platform_alert_settings platform admin read" for relation "public.platform_alert_settings" does not exist, skipping
+psql:supabase/proposed/20261103000000_provider_tenant_budgets.sql:119: NOTICE:  policy "provider_budget_alerts platform admin read" for relation "public.provider_budget_alerts" does not exist, skipping
+psql:supabase/proposed/20261106000000_provider_budget_fail_closed.sql:61: NOTICE:  policy "provider_lane_budgets platform admin read" for relation "public.provider_lane_budgets" does not exist, skipping
+

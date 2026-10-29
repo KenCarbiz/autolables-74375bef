@@ -25,6 +25,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
@@ -216,12 +217,18 @@ Deno.serve(async (req) => {
   }
 
   const kind: "generate" | "access" = action === "generate" ? "generate" : "access";
+  // The platform provider budget, on top of the dealership's report cap
+  // above: a refusal (or a budget that cannot be read) sends nothing.
+  const gate = await admitProviderCall(admin, { url: endpoint(kind, vin), caller: "marketcheck-title-report", tenantId, vin });
+  if (!gate.admitted) return json(200, { available: false, reason: "budget_refused", stats: await pullStats() });
   let res: Response;
   try {
     res = await fetch(endpoint(kind, vin), { signal: AbortSignal.timeout(20000) });
-  } catch (_e) {
+  } catch (e) {
+    await recordProviderCall(admin, gate.eventId, null, null, e instanceof Error ? e.message : String(e));
     return json(200, { available: false, reason: "provider_unreachable" });
   }
+  await recordProviderCall(admin, gate.eventId, res.status, null);
 
   // 422 on access = no report generated yet for this VIN → tell the dealer to generate.
   if (kind === "access" && res.status === 422) {

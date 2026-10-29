@@ -2,7 +2,7 @@ psql:scripts/sync-verify/platform.sql:30: WARNING:  wal_level is insufficient to
 HINT:  Set wal_level to "logical" before creating subscriptions.
 == Migration chain: 470 applied, 52 did not apply on the local stand-ins
 == Also applied: supabase/proposed/20261103000000_provider_tenant_budgets.sql
-== Function under test: working tree supabase/functions/marketcheck-sync/index.ts 66c8354c28310f44c38be4f8212c4f1d91f0feac
+== Function under test: working tree supabase/functions/marketcheck-sync/index.ts 874d3e8d466c2c280a2ae2b4372103b40ae0804b
    substituted: 118:const MC_BASE = "http://127.0.0.1:54411/mc/v2";
 PASS  no credential: refused
       expected 401
@@ -57,10 +57,10 @@ NOTE  clean feed: change history (vin suffix|field|previous>new|origin)
 NOTE  clean feed: vehicle 1 price fields (price|before_doc|doc_fee|website_sale|parse_status)
       19000.00|19000|500|19500|ok
 NOTE  clean feed: downstream functions the sync invoked (stubbed, nothing ran)
-      ['factory-sticker-orchestrate', 'generate-vehicle-forms', 'get-ready-nudges']
+      ['factory-sticker-orchestrate', 'generate-vehicle-forms']
 PASS  clean feed: the other dealership's inventory is unchanged
-      expected 'f99a47a1d3579816f7e4efcb64b25d2a'
-      actual   'f99a47a1d3579816f7e4efcb64b25d2a'
+      expected '4047d24475ef870824afbf33d474b704'
+      actual   '4047d24475ef870824afbf33d474b704'
 NOTE  clean feed: row counts
       runs=1 history=3 exceptions=3 prices=3 provider_events=3
 PASS  contaminated feed: status
@@ -69,8 +69,8 @@ PASS  contaminated feed: status
 NOTE  contaminated feed: response
       {"ok": true, "tenants_due": 1, "tenants_synced": 0, "listings_seen": 0, "new_vehicles": 0, "new_listings": 0, "new_vehicle_files": 0, "listings_upserted": 0, "prices_recorded": 0, "enrich_queued": 0, "enriched": 0, "errors": [], "diagnostics": [{"tenant_id": "f0000000-0000-4000-8000-000000000001", "source": "feed.example.test", "error": "pinned_scope_failed_validation", "kind": "scope_mismatch", "mc_param": "mc_rooftop_id", "mc_value": "rt-example-1"}], "tenants_considered": 1, "skipped": []}
 PASS  contaminated feed: inventory unchanged (nothing written from a feed that fails the rooftop check)
-      expected '6e00263f740981493ddfd9ed72ff7f97'
-      actual   '6e00263f740981493ddfd9ed72ff7f97'
+      expected '15624601fcc0851b68a14249647d8b35'
+      actual   '15624601fcc0851b68a14249647d8b35'
 PASS  contaminated feed: the foreign vehicle was not created
       expected '0'
       actual   '0'
@@ -87,8 +87,8 @@ NOTE  refused feed: response
 NOTE  refused feed: provider requests (the client retries a refused request twice)
       [('/dealerships/car', 429), ('/dealerships/inventory', 429), ('/dealerships/inventory', 429), ('/dealerships/inventory', 429)]
 PASS  refused feed: inventory unchanged
-      expected '6e00263f740981493ddfd9ed72ff7f97'
-      actual   '6e00263f740981493ddfd9ed72ff7f97'
+      expected '15624601fcc0851b68a14249647d8b35'
+      actual   '15624601fcc0851b68a14249647d8b35'
 PASS  refused feed: run recorded as failed
       expected 'failed'
       actual   'failed'
@@ -106,8 +106,8 @@ PASS  budget exhausted: no request of any kind reached the provider (the dealers
       expected []
       actual   []
 PASS  budget exhausted: inventory unchanged
-      expected '6e00263f740981493ddfd9ed72ff7f97'
-      actual   '6e00263f740981493ddfd9ed72ff7f97'
+      expected '15624601fcc0851b68a14249647d8b35'
+      actual   '15624601fcc0851b68a14249647d8b35'
 NOTE  budget exhausted: ledger refusals
       2
 NOTE  budget exhausted: run row
@@ -116,7 +116,7 @@ PASS  budget exhausted: reported as our own budget refusal, not the provider's 4
       expected ['budget_refused', False]
       actual   ['budget_refused', False]
 PASS  throughout: the other dealership's inventory is unchanged
-      expected 'f99a47a1d3579816f7e4efcb64b25d2a'
-      actual   'f99a47a1d3579816f7e4efcb64b25d2a'
+      expected '4047d24475ef870824afbf33d474b704'
+      actual   '4047d24475ef870824afbf33d474b704'
 
 26 checks, 0 failed

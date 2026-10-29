@@ -50,7 +50,7 @@ interface Settings { email_enabled: boolean; sms_enabled: boolean; email_recipie
 
 const usd = (v: number | string | null | undefined) => `$${Number(v ?? 0).toFixed(2)}`;
 const EMPTY_FORM: BudgetForm = {
-  tenantId: "", provider: "*", mode: "alert_only", callCap: "", usdCap: "", thresholds: "80, 100", blockEssential: false, notes: "",
+  tenantId: "", provider: "*", mode: "alert_only", callCap: "", usdCap: "", thresholds: "80, 100", notes: "",
 };
 // deno-lint-ignore no-explicit-any
 const db = supabase as any;
@@ -195,7 +195,7 @@ export default function ProviderBudgetsPanel() {
     tenantId: r.tenant_id, provider: r.provider, mode: r.mode || "alert_only",
     callCap: r.monthly_call_cap == null ? "" : String(r.monthly_call_cap),
     usdCap: r.monthly_usd_cap == null ? "" : String(Number(r.monthly_usd_cap)),
-    thresholds: (r.alert_thresholds || [80, 100]).join(", "), blockEssential: !!r.block_essential, notes: r.notes || "",
+    thresholds: (r.alert_thresholds || [80, 100]).join(", "), notes: r.notes || "",
   });
 
   const inputCls = "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm";
@@ -215,7 +215,7 @@ export default function ProviderBudgetsPanel() {
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               Monthly limits on paid provider calls for individual dealerships. "Alert only" tells you when a
               dealership reaches each alert point; "Enforce" also refuses further calls once the limit is used up.
-              The inventory feed keeps running under an enforced limit unless you also block it.
+              An enforced limit covers every call for the dealership, the inventory feed included.
             </p>
           </div>
           <button onClick={load} className="h-10 rounded-lg border border-border px-3 text-xs font-bold inline-flex items-center gap-1.5">
@@ -302,10 +302,6 @@ export default function ProviderBudgetsPanel() {
             <label className="space-y-1"><span className={labelCls}>Alert at (%)</span>
               <input aria-label="Alert points" className={inputCls} value={form.thresholds} onChange={(e) => setForm({ ...form, thresholds: e.target.value })} />
             </label>
-            <label className="flex items-center gap-2 pt-5 text-sm">
-              <input type="checkbox" className="h-5 w-5" checked={form.blockEssential} onChange={(e) => setForm({ ...form, blockEssential: e.target.checked })} />
-              Also stop the inventory feed
-            </label>
             <label className="space-y-1 md:col-span-4"><span className={labelCls}>Note</span>
               <input aria-label="Note" className={inputCls} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Why this dealership has a budget" />
             </label>
@@ -337,7 +333,7 @@ export default function ProviderBudgetsPanel() {
                     <tr key={`${r.tenant_id}:${r.provider}`} className="border-t border-border align-top">
                       <td className="py-2 pr-3 font-semibold">{names[r.tenant_id] || r.tenant_id}</td>
                       <td className="py-2 pr-3">{providerLabel(r.provider)}</td>
-                      <td className="py-2 pr-3">{r.mode ? MODE_LABEL[r.mode] : <span className="text-muted-foreground">No budget</span>}{r.block_essential ? " (feed too)" : ""}</td>
+                      <td className="py-2 pr-3">{r.mode ? MODE_LABEL[r.mode] : <span className="text-muted-foreground">No budget</span>}</td>
                       <td className="py-2 pr-3 tabular-nums">
                         {r.calls} calls · {usd(r.usd)}
                         {pct != null && (

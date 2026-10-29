@@ -101,17 +101,18 @@ describe("ProviderBudgetsPanel", () => {
     await waitFor(() => expect(state.invoke).toEqual([{ fn: "provider-budget-alerts", body: { action: "test", email: true, sms: false } }]));
   });
 
-  it("adds a dealership budget through the audited function", async () => {
+  it("adds a dealership budget through the audited function, covering the inventory feed (no exception offered)", async () => {
     render(<ProviderBudgetsPanel />);
     fireEvent.click(await screen.findByText("Add a budget"));
     fireEvent.change(screen.getByLabelText("Dealership"), { target: { value: T1 } });
     fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "blackbook" } });
     fireEvent.change(screen.getByLabelText("Mode"), { target: { value: "enforce" } });
     fireEvent.change(screen.getByLabelText("Dollars per month"), { target: { value: "40" } });
+    expect(screen.queryByText(/stop the inventory feed/i)).toBeNull();
     fireEvent.click(screen.getByText("Save budget"));
     await waitFor(() => expect(state.rpc.find((r) => r.fn === "platform_set_tenant_budget")?.args).toEqual({
       p_tenant_id: T1, p_provider: "blackbook", p_mode: "enforce", p_monthly_call_cap: null, p_monthly_usd_cap: 40,
-      p_alert_thresholds: [80, 100], p_block_essential: false, p_notes: null,
+      p_alert_thresholds: [80, 100], p_block_essential: true, p_notes: null,
     }));
   });
 });

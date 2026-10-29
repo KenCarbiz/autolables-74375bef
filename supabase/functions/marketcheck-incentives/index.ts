@@ -1,6 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { isServiceOrCron } from "../_shared/supabase.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
+
+// Every incentive request passes the provider budget first; a refusal (or a
+// budget that cannot be read) sends nothing and reads as an error, never as
+// "no incentives".
+// deno-lint-ignore no-explicit-any
+let budgetCtx: { admin: any; tenantId: string | null } | null = null;
 
 // marketcheck-incentives — OEM incentive lookup via MarketCheck's
 // /v2/search/car/incentive/oem endpoint (the only incentive route enabled
@@ -75,8 +82,18 @@ const fetchOffers = async (opts: { zip: string; radius?: number; make?: string; 
   if (opts.make) p.set("make", opts.make);
   if (opts.model) p.set("model", opts.model);
   if (opts.year) p.set("year", String(opts.year));
+  const url = `${MC_BASE}/search/car/incentive/oem?${p.toString()}`;
+  const gate = await admitProviderCall(budgetCtx?.admin, { url, caller: "marketcheck-incentives", tenantId: budgetCtx?.tenantId ?? null });
+  if (!gate.admitted) return { offers: [], error: "budget_refused" };
   try {
-    const res = await fetch(`${MC_BASE}/search/car/incentive/oem?${p.toString()}`);
+    let res: Response;
+    try {
+      res = await fetch(url);
+    } catch (e) {
+      await recordProviderCall(budgetCtx!.admin, gate.eventId, null, null, e instanceof Error ? e.message : String(e));
+      throw e;
+    }
+    await recordProviderCall(budgetCtx!.admin, gate.eventId, res.status, null);
     if (!res.ok) return { offers: [], error: `http_${res.status}` };
     const j = await res.json();
     const list: Json[] = Array.isArray(j?.listings) ? j.listings : Array.isArray(j?.incentives) ? j.incentives : [];
@@ -113,6 +130,7 @@ serve(async (req) => {
   }
 
   const admin = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
+  budgetCtx = { admin, tenantId: body.tenant_id || null };
 
   // ── On-demand customer-ZIP lookup ───────────────────────────────
   if (body.vin && body.zip && body.tenant_id) {
@@ -187,6 +205,7 @@ serve(async (req) => {
       // incentives of EVERY vehicle in the rooftop — customer-facing offers
       // gone for a whole dealer on one bad night. The single-VIN path above
       // already checks this; the batch path did not.
+      if (budgetCtx) budgetCtx.tenantId = t.tenant_id;
       const { offers, error: offersError } = await fetchOffers({ zip, rows: 500 });
       if (offersError) {
         console.warn(`incentives: skipping tenant ${t.tenant_id} — provider error ${offersError}`);

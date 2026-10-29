@@ -153,10 +153,9 @@ const OWNED_PARAMS = new Set([
 // essential, so they can never spend the reserve kept for the inventory feed.
 async function gatedProviderGet(url: string, timeoutMs: number): Promise<{ res: Response | null; budgetDenied: boolean }> {
   recordCall(callMeter, url);
-  const gate = budgetCtx
-    ? await admitProviderCall(budgetCtx.admin, { url, caller: "marketcheck-sync", essential: false, tenantId: budgetCtx.tenantId })
-    : null;
-  if (gate && !gate.admitted) return { res: null, budgetDenied: true };
+  // No budget context means no gate, which means no call (fail closed).
+  const gate = await admitProviderCall(budgetCtx?.admin, { url, caller: "marketcheck-sync", essential: false, tenantId: budgetCtx?.tenantId ?? null });
+  if (!gate.admitted) return { res: null, budgetDenied: true };
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
@@ -199,8 +198,8 @@ type FeedPage = { listings: MCListing[]; numFound: number; http: number; refused
 
 let callMeter = newCallMeter();
 // The run's database client and the tenant whose feed is being pulled, for
-// the budget ledger. Every sync call is essential: the feed and its rooftop
-// validation are what the reserve exists for.
+// the budget ledger. mcFetch (the feed pull and its rooftop validation) is the
+// essential lane; the dealer lookups in gatedProviderGet are enrichment.
 // deno-lint-ignore no-explicit-any
 let budgetCtx: { admin: any; tenantId: string | null } | null = null;
 
@@ -220,12 +219,10 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
     recordCall(callMeter, base);
     // The month's cap, hard. A denied feed call is a refusal, never an empty
     // lot: the pin and the inventory stay as they are.
-    const gate = budgetCtx
-      ? await admitProviderCall(budgetCtx.admin, { url, caller: "marketcheck-sync", essential: true, tenantId: budgetCtx.tenantId })
-      : null;
+    const gate = await admitProviderCall(budgetCtx?.admin, { url, caller: "marketcheck-sync", essential: true, tenantId: budgetCtx?.tenantId ?? null });
     // Refused by our own budget: nothing was sent, so there is no HTTP status
     // to report, and it must never read as the provider's 429.
-    if (gate && !gate.admitted) return { listings: [], numFound: 0, http: 0, refused: true, budgetDenied: true, endpoint: base };
+    if (!gate.admitted) return { listings: [], numFound: 0, http: 0, refused: true, budgetDenied: true, endpoint: base };
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
       if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
@@ -516,7 +513,7 @@ serve(async (req) => {
     } catch { /* logging is best-effort */ }
   };
 
-  let body: { tenant_id?: string; force?: boolean; lookup?: boolean; zip?: string; state?: string; enrich?: boolean } = {};
+  let body: { tenant_id?: string; force?: boolean; lookup?: boolean; zip?: string; state?: string; enrich?: boolean; no_prune?: boolean } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
 
   // ── Auth gate ───────────────────────────────────────────────
@@ -622,7 +619,9 @@ serve(async (req) => {
   if (cErr) return json(500, { error: cErr.message });
 
   const now = new Date();
-  const reachable = (configs || [])
+  // select() takes a computed column list, so supabase-js cannot infer the row
+  // type; the rows are SyncConfig-shaped (baseCols, plus dealer_id when present).
+  const reachable = ((configs || []) as unknown as SyncConfig[])
     .filter((c: SyncConfig) => toSourceHost(c.source) || (c.dealer_id || "").trim());
   const forced = !!(body.force && body.tenant_id);
   // A canary walks the feed, writes every listing it sees, records every

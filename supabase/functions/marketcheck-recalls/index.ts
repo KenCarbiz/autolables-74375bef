@@ -23,6 +23,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 import {
   HttpGet,
   HttpOutcome,
@@ -85,12 +86,30 @@ interface VinLookup {
 // marketcheck_autorecalls all carry an empty campaign list. A 404 is now
 // UNKNOWN, and so is every other non-2xx and every body whose shape we do not
 // recognise. Only a 2xx carrying a real recall array clears or opens a VIN.
+//
+// Each MarketCheck request passes the provider budget first (NHTSA, which is
+// free, does not). A refusal sends nothing, stops the endpoint walk and
+// leaves the VIN unknown, never clear.
+// deno-lint-ignore no-explicit-any
+let budgetCtx: { admin: any; tenantId: string | null } | null = null;
+
 async function fetchVinRecalls(vin: string): Promise<VinLookup> {
   const tried: { url: string; status: number | string }[] = [];
   const at = new Date().toISOString();
   let last: VinRecallAnswer | null = null;
   for (const url of recallEndpoints(vin)) {
+    const gate = await admitProviderCall(budgetCtx?.admin, { url, caller: "marketcheck-recalls", tenantId: budgetCtx?.tenantId ?? null, vin });
+    if (!gate.admitted) {
+      tried.push({ url: redact(url), status: `budget_refused:${gate.reason}` });
+      last = classifyMarketcheckVinRecall(
+        { kind: "transport_error", reason: "budget_refused" },
+        { vin, source: "marketcheck_autorecalls", checkedAt: at },
+      );
+      break;
+    }
     const outcome = await httpGet(url);
+    await recordProviderCall(budgetCtx!.admin, gate.eventId, outcome.kind === "response" ? outcome.status : null,
+      null, outcome.kind === "response" ? null : outcome.reason);
     tried.push({
       url: redact(url),
       status: outcome.kind === "response" ? outcome.status : "timeout_or_network",
@@ -223,6 +242,7 @@ Deno.serve(async (req) => {
   const admin = adminClient();
   const body = await req.json().catch(() => ({}));
   const tenantId: string | null = body.tenant_id || null;
+  budgetCtx = { admin, tenantId };
 
   // ── Auth gate: service-role (cron) bypasses; otherwise require a
   // signed-in tenant member or platform admin for the requested tenant.

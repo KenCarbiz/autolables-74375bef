@@ -1,0 +1,48 @@
+# Source: working tree on 4cebf53 (signalhouse files unchanged from HEAD: yes)
+== Edge pin: npm:@signalhousellc/sdk@1.6.0; bun.lock resolves @signalhousellc/sdk to 1.6.0
+
+== 1. deno check, npm packages from the registry
+PASS  send-sms
+PASS  signalhouse-webhook
+PASS  verify-passport-document-request
+
+== 2. the preview's resolution: node_modules installed from the committed bun.lock
+   installed: 1.6.0
+PASS  send-sms
+PASS  signalhouse-webhook
+PASS  verify-passport-document-request
+-- reproduction: the same node_modules with the edge pin set back to 1.0.66 (expected to fail, as the preview did)
+REPRODUCED  send-sms fails: error: Could not find a matching package for 'npm:@signalhousellc/sdk@1.0.66' in the node_modules directory. Ensure you have all your JSR and npm dependencies listed in your deno.json or package.json, then run `deno inst
+
+== 3. the wrapper against a local capture server
+-- pinned version (npm:@signalhousellc/sdk@1.6.0)
+PASS  number normalisation (no SDK involved)
+PASS  send: our wrapper reads a 2xx envelope as one enqueued message
+PASS  send: one POST to /message/sms
+PASS  send: bearer token from SIGNALHOUSE_API_KEY, JSON body
+PASS  send: body fields the API expects
+PASS  send: no idempotency key is sent by our wrapper
+PASS  blocked: a 2xx that enqueued nobody is reported as blocked
+PASS  rejected: a 4xx is reported as send_failed with the provider's status
+      hung request settled after 30s: {"ok":false,"code":"send_failed","status":502,"message":"Signal House send failed: Request timed out. Please try again."}
+PASS  timeout: a hung provider request settles as send_failed within 35 s
+
+9 checks, 0 failed
+
+-- comparison: the same wrapper pinned to 1.0.66
+PASS  number normalisation (no SDK involved)
+PASS  send: our wrapper reads a 2xx envelope as one enqueued message
+PASS  send: one POST to /message/sms
+PASS  send: bearer token from SIGNALHOUSE_API_KEY, JSON body
+PASS  send: body fields the API expects
+PASS  send: no idempotency key is sent by our wrapper
+PASS  blocked: a 2xx that enqueued nobody is reported as blocked
+PASS  rejected: a 4xx is reported as send_failed with the provider's status
+      hung request settled after 40s: {"ok":true,"value":{"provider":"signalhouse","messageId":"synthetic-msg-1","enqueuedCount":1,"blockedNumbers":[]}}
+FAIL  timeout: a hung provider request settles as send_failed within 35 s
+      expected {"ok":false,"code":"send_failed","within":true}
+      actual   {"ok":true,"within":false}
+
+9 checks, 1 failed
+      (comparison only; does not fail the check)
+exit 0

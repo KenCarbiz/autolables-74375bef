@@ -11,6 +11,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 
 // GOOGLE_SEARCH_CONSOLE_API_KEY is the only Google key on this project today;
 // if it's an unrestricted Google Cloud key with Places enabled it works here
@@ -21,6 +22,24 @@ const API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY") ||
   Deno.env.get("GOOGLE_SEARCH_CONSOLE_API_KEY") || "";
 
 const PLACES_BASE = "https://places.googleapis.com/v1";
+
+// Every Places request passes the provider budget first; a refusal (or a
+// budget that cannot be read) sends nothing to Google.
+class PlacesBudgetRefused extends Error {}
+async function gatedPlaces(
+  admin: ReturnType<typeof adminClient>, tenantId: string, product: string, url: string, init: RequestInit,
+): Promise<Response> {
+  const gate = await admitProviderCall(admin, { url, caller: "google-reviews", provider: "google_places", product, tenantId });
+  if (!gate.admitted) throw new PlacesBudgetRefused(gate.reason);
+  try {
+    const r = await fetch(url, init);
+    await recordProviderCall(admin, gate.eventId, r.status, null);
+    return r;
+  } catch (err) {
+    await recordProviderCall(admin, gate.eventId, null, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+}
 
 Deno.serve(async (req) => {
   const pf = preflight(req);
@@ -51,6 +70,17 @@ Deno.serve(async (req) => {
   const address = String(s.dealer_address || "").trim();
   if (!name) return json(422, { error: "dealer_name_missing" });
 
+  try {
+    return await refresh(admin, tenantId, s, name, address);
+  } catch (err) {
+    if (err instanceof PlacesBudgetRefused) return json(429, { error: "budget_refused", reason: err.message });
+    throw err;
+  }
+});
+
+async function refresh(
+  admin: ReturnType<typeof adminClient>, tenantId: string, s: Record<string, unknown>, name: string, address: string,
+): Promise<Response> {
   let placeId = String(s.google_place_id || "");
   let rating: number | null = null;
   let count: number | null = null;
@@ -58,7 +88,7 @@ Deno.serve(async (req) => {
   let matchedAddress = "";
 
   if (placeId) {
-    const r = await fetch(`${PLACES_BASE}/places/${placeId}`, {
+    const r = await gatedPlaces(admin, tenantId, "place_details", `${PLACES_BASE}/places/${placeId}`, {
       headers: { "X-Goog-Api-Key": API_KEY, "X-Goog-FieldMask": "rating,userRatingCount,displayName,formattedAddress" },
     });
     if (r.ok) {
@@ -73,7 +103,7 @@ Deno.serve(async (req) => {
   }
 
   if (!placeId) {
-    const r = await fetch(`${PLACES_BASE}/places:searchText`, {
+    const r = await gatedPlaces(admin, tenantId, "text_search", `${PLACES_BASE}/places:searchText`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -109,4 +139,4 @@ Deno.serve(async (req) => {
   if (uerr) return json(500, { error: "settings_update_failed", detail: uerr.message });
 
   return json(200, { ok: true, matched, matchedAddress, rating: patch.dealer_google_rating, count });
-});
+}

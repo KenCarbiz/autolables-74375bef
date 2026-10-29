@@ -1,4 +1,4 @@
-======== Stage refused: working tree supabase/functions/crawl-advertised-prices/index.ts dd90fc468e896e66dcce312fcb8a096df95cb909
+======== Stage refused: working tree supabase/functions/crawl-advertised-prices/index.ts b3e017a76ca59c707fd04d322a9ca1ab58cb7b16
    substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
    substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
 == Stage refused; observation columns present: True
@@ -63,10 +63,10 @@ PASS  refused: no listing's pricing changed
 PASS  refused: no observation was stored
       expected {'card': '', 'redirect': '', 'setting': '', 'conflict': '', 'evidence': '', 'partial': '', 'ambiguous': '', 'title': ''}
       actual   {'card': '', 'redirect': '', 'setting': '', 'conflict': '', 'evidence': '', 'partial': '', 'ambiguous': '', 'title': ''}
-PASS  refused: every vehicle's ledger names the dealership budget
+PASS  refused: every vehicle's ledger names the budget refusal
       expected {'card': True, 'redirect': True, 'setting': True, 'conflict': True, 'evidence': True, 'partial': True, 'ambiguous': True, 'title': True}
       actual   {'card': True, 'redirect': True, 'setting': True, 'conflict': True, 'evidence': True, 'partial': True, 'ambiguous': True, 'title': True}
-PASS  refused: each refusal is in the provider ledger as budget_denied, none admitted
+PASS  refused: each refusal is in the provider ledger as budget_denied (tenant_budget:firecrawl), none admitted
       expected '0|true'
       actual   '0|true'
 PASS  refused: one 'calls refused' alert is queued for the month
@@ -75,3 +75,9 @@ PASS  refused: one 'calls refused' alert is queued for the month
 
 6 checks, 0 failed
 == Stage refused exit 0
+NOTICE:  database "crawl_verify_unbudgeted" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:41: NOTICE:  trigger "price_component_evidence_no_update" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:46: NOTICE:  trigger "price_component_evidence_no_truncate" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:57: NOTICE:  policy "Tenant members read price evidence" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261104000000_crawl_control.sql:36: NOTICE:  policy "crawl_control platform admin read" for relation "public.crawl_control" does not exist, skipping
+

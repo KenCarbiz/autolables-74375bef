@@ -68,7 +68,6 @@ export interface BudgetForm {
   callCap: string;
   usdCap: string;
   thresholds: string;
-  blockEssential: boolean;
   notes: string;
 }
 
@@ -101,7 +100,9 @@ export function budgetPayload(f: BudgetForm): { payload: BudgetPayload | null; e
       p_monthly_call_cap: callCap,
       p_monthly_usd_cap: usdCap == null ? null : Math.round(usdCap * 100) / 100,
       p_alert_thresholds: t.ok,
-      p_block_essential: f.blockEssential,
+      // Fail-closed policy (owner, 2026-10-29): an enforced limit covers the
+      // inventory feed too; there is no feed exception to offer.
+      p_block_essential: true,
       p_notes: f.notes.trim() || null,
     },
     error: null,

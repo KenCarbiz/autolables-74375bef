@@ -2690,7 +2690,7 @@ A refusal is never mistaken for an answer from the provider:
 
 **Inventory sync with the migration applied: 26 of 26**, unchanged (`scripts/sync-verify/results/fixed-with-budgets.txt`).
 
-**Full suite: 7,346 passed, 1 skipped, 2 failed.** The 2 failures (`complianceData`, `complianceRedTeam`) are the same two that already failed at `3836dc3`. App typecheck is clean. The touched edge functions type-check, except `marketcheck-specs`, which has the same 2 errors it had before this change.
+**Full suite: 7,346 passed, 1 skipped, 2 failed.** The 2 failures (`complianceData`, `complianceRedTeam`) are the same two that already failed at `3836dc3`. App typecheck is clean. The touched edge functions type-check, except `marketcheck-specs`, which has the same 14 errors (all in `_shared/neovinSheet.ts`) it had before this change. *(Corrected 2026-10-29: this line previously said 2 errors.)*
 
 The pinned-text tests in `crawlFormat.test.ts` now expect the gated render. A new test there requires every render to carry the dealership and to ask the budget before the renderer is called. `intake-autoprovision.test.ts` now expects `tenant_id` in the harvest body.
 
@@ -2800,7 +2800,7 @@ Until then, the copy is retained as is.
   - `select()` takes a column list built at run time, so the supabase-js types collapse to `GenericStringError`. That gives six TS2769/TS2345/TS2339/TS2352 errors on `.filter`, `.map`, `run_hour` and the `SyncConfig[]` cast.
   - The declared request body has no `no_prune`, which is TS2339 at 633.
 - None is in a line the fix changed. The diff's hunks are at 147–309, 586–596, 674, 696 and later.
-- They are type-only. The sync harness runs this exact path at runtime, 26 of 26 both with and without the budget migration.
+- They are type-only. The sync harness runs part of this path at runtime, 26 of 26 both with and without the budget migration. *(Corrected 2026-10-29: the harness runs only forced single-tenant runs; the scheduled path, the skip logging and `no_prune` are not exercised. See the fail-closed section, verification record.)*
 - The three baseline errors that went away (`refused` and `endpoint` on the feed page) were in the changed path, and the new `FeedPage` type fixed them.
 
 **Test suite: not fully green.**
@@ -3089,3 +3089,243 @@ Policy B stays separate and pending.
 **Still unresolved:**
 8. Screenshot review: still blocked until the files are supplied.
 9. The 2 baseline test failures and the 9 type-only sync errors: open.
+
+## SignalHouse SDK review, fail-closed provider budgets, rollout order and verification record (2026-10-29)
+
+**Scope of this round.**
+- Local code, isolated tests and read-only production queries only.
+- Nothing deployed, no migration applied, no paid call, no live message.
+- Production state at 17:02 UTC:
+  - Cron job 1 (`autolabels_crawl_advertised_prices`) is still `active = false`.
+  - The crawler is still the pause build (0aaf4d9, blob 73ee8cb7).
+  - `provider_call_budgets` still holds one row: MarketCheck, 5,000 calls a month, reserve 250.
+
+### 1. SignalHouse SDK: recommendation
+
+**Recommendation: keep 1.6.0. Do not revert. The decision is yours. No SMS function has been deployed.**
+
+**How the version changed (git):**
+
+| Commit | `package.json` | `bun.lock` | Edge import (`_shared/signalhouse.ts`) |
+|---|---|---|---|
+| `e53a6f3^` | `^1.0.66` | 1.0.66 | `npm:@signalhousellc/sdk@1.0.66` |
+| `e53a6f3` (Lovable "Changes", 10-28 21:47 UTC) | `^1.6.0` | 1.6.0 | 1.0.66 (**mismatch**) |
+| `c60c69f`, `4a6527f` (10-29 15:41 UTC) | `^1.6.0` | 1.6.0 | 1.6.0 (with the `.d.ts`) |
+
+- The unreviewed upgrade is `e53a6f3`. The later "re-pin" only made the edge import match it.
+- **The same commit also changed two other dependencies, also unrequested:**
+  - `zod` went from `^3.25.76` to `^4.6.6`, a major version (the lockfile resolves 4.6.7);
+  - `react-router-dom` went from 6.30.2 to 6.30.6.
+  - See the verification record below for what that means for test results.
+
+**Why the preview failed with the prior version.**
+- In the preview, Deno resolves `npm:` imports against the project's `node_modules` (BYONM).
+- After `e53a6f3`, that directory held 1.6.0 while the code asked for exactly 1.0.66. Deno answered "Could not find a matching package".
+- `scripts/sms-verify/run.sh` reproduces the failure: stage 2, `REPRODUCED`, in `results/pinned-1.6.0-main.txt`.
+
+**What our code uses.**
+- One class, `SignalHouseSDK`, and one method, `sendSMS`, in `_shared/signalhouse.ts`.
+- `send-sms` and `verify-passport-document-request` send through it.
+- `signalhouse-webhook` imports only `toSignalHouseNumber`, a pure function. Because the import is at the top of the module, though, the SDK must still resolve when the function starts.
+
+**Comparison** (official package metadata, plus the real package driven against a local capture server):
+
+| | 1.0.66 | 1.6.0 |
+|---|---|---|
+| Package | Self-contained, uses axios | A shim: `export *` from `@signalhouse-sms/sdk@1.6.0` (also axios). Logs a DeprecationWarning when loaded. End of life 2027-05-01 |
+| API we call | `sendSMS` → `POST /message/sms` | Same request, same `{success, data, status}` envelope |
+| Authentication | `Authorization: Bearer <SIGNALHOUSE_API_KEY>` | Same (checked at the capture server) |
+| Request timeout | **None**: a hung request hangs until the edge time limit | **30 s**, reported as `send_failed` |
+| Errors | Status and body passed through | Same, plus named network and timeout messages |
+| Idempotency-Key | Not supported | Supported. Our wrapper does not send one (checked) |
+| Sending | 8 of 9 checks. Fails only the timeout check: the hung request settled at 40 s, when the capture server answered | 9 of 9 |
+| Receiving / webhook | Webhook handling does not use the SDK; identical under both | Identical |
+| Install script | Ships `install-skills.mjs` | `@signalhouse-sms/sdk` declares `install-skills.mjs` as its install script. It writes vendor skill files into `.claude/skills` and `.agents/skills` |
+
+On the install script:
+- Bun runs a dependency's install script only if the package is listed in `trustedDependencies`. None is listed, so Bun does not run it.
+- `npm install` from `package-lock.json` would run it.
+- Our harness installs with `--ignore-scripts`.
+- Recommendation: do not add it to `trustedDependencies`.
+
+**Would a smaller dependency-only correction work?** Yes.
+- `scripts/sms-verify/proposed-revert-sdk-1.0.66.patch` sets `package.json`, both lockfiles and the edge pin back to 1.0.66, with follow-redirects 1.16.2.
+- Results (`results/proposed-revert-1.0.66.txt`):
+  - the deploy-path type check passes;
+  - the capture-server run passes 8 of 9 (timeout as above).
+- Local emulation of the preview's type resolution fails with `ERR_TYPES_NOT_FOUND`. It fails the same way at the pre-upgrade revision `e53a6f3^`, which the preview served without trouble. So that local check is stricter than Lovable's preview, and the failure is not specific to the revert.
+
+**Why keep 1.6.0:**
+- every request we make is byte-for-byte the same;
+- 1.6.0 adds the 30 s timeout that 1.0.66 lacks, which matters for an edge function waiting on a send;
+- reverting means lockfile surgery against the version Lovable's tooling now resolves;
+- reverting the SDK does nothing about the `zod` and router changes in the same commit.
+
+**Risks of keeping it:**
+- The shim is deprecated: move to `@signalhouse-sms/sdk` directly before 2027-05-01.
+- One DeprecationWarning per cold start.
+- `package.json` uses the caret range `^1.6.0` while the edge pin is exact. A future install can drift. Proposal (not applied): pin `"1.6.0"` exactly.
+
+**Compatibility checks added.** No live message and no provider call in either:
+- `scripts/sms-verify/run.sh`, with the real pinned package:
+  - (1) `deno check` of the three SMS functions as deployed;
+  - (2) the preview's resolution, from a `node_modules` installed from the committed `bun.lock`, including a reproduction of the old mismatch;
+  - (3) the unmodified wrapper driven against a capture server on 127.0.0.1: request shape, auth header, body, blocked, rejected and timeout.
+- `supabase/functions/_shared/signalhouse.pin.test.ts` (vitest) fails if the edge pin, the `.d.ts`, `bun.lock` and `package-lock.json` disagree, so a mismatch like `e53a6f3` is caught before a preview breaks.
+
+### 2. Fail-closed provider budgets (implemented locally; nothing applied or deployed)
+
+**Policy as approved:**
+- A budget that is missing, unreadable or used up means no provider call.
+- The essential inventory sync and optional enrichment have separate budgets.
+- Unconfigured providers stay disabled.
+- No inventory exception.
+
+**Database: `supabase/proposed/20261106000000_provider_budget_fail_closed.sql` (requires 20261103).**
+- `provider_lane_budgets(provider, lane, enabled, billing_unit, monthly_call_cap, monthly_usd_cap, notes, updated_at, updated_by)`:
+  - `lane` is `essential_sync` (MarketCheck only, enforced by a CHECK) or `enrichment`;
+  - an enabled lane must have a limit (CHECK);
+  - **seeded disabled, with no limits**: MarketCheck (both lanes), Firecrawl, VinAudit, MonroneyLabels, Black Book, Google Places;
+  - platform admins can read it; nobody can write it directly, the service role included.
+- `provider_call_admit`, same signature. In order:
+  1. Locks the caller's lane row (`FOR UPDATE`) and counts that lane's month. Refuses with `unconfigured`, `disabled`, `lane_cap`, `lane_usd_cap`, or `unpriced` (a dollar limit and no known price).
+  2. Applies the platform ceiling across both lanes, where an enabled `provider_call_budgets` row exists (`monthly_cap`).
+  3. Applies dealership Enforce budgets **to the feed too** (`tenant_budget`). `block_essential` is no longer read.
+- Logging, with no secrets:
+  - every admission writes an `admitted` row, noted `reserved:<lane>`; that row is the reservation;
+  - every refusal writes `budget_denied`, noted `<reason>:<lane>`;
+  - `provider_call_record` reconciles the reservation with the provider's status and stamps `reconciled_at`;
+  - `provider_call_unreconciled()` lists reservations that never came back, which stay counted;
+  - no column holds a URL, key or token, and the URL is never sent to the database.
+- `platform_set_provider_lane_budget(...)`:
+  - platform admins only;
+  - a reason is required;
+  - audited in `audit_log` with who, before, after and the reason;
+  - keeps existing notes when called with none.
+- Rollback file: run it, then re-run 20261103. Both gate functions are restored exactly, and the lane table and every ledger row are kept. The rollback itself re-opens calls, so it needs your approval.
+
+**Edge code** (`_shared/providerBudget.ts`, `providerBudgetPolicy.ts`):
+- The gate refuses on: no database client, an error, an exception, an answer it cannot read, and the hosted `ungated` answer. On `ungated` the reservation is closed as `budget_denied` with the reason `unconfigured`.
+- Console warnings never include the URL.
+
+**Callers through the gate:**
+- the feed, `marketcheck-sync`: the inventory pull and its rooftop-validation search are essential; dealer lookups are enrichment;
+- `vehicle-enrich`, `marketcheck-comps`, `marketcheck-specs`;
+- `crawl-advertised-prices`: no budget context means no render;
+- `oem-brochure` and `oem-owners-manual` (Firecrawl search), `oem-window-sticker`, `blackbook-values`;
+- **newly gated in this round** (each was an ungated paid caller):
+  - `marketcheck-recalls`: MarketCheck endpoints only, since NHTSA is free; a refusal leaves the VIN unknown, never clear;
+  - `marketcheck-incentives`: a refusal is an error, never "no incentives";
+  - `marketcheck-title-report`: on top of the dealership's report cap;
+  - `firecrawl-scrape`;
+  - `google-reviews` (Places).
+- A vitest sweep now fails if any edge function that names a paid provider host does not go through the gate.
+- `market-valuation-write` has its own reservation function and calls MarketCheck only on a granted slot, so it already fails closed. Its calls are not yet counted in the lanes; that remains a gap.
+
+**Admin panel.** Budgets & alerts (`ProviderBudgetsPanel`):
+- The "Also stop the inventory feed" checkbox is removed.
+- Saving always sends `p_block_essential: true`, so Enforce covers the feed under 20261103 alone as well.
+- One sentence of copy changed.
+- No other visual change. This tab is not one of the 13 measured screens.
+
+### 3. Test results (local, synthetic data, no provider reachable)
+
+| Harness | Result |
+|---|---|
+| `scripts/budget-verify/failclosed/run.sh` | **24 of 24 checks**: unconfigured and disabled lanes refuse and are logged; the lanes are separate; feed at its limit refuses; dealership Enforce refuses the feed; `unpriced`; dollar limit; platform ceiling across both lanes; reconciliation and the unreconciled list; a second answer cannot overwrite a reconciled event; admin-only setter, reason required, audited; dealers cannot read the lanes; no URL, key or token columns |
+| Concurrency, call limit | 30 workers at once, each holding its admission transaction open, against 7 calls left: **exactly 7 admitted, 23 refused** |
+| Concurrency, dollar limit | 30 workers, $3.50 left at $0.50 a call: **exactly 7 admitted, 23 refused** |
+| Negative control | The same race against a copy without the lane lock admits **30 of 30**, so the race does exercise the lock |
+| Rollback | Both gate functions match their pre-20261106 definitions (md5); 30 ledger rows and the lane table kept; the new functions gone. The restored `provider_call_record` matches production exactly (md5 `1a86d341…`, read 10-29) |
+| Crawl e2e, 12 stages (`scripts/crawl-verify/results/e2e-*.txt`) | `prefix` reproduces its 12 known defects. `missing`, `paused`, `noschema`, `observe`, `inflight`, `fixed`, `budget` and `refused` all pass. **New stages:** `unbudgeted` (no Firecrawl budget, as in production today) refuses every render, and nothing changes; `lanesoff` (20261106 as seeded) refuses every render, and nothing changes; `laneson` (Firecrawl enrichment lane at 100 calls) passes 20 of 20, and every one of the 18 renders was reserved and reconciled, none left open |
+| Sync (`scripts/sync-verify/results/`) | 26 of 26: without budgets, with 20261103, and with 20261103 + 20261106 and both MarketCheck lanes enabled. With 20261106 as seeded, the feed is refused before any request: zero provider requests, inventory unchanged, the run recorded as failed. The 5 clean-feed checks fail by design |
+| Per-dealership budgets (`scripts/budget-verify/run.sh`) | 3, 40 and 3 of 3, 40 and 3 |
+| SignalHouse (`scripts/sms-verify/run.sh`) | As in section 1 |
+| `deno check` | No errors: `crawl-advertised-prices`, `marketcheck-sync`, `vehicle-enrich`, `marketcheck-comps`, `provider-budget-alerts`, `marketcheck-recalls`, `marketcheck-incentives`, `marketcheck-title-report`, `firecrawl-scrape`, `google-reviews`, and the three SMS functions. `marketcheck-specs`: 14, unchanged |
+
+### 4. Providers: billing units, prices and proposed limits (for your decision)
+
+No production limit is set by this work.
+- List prices are from `_shared/mcCost.ts`: captured 2026-08-01, revised 10-27 from your change order, and not verified against the live page. Your contract governs.
+- "Proposed" figures are derived from usage on record for you to accept or change. None is a dollar cap.
+- A dollar limit on a provider whose price is unknown refuses every call (`unpriced`), so only call limits are proposed there.
+
+| Provider (lane) | Billing unit | Known price | Unknown | Usage on record | Proposed limit |
+|---|---|---|---|---|---|
+| MarketCheck feed (`essential_sync`) | Call. Syndication returns up to 1,500 rows per page | Syndication $1.00; inventory search $0.002 | Contract terms and plan minimums | 1 tenant, nightly, 130 active listings: 1 syndication call per run, plus up to 1 validation search. A refused request is retried twice. This month: 46 events, 45 `refused_quota`, 1 `no_result` | **100 calls a month**: 31 runs × up to 3 attempts, rounded |
+| MarketCheck enrichment (`enrichment`) | Call | Price prediction $0.07, recalls $0.07, NeoVIN $0.08, incentives $0.20, VINData report $0.49, history $0.006, dealer API $0.0025, MDS $0.002, recents $0.0025 | Contract terms | The sync enriches up to 10 vehicles a run at about 6 requests each, plus on-demand recalls, title reports, comps and specs. The incentives cron is paused | **1,000 calls a month** (one full refresh of 130 vehicles × 6 = 780, plus on-demand margin). The platform ceiling stays at 5,000 across both lanes |
+| Firecrawl (`enrichment`) | Credits per request | A plain HTML render is 1 credit | Dollars per credit (plan); credits for screenshot and other formats; credits per search | Before the pause, crawler renders ran 25–52 a day (about 750–1,560 a month). OEM searches about 44–176 in the last 30 days. Operator scrapes were never recorded (ungated until now) | **500 requests in the pilot month**: one observation run of 130 vehicles × up to 2 renders = 260, plus about 200 searches. Raise only after review |
+| VinAudit / MonroneyLabels (`enrichment`) | Sticker | — | Price | None ever (no key configured) | **Stay disabled** |
+| Black Book (`enrichment`) | Call | — | Price | No ledger events | **Stay disabled** until a contract price is known |
+| Google Places (`enrichment`) | Request (Place Details, Text Search) | — | Per-request price for these fields | Manual refresh from the trust panel, never recorded | **20 requests a month** |
+
+### 5. Rollout order (revised; each step needs its own approval)
+
+1. **Migrations, only after separate approval.**
+   - Pre-check: production still matches the recorded definitions: `provider_call_admit` md5 `9750c907…`, `provider_call_record` `1a86d341…`, fee preview `2a1468b9…`.
+   - Crawl: 20261101, 20261102, then 20261104 (controls; both switches OFF).
+   - Budgets: 20261103 and 20261106 together, **with lane limits set in the same window.** 20261106 seeds every lane disabled, so on its own it **stops every gated provider call, the MarketCheck feed included**, until you set limits through the audited setter.
+   - 20261105 (fee-preview reconciliation) separately. Policy B separately.
+2. **Corrected crawler deployed with execution OFF and promotion OFF.**
+   - Verify the 503 pause now comes from the control (`control: "control"`).
+   - Cron job 1 still paused; no new crawl rows in the ledger.
+   - Until a Firecrawl lane exists, the fail-closed gate refuses renders anyway.
+3. **Observation-only paid pilot, separately authorized.** It is **not free**:
+   - each render costs Firecrawl credits (1 per plain render; more for screenshot formats, unknown);
+   - the authorization names the dealership, the vehicle count and the Firecrawl limit;
+   - execution ON, promotion OFF, one supervised invocation, then execution OFF.
+4. **Evidence and held-observation review.**
+   - Every observation stored as `held_promotion_off`, with its fee basis and screenshot hash.
+   - `provider_call_unreconciled()` empty.
+   - Spend against the limit, and every refusal accounted for.
+5. **Promotion pilot, separately authorized.**
+   - Promotion ON for one supervised run.
+   - Each promoted price checked against its evidence.
+   - The hold restored afterwards.
+6. **Cron resumption**, separately authorized, only after 2–5 pass, with the budgets in place.
+
+SMS functions stay undeployed until you accept or revert the SDK change (section 1).
+
+### 6. Verification record
+
+**Which revision each result is for:**
+
+| Layer | Revision | Notes |
+|---|---|---|
+| Local source | The commit that adds this section (the tested working tree is its content) | All results in sections 1 and 3 |
+| Local dependencies | Two sets | (a) the existing `node_modules`: zod 3.25.76, react-router-dom 6.30.2, SDK 1.6.0, which predate `e53a6f3`; (b) a fresh `bun install --frozen-lockfile --ignore-scripts` from the committed `bun.lock`: zod 4.6.7, router 6.30.6, SDK 1.6.0, which is the preview's set |
+| UI preview | `main` HEAD after this push | Rebuilds the UI only. The only UI change is the Budgets & alerts checkbox and its copy |
+| Deployed edge functions | `crawl-advertised-prices`: the pause build from `0aaf4d9` (blob `73ee8cb7`, deployed 10-29 15:40:29 UTC). `marketcheck-sync`, `vehicle-enrich`, `marketcheck-specs`, `marketcheck-comps`: `2b03c4e` (10-27 22:56Z). **Every other function: revision not on record** | Nothing in this round is deployed. The deployed MarketCheck callers still contain the fail-open gate |
+| Production database | `provider_call_admit` `9750c907…` (hosted, pre-20261103); `provider_call_record` `1a86d341…`; fee preview `2a1468b9…` | Read-only, 10-29 |
+
+**Full test suite.**
+
+| Dependency set | Passed | Skipped | Failed |
+|---|---|---|---|
+| (a) existing `node_modules`, final tree | 7,382 | 1 | 2 baseline. In an earlier full run of this round, `functionAuth` "is absent from every committed file" also timed out under load (6,860 ms against 5,000 ms). It passes alone, 78 of 78, and passed in the final run |
+| (b) the committed `bun.lock` (zod 4) | 7,380 | 1 | 2 baseline. App typecheck clean; `bun run build` succeeds |
+
+Set (b) was taken before the last five callers were gated. The re-run on the exact commit is reported with the push.
+
+- **The skipped test:** `factorySticker/render/index.test.ts`, "writes the sample matrix to the scratchpad". It is `describe.runIf(WRITE_SAMPLES)`, a manual sample-PDF generator, and is skipped by design.
+- **The two baseline failures:** both are clock-dependent fixtures, not product defects introduced here, and both also fail at `3836dc3`.
+  - `complianceRedTeam` "sets blocker=false when only warns are present". California SB 766 applicability is date-gated from 2026-10-01 (`SB766_EFFECTIVE_DATE`). Since then the fixture's CA draft (no sale date, so today) correctly raises `three-day-return-ack-missing` as a fail, which makes the blocker true. The fixture needs a pre-October sale date or the acknowledgement. **Open.**
+  - `complianceData` "does not treat NO_MODEL_CAMPAIGNS_FOUND as compliance clearance". The fixture's NHTSA answer is dated 2026-09-08, which is now more than 30 days old, so the copy correctly switches to the stale-answer wording and no longer contains "No campaigns on this model". The fixture needs a date relative to now. **Open.**
+- **The nine `marketcheck-sync` type errors: corrected in local source at the type level. Path safety partly open.**
+  - Causes:
+    - eight come from `select()` taking a computed column list, which supabase-js types as `GenericStringError` rows;
+    - one comes from the request-body type missing `no_prune`.
+  - The fix casts the rows to `SyncConfig[]` once and adds `no_prune?: boolean`.
+  - The emitted JavaScript is byte-identical to the type-checked file before the fix (esbuild, sha256 `a06cf475…`). Against HEAD, the only emitted differences are the two intended fail-closed gate lines.
+  - `deno check` now reports 0 errors.
+  - Runtime coverage of the affected paths:
+    - **exercised** by the sync harness: the reachable-tenant filter, forced selection and the per-tenant loop;
+    - **not exercised**, so unverified at runtime: scheduled selection and skip logging (`isDue`, `skipReason`, `overdueBy`, `hoursSinceSlot`; the helpers alone are unit-tested in `syncSchedule.test.ts`), the `no_prune` canary, dealer-id-only tenants, and the fallback query without `dealer_id`.
+  - The deployed sync (`2b03c4e`) still carries the original nine in its source.
+- **`marketcheck-specs`: 14 errors, all in `_shared/neovinSheet.ts`, unchanged.** Open. The earlier "2 errors" statement is corrected above.
+
+### 7. Kept separate
+
+- **Policy B** (`20261031000000`): pending, not applied, untouched.
+- **Fee-preview reconciliation** (`20261105000000`): prepared, not applied. Production still `2a1468b9…`.
+- **Visual acceptance:** the register is unchanged. No visual tuning, and the accepted screens are untouched. Screenshot review is still blocked until the files are supplied.

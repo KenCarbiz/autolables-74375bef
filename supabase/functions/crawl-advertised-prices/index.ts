@@ -577,7 +577,9 @@ async function pacedRender(url: string, formats: RenderFormat[], deadlineAt: num
   let rateLimitRetries = 0;
   let last: RenderResult | null = null;
   let eventId: number | null = null;
-  if (budget && activeRenderKey) {
+  // No budget means no render (fail closed).
+  if (!budget) return { render: null, formats, pacedWaitMs, rateLimitRetries, gaveUp: "budget_refused" };
+  if (activeRenderKey) {
     const gate = await admitProviderCall(budget.admin, {
       url, caller: budget.caller, provider: "firecrawl",
       product: formats.some((f) => typeof f !== "string" && f.type === "screenshot") ? "scrape_screenshot" : "scrape",
@@ -587,7 +589,7 @@ async function pacedRender(url: string, formats: RenderFormat[], deadlineAt: num
     eventId = gate.eventId;
   }
   const done = async (r: PacedRender): Promise<PacedRender> => {
-    if (budget) await recordProviderCall(budget.admin, eventId, r.render ? r.render.status : null, r.render?.error ?? null);
+    await recordProviderCall(budget.admin, eventId, r.render ? r.render.status : null, r.render?.error ?? null);
     return r;
   };
   for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt++) {
@@ -944,7 +946,7 @@ serve(async (req) => {
       renderBudget--;
       const pr = await pacedRender(fetchUrl, HTML_ONLY_FORMATS, deadlineAt,
         { admin, tenantId: body.tenant_id ?? null, vin: testVin, caller: "crawl-advertised-prices:test" });
-      if (pr.gaveUp === "budget_refused") renderError = "dealership provider budget refused the render";
+      if (pr.gaveUp === "budget_refused") renderError = "provider budget refused the render (dealership, platform or lane limit, or no budget configured)";
       const fr = pr.render;
       pacedWaitMs = pr.pacedWaitMs;
       rateLimitRetries = pr.rateLimitRetries;

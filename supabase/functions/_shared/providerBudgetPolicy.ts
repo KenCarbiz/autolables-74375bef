@@ -8,7 +8,39 @@
 // while the count is under cap minus reserve, so the sweep can never spend the
 // feed's last slots.
 
-export type AdmissionReason = "ungated" | "admitted" | "monthly_cap" | "reserve_for_essential" | "tenant_budget";
+export type AdmissionReason =
+  | "ungated" | "admitted" | "monthly_cap" | "reserve_for_essential" | "tenant_budget"
+  | "unconfigured" | "disabled" | "lane_cap" | "lane_usd_cap" | "unpriced";
+
+const KNOWN_REASONS: readonly AdmissionReason[] = [
+  "ungated", "admitted", "monthly_cap", "reserve_for_essential", "tenant_budget",
+  "unconfigured", "disabled", "lane_cap", "lane_usd_cap", "unpriced",
+];
+
+// Fail-closed lanes (proposed migration 20261106000000). The inventory feed
+// and enrichment never share an allowance; a missing, disabled or exhausted
+// lane refuses; a dollar limit refuses a call it cannot price.
+export type Lane = "essential_sync" | "enrichment";
+export const laneOf = (essential: boolean): Lane => (essential ? "essential_sync" : "enrichment");
+
+export interface LaneBudget {
+  enabled: boolean;
+  monthlyCallCap: number | null;
+  monthlyUsdCap: number | null;
+}
+
+export function decideLaneAdmission(
+  lane: LaneBudget | null,
+  used: { calls: number; usd: number },
+  estimatedUsd: number | null,
+): { admitted: boolean; reason: AdmissionReason } {
+  if (!lane) return { admitted: false, reason: "unconfigured" };
+  if (!lane.enabled) return { admitted: false, reason: "disabled" };
+  if (lane.monthlyCallCap != null && used.calls >= lane.monthlyCallCap) return { admitted: false, reason: "lane_cap" };
+  if (lane.monthlyUsdCap != null && estimatedUsd == null) return { admitted: false, reason: "unpriced" };
+  if (lane.monthlyUsdCap != null && used.usd + (estimatedUsd ?? 0) > lane.monthlyUsdCap) return { admitted: false, reason: "lane_usd_cap" };
+  return { admitted: true, reason: "admitted" };
+}
 
 export interface AdmissionInput {
   monthCalls: number;
@@ -109,8 +141,8 @@ export interface AdmitResult {
   reason: AdmissionReason | "gate_unavailable";
 }
 
-// The RPC answers one row; a missing or malformed answer is treated as an
-// unavailable gate, which callers fail open on and log.
+// The RPC answers one row; a missing or malformed answer is an unavailable
+// gate, which the caller treats as a refusal (fail closed).
 export function parseAdmitRow(row: unknown): AdmitResult | null {
   const r = (Array.isArray(row) ? row[0] : row) as Record<string, unknown> | null | undefined;
   if (!r || typeof r !== "object" || typeof r.admitted !== "boolean") return null;
@@ -122,8 +154,6 @@ export function parseAdmitRow(row: unknown): AdmitResult | null {
     monthCalls: n(r.month_calls),
     cap: n(r.monthly_call_cap),
     reserve: n(r.reserve_for_essential),
-    reason: (["ungated", "admitted", "monthly_cap", "reserve_for_essential", "tenant_budget"] as const).includes(reason as AdmissionReason)
-      ? (reason as AdmissionReason)
-      : "gate_unavailable",
+    reason: KNOWN_REASONS.includes(reason as AdmissionReason) ? (reason as AdmissionReason) : "gate_unavailable",
   };
 }

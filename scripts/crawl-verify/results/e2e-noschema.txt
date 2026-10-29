@@ -1,4 +1,4 @@
-======== Stage noschema: working tree supabase/functions/crawl-advertised-prices/index.ts dd90fc468e896e66dcce312fcb8a096df95cb909
+======== Stage noschema: working tree supabase/functions/crawl-advertised-prices/index.ts b3e017a76ca59c707fd04d322a9ca1ab58cb7b16
    substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
    substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
 == Stage noschema; observation columns present: False
@@ -20,7 +20,7 @@
   card       listing 30100|900|31000    observations [30000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   redirect   listing 26100|900|27000    observations [-]
-             ledger vin_mismatch | [paced_wait_ms=980 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url
+             ledger vin_mismatch | [paced_wait_ms=948 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url
   setting    listing 24992|900|25892    observations [25572|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   conflict   listing 21600|900|22500    observations [22000|t]
@@ -30,7 +30,7 @@
   partial    listing 28100|900|29000    observations [28000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   ambiguous  listing 20100|900|21000    observations [-]
-             ledger ambiguous_price | [paced_wait_ms=1015 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger ambiguous_price | [paced_wait_ms=1098 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   title      listing 26100|900|27000    observations [26000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
 
@@ -50,7 +50,7 @@
   partial    listing 28100|900|29000    observations [28000|t ; 28000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   ambiguous  listing 20100|900|21000    observations [-]
-             ledger ambiguous_price | [paced_wait_ms=984 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger ambiguous_price | [paced_wait_ms=1055 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   title      listing 26100|900|27000    observations [26000|t ; 26000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
 
@@ -69,3 +69,8 @@ PASS  each stored observation is reported as held for the schema
 
 4 checks, 0 failed
 == Stage noschema exit 0
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:41: NOTICE:  trigger "price_component_evidence_no_update" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:46: NOTICE:  trigger "price_component_evidence_no_truncate" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:57: NOTICE:  policy "Tenant members read price evidence" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261104000000_crawl_control.sql:36: NOTICE:  policy "crawl_control platform admin read" for relation "public.crawl_control" does not exist, skipping
+

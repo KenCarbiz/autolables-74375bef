@@ -138,16 +138,20 @@ elif STAGE in ("observe", "inflight"):
           {"card": "held_promotion_off", "title": "held_promotion_off", "partial": "held_promotion_off", "evidence": "held_promotion_off"},
           {k: promotion_of(k, 1) for k in ("card", "title", "partial", "evidence")})
     check(f"{STAGE}: the run summaries count the held vehicles", True, (body.get("listing_outcomes") or {}).get("held_promotion_off", 0) >= 2)
-elif STAGE == "refused":
-    check("refused: no render was sent to the renderer in either run", 0, len(renders) + len(renders2))
-    check("refused: no listing's pricing changed", INITIAL, after2)
-    check("refused: no observation was stored", {k: "" for k in CASES}, {k: observations(k) for k in CASES})
-    check("refused: every vehicle's ledger names the dealership budget",
+elif STAGE in ("refused", "unbudgeted", "lanesoff"):
+    # refused: the dealership's budget; unbudgeted: no Firecrawl budget at all
+    # on the hosted gate; lanesoff: 20261106 applied with its lanes as seeded.
+    note = {"refused": "tenant_budget:firecrawl", "unbudgeted": "unconfigured:%", "lanesoff": "disabled:enrichment"}[STAGE]
+    check(f"{STAGE}: no render was sent to the renderer in either run", 0, len(renders) + len(renders2))
+    check(f"{STAGE}: no listing's pricing changed", INITIAL, after2)
+    check(f"{STAGE}: no observation was stored", {k: "" for k in CASES}, {k: observations(k) for k in CASES})
+    check(f"{STAGE}: every vehicle's ledger names the budget refusal",
           {k: True for k in CASES}, {k: ledger(k).startswith("render_budget_refused") for k in CASES})
-    check("refused: each refusal is in the provider ledger as budget_denied, none admitted",
-          "0|true", sql(f"SELECT count(*) FILTER (WHERE outcome <> 'budget_denied') || '|' || bool_and(note = 'tenant_budget:firecrawl') FROM public.provider_call_events WHERE provider = 'firecrawl' AND tenant_id = '{T}'"))
-    check("refused: one 'calls refused' alert is queued for the month",
-          "call_denied:1", sql(f"SELECT kind || ':' || count(*) FROM public.provider_budget_alerts WHERE tenant_id = '{T}' GROUP BY kind"))
+    check(f"{STAGE}: each refusal is in the provider ledger as budget_denied ({note}), none admitted",
+          "0|true", sql(f"SELECT count(*) FILTER (WHERE outcome <> 'budget_denied') || '|' || bool_and(note LIKE '{note}') FROM public.provider_call_events WHERE provider = 'firecrawl' AND tenant_id = '{T}'"))
+    if STAGE == "refused":
+        check("refused: one 'calls refused' alert is queued for the month",
+              "call_denied:1", sql(f"SELECT kind || ':' || count(*) FROM public.provider_budget_alerts WHERE tenant_id = '{T}' GROUP BY kind"))
 elif STAGE == "noschema":
     check("run 1: no listing's pricing changed before the migration", INITIAL, after1)
     check("run 2: no listing's pricing changed before the migration", INITIAL, after2)
@@ -183,6 +187,13 @@ else:
     check("run 2: the dealer-setting-only vehicle is still unchanged", INITIAL["setting"], after2["setting"])
     check("no vehicle has more than one observation per run",
           True, all(int(sql(f"SELECT count(*) FROM public.advertised_prices WHERE vin = '{V[k]}'") or 0) <= 2 for k in CASES))
+
+if os.environ.get("LANES") == "on":
+    total = len(renders) + len(renders2)
+    check("lanes on: every render was reserved in the Firecrawl lane and reconciled with its answer (events|reconciled|left open)",
+          f"{total}|{total}|0",
+          sql("SELECT count(*) || '|' || count(reconciled_at) || '|' || count(*) FILTER (WHERE outcome IN ('admitted', 'budget_denied')) "
+              "FROM public.provider_call_events WHERE provider = 'firecrawl'"))
 
 failed = results.count(False)
 print(f"\n{len(results)} checks, {failed} failed")

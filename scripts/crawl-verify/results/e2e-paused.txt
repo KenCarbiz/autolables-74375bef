@@ -1,4 +1,4 @@
-======== Stage paused: working tree supabase/functions/crawl-advertised-prices/index.ts dd90fc468e896e66dcce312fcb8a096df95cb909
+======== Stage paused: working tree supabase/functions/crawl-advertised-prices/index.ts b3e017a76ca59c707fd04d322a9ca1ab58cb7b16
    substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
    substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
 == Stage paused; observation columns present: True
@@ -66,3 +66,5 @@ PASS  paused: nothing was rendered, stored or written
 
 3 checks, 0 failed
 == Stage paused exit 0
+psql:supabase/proposed/20261104000000_crawl_control.sql:36: NOTICE:  policy "crawl_control platform admin read" for relation "public.crawl_control" does not exist, skipping
+

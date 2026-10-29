@@ -19,6 +19,15 @@
 #             budget set: must behave exactly as fixed
 #   refused   as budget, with the dealership's Firecrawl budget enforced at
 #             zero: no render may be sent and nothing may change
+#   unbudgeted  as fixed, but with no Firecrawl budget row (as in production
+#             on 2026-10-29): the fail-closed gate refuses every render
+#   lanesoff  as budget, plus 20261106000000 (fail-closed lanes) as seeded,
+#             every lane disabled: no render, nothing changes
+#   laneson   as lanesoff, with the Firecrawl enrichment lane enabled at 100
+#             calls: behaves as fixed, and every render is reserved and
+#             reconciled in the ledger
+# Every stage that renders, except unbudgeted, has a platform Firecrawl budget
+# row, because the fail-closed gate refuses a provider without one.
 # The switches are set directly as the database owner here, standing in for
 # the audited admin function, which scripts/crawl-verify/control checks.
 #
@@ -86,19 +95,28 @@ for STAGE in "${STAGES[@]}"; do
     MIGS=()
     [[ $STAGE != noschema ]] && MIGS+=(supabase/proposed/20261101000000_price_component_evidence.sql supabase/proposed/20261102000000_crawl_observation_basis.sql)
     [[ $STAGE != missing ]] && MIGS+=(supabase/proposed/20261104000000_crawl_control.sql)
-    [[ $STAGE == budget || $STAGE == refused ]] && MIGS+=(supabase/proposed/20261103000000_provider_tenant_budgets.sql)
+    [[ $STAGE == budget || $STAGE == refused || $STAGE == lanes* ]] && MIGS+=(supabase/proposed/20261103000000_provider_tenant_budgets.sql)
+    [[ $STAGE == lanes* ]] && MIGS+=(supabase/proposed/20261106000000_provider_budget_fail_closed.sql)
     for f in "${MIGS[@]}"; do
       "${PSQL[@]}" -d "$DB" -f "$f" >/dev/null
     done
-    # The crawl_control grants are the migration's own (SELECT only); every
-    # other table as the hosted service role has it.
-    "${PSQL[@]}" -d "$DB" -c "DO \$\$ DECLARE t text; BEGIN FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'crawl_control' LOOP EXECUTE format('GRANT ALL ON public.%I TO service_role', t); END LOOP; END \$\$" >/dev/null
+    # The crawl_control and provider_lane_budgets grants are the migrations'
+    # own (SELECT only); every other table as the hosted service role has it.
+    "${PSQL[@]}" -d "$DB" -c "DO \$\$ DECLARE t text; BEGIN FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('crawl_control', 'provider_lane_budgets') LOOP EXECUTE format('GRANT ALL ON public.%I TO service_role', t); END LOOP; END \$\$" >/dev/null
     case $STAGE in
-      noschema|inflight|fixed|budget|refused) SWITCHES="true, true" ;;
+      noschema|inflight|fixed|budget|refused|unbudgeted|lanes*) SWITCHES="true, true" ;;
       observe) SWITCHES="true, false" ;;
       *) SWITCHES="" ;;
     esac
     [[ -n $SWITCHES ]] && "${PSQL[@]}" -d "$DB" -c "UPDATE public.crawl_control SET (execution_enabled, promotion_enabled) = ($SWITCHES)" >/dev/null
+  fi
+  if [[ $STAGE != prefix && $STAGE != unbudgeted ]]; then
+    "${PSQL[@]}" -d "$DB" -c "INSERT INTO public.provider_call_budgets (provider, monthly_call_cap, reserve_for_essential, enabled, notes) VALUES ('firecrawl', 1000, 0, true, 'local verification') ON CONFLICT (provider) DO NOTHING" >/dev/null
+  fi
+  # Set as the database owner, standing in for the audited setter, which
+  # scripts/budget-verify/failclosed checks.
+  if [[ $STAGE == laneson ]]; then
+    "${PSQL[@]}" -d "$DB" -c "UPDATE public.provider_lane_budgets SET enabled = true, monthly_call_cap = 100 WHERE provider = 'firecrawl' AND lane = 'enrichment'" >/dev/null
   fi
   if [[ $STAGE == refused ]]; then
     "${PSQL[@]}" -d "$DB" -c "INSERT INTO public.provider_tenant_budgets (tenant_id, provider, mode, monthly_call_cap) VALUES ('c0000000-0000-4000-8000-000000000001', 'firecrawl', 'enforce', 0)" >/dev/null
@@ -144,7 +162,8 @@ EOF
     [[ $i == 120 ]] && { echo "services did not start"; tail -n 20 "$WORK"/*-$STAGE.log; exit 2; }
   done
   status=0
-  STAGE=$(case $STAGE in noschema|refused|missing|paused|observe|inflight) echo $STAGE;; *) echo contract;; esac) FN_URL=http://127.0.0.1:$FN_PORT/ \
+  LANES=$([[ $STAGE == laneson ]] && echo on || echo off) \
+  STAGE=$(case $STAGE in noschema|refused|unbudgeted|lanesoff|missing|paused|observe|inflight) echo $STAGE;; *) echo contract;; esac) FN_URL=http://127.0.0.1:$FN_PORT/ \
     GATEWAY_URL=http://127.0.0.1:$GATEWAY_PORT SERVICE_KEY=$SERVICE_KEY DB=$DB PAGES_JSON=$(pwd)/scripts/crawl-verify/e2e/pages.json \
     python3 -I scripts/crawl-verify/e2e/drive.py || status=$?
   if [[ -n "${CRAWL_VERIFY_LOGS:-}" ]]; then cp "$WORK"/*-$STAGE.log "$CRAWL_VERIFY_LOGS"/ 2>/dev/null || true; fi

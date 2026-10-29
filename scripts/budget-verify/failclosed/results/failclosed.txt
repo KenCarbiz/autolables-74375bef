@@ -1,0 +1,35 @@
+ n  | result |                                        label                                         | detail 
+----+--------+--------------------------------------------------------------------------------------+--------
+  1 | PASS   | fresh: the inventory feed is refused (lane disabled)                                 | 
+  2 | PASS   | fresh: MarketCheck enrichment is refused (lane disabled)                             | 
+  3 | PASS   | fresh: Firecrawl is refused (lane disabled)                                          | 
+  4 | PASS   | fresh: a provider with no lane at all is refused                                     | 
+  5 | PASS   | fresh: Google Places is seeded and refused (lane disabled)                           | 
+  6 | PASS   | fresh: the feed lane exists only for MarketCheck                                     | 
+  7 | PASS   | fresh: every refusal is in the ledger as budget_denied with its reason and lane      | 
+  8 | PASS   | admin: a lane cannot be enabled without a limit                                      | 
+  9 | PASS   | admin: a change needs a reason                                                       | 
+ 10 | PASS   | admin: a dealer user cannot set a lane                                               | 
+ 11 | PASS   | admin: a dealer user cannot read the lanes                                           | 
+ 12 | PASS   | admin: the feed lane enabled at 3 calls, audited with who and the reason, notes kept | 
+ 13 | PASS   | lanes: the feed gets its 3 calls, then stops                                         | 
+ 14 | PASS   | lanes: enrichment is still disabled while the feed lane is open                      | 
+ 15 | PASS   | lanes: enrichment has its own 2 calls; the exhausted feed lane does not take them    | 
+ 16 | PASS   | lanes: enrichment spending did not reopen or consume the feed lane                   | 
+ 17 | PASS   | ceiling: the plan cap counts both lanes (5 used, 1 left)                             | 
+ 18 | PASS   | dollars: a dollar-limited lane refuses a call it cannot price                        | 
+ 19 | PASS   | dollars: priced at $0.50, two calls fit in $1.00, the third is refused               | 
+ 20 | PASS   | no exception: an enforced dealership budget refuses the feed too                     | 
+ 21 | PASS   | reconcile: the reservation takes the answer and a time                               | 
+ 22 | PASS   | reconcile: a reservation that never came back is listed, and still counted           | 
+ 23 | PASS   | reconcile: a second answer cannot overwrite a reconciled event                       | 
+ 24 | PASS   | ledger: no column for a URL, key or token                                            | 
+
+        summary         
+------------------------
+ 24 of 24 checks passed
+
+PASS  race (call limit): 30 concurrent workers, 7 admitted, 23 refused
+PASS  race (dollar limit): 30 concurrent workers, 7 admitted, 23 refused
+PASS  control: without the lane lock the same race admits 30 of 30 against a limit of 7
+PASS  rollback: both gate functions restored exactly, 30 ledger rows and the lane table kept, the new functions gone

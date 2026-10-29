@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { budgetPayload, isMissingSchema, parseEmails, parsePhones, parseThresholds, percentUsed, type BudgetForm } from "./providerBudgets";
 
 const form = (o: Partial<BudgetForm> = {}): BudgetForm => ({
-  tenantId: "t1", provider: "*", mode: "alert_only", callCap: "", usdCap: "250", thresholds: "80, 100", blockEssential: false, notes: "", ...o,
+  tenantId: "t1", provider: "*", mode: "alert_only", callCap: "", usdCap: "250", thresholds: "80, 100", notes: "", ...o,
 });
 
 describe("Budgets & alerts form rules", () => {

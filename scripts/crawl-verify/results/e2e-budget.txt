@@ -1,4 +1,4 @@
-======== Stage budget: working tree supabase/functions/crawl-advertised-prices/index.ts dd90fc468e896e66dcce312fcb8a096df95cb909
+======== Stage budget: working tree supabase/functions/crawl-advertised-prices/index.ts b3e017a76ca59c707fd04d322a9ca1ab58cb7b16
    substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
    substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
 == Stage contract; observation columns present: True
@@ -20,7 +20,7 @@
   card       listing 29100|900|30000    observations [30000|t|promoted|page_verified|same_render]
              ledger captured | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   redirect   listing 26100|900|27000    observations [-]
-             ledger vin_mismatch | [paced_wait_ms=943 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url
+             ledger vin_mismatch | [paced_wait_ms=1012 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected ur
   setting    listing 24992|900|25892    observations [25572|t|held_fee_basis|dealer_configured_unverified|same_render]
              ledger held_fee_basis | dealer_configured_unverified: no fee evidence on the page; derived from the dealership's setting (advertised_includes_doc_fee), not verified by the page
   conflict   listing 21600|900|22500    observations [22000|t|held_fee_basis|conflict|same_render]
@@ -30,15 +30,15 @@
   partial    listing 28100|900|29000    observations [28000|t|promotion_failed|page_verified|same_render]
              ledger promotion_failed | injected failure: listing pricing write refused for 1EXMP0007S9000016
   ambiguous  listing 20100|900|21000    observations [-]
-             ledger ambiguous_price | [paced_wait_ms=255 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger ambiguous_price | [paced_wait_ms=967 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   title      listing 25100|900|26000    observations [26000|t|promoted|page_verified|same_render]
-             ledger captured | [paced_wait_ms=397 rate_limit_retries=0 formats=html+screenshot] page=vehicle findings=embedded_title_present,page_title_missing url_source=listing
+             ledger captured | [paced_wait_ms=1098 rate_limit_retries=0 formats=html+screenshot] page=vehicle findings=embedded_title_present,page_title_missing url_source=listing
 
 == Run 2: HTTP 200; updated 0 unchanged 6 skipped 2 failed 0 listing_outcomes {'unchanged': 2, 'held_fee_basis': 2, 'promoted': 2}
 
 == After run 2 (failures removed)
   card       listing 29100|900|30000    observations [30000|t|promoted|page_verified|same_render ; 30000|f|not_required|page_verified|not_captured]
-             ledger captured | [paced_wait_ms=371 rate_limit_retries=0 formats=html] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger captured | [paced_wait_ms=1051 rate_limit_retries=0 formats=html] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   redirect   listing 26100|900|27000    observations [-]
              ledger vin_mismatch | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url_s
   setting    listing 24992|900|25892    observations [25572|t|held_fee_basis|dealer_configured_unverified|same_render ; 25572|f|held_fee_basis|dealer_configured_unverified|not_captured]
@@ -46,13 +46,13 @@
   conflict   listing 21600|900|22500    observations [22000|t|held_fee_basis|conflict|same_render ; 22000|f|held_fee_basis|conflict|not_captured]
              ledger held_fee_basis | conflict: the page shows the price excludes the fee; the dealership's setting (advertised_includes_doc_fee) says includes_fee
   evidence   listing 32100|900|33000    observations [33000|f|held_evidence|page_verified|not_captured ; 33000|t|promoted|page_verified|same_render]
-             ledger captured | [paced_wait_ms=614 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger captured | [paced_wait_ms=950 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   partial    listing 27100|900|28000    observations [28000|t|promotion_failed|page_verified|same_render ; 28000|t|promoted|page_verified|revalidated_render]
-             ledger captured | [paced_wait_ms=564 rate_limit_retries=0 formats=html] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger captured | [paced_wait_ms=964 rate_limit_retries=0 formats=html] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   ambiguous  listing 20100|900|21000    observations [-]
-             ledger ambiguous_price | [paced_wait_ms=757 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger ambiguous_price | [paced_wait_ms=1050 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   title      listing 25100|900|26000    observations [26000|t|promoted|page_verified|same_render ; 26000|f|not_required|page_verified|not_captured]
-             ledger captured | [paced_wait_ms=555 rate_limit_retries=0 formats=html] page=vehicle findings=embedded_title_present,page_title_missing url_source=listing
+             ledger captured | [paced_wait_ms=1032 rate_limit_retries=0 formats=html] page=vehicle findings=embedded_title_present,page_title_missing url_source=listing
 
 PASS  card: the vehicle's own price is applied, not the similar-vehicle card's
       expected '29100|900|30000'
@@ -114,3 +114,12 @@ PASS  no vehicle has more than one observation per run
 
 19 checks, 0 failed
 == Stage budget exit 0
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:41: NOTICE:  trigger "price_component_evidence_no_update" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:46: NOTICE:  trigger "price_component_evidence_no_truncate" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:57: NOTICE:  policy "Tenant members read price evidence" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261104000000_crawl_control.sql:36: NOTICE:  policy "crawl_control platform admin read" for relation "public.crawl_control" does not exist, skipping
+psql:supabase/proposed/20261103000000_provider_tenant_budgets.sql:101: NOTICE:  policy "provider_tenant_budgets platform admin read" for relation "public.provider_tenant_budgets" does not exist, skipping
+psql:supabase/proposed/20261103000000_provider_tenant_budgets.sql:107: NOTICE:  policy "provider_unit_prices platform admin read" for relation "public.provider_unit_prices" does not exist, skipping
+psql:supabase/proposed/20261103000000_provider_tenant_budgets.sql:113: NOTICE:  policy "platform_alert_settings platform admin read" for relation "public.platform_alert_settings" does not exist, skipping
+psql:supabase/proposed/20261103000000_provider_tenant_budgets.sql:119: NOTICE:  policy "provider_budget_alerts platform admin read" for relation "public.provider_budget_alerts" does not exist, skipping
+

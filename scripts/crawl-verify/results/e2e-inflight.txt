@@ -1,4 +1,4 @@
-======== Stage inflight: working tree supabase/functions/crawl-advertised-prices/index.ts dd90fc468e896e66dcce312fcb8a096df95cb909
+======== Stage inflight: working tree supabase/functions/crawl-advertised-prices/index.ts b3e017a76ca59c707fd04d322a9ca1ab58cb7b16
    substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
    substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
 == Stage inflight; observation columns present: True
@@ -20,7 +20,7 @@
   card       listing 30100|900|31000    observations [30000|t|held_promotion_off|page_verified|same_render]
              ledger held_promotion_off | promotion is switched off (observation-only mode)
   redirect   listing 26100|900|27000    observations [-]
-             ledger vin_mismatch | [paced_wait_ms=998 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url
+             ledger vin_mismatch | [paced_wait_ms=969 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url
   setting    listing 24992|900|25892    observations [25572|t|held_fee_basis|dealer_configured_unverified|same_render]
              ledger held_fee_basis | dealer_configured_unverified: no fee evidence on the page; derived from the dealership's setting (advertised_includes_doc_fee), not verified by the page
   conflict   listing 21600|900|22500    observations [22000|t|held_fee_basis|conflict|same_render]
@@ -30,7 +30,7 @@
   partial    listing 28100|900|29000    observations [28000|t|held_promotion_off|page_verified|same_render]
              ledger held_promotion_off | promotion is switched off (observation-only mode)
   ambiguous  listing 20100|900|21000    observations [-]
-             ledger ambiguous_price | [paced_wait_ms=956 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger ambiguous_price | [paced_wait_ms=974 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   title      listing 26100|900|27000    observations [26000|t|held_promotion_off|page_verified|same_render]
              ledger held_promotion_off | promotion is switched off (observation-only mode)
 
@@ -50,7 +50,7 @@
   partial    listing 28100|900|29000    observations [28000|t|held_promotion_off|page_verified|same_render ; 28000|t|held_promotion_off|page_verified|revalidated_render]
              ledger held_promotion_off | promotion is switched off (observation-only mode)
   ambiguous  listing 20100|900|21000    observations [-]
-             ledger ambiguous_price | [paced_wait_ms=1096 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger ambiguous_price | [paced_wait_ms=990 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   title      listing 26100|900|27000    observations [26000|t|held_promotion_off|page_verified|same_render ; 26000|t|held_promotion_off|page_verified|revalidated_render]
              ledger held_promotion_off | promotion is switched off (observation-only mode)
 
@@ -81,3 +81,8 @@ PASS  inflight: the run summaries count the held vehicles
 
 8 checks, 0 failed
 == Stage inflight exit 0
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:41: NOTICE:  trigger "price_component_evidence_no_update" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:46: NOTICE:  trigger "price_component_evidence_no_truncate" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261101000000_price_component_evidence.sql:57: NOTICE:  policy "Tenant members read price evidence" for relation "public.price_component_evidence" does not exist, skipping
+psql:supabase/proposed/20261104000000_crawl_control.sql:36: NOTICE:  policy "crawl_control platform admin read" for relation "public.crawl_control" does not exist, skipping
+

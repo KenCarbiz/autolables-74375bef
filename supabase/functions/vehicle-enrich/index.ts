@@ -99,10 +99,9 @@ async function mcFetch(url: string, timeoutMs: number): Promise<Response | null>
     // Every attempt is a provider call: admitted against the month's budget
     // and recorded with the answer. A denied call is a null, which every
     // caller already treats as "no answer, keep what is stored".
-    const gate = budgetCtx
-      ? await admitProviderCall(budgetCtx.admin, { url, caller: "vehicle-enrich", tenantId: budgetCtx.tenantId, vin: budgetCtx.vin })
-      : null;
-    if (gate && !gate.admitted) return null;
+    // No budget context means no gate, which means no call (fail closed).
+    const gate = await admitProviderCall(budgetCtx?.admin, { url, caller: "vehicle-enrich", tenantId: budgetCtx?.tenantId ?? null, vin: budgetCtx?.vin ?? null });
+    if (!gate.admitted) return null;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
       if (gate && budgetCtx) await recordProviderCall(budgetCtx.admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
