@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-29T06:28:40.099Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-29T07:08:05.765Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -28,7 +28,7 @@ Owner decisions from `scripts/admin-parity/acceptance.json`. Accepted screens ar
 | 04 | pending | 89.87% | 0.95% |  |  |
 | 05 | pending | 89.87% | 6.19% |  |  |
 | 06 | individually approved (2026-10-29) | 94.11% | 4.13% | 7f4fa1a | a085c74 |
-| 07 | pending | 87.83% | 3.08% |  |  |
+| 07 | pending | 87.86% | 3.13% |  |  |
 | 08 | individually accepted with listed exceptions (2026-10-29) | 92.12% | 0.27% | 2fe74e3 | 4958ce9 |
 | 09 | pending | 86.53% | 2.60% |  |  |
 | 10 | pending | 89.53% | 0.92% |  |  |
@@ -131,8 +131,8 @@ Reference: `scripts/admin-parity/reference/03-people-access.png`. Fonts: Inter l
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 91.66% | 74.11% | 90.70% | 71.42% | 92.58% (-50px) | 72.12% | 95.48% | 70.36% | 3.71% |
-| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 91.37% | 73.36% | 90.64% | 71.48% | n/a | n/a | n/a | n/a | 3.65% |
+| 1586x992 | `scripts/admin-parity/out/03-1586x992.png` | 91.66% | 74.14% | 90.70% | 71.46% | 92.59% (-50px) | 72.27% | 95.51% | 70.15% | 3.71% |
+| 1600x1000 | `scripts/admin-parity/out/03-1600x1000.png` | 91.39% | 73.41% | 90.66% | 71.56% | n/a | n/a | n/a | n/a | 3.65% |
 
 Rail stand-in: 238px (the mock's rail width); content region starts at x=241.
 Section row bottom: reference y=217, capture y=167 (title block offset -50px).
@@ -199,7 +199,7 @@ Masks (3): member address in the capabilities description (fixture); mock-only a
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1856 | none | `scripts/admin-parity/out/04-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)], div[Role capabilities by task (scrolls sideways)] | `scripts/admin-parity/out/04-1366x768.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/04-1366x768.png` |
 | 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/04-1024x768.png` |
 | 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/04-390x844.png` |
 
@@ -309,12 +309,12 @@ Masks (7): expected impact counts (fixture inventory sizes); example vehicle nam
 
 ## Screen 07
 
-Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 87.83% is below 95%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/07-product-applicability-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 87.86% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 88.88% | 66.93% | 87.83% | 62.50% | 91.93% (+42px) | 73.68% | 97.08% | 73.81% | 3.08% |
-| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 88.45% | 67.16% | 87.58% | 62.93% | n/a | n/a | n/a | n/a | 3.04% |
+| 1586x992 | `scripts/admin-parity/out/07-1586x992.png` | 88.90% | 67.06% | 87.86% | 62.67% | 91.95% (+42px) | 73.78% | 97.09% | 73.83% | 3.13% |
+| 1600x1000 | `scripts/admin-parity/out/07-1600x1000.png` | 88.46% | 67.14% | 87.59% | 62.91% | n/a | n/a | n/a | n/a | 3.07% |
 
 Rail stand-in: 242px (the mock's rail width); content region starts at x=245.
 Body anchor (pinned in landmarks.json): reference y=228, capture y=270 (title block offset +42px).
@@ -331,14 +331,14 @@ Masks (6): sample vehicle names and mileage (fixture vehicles); product price (f
 | priceBox | within tolerance | x=290 yBody=411 w=655 h=260 | x=288 y=682 yBody=412 w=656 h=261 | x-2 w+1 h+1 yBody+1 |
 | evidenceCard | within tolerance | x=981 yBody=19 w=581 h=358 | x=979 y=290 yBody=20 w=583 h=358 | x-2 w+2 h+0 yBody+1 |
 | evidenceList | within tolerance | x=999 yBody=103 w=544 h=259 | x=997 y=375 yBody=105 w=547 h=257 | x-2 w+3 h-2 yBody+2 |
-| samplesCard | within tolerance | x=981 yBody=388 w=581 h=299 | x=979 y=659 yBody=389 w=583 h=298 | x-2 w+2 h-1 yBody+1 |
-| samplesTable | within tolerance | x=996 yBody=472 w=556 h=197 | x=996 y=743 yBody=473 w=558 h=197 | x+0 w+2 h+0 yBody+1 |
+| samplesCard | within tolerance | x=981 yBody=388 w=581 h=299 | x=979 y=659 yBody=389 w=583 h=300 | x-2 w+2 h+1 yBody+1 |
+| samplesTable | within tolerance | x=996 yBody=472 w=556 h=197 | x=996 y=743 yBody=473 w=556 h=199 | x+0 w+0 h+2 yBody+1 |
 | reviewButton | within tolerance | x=1408 yBody=706 w=155 h=42 | x=1406 y=976 yBody=706 w=156 h=42 | x-2 w+1 h+0 yBody+0 |
 
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1857 | none | `scripts/admin-parity/out/07-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)], div[Sample vehicle results (scrolls sideways)] | `scripts/admin-parity/out/07-1366x768.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/07-1366x768.png` |
 | 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/07-1024x768.png` |
 | 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Product views (scrolls sideways)], div[Sample vehicle results (scrolls sideways)] | `scripts/admin-parity/out/07-390x844.png` |
 

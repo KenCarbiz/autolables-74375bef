@@ -1,0 +1,262 @@
+[
+  {
+    "screen": "03",
+    "size": "1366x768",
+    "nav": "Administration sections",
+    "scrolls": true,
+    "overflowBy": 28,
+    "fadeShown": {
+      "left": false,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "People & Access",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  },
+  {
+    "screen": "03",
+    "size": "1366x768",
+    "nav": "People & Access views",
+    "scrolls": false
+  },
+  {
+    "screen": "03",
+    "size": "1024x768",
+    "nav": "Administration sections",
+    "scrolls": true,
+    "overflowBy": 370,
+    "fadeShown": {
+      "left": false,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "People & Access",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  },
+  {
+    "screen": "03",
+    "size": "1024x768",
+    "nav": "People & Access views",
+    "scrolls": false
+  },
+  {
+    "screen": "03",
+    "size": "390x844",
+    "nav": "Administration sections",
+    "scrolls": true,
+    "overflowBy": 759,
+    "fadeShown": {
+      "left": true,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "People & Access",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  },
+  {
+    "screen": "03",
+    "size": "390x844",
+    "nav": "People & Access views",
+    "scrolls": false
+  },
+  {
+    "screen": "04",
+    "size": "1366x768",
+    "nav": "Administration sections",
+    "scrolls": true,
+    "overflowBy": 28,
+    "fadeShown": {
+      "left": false,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "People & Access",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  },
+  {
+    "screen": "04",
+    "size": "1024x768",
+    "nav": "Administration sections",
+    "scrolls": true,
+    "overflowBy": 370,
+    "fadeShown": {
+      "left": false,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "People & Access",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  },
+  {
+    "screen": "04",
+    "size": "390x844",
+    "nav": "Administration sections",
+    "scrolls": true,
+    "overflowBy": 759,
+    "fadeShown": {
+      "left": true,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "People & Access",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  },
+  {
+    "screen": "07",
+    "size": "1366x768",
+    "nav": "Administration sections",
+    "scrolls": true,
+    "overflowBy": 28,
+    "fadeShown": {
+      "left": false,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "Pricing & Products",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  },
+  {
+    "screen": "07",
+    "size": "1366x768",
+    "nav": "Product views",
+    "scrolls": false
+  },
+  {
+    "screen": "07",
+    "size": "1024x768",
+    "nav": "Administration sections",
+    "scrolls": true,
+    "overflowBy": 370,
+    "fadeShown": {
+      "left": false,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "Pricing & Products",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  },
+  {
+    "screen": "07",
+    "size": "1024x768",
+    "nav": "Product views",
+    "scrolls": false
+  },
+  {
+    "screen": "07",
+    "size": "390x844",
+    "nav": "Administration sections",
+    "scrolls": true,
+    "overflowBy": 759,
+    "fadeShown": {
+      "left": true,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "Pricing & Products",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  },
+  {
+    "screen": "07",
+    "size": "390x844",
+    "nav": "Product views",
+    "scrolls": true,
+    "overflowBy": 152,
+    "fadeShown": {
+      "left": false,
+      "right": true
+    },
+    "pageOverflow": 0,
+    "active": {
+      "label": "Applicability",
+      "inRegion": true,
+      "clearOfFades": true,
+      "outlineClipped": false,
+      "outline": "none 0px offset 0px"
+    },
+    "focusFailures": [],
+    "lastReachableByWheel": true,
+    "focusOutline": "solid 2px offset -2px",
+    "ok": true
+  }
+]

@@ -1,0 +1,16 @@
+PASS  03 1366x768 Administration sections: overflow 28px; fade -R; active "People & Access" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+03 1366x768 People & Access views: fits, no scrolling
+PASS  03 1024x768 Administration sections: overflow 370px; fade -R; active "People & Access" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+03 1024x768 People & Access views: fits, no scrolling
+PASS  03 390x844 Administration sections: overflow 759px; fade LR; active "People & Access" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+03 390x844 People & Access views: fits, no scrolling
+PASS  04 1366x768 Administration sections: overflow 28px; fade -R; active "People & Access" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+PASS  04 1024x768 Administration sections: overflow 370px; fade -R; active "People & Access" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+PASS  04 390x844 Administration sections: overflow 759px; fade LR; active "People & Access" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+PASS  07 1366x768 Administration sections: overflow 28px; fade -R; active "Pricing & Products" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+07 1366x768 Product views: fits, no scrolling
+PASS  07 1024x768 Administration sections: overflow 370px; fade -R; active "Pricing & Products" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+07 1024x768 Product views: fits, no scrolling
+PASS  07 390x844 Administration sections: overflow 759px; fade LR; active "Pricing & Products" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+PASS  07 390x844 Product views: overflow 152px; fade -R; active "Applicability" fully visible; focus failures 0; wheel reaches last true; page overflow 0px; focus outline solid 2px offset -2px
+0 failing

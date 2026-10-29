@@ -1,0 +1,167 @@
+[
+ {
+  "screen": "03",
+  "viewport": "1586x992",
+  "pageOverflowPx": 0,
+  "pageHeight": 992,
+  "captures": 1,
+  "scrollRegions": []
+ },
+ {
+  "screen": "03",
+  "viewport": "1366x768",
+  "pageOverflowPx": 0,
+  "pageHeight": 978,
+  "captures": 2,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 28
+   }
+  ]
+ },
+ {
+  "screen": "03",
+  "viewport": "768x1024",
+  "pageOverflowPx": 0,
+  "pageHeight": 1515,
+  "captures": 2,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 397
+   }
+  ]
+ },
+ {
+  "screen": "03",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 1577,
+  "captures": 2,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   },
+   {
+    "label": "Team members (scrolls sideways)",
+    "focusable": true,
+    "hidden": 362
+   }
+  ]
+ },
+ {
+  "screen": "04",
+  "viewport": "1586x992",
+  "pageOverflowPx": 0,
+  "pageHeight": 992,
+  "captures": 1,
+  "scrollRegions": []
+ },
+ {
+  "screen": "04",
+  "viewport": "1366x768",
+  "pageOverflowPx": 0,
+  "pageHeight": 1481,
+  "captures": 2,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 28
+   }
+  ]
+ },
+ {
+  "screen": "04",
+  "viewport": "768x1024",
+  "pageOverflowPx": 0,
+  "pageHeight": 1615,
+  "captures": 2,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 397
+   }
+  ]
+ },
+ {
+  "screen": "04",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 2940,
+  "captures": 4,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   }
+  ]
+ },
+ {
+  "screen": "07",
+  "viewport": "1586x992",
+  "pageOverflowPx": 0,
+  "pageHeight": 1040,
+  "captures": 2,
+  "scrollRegions": []
+ },
+ {
+  "screen": "07",
+  "viewport": "1366x768",
+  "pageOverflowPx": 0,
+  "pageHeight": 1722,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 28
+   }
+  ]
+ },
+ {
+  "screen": "07",
+  "viewport": "768x1024",
+  "pageOverflowPx": 0,
+  "pageHeight": 1710,
+  "captures": 2,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 397
+   }
+  ]
+ },
+ {
+  "screen": "07",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 2423,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   },
+   {
+    "label": "Product views (scrolls sideways)",
+    "focusable": true,
+    "hidden": 152
+   },
+   {
+    "label": "Sample vehicle results (scrolls sideways)",
+    "focusable": true,
+    "hidden": 229
+   }
+  ]
+ }
+]
