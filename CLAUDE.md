@@ -72,6 +72,15 @@ source — do not push there expecting it to deploy.)
    Never amend published commits.
 5. **Remote**: `origin` is `KenCarbiz/autolables-74375bef`. All
    pushes go here — this is the deploy source.
+6. **Publish after every push to `main` (owner policy, 2026-10-29).**
+   Once a change is pushed to `main` and reported to the owner, publish
+   the Lovable project without asking (`mcp__Lovable__deploy_project`,
+   project id `1a2a5abf-4218-480d-aac9-d7bd0d3cfb73`). Then confirm the
+   live bundle on autolabels.io changed and tell the owner it is live.
+   This covers the frontend publish only: edge-function deploys,
+   migrations, backfills and price changes still need their own
+   approval. After each publish, confirm `crawl-advertised-prices`
+   still answers 503 `crawl_paused` while the crawler pause stands.
 
 ## Code rules
 
