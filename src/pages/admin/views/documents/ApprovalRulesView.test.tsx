@@ -99,6 +99,17 @@ describe("ApprovalRulesView", () => {
     expect(mocks.log).not.toHaveBeenCalled();
   });
 
+  it("returns focus to Review policy changes when the review dialog closes", async () => {
+    renderView(FIXTURE_11.fixture);
+    const trigger = screen.getByRole("button", { name: "Review policy changes" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
   it("starts clean when the fixture carries no pending draft", () => {
     renderView(readOnlyFixture());
     expect(screen.getByText("None")).toBeInTheDocument();

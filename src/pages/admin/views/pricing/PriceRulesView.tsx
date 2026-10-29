@@ -316,7 +316,7 @@ export default function PriceRulesView() {
                     ),
                   },
                 ].map((row) => (
-                  <div key={row.label} className="grid grid-cols-[209px_minmax(0,1fr)] text-[14px] leading-[24px]">
+                  <div key={row.label} className="grid grid-cols-[minmax(0,136px)_minmax(0,1fr)] gap-x-3 sm:gap-x-0 sm:grid-cols-[209px_minmax(0,1fr)] text-[14px] leading-[24px]">
                     <dt className="text-adm-ink">{row.label}</dt>
                     <dd className="text-adm-ink min-w-0">{row.value}</dd>
                   </div>
@@ -329,9 +329,9 @@ export default function PriceRulesView() {
             <div className="mt-4 border-t border-adm-border pt-[10px]">
               <h4 className="text-[16px] leading-[22px] font-semibold text-adm-ink">Change impact</h4>
               <p className="mt-[3px] text-[13px] leading-[18px] text-adm-muted">Shows how many vehicles will be affected by a change to these settings.</p>
-              <label className="mt-[9px] flex items-center">
+              <label className="mt-[9px] flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-0">
                 <span className="w-[89px] flex-shrink-0 text-[14px] leading-[20px] font-medium text-adm-ink">Scope</span>
-                <AdminSelect value={scope} onChange={(e) => setScope(e.target.value as FeeScope)} className="h-8 w-full max-w-[252px] text-[14px]" aria-label="Change scope">
+                <AdminSelect value={scope} onChange={(e) => setScope(e.target.value as FeeScope)} className="h-8 w-full sm:max-w-[252px] text-[14px]" aria-label="Change scope">
                   <option value="active">Active inventory (default)</option>
                   <option value="all">Include archived records</option>
                 </AdminSelect>
@@ -395,7 +395,7 @@ export default function PriceRulesView() {
         title="Price consistency"
         description="Compares advertised total across different consumer touchpoints."
         headerBorder={false}
-        headerClassName="pt-[14px] pb-0"
+        headerClassName="pt-[14px] pb-0 max-sm:flex-col max-sm:gap-2"
         action={
           <>
             <StatusChip tone={headline.tone} icon>{headline.label}</StatusChip>

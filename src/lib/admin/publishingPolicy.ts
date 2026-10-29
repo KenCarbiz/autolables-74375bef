@@ -124,6 +124,8 @@ export function deriveDocumentPublication(rules: DocumentRules, description: Des
   };
 }
 
+const listOf = (parts: string[]): string => (parts.length < 2 ? parts.join("") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`);
+
 export function deriveRetailReadiness(settings: PublishingSettingsSlice, cls: VehicleClass): PolicyCell {
   const installs = settings.require_install_verification === true;
   const price = settings.feature_price_verification === true;
@@ -132,7 +134,7 @@ export function deriveRetailReadiness(settings: PublishingSettingsSlice, cls: Ve
     return {
       label: parts.length ? "Pre-delivery checks" : "No pre-delivery gate",
       detail: parts.length
-        ? `Signing waits for ${parts.join(" and ")}. New vehicles have no inspection gate.`
+        ? `Signing waits for ${listOf(parts as string[])}. New vehicles have no inspection gate.`
         : "Customer disclosures can be signed without a pre-delivery gate on new vehicles.",
       enforcer: "require_install_verification; feature_price_verification with enforce_price_verified_before_sign",
       state: parts.length ? "configured" : "open",
@@ -144,7 +146,7 @@ export function deriveRetailReadiness(settings: PublishingSettingsSlice, cls: Ve
   return {
     label: k208 ? (cls === "cpo" ? "Service + CPO checks" : "Service + inspection") : parts.length ? "Pre-delivery checks" : "No inspection gate",
     detail: parts.length
-      ? `Signing waits for ${parts.join(", ")}.${cls === "cpo" ? " CPO program evidence is dealer-attested, not a server gate." : ""}`
+      ? `Signing waits for ${listOf(parts as string[])}.${cls === "cpo" ? " CPO program evidence is dealer-attested, not a server gate." : ""}`
       : `Customer disclosures can be signed without an inspection gate on ${cls === "cpo" ? "CPO" : "used"} vehicles.`,
     enforcer: "require_safety_inspection, require_k208_licensee_certification, require_install_verification read by the signing flow; k208_signer_allowed",
     state: parts.length ? "configured" : "open",
@@ -226,7 +228,7 @@ export function deriveClassDetail(row: PublishingRow, settings: PublishingSettin
         tone: gated ? "danger" : "info",
       },
     ],
-    ruleText: `A ${cls} vehicle can be listed when it meets the recall policy${auto ? " and is published on intake" : " and a person publishes it"}. ${approval ? "Documents must be approved before publication" : "Documents publish without an approval gate"}${gated ? `, and the vehicle must complete ${row.retailReadiness.detail.replace(/^Signing waits for /, "").replace(/\.$/, "").replace(/\. .*$/, "")} to be retail ready.` : ", and no retail-readiness gate applies."}`,
+    ruleText: `A ${cls} vehicle can be listed when it meets the recall policy${auto ? " and is published on intake" : " and a person publishes it"}. ${approval ? "Documents must be approved before publication" : "Documents publish without an approval gate"}${gated ? `, and the vehicle needs ${row.retailReadiness.detail.replace(/^Signing waits for /, "").replace(/\.$/, "").replace(/\. .*$/, "")} to be retail ready.` : ", and no retail-readiness gate applies."}`,
     approvalRulesHref: adminTabHref("approval-rules"),
   };
 }

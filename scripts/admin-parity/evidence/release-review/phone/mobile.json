@@ -1,0 +1,178 @@
+[
+ {
+  "screen": "10",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 1932,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   },
+   {
+    "label": "Publishing views (scrolls sideways)",
+    "focusable": true,
+    "hidden": 107
+   },
+   {
+    "label": "Effective publishing policy by vehicle type (scrolls sideways)",
+    "focusable": true,
+    "hidden": 446
+   }
+  ]
+ },
+ {
+  "screen": "11",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 1801,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   },
+   {
+    "label": "Documents & Service views (scrolls sideways)",
+    "focusable": true,
+    "hidden": 132
+   },
+   {
+    "label": "Approval rules by document (scrolls sideways)",
+    "focusable": true,
+    "hidden": 428
+   }
+  ]
+ },
+ {
+  "screen": "13",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 2527,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   }
+  ]
+ },
+ {
+  "screen": "02",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 2280,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   },
+   {
+    "label": "Dealership & Brand views (scrolls sideways)",
+    "focusable": true,
+    "hidden": 52
+   }
+  ]
+ },
+ {
+  "screen": "03",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 1577,
+  "captures": 2,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   },
+   {
+    "label": "Team members (scrolls sideways)",
+    "focusable": true,
+    "hidden": 362
+   }
+  ]
+ },
+ {
+  "screen": "04",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 2940,
+  "captures": 4,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   }
+  ]
+ },
+ {
+  "screen": "05",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 3959,
+  "captures": 5,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   },
+   {
+    "label": "Pricing & Products views (scrolls sideways)",
+    "focusable": true,
+    "hidden": 67
+   }
+  ]
+ },
+ {
+  "screen": "07",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 2457,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   },
+   {
+    "label": "Product views (scrolls sideways)",
+    "focusable": true,
+    "hidden": 152
+   },
+   {
+    "label": "Sample vehicle results (scrolls sideways)",
+    "focusable": true,
+    "hidden": 229
+   }
+  ]
+ },
+ {
+  "screen": "09",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 2324,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 760
+   },
+   {
+    "label": "Escalation delivery activity (scrolls sideways)",
+    "focusable": true,
+    "hidden": 318
+   }
+  ]
+ }
+]

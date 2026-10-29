@@ -1,0 +1,78 @@
+10 1586x992 unchanged: overflow 0px; alerts []; disabled []
+10 1586x992 used-selected: overflow 0px; alerts []; disabled []
+10 1586x992 cpo-selected: overflow 0px; alerts []; disabled []
+10 1586x992 collapsed: overflow 0px; alerts []; disabled []
+10 1586x992 preview-impact-dialog: dialog "Review publishing policy change" fits true, scrolls inside false; overflow 0px; alerts []; disabled [Apply policy]
+10 1586x992 preview-impact-escape: focus returned true
+10 1586x992 policy-edited: overflow 0px; alerts []; disabled []
+10 1586x992 policy-review-dialog: dialog "Review publishing policy change" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+10 1586x992 policy-review-escape: focus returned true
+10 390x844 unchanged: overflow 0px; alerts []; disabled []
+10 390x844 used-selected: overflow 0px; alerts []; disabled []
+10 390x844 cpo-selected: overflow 0px; alerts []; disabled []
+10 390x844 collapsed: overflow 0px; alerts []; disabled []
+10 390x844 preview-impact-dialog: dialog "Review publishing policy change" fits true, scrolls inside true; overflow 0px; alerts []; disabled []
+10 390x844 preview-impact-escape: focus returned true
+10 390x844 policy-edited: overflow 0px; alerts []; disabled []
+10 390x844 policy-review-dialog: dialog "Review publishing policy change" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+10 390x844 policy-review-dialog-scrolled: dialog "Review publishing policy change" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+10 390x844 policy-review-escape: focus returned true
+11 1586x992 unchanged: overflow 0px; alerts []; disabled []
+11 1586x992 edit-window-sticker: overflow 0px; alerts []; disabled []
+11 1586x992 edit-window-sticker-escape: focus returned true
+11 1586x992 policy-edited: overflow 0px; alerts []; disabled []
+11 1586x992 policy-review-dialog: dialog "Review policy changes" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+11 1586x992 policy-review-escape: focus returned true
+11 390x844 unchanged: overflow 0px; alerts []; disabled []
+11 390x844 edit-window-sticker: overflow 0px; alerts []; disabled []
+11 390x844 edit-window-sticker-escape: focus returned true
+11 390x844 policy-edited: overflow 0px; alerts []; disabled []
+11 390x844 policy-review-dialog: dialog "Review policy changes" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+11 390x844 policy-review-dialog-scrolled: dialog "Review policy changes" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+11 390x844 policy-review-escape: focus returned true
+13 1586x992 unchanged: overflow 0px; alerts []; disabled []
+13 1586x992 retry-options-open: overflow 0px; alerts []; disabled []
+13 1586x992 retry-options-escape: focus returned true
+13 1586x992 copy-evidence: overflow 0px; alerts []; disabled []
+13 390x844 unchanged: overflow 0px; alerts []; disabled []
+13 390x844 retry-options-open: overflow 0px; alerts []; disabled []
+13 390x844 retry-options-escape: focus returned true
+13 390x844 copy-evidence: overflow 0px; alerts []; disabled []
+02 1586x992 unchanged: overflow 0px; alerts []; disabled [Upload new logo, Review changes]
+02 1586x992 name-edited: overflow 0px; alerts []; disabled [Upload new logo]
+02 1586x992 name-review-panel: overflow 0px; alerts []; disabled [Upload new logo, Apply changes]
+02 1586x992 name-empty-validation: overflow 0px; alerts [brand-name]; disabled [Upload new logo, Review changes]
+02 390x844 unchanged: overflow 0px; alerts []; disabled [Review changes]
+02 390x844 name-edited: overflow 0px; alerts []; disabled []
+02 390x844 name-review-panel: overflow 0px; alerts []; disabled [Apply changes]
+02 390x844 name-empty-validation: overflow 0px; alerts [brand-name]; disabled [Review changes]
+05 1586x992 unchanged: overflow 0px; alerts []; disabled [Review changes]
+05 1586x992 edit-open: overflow 0px; alerts []; disabled [Review changes]
+05 1586x992 scope-changed: overflow 0px; alerts []; disabled [Review changes]
+05 1586x992 switch-toggled: overflow 0px; alerts []; disabled []
+05 1586x992 switch-edited: overflow 0px; alerts []; disabled []
+05 1586x992 switch-review-dialog: dialog "Review document fee change" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+05 1586x992 switch-review-escape: focus returned true
+05 390x844 unchanged: overflow 0px; alerts []; disabled [Review changes]
+05 390x844 edit-open: overflow 0px; alerts []; disabled []
+05 390x844 scope-changed: overflow 0px; alerts []; disabled []
+05 390x844 switch-toggled: overflow 0px; alerts []; disabled []
+05 390x844 switch-edited: overflow 0px; alerts []; disabled []
+05 390x844 switch-review-dialog: dialog "Review document fee change" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+05 390x844 switch-review-dialog-scrolled: dialog "Review document fee change" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+05 390x844 switch-review-escape: focus returned true
+09 1586x992 unchanged: overflow 0px; alerts [Destination requiredAdd email | Destination requiredAdd email]; disabled [SMSNot supported, In-appNot supported, PushNot supported, Review changes]
+09 1586x992 add-email: overflow 0px; alerts [Destination required | Destination requiredAdd email]; disabled [SMSNot supported, In-appNot supported, PushNot supported, Review changes]
+09 1586x992 target-edited-blocked: overflow 0px; alerts [Destination required | Destination requiredAdd email]; disabled [SMSNot supported, In-appNot supported, PushNot supported, Review changes]
+09 1586x992 target-edited: overflow 0px; alerts []; disabled [SMSNot supported, In-appNot supported, PushNot supported]
+09 1586x992 target-review-dialog: dialog "Review escalation changes" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+09 1586x992 target-review-escape: focus returned true
+09 1586x992 rules-switch: overflow 0px; alerts []; disabled []
+09 390x844 unchanged: overflow 0px; alerts [Destination requiredAdd email | Destination requiredAdd email]; disabled []
+09 390x844 add-email: overflow 0px; alerts [Destination required | Destination requiredAdd email]; disabled []
+09 390x844 target-edited-blocked: overflow 0px; alerts [Destination required | Destination requiredAdd email]; disabled [SMSNot supported, In-appNot supported, PushNot supported, Review changes]
+09 390x844 target-edited: overflow 0px; alerts []; disabled [SMSNot supported, In-appNot supported, PushNot supported]
+09 390x844 target-review-dialog: dialog "Review escalation changes" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+09 390x844 target-review-dialog-scrolled: dialog "Review escalation changes" fits true, scrolls inside false; overflow 0px; alerts []; disabled []
+09 390x844 target-review-escape: focus returned true
+09 390x844 rules-switch: overflow 0px; alerts []; disabled []

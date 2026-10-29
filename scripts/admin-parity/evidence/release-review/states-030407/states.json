@@ -1,0 +1,1393 @@
+[
+  {
+    "screen": "03",
+    "viewport": "1586x992",
+    "state": "row-actions-menu",
+    "file": "03-1586x992-row-actions-menu.png",
+    "note": "Row actions: View role policy, Change role, Remove from team",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Team",
+        "disabled": false
+      },
+      {
+        "label": "Roles",
+        "disabled": false
+      },
+      {
+        "label": "Invitations",
+        "disabled": false
+      },
+      {
+        "label": "Access activity",
+        "disabled": false
+      },
+      {
+        "label": "Add employee",
+        "disabled": false
+      },
+      {
+        "label": "Employee",
+        "disabled": false
+      },
+      {
+        "label": "Role",
+        "disabled": false
+      },
+      {
+        "label": "Department",
+        "disabled": false
+      },
+      {
+        "label": "Access",
+        "disabled": false
+      },
+      {
+        "label": "Status",
+        "disabled": false
+      },
+      {
+        "label": "ESexample.salesperson@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for example.salesperson@example.test",
+        "disabled": false
+      },
+      {
+        "label": "SAservice.advisor@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for service.advisor@example.test",
+        "disabled": false
+      },
+      {
+        "label": "IMinventory.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for inventory.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "TCtitle.clerk@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for title.clerk@example.test",
+        "disabled": false
+      },
+      {
+        "label": "GMgeneral.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for general.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Close role summary",
+        "disabled": false
+      },
+      {
+        "label": "View role policy",
+        "disabled": false
+      },
+      {
+        "label": "View role policy",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "1586x992",
+    "state": "change-role-dialog",
+    "file": "03-1586x992-change-role-dialog.png",
+    "note": "Review role change, editing step",
+    "dialog": "Review role change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review change",
+        "disabled": true
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "1586x992",
+    "state": "change-role-review",
+    "file": "03-1586x992-change-role-review.png",
+    "note": "Review step after choosing a different role; Apply is blocked by the design fixture's read-only reason",
+    "dialog": "Review role change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply change",
+        "disabled": true
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "1586x992",
+    "state": "change-role-dialog-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "03",
+    "viewport": "1586x992",
+    "state": "remove-dialog",
+    "file": "03-1586x992-remove-dialog.png",
+    "note": "Remove confirmation",
+    "dialog": "Remove example.salesperson@example.test from the team?",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Remove",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "1586x992",
+    "state": "remove-dialog-cancel",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "03",
+    "viewport": "1586x992",
+    "state": "rail-closed",
+    "file": "03-1586x992-rail-closed.png",
+    "note": "No member selected: the rail closes and the table takes the card width",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Team",
+        "disabled": false
+      },
+      {
+        "label": "Roles",
+        "disabled": false
+      },
+      {
+        "label": "Invitations",
+        "disabled": false
+      },
+      {
+        "label": "Access activity",
+        "disabled": false
+      },
+      {
+        "label": "Add employee",
+        "disabled": false
+      },
+      {
+        "label": "Employee",
+        "disabled": false
+      },
+      {
+        "label": "Role",
+        "disabled": false
+      },
+      {
+        "label": "Department",
+        "disabled": false
+      },
+      {
+        "label": "Access",
+        "disabled": false
+      },
+      {
+        "label": "Status",
+        "disabled": false
+      },
+      {
+        "label": "ESexample.salesperson@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for example.salesperson@example.test",
+        "disabled": false
+      },
+      {
+        "label": "SAservice.advisor@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for service.advisor@example.test",
+        "disabled": false
+      },
+      {
+        "label": "IMinventory.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for inventory.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "TCtitle.clerk@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for title.clerk@example.test",
+        "disabled": false
+      },
+      {
+        "label": "GMgeneral.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for general.manager@example.test",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "1586x992",
+    "state": "no-match",
+    "file": "03-1586x992-no-match.png",
+    "note": "Search with no match: count line and Clear filters",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Team",
+        "disabled": false
+      },
+      {
+        "label": "Roles",
+        "disabled": false
+      },
+      {
+        "label": "Invitations",
+        "disabled": false
+      },
+      {
+        "label": "Access activity",
+        "disabled": false
+      },
+      {
+        "label": "Add employee",
+        "disabled": false
+      },
+      {
+        "label": "Clear filters",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "390x844",
+    "state": "row-actions-menu",
+    "file": "03-390x844-row-actions-menu.png",
+    "note": "Row actions: View role policy, Change role, Remove from team",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Team",
+        "disabled": false
+      },
+      {
+        "label": "Roles",
+        "disabled": false
+      },
+      {
+        "label": "Invitations",
+        "disabled": false
+      },
+      {
+        "label": "Access activity",
+        "disabled": false
+      },
+      {
+        "label": "Add employee",
+        "disabled": false
+      },
+      {
+        "label": "Department",
+        "disabled": false
+      },
+      {
+        "label": "Access",
+        "disabled": false
+      },
+      {
+        "label": "Status",
+        "disabled": false
+      },
+      {
+        "label": "Actions for example.salesperson@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for service.advisor@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for inventory.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for title.clerk@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for general.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "View role policy",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "390x844",
+    "state": "change-role-dialog",
+    "file": "03-390x844-change-role-dialog.png",
+    "note": "Review role change, editing step",
+    "dialog": "Review role change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review change",
+        "disabled": true
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "390x844",
+    "state": "change-role-review",
+    "file": "03-390x844-change-role-review.png",
+    "note": "Review step after choosing a different role; Apply is blocked by the design fixture's read-only reason",
+    "dialog": "Review role change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": true,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "390x844",
+    "state": "change-role-review-scrolled",
+    "file": "03-390x844-change-role-review-scrolled.png",
+    "note": "Phone: the review step scrolls inside the dialog to Cancel and Apply change",
+    "dialog": "Review role change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": true,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply change",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "390x844",
+    "state": "change-role-dialog-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "03",
+    "viewport": "390x844",
+    "state": "remove-dialog",
+    "file": "03-390x844-remove-dialog.png",
+    "note": "Remove confirmation",
+    "dialog": "Remove example.salesperson@example.test from the team?",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Remove",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "390x844",
+    "state": "remove-dialog-cancel",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "03",
+    "viewport": "390x844",
+    "state": "rail-below-table",
+    "file": "03-390x844-rail-below-table.png",
+    "note": "Phone: the role summary rail sits below the table",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Department",
+        "disabled": false
+      },
+      {
+        "label": "Access",
+        "disabled": false
+      },
+      {
+        "label": "Status",
+        "disabled": false
+      },
+      {
+        "label": "Actions for example.salesperson@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for service.advisor@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for inventory.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for title.clerk@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Actions for general.manager@example.test",
+        "disabled": false
+      },
+      {
+        "label": "Close role summary",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "03",
+    "viewport": "390x844",
+    "state": "no-match",
+    "file": "03-390x844-no-match.png",
+    "note": "Search with no match: count line and Clear filters",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Team",
+        "disabled": false
+      },
+      {
+        "label": "Roles",
+        "disabled": false
+      },
+      {
+        "label": "Invitations",
+        "disabled": false
+      },
+      {
+        "label": "Access activity",
+        "disabled": false
+      },
+      {
+        "label": "Add employee",
+        "disabled": false
+      },
+      {
+        "label": "Clear filters",
+        "disabled": false
+      },
+      {
+        "label": "Close role summary",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "04",
+    "viewport": "1586x992",
+    "state": "test-role-access-dialog",
+    "file": "04-1586x992-test-role-access-dialog.png",
+    "note": "Test role access preview (test data)",
+    "dialog": "Preview as SalespersonTest data",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "04",
+    "viewport": "1586x992",
+    "state": "test-role-access-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "04",
+    "viewport": "1586x992",
+    "state": "review-policy-dialog",
+    "file": "04-1586x992-review-policy-dialog.png",
+    "note": "Review policy changes opens the role change review",
+    "dialog": "Review role change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review change",
+        "disabled": true
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "04",
+    "viewport": "1586x992",
+    "state": "status-sources-open",
+    "file": "04-1586x992-status-sources-open.png",
+    "note": "Required enforcement: where each status comes from, expanded",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Roles",
+        "disabled": false
+      },
+      {
+        "label": "Back to Roles",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "04",
+    "viewport": "1366x768",
+    "state": "matrix-full-width",
+    "file": "04-1366x768-matrix-full-width.png",
+    "note": "Below 1536px the cards stack, so the matrix shows Read, Create or act and Manage without sideways scrolling",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Roles",
+        "disabled": false
+      },
+      {
+        "label": "Back to Roles",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "04",
+    "viewport": "390x844",
+    "state": "test-role-access-dialog",
+    "file": "04-390x844-test-role-access-dialog.png",
+    "note": "Test role access preview (test data)",
+    "dialog": "Preview as SalespersonTest data",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "04",
+    "viewport": "390x844",
+    "state": "test-role-access-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "04",
+    "viewport": "390x844",
+    "state": "review-policy-dialog",
+    "file": "04-390x844-review-policy-dialog.png",
+    "note": "Review policy changes opens the role change review",
+    "dialog": "Review role change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review change",
+        "disabled": true
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "unchanged-review-disabled",
+    "file": "07-1586x992-unchanged-review-disabled.png",
+    "note": "No change yet: Review changes is disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Back to applicability",
+        "disabled": false
+      },
+      {
+        "label": "Details",
+        "disabled": false
+      },
+      {
+        "label": "Applicability",
+        "disabled": false
+      },
+      {
+        "label": "Installation evidence",
+        "disabled": false
+      },
+      {
+        "label": "Disclosures",
+        "disabled": false
+      },
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "edited-review-enabled",
+    "file": "07-1586x992-edited-review-enabled.png",
+    "note": "Mileage set to No limit: Review changes is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Back to applicability",
+        "disabled": false
+      },
+      {
+        "label": "Details",
+        "disabled": false
+      },
+      {
+        "label": "Applicability",
+        "disabled": false
+      },
+      {
+        "label": "Installation evidence",
+        "disabled": false
+      },
+      {
+        "label": "Disclosures",
+        "disabled": false
+      },
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "reviewing",
+    "file": "07-1586x992-reviewing.png",
+    "note": "Review step: before and after table, Back to edit and Apply changes",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Back to applicability",
+        "disabled": false
+      },
+      {
+        "label": "Details",
+        "disabled": false
+      },
+      {
+        "label": "Applicability",
+        "disabled": false
+      },
+      {
+        "label": "Installation evidence",
+        "disabled": false
+      },
+      {
+        "label": "Disclosures",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "reviewing-preview-only",
+    "file": "07-1586x992-reviewing-preview-only.png",
+    "note": "Design fixture: Apply changes disabled; \"Preview only — changes are not saved.\"",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "year-range-invalid",
+    "file": "07-1586x992-year-range-invalid.png",
+    "note": "Model year from later than to: validation message, Review changes disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Back to applicability",
+        "disabled": false
+      },
+      {
+        "label": "Details",
+        "disabled": false
+      },
+      {
+        "label": "Applicability",
+        "disabled": false
+      },
+      {
+        "label": "Installation evidence",
+        "disabled": false
+      },
+      {
+        "label": "Disclosures",
+        "disabled": false
+      },
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "sample-results-full-width",
+    "file": "07-1366x768-sample-results-full-width.png",
+    "note": "Below 1536px the panels stack, so every Sample vehicle results column is visible",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "unchanged-review-disabled",
+    "file": "07-1366x768-unchanged-review-disabled.png",
+    "note": "No change yet: Review changes is disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "edited-review-enabled",
+    "file": "07-1366x768-edited-review-enabled.png",
+    "note": "Mileage set to No limit: Review changes is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "reviewing",
+    "file": "07-1366x768-reviewing.png",
+    "note": "Review step: before and after table, Back to edit and Apply changes",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": []
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "reviewing-preview-only",
+    "file": "07-1366x768-reviewing-preview-only.png",
+    "note": "Design fixture: Apply changes disabled; \"Preview only — changes are not saved.\"",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "390x844",
+    "state": "unchanged-review-disabled",
+    "file": "07-390x844-unchanged-review-disabled.png",
+    "note": "No change yet: Review changes is disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "390x844",
+    "state": "edited-review-enabled",
+    "file": "07-390x844-edited-review-enabled.png",
+    "note": "Mileage set to No limit: Review changes is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "390x844",
+    "state": "reviewing",
+    "file": "07-390x844-reviewing.png",
+    "note": "Review step: before and after table, Back to edit and Apply changes",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": []
+  },
+  {
+    "screen": "07",
+    "viewport": "390x844",
+    "state": "reviewing-preview-only",
+    "file": "07-390x844-reviewing-preview-only.png",
+    "note": "Design fixture: Apply changes disabled; \"Preview only — changes are not saved.\"",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": true
+      }
+    ]
+  }
+]

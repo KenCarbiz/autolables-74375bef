@@ -1,0 +1,3884 @@
+[
+  {
+    "screen": "10",
+    "viewport": "1586x992",
+    "state": "unchanged",
+    "file": "10-1586x992-unchanged.png",
+    "note": "Effective policy, New selected",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Collapse",
+        "disabled": false
+      },
+      {
+        "label": "Review approval rules",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Preview impact",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "1586x992",
+    "state": "used-selected",
+    "file": "10-1586x992-used-selected.png",
+    "note": "Used selected",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Collapse",
+        "disabled": false
+      },
+      {
+        "label": "Review approval rules",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Preview impact",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "1586x992",
+    "state": "cpo-selected",
+    "file": "10-1586x992-cpo-selected.png",
+    "note": "CPO selected",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Collapse",
+        "disabled": false
+      },
+      {
+        "label": "Review approval rules",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Preview impact",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "1586x992",
+    "state": "collapsed",
+    "file": "10-1586x992-collapsed.png",
+    "note": "Policy detail collapsed",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Expand",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Preview impact",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "1586x992",
+    "state": "preview-impact-dialog",
+    "file": "10-1586x992-preview-impact-dialog.png",
+    "note": "Preview impact",
+    "dialog": "Review publishing policy change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply policy",
+        "disabled": true
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "1586x992",
+    "state": "preview-impact-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "10",
+    "viewport": "1586x992",
+    "state": "policy-edited",
+    "file": "10-1586x992-policy-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Expand",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Preview impact",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "1586x992",
+    "state": "policy-review-dialog",
+    "file": "10-1586x992-policy-review-dialog.png",
+    "note": "Review step: before and after; Apply is disabled in the design fixture",
+    "dialog": "Review publishing policy change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Continue to review",
+        "disabled": false
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "1586x992",
+    "state": "policy-review-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "unchanged",
+    "file": "10-390x844-unchanged.png",
+    "note": "Effective policy, New selected",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Collapse",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "used-selected",
+    "file": "10-390x844-used-selected.png",
+    "note": "Used selected",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Collapse",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "cpo-selected",
+    "file": "10-390x844-cpo-selected.png",
+    "note": "CPO selected",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Collapse",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "collapsed",
+    "file": "10-390x844-collapsed.png",
+    "note": "Policy detail collapsed",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Expand",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "preview-impact-dialog",
+    "file": "10-390x844-preview-impact-dialog.png",
+    "note": "Preview impact",
+    "dialog": "Review publishing policy change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": true,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "preview-impact-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "policy-edited",
+    "file": "10-390x844-policy-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Effective policy",
+        "disabled": false
+      },
+      {
+        "label": "Approvals",
+        "disabled": false
+      },
+      {
+        "label": "Destinations",
+        "disabled": false
+      },
+      {
+        "label": "Change history",
+        "disabled": false
+      },
+      {
+        "label": "New",
+        "disabled": false
+      },
+      {
+        "label": "Used",
+        "disabled": false
+      },
+      {
+        "label": "CPO",
+        "disabled": false
+      },
+      {
+        "label": "Expand",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Preview impact",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "policy-review-dialog",
+    "file": "10-390x844-policy-review-dialog.png",
+    "note": "Review step: before and after; Apply is disabled in the design fixture",
+    "dialog": "Review publishing policy change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Continue to review",
+        "disabled": false
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "policy-review-dialog-scrolled",
+    "file": "10-390x844-policy-review-dialog-scrolled.png",
+    "note": "Phone: the review step scrolled to its actions",
+    "dialog": "Review publishing policy change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Continue to review",
+        "disabled": false
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "10",
+    "viewport": "390x844",
+    "state": "policy-review-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "11",
+    "viewport": "1586x992",
+    "state": "unchanged",
+    "file": "11-1586x992-unchanged.png",
+    "note": "Approval rules",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Templates",
+        "disabled": false
+      },
+      {
+        "label": "Approval rules",
+        "disabled": false
+      },
+      {
+        "label": "Print & Calibration",
+        "disabled": false
+      },
+      {
+        "label": "Service policy",
+        "disabled": false
+      },
+      {
+        "label": "Edit Window sticker rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Buyers Guide rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Addendum rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Inspection record rules",
+        "disabled": false
+      },
+      {
+        "label": "View change history",
+        "disabled": false
+      },
+      {
+        "label": "Preview document",
+        "disabled": false
+      },
+      {
+        "label": "Review policy changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "11",
+    "viewport": "1586x992",
+    "state": "edit-window-sticker",
+    "file": "11-1586x992-edit-window-sticker.png",
+    "note": "Edit Window sticker rules",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Templates",
+        "disabled": false
+      },
+      {
+        "label": "Approval rules",
+        "disabled": false
+      },
+      {
+        "label": "Print & Calibration",
+        "disabled": false
+      },
+      {
+        "label": "Service policy",
+        "disabled": false
+      },
+      {
+        "label": "Edit Window sticker rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Buyers Guide rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Addendum rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Inspection record rules",
+        "disabled": false
+      },
+      {
+        "label": "View change history",
+        "disabled": false
+      },
+      {
+        "label": "Done",
+        "disabled": false
+      },
+      {
+        "label": "Require manager approval before printing",
+        "disabled": false
+      },
+      {
+        "label": "Require manager approval before publishing to th",
+        "disabled": false
+      },
+      {
+        "label": "Auto-submit newly generated documents for approv",
+        "disabled": false
+      },
+      {
+        "label": "Allow salespeople to print approved documents",
+        "disabled": false
+      },
+      {
+        "label": "Mark documents stale when the vehicle price chan",
+        "disabled": false
+      },
+      {
+        "label": "Mark stale when MSRP changes",
+        "disabled": false
+      },
+      {
+        "label": "Mark stale when mileage changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "11",
+    "viewport": "1586x992",
+    "state": "edit-window-sticker-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "11",
+    "viewport": "1586x992",
+    "state": "policy-edited",
+    "file": "11-1586x992-policy-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Edit Addendum rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Inspection record rules",
+        "disabled": false
+      },
+      {
+        "label": "Done",
+        "disabled": false
+      },
+      {
+        "label": "Require manager approval before printing",
+        "disabled": false
+      },
+      {
+        "label": "Require manager approval before publishing to th",
+        "disabled": false
+      },
+      {
+        "label": "Auto-submit newly generated documents for approv",
+        "disabled": false
+      },
+      {
+        "label": "Allow salespeople to print approved documents",
+        "disabled": false
+      },
+      {
+        "label": "Mark documents stale when the vehicle price chan",
+        "disabled": false
+      },
+      {
+        "label": "Mark stale when MSRP changes",
+        "disabled": false
+      },
+      {
+        "label": "Mark stale when mileage changes",
+        "disabled": false
+      },
+      {
+        "label": "Mark stale when the vehicle is sold or removed",
+        "disabled": false
+      },
+      {
+        "label": "Auto-unpublish stale public documents",
+        "disabled": false
+      },
+      {
+        "label": "Require manager review for stale documents",
+        "disabled": false
+      },
+      {
+        "label": "Auto-publish approved window stickers",
+        "disabled": false
+      },
+      {
+        "label": "Hide superseded documents from the public page",
+        "disabled": false
+      },
+      {
+        "label": "Show document version history publicly",
+        "disabled": false
+      },
+      {
+        "label": "Track QR scans",
+        "disabled": false
+      },
+      {
+        "label": "Preview document",
+        "disabled": false
+      },
+      {
+        "label": "Review policy changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "11",
+    "viewport": "1586x992",
+    "state": "policy-review-dialog",
+    "file": "11-1586x992-policy-review-dialog.png",
+    "note": "Review step: before and after; Apply is disabled in the design fixture",
+    "dialog": "Review policy changes",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Apply",
+        "disabled": false
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "11",
+    "viewport": "1586x992",
+    "state": "policy-review-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "11",
+    "viewport": "390x844",
+    "state": "unchanged",
+    "file": "11-390x844-unchanged.png",
+    "note": "Approval rules",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Templates",
+        "disabled": false
+      },
+      {
+        "label": "Approval rules",
+        "disabled": false
+      },
+      {
+        "label": "Print & Calibration",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "11",
+    "viewport": "390x844",
+    "state": "edit-window-sticker",
+    "file": "11-390x844-edit-window-sticker.png",
+    "note": "Edit Window sticker rules",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Templates",
+        "disabled": false
+      },
+      {
+        "label": "Approval rules",
+        "disabled": false
+      },
+      {
+        "label": "Print & Calibration",
+        "disabled": false
+      },
+      {
+        "label": "Edit Window sticker rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Buyers Guide rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Addendum rules",
+        "disabled": false
+      },
+      {
+        "label": "Edit Inspection record rules",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "11",
+    "viewport": "390x844",
+    "state": "edit-window-sticker-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "11",
+    "viewport": "390x844",
+    "state": "policy-edited",
+    "file": "11-390x844-policy-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Auto-publish approved window stickers",
+        "disabled": false
+      },
+      {
+        "label": "Hide superseded documents from the public page",
+        "disabled": false
+      },
+      {
+        "label": "Show document version history publicly",
+        "disabled": false
+      },
+      {
+        "label": "Track QR scans",
+        "disabled": false
+      },
+      {
+        "label": "Preview document",
+        "disabled": false
+      },
+      {
+        "label": "Review policy changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "11",
+    "viewport": "390x844",
+    "state": "policy-review-dialog",
+    "file": "11-390x844-policy-review-dialog.png",
+    "note": "Review step: before and after; Apply is disabled in the design fixture",
+    "dialog": "Review policy changes",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Apply",
+        "disabled": false
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "11",
+    "viewport": "390x844",
+    "state": "policy-review-dialog-scrolled",
+    "file": "11-390x844-policy-review-dialog-scrolled.png",
+    "note": "Phone: the review step scrolled to its actions",
+    "dialog": "Review policy changes",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Apply",
+        "disabled": false
+      },
+      {
+        "label": "Close",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "11",
+    "viewport": "390x844",
+    "state": "policy-review-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "13",
+    "viewport": "1586x992",
+    "state": "unchanged",
+    "file": "13-1586x992-unchanged.png",
+    "note": "Sync run detail",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Inventory feed",
+        "disabled": false
+      },
+      {
+        "label": "Copy technical evidence",
+        "disabled": false
+      },
+      {
+        "label": "Back to feed",
+        "disabled": false
+      },
+      {
+        "label": "Review retry options",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "13",
+    "viewport": "1586x992",
+    "state": "retry-options-open",
+    "file": "13-1586x992-retry-options-open.png",
+    "note": "Review retry options opened",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Inventory feed",
+        "disabled": false
+      },
+      {
+        "label": "Copy technical evidence",
+        "disabled": false
+      },
+      {
+        "label": "Back to feed",
+        "disabled": false
+      },
+      {
+        "label": "Review retry options",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "13",
+    "viewport": "1586x992",
+    "state": "retry-options-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "13",
+    "viewport": "1586x992",
+    "state": "copy-evidence",
+    "file": "13-1586x992-copy-evidence.png",
+    "note": "Copy technical evidence pressed",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Inventory feed",
+        "disabled": false
+      },
+      {
+        "label": "Copy technical evidence",
+        "disabled": false
+      },
+      {
+        "label": "Back to feed",
+        "disabled": false
+      },
+      {
+        "label": "Review retry options",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "13",
+    "viewport": "390x844",
+    "state": "unchanged",
+    "file": "13-390x844-unchanged.png",
+    "note": "Sync run detail",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Inventory feed",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "13",
+    "viewport": "390x844",
+    "state": "retry-options-open",
+    "file": "13-390x844-retry-options-open.png",
+    "note": "Review retry options opened",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Copy technical evidence",
+        "disabled": false
+      },
+      {
+        "label": "Back to feed",
+        "disabled": false
+      },
+      {
+        "label": "Review retry options",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "13",
+    "viewport": "390x844",
+    "state": "retry-options-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "13",
+    "viewport": "390x844",
+    "state": "copy-evidence",
+    "file": "13-390x844-copy-evidence.png",
+    "note": "Copy technical evidence pressed",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Copy technical evidence",
+        "disabled": false
+      },
+      {
+        "label": "Back to feed",
+        "disabled": false
+      },
+      {
+        "label": "Review retry options",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "02",
+    "viewport": "1586x992",
+    "state": "unchanged",
+    "file": "02-1586x992-unchanged.png",
+    "note": "No change: Review changes disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Identity",
+        "disabled": false
+      },
+      {
+        "label": "Appearance",
+        "disabled": false
+      },
+      {
+        "label": "Hours & Contact",
+        "disabled": false
+      },
+      {
+        "label": "Why Buy",
+        "disabled": false
+      },
+      {
+        "label": "Upload new logo",
+        "disabled": true
+      },
+      {
+        "label": "Edit",
+        "disabled": false
+      },
+      {
+        "label": "Not configured",
+        "disabled": false
+      },
+      {
+        "label": "Not configured",
+        "disabled": false
+      },
+      {
+        "label": "www.example.test (full address https://www.examp",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "02",
+    "viewport": "1586x992",
+    "state": "name-edited",
+    "file": "02-1586x992-name-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review changes is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Identity",
+        "disabled": false
+      },
+      {
+        "label": "Appearance",
+        "disabled": false
+      },
+      {
+        "label": "Hours & Contact",
+        "disabled": false
+      },
+      {
+        "label": "Why Buy",
+        "disabled": false
+      },
+      {
+        "label": "Upload new logo",
+        "disabled": true
+      },
+      {
+        "label": "Edit",
+        "disabled": false
+      },
+      {
+        "label": "Not configured",
+        "disabled": false
+      },
+      {
+        "label": "Not configured",
+        "disabled": false
+      },
+      {
+        "label": "www.example.test (full address https://www.examp",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "02",
+    "viewport": "1586x992",
+    "state": "name-review-panel",
+    "file": "02-1586x992-name-review-panel.png",
+    "note": "Review: the before and after list opens above the bar; Apply changes is disabled in the design fixture, which says why",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Identity",
+        "disabled": false
+      },
+      {
+        "label": "Appearance",
+        "disabled": false
+      },
+      {
+        "label": "Hours & Contact",
+        "disabled": false
+      },
+      {
+        "label": "Why Buy",
+        "disabled": false
+      },
+      {
+        "label": "Upload new logo",
+        "disabled": true
+      },
+      {
+        "label": "Edit",
+        "disabled": false
+      },
+      {
+        "label": "Not configured",
+        "disabled": false
+      },
+      {
+        "label": "Not configured",
+        "disabled": false
+      },
+      {
+        "label": "www.example.test (full address https://www.examp",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Keep editing",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "02",
+    "viewport": "1586x992",
+    "state": "name-empty-validation",
+    "file": "02-1586x992-name-empty-validation.png",
+    "note": "Dealership name cleared: validation and Review state",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [
+      "brand-name"
+    ],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Identity",
+        "disabled": false
+      },
+      {
+        "label": "Appearance",
+        "disabled": false
+      },
+      {
+        "label": "Hours & Contact",
+        "disabled": false
+      },
+      {
+        "label": "Why Buy",
+        "disabled": false
+      },
+      {
+        "label": "Upload new logo",
+        "disabled": true
+      },
+      {
+        "label": "Edit",
+        "disabled": false
+      },
+      {
+        "label": "Not configured",
+        "disabled": false
+      },
+      {
+        "label": "Not configured",
+        "disabled": false
+      },
+      {
+        "label": "www.example.test (full address https://www.examp",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "02",
+    "viewport": "390x844",
+    "state": "unchanged",
+    "file": "02-390x844-unchanged.png",
+    "note": "No change: Review changes disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Identity",
+        "disabled": false
+      },
+      {
+        "label": "Appearance",
+        "disabled": false
+      },
+      {
+        "label": "Hours & Contact",
+        "disabled": false
+      },
+      {
+        "label": "Why Buy",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "02",
+    "viewport": "390x844",
+    "state": "name-edited",
+    "file": "02-390x844-name-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review changes is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Identity",
+        "disabled": false
+      },
+      {
+        "label": "Appearance",
+        "disabled": false
+      },
+      {
+        "label": "Hours & Contact",
+        "disabled": false
+      },
+      {
+        "label": "Why Buy",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "02",
+    "viewport": "390x844",
+    "state": "name-review-panel",
+    "file": "02-390x844-name-review-panel.png",
+    "note": "Review: the before and after list opens above the bar; Apply changes is disabled in the design fixture, which says why",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Identity",
+        "disabled": false
+      },
+      {
+        "label": "Appearance",
+        "disabled": false
+      },
+      {
+        "label": "Hours & Contact",
+        "disabled": false
+      },
+      {
+        "label": "Why Buy",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Keep editing",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "02",
+    "viewport": "390x844",
+    "state": "name-empty-validation",
+    "file": "02-390x844-name-empty-validation.png",
+    "note": "Dealership name cleared: validation and Review state",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [
+      "brand-name"
+    ],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Identity",
+        "disabled": false
+      },
+      {
+        "label": "Appearance",
+        "disabled": false
+      },
+      {
+        "label": "Hours & Contact",
+        "disabled": false
+      },
+      {
+        "label": "Why Buy",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "1586x992",
+    "state": "unchanged",
+    "file": "05-1586x992-unchanged.png",
+    "note": "No change: Review changes disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Price rules",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Benefits",
+        "disabled": false
+      },
+      {
+        "label": "Warranty programs",
+        "disabled": false
+      },
+      {
+        "label": "Edit",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      },
+      {
+        "label": "Price audit",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "1586x992",
+    "state": "edit-open",
+    "file": "05-1586x992-edit-open.png",
+    "note": "Edit opened on the rule",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Price rules",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Benefits",
+        "disabled": false
+      },
+      {
+        "label": "Warranty programs",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Charge a document fee",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      },
+      {
+        "label": "Price audit",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "1586x992",
+    "state": "scope-changed",
+    "file": "05-1586x992-scope-changed.png",
+    "note": "Change scope set to another value",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Price rules",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Benefits",
+        "disabled": false
+      },
+      {
+        "label": "Warranty programs",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Charge a document fee",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      },
+      {
+        "label": "Price audit",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "1586x992",
+    "state": "switch-toggled",
+    "file": "05-1586x992-switch-toggled.png",
+    "note": "Branded-title switch toggled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Price rules",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Benefits",
+        "disabled": false
+      },
+      {
+        "label": "Warranty programs",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Charge a document fee",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Price audit",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "1586x992",
+    "state": "switch-edited",
+    "file": "05-1586x992-switch-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Price rules",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Benefits",
+        "disabled": false
+      },
+      {
+        "label": "Warranty programs",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Charge a document fee",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Price audit",
+        "disabled": false
+      },
+      {
+        "label": "Review",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "1586x992",
+    "state": "switch-review-dialog",
+    "file": "05-1586x992-switch-review-dialog.png",
+    "note": "Review step: before and after; Apply is disabled in the design fixture",
+    "dialog": "Review document fee change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Close review",
+        "disabled": false
+      },
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply to 48 active vehicles",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "1586x992",
+    "state": "switch-review-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "05",
+    "viewport": "390x844",
+    "state": "unchanged",
+    "file": "05-390x844-unchanged.png",
+    "note": "No change: Review changes disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Price rules",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Benefits",
+        "disabled": false
+      },
+      {
+        "label": "Warranty programs",
+        "disabled": false
+      },
+      {
+        "label": "Edit",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "390x844",
+    "state": "edit-open",
+    "file": "05-390x844-edit-open.png",
+    "note": "Edit opened on the rule",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Price rules",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Benefits",
+        "disabled": false
+      },
+      {
+        "label": "Warranty programs",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Charge a document fee",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "390x844",
+    "state": "scope-changed",
+    "file": "05-390x844-scope-changed.png",
+    "note": "Change scope set to another value",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Price rules",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Benefits",
+        "disabled": false
+      },
+      {
+        "label": "Warranty programs",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Charge a document fee",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "390x844",
+    "state": "switch-toggled",
+    "file": "05-390x844-switch-toggled.png",
+    "note": "Branded-title switch toggled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Price rules",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Benefits",
+        "disabled": false
+      },
+      {
+        "label": "Warranty programs",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      },
+      {
+        "label": "Charge a document fee",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "390x844",
+    "state": "switch-edited",
+    "file": "05-390x844-switch-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Review changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "390x844",
+    "state": "switch-review-dialog",
+    "file": "05-390x844-switch-review-dialog.png",
+    "note": "Review step: before and after; Apply is disabled in the design fixture",
+    "dialog": "Review document fee change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Close review",
+        "disabled": false
+      },
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply to 48 active vehicles",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "390x844",
+    "state": "switch-review-dialog-scrolled",
+    "file": "05-390x844-switch-review-dialog-scrolled.png",
+    "note": "Phone: the review step scrolled to its actions",
+    "dialog": "Review document fee change",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Close review",
+        "disabled": false
+      },
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply to 48 active vehicles",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "05",
+    "viewport": "390x844",
+    "state": "switch-review-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "09",
+    "viewport": "1586x992",
+    "state": "unchanged",
+    "file": "09-1586x992-unchanged.png",
+    "note": "No change: Review changes disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [
+      "Destination requiredAdd email",
+      "Destination requiredAdd email"
+    ],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Back to Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Rules",
+        "disabled": false
+      },
+      {
+        "label": "Delivery activity",
+        "disabled": false
+      },
+      {
+        "label": "Test route",
+        "disabled": false
+      },
+      {
+        "label": "Add BDC email",
+        "disabled": false
+      },
+      {
+        "label": "Add Sales manager email",
+        "disabled": false
+      },
+      {
+        "label": "EmailSend by email",
+        "disabled": false
+      },
+      {
+        "label": "SMSNot supported",
+        "disabled": true
+      },
+      {
+        "label": "In-appNot supported",
+        "disabled": true
+      },
+      {
+        "label": "PushNot supported",
+        "disabled": true
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "1586x992",
+    "state": "add-email",
+    "file": "09-1586x992-add-email.png",
+    "note": "Add BDC email opened",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [
+      "Destination required",
+      "Destination requiredAdd email"
+    ],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Back to Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Rules",
+        "disabled": false
+      },
+      {
+        "label": "Delivery activity",
+        "disabled": false
+      },
+      {
+        "label": "Test route",
+        "disabled": false
+      },
+      {
+        "label": "Add Sales manager email",
+        "disabled": false
+      },
+      {
+        "label": "EmailSend by email",
+        "disabled": false
+      },
+      {
+        "label": "SMSNot supported",
+        "disabled": true
+      },
+      {
+        "label": "In-appNot supported",
+        "disabled": true
+      },
+      {
+        "label": "PushNot supported",
+        "disabled": true
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "1586x992",
+    "state": "target-edited-blocked",
+    "file": "09-1586x992-target-edited-blocked.png",
+    "note": "An edit while destinations are missing: Review changes stays disabled and the bar says to complete the required fields",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [
+      "Destination required",
+      "Destination requiredAdd email"
+    ],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Back to Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Rules",
+        "disabled": false
+      },
+      {
+        "label": "Delivery activity",
+        "disabled": false
+      },
+      {
+        "label": "Test route",
+        "disabled": false
+      },
+      {
+        "label": "Add Sales manager email",
+        "disabled": false
+      },
+      {
+        "label": "EmailSend by email",
+        "disabled": false
+      },
+      {
+        "label": "SMSNot supported",
+        "disabled": true
+      },
+      {
+        "label": "In-appNot supported",
+        "disabled": true
+      },
+      {
+        "label": "PushNot supported",
+        "disabled": true
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "1586x992",
+    "state": "target-edited",
+    "file": "09-1586x992-target-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Rules",
+        "disabled": false
+      },
+      {
+        "label": "Delivery activity",
+        "disabled": false
+      },
+      {
+        "label": "Test route",
+        "disabled": false
+      },
+      {
+        "label": "EmailSend by email",
+        "disabled": false
+      },
+      {
+        "label": "SMSNot supported",
+        "disabled": true
+      },
+      {
+        "label": "In-appNot supported",
+        "disabled": true
+      },
+      {
+        "label": "PushNot supported",
+        "disabled": true
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "1586x992",
+    "state": "target-review-dialog",
+    "file": "09-1586x992-target-review-dialog.png",
+    "note": "Review step: before and after; Apply is disabled in the design fixture",
+    "dialog": "Review escalation changes",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Close review",
+        "disabled": false
+      },
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "1586x992",
+    "state": "target-review-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "09",
+    "viewport": "1586x992",
+    "state": "rules-switch",
+    "file": "09-1586x992-rules-switch.png",
+    "note": "Rules switch: no label attribute",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Back to Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Rules",
+        "disabled": false
+      },
+      {
+        "label": "Delivery activity",
+        "disabled": false
+      },
+      {
+        "label": "Test route",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "390x844",
+    "state": "unchanged",
+    "file": "09-390x844-unchanged.png",
+    "note": "No change: Review changes disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [
+      "Destination requiredAdd email",
+      "Destination requiredAdd email"
+    ],
+    "buttons": [
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Back to Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Rules",
+        "disabled": false
+      },
+      {
+        "label": "Delivery activity",
+        "disabled": false
+      },
+      {
+        "label": "Test route",
+        "disabled": false
+      },
+      {
+        "label": "Add BDC email",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "390x844",
+    "state": "add-email",
+    "file": "09-390x844-add-email.png",
+    "note": "Add BDC email opened",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [
+      "Destination required",
+      "Destination requiredAdd email"
+    ],
+    "buttons": [
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Back to Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Rules",
+        "disabled": false
+      },
+      {
+        "label": "Delivery activity",
+        "disabled": false
+      },
+      {
+        "label": "Test route",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "390x844",
+    "state": "target-edited-blocked",
+    "file": "09-390x844-target-edited-blocked.png",
+    "note": "An edit while destinations are missing: Review changes stays disabled and the bar says to complete the required fields",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [
+      "Destination required",
+      "Destination requiredAdd email"
+    ],
+    "buttons": [
+      {
+        "label": "Add Sales manager email",
+        "disabled": false
+      },
+      {
+        "label": "EmailSend by email",
+        "disabled": false
+      },
+      {
+        "label": "SMSNot supported",
+        "disabled": true
+      },
+      {
+        "label": "In-appNot supported",
+        "disabled": true
+      },
+      {
+        "label": "PushNot supported",
+        "disabled": true
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "390x844",
+    "state": "target-edited",
+    "file": "09-390x844-target-edited.png",
+    "note": "After an edit: the draft bar counts the change and Review is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "EmailSend by email",
+        "disabled": false
+      },
+      {
+        "label": "SMSNot supported",
+        "disabled": true
+      },
+      {
+        "label": "In-appNot supported",
+        "disabled": true
+      },
+      {
+        "label": "PushNot supported",
+        "disabled": true
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      },
+      {
+        "label": "Discard",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "390x844",
+    "state": "target-review-dialog",
+    "file": "09-390x844-target-review-dialog.png",
+    "note": "Review step: before and after; Apply is disabled in the design fixture",
+    "dialog": "Review escalation changes",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Close review",
+        "disabled": false
+      },
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "390x844",
+    "state": "target-review-dialog-scrolled",
+    "file": "09-390x844-target-review-dialog-scrolled.png",
+    "note": "Phone: the review step scrolled to its actions",
+    "dialog": "Review escalation changes",
+    "dialogFitsViewport": true,
+    "dialogScrollsInside": false,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Close review",
+        "disabled": false
+      },
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "09",
+    "viewport": "390x844",
+    "state": "target-review-escape",
+    "focusReturnedToTrigger": true
+  },
+  {
+    "screen": "09",
+    "viewport": "390x844",
+    "state": "rules-switch",
+    "file": "09-390x844-rules-switch.png",
+    "note": "Rules switch: no label attribute",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "alerts": [],
+    "buttons": [
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Back to Contact & Routing",
+        "disabled": false
+      },
+      {
+        "label": "Rules",
+        "disabled": false
+      },
+      {
+        "label": "Delivery activity",
+        "disabled": false
+      },
+      {
+        "label": "Test route",
+        "disabled": false
+      }
+    ]
+  }
+]

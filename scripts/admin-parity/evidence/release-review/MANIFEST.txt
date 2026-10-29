@@ -1,0 +1,51 @@
+Administration V2 release review package (2026-10-29)
+
+Screens: 02, 05, 09, 10, 11, 13 (new) and 03, 04, 07 (refreshed).
+Status: all nine PENDING your individual review. Accepted screens remain
+exactly 01, 06, 08 and 12; their captures were compared pixel by pixel
+with the accepted baselines in this round and are identical.
+
+Scores are protocol v2 masked reference-match scores: the fixture is
+captured at the references' native 1586x992 and compared pixel for pixel,
+with neither image resized (results.json records referenceResampled=false
+for every screen). The gate is unchanged: 95% target; 94.00-94.99%
+reviewable individually; below 94% needs a screen-specific exception.
+
+Contents
+  annotated/        numbered differences, one image per view:
+                    NN-desktop.png, NN-phone.png and a child or state view
+                    per screen (02 review panel, 05 edit, 09/10/11 review
+                    dialogs, 13 retry options, 03 role-change review,
+                    04 laptop stacking, 07 validation)
+  EXCEPTIONS-02-05-09-10-11-13.md   numbered lists matching the images
+  EXCEPTIONS-03-04-07.md            refreshed lists, with the corrected
+                                    rendering classification
+  causes/NN.png     cause maps: every pixel the score counts as different,
+                    coloured by cause (amber glyph rasterization, orange type
+                    size or width, violet text position, pink text where the
+                    mock has none, teal icon, red geometry)
+  decompose-tol2.json/.txt, decompose-tol4.json/.txt
+                    the score's missing points split by cause, at a 2px and
+                    a 4px text-position tolerance
+  states-six/       interaction states for 02/05/09/10/11/13 at 1586x992
+                    and 390x844, with states.json (buttons in view and their
+                    enabled state, dialog fit, overflow, focus return)
+  states-030407/    the same for 03/04/07
+  phone/            actual-viewport phone captures (390x844) for all nine
+  specs/            annotation specs; build-specs*.py generate them
+  states-six.txt, states-030407.txt, phone.txt
+                    run logs
+
+Regenerate (dev server on 5640):
+  node scripts/admin-parity/run.cjs --base-url http://127.0.0.1:5640
+  node scripts/admin-parity/decompose.cjs --maps <dir> [--tol 4]
+  node scripts/admin-parity/states-six.cjs --out <dir>
+  node scripts/admin-parity/states-030407.cjs --out <dir>
+  node scripts/admin-parity/mobile.cjs --out <dir> --sizes 390x844
+  python3 scripts/admin-parity/evidence/release-review/build-specs.py
+  python3 scripts/admin-parity/evidence/release-review/build-specs-030407.py
+  node scripts/admin-parity/annotate.cjs <spec.json>
+  node scripts/admin-parity/itemcheck.cjs <cause-map.png> <spec.json>
+
+Nothing was deployed, published, migrated or applied. The design fixtures
+write nothing.

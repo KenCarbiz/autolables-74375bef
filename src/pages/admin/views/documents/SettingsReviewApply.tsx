@@ -4,6 +4,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAudit } from "@/contexts/AuditContext";
 import { useAdminFixture, useAdminNow } from "@/lib/admin/dataSource";
+import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
 import {
   canApply,
   diffFields,
@@ -265,6 +266,7 @@ const versionLabel = (check: VersionCheck | null, version: string | number | nul
 
 export function SettingsReviewDialog<T extends object>({ review, title, description }: { review: SettingsReview<T>; title: string; description?: ReactNode }) {
   const { state, reviewedRows, open, computing, gate, versionCheck, canEdit } = review;
+  const onCloseAutoFocus = useReturnFocus(open);
   const phase = state.phase;
   const impact = state.impact;
   const applied = phase === "applied";
@@ -273,7 +275,7 @@ export function SettingsReviewDialog<T extends object>({ review, title, descript
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) review.close(); }}>
-      <DialogContent className="sm:max-w-2xl rounded-[12px] p-0 gap-0">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="sm:max-w-2xl rounded-[12px] p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-adm-border text-left">
           <DialogTitle className="text-[18px] leading-[26px] font-semibold text-adm-ink">{title}</DialogTitle>
           <DialogDescription className="text-[13px] leading-[18px] text-adm-muted">

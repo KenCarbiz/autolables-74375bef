@@ -1,0 +1,13 @@
+01: score 92.99% (capture identical to the harness capture) missing 7.01 pts = raster 0.29 + size 2.72 + moved 2.27 + extra 0.14 + icon 0.56 + geometry 1.04
+02: score 88.01% (capture identical to the harness capture) missing 11.99 pts = raster 0 + size 0 + moved 2.72 + extra 1.16 + icon 0.4 + geometry 7.72
+03: score 90.7% (capture identical to the harness capture) missing 9.3 pts = raster 0 + size 0.13 + moved 1.65 + extra 1.51 + icon 0.25 + geometry 5.76
+04: score 89.87% (capture identical to the harness capture) missing 10.13 pts = raster 0 + size 0.02 + moved 5.99 + extra 0.37 + icon 0.53 + geometry 3.21
+05: score 89.87% (capture identical to the harness capture) missing 10.13 pts = raster 0 + size 0 + moved 3.2 + extra 1.88 + icon 0.23 + geometry 4.83
+06: score 94.11% (capture identical to the harness capture) missing 5.89 pts = raster 0.53 + size 1.87 + moved 1.17 + extra 0.25 + icon 0.32 + geometry 1.74
+07: score 87.86% (capture DIFFERS from the harness capture) missing 12.14 pts = raster 0.03 + size 0.12 + moved 3.73 + extra 1.77 + icon 0.29 + geometry 6.2
+08: score 92.12% (capture identical to the harness capture) missing 7.88 pts = raster 0.09 + size 0.27 + moved 4.93 + extra 0.1 + icon 0.51 + geometry 1.98
+09: score 86.53% (capture identical to the harness capture) missing 13.47 pts = raster 0.02 + size 0.47 + moved 3.37 + extra 1.68 + icon 0.27 + geometry 7.67
+10: score 89.53% (capture identical to the harness capture) missing 10.47 pts = raster 0.27 + size 0.3 + moved 5.82 + extra 0.47 + icon 0.18 + geometry 3.42
+11: score 89.84% (capture identical to the harness capture) missing 10.16 pts = raster 0.08 + size 0.07 + moved 2.48 + extra 2.62 + icon 0.09 + geometry 4.81
+12: score 92.22% (capture identical to the harness capture) missing 7.78 pts = raster 0.05 + size 0.44 + moved 4.33 + extra 0.06 + icon 0.39 + geometry 2.51
+13: score 87.77% (capture identical to the harness capture) missing 12.23 pts = raster 0 + size 0.19 + moved 3.94 + extra 1.74 + icon 0.31 + geometry 6.05

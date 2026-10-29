@@ -2,6 +2,7 @@ import { useEffect, useReducer, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -63,6 +64,7 @@ export default function PublishingReviewDialog(props: PublishingReviewDialogProp
   const { updateSettings } = useDealerSettings();
   const { user, isAdmin } = useAuth();
   const { member } = useEntitlements();
+  const onCloseAutoFocus = useReturnFocus(open);
 
   const review = (s: ReviewApplyState<PublishingDraft>): ReviewApplyState<PublishingDraft> => {
     const errors = validatePublishingDraft(s.draft);
@@ -159,7 +161,7 @@ export default function PublishingReviewDialog(props: PublishingReviewDialogProp
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-[900px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-[12px] p-0" data-admin-v2="">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="max-w-[900px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-[12px] p-0" data-admin-v2="">
         <div className="px-6 pt-6">
           <DialogHeader>
             <DialogTitle className="text-[22px] leading-[28px] font-bold text-adm-ink">Review publishing policy change</DialogTitle>

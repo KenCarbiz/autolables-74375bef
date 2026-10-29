@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-29T07:51:06.552Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-29T19:01:52.730Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -449,8 +449,8 @@ Reference: `scripts/admin-parity/reference/10-publishing-policy.png`. Fonts: Int
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/10-1586x992.png` | 90.15% | 69.00% | 89.53% | 65.29% | 88.84% (-7px) | 63.11% | 95.04% | 66.03% | 0.92% |
-| 1600x1000 | `scripts/admin-parity/out/10-1600x1000.png` | 87.76% | 65.65% | 86.76% | 60.58% | n/a | n/a | n/a | n/a | 0.90% |
+| 1586x992 | `scripts/admin-parity/out/10-1586x992.png` | 90.15% | 69.01% | 89.53% | 65.31% | 88.85% (-7px) | 63.16% | 95.05% | 65.97% | 0.92% |
+| 1600x1000 | `scripts/admin-parity/out/10-1600x1000.png` | 87.77% | 65.67% | 86.77% | 60.61% | n/a | n/a | n/a | n/a | 0.90% |
 
 Rail stand-in: 257px (the mock's rail width); content region starts at x=260.
 Section row bottom: reference y=245, capture y=238 (title block offset -7px).

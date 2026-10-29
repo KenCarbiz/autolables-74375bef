@@ -102,6 +102,18 @@ describe("brand views render from the 02 fixture", () => {
     expect(h.ctx.updateSettings).not.toHaveBeenCalled();
   });
 
+  it("the design fixture opens the review of an edit but cannot apply it, and says why", () => {
+    renderFixture(IdentityView);
+    fireEvent.change(screen.getByLabelText("Dealership name"), { target: { value: "Example INFINITI of Hartford" } });
+    expect(screen.getByText("Unsaved changes")).toBeTruthy();
+    expect(reviewButton()).toHaveProperty("disabled", false);
+    fireEvent.click(reviewButton());
+    expect(within(screen.getByLabelText("Changes to apply")).getByText("Example INFINITI of Hartford")).toBeTruthy();
+    expect(screen.getByText("Design fixture: saving is disabled.")).toBeTruthy();
+    expect(applyButton()).toHaveProperty("disabled", true);
+    expect(h.ctx.updateSettings).not.toHaveBeenCalled();
+  });
+
   it("Appearance renders the palette, the accent editor and the reset", () => {
     renderFixture(AppearanceView);
     expect(screen.getByLabelText("Workspace accent")).toHaveProperty("value", "#2457D6");

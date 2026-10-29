@@ -31,6 +31,9 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
     if (status === "saved") return { tone: "success" as const, title: "Saved", detail: "Your settings are up to date." };
     return { tone: "success" as const, title: "No changes pending", detail: "Your settings are up to date." };
   })();
+  // The design fixture can show the review step but never write: Review opens,
+  // Apply stays disabled and says why.
+  const canReview = canSave || (form.source.isFixture && dirty && errors.length === 0 && status !== "saving");
   const Icon = view.tone === "success" ? CheckCircle2 : status === "saving" ? Loader2 : AlertTriangle;
   const iconClass = view.tone === "success" ? "text-[#1A9F5F]" : view.tone === "danger" ? "text-adm-danger" : view.tone === "warning" ? "text-adm-warning" : "text-adm-muted";
   // Reference: a footer strip from the rail edge to the page edge, flush under the cards,
@@ -43,6 +46,7 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
         <div className="border-b border-adm-border px-4 sm:px-6 py-4" aria-label="Changes to apply">
           <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Review changes</p>
           <p className="text-[12px] leading-[18px] text-adm-muted">Nothing is written until you apply. Fields not listed here are left as they are.</p>
+          {form.source.isFixture && blockedReason && <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">{blockedReason}</p>}
           <dl className="mt-3 grid grid-cols-1 md:grid-cols-[minmax(0,180px)_minmax(0,1fr)_minmax(0,1fr)] gap-x-6 gap-y-2 text-[13px] leading-[18px]">
             <dt className="hidden md:block text-[12px] font-semibold text-adm-muted">Field</dt>
             <dt className="hidden md:block text-[12px] font-semibold text-adm-muted">Before</dt>
@@ -75,7 +79,7 @@ export function BrandSaveBar<K extends SettingsKey>({ form }: { form: BrandForm<
               <AdminButton variant="primary" className={cn(button, "px-[30px]")} data-landmark="brand-review" onClick={() => void form.save()} disabled={!canSave} aria-disabled={!canSave}>Apply changes</AdminButton>
             </>
           ) : (
-            <AdminButton variant="primary" className={cn(button, "px-[30px]")} data-landmark="brand-review" onClick={() => setReviewing(true)} disabled={!canSave} aria-disabled={!canSave}>Review changes</AdminButton>
+            <AdminButton variant="primary" className={cn(button, "px-[30px]")} data-landmark="brand-review" onClick={() => setReviewing(true)} disabled={!canReview} aria-disabled={!canReview}>Review changes</AdminButton>
           )}
         </div>
       </div>

@@ -92,6 +92,13 @@ describe("class detail", () => {
     expect(JSON.stringify(d)).not.toMatch(/\d+ vehicles/);
   });
 
+  it("names the retail-readiness gates as a readable list", () => {
+    const s = settings({ require_safety_inspection: true, require_install_verification: true, document_rules: { requireApprovalBeforePublish: true } });
+    const rows = derivePublishingMatrix({ settings: s, description });
+    expect(deriveClassDetail(rows[1], s).ruleText).toMatch(/the vehicle needs a completed K-208 inspection and verified installs to be retail ready\.$/);
+    expect(rows[1].retailReadiness.detail).toBe("Signing waits for a completed K-208 inspection and verified installs.");
+  });
+
   it("changes the card titles when no gate applies", () => {
     const s = settings({ require_safety_inspection: false, require_install_verification: false, document_rules: { requireApprovalBeforePublish: false } });
     const d = deriveClassDetail(derivePublishingMatrix({ settings: s, description })[0], s);
