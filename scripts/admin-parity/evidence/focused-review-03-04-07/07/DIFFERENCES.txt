@@ -1,0 +1,93 @@
+07 Product applicability - remaining differences from the reference
+Implementation 2d7954d. Evidence ec43fe0 (captures); annotated images in
+annotated-2d7954d/07-*.png. PENDING owner review: not accepted.
+
+Score: protocol v2 content 87.86%, scored WITH the v2 masks (3.13% of the
+1586x992 frame excluded from both images). At 2fe74e3 it was 87.83% with
+3.08% masked. The masks are unchanged: the masked vehicle-name cells are
+2px taller because one status label now wraps (D4). Below 94%: needs an
+explicit screen-specific exception. Landmarks 9 of 9. Viewports: 0px page
+overflow at 390x844, 768x1024, 1366x768 and 1586x992.
+
+Numbers match the badges in annotated-2d7954d/07-desktop.png (1-13) and
+07-phone.png (14-16). Items 11, 12 and 17 have no box.
+
+USABILITY DEFECTS FOUND AND CORRECTED (2d7954d)
+ D3. Below 1536px the two panels sat side by side and Sample vehicle
+     results scrolled sideways: at 1366x768 the Publication column was cut
+     off (102px hidden). The panels now sit side by side from 1536px and
+     stack below. Before/after: defects/D3-07-sample-results-1366.png.
+ D4. At 1586x992, "Ready for review" was clipped under the table's right
+     fade (2px of overflow). Status labels in the table now wrap inside
+     their column. Badge 13; defects/D4-07-ready-for-review-1586.png.
+ D5. The Product views tabs drew the app-wide focus ring outside the
+     scrolling row, which clipped it to two vertical bars at every width.
+     They now use the shared tabs' inset 2px outline (as fixed for the
+     section tabs in 2fe74e3). tabs-check passes at 1366, 1024 and 390;
+     defects/D5-07-tab-focus-ring.png.
+
+APPROVED (cited owner decision)
+ 1. The parent section row sits above the breadcrumb and child title.
+    Citation: "the section row above child titles" (readiness 10.7).
+
+PROPOSED EXCEPTION: behaviour / truthful content (not approved)
+ 2. A "Back to applicability" link at top right (the mock has none; its
+    top right holds the DESIGN CONCEPT chip), and Administration and
+    Pricing & Products linked in the breadcrumb (the mock links only
+    Products).
+ 3. Review changes is disabled until a rule changes (mock: enabled). With
+    item 1 the action row sits below the 992px frame.
+ 4. CPO is shown checked and disabled: certified pre-owned follows Used in
+    the current rule model (mock: unchecked and editable).
+ 7. Truthful copy: "Added to the vehicle; itemized in the advertised
+    price."; "Installation evidence is required for each vehicle before
+    this product can be published with it."; "Proof of installation
+    required per vehicle."; "Real vehicles from your inventory, run through
+    the same matcher the addendum uses." (and "Customer-facing disclosure
+    and benefit are complete.").
+
+PROPOSED EXCEPTION: geometry / design choice (not approved)
+10. Product views tab row: 14px semibold labels in a 44px row (mock about
+    15px).
+11. Page margin: cards at x 266 (24px gutter) against the mock's 268; 2px.
+ -  Wrapped status labels in Sample vehicle results (D4) make two rows 55px
+    against 53px at 1536-1586.
+
+ASSET SUBSTITUTION (not approved)
+ 8. The standard icon set (lucide) for the evidence checklist, status marks
+    and info mark.
+
+RENDERING DIFFERENCES
+ 9. Native select chevrons (the mock draws custom chevrons) and the native
+    disabled checkbox; font rasterization throughout.
+
+FIXTURE DATA, NOT MASKED (scored)
+ 5. Product name "Example Protection Package" (mock "Ceramic Protection"),
+    and the fixture rule: maximum mileage 80,000 and model year from 2020
+    (mock: No limit, Any year). These count against the score.
+
+FIXTURE DATA, MASKED UNDER V2
+ 6. Sample vehicle names and mileage, and the product price (masks.json
+    "07").
+
+MOCK-ONLY ANNOTATIONS
+12. DESIGN CONCEPT chip and footer caption: both masked on 07.
+
+PHONE 390x844 (no phone reference; not scored; not approved)
+14. The title and breadcrumb wrap; the badge and back link stack under the
+    title.
+15. The Product views tabs scroll sideways with an edge fade; focus is
+    inset (D5).
+16. Mileage choices stack, with the maximum on its own row.
+17. Sample vehicle results scrolls sideways inside a labelled region (229px
+    hidden).
+
+STATES REVIEWED (states/, state-sheets/S-07-*.png)
+ No change (Review changes disabled); edited (enabled); review step (before
+ / after table, Back to edit, Apply changes enabled; not pressed, the
+ fixture writes nothing); reversed model year range ("Model year range is
+ reversed.", Review changes disabled); 1366x768 sample results and review
+ step. Desktop, laptop and phone.
+
+UNRESOLVED
+ None open after D3, D4 and D5.

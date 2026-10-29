@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | 4 of 13 accepted individually (appearance only): 01, 06, 08, 12; 9 pending | Acceptance register in section 10.19 and `scripts/admin-parity/acceptance.json`: 06 at 94.11% (approved, `7f4fa1a`); 01 at 92.99%, 08 at 92.12%, 12 at 92.22% (accepted with listed exceptions, `2fe74e3`, evidence `4958ce9`). Masked scores; none meets 94% or 95% except 06 in the 94% review band | Owner review of the remaining 9; 03, 04 and 07 in focused review |
+| 16 | Visual acceptance | 4 of 13 accepted individually (appearance only): 01, 06, 08, 12; 9 pending | Acceptance register in section 10.19 and `scripts/admin-parity/acceptance.json`: 06 at 94.11% (approved, `7f4fa1a`); 01 at 92.99%, 08 at 92.12%, 12 at 92.22% (accepted with listed exceptions, `2fe74e3`, evidence `4958ce9`), re-measured unchanged at `2d7954d`. Masked scores; none meets 94% or 95% except 06 in the 94% review band. 03, 04 and 07 focused review delivered (10.20, implementation `2d7954d`, evidence `ec43fe0`), pending | Owner review of 03, 04, 07 and the remaining 6 |
 
 ## 2. How the evidence was produced
 
@@ -1824,6 +1824,102 @@ Terms of the acceptance:
   - deployment;
   - the production pricing migration;
   - any claim that untested functionality works.
+
+### 10.20 Focused visual review: 03, 04 and 07 (2026-10-29)
+
+**Revisions.**
+- Implementation `2d7954d`; evidence `ec43fe0`. The annotated, defect and
+  state sheets were built from those captures in the following commit.
+- All 13 screens were measured in one run at `2d7954d`. 01, 06, 08 and 12
+  match their accepted scores and mask shares exactly, so the register still
+  carries their acceptance. Every other score is unchanged except 07.
+- Package: `scripts/admin-parity/evidence/focused-review-03-04-07/`
+  (`MANIFEST.txt`, per-screen `DIFFERENCES.txt`).
+
+| # | Screen | v2 content (masked) | Masked share | Landmarks | Status |
+| --- | --- | --- | --- | --- | --- |
+| 03 | People & Access: Team | 90.70% (unchanged) | 3.71% | 9 of 9 | pending |
+| 04 | Member role | 89.87% (unchanged) | 0.95% | 1 of 8 (7 follow from the owner-decided section row) | pending |
+| 07 | Product applicability | 87.86% (was 87.83%) | 3.13% (was 3.08%) | 9 of 9 | pending |
+
+07's masks are unchanged. The masked vehicle-name cells grew 2px because a
+status label now wraps (D4), and that moved both the score and the masked
+share.
+
+**Usability defects found and corrected in `2d7954d`.** Each was
+identified, with before captures, before it was changed.
+
+| # | Screen | Defect | Correction |
+| --- | --- | --- | --- |
+| D1 | 03 | At 1536px and wider, "Title Clerk / Office Mgr" ran 10px into the Department column | Long role labels wrap; other roles stay on one line; row heights unchanged |
+| D2 | 04 | At 1280-1535px the capability matrix hid 57-217px, including Manage, behind sideways scrolling | The cards sit side by side from 1536px and stack below |
+| D3 | 07 | Below 1536px Sample vehicle results hid the Publication column (102px at 1366) | The panels sit side by side from 1536px and stack below |
+| D4 | 07 | At 1586, "Ready for review" was clipped under the fade | Status labels wrap inside their column |
+| D5 | 07 | The Product views tabs' focus ring was clipped to two bars by the scrolling row | The shared tabs' inset outline |
+| D6 | 03 | On a phone, the role-change review step was taller than the viewport: title and Apply / Cancel unreachable | The dialog is capped to the viewport and scrolls inside |
+| D7 | 03, 04 | Closing a People & Access dialog left focus on the page body | Focus returns to the button or row menu that opened it (`useReturnFocus`) |
+
+The fixes are local to these screens' components. The shared shell, tabs,
+tokens and the app-wide dialog component are unchanged, which is why the
+four accepted screens re-measure identically.
+
+**Remaining differences** (per screen in `DIFFERENCES.txt`, numbered to
+match `annotated-2d7954d/`). The classes follow 10.18, and nothing is
+labelled approved without a citation.
+- **Approved with citation:**
+  - 03: the one-Administration title (10.6 item 1; 10.7) and tabs outside
+    the card (10.7).
+  - 04 and 07: the section row above the child title (10.7).
+- **Proposed geometry exceptions:**
+  - page margins: 03 +6px, 04 +5px, 07 -2px;
+  - tab-row label sizes and row heights;
+  - 04's 12px breadcrumb;
+  - 03's column widths from 1536px.
+- **Proposed behaviour / truthful-content exceptions:**
+  - 03: members identified by address (10.6 item 6); server order with no
+    default sort; real role labels.
+  - 04: linked breadcrumb; descriptions naming the member and "enforced";
+    the status-source disclosure.
+  - 07: back link and linked breadcrumb; Review changes disabled until a
+    change; CPO following Used (shown checked and disabled); truthful copy.
+- **Asset substitution:** the standard icon set on all three.
+- **Rendering:** font rasterization on all three; native select chevrons
+  and the disabled checkbox on 07.
+- **Fixture data:**
+  - Masked: 03 member addresses; 04 the member address; 07 sample vehicles
+    and the price.
+  - Not masked, and therefore scored: 07's product name and rule values.
+- **Mock-only annotations:** the DESIGN CONCEPT chip and footer captions
+  are masked on 03 and 07. 04 has only a footer caption, which is masked.
+- **Phone (no reference, not scored):**
+  - 03: stacked toolbar; sideways-scrolling table; rail below the table.
+  - 04: matrix as per-capability cards with "Allowed" and "Not allowed".
+  - 07: wrapped title block; scrolling Product views tabs; stacked mileage
+    choices; sideways-scrolling sample table.
+
+**States reviewed** (`NN/states/`, `state-sheets/`, `states.json`):
+- 03: row menu, Change role editing and review, Remove, rail closed, no
+  match.
+- 04: Test role access, Review policy changes, status sources expanded, the
+  1366 matrix.
+- 07: unchanged (Review disabled), edited (enabled), review step, reversed
+  year range (validation, Review disabled), the 1366 layout.
+
+Desktop and phone. Every dialog fits the viewport. Focus returns to the
+trigger, and no state overflows the page. Nothing was applied, because the
+design fixtures write nothing.
+
+**Checks at `2d7954d`:**
+- typecheck clean;
+- Administration tests (`src/pages/admin`, `src/components/admin`,
+  `src/lib/admin`): 60 files, 666 tests, all pass;
+- audit clean on 03, 04 and 07 at five viewports (07 logs only sandbox
+  network errors);
+- tabs-check passes on every scrolling tab row.
+
+03, 04 and 07 are pending the owner's screen-specific decision. Accepted
+screens remain exactly 01, 06, 08 and 12, and the other six pending
+screens (02, 05, 09, 10, 11, 13) await individual review.
 
 ## 11. Approvals requested
 

@@ -1,0 +1,80 @@
+04 Member role (Salesperson role) - remaining differences from the reference
+Implementation 2d7954d. Evidence ec43fe0 (captures); annotated images in
+annotated-2d7954d/04-*.png. PENDING owner review: not accepted.
+
+Score: protocol v2 content 89.87%, scored WITH the v2 masks (0.95% of the
+1586x992 frame excluded from both images). Unchanged from 2fe74e3: the 1586
+layout is unchanged by the fixes. Below 94%: needs an explicit
+screen-specific exception. Landmarks 1 of 8: the seven that fail
+(capabilitiesCard, capabilityTable, enforcementCard, enforcementList,
+bottomNote, testAccess, primaryAction) all follow from item 1, the
+owner-decided section row above the child title. Viewports: 0px page
+overflow at 390x844, 768x1024, 1366x768 and 1586x992.
+
+Numbers match the badges in annotated-2d7954d/04-desktop.png (1-8) and
+04-phone.png (14-15). Items 9-11 have no box.
+
+USABILITY DEFECTS FOUND AND CORRECTED (2d7954d)
+ D2. Between 1280 and 1535px the two cards sat side by side and the
+     capability matrix scrolled sideways, hiding 57-217px: at 1366x768 the
+     Manage column, the most sensitive permission, was hidden until
+     scrolled. The cards now sit side by side from 1536px and stack below,
+     so the matrix shows every column at 1024-1535px. Before/after:
+     defects/D2-04-matrix-1366.png.
+ D7. Closing Test role access (Escape) left keyboard focus on the page
+     body. Focus now returns to the Test role access button (states.json,
+     1586 and 390). The Review policy changes dialog uses the same fix.
+ The role preview and role change dialogs are capped to the viewport and
+ scroll inside (both fit at 390x844 today; this keeps short viewports
+ reachable).
+
+APPROVED (cited owner decision)
+ 1. The parent section row sits above the breadcrumb and child title (the
+    mock puts it below the title). Citation: "the section row above child
+    titles" (readiness 10.7, owner decisions). Source of the seven failing
+    landmarks.
+
+PROPOSED EXCEPTION: behaviour / truthful content (not approved)
+ 2. Breadcrumb links Administration, People & Access and Roles (the mock
+    links only People & Access).
+ 3. Role capabilities description names who it applies to: "Applied to
+    <member address> on this rooftop. Permissions apply across the
+    application." (mock: "Set what this role can read, create or act on,
+    and manage.").
+ 4. Required enforcement description: "for it to be enforced" (mock
+    "before the role can be published"): the policy is enforced, not
+    published.
+ 5. Added "Where each status comes from" disclosure under the enforcement
+    list (expanded in states/04-1586x992-status-sources-open.png).
+
+PROPOSED EXCEPTION: geometry / design choice (not approved)
+ 8. Page margin: cards at x 263 (24px gutter) against the mock's 258.
+ 9. Title block sizes: breadcrumb 12px (mock about 14px); section tab labels
+    14px in a 38px row (mock about 15px).
+
+ASSET SUBSTITUTION (not approved)
+ 6. The standard icon set (lucide) for the capability rows (the car glyph
+    differs most), enforcement rows and buttons.
+
+RENDERING DIFFERENCES
+ 7. Font rasterization; enforcement descriptions wrap at slightly different
+    points.
+
+FIXTURE DATA, MASKED UNDER V2
+10. The member address inside item 3 (masks.json "04").
+
+MOCK-ONLY ANNOTATIONS
+11. Footer caption: masked. The 04 mock has no DESIGN CONCEPT chip.
+
+PHONE 390x844 (no phone reference; not scored; not approved)
+14. The Back to Roles link sits under the title block.
+15. Below 768px the matrix becomes one card per capability with the words
+    "Allowed" / "Not allowed" beside each mark.
+
+STATES REVIEWED (states/, state-sheets/S-04-*.png)
+ Test role access dialog; Review policy changes (role change review, Review
+ change disabled until a new role is chosen); status sources expanded;
+ 1366x768 matrix at full width. Desktop and phone.
+
+UNRESOLVED
+ None open after D2 and D7.

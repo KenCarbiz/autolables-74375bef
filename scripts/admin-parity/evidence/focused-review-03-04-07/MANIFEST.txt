@@ -1,0 +1,63 @@
+Administration V2 - focused visual review: 03 People & Access (Team),
+04 Member role, 07 Product applicability
+
+Implementation measured and captured: 2d7954d
+Evidence commit (captures): ec43fe0
+Annotated, defect and state sheets: committed after ec43fe0 from those
+captures (no new capture)
+Before-fix captures: before-fix-2fe74e3/ (code 2fe74e3, before the 2d7954d
+fixes)
+
+Status: 03, 04 and 07 are PENDING the owner's individual review. Accepted
+screens remain exactly 01, 06, 08 and 12 (scripts/admin-parity/
+acceptance.json). Acceptance rule unchanged: 95% target; 94.00-94.99%
+eligible for individual approval; below 94% needs an explicit,
+screen-specific exception; no rounding, no diagnostic substitution, no
+automatic approval.
+
+Scores (protocol v2 content, masked; all 13 screens measured in one run at
+2d7954d):
+  03  90.70%  masked 3.71%  landmarks 9/9   (unchanged)
+  04  89.87%  masked 0.95%  landmarks 1/8   (unchanged; 7 follow from the
+                                             owner-decided section row)
+  07  87.86%  masked 3.13%  landmarks 9/9   (was 87.83% / 3.08%; same masks)
+  01, 06, 08, 12: identical to their accepted values (92.99/3.94,
+  94.11/4.13, 92.12/0.27, 92.22/2.80). The other screens are unchanged.
+
+Defects corrected in 2d7954d (defects/D1-D6, DIFFERENCES.txt per screen):
+  D1 03 role label ran into Department at 1536px+
+  D2 04 capability matrix hid Manage at 1280-1535px
+  D3 07 Sample results hid Publication below 1536px
+  D4 07 "Ready for review" clipped at 1586
+  D5 07 Product views focus ring clipped
+  D6 03 phone role-change review step off screen
+  D7 People & Access dialogs returned focus to the page body
+
+Checks at 2d7954d:
+- Typecheck clean.
+- Administration tests (src/pages/admin, src/components/admin,
+  src/lib/admin): 60 files, 666 tests, all pass.
+- Audit on 03, 04 and 07 at 1586, 1366, 1024, 768 and 390: no
+  overflow, clipping or overlap; one h1; no unnamed control; no small
+  target; every focus stop visible; no contrast failure; no icon under
+  16px. 07 logs 6 sandbox network errors (Supabase realtime blocked here).
+- tabs-check: every scrolling tab row on 03, 04 and 07 at 1366, 1024 and
+  390 passes.
+- states-030407.cjs: every dialog fits the viewport (the phone review step
+  scrolls inside); focus returns to the trigger on Escape / Cancel; 0px
+  page overflow in every state.
+
+Contents
+  NN/sheets/       reference, actual 1586x992, side-by-side, overlay
+  NN/full-page/    1920, 1366, 1024, 390
+  NN/viewport/     actual-viewport captures as the page scrolls
+  NN/states/       interaction states (states.json describes each)
+  NN/DIFFERENCES.txt
+  annotated-2d7954d/   numbered differences, desktop and phone
+  defects/         before/after sheets for each corrected defect
+  state-sheets/    labelled contact sheets of the states
+  before-fix-2fe74e3/, after-fix-crops/
+  states.json, viewport-checks.json, tabs-check.json/.txt, audit.txt
+
+No deployment, pricing migration, reference redraw or broad typography
+tuning was done.

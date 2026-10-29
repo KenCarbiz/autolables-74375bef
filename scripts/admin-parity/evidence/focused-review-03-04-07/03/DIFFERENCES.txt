@@ -1,0 +1,88 @@
+03 People & Access: Team - remaining differences from the reference
+Implementation 2d7954d. Evidence ec43fe0 (captures); annotated images in
+annotated-2d7954d/03-*.png. PENDING owner review: not accepted.
+
+Score: protocol v2 content 90.70%, scored WITH the v2 masks (3.71% of the
+1586x992 frame excluded from both images). Unchanged from 2fe74e3. Below 94%:
+needs an explicit screen-specific exception. Landmarks 9 of 9. Viewports: 0px
+page overflow at 390x844, 768x1024, 1366x768 and 1586x992.
+
+Numbers match the badges in annotated-2d7954d/03-desktop.png (1-13) and
+03-phone.png (14-15). Items 11, 12 and 16 have no box.
+
+USABILITY DEFECTS FOUND AND CORRECTED (2d7954d; before captures in
+before-fix-2fe74e3/, sheets in defects/)
+ D1. At 1536px and wider, "Title Clerk / Office Mgr" ran 10px past the Role
+     column and ended 7px from "Business Office", so the two columns read
+     as one phrase. Long role labels now wrap inside the column (role cell
+     right padding 12px from 1536px, so "Inventory Manager" stays on one
+     line). Row heights unchanged at 1586. Badge 13.
+ D6. Phone: the Review role change dialog's review step was taller than the
+     viewport and centred, so its title and Cancel / Apply change were off
+     screen and unreachable. The dialog is now capped to the viewport and
+     scrolls inside (states/03-390x844-change-role-review*.png).
+ D7. Closing Change role (Escape) or Remove (Cancel) left keyboard focus on
+     the page body (Radix returns focus only to a DialogTrigger; these open
+     from a row menu item). Focus now returns to the row's Actions button.
+     Probe before the fix: focus on BODY after 400-1000ms; after:
+     states.json "focus returned true" at 1586 and 390. The same fix covers
+     the Invitations tab's Revoke dialog.
+
+APPROVED (cited owner decision)
+ 1. One "Administration" title; the mock titles the page "People & Access"
+    with a DESIGN CONCEPT chip above. Citation: title block approved
+    2026-10-28 (readiness 10.6 item 1); "the one-Administration title
+    block" (10.7, owner decisions).
+ 2. Child tabs (Team, Roles, Invitations, Access activity) sit outside the
+    card; the mock draws them inside it. Citation: "tabs outside cards"
+    (10.7, owner decisions). Consequence: the card is 671px tall against
+    the mock's 706px.
+
+PROPOSED EXCEPTION: geometry / design choice (not approved)
+ 3. Section tab row: 14px labels in a 38px row, 36px gaps; the mock draws
+    larger labels (about 16px) in a taller row.
+ 4. Page margin: card at x 262 (24px gutter) against the mock's 256.
+12. Table column widths from 1536px follow the reference (158/147/144/150/
+    58); the role cell's right padding is 12px rather than 17px (D1).
+
+PROPOSED EXCEPTION: behaviour / truthful content (not approved)
+ 5. Members are identified by their address, which wraps to 2-3 lines
+    (mock: short display names). Row 1 is 79px tall against the mock's
+    67px. Readiness 10.6 item 6 lists this as pending.
+ 6. No column is sorted by default; every header shows the neutral sort
+    mark and the list keeps the server's order (the mock shows Employee and
+    Role sorted ascending).
+ 7. Role labels come from the role catalogue: "Service Writer" and "Title
+    Clerk / Office Mgr" (mock "Service Advisor", "Title Clerk"). Not masked.
+
+ASSET SUBSTITUTION (not approved)
+ 8. The standard icon set (lucide) for search, add employee, building,
+    checks, bans, sort marks and info.
+
+RENDERING DIFFERENCES
+ 9. Font rasterization: Inter in Chromium against the mock's renderer
+    (marked on the rail list; present throughout).
+
+FIXTURE DATA, MASKED UNDER V2
+10. Member addresses in the table and the rail (masks.json "03").
+
+MOCK-ONLY ANNOTATIONS
+11. DESIGN CONCEPT chip and footer caption: both masked on 03.
+
+PHONE 390x844 (no phone reference; not scored; not approved)
+14. The toolbar stacks: search full width, then Department, then Add
+    employee.
+15. The table scrolls sideways inside a labelled, focusable region with an
+    edge fade (362px hidden).
+16. The Role summary rail sits below the table (states/03-390x844-rail-
+    below-table.png).
+
+STATES REVIEWED (states/, state-sheets/S-03-*.png; states.json records
+enabled buttons, dialog fit and focus return)
+ Row actions menu; Change role editing (Review change disabled until a new
+ role is chosen); Change role review (Apply change disabled by the design
+ fixture's read-only reason); Remove confirmation; rail closed; search with
+ no match (count line, Clear filters). Desktop and phone.
+
+UNRESOLVED
+ None open after D1, D6 and D7.
