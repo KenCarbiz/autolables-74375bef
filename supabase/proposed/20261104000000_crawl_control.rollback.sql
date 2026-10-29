@@ -1,0 +1,12 @@
+-- Rollback for the PROPOSED 20261104000000_crawl_control.sql.
+--
+-- There is no rollback that turns the controls off: OFF is their default and
+-- the safe state. To hold promotion, or pause the crawler, call
+-- platform_set_crawl_control(false, false, '<reason>', <version>) as a
+-- platform admin.
+--
+-- Removing the functions would make the corrected crawler read "missing",
+-- which it treats as paused with promotion off, so even that is safe; but the
+-- table and its history are kept, and nothing here drops them or the
+-- held_promotion_off outcomes already recorded on observations.
+SELECT 1;

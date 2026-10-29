@@ -1,5 +1,5 @@
-======== Stage refused: working tree supabase/functions/crawl-advertised-prices/index.ts 7a4481f60e701b61886269a559d0363cca7141ad
-   substituted: 454:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
+======== Stage refused: working tree supabase/functions/crawl-advertised-prices/index.ts dd90fc468e896e66dcce312fcb8a096df95cb909
+   substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
    substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
 == Stage refused; observation columns present: True
 

@@ -7,6 +7,7 @@ import { useProductRules, VehicleContext } from "@/hooks/useProductRules";
 import { describeUnknown } from "@/lib/productEligibility";
 import { bucketForVehicle, resolveTierPrice } from "@/types/product";
 import { supabase } from "@/integrations/supabase/client";
+import { crawlPausedMessage } from "@/lib/inventory/crawlPaused";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { computeFinancingDisclosure } from "@/lib/sb766";
@@ -676,7 +677,7 @@ const Index = () => {
       const { error } = await supabase.functions.invoke("crawl-advertised-prices", {
         body: { tenant_id: tenant.id, vin: vehicle.vin.trim().toUpperCase(), discover: true },
       });
-      if (error) toast.error("Re-scrape failed — capture the price manually for now");
+      if (error) toast.error((await crawlPausedMessage(error)) ?? "Re-scrape failed — capture the price manually for now");
       else toast.success("Re-scrape requested — refreshing advertised price");
     } finally {
       setRescraping(false);

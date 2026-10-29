@@ -7,10 +7,13 @@
 //   2. the observation row (raw figure, fee basis record, identity, evidence)
 //      is stored, idempotently by a key over what was observed;
 //   3. only then, and only when the fee basis is page-verified and the evidence
-//      was accepted, are the derived values written to the listing, with a
-//      guarded update that changes nothing if the listing moved meanwhile.
+//      was accepted, are the derived values written to the listing, through
+//      crawl_promote_listing(), which writes only while the platform's
+//      promotion switch is on (read under a lock in the same transaction) and
+//      changes nothing if the listing moved meanwhile.
 //
-// Any failure leaves the listing as it was and names the outcome.
+// Any failure leaves the listing as it was and names the outcome. A missing
+// or unreadable promotion switch means promotion is off.
 
 import type { VehiclePriceResult } from "./vdpPrice.ts";
 
@@ -55,7 +58,7 @@ export function observationKey(p: {
 
 export type ListingPromotion =
   | "pending" | "promoted" | "not_required" | "promotion_failed" | "promotion_conflict"
-  | "held_fee_basis" | "held_evidence" | "held_schema";
+  | "held_fee_basis" | "held_evidence" | "held_schema" | "held_promotion_off";
 
 export type CommitOutcome =
   | "promoted"            // listing pricing fields now match the verified observation
@@ -63,6 +66,7 @@ export type CommitOutcome =
   | "held_fee_basis"      // observation stored; fee basis not page-verified; listing untouched
   | "held_evidence"       // observation stored; no acceptable evidence; listing untouched
   | "held_schema"         // stored without the structured record (columns absent); listing untouched
+  | "held_promotion_off"  // observation stored and promotable; promotion is switched off (observation-only)
   | "duplicate"           // this exact observation was already stored and settled
   | "observation_failed"  // nothing stored; listing untouched
   | "promotion_failed"    // observation stored; the listing write failed; listing untouched
@@ -86,10 +90,19 @@ export interface CommitDb {
   /** Inserts the observation without the structured columns (older schema). */
   insertLegacyObservation(row: Record<string, unknown>): Promise<{ ok: boolean; message?: string }>;
   readListingPricing(tenantId: string, vin: string): Promise<ListingPricing | null | { error: string }>;
-  /** Updates only when the pricing fields still equal `expected`; returns rows changed. */
-  updateListingIfUnchanged(expected: ListingPricing, patch: Record<string, unknown>): Promise<{ changed: number; error?: string }>;
+  /**
+   * The only listing write: applies `patch` when promotion is switched on and
+   * the pricing fields still equal `expected`, in one database transaction.
+   */
+  promoteListing(expected: ListingPricing, patch: Record<string, unknown>, observationId: string): Promise<PromoteResult>;
   markObservation(id: string, promotion: ListingPromotion, detail: string | null): Promise<void>;
 }
+
+export type PromoteResult =
+  | { result: "promoted" }
+  | { result: "conflict" }
+  | { result: "held_promotion_off"; detail: string }
+  | { result: "error"; error: string };
 
 export interface CommitInput {
   tenantId: string;
@@ -120,7 +133,7 @@ export async function commitObservation(db: CommitDb, c: CommitInput): Promise<{
   }
   if (ins.kind === "error") return { outcome: "observation_failed", observationId: null, detail: ins.message };
   const id = ins.id;
-  if (ins.kind === "duplicate" && ins.promotion && !["pending", "promotion_failed", "promotion_conflict"].includes(ins.promotion)) {
+  if (ins.kind === "duplicate" && ins.promotion && !["pending", "promotion_failed", "promotion_conflict", "held_promotion_off"].includes(ins.promotion)) {
     return { outcome: "duplicate", observationId: id, detail: `already stored (${ins.promotion})` };
   }
   if (!c.promote) return { outcome: c.holdAs ?? "held_fee_basis", observationId: id, detail: c.holdDetail };
@@ -135,18 +148,27 @@ export async function commitObservation(db: CommitDb, c: CommitInput): Promise<{
     await db.markObservation(id, "not_required", null).catch(() => undefined);
     return { outcome: "unchanged", observationId: id, detail: null };
   }
-  const upd = await db.updateListingIfUnchanged(current, c.patch);
-  if (upd.error) {
+  const upd = await db.promoteListing(current, c.patch, id);
+  if (upd.result === "held_promotion_off") {
+    await db.markObservation(id, "held_promotion_off", upd.detail).catch(() => undefined);
+    return { outcome: "held_promotion_off", observationId: id, detail: upd.detail };
+  }
+  if (upd.result === "error") {
     await db.markObservation(id, "promotion_failed", upd.error).catch(() => undefined);
     return { outcome: "promotion_failed", observationId: id, detail: upd.error };
   }
-  if (upd.changed === 0) {
+  if (upd.result === "conflict") {
     await db.markObservation(id, "promotion_conflict", "the listing's pricing changed between read and write").catch(() => undefined);
     return { outcome: "promotion_conflict", observationId: id, detail: "the listing's pricing changed between read and write" };
   }
   await db.markObservation(id, "promoted", null).catch(() => undefined);
   return { outcome: "promoted", observationId: id, detail: null };
 }
+
+// PostgREST's answers when the control's functions are not installed.
+// deno-lint-ignore no-explicit-any
+export const controlMissing = (e: any): boolean =>
+  ["PGRST202", "42883", "42P01", "PGRST205"].includes(String(e?.code)) || /could not find the function|does not exist/i.test(String(e?.message ?? ""));
 
 // The CommitDb over a supabase-js client. Kept here so the crawler and the
 // isolated tests use one implementation.
@@ -181,11 +203,20 @@ export function supabaseCommitDb(admin: any): CommitDb {
       if (error) return { error: error.message };
       return data ? { id: String(data.id), advertised_price_before_doc: data.advertised_price_before_doc, doc_fee: data.doc_fee, website_sale_price: data.website_sale_price } : null;
     },
-    async updateListingIfUnchanged(expected, patch) {
-      let q = admin.from("vehicle_listings").update(patch).eq("id", expected.id);
-      for (const f of PRICE_FIELDS) q = expected[f] == null ? q.is(f, null) : q.eq(f, expected[f]);
-      const { data, error } = await q.select("id");
-      return error ? { changed: 0, error: error.message } : { changed: (data ?? []).length };
+    async promoteListing(expected, patch, observationId) {
+      const exp = Object.fromEntries(PRICE_FIELDS.map((f) => [f, expected[f]]));
+      const { data, error } = await admin.rpc("crawl_promote_listing", {
+        p_listing_id: expected.id, p_expected: exp, p_patch: patch, p_observation_id: observationId,
+      });
+      if (error) {
+        return controlMissing(error)
+          ? { result: "held_promotion_off", detail: "promotion control not installed: promotion is off" }
+          : { result: "error", error: String(error.message ?? error) };
+      }
+      if (data === "promoted") return { result: "promoted" };
+      if (data === "conflict") return { result: "conflict" };
+      if (data === "held_promotion_off") return { result: "held_promotion_off", detail: "promotion is switched off (observation-only mode)" };
+      return { result: "held_promotion_off", detail: `unrecognized promotion answer ${JSON.stringify(data)}: promotion is off` };
     },
     async markObservation(id, promotion, detail) {
       await admin.from("advertised_prices").update({ listing_promotion: promotion, listing_promotion_detail: detail }).eq("id", id);

@@ -1,5 +1,5 @@
-======== Stage noschema: working tree supabase/functions/crawl-advertised-prices/index.ts 43325ea2fa2188bb20d58ce13abd87ef51ed1e62
-   substituted: 453:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
+======== Stage noschema: working tree supabase/functions/crawl-advertised-prices/index.ts dd90fc468e896e66dcce312fcb8a096df95cb909
+   substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
    substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
 == Stage noschema; observation columns present: False
 
@@ -20,7 +20,7 @@
   card       listing 30100|900|31000    observations [30000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   redirect   listing 26100|900|27000    observations [-]
-             ledger vin_mismatch | [paced_wait_ms=971 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url
+             ledger vin_mismatch | [paced_wait_ms=980 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url
   setting    listing 24992|900|25892    observations [25572|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   conflict   listing 21600|900|22500    observations [22000|t]
@@ -30,7 +30,7 @@
   partial    listing 28100|900|29000    observations [28000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   ambiguous  listing 20100|900|21000    observations [-]
-             ledger ambiguous_price | [paced_wait_ms=1103 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger ambiguous_price | [paced_wait_ms=1015 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   title      listing 26100|900|27000    observations [26000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
 
@@ -41,16 +41,16 @@
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   redirect   listing 26100|900|27000    observations [-]
              ledger vin_mismatch | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url_s
-  setting    listing 24992|900|25892    observations [25572|t ; 25572|t]
+  setting    listing 24992|900|25892    observations [25572|t ; 25572|f]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
-  conflict   listing 21600|900|22500    observations [22000|t ; 22000|t]
+  conflict   listing 21600|900|22500    observations [22000|t ; 22000|f]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   evidence   listing 33100|900|34000    observations [33000|f ; 33000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   partial    listing 28100|900|29000    observations [28000|t ; 28000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
   ambiguous  listing 20100|900|21000    observations [-]
-             ledger ambiguous_price | [paced_wait_ms=1030 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+             ledger ambiguous_price | [paced_wait_ms=984 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
   title      listing 26100|900|27000    observations [26000|t ; 26000|t]
              ledger held_schema | stored without the fee basis record; listing not updated until the schema is migrated
 

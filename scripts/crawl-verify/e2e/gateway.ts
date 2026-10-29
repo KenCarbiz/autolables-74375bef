@@ -8,7 +8,9 @@
 //                           screenshot link when one was asked for;
 //   /fc/v2/team/credit-usage  a balance, so key selection succeeds;
 //   /shots/*.png            screenshot bytes;
-//   /functions/v1/*         recorded and answered, nothing runs.
+//   /functions/v1/*         recorded and answered, nothing runs;
+//   FLIP_PROMOTION_AT_RENDER=n  switches promotion off (crawl_control) while
+//                           the n-th render is being served.
 // Nothing leaves the machine; the crawler runs with network access limited to
 // 127.0.0.1.
 
@@ -23,6 +25,9 @@ const renders: Array<{ vin: string | null; formats: unknown; url: string }> = []
 const stored: Array<{ path: string; bytes: number; status: number }> = [];
 const functions: string[] = [];
 let shot = 0;
+const flipAt = Number(Deno.env.get("FLIP_PROMOTION_AT_RENDER") ?? "0");
+const flips: Array<{ atRender: number; ok: boolean }> = [];
+let renderCount = 0;
 
 const vinIn = (u: string) => Object.keys(fixture.pages).find((v) => u.toLowerCase().includes(v.toLowerCase())) ?? null;
 
@@ -58,6 +63,15 @@ Deno.serve({ hostname: "127.0.0.1", port, onListen: () => {} }, async (req) => {
     const body = await req.json() as { url: string; formats: unknown };
     const vin = vinIn(body.url);
     renders.push({ vin, formats: body.formats, url: body.url });
+    renderCount++;
+    // The in-flight stage: an admin hold lands while this render is out.
+    if (flipAt > 0 && renderCount === flipAt) {
+      const out = await new Deno.Command("psql", {
+        args: ["-X", "-qtA", "-U", Deno.env.get("PGUSER") ?? "postgres", "-d", Deno.env.get("FLIP_DB") ?? "", "-c",
+          "UPDATE public.crawl_control SET promotion_enabled = false, version = version + 1, reason = 'hold during run (test)'"],
+      }).output();
+      flips.push({ atRender: renderCount, ok: out.success });
+    }
     const page = vin ? fixture.pages[vin] : null;
     if (!page) return Response.json({ success: true, data: { html: "<html><body>Not found</body></html>", metadata: { url: body.url, statusCode: 404 } } });
     const wantsShot = JSON.stringify(body.formats).includes("screenshot");
@@ -81,6 +95,7 @@ Deno.serve({ hostname: "127.0.0.1", port, onListen: () => {} }, async (req) => {
   if (url.pathname === "/__renders") return Response.json(renders.splice(0));
   if (url.pathname === "/__stored") return Response.json(stored.splice(0));
   if (url.pathname === "/__functions") return Response.json(functions.splice(0));
+  if (url.pathname === "/__flips") return Response.json(flips);
   if (url.pathname === "/__fail_storage") { failStorage = new Set((url.searchParams.get("vins") ?? "").split(",").filter(Boolean)); return new Response("ok"); }
   return new Response("not found", { status: 404 });
 });

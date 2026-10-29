@@ -5,13 +5,22 @@
 #   prefix    the crawler as it was at CRAWL_PREFIX_REV (default 3836dc3, the
 #             last commit before the fix), on the hosted schema: a deliberate
 #             reproduction; the corrected-contract checks are expected to fail
-#   noschema  the fixed crawler before its proposed migration is applied
-#   fixed     the fixed crawler with supabase/proposed/20261101000000 and
-#             20261102000000 applied
+#   missing   the fixed crawler with 20261101 and 20261102 but without the
+#             crawl controls (20261104): paused, nothing happens
+#   paused    all three applied, controls at their defaults (both off): paused
+#   noschema  the controls on, but 20261101 and 20261102 not applied: nothing
+#             may change any listing's pricing
+#   observe   execution on, promotion off: observations and evidence stored,
+#             no listing price changes
+#   inflight  both on at the start; an admin hold is set during the first
+#             render: the run already in flight promotes nothing
+#   fixed     all three applied, both switches on
 #   budget    as fixed, plus 20261103000000 (per-dealership budgets) with no
 #             budget set: must behave exactly as fixed
 #   refused   as budget, with the dealership's Firecrawl budget enforced at
 #             zero: no render may be sent and nothing may change
+# The switches are set directly as the database owner here, standing in for
+# the audited admin function, which scripts/crawl-verify/control checks.
 #
 # The replica is the full migration chain on local stand-ins, aligned to the
 # hosted catalogue, with the hosted definitions of the functions the crawler
@@ -28,7 +37,7 @@ cd "$(dirname "$0")/../../.."
 DENO=${DENO:-deno}
 POSTGREST=${POSTGREST:-postgrest}
 PREFIX_REV=${CRAWL_PREFIX_REV:-3836dc3}
-STAGES=("$@"); [[ ${#STAGES[@]} -eq 0 ]] && STAGES=(prefix noschema fixed)
+STAGES=("$@"); [[ ${#STAGES[@]} -eq 0 ]] && STAGES=(prefix missing paused noschema observe inflight fixed)
 WORK=$(mktemp -d)
 PIDS=()
 stop() { for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null || true; done; PIDS=(); sleep 1; }
@@ -73,13 +82,23 @@ overall=0
 for STAGE in "${STAGES[@]}"; do
   DB=crawl_verify_$STAGE
   "${PSQL[@]}" -d postgres -c "DROP DATABASE IF EXISTS $DB" -c "CREATE DATABASE $DB TEMPLATE $BASE" >/dev/null
-  if [[ $STAGE == fixed || $STAGE == budget || $STAGE == refused ]]; then
-    MIGS=(supabase/proposed/20261101000000_price_component_evidence.sql supabase/proposed/20261102000000_crawl_observation_basis.sql)
-    [[ $STAGE != fixed ]] && MIGS+=(supabase/proposed/20261103000000_provider_tenant_budgets.sql)
+  if [[ $STAGE != prefix ]]; then
+    MIGS=()
+    [[ $STAGE != noschema ]] && MIGS+=(supabase/proposed/20261101000000_price_component_evidence.sql supabase/proposed/20261102000000_crawl_observation_basis.sql)
+    [[ $STAGE != missing ]] && MIGS+=(supabase/proposed/20261104000000_crawl_control.sql)
+    [[ $STAGE == budget || $STAGE == refused ]] && MIGS+=(supabase/proposed/20261103000000_provider_tenant_budgets.sql)
     for f in "${MIGS[@]}"; do
       "${PSQL[@]}" -d "$DB" -f "$f" >/dev/null
     done
-    "${PSQL[@]}" -d "$DB" -c "GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role" >/dev/null
+    # The crawl_control grants are the migration's own (SELECT only); every
+    # other table as the hosted service role has it.
+    "${PSQL[@]}" -d "$DB" -c "DO \$\$ DECLARE t text; BEGIN FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'crawl_control' LOOP EXECUTE format('GRANT ALL ON public.%I TO service_role', t); END LOOP; END \$\$" >/dev/null
+    case $STAGE in
+      noschema|inflight|fixed|budget|refused) SWITCHES="true, true" ;;
+      observe) SWITCHES="true, false" ;;
+      *) SWITCHES="" ;;
+    esac
+    [[ -n $SWITCHES ]] && "${PSQL[@]}" -d "$DB" -c "UPDATE public.crawl_control SET (execution_enabled, promotion_enabled) = ($SWITCHES)" >/dev/null
   fi
   if [[ $STAGE == refused ]]; then
     "${PSQL[@]}" -d "$DB" -c "INSERT INTO public.provider_tenant_budgets (tenant_id, provider, mode, monthly_call_cap) VALUES ('c0000000-0000-4000-8000-000000000001', 'firecrawl', 'enforce', 0)" >/dev/null
@@ -112,7 +131,8 @@ log-level = "error"
 EOF
   "$POSTGREST" "$WORK/pgrst-$STAGE.conf" >"$WORK/pgrst-$STAGE.log" 2>&1 & PIDS+=($!)
   PGRST_URL=http://127.0.0.1:$PGRST_PORT GATEWAY_PORT=$GATEWAY_PORT PAGES_JSON=$(pwd)/scripts/crawl-verify/e2e/pages.json \
-    "$DENO" run --quiet --allow-net=127.0.0.1 --allow-env --allow-read scripts/crawl-verify/e2e/gateway.ts >"$WORK/gateway-$STAGE.log" 2>&1 & PIDS+=($!)
+    FLIP_PROMOTION_AT_RENDER=$([[ $STAGE == inflight ]] && echo 1 || echo 0) FLIP_DB=$DB \
+    "$DENO" run --quiet --allow-net=127.0.0.1 --allow-env --allow-read --allow-run=psql scripts/crawl-verify/e2e/gateway.ts >"$WORK/gateway-$STAGE.log" 2>&1 & PIDS+=($!)
   SUPABASE_URL=http://127.0.0.1:$GATEWAY_PORT SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY \
     FIRECRAWL_API_KEY=synthetic-not-a-key FIRECRAWL_RPM=60 MARKETCHECK_CRON_SECRET=local-cron-secret \
     "$DENO" run --quiet --allow-net=127.0.0.1 --allow-env --allow-read --import-map="$WORK/import_map.json" \
@@ -124,7 +144,7 @@ EOF
     [[ $i == 120 ]] && { echo "services did not start"; tail -n 20 "$WORK"/*-$STAGE.log; exit 2; }
   done
   status=0
-  STAGE=$(case $STAGE in noschema) echo noschema;; refused) echo refused;; *) echo contract;; esac) FN_URL=http://127.0.0.1:$FN_PORT/ \
+  STAGE=$(case $STAGE in noschema|refused|missing|paused|observe|inflight) echo $STAGE;; *) echo contract;; esac) FN_URL=http://127.0.0.1:$FN_PORT/ \
     GATEWAY_URL=http://127.0.0.1:$GATEWAY_PORT SERVICE_KEY=$SERVICE_KEY DB=$DB PAGES_JSON=$(pwd)/scripts/crawl-verify/e2e/pages.json \
     python3 -I scripts/crawl-verify/e2e/drive.py || status=$?
   if [[ -n "${CRAWL_VERIFY_LOGS:-}" ]]; then cp "$WORK"/*-$STAGE.log "$CRAWL_VERIFY_LOGS"/ 2>/dev/null || true; fi

@@ -240,7 +240,7 @@ describe("evidence from a separate load is revalidated", () => {
 
 // An in-memory store with the guarantees the real one gives: a unique key per
 // dealership, a guarded update, and injectable failures.
-function fakeDb(listing: ListingPricing | null, fail: Partial<Record<"insert" | "schema" | "read" | "update" | "race", boolean>> = {}) {
+function fakeDb(listing: ListingPricing | null, fail: Partial<Record<"insert" | "schema" | "read" | "update" | "race" | "promotionOff" | "controlMissing", boolean>> = {}) {
   const rows = new Map<string, { id: string; promotion: string | null; row: Record<string, unknown> }>();
   const legacy: Record<string, unknown>[] = [];
   const updates: Record<string, unknown>[] = [];
@@ -258,13 +258,15 @@ function fakeDb(listing: ListingPricing | null, fail: Partial<Record<"insert" | 
     },
     async insertLegacyObservation(row) { legacy.push(row); return { ok: true }; },
     async readListingPricing() { return fail.read ? { error: "read failed" } : state ? { ...state } : null; },
-    async updateListingIfUnchanged(expected, patch) {
-      if (fail.update) return { changed: 0, error: "update refused" };
+    async promoteListing(expected, patch) {
+      if (fail.controlMissing) return { result: "held_promotion_off", detail: "promotion control not installed: promotion is off" };
+      if (fail.promotionOff) return { result: "held_promotion_off", detail: "promotion is switched off (observation-only mode)" };
+      if (fail.update) return { result: "error", error: "update refused" };
       if (fail.race && state) state = { ...state, website_sale_price: 1 };
-      if (!state || (["advertised_price_before_doc", "doc_fee", "website_sale_price"] as const).some((f) => state![f] !== expected[f])) return { changed: 0 };
+      if (!state || (["advertised_price_before_doc", "doc_fee", "website_sale_price"] as const).some((f) => state![f] !== expected[f])) return { result: "conflict" };
       state = { ...state, ...(patch as Partial<ListingPricing>) };
       updates.push(patch);
-      return { changed: 1 };
+      return { result: "promoted" };
     },
     async markObservation(id, promotion) { for (const r of rows.values()) if (r.id === id) r.promotion = promotion; },
   };
@@ -321,6 +323,34 @@ describe("store the observation, then promote", () => {
     expect(f.rows.size).toBe(1);
     expect((await commitObservation(f.db, commit())).outcome).toBe("duplicate");
     expect(f.updates).toHaveLength(1);
+  });
+
+  it("observation-only mode: a promotable observation and its evidence are stored, the listing is untouched", async () => {
+    const f = fakeDb(LISTING, { promotionOff: true });
+    const r = await commitObservation(f.db, commit());
+    expect(r).toMatchObject({ outcome: "held_promotion_off", detail: "promotion is switched off (observation-only mode)" });
+    expect(f.rows.size).toBe(1);
+    expect([...f.rows.values()][0].row).toMatchObject({ observation: {} });
+    expect([...f.rows.values()][0].promotion).toBe("held_promotion_off");
+    expect(f.updates).toHaveLength(0);
+    expect(f.listing()).toEqual(LISTING);
+  });
+
+  it("observation-only mode: once promotion is switched on, the held observation is promoted once", async () => {
+    const f = fakeDb(LISTING, { promotionOff: true });
+    expect((await commitObservation(f.db, commit())).outcome).toBe("held_promotion_off");
+    f.setFail({ promotionOff: false });
+    expect((await commitObservation(f.db, commit())).outcome).toBe("promoted");
+    expect((await commitObservation(f.db, commit())).outcome).toBe("duplicate");
+    expect(f.rows.size).toBe(1);
+    expect(f.updates).toHaveLength(1);
+  });
+
+  it("a missing promotion control means promotion is off", async () => {
+    const f = fakeDb(LISTING, { controlMissing: true });
+    const r = await commitObservation(f.db, commit());
+    expect(r.outcome).toBe("held_promotion_off");
+    expect(f.updates).toHaveLength(0);
   });
 
   it("a listing that changed between read and write is not overwritten", async () => {

@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { supabase } from "@/integrations/supabase/client";
+import { crawlPausedMessage } from "@/lib/inventory/crawlPaused";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
@@ -157,7 +158,8 @@ const InventoryModern = () => {
       await load();
       broadcastSynced("prices", { found });
     } catch (err) {
-      toast.error(`Scrape failed: ${err instanceof Error ? err.message : "unknown error"}`);
+      const paused = await crawlPausedMessage(err);
+      toast.error(paused ?? `Scrape failed: ${err instanceof Error ? err.message : "unknown error"}`);
     } finally {
       setScraping(false);
     }

@@ -2902,3 +2902,190 @@ Each is a separate change for your approval.
 
 8. Screenshot review: still blocked until the files are supplied.
 9. The 2 baseline test failures and the 9 type-only sync errors: open, unchanged by this work.
+
+## Evidence attachment, crawler entry points blocked, promotion hold, corrected budget proposal (2026-10-29)
+
+### 1. Evidence: private attachment (done)
+
+- **What was attached.** `RESTRICTED-crawl-evidence-2026-10-29.tar.gz`, attached privately in the conversation.
+  - sha256 `cd56c0546d8c94f82f5faa8959bc6cea854f6240bdba31b76a821365208f807d`.
+  - Six files, all mode 600: the five exports and `MANIFEST.txt`.
+- **How it was checked.**
+  - Before packaging, the exports were scanned for credentials, tokens and signed URLs. None were found. Screenshot references are private storage paths, and the only URLs are the dealer's public pages and the renderer's public pricing page.
+  - The archive was extracted to a fresh directory, and every file was verified against the manifest's sha256 list.
+- **Where else it is.** Nothing was uploaded anywhere else. The scratchpad copy is retained.
+
+### 2. Crawler entry points: blocked in production (done)
+
+The deployed pre-fix crawler (`a5ddf4b`) has no setting that could pause it, so a database-only block would have needed a schema change.
+
+**What was deployed.**
+- A pause build of `crawl-advertised-prices` (commit `0aaf4d9`, blob `73ee8cb7…`).
+- It is self-contained with no imports. It answers every request except a CORS preflight with **503** and `{"ok":false,"paused":true,"error":"crawl_paused","message":"Temporarily paused for pricing verification"}`. It reads, renders, writes and charges nothing.
+- It is not the crawler rewrite, and no migration was needed.
+
+| Production change | When (UTC) | Evidence |
+|---|---|---|
+| Deploy of `crawl-advertised-prices` = the pause build | 15:40:29 | Deploy agent: blob `73ee8cb7…` matched the commit; submitted source sha256 `3bf8ac82…`; only that function deployed; not invoked |
+| One verification request: a GET from the database's HTTP extension (request 64587) | 15:43:56 | **503** with the message above. The previous build answers GET with 405 before any work, so the answer proves which build serves. Side-effect free under either build |
+
+**Blocked, server-side, for every caller:**
+- the cron (also still paused, jobid 1, `active = false`);
+- the Inventory price scrape;
+- the single-vehicle re-scrape;
+- the admin test URL;
+- any direct request.
+
+**Unchanged.** As of 15:54:05:
+- no crawler write since 07:25:13;
+- no listing price changed;
+- no crawl run;
+- no migration;
+- the cron still paused.
+
+**Out of scope: an action by the deploy agent.** After deploying, the agent also edited two files on its own initiative and committed them to main as `4a6527f`. The edit re-pins the SignalHouse SDK import in `_shared/signalhouse.ts` and `signalhouse-sdk.d.ts` from 1.0.66 to 1.6.0. It was fixing a preview-build error left by the dependency upgrade the agent made on 10-28.
+
+- Nothing else was deployed: there was no deploy call after the edit.
+- I have not reverted it, because reverting would break the preview build again.
+- It affects `send-sms` and the other SMS senders the next time any of them is deployed.
+
+**How the pause is lifted.** The pause build is lifted only by deploying the corrected crawler, on a separate approval. That crawler has its own execution switch, which is off by default (section 3).
+
+- Redeploying `a5ddf4b` would restore the defective crawler. It is not a rollback.
+
+**Message in the app.** The three buttons now show the server's message ("Temporarily paused for pricing verification") instead of a generic failure. This uses `src/lib/inventory/crawlPaused.ts`, and changes only error text: no layout or visual change. It reaches the preview from main and the live app only when published.
+
+### 3. Promotion hold: built and tested locally (not deployed, not activated)
+
+**Proposed migration `supabase/proposed/20261104000000_crawl_control.sql`.** Not applied. Its rollback keeps the table and history.
+
+- **`crawl_control`, one row, two switches, both OFF by default:**
+  - `execution_enabled`: when off, the crawler answers every request with the pause message;
+  - `promotion_enabled`: when off, the crawler runs in observation-only mode, storing observations and evidence and never changing a listing price.
+- **`crawl_promote_listing()`, the only path from an observation to a listing price.**
+  - It reads `promotion_enabled` under a row lock, in the same transaction as the guarded update.
+  - It writes only the ten price and provenance fields, refuses any other field, and changes nothing if the listing moved.
+  - The crawler's direct update (`updateListingIfUnchanged`) is removed.
+- **`platform_set_crawl_control()` is the only writer.**
+  - It requires a platform admin, a reason, and the current version.
+  - It records who and when on the row, and writes before/after to `audit_log`.
+  - Nobody else can write the table, including the service role the crawler runs as.
+- **Missing or unreadable means OFF.** A missing table, function or row, a read error or a malformed answer all count as OFF:
+  - in the crawler (`_shared/crawlControl.ts`);
+  - in the commit path (`crawlCommit.ts`: a missing function is held, any other error is a failed promotion, and neither writes);
+  - and in SQL.
+- **In-flight runs.**
+  - The crawler re-reads the execution switch before each vehicle and before discovery.
+  - Promotion is decided by the database at write time, so a hold applies immediately, even inside a running crawl.
+- **Covered and not covered.** This covers every crawl-observation promotion path; no trigger or other function promotes observations, as checked in production. Other writers of listing pricing are outside this control and remain separate decisions:
+  - the MarketCheck feed sync (cron paused);
+  - doc-fee recalculation and Fee Review & Apply;
+  - manual edits.
+
+**Results (local replica, synthetic data):**
+
+| Suite | Result |
+|---|---|
+| Control SQL (`scripts/crawl-verify/control/run.sh`) | **22 of 22**, plus **2 of 2** concurrency (two sessions) |
+| Crawler end to end (`scripts/crawl-verify/e2e/run.sh`) | `missing` 3/3 · `paused` 3/3 · `noschema` 4/4 · `observe` 6/6 · `inflight` 8/8 · `fixed` 19/19 · `budget` 19/19 · `refused` 6/6 · `prefix` 7/19 (the deliberate reproduction of the old crawler's defects) |
+| Unit and component tests | `crawlControl.test.ts` 11, `crawlVehiclePrice.test.ts` 42 (3 new hold cases), `crawlFormat.test.ts` 53, `crawlPaused.test.ts` 2: all pass |
+
+**Control SQL, 22 checks:**
+- defaults are off, and promotion is held by default;
+- refused attempts to change the switches leave no trace: a dealer user, the anonymous role, the service role through the setter, the service role or an admin writing directly, and a signed-in user calling the promotion function;
+- reads are restricted;
+- a reason is required, and a stale version is refused;
+- observation-only mode holds promotion;
+- who, when and why are recorded, and every change is audited;
+- the guarded write, a conflict, and a non-price field refused;
+- a missing row reads as off.
+
+**Concurrency, 2 checks:**
+- **Hold first:** a promotion that starts while an admin's hold is in flight waits for it, then writes nothing.
+- **Promotion first:** a hold set while a promotion is in flight waits for that promotion to finish. That promotion was already in progress, so it completes; the next one is held.
+
+**Crawler end to end, by stage:**
+- **missing / paused:** every request is answered with the pause message, and nothing is rendered, stored or written.
+- **observe:** pages are read; no listing price changes in either run; promotable vehicles are stored as `held_promotion_off` with their screenshot hash; the other held outcomes are unchanged.
+- **inflight:** the run starts with promotion on. A hold set during the first render stops every promotion in that run, and observations and evidence are kept.
+- **fixed / budget:** the full contract with both switches on.
+
+**Full suite and typecheck.**
+
+- **Full suite: 7,362 passed, 1 skipped, 2 failed.** The 2 failures are the known baseline ones (`complianceData`, `complianceRedTeam`), so the suite is not fully green.
+- **App typecheck:** clean.
+- **Two problems found on the first full run, and how each was resolved:**
+  - **The secret scan (`functionAuth.test.ts`).** It timed out under full-suite load: 32 s against a 5 s limit. Run alone it passes, 78 of 78. It was not a leak.
+  - **11 SignalHouse tests.** These broke because the deploy agent's re-pin (`4a6527f`) no longer matched the test alias `npm:@signalhousellc/sdk@1.0.66`. The alias in `vitest.config.ts` now matches any pinned version, and the tests pass 12 of 12. This is a test-config change only; the pin decision stays open (section 6).
+
+### 4. Budget proposal, corrected (proposal only; nothing implemented or deployed)
+
+This supersedes the earlier proposal and the defaults in the undeployed `dfea8dd` budget patch. Those must change before that patch is deployed:
+
+- **Fail closed everywhere.** When the budget check cannot answer (`gate_unavailable`, a missing function, an error), the call is refused, **including the inventory feed**. `providerBudget.ts`'s current fail-open behaviour must be inverted.
+- **No implicit feed bypass.**
+  - A dealership budget in Enforce mode refuses the feed at its cap too: `block_essential` becomes the default, and there is no essential bypass.
+  - A provider with no platform budget row is refused, instead of today's hosted `ungated` admit.
+- **Inventory continuity exception.** Only on separate written authorization:
+  - a named exception per provider (and optionally per dealership);
+  - its own small monthly cap and an expiry;
+  - every call it admits logged as `continuity_exception` in `provider_call_events`, with a super-admin alert on first use;
+  - an exception that is unavailable or exhausted refuses.
+- **Explicit provider budgets.** A platform row for every paid provider: MarketCheck, Firecrawl (renders and searches), VinAudit / MonroneyLabels, Black Book, Google Places. Email and SMS are counted by message.
+  - Caps are set by you; any provider without one stays closed.
+  - MarketCheck keeps its 5,000 calls a month, with the existing feed reserve inside the cap.
+- **Two budgets, never shared.**
+  - **Essential inventory sync:** the MarketCheck feed pull and its rooftop validation only.
+  - **Optional enrichment:** comps, specs, recalls, title reports, incentives, NeoVIN, Black Book, OEM brochures, manuals and stickers, crawler renders and searches, Places.
+  - Enrichment can never draw on the feed's budget.
+
+**packet-backfill: current records only, no calls made.**
+
+- **Schedule.** Active cron job 27 runs daily at 09:40 UTC. Over the last 30 days it ran 30 times, all succeeding (the cron run status only).
+- **Window-sticker pulls (VinAudit / MonroneyLabels): none ever.** No listing has `oem_sticker_checked_at` set and none has a sticker URL, which means no sticker provider is configured and nothing has been spent on stickers.
+  - Exposure if a key is ever set: 131 published listings unchecked. At the default 20 per run (maximum 200), that is about 7 daily runs to pull them all.
+- **Firecrawl searches (OEM link harvests).**
+  - 149 harvest attempts since 2026-08-01 across 120 model records.
+  - 44 model records touched in the last 30 days, 15 in the last 7.
+  - 29 brochure links and 14 owner's manual links found in the last 30 days.
+  - A harvest runs 1–2 searches (brochure) or up to 4 (manual), so the last 30 days is roughly 44–176 searches.
+  - The default per-run cap is 8 harvests (maximum 60): at most about 32 searches a day, or 960 a month, at the default.
+- **Cost: unknown.** The credit price of one Firecrawl search is not on record (`PROVIDER_COST_AND_ENTITLEMENT_MAP.md`: UNKNOWN), so no dollar figure is given. The intake path calls the same functions, and the records do not separate intake from backfill.
+
+### 5. Fee-preview deployment record (prepared, not applied)
+
+**What `supabase/proposed/20261105000000_reconcile_fee_preview_fix.sql` does:**
+- It verifies that the live `admin_doc_fee_change_preview` is exactly the 20261029120000 definition: `pg_get_functiondef` md5 `2a1468b9…`, as read in production and reproduced locally from the file.
+- If anything else is live, it stops and records nothing.
+- It records provenance as a comment on the function and an `audit_log` row.
+
+**What it does not do:**
+- It does not redefine the function.
+- It does not insert a historical row for 20261029120000. Applied through the normal process, it is recorded under its own version.
+
+**Tested locally:**
+- On the matching definition it passes: the definition is unchanged and one audit row is written.
+- With Policy B applied first it stops, and nothing is recorded.
+
+Policy B stays separate and pending.
+
+### 6. Remaining rollout blockers
+
+**Decisions for you:**
+1. **The deploy agent's SDK re-pin (`4a6527f`):** accept it or revert it. Either way, it has to be settled before any SMS function is deployed.
+2. **Budget policy:** the corrected fail-closed proposal (section 4) and the provider caps. The continuity exception needs its own written authorization if wanted.
+
+**Approvals needed:**
+3. **Crawl migrations** `20261101000000`, `20261102000000` and `20261104000000`, all additive.
+4. **The corrected crawler deployment.** It keeps the pause until an admin turns execution on.
+5. **Observation-only, then promotion.**
+   - Execution on with promotion off, for observation-only runs.
+   - A supervised paid run.
+   - Promotion on only after you review the held vehicles.
+   - Resuming the cron is a separate step.
+6. **The fee-preview reconciliation migration** (`20261105000000`).
+7. **Policy B:** separate and pending.
+
+**Still unresolved:**
+8. Screenshot review: still blocked until the files are supplied.
+9. The 2 baseline test failures and the 9 type-only sync errors: open.

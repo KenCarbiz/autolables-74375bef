@@ -1,0 +1,32 @@
+ n  | result |                                      label                                      | detail 
+----+--------+---------------------------------------------------------------------------------+--------
+  1 | PASS   | default: both switches off, version 1                                           | 
+  2 | PASS   | default: the crawler's promotion is held and the listing is unchanged           | 
+  3 | PASS   | auth: a dealer user cannot enable promotion                                     | 
+  4 | PASS   | auth: the anonymous role cannot call the setter                                 | 
+  5 | PASS   | auth: the service role (the crawler) cannot enable promotion through the setter | 
+  6 | PASS   | auth: the service role cannot write the table directly                          | 
+  7 | PASS   | auth: a platform admin cannot write the table directly either                   | 
+  8 | PASS   | auth: a signed-in user cannot call the promotion function                       | 
+  9 | PASS   | read: a dealer user cannot see the switches; an admin can                       | 
+ 10 | PASS   | after refused attempts: still off, still version 1, nothing audited             | 
+ 11 | PASS   | admin: a change needs a reason                                                  | 
+ 12 | PASS   | admin: a stale version is refused                                               | 
+ 13 | PASS   | admin: execution on, promotion still off (observation-only)                     | 
+ 14 | PASS   | observation-only: promotion still held                                          | 
+ 15 | PASS   | admin: promotion on                                                             | 
+ 16 | PASS   | record: who, when and why are on the row                                        | 
+ 17 | PASS   | record: each change is audited with the admin and the before/after switches     | 
+ 18 | PASS   | promotion on: the guarded write applies                                         | 
+ 19 | PASS   | promotion on: a listing that moved is not overwritten                           | 
+ 20 | PASS   | promotion on: a field outside the price fields is refused                       | 
+ 21 | PASS   | missing row: both switches read off                                             | 
+ 22 | PASS   | missing row: promotion held, listing unchanged                                  | 
+
+        summary         
+------------------------
+ 22 of 22 checks passed
+
+PASS  hold first: the promotion waited for the hold (>= 1000 ms) and wrote nothing
+PASS  promotion first: the hold waited (>= 1000 ms) for the in-flight promotion, which completed; the next one is held
+concurrency: 2 of 2 checks passed

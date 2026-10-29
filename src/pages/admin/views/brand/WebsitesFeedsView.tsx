@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { crawlPausedMessage } from "@/lib/inventory/crawlPaused";
 import { AdminButton, AdminCard, InlineNote } from "@/components/admin/v2/primitives";
 import { WEBSITES_KEYS, validateWebsites } from "./brandModel";
 import { useBrandForm } from "./useBrandForm";
@@ -36,7 +37,7 @@ export default function WebsitesFeedsView() {
     setResult(null);
     try {
       const { data, error } = await supabase.functions.invoke("crawl-advertised-prices", { body: { tenant_id: source.tenantId, test_url: testUrl.trim() } });
-      if (error) setResult({ error: error.message });
+      if (error) setResult({ error: (await crawlPausedMessage(error)) ?? error.message });
       else setResult((data?.test as PriceTestResult) || (data as PriceTestResult) || { error: "No result" });
     } catch (e) {
       setResult({ error: e instanceof Error ? e.message : String(e) });

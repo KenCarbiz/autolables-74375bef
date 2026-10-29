@@ -28,7 +28,7 @@ export default defineConfig({
       { find: "https://esm.sh/pdf-lib@1.17.1", replacement: "pdf-lib" },
       // Same idea for the Signal House SDK, which edge functions pin with an
       // npm: specifier Vite cannot resolve on its own.
-      { find: "npm:@signalhousellc/sdk@1.0.66", replacement: "@signalhousellc/sdk" },
+      { find: /^npm:@signalhousellc\/sdk@[0-9.]+$/, replacement: "@signalhousellc/sdk" },
       {
         find: "@/integrations/supabase/client",
         replacement: path.resolve(__dirname, "./src/lib/supabaseClient.ts"),

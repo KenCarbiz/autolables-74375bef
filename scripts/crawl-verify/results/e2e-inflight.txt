@@ -1,0 +1,83 @@
+======== Stage inflight: working tree supabase/functions/crawl-advertised-prices/index.ts dd90fc468e896e66dcce312fcb8a096df95cb909
+   substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
+   substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
+== Stage inflight; observation columns present: True
+
+== Before any run (before-fee|fee|sale, as the feed left them)
+  card       30100|900|31000   page: a similar-vehicle card with another VIN and a lower Selling Price comes first; the vehicle's own block shows a fee line and a total
+  redirect   26100|900|27000   page: the address redirects to another car's page (no VIN in the final address); this vehicle appears only in that page's related strip
+  setting    24992|900|25892   page: one labelled figure and nothing on the page about the fee (like the nine production updates)
+  conflict   21600|900|22500   page: the page states the price excludes the fee; the dealership's setting says it includes it
+  evidence   33100|900|34000   page: a page-verified price whose screenshot cannot be stored
+  partial    28100|900|29000   page: a page-verified price whose listing write fails in the database
+  ambiguous  20100|900|21000   page: two unattributed Selling Price figures that disagree
+  title      26100|900|27000   page: no document title; an embedded panel's SVG title is the only <title> on the page
+
+== Run 1: HTTP 200; updated 6 unchanged 0 skipped 2 failed 0 listing_outcomes {'held_promotion_off': 3, 'held_fee_basis': 2, 'held_evidence': 1}
+   renders 9; storage writes [('1EXMP0008S9000011', 200), ('1EXMP000XS9000012', 200), ('1EXMP0001S9000013', 200), ('1EXMP0003S9000014', 200), ('1EXMP0005S9000015', 500), ('1EXMP0005S9000015', 500), ('1EXMP0007S9000016', 200), ('1EXMP0009S9000017', 200), ('1EXMP0000S9000018', 200)]
+
+== After run 1 (failures injected)
+  card       listing 30100|900|31000    observations [30000|t|held_promotion_off|page_verified|same_render]
+             ledger held_promotion_off | promotion is switched off (observation-only mode)
+  redirect   listing 26100|900|27000    observations [-]
+             ledger vin_mismatch | [paced_wait_ms=998 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url
+  setting    listing 24992|900|25892    observations [25572|t|held_fee_basis|dealer_configured_unverified|same_render]
+             ledger held_fee_basis | dealer_configured_unverified: no fee evidence on the page; derived from the dealership's setting (advertised_includes_doc_fee), not verified by the page
+  conflict   listing 21600|900|22500    observations [22000|t|held_fee_basis|conflict|same_render]
+             ledger held_fee_basis | conflict: the page shows the price excludes the fee; the dealership's setting (advertised_includes_doc_fee) says includes_fee
+  evidence   listing 33100|900|34000    observations [33000|f|held_evidence|page_verified|not_captured]
+             ledger held_evidence | the evidence screenshot could not be stored
+  partial    listing 28100|900|29000    observations [28000|t|held_promotion_off|page_verified|same_render]
+             ledger held_promotion_off | promotion is switched off (observation-only mode)
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger ambiguous_price | [paced_wait_ms=956 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  title      listing 26100|900|27000    observations [26000|t|held_promotion_off|page_verified|same_render]
+             ledger held_promotion_off | promotion is switched off (observation-only mode)
+
+== Run 2: HTTP 200; updated 0 unchanged 6 skipped 2 failed 0 listing_outcomes {'held_promotion_off': 4, 'held_fee_basis': 2}
+
+== After run 2 (failures removed)
+  card       listing 30100|900|31000    observations [30000|t|held_promotion_off|page_verified|same_render ; 30000|t|held_promotion_off|page_verified|revalidated_render]
+             ledger held_promotion_off | promotion is switched off (observation-only mode)
+  redirect   listing 26100|900|27000    observations [-]
+             ledger vin_mismatch | [paced_wait_ms=0 rate_limit_retries=0 formats=html+screenshot] page=other_vehicle redirected title="2024 Example SUV | Example Motors" findings=redirected url_s
+  setting    listing 24992|900|25892    observations [25572|t|held_fee_basis|dealer_configured_unverified|same_render ; 25572|f|held_fee_basis|dealer_configured_unverified|not_captured]
+             ledger held_fee_basis | dealer_configured_unverified: no fee evidence on the page; derived from the dealership's setting (advertised_includes_doc_fee), not verified by the page
+  conflict   listing 21600|900|22500    observations [22000|t|held_fee_basis|conflict|same_render ; 22000|f|held_fee_basis|conflict|not_captured]
+             ledger held_fee_basis | conflict: the page shows the price excludes the fee; the dealership's setting (advertised_includes_doc_fee) says includes_fee
+  evidence   listing 33100|900|34000    observations [33000|f|held_evidence|page_verified|not_captured ; 33000|t|held_promotion_off|page_verified|same_render]
+             ledger held_promotion_off | promotion is switched off (observation-only mode)
+  partial    listing 28100|900|29000    observations [28000|t|held_promotion_off|page_verified|same_render ; 28000|t|held_promotion_off|page_verified|revalidated_render]
+             ledger held_promotion_off | promotion is switched off (observation-only mode)
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger ambiguous_price | [paced_wait_ms=1096 rate_limit_retries=0 formats=html+screenshot] page=vehicle title="2024 Example SUV | Example Motors" url_source=listing
+  title      listing 26100|900|27000    observations [26000|t|held_promotion_off|page_verified|same_render ; 26000|t|held_promotion_off|page_verified|revalidated_render]
+             ledger held_promotion_off | promotion is switched off (observation-only mode)
+
+PASS  inflight: the run started with promotion on
+      expected True
+      actual   True
+PASS  inflight: the hold landed during the first render of the run
+      expected [{'atRender': 1, 'ok': True}]
+      actual   [{'atRender': 1, 'ok': True}]
+PASS  inflight: the run read pages (renders sent)
+      expected True
+      actual   True
+PASS  inflight: no listing's pricing changed in either run
+      expected ({'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}, {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'})
+      actual   ({'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}, {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'})
+PASS  inflight: the vehicles that would have been promoted are stored and held, with their screenshot hash
+      expected {'card': 'held_promotion_off|t', 'title': 'held_promotion_off|t'}
+      actual   {'card': 'held_promotion_off|t', 'title': 'held_promotion_off|t'}
+PASS  inflight: the other outcomes are unchanged: setting and conflict held for fee basis, failed screenshot held for evidence
+      expected {'setting': 'held_fee_basis', 'conflict': 'held_fee_basis', 'evidence': 'held_evidence'}
+      actual   {'setting': 'held_fee_basis', 'conflict': 'held_fee_basis', 'evidence': 'held_evidence'}
+PASS  inflight: run 2 stores again and still promotes nothing
+      expected {'card': 'held_promotion_off', 'title': 'held_promotion_off', 'partial': 'held_promotion_off', 'evidence': 'held_promotion_off'}
+      actual   {'card': 'held_promotion_off', 'title': 'held_promotion_off', 'partial': 'held_promotion_off', 'evidence': 'held_promotion_off'}
+PASS  inflight: the run summaries count the held vehicles
+      expected True
+      actual   True
+
+8 checks, 0 failed
+== Stage inflight exit 0

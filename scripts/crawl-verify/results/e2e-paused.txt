@@ -1,0 +1,68 @@
+======== Stage paused: working tree supabase/functions/crawl-advertised-prices/index.ts dd90fc468e896e66dcce312fcb8a096df95cb909
+   substituted: 455:const FIRECRAWL_ENDPOINT = "http://127.0.0.1:54421/fc/v2/scrape";
+   substituted: 12:export const CREDIT_USAGE_ENDPOINT = "http://127.0.0.1:54421/fc/v2/team/credit-usage";
+== Stage paused; observation columns present: True
+
+== Before any run (before-fee|fee|sale, as the feed left them)
+  card       30100|900|31000   page: a similar-vehicle card with another VIN and a lower Selling Price comes first; the vehicle's own block shows a fee line and a total
+  redirect   26100|900|27000   page: the address redirects to another car's page (no VIN in the final address); this vehicle appears only in that page's related strip
+  setting    24992|900|25892   page: one labelled figure and nothing on the page about the fee (like the nine production updates)
+  conflict   21600|900|22500   page: the page states the price excludes the fee; the dealership's setting says it includes it
+  evidence   33100|900|34000   page: a page-verified price whose screenshot cannot be stored
+  partial    28100|900|29000   page: a page-verified price whose listing write fails in the database
+  ambiguous  20100|900|21000   page: two unattributed Selling Price figures that disagree
+  title      26100|900|27000   page: no document title; an embedded panel's SVG title is the only <title> on the page
+
+== Run 1: HTTP 503; updated None unchanged None skipped None failed None listing_outcomes None
+   renders 0; storage writes []
+
+== After run 1 (failures injected)
+  card       listing 30100|900|31000    observations [-]
+             ledger -
+  redirect   listing 26100|900|27000    observations [-]
+             ledger -
+  setting    listing 24992|900|25892    observations [-]
+             ledger -
+  conflict   listing 21600|900|22500    observations [-]
+             ledger -
+  evidence   listing 33100|900|34000    observations [-]
+             ledger -
+  partial    listing 28100|900|29000    observations [-]
+             ledger -
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger -
+  title      listing 26100|900|27000    observations [-]
+             ledger -
+
+== Run 2: HTTP 503; updated None unchanged None skipped None failed None listing_outcomes None
+
+== After run 2 (failures removed)
+  card       listing 30100|900|31000    observations [-]
+             ledger -
+  redirect   listing 26100|900|27000    observations [-]
+             ledger -
+  setting    listing 24992|900|25892    observations [-]
+             ledger -
+  conflict   listing 21600|900|22500    observations [-]
+             ledger -
+  evidence   listing 33100|900|34000    observations [-]
+             ledger -
+  partial    listing 28100|900|29000    observations [-]
+             ledger -
+  ambiguous  listing 20100|900|21000    observations [-]
+             ledger -
+  title      listing 26100|900|27000    observations [-]
+             ledger -
+
+PASS  paused: every request is refused with the pause message
+      expected [(503, True, 'Temporarily paused for pricing verification'), (503, True, 'Temporarily paused for pricing verification')]
+      actual   [(503, True, 'Temporarily paused for pricing verification'), (503, True, 'Temporarily paused for pricing verification')]
+PASS  paused: the control state is named
+      expected 'control'
+      actual   'control'
+PASS  paused: nothing was rendered, stored or written
+      expected (0, 0, {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}, {'card': '', 'redirect': '', 'setting': '', 'conflict': '', 'evidence': '', 'partial': '', 'ambiguous': '', 'title': ''}, {'card': '', 'redirect': '', 'setting': '', 'conflict': '', 'evidence': '', 'partial': '', 'ambiguous': '', 'title': ''})
+      actual   (0, 0, {'card': '30100|900|31000', 'redirect': '26100|900|27000', 'setting': '24992|900|25892', 'conflict': '21600|900|22500', 'evidence': '33100|900|34000', 'partial': '28100|900|29000', 'ambiguous': '20100|900|21000', 'title': '26100|900|27000'}, {'card': '', 'redirect': '', 'setting': '', 'conflict': '', 'evidence': '', 'partial': '', 'ambiguous': '', 'title': ''}, {'card': '', 'redirect': '', 'setting': '', 'conflict': '', 'evidence': '', 'partial': '', 'ambiguous': '', 'title': ''})
+
+3 checks, 0 failed
+== Stage paused exit 0

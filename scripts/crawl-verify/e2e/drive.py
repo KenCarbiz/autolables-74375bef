@@ -109,7 +109,36 @@ snapshot("After run 2 (failures removed)")
 after2 = {k: pricing(k) for k in CASES}
 print()
 
-if STAGE == "refused":
+def promotion_of(k, run=0):
+    rows = observations(k).split(" ; ")
+    return rows[run].split("|")[2] if len(rows) > run and rows[run] else ""
+
+
+if STAGE in ("missing", "paused"):
+    msg = "Temporarily paused for pricing verification"
+    check(f"{STAGE}: every request is refused with the pause message",
+          [(503, True, msg), (503, True, msg)], [(status, body.get("paused"), body.get("message")), (status2, body2.get("paused"), body2.get("message"))])
+    check(f"{STAGE}: the control state is named", "missing" if STAGE == "missing" else "control", body.get("control"))
+    check(f"{STAGE}: nothing was rendered, stored or written", (0, 0, INITIAL, {k: "" for k in CASES}, {k: "" for k in CASES}),
+          (len(renders) + len(renders2), len(stored), after2, {k: observations(k) for k in CASES}, {k: ledger(k) for k in CASES}))
+elif STAGE in ("observe", "inflight"):
+    flips = gw("/__flips")
+    if STAGE == "inflight":
+        check("inflight: the run started with promotion on", True, (body.get("listing_outcomes") is not None) and sql("SELECT count(*) FROM public.audit_log WHERE action = 'advertised_price_crawl_run' AND details #>> '{control,promotion}' = 'true'") != "0")
+        check("inflight: the hold landed during the first render of the run", [{"atRender": 1, "ok": True}], flips)
+    check(f"{STAGE}: the run read pages (renders sent)", True, len(renders) > 0)
+    check(f"{STAGE}: no listing's pricing changed in either run", (INITIAL, INITIAL), (after1, after2))
+    check(f"{STAGE}: the vehicles that would have been promoted are stored and held, with their screenshot hash",
+          {"card": "held_promotion_off|t", "title": "held_promotion_off|t"},
+          {k: promotion_of(k) + "|" + obs1[k].split(" ; ")[0].split("|")[1] for k in ("card", "title")})
+    check(f"{STAGE}: the other outcomes are unchanged: setting and conflict held for fee basis, failed screenshot held for evidence",
+          {"setting": "held_fee_basis", "conflict": "held_fee_basis", "evidence": "held_evidence"},
+          {k: promotion_of(k) for k in ("setting", "conflict", "evidence")})
+    check(f"{STAGE}: run 2 stores again and still promotes nothing",
+          {"card": "held_promotion_off", "title": "held_promotion_off", "partial": "held_promotion_off", "evidence": "held_promotion_off"},
+          {k: promotion_of(k, 1) for k in ("card", "title", "partial", "evidence")})
+    check(f"{STAGE}: the run summaries count the held vehicles", True, (body.get("listing_outcomes") or {}).get("held_promotion_off", 0) >= 2)
+elif STAGE == "refused":
     check("refused: no render was sent to the renderer in either run", 0, len(renders) + len(renders2))
     check("refused: no listing's pricing changed", INITIAL, after2)
     check("refused: no observation was stored", {k: "" for k in CASES}, {k: observations(k) for k in CASES})
