@@ -3303,9 +3303,9 @@ SMS functions stay undeployed until you accept or revert the SDK change (section
 | Dependency set | Passed | Skipped | Failed |
 |---|---|---|---|
 | (a) existing `node_modules`, final tree | 7,382 | 1 | 2 baseline. In an earlier full run of this round, `functionAuth` "is absent from every committed file" also timed out under load (6,860 ms against 5,000 ms). It passes alone, 78 of 78, and passed in the final run |
-| (b) the committed `bun.lock` (zod 4) | 7,380 | 1 | 2 baseline. App typecheck clean; `bun run build` succeeds |
+| (b) the committed `bun.lock` (zod 4.6.7, router 6.30.6), exact commit `bdc86aa` (`git archive`) | 7,382 | 1 | 2 baseline. App typecheck clean; `bun run build` succeeds |
 
-Set (b) was taken before the last five callers were gated. The re-run on the exact commit is reported with the push.
+After the commit, the secret-scan test (`functionAuth`, which reads committed files only) passed 78 of 78 on `bdc86aa`.
 
 - **The skipped test:** `factorySticker/render/index.test.ts`, "writes the sample matrix to the scratchpad". It is `describe.runIf(WRITE_SAMPLES)`, a manual sample-PDF generator, and is skipped by design.
 - **The two baseline failures:** both are clock-dependent fixtures, not product defects introduced here, and both also fail at `3836dc3`.
