@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-28T22:15:05.834Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-29T05:30:19.165Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -240,12 +240,12 @@ Masks (29): change impact counts (fixture inventory sizes); preview vehicle name
 
 ## Screen 06
 
-Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 94.15% is below 95%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 94.11% is below 95%). Acceptance pending; no exception has been approved.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 88.47% | 82.33% | 94.15% | 81.98% | 94.10% (+0px) | 81.85% | 98.15% | 84.94% | 4.12% |
-| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.37% | 73.52% | 90.34% | 70.96% | n/a | n/a | n/a | n/a | 4.05% |
+| 1586x992 | `scripts/admin-parity/out/06-1586x992.png` | 88.44% | 82.17% | 94.11% | 81.78% | 94.05% (+0px) | 81.61% | 98.10% | 84.91% | 4.13% |
+| 1600x1000 | `scripts/admin-parity/out/06-1600x1000.png` | 85.35% | 73.43% | 90.32% | 70.83% | n/a | n/a | n/a | n/a | 4.06% |
 
 Rail stand-in: 243px (the mock's rail width); content region starts at x=246.
 Body anchor (pinned in landmarks.json): reference y=187, capture y=187 (title block offset +0px).

@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | Not met; exceptions pending | Protocol v2 on `1dd1d4b`: 06 at 94.15% (individual review); 12 screens below 94%; mobile pass and 05 pricing correction verified (sections 10.7-10.8) | Owner visual review |
+| 16 | Visual acceptance | Not met; 06 submitted for individual review | Protocol v2, all 13 screens measured on one revision (`7f4fa1a`, section 10.15): 06 at 94.11% (individual review); 12 screens below 94% | Owner visual review |
 
 ## 2. How the evidence was produced
 
@@ -1461,6 +1461,90 @@ treatment is not the problem on these surfaces.
 | G7 | Crawler patch deployed in shadow mode: evidence and audit only, no listing writes, for at least one full crawl cycle; held and unresolved rates reviewed | Open |
 | G8 | Listing writes enabled for one dealership with a rollback flag; class A correction regenerated from reconciled stacks through the guarded template | Open |
 | G9 | MarketCheck resumption decided separately, after quota, cost and these safeguards | Open (paused) |
+
+### 10.15 Screen 06 individual review package; all 13 screens on one revision (2026-10-29)
+
+**Revision.** Every number below was measured in one harness run on
+implementation commit `7f4fa1a`. `a46cfa7` and this commit add only review
+tooling and evidence under `scripts/`, so the app code is the same. No
+screen was tuned in this round. The acceptance rule is unchanged:
+- 95% target;
+- 94.00-94.99% eligible for individual approval;
+- below 94% is below the numeric target unless a specific exception is
+  approved.
+
+| # | Screen | v2 content | Band | Landmarks |
+| --- | --- | --- | --- | --- |
+| 01 | Overview | 92.99% | below 94 | pass |
+| 02 | Dealership & Brand | 88.01% | below 94 | pass |
+| 03 | People & Access | 90.70% | below 94 | pass |
+| 04 | Member role | 89.87% | below 94 | fail (owner layout decision) |
+| 05 | Price rules | 89.87% | below 94 | pass |
+| 06 | Fee change review | **94.11%** | 94.00-94.99: individual review | pass |
+| 07 | Product applicability | 87.83% | below 94 | pass |
+| 08 | Contact & Routing | 92.12% | below 94 | pass |
+| 09 | Escalation rules | 86.53% | below 94 | pass |
+| 10 | Effective policy | 89.53% | below 94 | fail (owner layout decision) |
+| 11 | Approval rules | 89.84% | below 94 | fail (approved title block) |
+| 12 | Inventory feed | 92.22% | below 94 | fail (owner layout decision) |
+| 13 | Sync run detail | 87.77% | below 94 | fail (owner layout decision) |
+
+Every value equals the earlier figure for that screen, so the mixed-revision
+table in 10.8 and 10.9 is superseded by this one.
+
+**Screen 06 package** (`scripts/admin-parity/evidence/`):
+- **Reference, actual, overlay and differences:** `overlay/06.png`.
+- **Side by side with diffs:** `side-by-side/06.png`.
+- **Actual captures:**
+  - `screen-06-review/actual-06-1586x992.png`;
+  - `screen-06-review/06-1920x1080.png`;
+  - `screen-06-review/06-1366x768.png`;
+  - `screen-06-review/06-390x844.png`.
+- **Desktop states** (`screen-06-review/states/`, with `states-06.json`):
+
+  | State | Buttons and messages |
+  | --- | --- |
+  | Review as opened | Back to edit enabled; Apply to 48 active vehicles enabled |
+  | Back to edit | Review changes enabled; draft kept |
+  | Fee set back to $895 | Review changes disabled |
+  | Amount -5 submitted | "The fee cannot be negative." |
+  | Fee switched off | Amount field disabled |
+  | 1366x768 | The review fits without scrolling |
+
+- **Phone captures** (`screen-06-review/mobile/`): 390x844, 320x568 and
+  390x500 (short, on-screen keyboard), captured as the dialog body scrolls.
+  30 of 30 checks pass:
+  - the dialog fits the viewport;
+  - the page behind does not scroll;
+  - Close, Back and Apply are reachable;
+  - every fee and total is readable;
+  - focus is trapped and returns to the trigger;
+  - the inputs scroll into view.
+- **States the fixture cannot reach:** Apply disabled while the review is
+  held, Apply disabled without pricing authority, and impact not computable.
+  These are covered by `FeeReviewPage.test.tsx`; with the pricing suites, 183
+  of 183 tests pass. The fixture does not perform an apply.
+
+**Pricing in screen 06 (verified).**
+- The example row follows the corrected fee-inclusive rule: fee $895 to $925,
+  selling price $18,525 to $18,495 (-$30), advertised total $19,420 to
+  $19,420 (no change).
+- The phone check had still expected the pre-correction total of $19,450.
+  The check was updated to the corrected values; the screen was not changed.
+- **Known deviation from the mock, kept on purpose.** The reference shows the
+  pre-correction arithmetic: selling price unchanged, advertised total +$30.
+  Matching it would reintroduce the pricing error, so this difference stays
+  and counts against the score.
+- **Proposed rule, not live.** The behaviour shown is the policy B rule. The
+  policy B migration is not applied in production, so the live dialog shows
+  whatever the deployed server preview returns.
+
+**Current captures of 01, 08 and 12** for review before any tuning proposal:
+- `overlay/01.png`, `overlay/08.png`, `overlay/12.png`;
+- `side-by-side/01.png`, `side-by-side/08.png`, `side-by-side/12.png`;
+- `screen-06-review/actual-{01,08,12}-1586x992.png`.
+
+No tuning is proposed until you have reviewed them.
 
 ## 11. Approvals requested
 

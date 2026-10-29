@@ -1,0 +1,167 @@
+[
+ {
+  "viewport": "390x844",
+  "results": [
+   {
+    "check": "dialog fits the viewport",
+    "ok": true,
+    "detail": "dialog 12-832 of 844px; internal scroll areas 1"
+   },
+   {
+    "check": "background page does not scroll",
+    "ok": true,
+    "detail": "window scrollY 0 -> 0; html overflow-y hidden"
+   },
+   {
+    "check": "Close reachable",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "check": "Back to edit reachable",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "check": "Apply reachable",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "check": "fee and advertised-total values readable",
+    "ok": true,
+    "detail": "10 values checked"
+   },
+   {
+    "check": "focus trapped in the dialog",
+    "ok": true,
+    "detail": "0 of 60 Tab / Shift+Tab presses left the dialog"
+   },
+   {
+    "check": "edit inputs scroll into view on focus",
+    "ok": true,
+    "detail": "3 inputs"
+   },
+   {
+    "check": "focus returns to the trigger (Escape)",
+    "ok": true,
+    "detail": "focus moved into dialog on open: true; after close focus on button[price-review] \"Review changes\"; trigger enabled: true; url /admin/design-fixture/05"
+   },
+   {
+    "check": "focus returns to the trigger (Close button)",
+    "ok": true,
+    "detail": "focus moved into dialog on open: true; after close focus on button[price-review] \"Review changes\"; trigger enabled: true; url /admin/design-fixture/05"
+   }
+  ]
+ },
+ {
+  "viewport": "320x568",
+  "results": [
+   {
+    "check": "dialog fits the viewport",
+    "ok": true,
+    "detail": "dialog 12-556 of 568px; internal scroll areas 1"
+   },
+   {
+    "check": "background page does not scroll",
+    "ok": true,
+    "detail": "window scrollY 0 -> 0; html overflow-y hidden"
+   },
+   {
+    "check": "Close reachable",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "check": "Back to edit reachable",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "check": "Apply reachable",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "check": "fee and advertised-total values readable",
+    "ok": true,
+    "detail": "10 values checked"
+   },
+   {
+    "check": "focus trapped in the dialog",
+    "ok": true,
+    "detail": "0 of 60 Tab / Shift+Tab presses left the dialog"
+   },
+   {
+    "check": "edit inputs scroll into view on focus",
+    "ok": true,
+    "detail": "3 inputs"
+   },
+   {
+    "check": "focus returns to the trigger (Escape)",
+    "ok": true,
+    "detail": "focus moved into dialog on open: true; after close focus on button[price-review] \"Review changes\"; trigger enabled: true; url /admin/design-fixture/05"
+   },
+   {
+    "check": "focus returns to the trigger (Close button)",
+    "ok": true,
+    "detail": "focus moved into dialog on open: true; after close focus on button[price-review] \"Review changes\"; trigger enabled: true; url /admin/design-fixture/05"
+   }
+  ]
+ },
+ {
+  "viewport": "390x500",
+  "results": [
+   {
+    "check": "dialog fits the viewport",
+    "ok": true,
+    "detail": "dialog 12-488 of 500px; internal scroll areas 1"
+   },
+   {
+    "check": "background page does not scroll",
+    "ok": true,
+    "detail": "window scrollY 0 -> 0; html overflow-y hidden"
+   },
+   {
+    "check": "Close reachable",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "check": "Back to edit reachable",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "check": "Apply reachable",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "check": "fee and advertised-total values readable",
+    "ok": true,
+    "detail": "10 values checked"
+   },
+   {
+    "check": "focus trapped in the dialog",
+    "ok": true,
+    "detail": "0 of 60 Tab / Shift+Tab presses left the dialog"
+   },
+   {
+    "check": "edit inputs scroll into view on focus",
+    "ok": true,
+    "detail": "3 inputs"
+   },
+   {
+    "check": "focus returns to the trigger (Escape)",
+    "ok": true,
+    "detail": "focus moved into dialog on open: true; after close focus on button[price-review] \"Review changes\"; trigger enabled: true; url /admin/design-fixture/05"
+   },
+   {
+    "check": "focus returns to the trigger (Close button)",
+    "ok": true,
+    "detail": "focus moved into dialog on open: true; after close focus on button[price-review] \"Review changes\"; trigger enabled: true; url /admin/design-fixture/05"
+   }
+  ]
+ }
+]

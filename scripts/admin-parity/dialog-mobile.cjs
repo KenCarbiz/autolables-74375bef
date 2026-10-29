@@ -112,7 +112,9 @@ async function checkViewport(browser, w, h) {
     const r = await loc.evaluate(visibleIn);
     if (!r.ok) failures.push(`${money[i]}: ${r.why}`);
   }
-  const needed = ["$895", "$925", "$19,420", "$19,450"];
+  // Fee-inclusive basis (policy B fixture): the advertised total stays $19,420 and the
+  // selling price absorbs the change ($18,525 -> $18,495).
+  const needed = ["$895", "$925", "$19,420", "$18,525", "$18,495"];
   const missing = needed.filter((v) => !money.some((m) => m.includes(v)));
   record("fee and advertised-total values readable", money.length > 0 && failures.length === 0 && missing.length === 0, `${money.length} values checked${failures.length ? `; ${failures.join("; ")}` : ""}${missing.length ? `; not shown: ${missing.join(", ")}` : ""}`);
 

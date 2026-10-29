@@ -1,0 +1,84 @@
+[
+  {
+    "capture": "06-desktop-01-review.png",
+    "note": "Review step as opened: draft fee $925 against $895",
+    "buttons": [
+      "Back to edit: enabled",
+      "Apply to 48 active vehicles: enabled"
+    ],
+    "messages": [
+      "$30",
+      "$30"
+    ]
+  },
+  {
+    "capture": "06-desktop-02-edit.png",
+    "note": "Back to edit: draft kept",
+    "buttons": [
+      "Review changes: enabled"
+    ],
+    "messages": []
+  },
+  {
+    "capture": "06-desktop-03-unchanged.png",
+    "note": "Fee set back to the current $895: nothing to review",
+    "buttons": [
+      "Review changes: disabled"
+    ],
+    "messages": []
+  },
+  {
+    "capture": "06-desktop-04-validation.png",
+    "note": "Invalid amount (-5) submitted for review",
+    "buttons": [
+      "Review changes: enabled"
+    ],
+    "messages": [
+      "The fee cannot be negative."
+    ]
+  },
+  {
+    "capture": "06-desktop-05-fee-off.png",
+    "note": "Document fee switched off: amount field disabled",
+    "buttons": [
+      "Review changes: enabled"
+    ],
+    "messages": []
+  },
+  {
+    "capture": "06-desktop-06-applied.png",
+    "note": "Apply pressed on the fixture (no server; fixture result)",
+    "buttons": [
+      "Back to edit: enabled",
+      "Apply to 48 active vehicles: enabled"
+    ],
+    "messages": [
+      "$30",
+      "$30"
+    ]
+  },
+  {
+    "capture": "06-desktop-1366x768-scroll-top.png",
+    "note": "Short desktop viewport, top (content 574px in 574px)",
+    "buttons": [
+      "Back to edit: enabled",
+      "Apply to 48 active vehicles: enabled"
+    ],
+    "messages": [
+      "$30",
+      "$30"
+    ]
+  },
+  {
+    "capture": "06-desktop-1366x768-scroll-end.png",
+    "note": "Short desktop viewport, scrolled to the end",
+    "buttons": [
+      "Back to edit: enabled",
+      "Apply to 48 active vehicles: enabled"
+    ],
+    "messages": [
+      "$30",
+      "$30"
+    ]
+  }
+]
