@@ -16,11 +16,31 @@ Generated 2026-10-29T06:28:40.099Z by `bun run admin:parity` against the develop
 - Body parity (aligned): the handoff's information architecture fixes one h1, "Administration", with a breadcrumb above it, while the mocks title their pages four different ways (section name as title, no breadcrumb, no description, a chip above the title). That title block is a proposed exception awaiting the owner, not an approved one. As a diagnostic only, the body score shifts the reference so both section rows end on the same pixel row and scores everything below it in the content region, with the same masks. The offset is printed with the score and it never replaces the protocol number.
 - Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.
 
+## Acceptance register
+
+Owner decisions from `scripts/admin-parity/acceptance.json`. Accepted screens are accepted individually for appearance only at the score and mask share shown; the gate below still reports them as not meeting 95%.
+
+| Screen | Status | Protocol v2 content (masked) | Masked share of frame | Implementation | Evidence |
+|---|---|---|---|---|---|
+| 01 | individually accepted with listed exceptions (2026-10-29) | 92.99% | 3.94% | 2fe74e3 | 4958ce9 |
+| 02 | pending | 88.01% | 1.34% |  |  |
+| 03 | pending | 90.70% | 3.71% |  |  |
+| 04 | pending | 89.87% | 0.95% |  |  |
+| 05 | pending | 89.87% | 6.19% |  |  |
+| 06 | individually approved (2026-10-29) | 94.11% | 4.13% | 7f4fa1a | a085c74 |
+| 07 | pending | 87.83% | 3.08% |  |  |
+| 08 | individually accepted with listed exceptions (2026-10-29) | 92.12% | 0.27% | 2fe74e3 | 4958ce9 |
+| 09 | pending | 86.53% | 2.60% |  |  |
+| 10 | pending | 89.53% | 0.92% |  |  |
+| 11 | pending | 89.84% | 2.10% |  |  |
+| 12 | individually accepted with listed exceptions (2026-10-29) | 92.22% | 2.80% | 2fe74e3 | 4958ce9 |
+| 13 | pending | 87.77% | 3.58% |  |  |
+
 Registered fixtures: 10, 11, 12, 13, 01, 02, 03, 04, 05, 06, 07, 08, 09.
 
 ## Screen 01
 
-Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.99% is below 95%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.99% is below 95%). Individually accepted with listed exceptions by the owner on 2026-10-29 (appearance only) at 92.99% with 3.94% of the frame masked, implementation 2fe74e3, evidence 4958ce9; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, asset substitution). This is not a 95% or 94% pass.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -240,7 +260,7 @@ Masks (29): change impact counts (fixture inventory sizes); preview vehicle name
 
 ## Screen 06
 
-Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 94.11% is below 95%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 94.11% is below 95%). Individually approved by the owner on 2026-10-29 (appearance only) at 94.11% with 4.13% of the frame masked, implementation 7f4fa1a, evidence a085c74; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.15 (policy B pricing difference). This is not a 95% or 94% pass.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -335,7 +355,7 @@ Masks (6): sample vehicle names and mileage (fixture vehicles); product price (f
 
 ## Screen 08
 
-Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.12% is below 95%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.12% is below 95%). Individually accepted with listed exceptions by the owner on 2026-10-29 (appearance only) at 92.12% with 0.27% of the frame masked, implementation 2fe74e3, evidence 4958ce9; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution). This is not a 95% or 94% pass.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -511,7 +531,7 @@ Masks (6): policy change provenance (relative time and fixture name); readiness 
 
 ## Screen 12
 
-Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol v2 content parity 92.22% is below 95%). Acceptance pending; no exception has been approved.
+Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol v2 content parity 92.22% is below 95%). Individually accepted with listed exceptions by the owner on 2026-10-29 (appearance only) at 92.22% with 2.80% of the frame masked, implementation 2fe74e3, evidence 4958ce9; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution). This is not a 95% or 94% pass.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|

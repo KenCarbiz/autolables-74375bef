@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | 06 approved individually (appearance only); 12 screens pending | All 13 screens measured on `2fe74e3` (section 10.17), scores unchanged and masked as in every v2 run: 06 at 94.11% (approved); 12 screens below 94%; 01, 08 and 12 in focused review, differences classified in 10.18 (evidence `4958ce9`) | Owner visual review of the remaining 12 |
+| 16 | Visual acceptance | 4 of 13 accepted individually (appearance only): 01, 06, 08, 12; 9 pending | Acceptance register in section 10.19 and `scripts/admin-parity/acceptance.json`: 06 at 94.11% (approved, `7f4fa1a`); 01 at 92.99%, 08 at 92.12%, 12 at 92.22% (accepted with listed exceptions, `2fe74e3`, evidence `4958ce9`). Masked scores; none meets 94% or 95% except 06 in the 94% review band | Owner review of the remaining 9; 03, 04 and 07 in focused review |
 
 ## 2. How the evidence was produced
 
@@ -1775,6 +1775,55 @@ Kept unchanged: the `2fe74e3` keyboard-tab fixes and the `b278995`
 responsive table fix. Screen 06 remains individually approved at 94.11% and
 frozen. 01, 08 and 12 remain pending the owner's screen-specific decision,
 and the other nine screens remain pending.
+
+### 10.19 Acceptance register (2026-10-29)
+
+**Owner decision, 2026-10-29.** Screens 01, 08 and 12 are individually
+approved for visual acceptance:
+- at implementation `2fe74e3`;
+- using evidence `4958ce9`;
+- with the corrected classifications in `f23762a`.
+
+The screen-specific geometry, truthful-content, behaviour and
+asset-substitution exceptions listed in 10.18 are accepted for these three
+screens.
+
+The register lives in `scripts/admin-parity/acceptance.json`, and the parity
+report prints it:
+- The report carries an acceptance forward only while a measurement matches
+  the recorded score and mask share to two decimals.
+- Otherwise it flags the acceptance "needs review".
+- The gate itself is unchanged: an accepted screen still reports
+  "below 95%".
+
+| # | Screen | Status | Protocol v2 content (masked) | Masked share of the 1586x992 frame | Implementation | Evidence | Exceptions |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 01 | Overview | individually accepted with listed exceptions | 92.99% | 3.94% | `2fe74e3` | `4958ce9` | 10.18: geometry, asset substitution |
+| 06 | Fee change review | individually approved | 94.11% | 4.13% | `7f4fa1a` | `a085c74` | 10.15: policy B pricing difference |
+| 08 | Contact & Routing | individually accepted with listed exceptions | 92.12% | 0.27% | `2fe74e3` | `4958ce9` | 10.18: geometry, truthful content, behaviour, asset substitution |
+| 12 | Inventory feed | individually accepted with listed exceptions | 92.22% | 2.80% | `2fe74e3` | `4958ce9` | 10.18: geometry, truthful content, behaviour, asset substitution |
+
+Pending (9): 02, 03, 04, 05, 07, 09, 10, 11, 13.
+
+Terms of the acceptance:
+- **Scores.** These are masked reference-match scores, kept at their exact
+  values and mask coverage.
+  - 01, 08 and 12 do not meet 94% or 95%.
+  - 06 sits in the 94.00-94.99% band and does not meet 95%.
+  - The comparison protocol is unchanged.
+- **Phone layouts.** The 390x844 layouts of 01, 08 and 12 were visually
+  reviewed separately. No reference-match score is claimed for them.
+- **Kept.** The keyboard-tab fixes (`2fe74e3`) and the responsive table fix
+  (`b278995`).
+- **Frozen.** The accepted visual direction on 01, 06, 08 and 12, including
+  the correct disabled actions, truthful wording and readable text sizes.
+  Changes to the shared shell, tabs or tokens must leave these four screens'
+  scores and captures unchanged, or come back for review.
+- **Scope.** This covers appearance and the listed visual exceptions only.
+  It does not authorize:
+  - deployment;
+  - the production pricing migration;
+  - any claim that untested functionality works.
 
 ## 11. Approvals requested
 

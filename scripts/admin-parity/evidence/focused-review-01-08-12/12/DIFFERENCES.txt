@@ -1,4 +1,9 @@
 12 Inventory feed - remaining differences from the reference
+ACCEPTED 2026-10-29 (owner): individually accepted with the listed exceptions
+at 92.22% (masked, 2.80% of the frame), implementation 2fe74e3, evidence
+4958ce9, classification f23762a. Appearance only; not a 94% or 95% pass. Phone
+layout visually reviewed separately, no score claimed. Visual direction
+frozen. Register: scripts/admin-parity/acceptance.json; readiness 10.19.
 Implementation 2fe74e3 (includes the b278995 table fix and the 2fe74e3 tab
 fix). Evidence 4958ce9 (annotated-2fe74e3/12-*.png); the 1586x992, 1366x768
 and 390x844 captures are byte-identical to those committed in 0536e10.
@@ -6,8 +11,8 @@ Classification revised after 4958ce9 (documentation only: no new capture, no
 pixel change, no protocol or mask change).
 
 Score: protocol v2 content 92.22%, scored WITH the v2 masks (2.80% of the
-1586x992 frame excluded from both images). Below 94%: needs an explicit
-screen-specific exception; none is approved. The b278995 fix did not change
+1586x992 frame excluded from both images). Below 94%: accepted individually
+with the listed exceptions on 2026-10-29 (header above). The b278995 fix did not change
 the score because the 1586 layout is unchanged. Landmarks 11 of 12: only
 childTabs fails, which is the owner-decided heading placement (item 1).
 

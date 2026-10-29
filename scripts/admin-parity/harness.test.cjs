@@ -142,11 +142,41 @@ test("the report states the gate, each landmark and each breakpoint", () => {
       responsive: [{ viewport: "390x844", ok: false, scrollWidth: 442, innerWidth: 390, maxRight: 1282, scrollRegions: ["nav"], file: "r.png" }],
       gate: { landmarks: false, responsive: false, contentParity: 88, pass: false },
     }],
-  }, out);
+  }, out, { acceptance: {} });
   const text = fs.readFileSync(out, "utf8");
   assert.match(text, /Gate: FAIL \(landmarks out of tolerance; page overflow at a breakpoint; protocol v2 content parity 88\.00% is below 95%\)/);
   assert.match(text, /\| title \| OUT of tolerance \| x=1 \| x=30 y=0 w=0 h=0 \| x\+29 \|/);
   assert.doesNotMatch(text, /NaN/);
   assert.match(text, /\| 390x844 \| OVERFLOW \| 442 \| 390 \| 1282 \| nav \|/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the acceptance register carries an owner acceptance only while the score and mask share still match", () => {
+  const { acceptanceState } = require("./report.cjs");
+  const record = { decision: "individually accepted with listed exceptions", date: "2026-10-29", score: 92.99, maskedPercent: 3.94, implementation: "abc1234", evidence: "def5678", exceptions: "10.18" };
+  const screen = (score, masked) => ({ screen: "01", frames: { reference: { maskedPercent: masked, content: { parityPercent: score } } } });
+  assert.equal(acceptanceState(screen(92.99, 3.94), { "01": record }).status, "accepted");
+  assert.equal(acceptanceState(screen(92.98, 3.94), { "01": record }).status, "needs review");
+  assert.equal(acceptanceState(screen(92.99, 4.1), { "01": record }).status, "needs review");
+  assert.equal(acceptanceState(screen(92.99, 3.94), {}).status, "pending");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "parity-"));
+  const out = path.join(dir, "report.md");
+  writeReport({
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    referenceFrame: { width: 1586, height: 992 },
+    protocolFrame: { width: 1600, height: 1000 },
+    registered: ["01"],
+    skipped: [],
+    screens: [{ ...screen(92.99, 3.94), reference: "r.png", fonts: { inter: true, loaded: [] }, masks: [], responsive: [], gate: { landmarks: true, responsive: true, contentParity: 92.99 } }],
+  }, out, { acceptance: { "01": record } });
+  const text = fs.readFileSync(out, "utf8");
+  assert.match(text, /Gate: FAIL \(protocol v2 content parity 92\.99% is below 95%\)\. Individually accepted with listed exceptions by the owner on 2026-10-29 \(appearance only\) at 92\.99% with 3\.94% of the frame masked/);
+  assert.match(text, /This is not a 95% or 94% pass\./);
+  assert.match(text, /\| 01 \| individually accepted with listed exceptions \(2026-10-29\) \| 92\.99% \| 3\.94% \| abc1234 \| def5678 \|/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the committed register accepts exactly 01, 06, 08 and 12", () => {
+  const reg = JSON.parse(fs.readFileSync(path.join(__dirname, "acceptance.json"), "utf8"));
+  assert.deepEqual(Object.keys(reg).filter((k) => !k.startsWith("_")).sort(), ["01", "06", "08", "12"]);
 });

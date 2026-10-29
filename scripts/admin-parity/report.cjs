@@ -19,7 +19,34 @@ function readNotes() {
   return JSON.parse(fs.readFileSync(notesPath, "utf8"));
 }
 
-function gateLine(s) {
+function readAcceptance() {
+  const p = path.join(__dirname, "acceptance.json");
+  if (!fs.existsSync(p)) return {};
+  const all = JSON.parse(fs.readFileSync(p, "utf8"));
+  return Object.fromEntries(Object.entries(all).filter(([k]) => !k.startsWith("_")));
+}
+
+// The recorded score and mask share must match the current measurement to
+// two decimals; otherwise the owner's acceptance is not carried forward.
+function acceptanceState(s, accepted) {
+  const a = accepted[s.screen];
+  if (!a) return { status: "pending" };
+  const ref = s.frames && s.frames.reference;
+  const score = ref && ref.content ? ref.content.parityPercent : null;
+  const masked = ref ? ref.maskedPercent : null;
+  const same = typeof score === "number" && typeof masked === "number" && score.toFixed(2) === a.score.toFixed(2) && masked.toFixed(2) === a.maskedPercent.toFixed(2);
+  return { status: same ? "accepted" : "needs review", record: a, score, masked };
+}
+
+function acceptanceText(state) {
+  if (state.status === "pending") return "Acceptance pending; no exception has been approved.";
+  const a = state.record;
+  const recorded = `${a.score.toFixed(2)}% with ${a.maskedPercent.toFixed(2)}% of the frame masked, implementation ${a.implementation}, evidence ${a.evidence}`;
+  if (state.status === "needs review") return `Owner acceptance recorded on ${a.date} at ${recorded} no longer matches this measurement (${pct(state.score)}, ${pct(state.masked)} masked); acceptance needs review.`;
+  return `${a.decision[0].toUpperCase()}${a.decision.slice(1)} by the owner on ${a.date} (appearance only) at ${recorded}; exceptions: ${a.exceptions}. This is not a 95% or 94% pass.`;
+}
+
+function gateLine(s, accepted = {}) {
   if (!s.gate) return "Gate: not evaluated.";
   if (s.gate.error) return `Gate: FAIL (the screen did not render: ${s.gate.error}).`;
   const protocol = s.frames && s.frames.reference && s.frames.reference.content ? s.frames.reference.content.parityPercent : s.gate.contentParity;
@@ -28,10 +55,11 @@ function gateLine(s) {
   if (!s.gate.responsive) reasons.push("page overflow at a breakpoint");
   if (typeof protocol !== "number") reasons.push("no protocol v2 score");
   else if (protocol < 95) reasons.push(`protocol v2 content parity ${protocol.toFixed(2)}% is below 95%`);
-  return reasons.length ? `Gate: FAIL (${reasons.join("; ")}). Acceptance pending; no exception has been approved.` : "Gate: PASS.";
+  const acceptance = acceptanceText(acceptanceState(s, accepted));
+  return reasons.length ? `Gate: FAIL (${reasons.join("; ")}). ${acceptance}` : "Gate: PASS.";
 }
 
-function writeReport(results, outPath) {
+function writeReport(results, outPath, { acceptance = readAcceptance() } = {}) {
   const notes = readNotes();
   const lines = [];
   lines.push("# Administration V2 visual parity report");
@@ -52,12 +80,25 @@ function writeReport(results, outPath) {
   lines.push("- Body parity (aligned): the handoff's information architecture fixes one h1, \"Administration\", with a breadcrumb above it, while the mocks title their pages four different ways (section name as title, no breadcrumb, no description, a chip above the title). That title block is a proposed exception awaiting the owner, not an approved one. As a diagnostic only, the body score shifts the reference so both section rows end on the same pixel row and scores everything below it in the content region, with the same masks. The offset is printed with the score and it never replaces the protocol number.");
   lines.push("- Responsive: 1920x1080, 1366x768, 1024x768 and 390x844 captured; a breakpoint passes when the document has no horizontal overflow and no element extends past the viewport.");
   lines.push("");
+  lines.push("## Acceptance register");
+  lines.push("");
+  lines.push("Owner decisions from `scripts/admin-parity/acceptance.json`. Accepted screens are accepted individually for appearance only at the score and mask share shown; the gate below still reports them as not meeting 95%.");
+  lines.push("");
+  lines.push("| Screen | Status | Protocol v2 content (masked) | Masked share of frame | Implementation | Evidence |");
+  lines.push("|---|---|---|---|---|---|");
+  for (const s of results.screens) {
+    const st = acceptanceState(s, acceptance);
+    const a = st.record;
+    const label = st.status === "pending" ? "pending" : st.status === "accepted" ? `${a.decision} (${a.date})` : "acceptance needs review";
+    lines.push(`| ${s.screen} | ${label} | ${pct(s.frames.reference && s.frames.reference.content ? s.frames.reference.content.parityPercent : null)} | ${pct(s.frames.reference ? s.frames.reference.maskedPercent : null)} | ${a ? a.implementation : ""} | ${a ? a.evidence : ""} |`);
+  }
+  lines.push("");
   lines.push(`Registered fixtures: ${results.registered && results.registered.length ? results.registered.join(", ") : "none"}.${results.skipped && results.skipped.length ? ` Requested but not registered: ${results.skipped.join(", ")}.` : ""}`);
   lines.push("");
   for (const s of results.screens) {
     lines.push(`## Screen ${s.screen}`);
     lines.push("");
-    lines.push(`Reference: ${s.reference ? `\`${s.reference}\`` : "not present"}. Fonts: Inter ${s.fonts && s.fonts.inter ? "loaded" : "not loaded"}${s.fonts && s.fonts.loaded.length ? ` (${s.fonts.loaded.join(", ")})` : ""}. ${gateLine(s)}`);
+    lines.push(`Reference: ${s.reference ? `\`${s.reference}\`` : "not present"}. Fonts: Inter ${s.fonts && s.fonts.inter ? "loaded" : "not loaded"}${s.fonts && s.fonts.loaded.length ? ` (${s.fonts.loaded.join(", ")})` : ""}. ${gateLine(s, acceptance)}`);
     lines.push("");
     lines.push("| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |");
     lines.push("|---|---|---|---|---|---|---|---|---|---|---|");
@@ -124,4 +165,4 @@ function writeReport(results, outPath) {
   fs.writeFileSync(outPath, lines.join("\n"));
 }
 
-module.exports = { writeReport };
+module.exports = { writeReport, acceptanceState };

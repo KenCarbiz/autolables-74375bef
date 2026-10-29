@@ -1,0 +1,50 @@
+{
+  "_comment": "Owner acceptance register. A screen listed here was individually accepted by the owner for appearance only, at the recorded protocol v2 content score with the recorded share of the 1586x992 frame masked. Acceptance does not mean the screen meets the 95% target or the 94.00-94.99% band, does not change the comparison protocol or the gate, and does not authorize deployment, a pricing migration or any untested behaviour. Screens not listed are pending. If a later measurement differs from the recorded score, the report flags the acceptance for review instead of carrying it forward.",
+  "01": {
+    "screen": "Overview",
+    "decision": "individually accepted with listed exceptions",
+    "date": "2026-10-29",
+    "score": 92.99,
+    "maskedPercent": 3.94,
+    "implementation": "2fe74e3",
+    "evidence": "4958ce9",
+    "classification": "f23762a",
+    "exceptions": "ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, asset substitution)",
+    "frozen": true
+  },
+  "06": {
+    "screen": "Fee change review",
+    "decision": "individually approved",
+    "date": "2026-10-29",
+    "score": 94.11,
+    "maskedPercent": 4.13,
+    "implementation": "7f4fa1a",
+    "evidence": "a085c74",
+    "exceptions": "ADMIN_V2_RELEASE_READINESS.md 10.15 (policy B pricing difference)",
+    "frozen": true
+  },
+  "08": {
+    "screen": "Contact & Routing",
+    "decision": "individually accepted with listed exceptions",
+    "date": "2026-10-29",
+    "score": 92.12,
+    "maskedPercent": 0.27,
+    "implementation": "2fe74e3",
+    "evidence": "4958ce9",
+    "classification": "f23762a",
+    "exceptions": "ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution)",
+    "frozen": true
+  },
+  "12": {
+    "screen": "Inventory feed",
+    "decision": "individually accepted with listed exceptions",
+    "date": "2026-10-29",
+    "score": 92.22,
+    "maskedPercent": 2.8,
+    "implementation": "2fe74e3",
+    "evidence": "4958ce9",
+    "classification": "f23762a",
+    "exceptions": "ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution)",
+    "frozen": true
+  }
+}

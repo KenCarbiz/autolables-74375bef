@@ -1,12 +1,17 @@
 01 Overview - remaining differences from the reference
+ACCEPTED 2026-10-29 (owner): individually accepted with the listed exceptions
+at 92.99% (masked, 3.94% of the frame), implementation 2fe74e3, evidence
+4958ce9, classification f23762a. Appearance only; not a 94% or 95% pass. Phone
+layout visually reviewed separately, no score claimed. Visual direction
+frozen. Register: scripts/admin-parity/acceptance.json; readiness 10.19.
 Implementation 2fe74e3. Evidence 4958ce9 (annotated-2fe74e3/01-*.png); the
 1586x992 and 390x844 captures are byte-identical to those committed in 0536e10.
 Classification revised after 4958ce9 (documentation only: no new capture, no
 pixel change, no protocol or mask change).
 
 Score: protocol v2 content 92.99%, scored WITH the v2 masks (3.94% of the
-1586x992 frame excluded from both images). Below 94%: needs an explicit
-screen-specific exception; none is approved. Landmarks 10 of 10. Viewports:
+1586x992 frame excluded from both images). Below 94%: accepted individually
+with the listed exceptions on 2026-10-29 (header above). Landmarks 10 of 10. Viewports:
 0px page overflow at 390x844, 768x1024, 1366x768 and 1586x992.
 
 Numbers match the badges in annotated-2fe74e3/01-desktop.png (1-8) and

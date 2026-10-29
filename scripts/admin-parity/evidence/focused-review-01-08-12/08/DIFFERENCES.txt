@@ -1,4 +1,9 @@
 08 Contact & Routing - remaining differences from the reference
+ACCEPTED 2026-10-29 (owner): individually accepted with the listed exceptions
+at 92.12% (masked, 0.27% of the frame), implementation 2fe74e3, evidence
+4958ce9, classification f23762a. Appearance only; not a 94% or 95% pass. Phone
+layout visually reviewed separately, no score claimed. Visual direction
+frozen. Register: scripts/admin-parity/acceptance.json; readiness 10.19.
 Implementation 2fe74e3. Evidence 4958ce9 (annotated-2fe74e3/08-*.png); the
 1586x992 capture is byte-identical to the one committed in 0536e10. The
 390x844 capture used for 08-phone.png is the 2fe74e3 capture, committed as
@@ -9,8 +14,8 @@ Classification revised after 4958ce9 (documentation only: no new capture, no
 pixel change, no protocol or mask change).
 
 Score: protocol v2 content 92.12%, scored WITH the v2 masks (0.27% of the
-1586x992 frame: the footer caption only). Below 94%: needs an explicit
-screen-specific exception; none is approved. Landmarks 12 of 12. Viewports:
+1586x992 frame: the footer caption only). Below 94%: accepted individually
+with the listed exceptions on 2026-10-29 (header above). Landmarks 12 of 12. Viewports:
 0px page overflow at 390x844, 768x1024, 1366x768 and 1586x992.
 
 Numbers match the badges in annotated-2fe74e3/08-desktop.png and
