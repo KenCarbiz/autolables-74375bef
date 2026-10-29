@@ -1,5 +1,5 @@
 12 Inventory feed - remaining differences from the reference
-Implementation b278995 (includes the usability fix below). Protocol v2
+Current implementation 2fe74e3 (includes the b278995 table fix and the 2fe74e3 tab fix). Protocol v2
 content 92.22% - below 94%: below the numeric target; no exception approved.
 The score is unchanged by the fix, because the 1586 reference layout is
 unchanged. Landmarks 11 of 12: only childTabs fails, the owner-decided
@@ -48,5 +48,6 @@ B. Rendering differences
  9. "DESIGN CONCEPT" chip and caption: mock-only annotations.
 
 C. Unresolved (decision or defect)
-10. Shared section tabs at 1366x768 (same as 01 item 9).
+ None open.
+ Resolved: shared section tabs, fixed in 2fe74e3 (see 01).
  No other usability defect was found.

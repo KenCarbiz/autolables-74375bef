@@ -1,5 +1,5 @@
 01 Overview - remaining differences from the reference
-Implementation b278995 (screen 01 code identical to 7f4fa1a). Protocol v2
+Current implementation 2fe74e3 (measured; package b278995/0536e10 superseded for current captures) (screen 01 code identical to 7f4fa1a). Protocol v2
 content 92.99% - below 94%: below the numeric target; no exception approved.
 Landmarks 10 of 10. Viewports: 0px page overflow at 390x844, 768x1024,
 1366x768 and 1586x992.
@@ -27,10 +27,15 @@ B. Rendering differences
     only the full-frame figure, not the content score.
 
 C. Unresolved (decision or defect)
- 8. Page title size (open decision, exception-proposal item 2): the
-    Administration title uses the 28px token where the mock draws about
-    36px. It is not changed in this round (no typography tuning).
- 9. Shared section tabs at 1366x768: the row scrolls sideways 28px with a
-    fade, so the last tab is partly hidden until scrolled. The same shared
-    component appears on every screen. Reported, not changed.
- No other usability defect was found.
+ None open.
+ Resolved since b278995:
+ - Page title (was item 8): the shared parent "Administration" title at
+   28px is an approved design decision (owner, 2026-10-29). It moves to A
+   as item 1 in the annotated capture and is not enlarged.
+ - Shared section tabs (was item 9): horizontal scrolling with the edge fade
+   is kept. Two defects were found and fixed in 2fe74e3:
+   * keyboard focus left the last tab outside the row at 1366 and left tabs
+     under the fade at 1024 and 390;
+   * the focus outline was clipped to one edge.
+   Labels and touch targets are unchanged. tabs-check.cjs passes all 10
+   scrolling rows checked on 01, 08 and 12 at 1366, 1024 and 390.

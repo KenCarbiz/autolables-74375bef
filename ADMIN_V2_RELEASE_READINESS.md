@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | 06 approved individually (appearance only); 12 screens pending | All 13 screens measured on `b278995` (section 10.16): 06 at 94.11% (approved on package `a085c74`, measuring `7f4fa1a`, with identical code); 12 screens below 94%; 01, 08 and 12 in focused review | Owner visual review of the remaining 12 |
+| 16 | Visual acceptance | 06 approved individually (appearance only); 12 screens pending | All 13 screens measured on `2fe74e3` (section 10.17), scores unchanged: 06 at 94.11% (approved); 12 screens below 94%; 01, 08 and 12 in focused review | Owner visual review of the remaining 12 |
 
 ## 2. How the evidence was produced
 
@@ -1647,6 +1647,59 @@ delivered to the owner). For each screen:
   1366x768 on every screen.
 
 No typography or pixel tuning was done.
+
+### 10.17 Focused review, round 2: owner decisions on 01, 08 and the shared tabs (2026-10-29)
+
+**Revisions.**
+- Current implementation `2fe74e3`. All 13 screens were re-measured at it,
+  and every score is unchanged from 10.16 (01 92.99%, 08 92.12%, 12 92.22%,
+  06 94.11%).
+- `b278995` and evidence `0536e10` remain the record of the screen 12 table
+  fix.
+- `b04a863` adds only annotation tooling.
+- Annotated captures are in
+  `scripts/admin-parity/evidence/focused-review-01-08-12/annotated-2fe74e3/`.
+- Screen 12's pre-fix laptop captures there are labelled HISTORICAL
+  (`bf89227`).
+
+**Decisions recorded:**
+- **01 title.** The shared parent "Administration" title at 28px is an
+  approved design decision. Its difference from the mock's ~36px is
+  recorded as approved, not reopened.
+- **08 widget preview.** The Call and Contact items are an embedded
+  customer-widget representation, not Administration controls.
+  - They are non-interactive spans with aria-hidden 14x14 icons, the same
+    size as the real widget.
+  - Each item is 135x32. The real widget draws 36px buttons with 12px
+    labels; the preview uses 32px and 11px.
+  - Icon centre is within 0.25px of the label centre.
+  - Text contrast is 5.0:1 on the button wash and 6.9:1 on the widget blue.
+  - The 16px icon minimum still applies to Administration controls.
+- **Shared section and child tabs.** Horizontal scrolling with the edge fade
+  is kept. Two defects were fixed in `2fe74e3`:
+  - Keyboard focus did not bring the focused tab into view: the last
+    section tab stayed outside the row at 1366, and tabs sat under the fade
+    at 1024 and 390. `ScrollRegion` now scrolls the focused item, and the
+    active tab on load, clear of both fades.
+  - The focus outline was clipped to one edge by the scrolling row. Tabs
+    now draw the outline inset.
+
+  Labels and touch targets are unchanged.
+  `scripts/admin-parity/tabs-check.cjs` verifies every scrolling row on 01,
+  08 and 12 at 1366, 1024 and 390, 10 of 10 passing:
+  - the fade shows;
+  - the active tab is fully visible;
+  - every keyboard-focused tab is fully visible and clear of the fades,
+    with an unclipped outline;
+  - a horizontal wheel reaches the last tab;
+  - there is no page overflow.
+- **Checks at `2fe74e3`:** typecheck clean; Administration tests 248 of 248;
+  audit clean on all 13 screens. The audit's existing notes are unchanged:
+  small icons on 06 and 09, and sandbox network errors on 07. Screen 06's
+  capture and score are unchanged, and its approval and freeze stand.
+
+No exception is approved for 01, 08 or 12; each remains pending the owner's
+screen-specific decision.
 
 ## 11. Approvals requested
 

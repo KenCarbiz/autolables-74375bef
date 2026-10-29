@@ -1,5 +1,5 @@
 08 Contact & Routing - remaining differences from the reference
-Implementation b278995 (screen 08 code identical to 7f4fa1a). Protocol v2
+Current implementation 2fe74e3 (measured; package b278995/0536e10 superseded for current captures) (screen 08 code identical to 7f4fa1a). Protocol v2
 content 92.12% - below 94%: below the numeric target; no exception approved.
 Landmarks 12 of 12. Viewports: 0px page overflow at 390x844, 768x1024,
 1366x768 and 1586x992.
@@ -35,9 +35,24 @@ B. Rendering differences
 11. "DESIGN CONCEPT" chip and caption: mock-only annotations.
 
 C. Unresolved (decision or defect)
-12. Live preview (shopper widget mirror): the Call and Contact icons render
-    at 14px, under the Administration 16px icon minimum. They mirror the
-    customer widget's own size, so they are reported, not changed.
-13. Shared section tabs at 1366x768 (same as 01 item 9).
+ None open.
+ Resolved since b278995:
+ - Live preview icons (was item 12): documented as an embedded
+   customer-widget representation, not an Administration control
+   (owner, 2026-10-29). Measured at 2fe74e3 (widget-icons-08.cjs), at
+   1586x992 and 390x844:
+   * Call and Contact are non-interactive <span> elements: no role, no
+     tabindex, not focusable or clickable. They are decorative facsimiles.
+   * Icons are 14x14 and aria-hidden, the same as the real widget
+     (PassportCtaDock, w-3.5).
+   * Each item is 135x32 (134x32 on a phone). The real widget's buttons are
+     36px tall with 12px labels; the preview draws them 32px tall with 11px
+     labels, a slight scale-down.
+   * Icon centre is 0.25px from the label centre.
+   * White 11px bold text has 5.0:1 contrast on the 15% white wash and
+     6.9:1 on the widget blue.
+   The Administration 16px icon minimum continues to apply to
+   Administration controls only.
+ - Shared section tabs (was item 13): fixed in 2fe74e3 (see 01).
  No other usability defect was found. At 1366x768 every control is visible
  and reachable as the page scrolls (laptop-1366x768 captures).
