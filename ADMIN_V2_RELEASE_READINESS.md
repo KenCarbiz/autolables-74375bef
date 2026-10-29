@@ -1316,6 +1316,152 @@ amount blocks, a fee below the total, an unknown line, a fee-amount mismatch, a
 missing total and the feed comparison. With the 23 cases of 10.12, 45 tests
 pass.
 
+### 10.14 Price-stack development round 2 (2026-10-29): audit, policy, gates
+
+Aggregate only. Per-vehicle detail is in the restricted audit.
+
+**Evidence sources this round.**
+- The dealer site and ftc.gov are not reachable from the session: both are
+  blocked by the environment's allowed-domains policy.
+- **Verified:** the one stack the owner supplied.
+- **Stored:** feed and crawl observations, by VIN and timestamp.
+- **FTC guidance:** the 15 September 2026 staff FAQs, read through legal and
+  trade summaries, not the primary page.
+- **No dated page evidence** was obtained for the other 24 B2 vehicles or the
+  nine held class A vehicles.
+
+#### Customer-facing audit (25 flagged new vehicles, all published)
+
+| Surface | Shown today | Issue |
+|---|---|---|
+| Passport headline, Total Advertised Price, Today's Price | Feed total `price` (fee included) | Nets an incentive of unverified eligibility (14 x $10,000, 10 x $4,000, 1 x $2,000), not disclosed |
+| Passport "Dealer Discount" | MSRP - (`price` - fee) | Presents the incentive as dealer discount |
+| Passport "You Save" | MSRP - `price` | Counts the incentive as savings |
+| Passport market claims (24 with a market value) | "Great Price", "Best Value", "$X Below Market", score 82-91 | Built on the incentive-netted price. Without it, 16 of 24 would be at or above market |
+| Payment estimates | Built on `price` | Same base |
+| Addendum "Listed Price", Sticker Studio "Our Price" / "Offered At" | `price`, printed live | Same figure, no incentive disclosure |
+| Window sheet in "Total MSRP" mode | `price` labelled "Base MSRP" | Separate labelling defect |
+| Factory sticker, addendum label | MSRP only | Not affected |
+
+The $895 fee is included in every total and itemised on the Passport. Fee
+treatment is not the problem on these surfaces.
+
+#### Proposed public price-display policy (for owner and dealer compliance review)
+
+1. **Primary advertised price.** The generally available, all-in total: dealer
+   price + mandatory fees, minus only offers verified as available to every
+   buyer and unexpired. Government charges are the only exclusion.
+2. **Verification.** An offer is verified generally available only through a
+   program record from an authoritative source: OEM program data or a
+   dealer-approved entry with dates. A website label, a generic statement or
+   arithmetic that closes is never sufficient.
+3. **Conditional or unverified offers.** Shown only separately, after dealer
+   compliance approval. Each is named, with its amount, its qualification
+   ("requires financing through the captive lender", "eligibility not
+   verified") and its expiration date, and never folded into the headline or
+   into "You Save" or "Dealer Discount".
+4. **Savings and discount lines.** "Dealer Discount" shows only the dealer's
+   own discount from the widget. "You Save" uses the primary price.
+5. **Market comparison and scores.** Use the fee-exclusive comparison basis
+   (dealer price minus verified offers). While any offer on the vehicle is
+   unverified, price-fairness and confidence displays show limited confidence.
+   They never derive a "Great Price" or "Below Market" claim from an
+   unverified offer.
+6. **Unknown or contradictory evidence.** No automatic price change. The
+   vehicle is held for review.
+
+#### Proposed remediation for the 25 vehicles (not applied; needs authorization)
+
+- **R1, immediate, presentation only, 25 vehicles.**
+  - Suppress the market-claim chips and badge ("Great Price", "Best Value",
+    "Below Market") and the "You Save" line.
+  - Relabel "Dealer Discount" as "Discounts and incentives", or hide it.
+  - Add the line "Price includes manufacturer incentives; eligibility
+    restrictions may apply. See dealer for details."
+  - Reversible by flag. No price change.
+- **R2, owner choice.** Show the generally available total as the headline,
+  with the $10,000 / $4,000 / $2,000 offer listed separately, until each offer
+  is verified. This changes customer-facing prices and needs the dealer's
+  compliance sign-off.
+- **R3.** Fix the window sheet "Total MSRP" mode labelling `price` as
+  "Base MSRP".
+- **R4, dealer disclosure (proposed wording for the dealer's review).**
+  > "Your Price includes the dealer conveyance fee of $895 and all
+  > manufacturer incentives shown above. Retail Cash and other manufacturer
+  > incentives are subject to manufacturer eligibility requirements, may not
+  > be available to all buyers, may not be combinable, and expire as stated.
+  > Excludes tax, title and registration."
+
+  This replaces the generic statement that the conveyance fee is excluded,
+  which contradicts the itemised Your Price.
+
+#### Parser revision (proposed, not deployed)
+
+- **Ownership by page component.** A small HTML element tree (`htmlTree.ts`)
+  decides which vehicle a widget belongs to: the nearest enclosing component
+  that names the vehicle. VINs that already own their own widgets are set
+  aside, and the page address names the vehicle on a detail page.
+  - An inventory list that prints the VIN under the price is attributed
+    correctly; text-distance scoping misattributed it.
+  - Identical mobile and desktop copies count as one stack. Differing copies
+    are ambiguous.
+- **Each incentive on its own evidence.**
+  - **Eligibility:** `verified_general` only from a program record;
+    `stated_general_unverified`, `conditional` or `unknown` otherwise.
+  - **Also recorded:** restrictions (financing, lease, purchase, credit,
+    loyalty, conquest, military, college, first responder, trade-in,
+    residency), combinability, and effective and expiration dates.
+  - Footnotes bind to an offer by marker or by name. Page-wide text never
+    binds.
+  - **Held for review:** expired offers, exclusive offers applied together, and
+    unverified offers. A held vehicle writes nothing.
+- **Separate outputs:** the dealer's advertised total, the generally available
+  total and the fee-exclusive market-comparison basis.
+- **Immutable evidence.** `priceEvidence.ts` builds one hashed record per
+  component, disclaimer and stack summary. The proposed table
+  `20261101000000_price_component_evidence.sql` (with a rollback) is
+  append-only:
+  - update, delete and truncate are refused by trigger;
+  - a reading is unique by its hash;
+  - tenant-scoped read follows the canonical RLS shape;
+  - only the service role writes.
+
+  Verified in an isolated database with `scripts/db-verify/price-evidence-verify.sh`:
+  13 of 13 checks pass. Not applied to production.
+- **Fixtures.** `sanitizePage.ts` turns a captured page into a fixture: VINs
+  mapped, names replaced, scripts and external references removed, and stage
+  prices shifted by one offset so the arithmetic still closes. Tested. Real
+  captures await domain access (gate G2).
+- **Integration.** The crawler patch is regenerated:
+  - It appends evidence and writes only the generally available split.
+  - It never writes `price`.
+  - It loads program records from an empty loader until an intake exists, so
+    every offer reads as unverified.
+  - It applies cleanly and is not applied.
+- **Tests.** 54 price-stack, evidence and sanitiser cases, covering:
+  - new, used and CPO pages;
+  - multiple widgets and duplicate VINs;
+  - conflicting disclaimers;
+  - expired and mutually exclusive offers;
+  - per-offer eligibility;
+  - unavailable evidence.
+
+  Pricing suite 167 of 167; app typecheck clean.
+
+#### Readiness gates for a controlled rollout
+
+| Gate | Condition | Status |
+|---|---|---|
+| G1 | Owner approves the public price-display policy and the dealer's compliance contact signs off on conditional-offer wording | Open |
+| G2 | The dealer's public website domain allowed for read-only access; real pages captured, sanitised and added as fixtures for new, used and CPO pages, and the parser passes on them | Open (blocked by network policy) |
+| G3 | Dated widget evidence for the 24 B2 and 9 class A vehicles; each classified by `compareWithFeed` with same-window observations | Open (depends on G2) |
+| G4 | Program-record intake designed and approved (OEM program data or dealer-entered offers with dates and eligibility) | Open |
+| G5 | Evidence table migration approved and applied, then verified in production read-only | Open |
+| G6 | R1 presentation safeguards approved and shipped before any crawler write, so unverified offers stop driving savings and market claims | Open, recommended first |
+| G7 | Crawler patch deployed in shadow mode: evidence and audit only, no listing writes, for at least one full crawl cycle; held and unresolved rates reviewed | Open |
+| G8 | Listing writes enabled for one dealership with a rollback flag; class A correction regenerated from reconciled stacks through the guarded template | Open |
+| G9 | MarketCheck resumption decided separately, after quota, cost and these safeguards | Open (paused) |
+
 ## 11. Approvals requested
 
 1. Done: the fee preview fix was applied and verified (section 4).

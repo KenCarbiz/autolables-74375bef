@@ -1,6 +1,6 @@
 diff -ruN a/supabase/functions/_shared/feeTreatment.ts b/supabase/functions/_shared/feeTreatment.ts
 --- a/supabase/functions/_shared/feeTreatment.ts	1970-01-01 00:00:00.000000000 +0000
-+++ b/supabase/functions/_shared/feeTreatment.ts	2026-10-29 04:53:34.270067373 +0000
++++ b/supabase/functions/_shared/feeTreatment.ts	2026-10-29 05:08:05.197158713 +0000
 @@ -0,0 +1,280 @@
 +// PROPOSED, NOT DEPLOYED. Per-page document fee treatment for the advertised
 +// price crawler (crawl-advertised-prices), for pages that show a single
@@ -282,56 +282,253 @@ diff -ruN a/supabase/functions/_shared/feeTreatment.ts b/supabase/functions/_sha
 +    ? `Fee treatment for ${d.condition} page: ${d.treatment} (evidence: ${ev}).`
 +    : `Fee treatment unresolved (${d.reason}) for ${d.condition ?? "unknown"} page; breakdown not written (evidence: ${ev}).`;
 +}
+diff -ruN a/supabase/functions/_shared/htmlTree.ts b/supabase/functions/_shared/htmlTree.ts
+--- a/supabase/functions/_shared/htmlTree.ts	1970-01-01 00:00:00.000000000 +0000
++++ b/supabase/functions/_shared/htmlTree.ts	2026-10-29 05:08:05.196699800 +0000
+@@ -0,0 +1,71 @@
++// PROPOSED, NOT DEPLOYED. A small, dependency-free HTML element tree for the
++// price-stack reader: element ranges over the raw page, so a price can be
++// attributed to the page component that contains it rather than to whatever
++// VIN happens to be nearest in the text. Tolerant of unclosed tags; it never
++// throws on malformed markup.
++
++export interface El {
++  tag: string;
++  attrs: string;
++  start: number;
++  /** Exclusive end, after the closing tag (or the page end when unclosed). */
++  end: number;
++  parent: El | null;
++  children: El[];
++}
++
++const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
++const RAW_TEXT = new Set(["script", "style", "textarea", "title"]);
++
++export function parseTree(html: string): El {
++  const root: El = { tag: "#root", attrs: "", start: 0, end: html.length, parent: null, children: [] };
++  const open: El[] = [root];
++  const re = /<!--[\s\S]*?-->|<(\/?)([a-zA-Z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
++  let m: RegExpExecArray | null;
++  while ((m = re.exec(html))) {
++    if (m[0].startsWith("<!--")) continue;
++    const closing = m[1] === "/";
++    const tag = m[2].toLowerCase();
++    if (closing) {
++      const i = open.map((e) => e.tag).lastIndexOf(tag);
++      if (i <= 0) continue;
++      while (open.length > i) {
++        const e = open.pop() as El;
++        e.end = re.lastIndex;
++      }
++      continue;
++    }
++    const parent = open[open.length - 1];
++    const el: El = { tag, attrs: m[3] ?? "", start: m.index, end: html.length, parent, children: [] };
++    parent.children.push(el);
++    if (VOID.has(tag) || /\/\s*$/.test(m[3] ?? "")) { el.end = re.lastIndex; continue; }
++    if (RAW_TEXT.has(tag)) {
++      const close = new RegExp(`</${tag}\\s*>`, "ig");
++      close.lastIndex = re.lastIndex;
++      const c = close.exec(html);
++      el.end = c ? close.lastIndex : html.length;
++      re.lastIndex = el.end;
++      continue;
++    }
++    open.push(el);
++  }
++  return root;
++}
++
++/** The deepest element whose range contains `pos`. */
++export function deepestAt(root: El, pos: number): El {
++  let cur = root;
++  for (;;) {
++    const next = cur.children.find((c) => c.start <= pos && pos < c.end);
++    if (!next) return cur;
++    cur = next;
++  }
++}
++
++export const ancestorsOf = (el: El): El[] => {
++  const out: El[] = [];
++  for (let e: El | null = el; e; e = e.parent) out.push(e);
++  return out;
++};
++
++export const contains = (outer: El, inner: El) => outer.start <= inner.start && inner.end <= outer.end;
+diff -ruN a/supabase/functions/_shared/priceEvidence.ts b/supabase/functions/_shared/priceEvidence.ts
+--- a/supabase/functions/_shared/priceEvidence.ts	1970-01-01 00:00:00.000000000 +0000
++++ b/supabase/functions/_shared/priceEvidence.ts	2026-10-29 05:08:05.196733846 +0000
+@@ -0,0 +1,81 @@
++// PROPOSED, NOT DEPLOYED. One immutable evidence record per price component
++// read from a dealer page, for the append-only table proposed in
++// supabase/proposed/20261101000000_price_component_evidence.sql. Each record
++// carries hashes of the page and of the vehicle's widget, so a later reader can
++// prove which bytes a figure came from; the record's own hash is its identity,
++// so the same reading is never stored twice and a changed one never replaces
++// an old one.
++
++import type { PriceStackResult } from "./priceStack.ts";
++
++export const EXTRACTOR_VERSION = "price-stack/2026-10-29";
++
++export interface EvidenceContext {
++  tenantId: string;
++  vin: string;
++  sourceUrl: string;
++  capturedAt: string;
++  screenshotSha256: string | null;
++}
++
++export interface ComponentEvidenceRecord {
++  tenant_id: string;
++  vin: string;
++  captured_at: string;
++  source_url: string;
++  extractor_version: string;
++  page_sha256: string;
++  widget_sha256: string | null;
++  screenshot_sha256: string | null;
++  stack_status: string;
++  component_role: string;
++  label: string | null;
++  amount: number | null;
++  printed_sign: number | null;
++  line_index: number | null;
++  details: Record<string, unknown>;
++  record_sha256: string;
++}
++
++const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
++export async function sha256(text: string): Promise<string> {
++  return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
++}
++
++// Key order never changes a hash.
++export const canonical = (v: unknown): string => {
++  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
++  if (v && typeof v === "object") {
++    return `{${Object.keys(v as Record<string, unknown>).sort().map((k) => `${JSON.stringify(k)}:${canonical((v as Record<string, unknown>)[k])}`).join(",")}}`;
++  }
++  return JSON.stringify(v ?? null);
++};
++
++export async function buildEvidenceRecords(html: string, r: PriceStackResult, ctx: EvidenceContext): Promise<ComponentEvidenceRecord[]> {
++  const pageSha = await sha256(html);
++  const widgetSha = r.widgetRange ? await sha256(html.slice(r.widgetRange[0], r.widgetRange[1])) : null;
++  const common = {
++    tenant_id: ctx.tenantId, vin: ctx.vin.toUpperCase(), captured_at: ctx.capturedAt, source_url: ctx.sourceUrl,
++    extractor_version: EXTRACTOR_VERSION, page_sha256: pageSha, widget_sha256: widgetSha,
++    screenshot_sha256: ctx.screenshotSha256, stack_status: r.status,
++  };
++  const drafts: Omit<ComponentEvidenceRecord, "record_sha256">[] = [];
++  for (const l of r.lines) {
++    const inc = l.role === "incentive" ? r.incentives.find((x) => x.name === l.label && x.amount === l.amount) : undefined;
++    drafts.push({
++      ...common, component_role: l.role, label: l.label, amount: l.amount, printed_sign: l.printedSign, line_index: l.index,
++      details: inc
++        ? { marker: l.marker, eligibility: inc.eligibility, restrictions: inc.restrictions, combinability: inc.combinability,
++            effective_date: inc.effectiveDate, expiration_date: inc.expirationDate, expired: inc.expired, evidence: inc.evidence }
++        : { marker: l.marker },
++    });
++  }
++  for (const d of r.disclaimers) {
++    drafts.push({ ...common, component_role: `disclaimer_${d.scope}`, label: d.says, amount: null, printed_sign: null, line_index: null, details: { text: d.text } });
++  }
++  drafts.push({
++    ...common, component_role: "stack_summary", label: null, amount: r.advertisedTotal?.amount ?? null, printed_sign: null, line_index: null,
++    details: { flags: r.flags, proof: r.proof, reason: r.reason, generally_available_total: r.generallyAvailableTotal, market_comparison_basis: r.marketComparisonBasis },
++  });
++  return Promise.all(drafts.map(async (d) => ({ ...d, record_sha256: await sha256(canonical(d)) })));
++}
 diff -ruN a/supabase/functions/_shared/priceStack.ts b/supabase/functions/_shared/priceStack.ts
 --- a/supabase/functions/_shared/priceStack.ts	1970-01-01 00:00:00.000000000 +0000
-+++ b/supabase/functions/_shared/priceStack.ts	2026-10-29 04:49:58.209658160 +0000
-@@ -0,0 +1,395 @@
++++ b/supabase/functions/_shared/priceStack.ts	2026-10-29 05:08:05.196375765 +0000
+@@ -0,0 +1,571 @@
 +// PROPOSED, NOT DEPLOYED. Source-evidenced price-component model for a dealer
 +// vehicle page. Lives outside supabase/functions so no function deploy can
 +// pick it up; crawl-advertised-prices.patch beside this file wires it in.
 +//
-+// A dealer page can carry several prices for one vehicle, each a different
-+// stage of the same calculation, e.g.
++// A dealer page can carry several prices for one vehicle, each a stage of one
++// calculation:
 +//
-+//   MSRP                $116,750
-+//   Dealer Discount      -$3,000
-+//   Harte Price         $113,750   dealer price, before incentives and fee
-+//   Retail Cash         -$10,000   manufacturer incentive
-+//   Conveyance Fee         +$895
-+//   Your Price          $104,645   customer total, after incentives, with fee
++//   MSRP                       $116,750
++//   Dealer Discount             -$3,000
++//   <Dealer> Price             $113,750   dealer price, before incentives and fee
++//   Retail Cash                -$10,000   manufacturer incentive
++//   Conveyance Fee                +$895
++//   Your Price                 $104,645   dealer's advertised customer total
 +//
-+// Reading one of these figures and guessing its fee treatment from a tenant
-+// setting compared the dealer-price stage against a feed that carries the
-+// final stage; every such "discrepancy" was a pre- versus post-incentive
-+// comparison. This model reads the stack scoped to the VIN's own pricing
-+// widget, names every line by role, proves the arithmetic, and keeps generic
-+// page disclaimers apart. It decides nothing it cannot reconcile.
++// This reader:
++//  - attributes each stack to the page component that contains it (the element
++//    tree), never to whichever VIN is nearest in the text;
++//  - names every line by role and proves the arithmetic;
++//  - classifies every incentive on ITS OWN evidence (eligibility, restrictions,
++//    combinability, effective and expiration dates). A label, a generic page
++//    statement, or arithmetic that closes is never proof that every shopper
++//    qualifies; only a verified program record can say that;
++//  - keeps page-wide disclaimers apart from the vehicle's own widget;
++//  - derives the generally available customer total (the public price) and a
++//    fee-exclusive market-comparison basis that never include an unverified
++//    incentive.
++// Anything it cannot establish is left unresolved or held for review.
++
++import { ancestorsOf, contains, deepestAt, parseTree, type El } from "./htmlTree.ts";
 +
 +export type LineRole = "msrp" | "discount" | "dealer_price" | "incentive" | "fee" | "final_price" | "unknown";
-+export type Eligibility = "stated_unconditional" | "conditional" | "unknown";
 +
 +export interface StackLine {
 +  label: string;
++  /** Footnote marker printed with the label ("*", "1", "†"), if any. */
++  marker: string | null;
 +  role: LineRole;
-+  /** Amount as printed, unsigned. */
 +  amount: number;
-+  /** Sign as printed: -1 for "-$", +1 for "+$", 0 when unsigned. */
 +  printedSign: -1 | 0 | 1;
-+  /** Order of the line inside the VIN-scoped widget. */
 +  index: number;
 +}
 +
++export type Eligibility = "verified_general" | "stated_general_unverified" | "conditional" | "unknown";
++export type Restriction =
++  | "financing_required" | "lease_only" | "purchase_only" | "credit_approval" | "loyalty" | "conquest"
++  | "military" | "college" | "first_responder" | "trade_in_required" | "residency";
++
++export interface OfferEvidence {
++  source: "widget_line" | "widget_footnote" | "program_record";
++  text: string;
++}
++
 +export interface Incentive {
-+  label: string;
++  name: string;
 +  amount: number;
 +  eligibility: Eligibility;
-+  eligibilityEvidence: string | null;
++  restrictions: Restriction[];
++  combinability: "exclusive" | "combinable" | "unknown";
++  effectiveDate: string | null;
++  expirationDate: string | null;
++  /** Null when no expiration is known. */
++  expired: boolean | null;
++  evidence: OfferEvidence[];
++}
++
++/** A verified offer record from an authoritative source (OEM program data or a
++ *  dealer-approved program entry), the only thing that can establish general
++ *  availability. Supplied by the caller; never inferred from the page. */
++export interface ProgramRecord {
++  name: string;
++  amount: number;
++  generallyAvailable: boolean;
++  restrictions?: Restriction[];
++  combinableWith?: string[] | "all" | "none";
++  effectiveDate?: string | null;
++  expirationDate?: string | null;
++  source: string;
 +}
 +
 +export interface Disclaimer {
 +  scope: "widget" | "page";
 +  text: string;
-+  says: "fee_excluded" | "fee_included" | "incentive_conditional" | "incentive_unconditional" | "other";
++  says: "fee_excluded" | "fee_included" | "incentive_conditional" | "incentive_general" | "other";
 +}
 +
 +export type StackStatus =
@@ -347,44 +544,52 @@ diff -ruN a/supabase/functions/_shared/priceStack.ts b/supabase/functions/_share
 +export type ReviewFlag =
 +  | "incentive_eligibility_unverified"
 +  | "incentive_conditional"
++  | "incentive_expired"
++  | "incentives_mutually_exclusive"
 +  | "disclaimer_contradicts_widget_fee"
-+  | "widget_disclaimer_contradicts_widget_fee";
++  | "widget_disclaimer_contradicts_widget_fee"
++  | "duplicate_widgets_consistent";
 +
 +export interface PriceStackResult {
 +  status: StackStatus;
-+  /** Ready for an automatic write: reconciled and no review flag. */
++  /** Reconciled and nothing held for review. */
 +  writable: boolean;
 +  flags: ReviewFlag[];
 +  lines: StackLine[];
-+  /** The exact advertised customer total (e.g. "Your Price") and its label. */
-+  customerTotal: { amount: number; label: string } | null;
-+  /** The total less the fee: the price after incentives, before the fee. */
-+  beforeFeeAfterIncentives: number | null;
-+  /** The dealer's own price before incentives and fee (e.g. "Harte Price"). */
++  /** The dealer's advertised customer total ("Your Price") as printed. */
++  advertisedTotal: { amount: number; label: string } | null;
 +  dealerPrice: { amount: number; label: string } | null;
 +  msrp: number | null;
 +  discounts: { label: string; amount: number }[];
 +  incentives: Incentive[];
 +  fee: { label: string; amount: number; includedIn: string } | null;
++  /** Dealer price + fee - verified, unexpired, combinable incentives only. */
++  generallyAvailableTotal: number | null;
++  /** Fee-exclusive: dealer price - verified incentives. Never the advertised total. */
++  marketComparisonBasis: number | null;
 +  disclaimers: Disclaimer[];
-+  /** Which arithmetic checks held, for the audit row. */
 +  proof: string[];
 +  reason: string | null;
++  /** Byte range of the widget in the page, for the evidence hash. */
++  widgetRange: [number, number] | null;
 +}
 +
 +export interface PriceStackConfig {
-+  /** Dealer-specific label for the pre-incentive dealer price, e.g. "Harte Price". */
 +  dealerPriceLabels?: string[];
-+  /** Dealer-specific label for the customer total, e.g. "Your Price". */
 +  finalPriceLabels?: string[];
-+  /** The configured document fee; the fee line must state this amount. */
 +  configuredFee: number;
++  /** When the page was captured; decides whether an offer has expired. */
++  observedAt?: Date;
++  /** The page address; a VDP names its own vehicle in it. */
++  pageUrl?: string;
++  programRecords?: ProgramRecord[];
 +}
 +
 +const TOL = 1;
 +const near = (a: number, b: number) => Math.abs(a - b) <= TOL;
 +const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 +const VIN_RE = /\b[A-HJ-NPR-Z0-9]{17}\b/gi;
++const looksLikeVin = (s: string) => /\d/.test(s) && /[A-Z]/i.test(s);
 +
 +const DEFAULT_DEALER_PRICE = ["dealer price", "sale price", "selling price", "internet price", "special price", "e-price", "our price"];
 +const DEFAULT_FINAL_PRICE = ["your price", "final price", "total price", "price after incentives", "net price"];
@@ -393,64 +598,48 @@ diff -ruN a/supabase/functions/_shared/priceStack.ts b/supabase/functions/_share
 +const INCENTIVE_RE = /\b(?:rebate|incentive|loyalty|conquest|military|college|first responder|trade[- ]in assistance|cash allowance|cash(?!\s*price))\b/i;
 +const FEE_RE = /\b(?:conveyance|doc(?:ument(?:ation)?)?|dealer|processing|administrative|admin)\s+fees?\b/i;
 +
-+const CONDITIONAL_RE = /\b(?:financial services|finance cash|lease cash|apr cash|must finance|finance through|financed through|lease through|when financ|when leas|with approved credit|on approved credit|qualif\w*|eligib\w*|loyalty|conquest|current owners?|lessees?|military|college|first responder|restrictions apply|not all (?:buyers|customers)|see dealer for details|in lieu of|trade[- ]in required)\b/i;
-+const UNCONDITIONAL_RE = /\b(?:available to all (?:buyers|customers)|no qualification(?:s)? required|applies to (?:all|every) (?:buyers?|customers?|purchases?))\b/i;
++const RESTRICTION_PATTERNS: [Restriction, RegExp][] = [
++  ["financing_required", /\b(?:must finance|finance through|financed through|financing through|requires financing|financing required|financial services|when financ\w*|finance cash|apr cash|with (?:\w+ )?financing)\b/i],
++  ["lease_only", /\b(?:lease cash|when leas\w*|lease through|on (?:a )?lease|lessees?)\b/i],
++  ["purchase_only", /\b(?:cash purchase only|purchase only|not available (?:on|with) lease)\b/i],
++  ["credit_approval", /\b(?:approved credit|credit approval|well[- ]qualified|tier \d)\b/i],
++  ["loyalty", /\b(?:loyalty|current owners?|returning (?:owners?|customers?))\b/i],
++  ["conquest", /\bconquest\b/i],
++  ["military", /\bmilitary\b/i],
++  ["college", /\b(?:college|recent grad\w*)\b/i],
++  ["first_responder", /\bfirst responders?\b/i],
++  ["trade_in_required", /\b(?:trade[- ]in required|with (?:a |qualifying )?trade)\b/i],
++  ["residency", /\b(?:residents? of|must reside)\b/i],
++];
++const GENERAL_RE = /\b(?:available to all (?:buyers|customers|shoppers)|no qualification(?:s)? required|applies to (?:all|every) (?:buyers?|customers?|purchases?))\b/i;
++const EXCLUSIVE_RE = /\b(?:cannot be combined|can ?not be combined|not combinable|may not be combined|not compatible with|in lieu of|not stackable)\b/i;
++const COMBINABLE_RE = /\b(?:can be combined|combinable with|stackable with)\b/i;
 +
 +const money = (s: string) => Number(s.replace(/,/g, ""));
-+// Block-level boundaries become " | " so a price line ("Retail Cash -$10,000")
-+// stays one segment and a sentence of prose stays apart from it.
-+const BLOCK_TAG = /<\/?(?:div|p|li|ul|ol|tr|td|th|dt|dd|dl|br|h[1-6]|section|article|table|tbody|header|footer)\b[^>]*>/gi;
-+const stripTags = (h: string) =>
-+  h.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
-+    .replace(BLOCK_TAG, " | ").replace(/<[^>]+>/g, " ").replace(/&nbsp;?/gi, " ")
-+    .replace(/&#8722;|&minus;/gi, "-").replace(/\s+/g, " ").trim();
++const BLOCK_TAG = /<\/?(?:div|p|li|ul|ol|tr|td|th|dt|dd|dl|br|h[1-6]|section|article|table|tbody|header|footer|aside|main|nav)\b[^>]*>/gi;
++export const stripTags = (h: string) =>
++  h.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ")
++    .replace(BLOCK_TAG, " | ").replace(/<[^>]+>/g, " ").replace(/&nbsp;?/gi, " ").replace(/&amp;/gi, "&")
++    .replace(/&#8722;|&minus;/gi, "-").replace(/&dagger;/gi, "†").replace(/&sup(\d);/gi, "$1").replace(/\s+/g, " ").trim();
 +
-+// The widget for one vehicle: the stretch of the page around this VIN that
-+// contains no other VIN. A similar-vehicle card or another car's widget is
-+// bounded out by its own VIN; a VIN that appears in two separate places with
-+// price lines in both is ambiguous and left for review.
-+export function vinScope(html: string, vin: string): { scoped: string; outside: string; status: "ok" | "vin_not_found" | "ambiguous_vin_scope" } {
-+  const target = vin.toUpperCase();
-+  // A VIN inside a tag (data-vin="...") marks from the start of that tag.
-+  const tagStart = (at: number) => {
-+    const lt = html.lastIndexOf("<", at);
-+    return lt >= 0 && html.lastIndexOf(">", at) < lt ? lt : at;
-+  };
-+  const marks = [...html.matchAll(VIN_RE)].map((m) => ({ at: tagStart(m.index ?? 0), vin: m[0].toUpperCase() }));
-+  const own = marks.filter((m) => m.vin === target);
-+  if (!own.length) return { scoped: "", outside: stripTags(html), status: "vin_not_found" };
-+  // A vehicle's region runs forward from its own VIN to the next different
-+  // VIN (a card or widget names its vehicle first). Consecutive mentions of
-+  // the same VIN with no other VIN between them form one region.
-+  const regions: { start: number; end: number }[] = [];
-+  let open: { start: number } | null = null;
-+  for (const m of marks) {
-+    if (m.vin === target) { if (!open) open = { start: m.at }; continue; }
-+    if (open) { regions.push({ start: open.start, end: m.at }); open = null; }
-+  }
-+  if (open) regions.push({ start: open.start, end: html.length });
-+  const withPrices = regions.filter((r) => /\$\s?\d/.test(stripTags(html.slice(r.start, r.end))));
-+  if (withPrices.length > 1) return { scoped: "", outside: stripTags(html), status: "ambiguous_vin_scope" };
-+  const r = withPrices[0] ?? regions[0];
-+  return {
-+    scoped: stripTags(html.slice(r.start, r.end)),
-+    outside: stripTags(html.slice(0, r.start) + " | " + html.slice(r.end)),
-+    status: "ok",
-+  };
-+}
-+
++const MARK = String.raw`([*†‡§¹²³⁴-⁹]{1,3}|\(\d\)|\[\d\])?`;
 +const AMT = String.raw`([+\-−–])?\s*\$\s?(\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{2})?`;
 +const LABEL = String.raw`([A-Za-z][A-Za-z0-9 .&'/-]{0,40}?)`;
-+const LINE_SEG = new RegExp(String.raw`^${LABEL}\s*:?\s*${AMT}$`);
-+const LABEL_SEG = new RegExp(String.raw`^${LABEL}\s*:?$`);
++const LINE_SEG = new RegExp(String.raw`^${LABEL}\s*${MARK}\s*:?\s*${AMT}$`);
++const LABEL_SEG = new RegExp(String.raw`^${LABEL}\s*${MARK}\s*:?$`);
 +const AMOUNT_SEG = new RegExp(String.raw`^${AMT}$`);
 +const segmentsOf = (text: string) => text.split("|").map((s) => s.trim()).filter(Boolean);
 +const shortLabel = (s: string) => s.trim().split(/\s+/).length <= 6;
++const normMarker = (m: string | undefined | null) => {
++  if (!m) return null;
++  const sup: Record<string, string> = { "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9" };
++  return m.replace(/[()[\]]/g, "").split("").map((c) => sup[c] ?? c).join("");
++};
 +
-+export function classifyLabel(label: string, cfg: PriceStackConfig): LineRole {
++export function classifyLabel(label: string, cfg: Pick<PriceStackConfig, "dealerPriceLabels" | "finalPriceLabels">): LineRole {
 +  const l = label.toLowerCase().trim();
 +  const has = (list: string[]) => list.some((x) => new RegExp(`\\b${esc(x.toLowerCase())}\\b`).test(l));
-+  if (has(cfg.finalPriceLabels ?? []) ) return "final_price";
++  if (has(cfg.finalPriceLabels ?? [])) return "final_price";
 +  if (has(cfg.dealerPriceLabels ?? [])) return "dealer_price";
 +  if (FEE_RE.test(l)) return "fee";
 +  if (INCENTIVE_RE.test(l)) return "incentive";
@@ -461,105 +650,225 @@ diff -ruN a/supabase/functions/_shared/priceStack.ts b/supabase/functions/_share
 +  return "unknown";
 +}
 +
-+// A price line is a short label and one amount, in one segment or a label
-+// segment followed by an amount segment. Everything else is prose, read only
-+// for disclaimers.
-+// The stack is the run of price lines with at most MAX_GAP prose segments
-+// between them; prose within NEAR segments of the run is the widget's own
-+// footnote, anything further is page text. When the VIN's region holds more
-+// than one run that carries a customer total, the widget is ambiguous.
-+const MAX_GAP = 2;
-+const NEAR = 2;
-+
-+export function splitWidget(scopedText: string, cfg: PriceStackConfig):
-+  { lines: StackLine[]; widgetProse: string; pageProse: string; ambiguous: boolean } {
-+  const segs = segmentsOf(scopedText);
-+  type Seg = { kind: "line"; label: string; sign?: string; amt: string; at: number } | { kind: "prose"; text: string; at: number };
-+  const parsed: Seg[] = [];
++// Lines and prose of one widget's text. A price line is a short label (with an
++// optional footnote marker) and one amount, in one block or a label block
++// followed by an amount block; everything else is prose.
++export function splitLines(text: string, cfg: PriceStackConfig): { lines: StackLine[]; prose: string[] } {
++  const segs = segmentsOf(text);
++  const lines: StackLine[] = [];
++  const prose: string[] = [];
++  const push = (label: string, marker: string | undefined, sign: string | undefined, amt: string) => {
++    const l = label.replace(/\s+/g, " ").trim();
++    lines.push({ label: l, marker: normMarker(marker), role: classifyLabel(l, cfg), amount: money(amt), printedSign: (sign ? (sign === "+" ? 1 : -1) : 0) as -1 | 0 | 1, index: lines.length });
++  };
 +  for (let i = 0; i < segs.length; i++) {
 +    const s = segs[i];
 +    const line = s.match(LINE_SEG);
-+    if (line && shortLabel(line[1])) { parsed.push({ kind: "line", label: line[1], sign: line[2], amt: line[3], at: i }); continue; }
++    if (line && shortLabel(line[1])) { push(line[1], line[2], line[3], line[4]); continue; }
 +    const lab = s.match(LABEL_SEG);
 +    const next = segs[i + 1]?.match(AMOUNT_SEG);
-+    if (lab && next && shortLabel(lab[1])) { parsed.push({ kind: "line", label: lab[1], sign: next[1], amt: next[2], at: i }); i++; continue; }
-+    parsed.push({ kind: "prose", text: s, at: i });
++    if (lab && next && shortLabel(lab[1])) { push(lab[1], lab[2], next[1], next[2]); i++; continue; }
++    prose.push(s);
 +  }
-+  const runs: { from: number; to: number }[] = [];
-+  for (const p of parsed) {
-+    if (p.kind !== "line") continue;
-+    const last = runs[runs.length - 1];
-+    const gap = last ? parsed.filter((q) => q.kind === "prose" && q.at > last.to && q.at < p.at).length : Infinity;
-+    if (last && gap <= MAX_GAP) last.to = p.at; else runs.push({ from: p.at, to: p.at });
-+  }
-+  const toLine = (p: Extract<Seg, { kind: "line" }>, index: number): StackLine => {
-+    const label = p.label.replace(/\s+/g, " ").trim();
-+    return { label, role: classifyLabel(label, cfg), amount: money(p.amt), printedSign: (p.sign ? (p.sign === "+" ? 1 : -1) : 0) as -1 | 0 | 1, index };
-+  };
-+  const linesIn = (r: { from: number; to: number }) =>
-+    parsed.filter((p): p is Extract<Seg, { kind: "line" }> => p.kind === "line" && p.at >= r.from && p.at <= r.to).map(toLine);
-+  const withTotal = runs.filter((r) => linesIn(r).some((l) => l.role === "final_price"));
-+  const chosen = withTotal.length === 1 ? withTotal[0] : withTotal.length === 0 && runs.length === 1 ? runs[0] : null;
-+  const prose = parsed.filter((p): p is Extract<Seg, { kind: "prose" }> => p.kind === "prose");
-+  if (!chosen) {
-+    return { lines: [], widgetProse: "", pageProse: prose.map((p) => p.text).join(" "), ambiguous: runs.length > 0 };
-+  }
-+  const near = (p: { at: number }) => p.at >= chosen.from - NEAR && p.at <= chosen.to + NEAR;
-+  return {
-+    lines: linesIn(chosen),
-+    widgetProse: prose.filter(near).map((p) => p.text).join(" "),
-+    pageProse: prose.filter((p) => !near(p)).map((p) => p.text).join(" "),
-+    ambiguous: false,
-+  };
++  return { lines, prose };
 +}
 +
-+const sentences = (t: string) => t.replace(/\|/g, " ").split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter((s) => s.length > 12);
++const sentences = (t: string) => t.replace(/\|/g, " ").split(/(?<=[.!?])\s+(?=[A-Z*†‡§¹²³\d(\[])/).map((s) => s.trim()).filter((s) => s.length > 8);
 +
 +export function readDisclaimers(text: string, scope: Disclaimer["scope"]): Disclaimer[] {
 +  const out: Disclaimer[] = [];
 +  for (const s of sentences(text)) {
-+    if (/\$\s?\d/.test(s) && !/\b(?:fee|incentive|rebate|cash|offer|qualif|eligib)\b/i.test(s)) continue;
-+    if (FEE_RE.test(s) || /\bfees?\b/i.test(s)) {
-+      if (/\b(?:exclud\w*|not includ\w*|does not include|plus|additional|extra)\b/i.test(s) && FEE_RE.test(s)) {
-+        out.push({ scope, text: s.slice(0, 240), says: "fee_excluded" });
-+        continue;
-+      }
-+      if (/\b(?:includ\w*|inclusive)\b/i.test(s) && FEE_RE.test(s) && !/\bnot\b/i.test(s)) {
-+        out.push({ scope, text: s.slice(0, 240), says: "fee_included" });
-+        continue;
-+      }
++    const clip = s.slice(0, 280);
++    if (FEE_RE.test(s)) {
++      if (/\b(?:exclud\w*|not includ\w*|does not include|plus|additional|extra)\b/i.test(s)) { out.push({ scope, text: clip, says: "fee_excluded" }); continue; }
++      if (/\b(?:includ\w*|inclusive)\b/i.test(s) && !/\bnot\b/i.test(s)) { out.push({ scope, text: clip, says: "fee_included" }); continue; }
 +    }
-+    if (INCENTIVE_RE.test(s) || /\boffers?\b/i.test(s)) {
-+      if (UNCONDITIONAL_RE.test(s)) out.push({ scope, text: s.slice(0, 240), says: "incentive_unconditional" });
-+      else if (CONDITIONAL_RE.test(s)) out.push({ scope, text: s.slice(0, 240), says: "incentive_conditional" });
++    if (INCENTIVE_RE.test(s) || /\b(?:offers?|rebates?)\b/i.test(s)) {
++      if (GENERAL_RE.test(s)) out.push({ scope, text: clip, says: "incentive_general" });
++      else if (RESTRICTION_PATTERNS.some(([, re]) => re.test(s)) || /\b(?:qualif\w*|eligib\w*|restrictions apply)\b/i.test(s)) out.push({ scope, text: clip, says: "incentive_conditional" });
 +    }
 +  }
 +  return out;
 +}
 +
++const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
++function parseDate(s: string): string | null {
++  let m = s.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
++  if (m) {
++    const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
++    return `${y}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
++  }
++  m = s.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\.?\s+(\d{1,2}),?\s+(\d{4})\b/i);
++  if (m) return `${m[3]}-${String(MONTHS.indexOf(m[1].toLowerCase()) + 1).padStart(2, "0")}-${m[2].padStart(2, "0")}`;
++  return null;
++}
++const EXPIRES_RE = /\b(?:expires?|expiration|ends?|through|thru|valid (?:through|until)|until|exp\.)\s*(?:on\s*)?:?\s*([A-Za-z]+\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})/i;
++const EFFECTIVE_RE = /\b(?:starting|starts|from|effective|begins?|valid from)\s*(?:on\s*)?:?\s*([A-Za-z]+\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})/i;
++
++// The evidence that belongs to ONE incentive: its own line, and footnotes that
++// carry its marker or name it. A footnote that names no offer and carries no
++// marker is page context, not this offer's terms.
++function offerEvidence(line: StackLine, footnotes: string[]): OfferEvidence[] {
++  const ev: OfferEvidence[] = [{ source: "widget_line", text: `${line.label}${line.marker ?? ""} -$${line.amount}` }];
++  const name = line.label.toLowerCase();
++  for (const f of footnotes) {
++    const lead = normMarker(f.match(/^\s*([*†‡§¹²³⁴-⁹]{1,3}|\(\d\)|\[\d\]|\d(?=\s))/)?.[1]);
++    const byMarker = line.marker != null && lead === line.marker;
++    const byName = f.toLowerCase().includes(name);
++    if (byMarker || byName) ev.push({ source: "widget_footnote", text: f.slice(0, 280) });
++  }
++  return ev;
++}
++
++function classifyIncentive(line: StackLine, footnotes: string[], cfg: PriceStackConfig): Incentive {
++  const evidence = offerEvidence(line, footnotes);
++  const terms = evidence.filter((e) => e.source === "widget_footnote").map((e) => e.text).join(" ");
++  const all = `${line.label} ${terms}`;
++  const restrictions = RESTRICTION_PATTERNS.filter(([, re]) => re.test(all)).map(([r]) => r);
++  const record = (cfg.programRecords ?? []).find((p) => p.name.toLowerCase() === line.label.toLowerCase() && near(p.amount, line.amount));
++  if (record) evidence.push({ source: "program_record", text: `${record.source}: ${record.name} ${record.amount}${record.generallyAvailable ? " (generally available)" : ""}` });
++  const expirationDate = record?.expirationDate ?? parseDate(terms.match(EXPIRES_RE)?.[1] ?? "");
++  const effectiveDate = record?.effectiveDate ?? parseDate(terms.match(EFFECTIVE_RE)?.[1] ?? "");
++  const day = (cfg.observedAt ?? new Date()).toISOString().slice(0, 10);
++  const expired = expirationDate ? expirationDate < day : null;
++  const allRestrictions = [...new Set([...restrictions, ...(record?.restrictions ?? [])])];
++  const combinability: Incentive["combinability"] = record?.combinableWith === "none" ? "exclusive"
++    : record?.combinableWith ? "combinable"
++    : EXCLUSIVE_RE.test(terms) ? "exclusive" : COMBINABLE_RE.test(terms) ? "combinable" : "unknown";
++  let eligibility: Eligibility = "unknown";
++  if (allRestrictions.length) eligibility = "conditional";
++  else if (record?.generallyAvailable) eligibility = "verified_general";
++  else if (GENERAL_RE.test(terms)) eligibility = "stated_general_unverified";
++  return {
++    name: line.label, amount: line.amount, eligibility, restrictions: allRestrictions, combinability,
++    effectiveDate, expirationDate, expired, evidence,
++  };
++}
++
++// ── Component attribution ─────────────────────────────────────────────────
++
++/** `el` holds the price lines; `scope` is el plus its immediate container
++ *  when that container is the widget's own (its footnotes live there). */
++interface Widget { el: El; scope: El; text: string; lines: StackLine[]; prose: string[] }
++
++const STAGE_ROLES = new Set<LineRole>(["msrp", "dealer_price", "final_price"]);
++
++// Every element whose own text forms a stack: at least one stage line and a
++// customer total or a dealer price, the smallest such element per stack.
++function findWidgets(html: string, root: El, cfg: PriceStackConfig): Widget[] {
++  const cands: Widget[] = [];
++  const visit = (el: El) => {
++    if (el.tag === "script" || el.tag === "style") return;
++    for (const c of el.children) visit(c);
++    if (el === root) return;
++    if (cands.some((w) => contains(el, w.el))) return;
++    const text = stripTags(html.slice(el.start, el.end));
++    if (!/\$\s?\d/.test(text)) return;
++    const { lines, prose } = splitLines(text, cfg);
++    const stages = lines.filter((l) => STAGE_ROLES.has(l.role));
++    if (lines.length >= 2 && stages.length >= 1 && lines.some((l) => l.role === "final_price" || l.role === "dealer_price")) {
++      cands.push({ el, scope: el, text, lines, prose });
++    }
++  };
++  visit(root);
++  // A widget's footnote usually sits beside the line list, in the same small
++  // container. Take that container when it holds no other widget and is not
++  // much more than the widget itself.
++  for (const w of cands) {
++    const p = w.el.parent;
++    if (!p || p === root || cands.some((o) => o !== w && contains(p, o.el))) continue;
++    const pText = stripTags(html.slice(p.start, p.end));
++    const namesAVehicle = (pText.match(VIN_RE) ?? []).some(looksLikeVin);
++    if (pText.length > Math.max(600, 3 * w.text.length) || namesAVehicle) continue;
++    w.scope = p;
++    w.prose = splitLines(pText, cfg).prose;
++  }
++  return cands;
++}
++
++interface VinMark { vin: string; at: number }
++
++function vinMarks(html: string): VinMark[] {
++  return [...html.matchAll(VIN_RE)].filter((m) => looksLikeVin(m[0])).map((m) => ({ vin: m[0].toUpperCase(), at: m.index ?? 0 }));
++}
++
++// Owner of a widget: walk up from the widget to the first element that
++// mentions any VIN. One VIN there owns it. Several: VINs that already own a
++// widget of their own inside that element are set aside; one left owns it.
++// None at all: the page address names the vehicle of a detail page.
++function assignOwners(widgets: Widget[], marks: VinMark[], urlVin: string | null): Map<Widget, string | "ambiguous" | null> {
++  const owners = new Map<Widget, string | "ambiguous" | null>();
++  const vinsIn = (el: El) => new Set(marks.filter((m) => el.start <= m.at && m.at < el.end).map((m) => m.vin));
++  const firstWithVins = (w: Widget) => ancestorsOf(w.el).find((a) => vinsIn(a).size > 0) ?? null;
++  for (const w of widgets) {
++    const a = firstWithVins(w);
++    const v = a ? vinsIn(a) : new Set<string>();
++    owners.set(w, v.size === 1 ? [...v][0] : null);
++  }
++  for (const w of widgets) {
++    if (owners.get(w) != null) continue;
++    const a = firstWithVins(w);
++    if (!a || a.tag === "#root" && vinsIn(a).size === 0) { owners.set(w, urlVin); continue; }
++    const claimed = new Set(widgets.filter((o) => o !== w && contains(a, o.el) && typeof owners.get(o) === "string" && owners.get(o) !== "ambiguous").map((o) => owners.get(o) as string));
++    const left = [...vinsIn(a)].filter((v) => !claimed.has(v));
++    if (left.length === 1) owners.set(w, left[0]);
++    else if (left.length === 0 && urlVin && !claimed.has(urlVin)) owners.set(w, urlVin);
++    else owners.set(w, "ambiguous");
++  }
++  return owners;
++}
++
++const signature = (lines: StackLine[]) => lines.map((l) => `${l.role}:${l.amount}`).join(",");
++
 +const empty = (status: StackStatus, reason: string, extra: Partial<PriceStackResult> = {}): PriceStackResult => ({
-+  status, writable: false, flags: [], lines: [], customerTotal: null, beforeFeeAfterIncentives: null,
-+  dealerPrice: null, msrp: null, discounts: [], incentives: [], fee: null, disclaimers: [], proof: [], reason, ...extra,
++  status, writable: false, flags: [], lines: [], advertisedTotal: null, dealerPrice: null, msrp: null, discounts: [],
++  incentives: [], fee: null, generallyAvailableTotal: null, marketComparisonBasis: null, disclaimers: [], proof: [],
++  reason, widgetRange: null, ...extra,
 +});
 +
 +export function readPriceStack(html: string, vin: string, cfg: PriceStackConfig): PriceStackResult {
-+  const scope = vinScope(html, vin);
-+  if (scope.status !== "ok") return empty(scope.status, scope.status === "vin_not_found" ? "the VIN is not on the page" : "the VIN has price lines in more than one place");
-+  const { lines, widgetProse, pageProse, ambiguous } = splitWidget(scope.scoped, cfg);
-+  const disclaimers = [
-+    ...readDisclaimers(widgetProse, "widget"),
-+    ...readDisclaimers(`${pageProse} ${scope.outside.replace(/\|/g, " ")}`, "page"),
-+  ];
-+  const base = { lines, disclaimers };
-+  if (ambiguous) return empty("ambiguous_vin_scope", "more than one price stack in the VIN's region", base);
-+  if (!lines.length) return empty("no_stack", "no price lines inside the VIN's widget", base);
++  const target = vin.toUpperCase();
++  const root = parseTree(html);
++  const marks = vinMarks(html);
++  const urlVin = (cfg.pageUrl?.toUpperCase().match(VIN_RE) ?? []).find(looksLikeVin) ?? null;
++  if (!marks.some((m) => m.vin === target) && urlVin !== target) return empty("vin_not_found", "the VIN is not on the page");
++
++  const widgets = findWidgets(html, root, cfg);
++  const owners = assignOwners(widgets, marks, urlVin);
++  const mine = widgets.filter((w) => owners.get(w) === target);
++  const contested = widgets.filter((w) => owners.get(w) === "ambiguous");
++  const flags: ReviewFlag[] = [];
++
++  // Page text outside every vehicle widget: the general disclaimers.
++  const pageText = (() => {
++    let t = html;
++    for (const w of [...widgets].sort((a, b) => b.scope.start - a.scope.start)) t = t.slice(0, w.scope.start) + " | " + t.slice(w.scope.end);
++    return stripTags(t);
++  })();
++  const pageDisclaimers = readDisclaimers(pageText, "page");
++
++  if (!mine.length) {
++    if (contested.length) return empty("ambiguous_vin_scope", "a price stack on the page could not be attributed to one vehicle", { disclaimers: pageDisclaimers });
++    return empty("no_stack", "no price stack belongs to this VIN", { disclaimers: pageDisclaimers });
++  }
++  // The same widget is often rendered twice (mobile and desktop). Identical
++  // copies are one stack; copies that differ cannot both be the price.
++  const sigs = new Set(mine.map((w) => signature(w.lines)));
++  if (sigs.size > 1) return empty("ambiguous_vin_scope", "this VIN has differing price stacks on the page", { disclaimers: pageDisclaimers });
++  if (mine.length > 1) flags.push("duplicate_widgets_consistent");
++  const w = mine[0];
++  const lines = w.lines;
++  // A footnote is a block of the widget's prose, split only where a new
++  // marker begins, so an offer's terms and its dates stay together.
++  const footnotes = w.prose.flatMap((b) => b.split(/(?<=[.!?])\s+(?=[*†‡§¹²³⁴-⁹]|\(\d\)|\[\d\])/)).map((s) => s.trim()).filter(Boolean);
++  const disclaimers = [...readDisclaimers(w.prose.join(" | "), "widget"), ...pageDisclaimers];
++  const base = { lines, disclaimers, widgetRange: [w.scope.start, w.scope.end] as [number, number] };
 +
 +  const unknown = lines.filter((l) => l.role === "unknown");
 +  if (unknown.length) return empty("unknown_line", `unrecognised line(s): ${unknown.map((l) => l.label).join(", ")}`, base);
-+
-+  const one = (role: LineRole) => lines.filter((l) => l.role === role);
-+  const msrpLines = one("msrp"), dealerLines = one("dealer_price"), finalLines = one("final_price");
-+  const discountLines = one("discount"), incentiveLines = one("incentive"), feeLines = one("fee");
++  const of = (role: LineRole) => lines.filter((l) => l.role === role);
++  const [msrpLines, dealerLines, finalLines, feeLines] = [of("msrp"), of("dealer_price"), of("final_price"), of("fee")];
++  const discountLines = of("discount"), incentiveLines = of("incentive");
 +  if (msrpLines.length > 1 || dealerLines.length > 1 || finalLines.length > 1 || feeLines.length > 1) {
 +    return empty("unreconciled", "a stage appears more than once in the widget", base);
 +  }
@@ -569,85 +878,116 @@ diff -ruN a/supabase/functions/_shared/priceStack.ts b/supabase/functions/_share
 +  const feeLine = feeLines[0] ?? null;
 +  const discounts = discountLines.map((l) => ({ label: l.label, amount: l.amount }));
 +  const proof: string[] = [];
-+
 +  if (feeLine && cfg.configuredFee > 0 && !near(feeLine.amount, cfg.configuredFee)) {
 +    return empty("fee_amount_mismatch", `widget fee ${feeLine.amount} != configured ${cfg.configuredFee}`, base);
 +  }
-+  // Signs: a discount or incentive printed with "+" is not a reduction; a fee
-+  // printed with "-" is not a charge. Either is a stack this model does not know.
 +  if ([...discountLines, ...incentiveLines].some((l) => l.printedSign === 1) || (feeLine && feeLine.printedSign === -1)) {
 +    return empty("unreconciled", "a line's printed sign contradicts its role", base);
 +  }
-+
 +  const sumDisc = discounts.reduce((a, d) => a + d.amount, 0);
 +  const sumInc = incentiveLines.reduce((a, l) => a + l.amount, 0);
 +  const fee = feeLine?.amount ?? 0;
-+
 +  if (msrp != null && dealer) {
 +    if (!near(msrp - sumDisc, dealer.amount)) return empty("unreconciled", `MSRP ${msrp} - discounts ${sumDisc} != ${dealer.label} ${dealer.amount}`, base);
 +    proof.push(`MSRP ${msrp} - discounts ${sumDisc} = ${dealer.label} ${dealer.amount}`);
 +  }
 +  if (!final) return empty("missing_final_price", "no customer-total line in the widget", { ...base, proof });
-+
 +  const start = dealer?.amount ?? (msrp != null ? msrp - sumDisc : null);
 +  if (start == null) return empty("unreconciled", "no dealer price or MSRP to start the stack from", { ...base, proof });
 +  if (!near(start - sumInc + fee, final.amount)) {
 +    return empty("unreconciled", `${start} - incentives ${sumInc} + fee ${fee} != ${final.label} ${final.amount}`, { ...base, proof });
 +  }
 +  proof.push(`${dealer?.label ?? "MSRP - discounts"} ${start} - incentives ${sumInc} + fee ${fee} = ${final.label} ${final.amount}`);
-+  // Order matters: the fee must sit between the dealer price and the total,
-+  // so the total is the figure that carries it.
 +  if (feeLine && !(feeLine.index < final.index && (!dealer || dealer.index < feeLine.index))) {
 +    return empty("unreconciled", "the fee line is not between the dealer price and the customer total", { ...base, proof });
 +  }
 +
-+  const widgetConditional = disclaimers.find((d) => d.scope === "widget" && d.says === "incentive_conditional");
-+  const widgetUnconditional = disclaimers.find((d) => d.scope === "widget" && d.says === "incentive_unconditional");
-+  const incentives: Incentive[] = incentiveLines.map((l) => {
-+    if (CONDITIONAL_RE.test(l.label)) return { label: l.label, amount: l.amount, eligibility: "conditional", eligibilityEvidence: `label: ${l.label}` };
-+    if (widgetConditional) return { label: l.label, amount: l.amount, eligibility: "conditional", eligibilityEvidence: widgetConditional.text };
-+    if (widgetUnconditional) return { label: l.label, amount: l.amount, eligibility: "stated_unconditional", eligibilityEvidence: widgetUnconditional.text };
-+    return { label: l.label, amount: l.amount, eligibility: "unknown", eligibilityEvidence: null };
-+  });
-+
-+  const flags: ReviewFlag[] = [];
-+  if (incentives.some((x) => x.eligibility === "unknown")) flags.push("incentive_eligibility_unverified");
++  // Arithmetic proves only that the lines add up. Each offer is judged on
++  // its own evidence.
++  const incentives = incentiveLines.map((l) => classifyIncentive(l, footnotes, cfg));
++  if (incentives.some((x) => x.eligibility === "unknown" || x.eligibility === "stated_general_unverified")) flags.push("incentive_eligibility_unverified");
 +  if (incentives.some((x) => x.eligibility === "conditional")) flags.push("incentive_conditional");
++  if (incentives.some((x) => x.expired === true)) flags.push("incentive_expired");
++  if (incentives.length > 1 && incentives.some((x) => x.combinability === "exclusive")) flags.push("incentives_mutually_exclusive");
 +  if (feeLine) {
-+    if (disclaimers.some((d) => d.scope === "page" && d.says === "fee_excluded")) flags.push("disclaimer_contradicts_widget_fee");
++    if (pageDisclaimers.some((d) => d.says === "fee_excluded")) flags.push("disclaimer_contradicts_widget_fee");
 +    if (disclaimers.some((d) => d.scope === "widget" && d.says === "fee_excluded")) flags.push("widget_disclaimer_contradicts_widget_fee");
 +  }
 +
++  const verified = incentives.filter((x) => x.eligibility === "verified_general" && x.expired !== true
++    && (x.combinability !== "exclusive" || incentives.length === 1));
++  const verifiedSum = verified.reduce((a, x) => a + x.amount, 0);
++  const dealerStage = start;
++  const holds = flags.filter((f) => f !== "duplicate_widgets_consistent");
 +  return {
 +    status: "reconciled",
-+    writable: flags.length === 0,
++    writable: holds.length === 0,
 +    flags,
 +    lines,
-+    customerTotal: { amount: final.amount, label: final.label },
-+    beforeFeeAfterIncentives: final.amount - fee,
++    advertisedTotal: { amount: final.amount, label: final.label },
 +    dealerPrice: dealer ? { amount: dealer.amount, label: dealer.label } : null,
 +    msrp,
 +    discounts,
 +    incentives,
 +    fee: feeLine ? { label: feeLine.label, amount: feeLine.amount, includedIn: final.label } : null,
++    generallyAvailableTotal: dealerStage - verifiedSum + fee,
++    marketComparisonBasis: dealerStage - verifiedSum,
 +    disclaimers,
 +    proof,
 +    reason: null,
++    widgetRange: base.widgetRange,
 +  };
 +}
 +
-+export type FeedComparison =
-+  | "agrees"
-+  | "pre_vs_post_incentive"
-+  | "genuine_difference"
-+  | "dates_not_comparable"
-+  | "unresolved";
++// ── Public price policy ───────────────────────────────────────────────────
 +
-+// Compare the feed's total with the page's stack for the same VIN. Only
-+// observations taken within `maxAgeMs` of each other are compared; a page read
-+// today says nothing about the feed of a month ago. The page figure the
-+// crawler stored is named by stage so a pre-incentive figure is never reported
-+// as a price discrepancy.
++export interface PublicPriceDecision {
++  /** May the platform publish a price for this vehicle without review? */
++  publishable: boolean;
++  /** The primary advertised price: the generally available, all-in total. */
++  primary: { amount: number; label: string; includesFee: true } | null;
++  /** Offers shown only separately, with qualifications, after dealer approval. */
++  conditionalOffers: { name: string; amount: number; priceWithOffer: number; qualifications: string[]; expires: string | null }[];
++  /** The dealer's own advertised total, when it differs from the primary. */
++  dealerAdvertisedTotal: { amount: number; label: string } | null;
++  /** Fee-exclusive basis for market comparison and price-fairness scoring. */
++  marketComparisonBasis: number | null;
++  /** Scores built on this price must say confidence is limited. */
++  scoreConfidence: "normal" | "limited" | "none";
++  reasons: string[];
++}
++
++export function publicPriceDecision(r: PriceStackResult): PublicPriceDecision {
++  if (r.status !== "reconciled" || r.generallyAvailableTotal == null) {
++    return { publishable: false, primary: null, conditionalOffers: [], dealerAdvertisedTotal: null, marketComparisonBasis: null, scoreConfidence: "none", reasons: [r.reason ?? r.status] };
++  }
++  const reasons: string[] = [];
++  const unverified = r.incentives.filter((x) => x.eligibility !== "verified_general");
++  for (const x of unverified) reasons.push(`${x.name} ${x.amount}: ${x.eligibility.replace(/_/g, " ")}${x.expired ? ", expired" : ""}`);
++  if (r.flags.includes("disclaimer_contradicts_widget_fee") || r.flags.includes("widget_disclaimer_contradicts_widget_fee")) {
++    reasons.push("the dealer's fee disclaimer contradicts the itemised fee; dealer disclosure needs correction");
++  }
++  if (r.flags.includes("incentives_mutually_exclusive")) reasons.push("offers that cannot be combined are applied together");
++  const differs = r.advertisedTotal && !near(r.advertisedTotal.amount, r.generallyAvailableTotal);
++  if (differs) reasons.push(`dealer advertises ${r.advertisedTotal!.label} ${r.advertisedTotal!.amount}, which applies offers not verified as generally available`);
++  return {
++    publishable: r.writable,
++    primary: { amount: r.generallyAvailableTotal, label: "Price", includesFee: true },
++    conditionalOffers: r.incentives.filter((x) => x.eligibility !== "verified_general" && x.expired !== true).map((x) => ({
++      name: x.name, amount: x.amount, priceWithOffer: r.generallyAvailableTotal! - x.amount,
++      qualifications: x.restrictions.length ? x.restrictions : ["eligibility not verified"], expires: x.expirationDate,
++    })),
++    dealerAdvertisedTotal: differs ? r.advertisedTotal : null,
++    marketComparisonBasis: r.marketComparisonBasis,
++    scoreConfidence: unverified.length ? "limited" : "normal",
++    reasons,
++  };
++}
++
++// ── Feed comparison and stage naming ──────────────────────────────────────
++
++export type FeedComparison = "agrees" | "pre_vs_post_incentive" | "genuine_difference" | "dates_not_comparable" | "unresolved";
++
 +export function compareWithFeed(
 +  page: PriceStackResult,
 +  pageAt: Date,
@@ -656,44 +996,41 @@ diff -ruN a/supabase/functions/_shared/priceStack.ts b/supabase/functions/_share
 +  maxAgeMs = 3 * 86_400_000,
 +): { result: FeedComparison; storedStage: string | null; detail: string } {
 +  const storedStage = storedFigure == null ? null : stageOf(page, storedFigure);
-+  if (page.status !== "reconciled" || !page.customerTotal) {
-+    return { result: "unresolved", storedStage, detail: page.reason ?? page.status };
-+  }
++  if (page.status !== "reconciled" || !page.advertisedTotal) return { result: "unresolved", storedStage, detail: page.reason ?? page.status };
 +  if (Math.abs(pageAt.getTime() - feed.at.getTime()) > maxAgeMs) {
 +    return { result: "dates_not_comparable", storedStage, detail: `page ${pageAt.toISOString()} vs feed ${feed.at.toISOString()}` };
 +  }
-+  if (near(feed.total, page.customerTotal.amount)) {
-+    const incentives = page.incentives.reduce((a, x) => a + x.amount, 0);
-+    if (storedFigure != null && page.dealerPrice && near(storedFigure, page.dealerPrice.amount) && incentives > 0) {
-+      return { result: "pre_vs_post_incentive", storedStage, detail: `feed = ${page.customerTotal.label}; stored figure is ${page.dealerPrice.label}, before ${incentives} of incentives and the fee` };
++  if (near(feed.total, page.advertisedTotal.amount)) {
++    const inc = page.incentives.reduce((a, x) => a + x.amount, 0);
++    if (storedFigure != null && page.dealerPrice && near(storedFigure, page.dealerPrice.amount) && inc > 0) {
++      return { result: "pre_vs_post_incentive", storedStage, detail: `feed = ${page.advertisedTotal.label}; stored figure is ${page.dealerPrice.label}, before ${inc} of incentives and the fee` };
 +    }
-+    return { result: "agrees", storedStage, detail: `feed = ${page.customerTotal.label}` };
++    return { result: "agrees", storedStage, detail: `feed = ${page.advertisedTotal.label}` };
 +  }
-+  return { result: "genuine_difference", storedStage, detail: `feed ${feed.total} != ${page.customerTotal.label} ${page.customerTotal.amount}` };
++  return { result: "genuine_difference", storedStage, detail: `feed ${feed.total} != ${page.advertisedTotal.label} ${page.advertisedTotal.amount}` };
 +}
 +
-+// Which stage of a reconciled stack a single extracted figure is. Used to say
-+// exactly what an existing observation captured.
-+export function stageOf(result: PriceStackResult, figure: number): string | null {
-+  if (result.customerTotal && near(figure, result.customerTotal.amount)) return `customer total (${result.customerTotal.label})`;
-+  if (result.dealerPrice && near(figure, result.dealerPrice.amount)) return `dealer price before incentives and fee (${result.dealerPrice.label})`;
-+  if (result.beforeFeeAfterIncentives != null && near(figure, result.beforeFeeAfterIncentives)) return "after incentives, before fee";
-+  if (result.msrp != null && near(figure, result.msrp)) return "MSRP";
++export function stageOf(r: PriceStackResult, figure: number): string | null {
++  if (r.advertisedTotal && near(figure, r.advertisedTotal.amount)) return `advertised customer total (${r.advertisedTotal.label})`;
++  if (r.dealerPrice && near(figure, r.dealerPrice.amount)) return `dealer price before incentives and fee (${r.dealerPrice.label})`;
++  if (r.advertisedTotal && r.fee && near(figure, r.advertisedTotal.amount - r.fee.amount)) return "after incentives, before fee";
++  if (r.msrp != null && near(figure, r.msrp)) return "MSRP";
 +  return null;
 +}
 diff -ruN a/supabase/functions/crawl-advertised-prices/index.ts b/supabase/functions/crawl-advertised-prices/index.ts
 --- a/supabase/functions/crawl-advertised-prices/index.ts	2026-10-29 03:58:05.060678072 +0000
-+++ b/supabase/functions/crawl-advertised-prices/index.ts	2026-10-29 04:49:58.203617766 +0000
-@@ -7,6 +7,8 @@
++++ b/supabase/functions/crawl-advertised-prices/index.ts	2026-10-29 05:07:58.556770002 +0000
+@@ -7,6 +7,9 @@
    type CrawlUrlSource, type RenderedPageVerdictDetail,
  } from "../_shared/crawlUrlPolicy.ts";
  import { judgeAboveFeed, parseFeedTimestamp } from "../_shared/priceGuard.ts";
 +import { breakdownFor, decideFeeTreatment, decisionNote, type DealerFeeSettings } from "../_shared/feeTreatment.ts";
-+import { readPriceStack, stageOf } from "../_shared/priceStack.ts";
++import { publicPriceDecision, readPriceStack, type ProgramRecord } from "../_shared/priceStack.ts";
++import { buildEvidenceRecords } from "../_shared/priceEvidence.ts";
  import { fetchCreditUsage, pickRenderKey, selectRenderKey, type RenderKeyCandidate } from "../_shared/renderKey.ts";
  import {
    createRenderPacer, deriveRenderBudget, parseRetryAfter, resolveRendersPerMinute,
-@@ -661,6 +663,10 @@
+@@ -661,6 +664,10 @@
    price_parse_status: "ok" | "warning" | "pending";
    price_parse_notes: string;
  }
@@ -704,7 +1041,7 @@ diff -ruN a/supabase/functions/crawl-advertised-prices/index.ts b/supabase/funct
  const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, configuredDocFee: number, includesDocFee = false): PriceBreakdown => {
    // The dealer's CONFIGURED doc fee (from admin) is authoritative for the
    // amount; the page's conveyance fee line is a parse CHECK against it. When
-@@ -1079,7 +1085,7 @@
+@@ -1079,7 +1086,7 @@
    // dealer_profiles.settings.vdp_price_labels (comma-separated, priority
    // order) and .vdp_strip_finance_params (default true) configure the
    // extractor. Cached in a Map so the per-row loop doesn't refetch.
@@ -713,7 +1050,7 @@ diff -ruN a/supabase/functions/crawl-advertised-prices/index.ts b/supabase/funct
    const getTenantScrapeSettings = async (tenantId: string) => {
      const cached = settingsCache.get(tenantId);
      if (cached) return cached;
-@@ -1100,7 +1106,17 @@
+@@ -1100,10 +1107,24 @@
        return true;
      });
      const stripFinance = s.vdp_strip_finance_params !== false;
@@ -732,38 +1069,43 @@ diff -ruN a/supabase/functions/crawl-advertised-prices/index.ts b/supabase/funct
      settingsCache.set(tenantId, out);
      return out;
    };
-@@ -1766,7 +1782,96 @@
++  // Verified offer records (OEM program data or dealer-approved entries) are
++  // the only source of general availability. None exist until that intake is
++  // built and approved, so every offer reads as unverified.
++  const programRecordsFor = async (_tenantId: string): Promise<ProgramRecord[]> => [];
+   const maybeNormalize = (url: string, stripFinance: boolean) => stripFinance ? normalizeVdpUrl(url) : url;
+ 
+   // When the feed last answered for a tenant, for the above-feed guard: a
+@@ -1766,7 +1787,96 @@
        let componentsChanged = false;
        try {
          const comp = extractPriceComponents(priceEvidenceHtml(html));
 -        const bd = buildBreakdown(newPrice, comp, cfg.docFee, cfg.inclDocFee);
-+        // The VIN's own pricing widget first: every stage (MSRP, discounts,
-+        // dealer price, incentives, fee, customer total) named by label and
-+        // proven by arithmetic, generic page disclaimers kept apart. Its
-+        // components are audited whenever any were read, so the source stays
-+        // inspectable whether or not anything is written.
-+        const stack = readPriceStack(priceEvidenceHtml(html), row.vin, {
++        // The VIN's own pricing widget first, attributed by page component:
++        // every stage (MSRP, discounts, dealer price, each incentive with its
++        // own eligibility and dates, fee, advertised total) named by label and
++        // proven by arithmetic; page-wide disclaimers kept apart. Every
++        // component is appended to price_component_evidence (append-only), so
++        // the source stays provable whether or not anything is written.
++        const stack = readPriceStack(html, row.vin, {
 +          dealerPriceLabels: cfg.stackLabels.dealer, finalPriceLabels: cfg.stackLabels.final, configuredFee: cfg.docFee,
++          observedAt: new Date(), pageUrl: fetchUrl, programRecords: await programRecordsFor(row.tenant_id),
 +        });
 +        if (stack.lines.length || stack.disclaimers.length) {
-+          await admin.from("audit_log").insert({
-+            action: "advertised_price_components", entity_type: "advertised_price",
-+            entity_id: row.vin, store_id: row.tenant_id,
-+            details: {
-+              vin: row.vin, url: fetchUrl, extracted_price: newPrice, extracted_stage: stageOf(stack, newPrice),
-+              status: stack.status, writable: stack.writable, flags: stack.flags, reason: stack.reason,
-+              customer_total: stack.customerTotal, before_fee_after_incentives: stack.beforeFeeAfterIncentives,
-+              dealer_price: stack.dealerPrice, msrp: stack.msrp, discounts: stack.discounts, incentives: stack.incentives,
-+              fee: stack.fee, lines: stack.lines, disclaimers: stack.disclaimers, proof: stack.proof,
-+              screenshot_path: screenshot?.path ?? null,
-+            },
-+          }).then(() => undefined, () => undefined);
++          const records = await buildEvidenceRecords(html, stack, {
++            tenantId: row.tenant_id, vin: row.vin, sourceUrl: fetchUrl, capturedAt: new Date().toISOString(),
++            screenshotSha256: screenshot?.sha256 ?? null,
++          });
++          await admin.from("price_component_evidence").upsert(records, { onConflict: "record_sha256", ignoreDuplicates: true })
++            .then(() => undefined, () => undefined);
 +        }
++        const decision = publicPriceDecision(stack);
 +        const stackNote = `Price stack ${stack.status}${stack.flags.length ? ` (${stack.flags.join(", ")})` : ""}${stack.reason ? `: ${stack.reason}` : ""}.`;
-+        if (stack.status === "reconciled" && !stack.writable) {
-+          // Reconciled but held: an incentive without eligibility evidence, or
-+          // a disclaimer that contradicts the itemised fee. Nothing is written.
-+          await admin.from("vehicle_listings").update({ price_parse_status: "warning", price_parse_notes: stackNote })
++        if (stack.status === "reconciled" && !decision.publishable) {
++          // Reconciled but held: an incentive without verified eligibility,
++          // an expired or exclusive offer, or a disclaimer that contradicts the
++          // itemised fee. Nothing is written but the reason.
++          await admin.from("vehicle_listings").update({ price_parse_status: "warning", price_parse_notes: `${stackNote} ${decision.reasons.join("; ")}.` })
 +            .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
 +          throw new LeaveBreakdownStage();
 +        }
@@ -772,18 +1114,20 @@ diff -ruN a/supabase/functions/crawl-advertised-prices/index.ts b/supabase/funct
 +            .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
 +          throw new LeaveBreakdownStage();
 +        }
-+        if (stack.status === "reconciled" && stack.customerTotal && stack.fee) {
-+          const bd = {
-+            advertised_price_before_doc: stack.beforeFeeAfterIncentives,
-+            doc_fee: stack.fee.amount,
-+            website_sale_price: stack.customerTotal.amount,
-+            retail_cash: stack.incentives.reduce((a, x) => a + x.amount, 0) || null,
-+            dealer_discount: stack.discounts.reduce((a, x) => a + x.amount, 0) || null,
-+            price_parse_status: "ok" as const,
-+            price_parse_notes: `${stackNote} ${stack.proof.join("; ")}.`,
-+          };
++        if (stack.status === "reconciled" && decision.primary && stack.fee) {
++          // Only the generally available total is written: verified offers
++          // are in it, nothing else is. `price` (the feed's figure) is never
++          // written here.
 +          await admin.from("vehicle_listings").update({
-+            ...bd, price_source_url: fetchUrl, price_last_verified_at: new Date().toISOString(),
++            advertised_price_before_doc: decision.primary.amount - stack.fee.amount,
++            doc_fee: stack.fee.amount,
++            website_sale_price: decision.primary.amount,
++            retail_cash: stack.incentives.filter((x) => x.eligibility === "verified_general" && x.expired !== true).reduce((a, x) => a + x.amount, 0) || null,
++            dealer_discount: stack.discounts.reduce((a, x) => a + x.amount, 0) || null,
++            price_parse_status: "ok",
++            price_parse_notes: `${stackNote} ${stack.proof.join("; ")}.`,
++            price_source_url: fetchUrl,
++            price_last_verified_at: new Date().toISOString(),
 +          }).eq("tenant_id", row.tenant_id).eq("vin", row.vin);
 +          throw new LeaveBreakdownStage();
 +        }
@@ -830,7 +1174,7 @@ diff -ruN a/supabase/functions/crawl-advertised-prices/index.ts b/supabase/funct
          // A fee or discount that moved is a change in what the shopper was
          // shown even when the headline price held, so it earns a screenshot.
          try {
-@@ -1864,7 +1969,7 @@
+@@ -1864,7 +1974,7 @@
              .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
          }
          if (misparse) { skipped++; continue; }
