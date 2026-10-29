@@ -1,5 +1,7 @@
 // PROPOSED, NOT DEPLOYED. Per-page document fee treatment for the advertised
-// price crawler (crawl-advertised-prices). Lives outside supabase/functions so
+// price crawler (crawl-advertised-prices), for pages that show a single
+// labelled figure. A page with an itemised price stack is read by
+// priceStack.ts instead, which places the fee by the stack's own lines. Lives outside supabase/functions so
 // it cannot ship with a function deploy; wiring it in is a separate, approved
 // change (crawl-advertised-prices.patch beside this file, which moves this
 // module to supabase/functions/_shared/feeTreatment.ts).

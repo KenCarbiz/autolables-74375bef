@@ -1231,6 +1231,91 @@ change requested):
   The crawler would stop writing price splits, so the split it currently writes
   on new-vehicle pages from the tenant-wide setting would stop.
 
+### 10.13 Revised root cause: the dealer price stack (2026-10-29)
+
+Aggregate only. Per-VIN detail is in the restricted report.
+
+The owner supplied two price stacks from the dealer's public site. The dealer's
+new-vehicle widget is a sequence of stages:
+
+> MSRP, dealer discount, dealer price (before incentives and fee),
+> manufacturer incentives, conveyance fee, customer total ("Your Price",
+> after incentives, with the fee)
+
+What each source carries:
+
+| Source | Figure it carries | Evidence |
+|---|---|---|
+| Feed `price` | The customer total | Both examples match to the dollar. |
+| Crawler, on the B2 pages | The dealer-price stage | Stored as if it were the fee-inclusive total. |
+| Stored discount and retail-cash fields | Unreliable | Read with page-wide patterns, not from the vehicle's widget. They contradict VIN-level arithmetic. |
+
+The generic page disclaimer says the fee is excluded, but the itemised
+customer total includes it. That contradiction is flagged, not resolved.
+
+| Class | Revised finding |
+|---|---|
+| B2 (25) | A pre-incentive dealer price was compared with a post-incentive customer total, not an advertised-price discrepancy. The gap is exactly the incentive less the fee: 14 x $10,000, 10 x $4,000, 1 x $2,000. Confirmed for 1 vehicle by the owner's stack. Consistent for 24, but not confirmed: their page and feed observations are weeks apart and no incentive line was captured. Incentive eligibility unverified. Compliance flag reframed: the displayed customer total includes an incentive of unverified eligibility. |
+| A (10) | The double fee subtraction stands. On the same day, the page figure plus the fee equalled the feed total, with no incentive. The correction (A1) stays deferred and is recommended to be superseded: regenerate it from each vehicle's reconciled stack through the same guarded template. 9 of the 10 have stored discount or retail-cash values the same-day arithmetic contradicts, so they hold for widget evidence. |
+
+**Crawler design, revised (proposed, not deployed).**
+
+`supabase/proposed/crawl-fee-treatment/priceStack.ts` reads the vehicle's own
+pricing widget:
+- **Scope.** The page region runs from the VIN to the next different VIN.
+  Another vehicle's card is never read, and two stacks with totals in one
+  region are ambiguous.
+- **Line roles.** Each line is classified as MSRP, discount, dealer price,
+  incentive, fee, customer total or unknown. The dealer's own labels for the
+  dealer-price and total stages are configurable, via the proposed setting
+  `price_stack_labels`.
+- **Arithmetic.** The stack must close: MSRP minus discounts equals the dealer
+  price, and the dealer price minus incentives plus the fee equals the customer
+  total. The fee line must state the configured fee, and it must sit between
+  the dealer price and the total.
+- **Output.** The customer total and its label, the before-fee price after
+  incentives, the dealer price before incentives, every discount and incentive
+  with its eligibility (`stated_unconditional`, `conditional` or `unknown`), the
+  fee and the figure it is included in, and the arithmetic proof.
+- **Disclaimers.** Widget-scoped and page-scoped disclaimers are kept
+  separately.
+- **Unresolved.** An unknown line, a stack that does not close, a fee-amount
+  mismatch, an ambiguous scope or a missing VIN leaves the vehicle unresolved.
+- **Held for review.** A stack that reconciles is still held, writing nothing,
+  when an incentive lacks eligibility evidence or a disclaimer contradicts the
+  itemised fee.
+- **Comparison with the feed.** `compareWithFeed` names the stage of a stored
+  figure and compares the feed only with a page observation within 3 days. It
+  returns one of: `agrees`, `pre_vs_post_incentive`, `genuine_difference`,
+  `dates_not_comparable`, `unresolved`.
+- **Single-figure pages.** Pages with no itemised stack fall back to the
+  per-page fee logic of 10.12.
+
+The condition-specific fee setting proposed in 10.12 is not sufficient. On
+one new-vehicle page the dealer price excludes the fee and the customer total
+includes it, so fee treatment belongs to the labelled figure, not to the
+vehicle condition. The setting is kept only as corroboration on single-figure
+pages.
+
+The regenerated `crawl-advertised-prices.patch` does the following:
+- It reads the stack first.
+- It writes the split only from a reconciled, unflagged stack:
+  - before-fee = total - fee;
+  - sale price = the customer total;
+  - discount and retail cash = sums of the widget lines.
+- It audits every stack it reads (`advertised_price_components`, with lines,
+  disclaimers, flags and proof).
+- Otherwise it writes nothing but a warning.
+- It applies cleanly to current `main` and is not applied.
+
+Tests: 22 price-stack cases in `src/lib/admin/pricing/proposedPriceStack.test.ts`,
+on synthetic look-alikes of both supplied stacks, including a conflicting
+generic disclaimer, a conditional incentive, an incentive stated as available
+to all buyers, a similar-vehicle card, an ambiguous region, split label and
+amount blocks, a fee below the total, an unknown line, a fee-amount mismatch, a
+missing total and the feed comparison. With the 23 cases of 10.12, 45 tests
+pass.
+
 ## 11. Approvals requested
 
 1. Done: the fee preview fix was applied and verified (section 4).
