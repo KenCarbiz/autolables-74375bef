@@ -1,5 +1,5 @@
 {
-  "_comment": "Owner acceptance register. A screen listed here was individually accepted by the owner for appearance only, at the recorded protocol v2 content score with the recorded share of the 1586x992 frame masked. Acceptance does not mean the screen meets the 95% target or the 94.00-94.99% band, does not change the comparison protocol or the gate, and does not authorize deployment, a pricing migration or any untested behaviour. Screens not listed are pending. If a later measurement differs from the recorded score, the report flags the acceptance for review instead of carrying it forward.",
+  "_comment": "Owner acceptance register. A screen listed here was individually accepted by the owner for appearance only, at the recorded protocol v2 content score with the recorded share of the 1586x992 frame masked. Acceptance does not mean the screen meets the 95% target or the 94.00-94.99% band, does not change the comparison protocol or the gate, and does not authorize deployment, a pricing migration or any untested behaviour. Screens not listed are pending. Each entry keeps the accepted baseline (record-acceptance-baseline.cjs): the accepted capture copied into acceptance/<NN>/, the reference and its hash, the mask definitions as they stood, and the capture settings. On every run the parity report checks the score and mask share, the reference, mask definitions and rail, and compares the new capture with the accepted one pixel by pixel. A changed capture is flagged for inspection even when the scores match; a changed score, mask share or contract is flagged for review. Nothing here revokes an approval automatically: the owner decides.",
   "01": {
     "screen": "Overview",
     "decision": "individually accepted with listed exceptions",
@@ -10,7 +10,71 @@
     "evidence": "4958ce9",
     "classification": "f23762a",
     "exceptions": "ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, asset substitution)",
-    "frozen": true
+    "frozen": true,
+    "baseline": {
+      "recordedFrom": "4958ce9",
+      "capture": "scripts/admin-parity/acceptance/01/accepted-1586x992.png",
+      "captureSha256": "e1c4bd968cc808789bf967fa96c29fd62266effc99f43140acb14ef3362240bb",
+      "capturedAt": "scripts/admin-parity/evidence/focused-review-01-08-12/01/sheets/actual-1586x992.png",
+      "reference": "scripts/admin-parity/reference/01-admin-overview.png",
+      "referenceSha256": "d39ffb12163c3f031599a6103df887e42f79666474a5480c16838dc2d156fc6d",
+      "masks": {
+        "selectors": [
+          {
+            "selector": "[data-admin-v2] a[aria-label] span.tabular-nums",
+            "reason": "summary tile counts"
+          },
+          {
+            "selector": "[data-admin-v2] section",
+            "heading": "Recent activity",
+            "inner": "li span.whitespace-nowrap",
+            "reason": "recent activity relative times"
+          },
+          {
+            "selector": "[data-admin-v2] section",
+            "heading": "Recent activity",
+            "inner": "li [data-parity=\"activity-detail\"]",
+            "reason": "recent activity detail lines (fixture names)"
+          }
+        ],
+        "rects": [
+          {
+            "x": 248,
+            "y": 965,
+            "w": 260,
+            "h": 18,
+            "reason": "mock-only annotation (handoff footer caption, not product UI)"
+          },
+          {
+            "x": 1460,
+            "y": 964,
+            "w": 101,
+            "h": 18,
+            "reason": "mock-only annotation (handoff footer caption, not product UI)"
+          }
+        ]
+      },
+      "masksSha256": "0cca05d023493af962d77bea5962b0bab04a6ef884ae99f304d15a6d632615f1",
+      "settings": {
+        "protocol": "v2",
+        "frame": {
+          "width": 1586,
+          "height": 992
+        },
+        "deviceScaleFactor": 1,
+        "route": "/admin/design-fixture/01?rail=229",
+        "rail": 229,
+        "contentRegion": {
+          "x": 232,
+          "y": 70,
+          "w": 1354,
+          "h": 922
+        },
+        "threshold": "a pixel differs when any channel moves more than 32/255",
+        "font": "Inter v20, document.fonts.ready awaited",
+        "browser": "Playwright Chromium 141.0.7390.37 (playwright 1.56.1), as of 2026-10-29; earlier runs did not record a version"
+      }
+    }
   },
   "06": {
     "screen": "Fee change review",
@@ -21,7 +85,63 @@
     "implementation": "7f4fa1a",
     "evidence": "a085c74",
     "exceptions": "ADMIN_V2_RELEASE_READINESS.md 10.15 (policy B pricing difference)",
-    "frozen": true
+    "frozen": true,
+    "baseline": {
+      "recordedFrom": "a085c74",
+      "capture": "scripts/admin-parity/acceptance/06/accepted-1586x992.png",
+      "captureSha256": "6b7dec48e4be50fc1d17c05c436b67be78cf4dd8ee09d40109d1106d7be2a1d8",
+      "capturedAt": "scripts/admin-parity/evidence/screen-06-review/actual-06-1586x992.png",
+      "reference": "scripts/admin-parity/reference/06-fee-change-review-child.png",
+      "referenceSha256": "d187f86f523ede6d3e1ccb9ebaa565316061ce98fab52ef8c8c542e23099b98b",
+      "masks": {
+        "selectors": [
+          {
+            "selector": "[role=\"dialog\"] [data-landmark=\"impact-count\"]",
+            "reason": "expected impact counts (fixture inventory sizes)"
+          },
+          {
+            "selector": "[data-landmark=\"fee-example-impact\"] tbody td:not(:nth-child(3))",
+            "reason": "example vehicle name, stock, VIN suffix, selling price and totals (fixture vehicle); the fee column is policy data and stays"
+          }
+        ],
+        "rects": [
+          {
+            "x": 1282,
+            "y": 967,
+            "w": 282,
+            "h": 18,
+            "reason": "mock-only annotation (handoff footer caption, not product UI)"
+          },
+          {
+            "x": 1443,
+            "y": 82,
+            "w": 121,
+            "h": 28,
+            "reason": "mock-only annotation (DESIGN CONCEPT label, which the handoff forbids in production)"
+          }
+        ]
+      },
+      "masksSha256": "66b174f7366855046ab2d456a57787bdd33f12c11e26f607605966007d8e2c3e",
+      "settings": {
+        "protocol": "v2",
+        "frame": {
+          "width": 1586,
+          "height": 992
+        },
+        "deviceScaleFactor": 1,
+        "route": "/admin/design-fixture/06?rail=243",
+        "rail": 243,
+        "contentRegion": {
+          "x": 246,
+          "y": 70,
+          "w": 1340,
+          "h": 922
+        },
+        "threshold": "a pixel differs when any channel moves more than 32/255",
+        "font": "Inter v20, document.fonts.ready awaited",
+        "browser": "Playwright Chromium 141.0.7390.37 (playwright 1.56.1), as of 2026-10-29; earlier runs did not record a version"
+      }
+    }
   },
   "08": {
     "screen": "Contact & Routing",
@@ -33,7 +153,47 @@
     "evidence": "4958ce9",
     "classification": "f23762a",
     "exceptions": "ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution)",
-    "frozen": true
+    "frozen": true,
+    "baseline": {
+      "recordedFrom": "4958ce9",
+      "capture": "scripts/admin-parity/acceptance/08/accepted-1586x992.png",
+      "captureSha256": "13010f8fafd7a1eacc809b9468bd0c88ab4d5f90266fc827a6f4b215b87318ba",
+      "capturedAt": "scripts/admin-parity/evidence/focused-review-01-08-12/08/sheets/actual-1586x992.png",
+      "reference": "scripts/admin-parity/reference/08-customer-contact-routing.png",
+      "referenceSha256": "0f72bce301d3cb6da7a8f61440d09cd9149a165a58a47bc43871be24def19ad7",
+      "masks": {
+        "selectors": [],
+        "rects": [
+          {
+            "x": 1299,
+            "y": 969,
+            "w": 262,
+            "h": 16,
+            "reason": "mock-only annotation (handoff footer caption, not product UI)"
+          }
+        ]
+      },
+      "masksSha256": "a238af4f11f40acb478bd6f5a6dbb84c02ebfa1232f1bf3631ac86a829e4b624",
+      "settings": {
+        "protocol": "v2",
+        "frame": {
+          "width": 1586,
+          "height": 992
+        },
+        "deviceScaleFactor": 1,
+        "route": "/admin/design-fixture/08?rail=237",
+        "rail": 237,
+        "contentRegion": {
+          "x": 240,
+          "y": 70,
+          "w": 1346,
+          "h": 922
+        },
+        "threshold": "a pixel differs when any channel moves more than 32/255",
+        "font": "Inter v20, document.fonts.ready awaited",
+        "browser": "Playwright Chromium 141.0.7390.37 (playwright 1.56.1), as of 2026-10-29; earlier runs did not record a version"
+      }
+    }
   },
   "12": {
     "screen": "Inventory feed",
@@ -45,6 +205,63 @@
     "evidence": "4958ce9",
     "classification": "f23762a",
     "exceptions": "ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution)",
-    "frozen": true
+    "frozen": true,
+    "baseline": {
+      "recordedFrom": "4958ce9",
+      "capture": "scripts/admin-parity/acceptance/12/accepted-1586x992.png",
+      "captureSha256": "d8027b52c30af79072209f462f5d9853285f1a1f8df37724a6579c57cddd6e1d",
+      "capturedAt": "scripts/admin-parity/evidence/focused-review-01-08-12/12/sheets/actual-1586x992.png",
+      "reference": "scripts/admin-parity/reference/12-integrations-feed-health.png",
+      "referenceSha256": "1a9c39511e5c49d56b3d2e77b505f1d060a53899200ed7da0234dc5408fddad2",
+      "masks": {
+        "selectors": [
+          {
+            "selector": "[data-admin-v2] [data-parity=\"timestamp\"]",
+            "reason": "run timestamps (tile values and attempt times)"
+          },
+          {
+            "selector": "[data-admin-v2] [data-parity=\"host\"]",
+            "reason": "fixture provider domain"
+          },
+          {
+            "selector": "[data-admin-v2] [data-parity=\"pin\"]",
+            "reason": "rooftop pin identifier"
+          },
+          {
+            "selector": "[data-admin-v2] [data-parity=\"count\"]",
+            "reason": "attempt count in the pager summary"
+          }
+        ],
+        "rects": [
+          {
+            "x": 270,
+            "y": 960,
+            "w": 298,
+            "h": 20,
+            "reason": "mock-only annotation (handoff footer caption, not product UI)"
+          }
+        ]
+      },
+      "masksSha256": "9d6332309d13b4a0eb9c65373715683308a499e2f133c448933d0d344ec5a157",
+      "settings": {
+        "protocol": "v2",
+        "frame": {
+          "width": 1586,
+          "height": 992
+        },
+        "deviceScaleFactor": 1,
+        "route": "/admin/design-fixture/12?rail=243",
+        "rail": 243,
+        "contentRegion": {
+          "x": 246,
+          "y": 70,
+          "w": 1340,
+          "h": 922
+        },
+        "threshold": "a pixel differs when any channel moves more than 32/255",
+        "font": "Inter v20, document.fonts.ready awaited",
+        "browser": "Playwright Chromium 141.0.7390.37 (playwright 1.56.1), as of 2026-10-29; earlier runs did not record a version"
+      }
+    }
   }
 }

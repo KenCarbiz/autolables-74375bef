@@ -18,29 +18,29 @@ Generated 2026-10-29T07:08:05.765Z by `bun run admin:parity` against the develop
 
 ## Acceptance register
 
-Owner decisions from `scripts/admin-parity/acceptance.json`. Accepted screens are accepted individually for appearance only at the score and mask share shown; the gate below still reports them as not meeting 95%.
+Owner decisions from `scripts/admin-parity/acceptance.json`. Accepted screens are accepted individually for appearance only at the score and mask share shown; the gate below still reports them as not meeting 95%. Each accepted screen is compared with its recorded baseline: score and mask share, the reference, mask definitions and rail, and the capture pixel by pixel. A changed capture is flagged for inspection even when the scores match; nothing revokes an approval automatically.
 
-| Screen | Status | Protocol v2 content (masked) | Masked share of frame | Implementation | Evidence |
-|---|---|---|---|---|---|
-| 01 | individually accepted with listed exceptions (2026-10-29) | 92.99% | 3.94% | 2fe74e3 | 4958ce9 |
-| 02 | pending | 88.01% | 1.34% |  |  |
-| 03 | pending | 90.70% | 3.71% |  |  |
-| 04 | pending | 89.87% | 0.95% |  |  |
-| 05 | pending | 89.87% | 6.19% |  |  |
-| 06 | individually approved (2026-10-29) | 94.11% | 4.13% | 7f4fa1a | a085c74 |
-| 07 | pending | 87.86% | 3.13% |  |  |
-| 08 | individually accepted with listed exceptions (2026-10-29) | 92.12% | 0.27% | 2fe74e3 | 4958ce9 |
-| 09 | pending | 86.53% | 2.60% |  |  |
-| 10 | pending | 89.53% | 0.92% |  |  |
-| 11 | pending | 89.84% | 2.10% |  |  |
-| 12 | individually accepted with listed exceptions (2026-10-29) | 92.22% | 2.80% | 2fe74e3 | 4958ce9 |
-| 13 | pending | 87.77% | 3.58% |  |  |
+| Screen | Status | Protocol v2 content (masked) | Masked share of frame | Implementation | Evidence | Capture against the accepted baseline |
+|---|---|---|---|---|---|---|
+| 01 | individually accepted with listed exceptions (2026-10-29) | 92.99% | 3.94% | 2fe74e3 | 4958ce9 | identical to the accepted capture |
+| 02 | pending | 88.01% | 1.34% |  |  |  |
+| 03 | pending | 90.70% | 3.71% |  |  |  |
+| 04 | pending | 89.87% | 0.95% |  |  |  |
+| 05 | pending | 89.87% | 6.19% |  |  |  |
+| 06 | individually approved (2026-10-29) | 94.11% | 4.13% | 7f4fa1a | a085c74 | identical to the accepted capture |
+| 07 | pending | 87.86% | 3.13% |  |  |  |
+| 08 | individually accepted with listed exceptions (2026-10-29) | 92.12% | 0.27% | 2fe74e3 | 4958ce9 | identical to the accepted capture |
+| 09 | pending | 86.53% | 2.60% |  |  |  |
+| 10 | pending | 89.53% | 0.92% |  |  |  |
+| 11 | pending | 89.84% | 2.10% |  |  |  |
+| 12 | individually accepted with listed exceptions (2026-10-29) | 92.22% | 2.80% | 2fe74e3 | 4958ce9 | identical to the accepted capture |
+| 13 | pending | 87.77% | 3.58% |  |  |  |
 
 Registered fixtures: 10, 11, 12, 13, 01, 02, 03, 04, 05, 06, 07, 08, 09.
 
 ## Screen 01
 
-Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.99% is below 95%). Individually accepted with listed exceptions by the owner on 2026-10-29 (appearance only) at 92.99% with 3.94% of the frame masked, implementation 2fe74e3, evidence 4958ce9; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, asset substitution). This is not a 95% or 94% pass.
+Reference: `scripts/admin-parity/reference/01-admin-overview.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.99% is below 95%). Individually accepted with listed exceptions by the owner on 2026-10-29 (appearance only) at 92.99% with 3.94% of the frame masked, implementation 2fe74e3, evidence 4958ce9; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, asset substitution). This is not a 95% or 94% pass. Capture identical to the accepted baseline.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -260,7 +260,7 @@ Masks (29): change impact counts (fixture inventory sizes); preview vehicle name
 
 ## Screen 06
 
-Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 94.11% is below 95%). Individually approved by the owner on 2026-10-29 (appearance only) at 94.11% with 4.13% of the frame masked, implementation 7f4fa1a, evidence a085c74; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.15 (policy B pricing difference). This is not a 95% or 94% pass.
+Reference: `scripts/admin-parity/reference/06-fee-change-review-child.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 94.11% is below 95%). Individually approved by the owner on 2026-10-29 (appearance only) at 94.11% with 4.13% of the frame masked, implementation 7f4fa1a, evidence a085c74; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.15 (policy B pricing difference). This is not a 95% or 94% pass. Capture identical to the accepted baseline.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -355,7 +355,7 @@ Masks (6): sample vehicle names and mileage (fixture vehicles); product price (f
 
 ## Screen 08
 
-Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.12% is below 95%). Individually accepted with listed exceptions by the owner on 2026-10-29 (appearance only) at 92.12% with 0.27% of the frame masked, implementation 2fe74e3, evidence 4958ce9; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution). This is not a 95% or 94% pass.
+Reference: `scripts/admin-parity/reference/08-customer-contact-routing.png`. Fonts: Inter loaded (Inter). Gate: FAIL (protocol v2 content parity 92.12% is below 95%). Individually accepted with listed exceptions by the owner on 2026-10-29 (appearance only) at 92.12% with 0.27% of the frame masked, implementation 2fe74e3, evidence 4958ce9; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution). This is not a 95% or 94% pass. Capture identical to the accepted baseline.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -531,7 +531,7 @@ Masks (6): policy change provenance (relative time and fixture name); readiness 
 
 ## Screen 12
 
-Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol v2 content parity 92.22% is below 95%). Individually accepted with listed exceptions by the owner on 2026-10-29 (appearance only) at 92.22% with 2.80% of the frame masked, implementation 2fe74e3, evidence 4958ce9; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution). This is not a 95% or 94% pass.
+Reference: `scripts/admin-parity/reference/12-integrations-feed-health.png`. Fonts: Inter loaded (Inter). Gate: FAIL (landmarks out of tolerance; protocol v2 content parity 92.22% is below 95%). Individually accepted with listed exceptions by the owner on 2026-10-29 (appearance only) at 92.22% with 2.80% of the frame masked, implementation 2fe74e3, evidence 4958ce9; exceptions: ADMIN_V2_RELEASE_READINESS.md 10.18 (geometry, truthful content, behaviour, asset substitution). This is not a 95% or 94% pass. Capture identical to the accepted baseline.
 
 | Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |
 |---|---|---|---|---|---|---|---|---|---|---|

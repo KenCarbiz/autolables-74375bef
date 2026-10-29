@@ -151,28 +151,61 @@ test("the report states the gate, each landmark and each breakpoint", () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("the acceptance register carries an owner acceptance only while the score and mask share still match", () => {
+test("an accepted screen is checked against its baseline: score, contract and capture, and never revoked automatically", () => {
   const { acceptanceState } = require("./report.cjs");
-  const record = { decision: "individually accepted with listed exceptions", date: "2026-10-29", score: 92.99, maskedPercent: 3.94, implementation: "abc1234", evidence: "def5678", exceptions: "10.18" };
-  const screen = (score, masked) => ({ screen: "01", frames: { reference: { maskedPercent: masked, content: { parityPercent: score } } } });
-  assert.equal(acceptanceState(screen(92.99, 3.94), { "01": record }).status, "accepted");
-  assert.equal(acceptanceState(screen(92.98, 3.94), { "01": record }).status, "needs review");
-  assert.equal(acceptanceState(screen(92.99, 4.1), { "01": record }).status, "needs review");
-  assert.equal(acceptanceState(screen(92.99, 3.94), {}).status, "pending");
+  const crypto = require("node:crypto");
+  const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
+  const accepted = encodePng(solid(8, 6, [240, 240, 240]));
+  const noisy = solid(8, 6, [240, 240, 240]);
+  noisy.data[0] = 241;
+  const moved = paint(solid(8, 6, [240, 240, 240]), 2, 1, 3, 2, [20, 20, 20]);
+  const files = { "base.png": accepted, "ref.png": Buffer.from("reference"), "same.png": accepted, "noisy.png": encodePng(noisy), "moved.png": encodePng(moved) };
+  const read = (rel) => { if (!(rel in files)) throw new Error("missing"); return files[rel]; };
+  const masks = { "01": { selectors: [], rects: [] } };
+  const baseline = { capture: "base.png", referenceSha256: sha(files["ref.png"]), masksSha256: sha(Buffer.from(JSON.stringify(masks["01"]))), settings: { rail: 229 } };
+  const record = { decision: "individually accepted with listed exceptions", date: "2026-10-29", score: 92.99, maskedPercent: 3.94, implementation: "abc1234", evidence: "def5678", exceptions: "10.18", baseline };
+  const screen = (score, masked, file, rail = 229) => ({ screen: "01", reference: "ref.png", rail, frames: { reference: { file, maskedPercent: masked, content: { parityPercent: score } } } });
+  const state = (s, reg = { "01": record }, m = masks) => acceptanceState(s, reg, { masks: m, read });
+
+  assert.equal(state(screen(92.99, 3.94, "same.png")).status, "accepted");
+  const noise = state(screen(92.99, 3.94, "noisy.png"));
+  assert.equal(noise.status, "inspect");
+  assert.deepEqual([noise.capture.changed, noise.capture.beyondThreshold], [1, 0]);
+  const shift = state(screen(92.99, 3.94, "moved.png"));
+  assert.equal(shift.status, "inspect");
+  assert.deepEqual(shift.capture.box, { x: 2, y: 1, w: 3, h: 2 });
+  assert.equal(shift.capture.beyondThreshold, 6);
+  assert.equal(state(screen(92.98, 3.94, "same.png")).status, "review");
+  assert.equal(state(screen(92.99, 4.1, "same.png")).status, "review");
+  assert.match(state(screen(92.99, 3.94, "same.png", 237)).review.join(), /rail 237px against 229px/);
+  assert.match(state(screen(92.99, 3.94, "same.png"), { "01": record }, { "01": { selectors: [{ selector: "x" }], rects: [] } }).review.join(), /mask definitions changed/);
+  files["ref.png"] = Buffer.from("redrawn");
+  assert.match(state(screen(92.99, 3.94, "same.png")).review.join(), /reference image changed/);
+  files["ref.png"] = Buffer.from("reference");
+  assert.match(state(screen(92.99, 3.94, "same.png"), { "01": { ...record, baseline: undefined } }).review.join(), /no accepted baseline/);
+  assert.equal(state(screen(92.99, 3.94, "same.png"), {}).status, "pending");
+
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "parity-"));
   const out = path.join(dir, "report.md");
-  writeReport({
-    generatedAt: "2026-01-01T00:00:00.000Z",
-    referenceFrame: { width: 1586, height: 992 },
-    protocolFrame: { width: 1600, height: 1000 },
-    registered: ["01"],
-    skipped: [],
-    screens: [{ ...screen(92.99, 3.94), reference: "r.png", fonts: { inter: true, loaded: [] }, masks: [], responsive: [], gate: { landmarks: true, responsive: true, contentParity: 92.99 } }],
-  }, out, { acceptance: { "01": record } });
-  const text = fs.readFileSync(out, "utf8");
+  const report = (file) => {
+    writeReport({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      referenceFrame: { width: 1586, height: 992 },
+      protocolFrame: { width: 1600, height: 1000 },
+      registered: ["01"],
+      skipped: [],
+      screens: [{ ...screen(92.99, 3.94, file), fonts: { inter: true, loaded: [] }, masks: [], responsive: [], gate: { landmarks: true, responsive: true, contentParity: 92.99 } }],
+    }, out, { acceptance: { "01": record }, masks, read });
+    return fs.readFileSync(out, "utf8");
+  };
+  let text = report("same.png");
   assert.match(text, /Gate: FAIL \(protocol v2 content parity 92\.99% is below 95%\)\. Individually accepted with listed exceptions by the owner on 2026-10-29 \(appearance only\) at 92\.99% with 3\.94% of the frame masked/);
-  assert.match(text, /This is not a 95% or 94% pass\./);
-  assert.match(text, /\| 01 \| individually accepted with listed exceptions \(2026-10-29\) \| 92\.99% \| 3\.94% \| abc1234 \| def5678 \|/);
+  assert.match(text, /This is not a 95% or 94% pass\. Capture identical to the accepted baseline\./);
+  assert.match(text, /\| 01 \| individually accepted with listed exceptions \(2026-10-29\) \| 92\.99% \| 3\.94% \| abc1234 \| def5678 \| identical to the accepted capture \|/);
+  text = report("moved.png");
+  assert.match(text, /capture changed, inspect \| 92\.99% \| 3\.94% \| abc1234 \| def5678 \| 6 pixels changed \(6 past 32\/255\) within x 2, y 1, 3x2 \|/);
+  assert.match(text, /Inspection required; the approval is not revoked automatically\./);
+  assert.doesNotMatch(text, /revoked\.|no longer accepted/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

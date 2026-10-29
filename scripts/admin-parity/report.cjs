@@ -1,6 +1,8 @@
 "use strict";
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
+const { decodePng } = require("./png.cjs");
 
 const pct = (n) => (typeof n === "number" ? `${n.toFixed(2)}%` : "n/a");
 
@@ -19,6 +21,11 @@ function readNotes() {
   return JSON.parse(fs.readFileSync(notesPath, "utf8"));
 }
 
+function readMasks() {
+  const p = path.join(__dirname, "masks.json");
+  return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : {};
+}
+
 function readAcceptance() {
   const p = path.join(__dirname, "acceptance.json");
   if (!fs.existsSync(p)) return {};
@@ -26,27 +33,77 @@ function readAcceptance() {
   return Object.fromEntries(Object.entries(all).filter(([k]) => !k.startsWith("_")));
 }
 
-// The recorded score and mask share must match the current measurement to
-// two decimals; otherwise the owner's acceptance is not carried forward.
-function acceptanceState(s, accepted) {
+const ROOT = path.resolve(__dirname, "../..");
+const sha256 = (buf) => crypto.createHash("sha256").update(buf).digest("hex");
+
+// Pixel comparison of a new capture with the accepted one: how many pixels
+// changed at all, how many past the protocol's 32/255 threshold, and the box
+// that holds them.
+function compareCaptures(acceptedBuf, currentBuf) {
+  if (acceptedBuf.equals(currentBuf)) return { identical: true, changed: 0, beyondThreshold: 0, box: null };
+  const a = decodePng(acceptedBuf);
+  const b = decodePng(currentBuf);
+  if (a.width !== b.width || a.height !== b.height) return { identical: false, sizeChanged: true, changed: a.width * a.height, beyondThreshold: a.width * a.height, box: { x: 0, y: 0, w: a.width, h: a.height } };
+  let changed = 0;
+  let beyond = 0;
+  let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
+  for (let i = 0, p = 0; i < a.data.length; i += 4, p++) {
+    const d = Math.max(Math.abs(a.data[i] - b.data[i]), Math.abs(a.data[i + 1] - b.data[i + 1]), Math.abs(a.data[i + 2] - b.data[i + 2]));
+    if (d === 0) continue;
+    changed++;
+    if (d > 32) beyond++;
+    const x = p % a.width, y = (p - x) / a.width;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return { identical: changed === 0, changed, beyondThreshold: beyond, box: changed ? { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 } : null };
+}
+
+// An accepted screen is checked three ways against its recorded baseline:
+// score and mask share (two decimals), contract (reference, mask definitions,
+// rail and frame) and the capture itself, pixel by pixel. Matching scores
+// cannot prove a screen is unchanged, so a changed capture is flagged for
+// inspection even when they match. Nothing here revokes an approval; it only
+// says what the owner should look at.
+function acceptanceState(s, accepted, { masks = readMasks(), read = (rel) => fs.readFileSync(path.resolve(ROOT, rel)) } = {}) {
   const a = accepted[s.screen];
   if (!a) return { status: "pending" };
   const ref = s.frames && s.frames.reference;
   const score = ref && ref.content ? ref.content.parityPercent : null;
   const masked = ref ? ref.maskedPercent : null;
-  const same = typeof score === "number" && typeof masked === "number" && score.toFixed(2) === a.score.toFixed(2) && masked.toFixed(2) === a.maskedPercent.toFixed(2);
-  return { status: same ? "accepted" : "needs review", record: a, score, masked };
+  const scoreSame = typeof score === "number" && typeof masked === "number" && score.toFixed(2) === a.score.toFixed(2) && masked.toFixed(2) === a.maskedPercent.toFixed(2);
+  const review = [];
+  if (!scoreSame) review.push(`score or mask share differs (${pct(score)}, ${pct(masked)} masked)`);
+  const b = a.baseline;
+  let capture = null;
+  if (!b) review.push("no accepted baseline recorded");
+  else {
+    try { if (sha256(read(s.reference)) !== b.referenceSha256) review.push("reference image changed"); } catch { review.push("reference image unreadable"); }
+    if (sha256(Buffer.from(JSON.stringify(masks[s.screen] ?? { selectors: [], rects: [] }))) !== b.masksSha256) review.push("mask definitions changed");
+    if (typeof s.rail === "number" && s.rail !== b.settings.rail) review.push(`rail ${s.rail}px against ${b.settings.rail}px`);
+    try { capture = compareCaptures(read(b.capture), read(ref.file)); } catch { review.push("capture unreadable"); }
+  }
+  const status = review.length ? "review" : capture && !capture.identical ? "inspect" : "accepted";
+  return { status, record: a, score, masked, review, capture };
+}
+
+function captureText(c) {
+  if (!c) return "not compared";
+  if (c.identical) return "identical to the accepted capture";
+  if (c.sizeChanged) return "frame size changed";
+  return `${c.changed} pixels changed (${c.beyondThreshold} past 32/255) within x ${c.box.x}, y ${c.box.y}, ${c.box.w}x${c.box.h}`;
 }
 
 function acceptanceText(state) {
   if (state.status === "pending") return "Acceptance pending; no exception has been approved.";
   const a = state.record;
   const recorded = `${a.score.toFixed(2)}% with ${a.maskedPercent.toFixed(2)}% of the frame masked, implementation ${a.implementation}, evidence ${a.evidence}`;
-  if (state.status === "needs review") return `Owner acceptance recorded on ${a.date} at ${recorded} no longer matches this measurement (${pct(state.score)}, ${pct(state.masked)} masked); acceptance needs review.`;
-  return `${a.decision[0].toUpperCase()}${a.decision.slice(1)} by the owner on ${a.date} (appearance only) at ${recorded}; exceptions: ${a.exceptions}. This is not a 95% or 94% pass.`;
+  const base = `${a.decision[0].toUpperCase()}${a.decision.slice(1)} by the owner on ${a.date} (appearance only) at ${recorded}; exceptions: ${a.exceptions}. This is not a 95% or 94% pass.`;
+  if (state.status === "review") return `${base} Review required: ${state.review.join("; ")}. The approval is not revoked automatically.`;
+  if (state.status === "inspect") return `${base} Capture changed since acceptance: ${captureText(state.capture)}. Inspection required; the approval is not revoked automatically.`;
+  return `${base} Capture identical to the accepted baseline.`;
 }
 
-function gateLine(s, accepted = {}) {
+function gateLine(s, accepted = {}, checkOptions = {}) {
   if (!s.gate) return "Gate: not evaluated.";
   if (s.gate.error) return `Gate: FAIL (the screen did not render: ${s.gate.error}).`;
   const protocol = s.frames && s.frames.reference && s.frames.reference.content ? s.frames.reference.content.parityPercent : s.gate.contentParity;
@@ -55,11 +112,12 @@ function gateLine(s, accepted = {}) {
   if (!s.gate.responsive) reasons.push("page overflow at a breakpoint");
   if (typeof protocol !== "number") reasons.push("no protocol v2 score");
   else if (protocol < 95) reasons.push(`protocol v2 content parity ${protocol.toFixed(2)}% is below 95%`);
-  const acceptance = acceptanceText(acceptanceState(s, accepted));
+  const acceptance = acceptanceText(acceptanceState(s, accepted, checkOptions));
   return reasons.length ? `Gate: FAIL (${reasons.join("; ")}). ${acceptance}` : "Gate: PASS.";
 }
 
-function writeReport(results, outPath, { acceptance = readAcceptance() } = {}) {
+function writeReport(results, outPath, { acceptance = readAcceptance(), masks, read } = {}) {
+  const checkOptions = { ...(masks ? { masks } : {}), ...(read ? { read } : {}) };
   const notes = readNotes();
   const lines = [];
   lines.push("# Administration V2 visual parity report");
@@ -82,15 +140,16 @@ function writeReport(results, outPath, { acceptance = readAcceptance() } = {}) {
   lines.push("");
   lines.push("## Acceptance register");
   lines.push("");
-  lines.push("Owner decisions from `scripts/admin-parity/acceptance.json`. Accepted screens are accepted individually for appearance only at the score and mask share shown; the gate below still reports them as not meeting 95%.");
+  lines.push("Owner decisions from `scripts/admin-parity/acceptance.json`. Accepted screens are accepted individually for appearance only at the score and mask share shown; the gate below still reports them as not meeting 95%. Each accepted screen is compared with its recorded baseline: score and mask share, the reference, mask definitions and rail, and the capture pixel by pixel. A changed capture is flagged for inspection even when the scores match; nothing revokes an approval automatically.");
   lines.push("");
-  lines.push("| Screen | Status | Protocol v2 content (masked) | Masked share of frame | Implementation | Evidence |");
-  lines.push("|---|---|---|---|---|---|");
+  lines.push("| Screen | Status | Protocol v2 content (masked) | Masked share of frame | Implementation | Evidence | Capture against the accepted baseline |");
+  lines.push("|---|---|---|---|---|---|---|");
   for (const s of results.screens) {
-    const st = acceptanceState(s, acceptance);
+    const st = acceptanceState(s, acceptance, checkOptions);
     const a = st.record;
-    const label = st.status === "pending" ? "pending" : st.status === "accepted" ? `${a.decision} (${a.date})` : "acceptance needs review";
-    lines.push(`| ${s.screen} | ${label} | ${pct(s.frames.reference && s.frames.reference.content ? s.frames.reference.content.parityPercent : null)} | ${pct(s.frames.reference ? s.frames.reference.maskedPercent : null)} | ${a ? a.implementation : ""} | ${a ? a.evidence : ""} |`);
+    const label = st.status === "pending" ? "pending" : st.status === "accepted" ? `${a.decision} (${a.date})` : st.status === "inspect" ? `${a.decision} (${a.date}); capture changed, inspect` : `${a.decision} (${a.date}); review required`;
+    const check = st.status === "pending" ? "" : st.status === "review" ? `${st.review.join("; ")}${st.capture ? `; ${captureText(st.capture)}` : ""}` : captureText(st.capture);
+    lines.push(`| ${s.screen} | ${label} | ${pct(s.frames.reference && s.frames.reference.content ? s.frames.reference.content.parityPercent : null)} | ${pct(s.frames.reference ? s.frames.reference.maskedPercent : null)} | ${a ? a.implementation : ""} | ${a ? a.evidence : ""} | ${check} |`);
   }
   lines.push("");
   lines.push(`Registered fixtures: ${results.registered && results.registered.length ? results.registered.join(", ") : "none"}.${results.skipped && results.skipped.length ? ` Requested but not registered: ${results.skipped.join(", ")}.` : ""}`);
@@ -98,7 +157,7 @@ function writeReport(results, outPath, { acceptance = readAcceptance() } = {}) {
   for (const s of results.screens) {
     lines.push(`## Screen ${s.screen}`);
     lines.push("");
-    lines.push(`Reference: ${s.reference ? `\`${s.reference}\`` : "not present"}. Fonts: Inter ${s.fonts && s.fonts.inter ? "loaded" : "not loaded"}${s.fonts && s.fonts.loaded.length ? ` (${s.fonts.loaded.join(", ")})` : ""}. ${gateLine(s, acceptance)}`);
+    lines.push(`Reference: ${s.reference ? `\`${s.reference}\`` : "not present"}. Fonts: Inter ${s.fonts && s.fonts.inter ? "loaded" : "not loaded"}${s.fonts && s.fonts.loaded.length ? ` (${s.fonts.loaded.join(", ")})` : ""}. ${gateLine(s, acceptance, checkOptions)}`);
     lines.push("");
     lines.push("| Frame | Capture | Full parity | Full structure | Content parity | Content structure | Body parity (aligned) | Body structure | Layout parity (text masked) | Text-box parity | Masked |");
     lines.push("|---|---|---|---|---|---|---|---|---|---|---|");
@@ -165,4 +224,4 @@ function writeReport(results, outPath, { acceptance = readAcceptance() } = {}) {
   fs.writeFileSync(outPath, lines.join("\n"));
 }
 
-module.exports = { writeReport, acceptanceState };
+module.exports = { writeReport, acceptanceState, compareCaptures };
