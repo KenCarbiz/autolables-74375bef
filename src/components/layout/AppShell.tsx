@@ -1,62 +1,23 @@
-import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { ReactElement, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useViewTransitionNavigate } from "@/lib/navigation";
-import { hasDealerCapability, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import { canSeeAdminTab, firstPermittedAdminTab } from "@/lib/permissions/adminTabAccess";
+import { hasDealerCapability, roleDisplayName, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { canSeeAdminTab } from "@/lib/permissions/adminTabAccess";
 import {
-  Award,
-  BarChart3,
-  Bell,
-  BookOpen,
   Building2,
   Car,
   Check,
-  CheckCircle2,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
   CreditCard,
-  ExternalLink,
-  FilePlus2,
-  FileText,
-  FileWarning,
-  Folder,
-  FolderOpen,
-  Grid2X2,
   HelpCircle,
-  History,
-  PlayCircle,
   LayoutDashboard,
-  LayoutTemplate,
   Lock,
   LogOut,
-  Video,
-  Menu,
-  Package,
-  Palette,
-  Plus,
-  QrCode,
-  RefreshCw,
-  Rocket,
   ScanLine,
-  ScrollText,
-  Search,
   Settings,
-  ShieldCheck,
-  Sparkles,
-  Store,
   Tag,
-  ToggleLeft,
-  TrendingUp,
-  Truck,
   Users,
-  Wrench,
-  X,
+  Video,
 } from "lucide-react";
-import { AdminIcon } from "@/components/design/AdminIcon";
-import { AdminBrandLockup } from "@/components/design/AdminBrandLockup";
-import { ADMIN_ICON_PATHS } from "@/lib/design/adminIconPaths";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -71,15 +32,17 @@ import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPa
 import { usePlatformEntitlements } from "@/hooks/usePlatformEntitlements";
 import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
 import {
-  buildAdminNavSections,
-  filterNavSections,
+  FRAME_LINKS,
+  bottomNavCandidates,
+  canOpenAdministration,
   findActiveNavItem,
-  isNavItemActive,
-  formatBadgeCount,
-  badgeAriaLabel,
   navModeForRole,
+  navSectionsForViewer,
 } from "@/components/layout/adminNav";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { paletteSearchScope, searchPrompt } from "@/components/layout/searchScope";
+import { useNavDrawer } from "@/components/layout/useNavDrawer";
+import { AppRail } from "@/components/layout/AppRail";
+import { AppHeader } from "@/components/layout/AppHeader";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,17 +51,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 
 interface AppShellProps {
   children: ReactNode;
 }
-
-const productIcon = (id: string) => {
-  if (id === "autolabels") return Tag;
-  if (id === "autocurb") return Car;
-  if (id === "autoframe") return Building2;
-  return Truck;
-};
 
 // Family apps shown in the user-menu "Switch app" section. Access is
 // gated on AutoCurb's product_ids (source of truth for cross-app
@@ -116,39 +74,60 @@ const FAMILY_APPS: FamilyApp[] = [
   { id: "autofilm",   name: "AutoFilm",   icon: Video, url: "https://autofilm.io/sso", entitlementKey: "autofilm"   },
 ];
 
+const underSegment = (base: string) => (p: string) => p === base || p.startsWith(`${base}/`);
+
+// The frame prints a page heading only where the page renders no h1 of its
+// own on desktop, so no page shows its title twice and none loses it. An
+// explicit list: pages are lazy, so the DOM cannot be asked at render time.
+const SHELL_HEADINGS: { match: (pathname: string) => boolean; title: string; subtitle: string }[] = [
+  { match: (p) => p === "/inventory" || p === "/inventory-v2", title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
+  { match: (p) => p === "/add-inventory", title: "Add to Inventory", subtitle: "Scan or enter a VIN to add the vehicle." },
+  { match: (p) => p === "/description-operations", title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
+  { match: underSegment("/print-center"), title: "Documents & Print Center", subtitle: "One versioned document package for the vehicle, printer, and customer Passport." },
+  { match: (p) => p.startsWith("/get-ready-command/"), title: "Get Ready Command", subtitle: "Review the work AutoLabels prepared, then authorize once." },
+  { match: underSegment("/vin-command"), title: "VIN Command Center", subtitle: "Everything created automatically. Review exceptions and authorize the next step." },
+  { match: (p) => p.startsWith("/service/vehicle/"), title: "Vehicle Service Workspace", subtitle: "One shared task from inspection to K-208 execution and delivery clearance." },
+  { match: (p) => p.startsWith("/service/scan/"), title: "Service Desk", subtitle: "Safety inspections, get-ready work, and K-208 execution." },
+  { match: (p) => p.startsWith("/k208/"), title: "K-208 Inspection Form", subtitle: "The completed CT DMV K-208, ready to print as the buyer's copy." },
+  { match: (p) => p.startsWith("/addendum-label/"), title: "Addendum Label", subtitle: "The 4.5 x 11 in addendum label, ready to print." },
+];
+
+// A platform administrator with no dealership membership is admitted on the
+// house tenant; the rooftop slot names where they are instead of asking them
+// to pick a store there is no control for.
+const PLATFORM_LABEL = "AutoLabels platform";
+
+const MENU_ITEM = "cursor-pointer rounded-lg min-h-11 gap-2.5 lg:min-h-0";
+const MENU_ICON = "h-5 w-5 shrink-0 text-muted-foreground";
+
 const AppShell = ({ children }: AppShellProps) => {
   const { user, isAdmin, signOut } = useAuth();
   const { tenant, currentStore, stores, setCurrentStore } = useTenant();
-  // The rail signs the workspace with the dealer GROUP, while the header
-  // switcher names the store — the two are different facts and must not be
-  // sourced from the same field. The house sentinel is not a real dealer.
-  const dealerGroupName = tenant && tenant.id !== "house" ? (tenant.name || "").trim() : "";
-  const tenantTagline = (currentStore?.tagline || "").trim();
   const { settings } = useDealerSettings();
   const { member } = useEntitlements();
   const { entries } = useAudit();
   const location = useLocation();
   const navigate = useViewTransitionNavigate();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
-  const { open: paletteOpen, setOpen: setPaletteOpen } = useCommandPalette();
+  const [rooftopOpen, setRooftopOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellPanelRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const { open: paletteOpen, setOpen: setPaletteOpen, restoreFocus: restorePaletteFocus } = useCommandPalette();
   const { productIds: platformProductIds, load: loadPlatformProducts } = usePlatformEntitlements();
-  const [storeFilter, setStoreFilter] = useState("");
-  const [marketCheckConnected, setMarketCheckConnected] = useState(false);
-  const [marketCheckLabel, setMarketCheckLabel] = useState("MarketCheck Pending");
-  const [lastMarketCheckSync, setLastMarketCheckSync] = useState<string | null>(null);
-  const [marketCheckCount, setMarketCheckCount] = useState<number | null>(null);
+  const drawer = useNavDrawer(`${location.pathname}${location.search}`);
 
   const role = member?.role;
-  // Capability-driven. Note: a roleless member is NO LONGER treated as a
-  // manager (the old `!role` default-true was a latent over-grant).
-  const isManager = isAdmin || hasDealerCapability(role, "can_manage_settings");
   const can = useCallback((c: DealerCapability) => hasDealerCapability(role, c, isAdmin), [role, isAdmin]);
-  // Any admin tab at all (not just can_manage_settings) opens the Settings door.
-  const anyAdminTab = isAdmin || firstPermittedAdminTab(role, isAdmin) != null;
   // Technicians and third-party vendors get their own shell: one worklist, and
   // none of the dealer chrome that creates, prices or sells a vehicle.
   const navMode = navModeForRole(role);
+  const dealerMode = navMode === "dealer";
+  // A switch that is not set reads as on, exactly as Admin V2 reads it, so the
+  // rail and the Administration tabs never disagree about a feature.
+  const hasFeature = useCallback((key: string) => (settings as unknown as Record<string, unknown>)[key] !== false, [settings]);
+  // Administration is offered only when Admin V2 has a tab this viewer may open.
+  const adminDoor = dealerMode && canOpenAdministration({ role, isAdmin, hasFeature });
 
   // Someone who completes get-ready work but does not stock the lot is
   // checking a car IN when they scan it, not adding it to the print queue.
@@ -159,89 +138,48 @@ const AppShell = ({ children }: AppShellProps) => {
   }, [navigate, scanPath]);
   const vinScanApi = useMemo(() => ({ openScan }), [openScan]);
 
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") return localStorage.getItem("sidebar_collapsed") === "1";
-    return false;
-  });
-
-  const toggleCollapsed = () => {
-    setCollapsed((current) => {
-      const next = !current;
-      if (typeof window !== "undefined") localStorage.setItem("sidebar_collapsed", next ? "1" : "0");
-      return next;
-    });
-  };
-
-  // Only the sections the operator has actually toggled live here; everything
-  // else falls back to the section's own defaultOpen. Seeding a key for every
-  // section made `defaultOpen` unfalsifiable, so an open-by-default section
-  // could never be collapsed.
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-
   // Worklist counts on the nav rows that represent queues; 0 renders no badge.
   const badges = useNavBadges();
 
-  // Consolidated, capability-gated nav built from the shared model in
-  // ./adminNav — the ~19 `?tab=` rows live behind the single "Settings" door,
-  // the document creators behind one "Create" hub, recon/prep/service/ready
-  // under "Get Ready". Expanded, collapsed, and mobile drawer all read this.
-  const navSections = buildAdminNavSections({ badges, anyAdminTab, role });
-  const visibleSections = filterNavSections(navSections, {
-    isAdmin,
-    isManager,
-    can,
-    hasFeature: (key) => Boolean((settings as unknown as Record<string, unknown>)[key]),
-  });
+  // One capability-gated model from ./adminNav; the rail and the drawer are
+  // the same element, so both read this.
+  const visibleSections = navSectionsForViewer({ role, isAdmin, badges, hasFeature });
+  const activeLeaf = findActiveNavItem(visibleSections, location.pathname, location.search);
 
-  const activeItem = findActiveNavItem(visibleSections, location.pathname, location.search);
-  const isActive_ = (item: (typeof visibleSections)[number]["items"][number]) => item === activeItem;
+  const shellHeading = SHELL_HEADINGS.find((h) => h.match(location.pathname));
 
-  const pageTitles: Record<string, { title: string; subtitle: string }> = {
-    "/dashboard": { title: "Home", subtitle: "Your dealership command center." },
-    "/home/technician": { title: "My Work", subtitle: "The vehicles assigned to you, one action each." },
-    "/home/vendor": { title: "My Assignments", subtitle: "The work this store has dispatched to your company." },
-    "/service-desk": { title: "Service Writer Desk", subtitle: "One row per vehicle in service, with its next action." },
-    "/customers": { title: "Customers", subtitle: "Every shopper, lead and deal against one customer record." },
-    "/leads": { title: "Customers", subtitle: "Every shopper, lead and deal against one customer record." },
-    "/deals": { title: "Deals", subtitle: "Every addendum as a deal, in the state the record says it is in." },
-    "/create": { title: "Create", subtitle: "Every document family, one door." },
-    "/queue": { title: "Work Queue", subtitle: "VIN decoding and the tasks waiting on a person." },
-    "/inventory": { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
-    "/inventory-v2": { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
-    "/saved": { title: "Deals", subtitle: "Saved addendums, signatures, and delivery status." },
-    "/addendum": { title: "New Addendum", subtitle: "Create compliant addendum labels and forms." },
-    "/new-car-sticker-legacy": { title: "New Car Sticker (legacy builder)", subtitle: "Superseded by the OEM Window Sticker Studio." },
-    "/inventory-intelligence": { title: "Inventory Intelligence", subtitle: "Pipeline state per vehicle, per document family." },
-    "/window-sticker-studio": { title: "OEM Window Sticker Studio", subtitle: "Create, validate and publish VIN-specific manufacturer-style reproductions." },
-    "/used-car-sticker": { title: "Used Car Sticker", subtitle: "Generate used vehicle buyer-facing labels." },
-    "/sticker-studio": { title: "Sticker Studio", subtitle: "Build and customize label templates." },
-    "/compliance": { title: "Compliance", subtitle: "Track dealership forms, rules, and audit items." },
-    "/description-studio": { title: "Manual Description", subtitle: "Authorized override for vehicles outside automatic generation." },
-    "/description-writer": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
-    "/description-operations": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
-    "/description-intelligence": { title: "Description Intelligence", subtitle: "Verified merchandising content for one vehicle." },
-    "/service/vehicle": { title: "Vehicle Service Workspace", subtitle: "One shared task from inspection to K-208 execution and delivery clearance." },
-    "/service/settings": { title: "K-208 Policy", subtitle: "Signer authority, gates, and Service Desk rules." },
-    "/service": { title: "Service Desk", subtitle: "Safety inspections, get-ready work, and K-208 execution." },
-    "/vin-command": { title: "VIN Command Center", subtitle: "Everything created automatically. Review exceptions and authorize the next step." },
-    "/get-ready-command": { title: "Get Ready Command", subtitle: "Review the work AutoLabels prepared, then authorize once." },
-    "/print-center": { title: "Documents & Print Center", subtitle: "One versioned document package for the vehicle, printer, and customer Passport." },
-  };
-  const prefixMeta = Object.entries(pageTitles).find(([k]) => k !== "/" && location.pathname.startsWith(k + "/"))?.[1];
-  const pageMeta = pageTitles[location.pathname] || prefixMeta
-    || { title: activeItem?.label || "Dashboard", subtitle: "AutoLabels admin workspace." };
-  const companyName = currentStore?.name || tenant?.name || (settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "Select store");
-  const dealerLocation = [currentStore?.city || (settings as any)?.dealer_city, currentStore?.state || (settings as any)?.dealer_state].filter(Boolean).join(", ") || "Manchester, CT";
-  // The activity feed is the dealership's record, not the worker's. A
-  // technician's or vendor's bell carries only the notifications addressed to
-  // them (RLS-scoped, below); store-wide compliance and pricing events — and
-  // the "View all activity" door into /admin — are not theirs to see.
-  const auditEntries = navMode === "dealer" ? entries : [];
-  const unreadAudit = auditEntries.filter((entry) => entry.action === "compliance_block" || entry.action === "price_integrity_block").length;
+  // The header names the dealer GROUP on line 1 and the rooftop on line 2 --
+  // two different facts, never sourced from the same field. The house
+  // sentinel is not a real dealer.
+  const realTenant = tenant && tenant.id !== "house" ? tenant : null;
+  const settingsDealerName = settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "";
+  const rooftopGroup = realTenant
+    ? (realTenant.name || "").trim() || settingsDealerName || currentStore?.name || ""
+    : isAdmin ? PLATFORM_LABEL : "";
+  const rooftopStore = realTenant && currentStore?.name && currentStore.name !== rooftopGroup ? currentStore.name : "";
+  // A rooftop's city is its own. The dealership's address stands in only for
+  // the one store synthesized from the tenant (TenantContext), or no store.
+  const usesDealershipAddress = !currentStore || (!!realTenant && currentStore.id === realTenant.id);
+  const rooftopLocation = realTenant
+    ? (usesDealershipAddress ? [settings.dealer_city, settings.dealer_state] : [currentStore?.city, currentStore?.state])
+        .map((part) => (part || "").trim())
+        .filter(Boolean)
+        .join(", ")
+    : "";
 
-  // Personal bell items (user_notifications, 20260726106000) — ADDITIVE to the
-  // audit activity feed below: the same dropdown lists "For you" first, then
-  // recent activity. RLS scopes the query to the signed-in user's own rows.
+  const tenantId = realTenant?.id ?? null;
+  const searchLabel = searchPrompt(paletteSearchScope({ role, isAdmin, hasMember: !!member, tenantId, storeId: currentStore?.id ?? null }));
+
+  // The activity feed is the dealership's record, not the worker's: it is
+  // offered only to the roles that can open the Activity tab it leads to.
+  // Everyone else's bell carries the notifications addressed to them
+  // (RLS-scoped, below).
+  const canSeeActivity = dealerMode && canSeeAdminTab(role, "audit", isAdmin);
+  const canSeeOverview = dealerMode && canSeeAdminTab(role, "home", isAdmin);
+
+  // Personal bell items (user_notifications, 20260726106000), listed first,
+  // then the recent activity feed. RLS scopes the query to the signed-in
+  // user's own rows.
   const [serviceNotifs, setServiceNotifs] = useState<UserNotificationRow[]>([]);
   const loadServiceNotifs = useCallback(async () => {
     if (!user?.id) { setServiceNotifs([]); return; }
@@ -253,7 +191,7 @@ const AppShell = ({ children }: AppShellProps) => {
         .order("created_at", { ascending: false })
         .limit(20);
       if (!error) setServiceNotifs((data as UserNotificationRow[]) || []);
-    } catch { /* table not yet migrated in this environment: bell stays audit-only */ }
+    } catch { /* table not yet migrated in this environment: bell stays activity-only */ }
   }, [user?.id]);
   useEffect(() => {
     loadServiceNotifs();
@@ -262,8 +200,9 @@ const AppShell = ({ children }: AppShellProps) => {
     const poll = window.setInterval(loadServiceNotifs, 60_000);
     return () => { window.removeEventListener("focus", onFocus); window.clearInterval(poll); };
   }, [loadServiceNotifs]);
+  // The red count is what the viewer can clear: their own unread
+  // notifications. Activity entries have no read state, so they never count.
   const unreadNotifs = serviceNotifs.filter(isUnread).length;
-  const unreadBell = unreadAudit + unreadNotifs;
   const markNotifRead = useCallback(async (n: UserNotificationRow) => {
     setServiceNotifs((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)));
     await (supabase as any).from("user_notifications").update({ read_at: new Date().toISOString() }).eq("id", n.id);
@@ -277,10 +216,10 @@ const AppShell = ({ children }: AppShellProps) => {
 
   const recentActivity = useMemo(
     () =>
-      [...auditEntries]
-        .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
-        .slice(0, 12),
-    [auditEntries],
+      canSeeActivity
+        ? [...entries].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at)).slice(0, 12)
+        : [],
+    [entries, canSeeActivity],
   );
   const formatActivityLabel = (a: string) =>
     a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -333,193 +272,24 @@ const AppShell = ({ children }: AppShellProps) => {
     if (!idTag && vin) idTag = `#${vin.slice(-6)}`;
     return [subject, idTag].filter(Boolean).join(" · ");
   };
-  const renderServiceNotifs = () => (
-    serviceNotifs.length === 0 ? null : (
-      <div className="border-b border-border">
-        <div className="flex items-center justify-between px-3 py-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">For you</span>
-          {unreadNotifs > 0 && (
-            <button onClick={() => void markAllNotifsRead()} className="text-[10px] font-semibold text-primary hover:underline">
-              Mark all read
-            </button>
-          )}
-        </div>
-        <div className="max-h-[220px] overflow-y-auto pb-1">
-          {serviceNotifs.map((n) => (
-            <button
-              key={n.id}
-              onClick={() => {
-                void markNotifRead(n);
-                navigate(n.vin ? `/service/vehicle/${n.vin.toUpperCase()}` : "/service");
-              }}
-              className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-muted/60"
-            >
-              <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${n.read_at ? "bg-slate-300" : "bg-blue-600"}`} />
-              <span className="min-w-0 flex-1 leading-tight">
-                <span className={`block text-[13px] truncate ${n.read_at ? "font-medium text-muted-foreground" : "font-semibold text-foreground"}`}>
-                  {serviceNotificationLabel(n.type)}
-                </span>
-                {n.vin && <span className="block text-[11px] text-muted-foreground font-mono">VIN …{n.vin.slice(-6)}</span>}
-              </span>
-              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 mt-0.5">
-                {formatActivityWhen(n.created_at)}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-    )
-  );
 
-  const renderNotificationsList = () => (
-    recentActivity.length === 0 ? (
-      <div className="px-4 py-8 text-center text-xs text-muted-foreground">
-        No recent activity yet. Stickers, signings, and compliance events will show here.
-      </div>
-    ) : (
-      <div className="max-h-[420px] overflow-y-auto py-1">
-        {recentActivity.map((e) => {
-          const outcome = syncOutcome(e as { action: string; details?: Record<string, unknown> });
-          return (
-          <button
-            key={e.id}
-            onClick={() => navigate(`/admin?tab=audit&entity=${encodeURIComponent(e.entity_id || "")}`)}
-            className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-muted/60"
-          >
-            <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${outcome ? (outcome.ok ? "bg-emerald-500" : "bg-rose-500") : activityDot(e.action)}`} />
-            <span className="min-w-0 flex-1 leading-tight">
-              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
-                <span className="truncate">{formatActivityLabel(e.action)}</span>
-                {outcome && (
-                  <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${outcome.ok ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
-                    {outcome.ok ? "Success" : "Failed"}
-                  </span>
-                )}
-              </span>
-              <span className="block text-[11px] text-muted-foreground truncate">
-                {outcome ? outcome.text : (activitySubject(e) || `${e.entity_type}${e.user_email ? ` · ${e.user_email}` : ""}`)}
-              </span>
-            </span>
-            <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 mt-0.5">
-              {formatActivityWhen(e.created_at)}
-            </span>
-          </button>
-          );
-        })}
-      </div>
-    )
-  );
-  const inventoryHasOwnMobileChrome = location.pathname === "/inventory";
-  const syncWhen = lastMarketCheckSync
-    ? (() => {
-        const d = new Date(lastMarketCheckSync);
-        const today = new Date();
-        const sameDay = d.toDateString() === today.toDateString();
-        const yest = new Date(today); yest.setDate(today.getDate() - 1);
-        const isYest = d.toDateString() === yest.toDateString();
-        const time = formatSyncTime(lastMarketCheckSync);
-        if (sameDay) return `Today · ${time}`;
-        if (isYest) return `Yesterday · ${time}`;
-        return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${time}`;
-      })()
-    : "Never";
-  const accountInitials = (() => {
-    const local = user?.email?.split("@")[0] || "";
-    const parts = local.split(/[._-]/).filter(Boolean);
-    const letters = parts.length >= 2 ? parts[0][0] + parts[1][0] : local.slice(0, 2);
-    return (letters || "U").toUpperCase();
-  })();
+  const emailLocal = user?.email?.split("@")[0] || "";
+  const metadataName = ((user?.user_metadata as { full_name?: string } | undefined)?.full_name || "").trim();
   const accountName = (() => {
-    const raw = user?.email?.split("@")[0].split(/[._]/)[0] || "Account";
+    if (metadataName) return metadataName;
+    const raw = emailLocal.split(/[._]/)[0] || "Account";
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   })();
-  const accountRole = isAdmin ? "Admin" : (role ? role.charAt(0).toUpperCase() + role.slice(1) : "Member");
-  const filteredStores = stores.filter((s) => {
-    const q = storeFilter.trim().toLowerCase();
-    if (!q) return true;
-    return `${s.name} ${s.city || ""} ${s.state || ""}`.toLowerCase().includes(q);
-  });
-
-  useEffect(() => {
-    setOpenSections((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      navSections.forEach((section) => {
-        const hasActive = section.items.some((item) => isNavItemActive(item, location.pathname, location.search));
-        if (hasActive && !next[section.key]) {
-          next[section.key] = true;
-          changed = true;
-        }
-      });
-      return changed ? next : prev;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, location.search]);
-
-  const refreshMarketCheck = useCallback(async () => {
-    if (!tenant?.id) {
-      setMarketCheckConnected(false);
-      setMarketCheckLabel("MarketCheck Pending");
-      setLastMarketCheckSync(null);
-      setMarketCheckCount(null);
-      return;
-    }
-    try {
-      const { data } = await (supabase as any)
-        .from("marketcheck_sync_config")
-        .select("last_run_at,last_status")
-        .eq("tenant_id", tenant.id)
-        .maybeSingle();
-      const connected = !!data?.last_run_at || !!data?.last_status;
-      setMarketCheckConnected(connected);
-      setMarketCheckLabel(connected ? "MarketCheck Connected" : "MarketCheck Pending");
-      // Prefer the DB timestamp; fall back to the most recent local sync
-      // broadcast so the top bar stays accurate even when the sync that
-      // ran writes to advertised_prices instead of marketcheck_sync_config.
-      const localTs = typeof window !== "undefined" ? window.localStorage.getItem(`autolabels:last-sync:${tenant.id}`) : null;
-      const dbTs = data?.last_run_at || null;
-      const winner = !dbTs ? localTs : !localTs ? dbTs : (new Date(localTs) > new Date(dbTs) ? localTs : dbTs);
-      setLastMarketCheckSync(winner);
-      const st = (data?.last_status || {}) as Record<string, unknown>;
-      setMarketCheckCount(typeof st.seen === "number" ? st.seen : (typeof st.num_found === "number" ? st.num_found : null));
-    } catch {
-      setMarketCheckConnected(false);
-      setMarketCheckLabel("MarketCheck Pending");
-      setLastMarketCheckSync(null);
-      setMarketCheckCount(null);
-    }
-  }, [tenant?.id]);
-
-  useEffect(() => {
-    refreshMarketCheck();
-    // The AppShell never unmounts between pages, so the badge must actively
-    // re-read: on an in-app sync broadcast, on tab focus, and on a slow poll —
-    // otherwise it shows the mount-time value forever even after a real sync.
-    const onSynced = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { at?: string } | undefined;
-      const at = detail?.at || new Date().toISOString();
-      if (tenant?.id) {
-        try { window.localStorage.setItem(`autolabels:last-sync:${tenant.id}`, at); } catch { /* ignore quota */ }
-      }
-      setLastMarketCheckSync(at);
-      setMarketCheckConnected(true);
-      setMarketCheckLabel((prev) => prev === "MarketCheck Pending" ? "MarketCheck Connected" : prev);
-      refreshMarketCheck();
-    };
-    const onFocus = () => refreshMarketCheck();
-    window.addEventListener("inventory-synced", onSynced);
-    window.addEventListener("focus", onFocus);
-    const poll = window.setInterval(refreshMarketCheck, 60_000);
-    return () => {
-      window.removeEventListener("inventory-synced", onSynced);
-      window.removeEventListener("focus", onFocus);
-      window.clearInterval(poll);
-    };
-  }, [refreshMarketCheck]);
-
-  // Re-read on every navigation so the persistent shell's badge stays fresh
-  // as the dealer moves between pages after a sync.
-  useEffect(() => { refreshMarketCheck(); }, [location.pathname, refreshMarketCheck]);
+  const accountInitials = (() => {
+    const words = metadataName.split(/\s+/).filter(Boolean);
+    if (words.length >= 2) return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+    const parts = emailLocal.split(/[._-]/).filter(Boolean);
+    const letters = parts.length >= 2 ? parts[0][0] + parts[1][0] : (metadataName || emailLocal).slice(0, 2);
+    return (letters || "U").toUpperCase();
+  })();
+  // The dealership role and the platform authority are different facts and
+  // get separate chips; a platform admin's dealer role is still their role.
+  const accountRole = role ? roleDisplayName(role) : "";
 
   useEffect(() => {
     if (!user) return;
@@ -532,8 +302,6 @@ const AppShell = ({ children }: AppShellProps) => {
     }, 800);
     return () => clearTimeout(timer);
   }, [user, tenant?.id, location.pathname, navigate]);
-
-  const toggleSection = (key: string, current: boolean) => setOpenSections((prev) => ({ ...prev, [key]: !current }));
 
   const handleSignOut = async () => {
     await signOut();
@@ -553,543 +321,390 @@ const AppShell = ({ children }: AppShellProps) => {
     }
   };
 
+  const chooseStore = (store: (typeof stores)[number]) => {
+    setCurrentStore(store);
+    setRooftopOpen(false);
+  };
+
+  // A popover with a filter and a listbox: the filter takes focus when it
+  // opens, the arrow keys move through the rooftops, Enter switches and closes,
+  // and focus goes back to the switcher.
+  const renderRooftopMenu = (trigger: ReactElement) => (
+    <Popover open={rooftopOpen} onOpenChange={setRooftopOpen} modal>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent align="start" aria-label="Switch rooftop" className="w-[min(320px,calc(100vw-32px))] bg-card p-0">
+        <Command loop label="Search dealerships" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground">
+          <CommandInput placeholder="Search dealerships…" />
+          <CommandList className="max-h-72">
+            <CommandEmpty>No dealerships match.</CommandEmpty>
+            <CommandGroup heading="Rooftops">
+              {stores.map((store, index) => {
+                const active = store.id === currentStore?.id;
+                const where = [store.city, store.state].filter(Boolean).join(", ");
+                return (
+                  <CommandItem
+                    key={store.id}
+                    value={`${store.name} ${where} #${index + 1}`}
+                    onSelect={() => chooseStore(store)}
+                    className={`min-h-11 cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 lg:min-h-0 ${active ? "bg-blue-50/60" : ""}`}
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700" aria-hidden="true">
+                      <Building2 className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1 leading-tight">
+                      <span className="block truncate text-[13px] font-semibold text-foreground">{store.name}</span>
+                      {where && <span className="block truncate text-[11px] text-muted-foreground">{where}</span>}
+                    </span>
+                    {active && (
+                      <>
+                        <Check className="h-5 w-5 shrink-0 text-blue-600" aria-hidden="true" />
+                        <span className="sr-only">(current rooftop)</span>
+                      </>
+                    )}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+            {canSeeOverview && (
+              <>
+                <CommandSeparator />
+                <CommandGroup>
+                  {/* Named for where it goes: Admin V2 Overview. Rooftops are
+                      added and edited in onboarding, not here. */}
+                  <CommandItem
+                    value="Dealership overview"
+                    onSelect={() => { setRooftopOpen(false); navigate(FRAME_LINKS.dealershipOverview); }}
+                    className="min-h-11 cursor-pointer gap-2.5 rounded-lg px-2.5 py-2 lg:min-h-0"
+                  >
+                    <LayoutDashboard className={MENU_ICON} aria-hidden="true" /> Dealership overview
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+
+  const renderNotifications = (trigger: ReactElement) => (
+    <Popover open={bellOpen} onOpenChange={setBellOpen} modal>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent
+        ref={bellPanelRef}
+        align="end"
+        tabIndex={-1}
+        aria-labelledby="frame-notifications-title"
+        className="w-[min(360px,calc(100vw-32px))] bg-card p-0 focus:outline-none"
+      >
+        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+          <h2 id="frame-notifications-title" className="text-sm font-bold text-foreground">Notifications</h2>
+          <span className="text-[11px] text-muted-foreground">{unreadNotifs > 0 ? `${unreadNotifs} unread` : "Nothing unread"}</span>
+        </div>
+
+        {serviceNotifs.length > 0 && (
+          <section aria-labelledby="frame-for-you" className="border-b border-border">
+            <div className="flex items-center justify-between px-3 py-1.5">
+              <h3 id="frame-for-you" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">For you</h3>
+              {unreadNotifs > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { void markAllNotifsRead(); bellPanelRef.current?.focus(); }}
+                  className="min-h-11 rounded px-2 text-[12px] font-semibold text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary lg:min-h-0 lg:py-1"
+                >
+                  Mark all read
+                </button>
+              )}
+            </div>
+            <ul className="max-h-[220px] overflow-y-auto pb-1">
+              {serviceNotifs.map((n) => (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void markNotifRead(n);
+                      setBellOpen(false);
+                      navigate(n.vin ? FRAME_LINKS.serviceVehicle(n.vin) : FRAME_LINKS.serviceDesk);
+                    }}
+                    className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary"
+                  >
+                    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read_at ? "bg-slate-300" : "bg-blue-600"}`} aria-hidden="true" />
+                    <span className="min-w-0 flex-1 leading-tight">
+                      <span className={`block truncate text-[13px] ${n.read_at ? "font-medium text-muted-foreground" : "font-semibold text-foreground"}`}>
+                        {serviceNotificationLabel(n.type)}
+                      </span>
+                      {n.vin && <span className="block font-mono text-[11px] text-muted-foreground">VIN …{n.vin.slice(-6)}</span>}
+                      {!n.read_at && <span className="sr-only">Unread.</span>}
+                    </span>
+                    <span className="mt-0.5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{formatActivityWhen(n.created_at)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {canSeeActivity && (
+          <section aria-labelledby="frame-recent-activity">
+            <div className="flex items-center justify-between px-3 py-1.5">
+              <h3 id="frame-recent-activity" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Recent activity</h3>
+              <span className="text-[11px] text-muted-foreground">{recentActivity.length} events</span>
+            </div>
+            {recentActivity.length === 0 ? (
+              <p className="px-4 pb-6 pt-2 text-center text-xs text-muted-foreground">
+                No recent activity yet. Stickers, signings, and compliance events will show here.
+              </p>
+            ) : (
+              // A record of what happened, not a set of doors: the Activity
+              // tab below is where an entry is opened and searched.
+              <ul className="max-h-[360px] overflow-y-auto py-1">
+                {recentActivity.map((e) => {
+                  const outcome = syncOutcome(e as { action: string; details?: Record<string, unknown> });
+                  return (
+                    <li key={e.id} className="flex items-start gap-2.5 px-3 py-2">
+                      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${outcome ? (outcome.ok ? "bg-emerald-500" : "bg-rose-500") : activityDot(e.action)}`} aria-hidden="true" />
+                      <span className="min-w-0 flex-1 leading-tight">
+                        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
+                          <span className="truncate">{formatActivityLabel(e.action)}</span>
+                          {outcome && (
+                            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${outcome.ok ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                              {outcome.ok ? "Success" : "Failed"}
+                            </span>
+                          )}
+                        </span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {outcome ? outcome.text : (activitySubject(e) || `${e.entity_type}${e.user_email ? ` · ${e.user_email}` : ""}`)}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 shrink-0 text-[11px] tabular-nums text-muted-foreground">{formatActivityWhen(e.created_at)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <div className="border-t border-border p-1">
+              <button
+                type="button"
+                onClick={() => { setBellOpen(false); navigate(FRAME_LINKS.activity); }}
+                className="flex min-h-11 w-full items-center justify-center rounded-md text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary lg:min-h-9"
+              >
+                View all activity
+              </button>
+            </div>
+          </section>
+        )}
+
+        {serviceNotifs.length === 0 && !canSeeActivity && (
+          <p className="px-4 py-8 text-center text-xs text-muted-foreground">
+            You're all caught up. Work assigned to you will show here.
+          </p>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+
+  const workspaceSettingsHref = canSeeAdminTab(role, "settings", isAdmin) ? FRAME_LINKS.workspaceSettings : FRAME_LINKS.administration;
+
+  const renderUserMenu = (trigger: ReactElement) => (
+    <DropdownMenu onOpenChange={(open) => { if (open) void loadPlatformProducts(); }}>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[min(320px,calc(100vw-32px))] bg-card p-2">
+        <div className="flex items-center gap-3 px-2 py-2.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-adm-selected text-sm font-semibold text-adm-primary" aria-hidden="true">
+            {accountInitials}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-bold text-foreground">{accountName}</div>
+            <div className="truncate text-[11px] text-muted-foreground">{user?.email}</div>
+            {(accountRole || isAdmin) && (
+              <div className="mt-1 inline-flex flex-wrap items-center gap-1">
+                {accountRole && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700">{accountRole}</span>}
+                {isAdmin && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700">Platform Admin</span>}
+              </div>
+            )}
+          </div>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="px-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Switch app</DropdownMenuLabel>
+        {FAMILY_APPS.map((app) => {
+          const Icon = app.icon;
+          const isCurrent = app.id === "autolabels";
+          const unlocked = isCurrent || platformProductIds.includes(app.entitlementKey);
+          return (
+            <DropdownMenuItem
+              key={app.id}
+              disabled={!unlocked || isCurrent}
+              onSelect={(event) => {
+                if (isCurrent || !unlocked) { event.preventDefault(); return; }
+                // Mint a short-lived handoff token so the sibling app can SSO
+                // the user in without a re-login.
+                void (async () => {
+                  try {
+                    const { data, error } = await supabase.functions.invoke("mint-handoff-token", {
+                      body: { targetApp: app.id },
+                    });
+                    const token = (data as { token?: string } | null)?.token;
+                    if (error || !token) {
+                      window.location.href = app.url;
+                      return;
+                    }
+                    window.location.href = `${app.url}?t=${encodeURIComponent(token)}`;
+                  } catch {
+                    window.location.href = app.url;
+                  }
+                })();
+              }}
+              className={`${MENU_ITEM} py-2 ${unlocked && !isCurrent ? "" : "cursor-default"} ${!unlocked ? "opacity-60" : ""}`}
+            >
+              <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${unlocked ? "bg-muted" : "bg-muted/60"}`} aria-hidden="true">
+                <Icon className={`h-5 w-5 ${unlocked ? "" : "text-muted-foreground"}`} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 text-sm font-semibold">
+                  {app.name}
+                  {!unlocked && <Lock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+                </div>
+                {isCurrent && <div className="text-[11px] text-muted-foreground">Current app</div>}
+                {!unlocked && <div className="text-[11px] text-muted-foreground">Not on your plan</div>}
+              </div>
+              {isCurrent && <span className="ml-2 h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />}
+            </DropdownMenuItem>
+          );
+        })}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="px-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Account</DropdownMenuLabel>
+        {dealerMode && can("can_manage_team") && (
+          <DropdownMenuItem onSelect={() => navigate(FRAME_LINKS.team)} className={MENU_ITEM}>
+            <Users className={MENU_ICON} aria-hidden="true" /> Team & permissions
+          </DropdownMenuItem>
+        )}
+        {adminDoor && (
+          <DropdownMenuItem onSelect={() => navigate(workspaceSettingsHref)} className={MENU_ITEM}>
+            <Settings className={MENU_ICON} aria-hidden="true" /> Workspace settings
+          </DropdownMenuItem>
+        )}
+        {/* Same gate as the palette. The billing-portal-session function checks
+            membership only; its missing role check is a separate backend item. */}
+        {can("can_manage_billing") && (
+          <DropdownMenuItem onSelect={() => void handleManageBilling()} className={MENU_ITEM}>
+            <CreditCard className={MENU_ICON} aria-hidden="true" /> Plan & billing
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onSelect={() => navigate(FRAME_LINKS.trust)} className={MENU_ITEM}>
+          <HelpCircle className={MENU_ICON} aria-hidden="true" /> Help & trust center
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void handleSignOut()} className={`${MENU_ITEM} text-destructive focus:text-destructive`}>
+          <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   // Role-aware mobile bottom nav: Scan stays the raised center; the four side
   // slots are filled from the role's capabilities (a service writer gets Get
   // Ready instead of Deals/Create, etc.).
-  const dealerBottomCandidates: { label: string; path: string; icon: typeof Grid2X2; cap: DealerCapability }[] = [
-    { label: "Home", path: "/dashboard", icon: Grid2X2, cap: "can_view_dashboard" },
-    { label: "Inventory", path: "/inventory", icon: Car, cap: "can_view_inventory" },
-    { label: "Get Ready", path: "/ready-board", icon: Wrench, cap: "can_view_get_ready" },
-    { label: "Deals", path: "/deals", icon: Folder, cap: "can_view_deals" },
-    { label: "Create", path: "/create", icon: FilePlus2, cap: "can_create_documents" },
-  ];
-  const bottomCandidates: { label: string; path: string; icon: typeof Grid2X2; cap: DealerCapability }[] =
-    navMode === "vendor"
-      ? [{ label: "My Work", path: "/home/vendor", icon: ClipboardList, cap: "can_complete_get_ready" }]
-      : navMode === "technician"
-        ? [
-            { label: "My Work", path: "/home/technician", icon: ClipboardList, cap: "can_view_work_queue" },
-            { label: "Ready", path: "/ready-board", icon: Wrench, cap: "can_view_get_ready" },
-          ]
-        : dealerBottomCandidates;
-  const sideItems = bottomCandidates.filter((c) => can(c.cap)).slice(0, 4);
-  const bottomNavItems: { label: string; path: string; icon: typeof Grid2X2; raised?: boolean }[] = [
+  const sideItems = bottomNavCandidates(navMode).filter((c) => can(c.capability)).slice(0, 4);
+  const bottomNavItems: { label: string; path: string; icon: typeof Car; raised?: boolean }[] = [
     ...sideItems.slice(0, 2),
     { label: "Scan", path: "scan", icon: ScanLine, raised: true },
     ...sideItems.slice(2, 4),
   ];
+  // Lit by the same matchers as the rail, so a nested page lights its slot.
+  const bottomActive = (path: string) => (activeLeaf ? activeLeaf.path === path : location.pathname === path);
 
   return (
     <VinScanContext.Provider value={vinScanApi}>
       {/* al-admin scopes the admin palette. Public routes and the locked
           customer passport render outside this shell and keep :root. */}
       <div className="al-admin min-h-screen bg-background flex w-full overflow-hidden">
-        {mobileOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />}
+        <a
+          href="#app-scroll"
+          onClick={(event) => { event.preventDefault(); mainRef.current?.focus(); }}
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[70] focus:rounded-[6px] focus:bg-adm-surface focus:px-4 focus:py-2.5 focus:text-[14px] focus:font-semibold focus:text-adm-ink focus:shadow-lg focus:outline focus:outline-2 focus:outline-adm-primary"
+        >
+          Skip to content
+        </a>
 
-        <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-shell border-r border-shell-border transition-all duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-64 flex flex-col`}>
-          <div className="h-16 flex items-center justify-between px-4 border-b border-shell-border flex-shrink-0">
-            <Link to="/dashboard" className={`flex items-center gap-3 min-w-0 ${collapsed ? "lg:justify-center lg:w-full" : ""}`}>
-              {/* The official lockup, admin only. brand/Logo still renders every
-                  public surface, including the locked customer passport. */}
-              <AdminBrandLockup variant={collapsed ? "mark" : "lockup"} height={collapsed ? 24 : 28} surface="dark" />
-            </Link>
-            <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1 rounded-md text-shell-foreground hover:bg-shell-hover">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+        {drawer.open && <div className="fixed inset-0 z-[45] bg-black/50 lg:hidden" onClick={drawer.closeDrawer} aria-hidden="true" />}
 
-          {/* Global controls: add a vehicle, and the one Create door for every
-              document family. Neither is a navigation destination, so neither
-              is a nav row — and a technician or vendor gets neither. */}
-          {navMode === "dealer" && (can("can_view_inventory") || can("can_create_documents")) && (
-            <div className={`px-3 pt-3 flex gap-2 ${collapsed ? "lg:flex-col" : ""}`}>
-              {can("can_view_inventory") && (
-                <button
-                  onClick={() => navigate("/inventory?add=1")}
-                  className="h-10 flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors"
-                  title="Add a vehicle"
-                >
-                  <Plus size={18} strokeWidth={2.25} aria-hidden="true" />
-                  {!collapsed && <span>Add Vehicle</span>}
-                </button>
-              )}
-              {can("can_create_documents") && (
-                <button
-                  onClick={() => navigate("/create")}
-                  aria-label="Create"
-                  className={`h-10 inline-flex items-center justify-center gap-2 rounded-full border border-shell-border text-shell-foreground text-sm font-semibold hover:bg-shell-hover transition-colors ${collapsed ? "w-full" : "w-10"}`}
-                  title="Create a document"
-                >
-                  <FilePlus2 size={18} strokeWidth={2.25} aria-hidden="true" />
-                </button>
-              )}
-            </div>
-          )}
+        {/* One rail at every width: sticky beside the content from lg, an
+            off-canvas modal drawer below it. Closed, the drawer is invisible,
+            so its links leave the tab order instead of hiding off-screen. */}
+        <AppRail
+          id="app-rail"
+          sections={visibleSections}
+          pathname={location.pathname}
+          search={location.search}
+          onNavigate={drawer.closeDrawer}
+          onClose={drawer.closeDrawer}
+          modal={drawer.modal}
+          closeButtonRef={drawer.closeRef}
+          className={drawer.railClassName}
+        />
 
-          <TooltipProvider delayDuration={200}>
-            <nav className="flex-1 overflow-y-auto p-3 space-y-1" aria-label="Primary">
-              {visibleSections.map((section) => {
-                const open = openSections[section.key] ?? section.defaultOpen;
-                const panelId = `nav-section-${section.key}`;
-                const showItems = open || collapsed || !section.title;
-                return (
-                  <div key={section.key} className="mb-2">
-                    {section.title && !collapsed && (
-                      <button
-                        onClick={() => toggleSection(section.key, open)}
-                        aria-expanded={open}
-                        aria-controls={panelId}
-                        className="w-full flex items-center justify-between rounded-md px-2.5 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-shell-muted transition-colors hover:text-shell-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shell-accent"
-                      >
-                        {section.title}
-                        <ChevronDown size={14} strokeWidth={2} aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${open ? "" : "-rotate-90"}`} />
-                      </button>
-                    )}
-                    {showItems && (
-                      <div id={panelId} className="space-y-0.5">
-                        {section.items.map((item) => {
-                          const active = isActive_(item);
-                          const Icon = item.icon;
-                          const badgeText = formatBadgeCount(item.badge);
-                          const row = (
-                            <Link
-                              to={item.path}
-                              onClick={() => setMobileOpen(false)}
-                              aria-current={active ? "page" : undefined}
-                              aria-label={collapsed ? item.label : undefined}
-                              className={`group relative flex min-h-[42px] items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-sm transition-colors duration-hover ease-standard motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shell-accent ${active ? "bg-shell-active font-semibold text-white" : "text-shell-foreground/75 hover:bg-shell-hover hover:text-shell-foreground"} ${collapsed ? "lg:min-h-[44px] lg:justify-center lg:px-0" : ""}`}
-                            >
-                              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? "bg-shell-accent/15" : ""}`}>
-                                {item.assetIcon && ADMIN_ICON_PATHS[item.assetIcon]
-                                  // The pack is the product's icon language;
-                                  // lucide was the placeholder. `inherit`
-                                  // because navigation state decides this
-                                  // colour, not the colour it was drawn in.
-                                  ? <AdminIcon id={item.assetIcon} decorative inherit size={19}
-                                      className={active ? "text-shell-accent" : "text-shell-muted group-hover:text-shell-accent"} />
-                                  // Falls back to lucide, so a wrong id or an
-                                  // uninstalled pack costs the new icon rather
-                                  // than the whole row.
-                                  : <Icon size={19} strokeWidth={2} aria-hidden="true" className={active ? "text-shell-accent" : "text-shell-muted group-hover:text-shell-accent"} />}
-                              </span>
-                              {!collapsed && <span className="truncate">{item.label}</span>}
-                              {!collapsed && badgeText && (
-                                <span
-                                  aria-label={badgeAriaLabel(item.label, item.badge ?? 0)}
-                                  className={`ml-auto inline-flex h-5 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ${active ? "bg-shell-accent text-slate-950" : "bg-shell-hover text-shell-muted"}`}
-                                >
-                                  {badgeText}
-                                </span>
-                              )}
-                              {collapsed && badgeText && (
-                                <span
-                                  aria-label={badgeAriaLabel(item.label, item.badge ?? 0)}
-                                  className={`absolute right-1 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums ${active ? "bg-shell-accent text-slate-950" : "bg-shell-hover text-shell-muted"}`}
-                                >
-                                  {badgeText}
-                                </span>
-                              )}
-                            </Link>
-                          );
-                          if (!collapsed) return <div key={item.path}>{row}</div>;
-                          return (
-                            <Tooltip key={item.path}>
-                              <TooltipTrigger asChild>{row}</TooltipTrigger>
-                              <TooltipContent side="right">{item.label}</TooltipContent>
-                            </Tooltip>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </nav>
-          </TooltipProvider>
+        <div ref={drawer.backgroundRef} className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+          <AppHeader
+            groupName={rooftopGroup}
+            storeLocation={rooftopLocation}
+            storeName={rooftopStore}
+            renderRooftopMenu={stores.length > 1 ? renderRooftopMenu : undefined}
+            onOpenSearch={() => setPaletteOpen(true)}
+            searchLabel={searchLabel}
+            notificationCount={unreadNotifs}
+            renderNotifications={renderNotifications}
+            userName={accountName}
+            userInitials={accountInitials}
+            renderUserMenu={renderUserMenu}
+            onOpenMenu={drawer.openDrawer}
+            menuOpen={drawer.open}
+            menuControls="app-rail"
+            menuButtonRef={drawer.triggerRef}
+          />
 
-          <div className="p-3 border-t border-shell-border flex-shrink-0 space-y-2">
-            <button onClick={() => setPaletteOpen(true)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-shell-muted hover:text-shell-foreground hover:bg-shell-hover ${collapsed ? "lg:justify-center" : ""}`} title={collapsed ? "Search" : undefined}>
-              <Search className="h-4 w-4" />
-              {!collapsed && <span>Search</span>}
-            </button>
-            <button onClick={toggleCollapsed} className={`hidden lg:flex w-full items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-shell-muted hover:text-shell-foreground hover:bg-shell-hover ${collapsed ? "lg:justify-center" : ""}`} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-              {!collapsed && <span>Collapse sidebar</span>}
-            </button>
-            {/* The dealer group signs the workspace: the operator always knows
-                whose records they are looking at, even deep in a vehicle. */}
-            {!collapsed && (dealerGroupName || tenantTagline) && (
-              <div className="pt-2 text-center">
-                {dealerGroupName && (
-                  <p className="text-[11px] font-bold tracking-wide text-shell-foreground/70 uppercase">{dealerGroupName}</p>
-                )}
-                {tenantTagline && (
-                  <p className="text-[9.5px] tracking-[0.14em] text-shell-muted uppercase mt-0.5">{tenantTagline}</p>
-                )}
+          <main ref={mainRef} id="app-scroll" tabIndex={-1} className="flex-1 overflow-y-auto pb-24 focus:outline-none lg:pb-0">
+            {shellHeading && (
+              <div className="hidden lg:block print:hidden px-6 pt-6">
+                {/* The scale carries size, line-height, weight and tracking
+                    together, so a heading cannot drift to the wrong weight. */}
+                <h1 className="text-al-section text-foreground">{shellHeading.title}</h1>
+                <p className="mt-0.5 text-al-meta text-muted-foreground">{shellHeading.subtitle}</p>
               </div>
             )}
-          </div>
-        </aside>
-
-        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-          {!inventoryHasOwnMobileChrome && (
-            <header className="lg:hidden shrink-0 border-b border-border bg-white px-4 pb-4 pt-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-4">
-                  <button onClick={() => setMobileOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-foreground active:bg-muted" aria-label="Open menu">
-                    <Menu className="h-7 w-7" />
-                  </button>
-                  <div className="h-12 w-px bg-slate-200" />
-                  {stores.length > 1 ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="min-w-0 text-left">
-                          <div className="flex items-center gap-2 text-[24px] font-black leading-none tracking-tight text-foreground">
-                            <span className="truncate">{companyName}</span>
-                            <ChevronDown className="h-5 w-5 shrink-0" />
-                          </div>
-                          <div className="mt-1 text-lg font-medium text-muted-foreground">{dealerLocation}</div>
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-72 bg-card">
-                        <DropdownMenuLabel>Switch location</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {stores.map((store) => (
-                          <DropdownMenuItem key={store.id} onClick={() => setCurrentStore(store)} className="cursor-pointer">
-                            <Store className="h-4 w-4 mr-2" />
-                            <div>
-                              <div className="font-medium">{store.name}</div>
-                              <div className="text-xs text-muted-foreground">{store.city}, {store.state}</div>
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <div className="min-w-0">
-                      <div className="truncate text-[24px] font-black leading-none tracking-tight text-foreground">{companyName}</div>
-                      <div className="mt-1 text-lg font-medium text-muted-foreground">{dealerLocation}</div>
-                    </div>
-                  )}
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-foreground active:bg-muted" aria-label="Recent activity">
-                      <Bell className="h-7 w-7" />
-                      {unreadBell > 0 && <span className="absolute -right-0.5 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{unreadBell}</span>}
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[340px] bg-card p-0">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-                      <span className="text-sm font-bold text-foreground">Recent activity</span>
-                      <span className="text-[10px] text-muted-foreground">{recentActivity.length} events</span>
-                    </div>
-                    {renderServiceNotifs()}
-                    {renderNotificationsList()}
-                    {navMode === "dealer" && (
-                      <>
-                        <DropdownMenuSeparator className="my-0" />
-                        <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
-                          View all activity
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="ml-[70px] mt-4 flex flex-wrap items-center gap-3 text-base font-medium text-muted-foreground">
-                <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Last sync: {formatSyncTime(lastMarketCheckSync)}</span>
-                <span className="h-5 w-px bg-slate-300" />
-                <span className="flex items-center gap-2"><CheckCircle2 className={`h-5 w-5 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} /> {marketCheckLabel}</span>
-              </div>
-            </header>
-          )}
-
-          <header className="hidden h-16 border-b border-border bg-card/95 backdrop-blur-sm lg:flex items-center gap-3 px-6 flex-shrink-0">
-            <div className="min-w-0 shrink-0">
-              {/* The scale carries size, line-height, weight and tracking
-                  together, so a heading cannot drift to the wrong weight. */}
-              <h1 className="truncate text-al-section text-foreground">{pageMeta.title}</h1>
-              <p className="truncate text-al-meta text-muted-foreground">{pageMeta.subtitle}</p>
-            </div>
-
-
-            <div className="flex shrink-0 items-center gap-2 ml-auto">
-              {(() => {
-                const isDescriptionRoute = location.pathname === "/description-writer"
-                  || location.pathname === "/description-studio"
-                  || location.pathname === "/description-operations"
-                  || location.pathname.startsWith("/description-intelligence");
-                if (isDescriptionRoute) {
-                  return (
-                    <div className="hidden xl:flex items-center gap-2">
-                      <button
-                        onClick={() => toast.info("Walkthrough coming soon")}
-                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-[13px] font-bold text-foreground hover:bg-muted"
-                      >
-                        <PlayCircle className="h-4 w-4 text-blue-600" /> How it works
-                      </button>
-                      <button
-                        onClick={() => navigate("/admin?tab=audit")}
-                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-[13px] font-bold text-foreground hover:bg-muted"
-                      >
-                        <History className="h-4 w-4 text-muted-foreground" /> History
-                      </button>
-                      {/* Tenant chip */}
-                      <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
-                        <span className="min-w-0 leading-tight">
-                          <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
-                          {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-              /* Dealer · last synced · MarketCheck — one card, dashed dividers */
-              <div className="hidden xl:flex h-11 items-stretch rounded-xl border border-border bg-card overflow-hidden">
-                {stores.length > 1 ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-2 px-3 hover:bg-muted">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
-                        <span className="min-w-0 text-left leading-tight">
-                          <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
-                          {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
-                        </span>
-                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-72 bg-card p-0">
-                      <div className="p-2">
-                        <div className="relative">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                          <input
-                            value={storeFilter}
-                            onChange={(e) => setStoreFilter(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            placeholder="Search dealerships…"
-                            className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-sm outline-none focus:border-foreground/20"
-                          />
-                        </div>
-                      </div>
-                      <div className="max-h-72 overflow-y-auto px-1 pb-1">
-                        {filteredStores.length === 0 ? (
-                          <p className="px-3 py-6 text-center text-xs text-muted-foreground">No dealerships match.</p>
-                        ) : filteredStores.map((store) => {
-                          const active = store.id === currentStore?.id;
-                          return (
-                            <button
-                              key={store.id}
-                              onClick={() => { setCurrentStore(store); setStoreFilter(""); }}
-                              className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-muted ${active ? "bg-blue-50/60" : ""}`}
-                            >
-                              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
-                              <span className="min-w-0 flex-1 leading-tight">
-                                <span className="block truncate text-[13px] font-semibold text-foreground">{store.name}</span>
-                                {(store.city || store.state) && <span className="block truncate text-[11px] text-muted-foreground">{[store.city, store.state].filter(Boolean).join(", ")}</span>}
-                              </span>
-                              {active && <Check className="h-4 w-4 shrink-0 text-blue-600" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <DropdownMenuSeparator className="my-0" />
-                      <DropdownMenuItem onClick={() => navigate("/admin?tab=home")} className="cursor-pointer gap-2.5 py-2.5">
-                        <Settings className="h-4 w-4 text-muted-foreground" /> Manage Dealerships
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <div className="flex items-center gap-2 px-3">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
-                    <span className="min-w-0 leading-tight">
-                      <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
-                      {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
-                    </span>
-                  </div>
-                )}
-
-                <span className="self-stretch border-l border-dashed border-border" />
-
-                {/* Last synced */}
-                <div className="flex items-center gap-2 px-3">
-                  <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
-                  <span className="leading-tight">
-                    <span className="block text-[12px] font-bold text-foreground">Synced {syncWhen}</span>
-                    {marketCheckCount != null && <span className="block text-[10px] font-semibold text-emerald-600">{marketCheckCount} vehicles updated</span>}
-                  </span>
-                </div>
-
-                <span className="self-stretch border-l border-dashed border-border" />
-
-                {/* MarketCheck */}
-                <div className="flex items-center gap-2 px-3">
-                  <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
-                  <span className="leading-tight">
-                    <span className="block text-[12px] font-bold text-foreground">MarketCheck</span>
-                    <span className={`block text-[10px] font-semibold ${marketCheckConnected ? "text-emerald-600" : "text-amber-600"}`}>{marketCheckConnected ? "Connected" : "Pending"}</span>
-                  </span>
-                </div>
-              </div>
-                );
-              })()}
-
-              {/* Notifications */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground" title="Recent activity">
-                    <Bell className="h-5 w-5" />
-                    {unreadBell > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadBell}</span>}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[360px] bg-card p-0">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-                    <span className="text-sm font-bold text-foreground">Recent activity</span>
-                    <span className="text-[10px] text-muted-foreground">{recentActivity.length} events</span>
-                  </div>
-                  {renderServiceNotifs()}
-                  {renderNotificationsList()}
-                  {navMode === "dealer" && (
-                    <>
-                      <DropdownMenuSeparator className="my-0" />
-                      <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
-                        View all activity
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <DropdownMenu onOpenChange={(open) => { if (open) void loadPlatformProducts(); }}>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-muted" title={user?.email || "Account"}>
-                    <span className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm">
-                      {accountInitials}
-                    </span>
-                    <span className="hidden xl:block min-w-0 text-left leading-tight">
-                      <span className="block truncate max-w-[110px] text-[12px] font-bold text-foreground">{accountName}</span>
-                      <span className="block text-[10px] text-muted-foreground">{accountRole}</span>
-                    </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 bg-card p-2">
-                  <div className="flex items-center gap-3 px-2 py-2.5">
-                    <span className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm shrink-0">
-                      {accountInitials}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-bold text-foreground">{accountName}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">{user?.email}</div>
-                      <div className="mt-1 inline-flex items-center gap-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{accountRole}</span>
-                        {isAdmin && <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-50 text-violet-700">Platform Admin</span>}
-                      </div>
-                    </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2">Switch app</DropdownMenuLabel>
-                  {FAMILY_APPS.map((app) => {
-                    const Icon = app.icon;
-                    const isCurrent = app.id === "autolabels";
-                    const unlocked = isCurrent || platformProductIds.includes(app.entitlementKey);
-                    return (
-                      <DropdownMenuItem
-                        key={app.id}
-                        disabled={!unlocked || isCurrent}
-                        onSelect={(event) => {
-                          if (isCurrent || !unlocked) { event.preventDefault(); return; }
-                          if (app.url.startsWith("http")) {
-                            // Mint a short-lived handoff token so the sibling
-                            // app can SSO the user in without a re-login.
-                            void (async () => {
-                              try {
-                                const { data, error } = await supabase.functions.invoke("mint-handoff-token", {
-                                  body: { targetApp: app.id },
-                                });
-                                const token = (data as { token?: string } | null)?.token;
-                                if (error || !token) {
-                                  window.location.href = app.url;
-                                  return;
-                                }
-                                window.location.href = `${app.url}?t=${encodeURIComponent(token)}`;
-                              } catch {
-                                window.location.href = app.url;
-                              }
-                            })();
-                          } else {
-                            navigate(app.url);
-                          }
-                        }}
-                        className={`py-2 rounded-lg ${unlocked && !isCurrent ? "cursor-pointer" : "cursor-default"} ${!unlocked ? "opacity-60" : ""}`}
-                      >
-                        <div className={`mr-3 flex h-9 w-9 items-center justify-center rounded-xl ${unlocked ? "bg-muted" : "bg-muted/60"}`}>
-                          <Icon className={`h-4 w-4 ${unlocked ? "" : "text-muted-foreground"}`} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 text-sm font-semibold">
-                            {app.name}
-                            {!unlocked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                          </div>
-                          {!unlocked && (
-                            <div className="text-[11px] text-muted-foreground">Upgrade to unlock</div>
-                          )}
-                        </div>
-                        {isCurrent && (
-                          <span className="ml-2 h-2 w-2 rounded-full bg-emerald-500" aria-label="Current app" />
-                        )}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2">Account</DropdownMenuLabel>
-                  {can("can_manage_team") && (
-                    <DropdownMenuItem onClick={() => navigate("/admin?tab=team")} className="cursor-pointer rounded-lg"><Users className="h-4 w-4 mr-2 text-muted-foreground" /> Team & permissions</DropdownMenuItem>
-                  )}
-                  {anyAdminTab && (
-                    <DropdownMenuItem
-                      onClick={() => navigate(canSeeAdminTab(role, "settings", isAdmin) ? "/admin?tab=settings" : "/admin")}
-                      className="cursor-pointer rounded-lg"
-                    >
-                      <Settings className="h-4 w-4 mr-2 text-muted-foreground" /> Workspace settings
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={handleManageBilling} className="cursor-pointer rounded-lg"><CreditCard className="h-4 w-4 mr-2 text-muted-foreground" /> Plan & billing</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/trust")} className="cursor-pointer rounded-lg"><HelpCircle className="h-4 w-4 mr-2 text-muted-foreground" /> Help & trust center</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive rounded-lg focus:text-destructive"><LogOut className="h-4 w-4 mr-2" /> Sign out</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </header>
-
-          <main id="app-scroll" className="flex-1 overflow-y-auto pb-24 lg:pb-0">
             {children}
           </main>
 
-          {!inventoryHasOwnMobileChrome && (
-            <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/95 px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
-              <div className="mx-auto grid max-w-[520px] grid-cols-5 items-end gap-1">
-                {bottomNavItems.map((item) => {
-                  const Icon = item.icon;
-                  const active = item.path !== "scan" && location.pathname === item.path;
+          <nav aria-label="Quick actions" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white/95 px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+            <div className="mx-auto grid max-w-[520px] grid-cols-5 items-end gap-1">
+              {bottomNavItems.map((item) => {
+                const Icon = item.icon;
+                if (item.raised) {
                   return (
-                    <button key={item.label} onClick={() => item.path === "scan" ? openScan() : navigate(item.path)} className={`flex flex-col items-center justify-end gap-1 text-[12px] font-bold ${active ? "text-blue-700" : "text-muted-foreground"}`}>
-                      <span className={`${item.raised ? "-mt-8 flex h-14 w-14 items-center justify-center rounded-full border border-border bg-white text-blue-700 shadow-lg" : "flex h-7 items-center justify-center"}`}>
-                        <Icon className={item.raised ? "h-7 w-7" : "h-6 w-6"} />
+                    <button key={item.label} type="button" onClick={openScan} className="flex flex-col items-center justify-end gap-1 rounded-lg text-[12px] font-bold text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
+                      <span className="-mt-8 flex h-14 w-14 items-center justify-center rounded-full border border-border bg-white text-blue-700 shadow-lg">
+                        <Icon className="h-7 w-7" aria-hidden="true" />
                       </span>
                       <span>{item.label}</span>
                     </button>
                   );
-                })}
-              </div>
-            </nav>
-          )}
+                }
+                const active = bottomActive(item.path);
+                return (
+                  <Link
+                    key={item.label}
+                    to={item.path}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex min-h-11 flex-col items-center justify-end gap-1 rounded-lg text-[12px] font-bold transition-colors duration-hover ease-standard motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary ${active ? "text-blue-700" : "text-muted-foreground"}`}
+                  >
+                    <span className="flex h-7 items-center justify-center">
+                      <Icon className="h-6 w-6" aria-hidden="true" />
+                    </span>
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
         </div>
 
         {showMobileQr && (
@@ -1110,19 +725,14 @@ const AppShell = ({ children }: AppShellProps) => {
           </div>
         )}
 
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          onCloseAutoFocus={(event) => { if (restorePaletteFocus?.()) event.preventDefault(); }}
+        />
       </div>
     </VinScanContext.Provider>
   );
 };
-
-function formatSyncTime(value: string | null) {
-  if (!value) return "--";
-  try {
-    return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(value));
-  } catch {
-    return "--";
-  }
-}
 
 export default AppShell;
