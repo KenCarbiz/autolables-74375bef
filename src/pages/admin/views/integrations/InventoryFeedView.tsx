@@ -148,12 +148,13 @@ export default function InventoryFeedView() {
           ) : (
             <>
               {/* Rows alternate 46 and 47px to land on the reference's 46.5px rhythm; the heights are minimums. */}
-              <AdminTable caption="Recent inventory feed attempts" minWidth={720} className="xl:[&_table]:table-fixed [&_tbody_td]:py-0 [&_tbody_tr]:h-[46px] [&_tbody_tr:first-child]:h-[45px] [&_tbody_tr:nth-child(2)]:h-[47px] [&_tbody_tr:last-child>td]:border-b-0">
+              {/* The fixed reference columns apply from 1536px; narrower desktops lay the columns out by content so Details keeps room to wrap. */}
+              <AdminTable caption="Recent inventory feed attempts" minWidth={700} className="min-[1536px]:[&_table]:table-fixed [&_tbody_td]:py-0 [&_tbody_tr]:h-[46px] [&_tbody_tr:first-child]:h-[45px] [&_tbody_tr:nth-child(2)]:h-[47px] [&_tbody_tr:last-child>td]:border-b-0">
                 <colgroup>
-                  <col className="w-[177px]" />
-                  <col className="w-[196px]" />
-                  <col className="w-[106px]" />
-                  <col className="w-[199px]" />
+                  <col className="min-[1536px]:w-[177px]" />
+                  <col className="min-[1536px]:w-[196px]" />
+                  <col className="min-[1536px]:w-[106px]" />
+                  <col className="min-[1536px]:w-[199px]" />
                   <col />
                 </colgroup>
                 <thead>
@@ -209,7 +210,7 @@ export default function InventoryFeedView() {
             <RefreshCw className="w-[22px] h-[22px] text-adm-primary flex-shrink-0" aria-hidden="true" />
             Refresh status
           </h3>
-          <div className="mt-[14px] grid grid-cols-1 gap-y-3 divide-adm-border sm:grid-cols-[192px_auto_minmax(0,1fr)] sm:gap-y-0 sm:divide-x">
+          <div className="mt-[14px] grid grid-cols-1 gap-y-3 divide-adm-border sm:grid-cols-3 min-[1536px]:grid-cols-[192px_auto_minmax(0,1fr)] sm:gap-y-0 sm:divide-x">
             <RefreshFact label="Scope" value={refresh.scope} />
             <RefreshFact label="Schedule" value={refresh.schedule} />
             <RefreshFact label="Status" value={refresh.statusLabel} />
@@ -308,7 +309,7 @@ const CoverageStat = ({ label, value }: { label: string; value: string }) => (
 const RefreshFact = ({ label, value }: { label: string; value: string }) => (
   <div className="min-w-0 sm:pr-3 sm:[&:not(:first-child)]:pl-[19px]">
     <p className="text-[13px] leading-[18px] text-adm-muted">{label}</p>
-    <p className="mt-[3px] text-[15px] leading-[22px] text-adm-ink sm:whitespace-nowrap">{value}</p>
+    <p className="mt-[3px] text-[15px] leading-[22px] text-adm-ink min-[1536px]:whitespace-nowrap">{value}</p>
   </div>
 );
 
