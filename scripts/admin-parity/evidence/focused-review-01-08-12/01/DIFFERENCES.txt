@@ -1,41 +1,67 @@
 01 Overview - remaining differences from the reference
-Current implementation 2fe74e3 (measured; package b278995/0536e10 superseded for current captures) (screen 01 code identical to 7f4fa1a). Protocol v2
-content 92.99% - below 94%: below the numeric target; no exception approved.
-Landmarks 10 of 10. Viewports: 0px page overflow at 390x844, 768x1024,
-1366x768 and 1586x992.
+Implementation 2fe74e3. Evidence 4958ce9 (annotated-2fe74e3/01-*.png); the
+1586x992 and 390x844 captures are byte-identical to those committed in 0536e10.
+Classification revised after 4958ce9 (documentation only: no new capture, no
+pixel change, no protocol or mask change).
 
-A. Approved design changes (owner decision or standing rule)
- 1. Readable-text floor: Recent activity detail and time stay at 11px where
-    the mock draws about 10px, so activity items wrap to 2-3 lines.
-    Standing rule: preserve readable text.
- 2. Real data in the fixture: Active inventory 128 and Open exceptions 1,012
-    (mock 130 and 1,019); the "User added" row shows a full address. Values
-    are masked in scoring. Standing rule: real data semantics.
+Score: protocol v2 content 92.99%, scored WITH the v2 masks (3.94% of the
+1586x992 frame excluded from both images). Below 94%: needs an explicit
+screen-specific exception; none is approved. Landmarks 10 of 10. Viewports:
+0px page overflow at 390x844, 768x1024, 1366x768 and 1586x992.
 
-B. Rendering differences
- 3. Inter in Chromium sets text wider than the mock's renderer. Two settings
-    titles wrap ("Customer Experience", "Documents & Service"), tile
-    descriptions run 3-4 lines against the mock's 2, and the banner title
-    runs past the mock's detail text.
- 4. Lucide glyphs against the mock's own drawings: tiles, queue marks,
-    settings, activity and policy rows.
- 5. Shell gutter 24px against the mock's 20px: card edges sit 4px in on the
-    left and 5-6px on the right.
- 6. The mock's banner edge colour varies along its length by more than the
-    32/255 tolerance.
- 7. Product rail and header are flat stand-ins in the fixture. This affects
-    only the full-frame figure, not the content score.
+Numbers match the badges in annotated-2fe74e3/01-desktop.png (1-8) and
+01-phone.png (9-10).
 
-C. Unresolved (decision or defect)
- None open.
- Resolved since b278995:
- - Page title (was item 8): the shared parent "Administration" title at
-   28px is an approved design decision (owner, 2026-10-29). It moves to A
-   as item 1 in the annotated capture and is not enlarged.
- - Shared section tabs (was item 9): horizontal scrolling with the edge fade
-   is kept. Two defects were found and fixed in 2fe74e3:
-   * keyboard focus left the last tab outside the row at 1366 and left tabs
-     under the fade at 1024 and 390;
-   * the focus outline was clipped to one edge.
-   Labels and touch targets are unchanged. tabs-check.cjs passes all 10
-   scrolling rows checked on 01, 08 and 12 at 1366, 1024 and 390.
+APPROVED (cited owner decision)
+ 1. Page title "Administration" at 28px (mock about 36px).
+    Citations: owner, 2026-10-29: "The shared parent 'Administration' title
+    at 28px was already approved. Keep it."; title block approved 2026-10-28
+    (readiness 10.6 item 1).
+
+PROPOSED EXCEPTION: geometry / design choice (not approved)
+ 3. Minimum text size 11px. Recent activity titles, times and details, and
+    the settings tile descriptions, are 11px where the mock draws about
+    9-10px. Consequence: tile descriptions run 3-4 lines (mock 2) and
+    activity items wrap to 2-3 lines. Font widths (item 4) add to the wraps.
+ 6. Page margin: shell gutter 24px against the mock's 20px. Card edges sit
+    4px in on the left and 5-6px in on the right.
+ 8. Section tab row dimensions: 14px labels, 38px row, 36px gaps, active
+    underline the width of the label (253-317). The mock draws slightly
+    larger labels with the underline padded past the label (about 249-339,
+    estimated from the image).
+
+ASSET SUBSTITUTION (not approved)
+ 5. The standard icon set (lucide) replaces the mock's drawn icons: summary
+    tiles, attention-queue marks, settings tiles, activity and policy rows.
+
+RENDERING DIFFERENCES
+ 4. Font rasterization: Inter in Chromium sets glyphs differently and wider
+    than the mock's renderer (marked on the banner text; present throughout).
+    Contributes to the wraps in item 3 and the two wrapped settings titles
+    ("Customer Experience", "Documents & Service").
+ 7. Banner edge: the mock's banner border colour varies along its length by
+    more than the 32/255 tolerance (an artefact of the reference image).
+
+FIXTURE DATA, MASKED UNDER V2 (excluded from the score on both images)
+ 2. Summary tile counts (fixture 128 and 1,012; mock 130 and 1,019), Recent
+    activity relative times, and Recent activity detail lines (fixture
+    names and addresses). Mask selectors in masks.json "01".
+
+MOCK-ONLY / OUTSIDE THE SCORED REGION
+ - Footer captions ("Proposed design...", "auto(LABELS) v0.1"): masked.
+ - The mock's DESIGN CONCEPT chip sits in the header, outside the content
+   region; not scored.
+ - Product rail and header are flat stand-ins in the fixture; they affect
+   only the full-frame figure, not the content score.
+
+PHONE 390x844 (no phone reference; not scored; not approved)
+ 9. Section tabs scroll sideways with an edge fade. The owner's conditional
+    acceptance of horizontal scrolling (2026-10-29) was given for 1366px;
+    the phone uses the same component and passes the same checks
+    (tabs-check.cjs).
+10. The banner's Review sync action moves under the text.
+
+UNRESOLVED (decision or defect)
+ None open. Fixed in 2fe74e3: keyboard focus now brings each tab clear of the
+ fades and the focus outline is no longer clipped (tabs-check.cjs 10 of 10
+ rows on 01, 08 and 12 at 1366, 1024 and 390).

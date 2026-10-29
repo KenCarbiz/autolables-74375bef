@@ -1,53 +1,75 @@
 12 Inventory feed - remaining differences from the reference
-Current implementation 2fe74e3 (includes the b278995 table fix and the 2fe74e3 tab fix). Protocol v2
-content 92.22% - below 94%: below the numeric target; no exception approved.
-The score is unchanged by the fix, because the 1586 reference layout is
-unchanged. Landmarks 11 of 12: only childTabs fails, the owner-decided
-heading placement.
+Implementation 2fe74e3 (includes the b278995 table fix and the 2fe74e3 tab
+fix). Evidence 4958ce9 (annotated-2fe74e3/12-*.png); the 1586x992, 1366x768
+and 390x844 captures are byte-identical to those committed in 0536e10.
+Classification revised after 4958ce9 (documentation only: no new capture, no
+pixel change, no protocol or mask change).
 
-Usability defect found and corrected in this round (commit b278995)
-- Recent attempts table at 1366x768 (before-fix-bf89227/): the fixed
-  reference columns left the Details column about 26px wide. Its text
-  showed as faded fragments and could be read only by scrolling the table
-  57px sideways.
-- Refresh status: "On schedule" ran past the card's right edge.
-- At 768x1024 the attempts table scrolled 2px sideways.
-- Fix: the fixed column widths and the Refresh status column widths apply
-  from 1536px wide only. Below that, the columns size by content and text
-  wraps. The phone minimum table width is 700px (was 720).
-- After the fix: no sideways scroll at 1366 or 768; Details and Status are
-  fully visible (laptop-1366x768/, tablet-768x1024/).
-- Phones still scroll the table sideways by design (labelled, focusable
-  region).
-- Tests: Administration suites 248 of 248 pass; typecheck clean; audit clean
-  on 01, 08 and 12.
+Score: protocol v2 content 92.22%, scored WITH the v2 masks (2.80% of the
+1586x992 frame excluded from both images). Below 94%: needs an explicit
+screen-specific exception; none is approved. The b278995 fix did not change
+the score because the 1586 layout is unchanged. Landmarks 11 of 12: only
+childTabs fails, which is the owner-decided heading placement (item 1).
 
-A. Approved design changes (owner decision or standing rule)
- 1. Heading placement: "Integrations & Data" sits under the child tabs; the
-    mock puts it above them (owner decision: no heading above the 12 tabs).
-    This is the failing childTabs landmark.
+Numbers match the badges in annotated-2fe74e3/12-desktop.png (1-10) and
+12-phone.png (11-12).
+
+USABILITY DEFECT CORRECTED (b278995; kept)
+ Before (12-laptop-1366x768-BEFORE-bf89227-historical*.png, code bf89227):
+ - Recent attempts at 1366x768: the fixed reference columns left Details
+   about 26px wide; its text could be read only by scrolling the table 57px
+   sideways.
+ - Refresh status: "On schedule" ran past the card's right edge.
+ - At 768x1024 the table scrolled 2px sideways.
+ After (12-laptop-1366x768-AFTER-2fe74e3*.png): the fixed column widths
+ apply from 1536px only; below that columns size by content and wrap; phone
+ minimum table width 700px. No sideways scroll at 1366 or 768. Phones still
+ scroll the table sideways by design (labelled, focusable region).
+
+APPROVED (cited owner decision)
+ 1. "Integrations & Data" sits under the child tabs (mock: above them).
+    Citation: owner decision "no heading above the 12 tabs" (readiness 10.7,
+    owner decisions; 10.6 item 4). This is the failing childTabs landmark.
+ 4. The Time column has no sort arrow (mock draws one); the table does not
+    sort. Citation: owner, 2026-10-29: "Do not add a sorting arrow".
+
+PROPOSED EXCEPTION: behaviour / truthful content (not approved)
  2. A fifth child tab, "Jobs & Pipelines": a real view the mock predates.
  3. Truthful states and copy:
     - "Previously validated" (mock "Verified");
     - the banner adds "Last successful pull 2 days ago";
-    - "Do not clear identity on provider rate limits or errors" wraps to
-      two lines;
-    - Schedule reads "Every 24 hours, 06:00 UTC".
-    Standing rule: real data semantics.
- 4. The Time column has no sort arrow because the table does not sort (the
-    mock draws one).
+    - Schedule reads "Every 24 hours, 06:00 UTC";
+    - "Do not clear identity on provider rate limits or errors" (wraps to
+      two lines).
 
-B. Rendering differences
- 5. Shell gutter 24px against the mock's 31px: left-anchored edges and
-    icons sit 6-7px in.
- 6. Lucide car, database and globe glyphs against the mock's drawings.
- 7. Inter text widths in the banner, tiles and table; the banner's resampled
-    2px button edge.
- 8. Fixture data (run times, provider domain, rooftop pin, pager count) is
-    masked in scoring.
- 9. "DESIGN CONCEPT" chip and caption: mock-only annotations.
+PROPOSED EXCEPTION: geometry / design choice (not approved)
+ 6. Page margin: shell gutter 24px against the mock's 31px; left-anchored
+    edges and icons sit 6-7px in.
+10. Tab row dimensions: section tabs 14px labels in a 38px row, child tabs
+    14px in a 40px row, 36px gaps (measured at 2fe74e3); the mock's labels
+    and rows are slightly larger.
 
-C. Unresolved (decision or defect)
- None open.
- Resolved: shared section tabs, fixed in 2fe74e3 (see 01).
- No other usability defect was found.
+ASSET SUBSTITUTION (not approved)
+ 5. The standard icon set (lucide) replaces the mock's car, database, globe
+    and clock drawings.
+
+RENDERING DIFFERENCES
+ 7. Font rasterization in the banner, tiles and table; the mock's banner
+    button has a resampled 2px edge.
+
+FIXTURE DATA, MASKED UNDER V2 (excluded from the score on both images)
+ 8. Run timestamps (tile values and attempt times), provider domain,
+    rooftop pin and the pager count. Mask selectors in masks.json "12".
+
+MOCK-ONLY ANNOTATIONS
+ 9. The mock's DESIGN CONCEPT chip (top right) is NOT masked on 12, so the
+    chip counts against this score. (It is masked on 02, 03, 06, 07, 09 and
+    13.) Recorded as found; the masks were not changed.
+ -  Footer caption: masked.
+
+PHONE 390x844 (no phone reference; not scored; not approved)
+11. The active child tab is scrolled into view, clear of the fade.
+12. The banner's action wraps under the text.
+
+UNRESOLVED (decision or defect)
+ None open. Shared tab fix in 2fe74e3: see 01.

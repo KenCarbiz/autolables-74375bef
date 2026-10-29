@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | 06 approved individually (appearance only); 12 screens pending | All 13 screens measured on `2fe74e3` (section 10.17), scores unchanged: 06 at 94.11% (approved); 12 screens below 94%; 01, 08 and 12 in focused review | Owner visual review of the remaining 12 |
+| 16 | Visual acceptance | 06 approved individually (appearance only); 12 screens pending | All 13 screens measured on `2fe74e3` (section 10.17), scores unchanged and masked as in every v2 run: 06 at 94.11% (approved); 12 screens below 94%; 01, 08 and 12 in focused review, differences classified in 10.18 (evidence `4958ce9`) | Owner visual review of the remaining 12 |
 
 ## 2. How the evidence was produced
 
@@ -1700,6 +1700,81 @@ No typography or pixel tuning was done.
 
 No exception is approved for 01, 08 or 12; each remains pending the owner's
 screen-specific decision.
+
+### 10.18 Focused review: classification corrected and scoring contract confirmed (2026-10-29)
+
+Documentation only. No pixel tuning, no new capture, no protocol or mask
+change, no rerun. Implementation `2fe74e3`; evidence `4958ce9`. The
+annotated images in `focused-review-01-08-12/annotated-2fe74e3/` were
+relabelled from the same captures, which are byte-identical to the `0536e10`
+captures except 08's phone capture. That one is the `2fe74e3` capture,
+committed in `annotated-2fe74e3/sources/`; it differs only in the section tab
+row. This section supersedes the "approved design change" and "rendering
+difference" groupings in 10.16, 10.17 and the earlier `DIFFERENCES.txt`.
+
+**Classes.** "Approved" is used only where a prior owner decision can be
+cited. Every other design choice is a proposed exception.
+
+| Class | 01 | 08 | 12 |
+| --- | --- | --- | --- |
+| Approved, with citation | 28px "Administration" title (owner 2026-10-29; title block 2026-10-28, 10.6 item 1) | title block and section row (10.6 item 1; 10.7); 14px widget-preview icons (owner 2026-10-29: "Do not enlarge") | heading under the tabs (10.7: "no heading above the 12 tabs"); no sort arrow (owner 2026-10-29: "Do not add a sorting arrow") |
+| Proposed exception: geometry / design choice | 24px page margin (mock 20px); 11px minimum text size (mock about 9-10px); section tab row dimensions | 24px page margin (mock 33px); tab rows: 14px labels in 38px and 40px rows (mock about 15px in about 45px) | 24px page margin (mock 31px); tab row dimensions |
+| Proposed exception: behaviour / truthful content | none | Review changes disabled; "Not supported yet"; warning lists what is missing; draft bar copy; no scope chevron; Escalation switch on its own page; sticky draft bar | "Jobs & Pipelines" tab; "Previously validated", last successful pull, schedule time, rate-limit wording |
+| Asset substitution | standard icon set (lucide) for the mock's icons | same | same |
+| Rendering difference | font rasterization (and the wraps it adds); the mock's banner edge colour | font rasterization; native switch appearance; 1px edge anti-aliasing | font rasterization; the mock's resampled banner button edge |
+| Fixture data, masked under v2 | tile counts; activity times; activity details | none | run times; provider domain; rooftop pin; pager count |
+| Mock-only annotation | footer captions (masked); DESIGN CONCEPT chip in the header, outside the content region | footer caption (masked); DESIGN CONCEPT chip **not masked, scored** | footer caption (masked); DESIGN CONCEPT chip **not masked, scored** |
+| Phone layout, no reference (not scored) | tabs scroll with a fade; banner action under the text | sticky draft bar; owner column collapsed; active tab in view | active tab in view; banner action wraps |
+
+Corrections made while classifying:
+- The 11px minimum text size was listed as approved under "preserve
+  readable text". No owner approval of the size itself exists, so it is
+  now a proposed exception. The 01 settings-tile wraps follow mainly from it
+  (11px against the mock's about 9-10px), with font widths adding to them.
+- Page margins and tab-row dimensions were listed as rendering differences.
+  They are geometry, now proposed exceptions.
+- Truthful copy, disabled actions and the missing chevron were listed as
+  approved under "real data semantics". They are proposed exceptions; 10.6
+  item 6 is still pending.
+- 08's child-tab row was described as 13px text in a 36px row. Measured at
+  `2fe74e3` it is 14px in a 40px row.
+- The 12 laptop "after" captures are marked "defect corrected", not
+  "approved".
+- The owner accepted horizontal tab scrolling at 1366px on conditions. The
+  phone rows use the same component and pass the same checks, but phone
+  layout has no reference and is listed for review, not as approved.
+
+**Scoring contract.**
+- Protocol v2 was owner-authorized on 2026-10-28 and introduced in `8b8f981`
+  (20:56 UTC).
+- `masks.json` last changed in `6391e7a` (18:19 UTC the same day), before v2.
+  `git diff 8b8f981 HEAD` shows no change to `masks.json`, `compare.cjs` or
+  `capture.cjs`.
+- The elements the 01 and 12 mask selectors match are unchanged since
+  `8b8f981`: the Overview source has not changed, and the inventory feed's
+  `data-parity` hooks are untouched (`b278995` changed only column widths).
+  08 has no selector masks.
+- Every v2 evidence run (`00075b6`, `fbd18a2`, `a085c74`, `0536e10` and
+  `4958ce9`) reports the same masked share and score for these screens:
+
+  | Screen | Masked share of the 1586x992 frame | Score |
+  | --- | --- | --- |
+  | 01 | 3.94% | 92.99% |
+  | 08 | 0.27% | 92.12% |
+  | 12 | 2.80% | 92.22% |
+
+- The published scores are **masked**. Masked pixels are excluded from both
+  images and from the denominator. No unmasked v2 figure is published, and
+  none was computed for this note.
+- One inconsistency was found and left unchanged. The DESIGN CONCEPT chip is
+  masked as a mock-only annotation on 02, 03, 06, 07, 09 and 13, but not on
+  08 or 12, so it counts against those two scores. 10.0 describes the chip
+  as masked; that is not true for 08 and 12.
+
+Kept unchanged: the `2fe74e3` keyboard-tab fixes and the `b278995`
+responsive table fix. Screen 06 remains individually approved at 94.11% and
+frozen. 01, 08 and 12 remain pending the owner's screen-specific decision,
+and the other nine screens remain pending.
 
 ## 11. Approvals requested
 

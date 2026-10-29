@@ -1,58 +1,80 @@
 08 Contact & Routing - remaining differences from the reference
-Current implementation 2fe74e3 (measured; package b278995/0536e10 superseded for current captures) (screen 08 code identical to 7f4fa1a). Protocol v2
-content 92.12% - below 94%: below the numeric target; no exception approved.
-Landmarks 12 of 12. Viewports: 0px page overflow at 390x844, 768x1024,
-1366x768 and 1586x992.
+Implementation 2fe74e3. Evidence 4958ce9 (annotated-2fe74e3/08-*.png); the
+1586x992 capture is byte-identical to the one committed in 0536e10. The
+390x844 capture used for 08-phone.png is the 2fe74e3 capture, committed as
+annotated-2fe74e3/sources/08-390x844-00-2fe74e3.png; it differs from the
+0536e10 phone capture only in the section tab row (rows 139-163), where the
+active tab now sits clear of the fade.
+Classification revised after 4958ce9 (documentation only: no new capture, no
+pixel change, no protocol or mask change).
 
-A. Approved design changes (owner decision or standing rule)
- 1. Title block: the one-Administration title block and the section row
-    (owner decision).
- 2. Review changes is disabled until the draft changes (the mock draws it
-    enabled). Correct behaviour.
- 3. The Escalation switch lives on the Escalation child page, so the
-    Response card does not draw it. Correct behaviour.
- 4. Truthful copy:
-    - "In-app notifications - Not supported yet" (mock: "Coming soon");
-    - the warning names what is missing ("Missing: BDC destination,
-      escalation destinations");
-    - the draft bar reads "No pending changes. Edits stay in this draft
-      until you review and apply them."
-    Standing rule: real data semantics.
- 5. The scope box has no chevron, because routing is stored once per
-    account (no scope choice exists). Real data semantics.
+Score: protocol v2 content 92.12%, scored WITH the v2 masks (0.27% of the
+1586x992 frame: the footer caption only). Below 94%: needs an explicit
+screen-specific exception; none is approved. Landmarks 12 of 12. Viewports:
+0px page overflow at 390x844, 768x1024, 1366x768 and 1586x992.
 
-B. Rendering differences
- 6. Inter text widths: "Customer should get a reply within:" and the timing
-    hints wrap differently from the mock.
- 7. Lucide glyphs against the mock's own drawings: grip, user, users,
-    shield, clock, mail, bell, chevrons and chip marks.
- 8. Switch knob and track rendering; 1px edge anti-aliasing where the mock
-    draws soft 2px borders.
- 9. The shell's child-tab row is 13px text in a 36px row (mock 15px in a
-    45px row).
-10. The sticky Draft configuration bar is anchored to the viewport, so in
-    the frame it sits over the mock's card bottoms.
-11. "DESIGN CONCEPT" chip and caption: mock-only annotations.
+Numbers match the badges in annotated-2fe74e3/08-desktop.png and
+08-phone.png (15-17). Items 7, 8 and 14 have no box.
 
-C. Unresolved (decision or defect)
- None open.
- Resolved since b278995:
- - Live preview icons (was item 12): documented as an embedded
-   customer-widget representation, not an Administration control
-   (owner, 2026-10-29). Measured at 2fe74e3 (widget-icons-08.cjs), at
-   1586x992 and 390x844:
-   * Call and Contact are non-interactive <span> elements: no role, no
-     tabindex, not focusable or clickable. They are decorative facsimiles.
-   * Icons are 14x14 and aria-hidden, the same as the real widget
-     (PassportCtaDock, w-3.5).
-   * Each item is 135x32 (134x32 on a phone). The real widget's buttons are
-     36px tall with 12px labels; the preview draws them 32px tall with 11px
-     labels, a slight scale-down.
-   * Icon centre is 0.25px from the label centre.
-   * White 11px bold text has 5.0:1 contrast on the 15% white wash and
-     6.9:1 on the widget blue.
-   The Administration 16px icon minimum continues to apply to
-   Administration controls only.
- - Shared section tabs (was item 13): fixed in 2fe74e3 (see 01).
- No other usability defect was found. At 1366x768 every control is visible
- and reachable as the page scrolls (laptop-1366x768 captures).
+APPROVED (cited owner decision)
+ 1. One "Administration" title block with the section row, and the child
+    page's own heading below the tabs. Citations: title block approved
+    2026-10-28 (readiness 10.6 item 1); owner decisions listed in 10.7.
+14. Shopper-widget preview keeps its 14px Call and Contact icons (below the
+    1586x992 frame). Citation: owner, 2026-10-29: "Do not enlarge its 14px
+    icons"; recorded as a customer-widget representation, not an
+    Administration control (measurements in readiness 10.17).
+
+PROPOSED EXCEPTION: behaviour / truthful content (not approved)
+ 2. Review changes is disabled until the draft changes (mock: enabled).
+ 3. "In-app notifications - Not supported yet" (mock: "Coming soon").
+ 4. The warning names what is missing ("Missing: BDC destination,
+    escalation destinations").
+ 5. Draft bar copy: "No pending changes. Edits stay in this draft until you
+    review and apply them."
+ 6. The scope box has no chevron: routing is stored once per account, so no
+    scope choice exists.
+ 7. The Escalation switch lives on the Escalation child page, so the
+    Response card does not draw it.
+ 8. The Draft configuration bar is sticky to the viewport, so in the frame it
+    sits over the mock's card bottoms (visible at items 2 and 5).
+ Readiness 10.6 item 6 lists these behaviour items as a pending proposal.
+
+PROPOSED EXCEPTION: geometry / design choice (not approved)
+11. Tab row dimensions: child tabs 14px labels in a 40px row, section tabs
+    14px in a 38px row, 36px gaps (measured at 2fe74e3). The mock's child
+    row draws about 15px labels in about a 45px row (estimated from the
+    image). An earlier note said "13px in a 36px row"; that was wrong and is
+    corrected here.
+ -  Page margin: shell gutter 24px. In the capture, left-anchored content
+    starts at x 261 against the mock's 270 (no box).
+
+ASSET SUBSTITUTION (not approved)
+10. The standard icon set (lucide) replaces the mock's drawn icons: grip,
+    user, users, shield, clock, mail, bell, chevrons and chip marks.
+
+RENDERING DIFFERENCES
+ 9. Font rasterization: Inter text widths make "Customer should get a reply
+    within:" and the timing hints wrap differently.
+12. Native switch appearance (knob and track) and 1px edge anti-aliasing
+    where the mock draws soft 2px borders.
+
+MOCK-ONLY ANNOTATIONS
+13. The mock's DESIGN CONCEPT chip (top right) is NOT masked on 08, so the
+    chip counts against this score. (It is masked on 02, 03, 06, 07, 09 and
+    13.) Recorded as found; the masks were not changed.
+ -  Footer caption "Proposed design - Illustrative data - No changes
+    applied": masked (the whole 0.27%).
+
+FIXTURE DATA
+ No fixture value on 08 is masked.
+
+PHONE 390x844 (no phone reference; not scored; not approved)
+15. The Draft configuration bar is sticky at the bottom of the viewport.
+16. The routing owner column collapses to a chevron.
+17. The active section tab is scrolled into view, clear of the fade.
+
+UNRESOLVED (decision or defect)
+ None open. No usability defect was found. At 1366x768 every control is
+ visible and reachable as the page scrolls (laptop-1366x768 captures).
+ Shared tab fix in 2fe74e3: see 01.
