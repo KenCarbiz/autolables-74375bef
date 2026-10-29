@@ -4,7 +4,7 @@ import { Route, Routes } from "react-router-dom";
 import { renderAdmin } from "@/test/adminRender";
 import { resetSupabaseSpy, spyCalls, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
 import { SCREEN_07 } from "@/pages/admin/fixtures/07";
-import { EXAMPLE_PRODUCT, EXAMPLE_RULE } from "@/pages/admin/fixtures/pricingFixtureData";
+import { EXAMPLE_PRODUCT, EXAMPLE_RULE, PRODUCT_APPLICABILITY_FIXTURE } from "@/pages/admin/fixtures/pricingFixtureData";
 import { PRODUCT_APPLICABILITY_PATH } from "@/pages/admin/childRoutes";
 
 vi.mock("@/integrations/supabase/client", async () => {
@@ -77,6 +77,34 @@ describe("ProductApplicabilityPage with the 07 fixture", () => {
 
     expect(screen.getByRole("button", { name: "Review changes" })).toBeDisabled();
     expect(writeCalls()).toEqual([]);
+  });
+
+  it("is preview only: Apply is blocked with the notice and no action reaches the real writer", () => {
+    renderPage("/admin/products/example-product-1/applicability", SCREEN_07.fixture);
+    expect(screen.getByText("Preview only — changes are not saved.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "No limit" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Optional accessory/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
+    const apply = screen.getByRole("button", { name: "Apply changes" });
+    expect(apply).toBeDisabled();
+    fireEvent.click(apply);
+    expect(screen.getByText("Preview only — changes are not saved.")).toBeInTheDocument();
+    expect(rulesState.updateRule).not.toHaveBeenCalled();
+    expect(rulesState.addRule).not.toHaveBeenCalled();
+    expect(auditState.log).not.toHaveBeenCalled();
+    expect(writeCalls()).toEqual([]);
+    expect(spyCalls.filter((c) => c.kind === "table" && c.table === "products")).toEqual([]);
+  });
+
+  it("shows a sample vehicle whose mileage is not recorded as Unknown, not as eligible or excluded", () => {
+    const view = SCREEN_07.fixture.views["product-applicability"] as typeof PRODUCT_APPLICABILITY_FIXTURE;
+    const vehicles = [{ ...view.vehicles[0], vin: "EXAMPLEVIN0000009", condition: "used", mileage: null }];
+    renderPage("/admin/products/example-product-1/applicability", { ...SCREEN_07.fixture, views: { "product-applicability": { ...view, vehicles } } });
+    const row = within(screen.getByRole("table", { name: "Sample vehicle results" })).getAllByRole("row")[1];
+    expect(within(row).getAllByText("Unknown").length).toBeGreaterThan(0);
+    expect(within(row).getByText("mileage not recorded")).toBeInTheDocument();
+    expect(within(row).queryByText("Yes")).toBeNull();
+    expect(within(row).queryByText("No")).toBeNull();
   });
 });
 

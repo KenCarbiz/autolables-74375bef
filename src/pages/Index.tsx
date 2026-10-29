@@ -4,6 +4,7 @@ import { useProducts, Product, type ProductUpgrade } from "@/hooks/useProducts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useProductRules, VehicleContext } from "@/hooks/useProductRules";
+import { describeUnknown } from "@/lib/productEligibility";
 import { bucketForVehicle, resolveTierPrice } from "@/types/product";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -139,7 +140,7 @@ const Index = () => {
   const { data: products, isLoading } = useProducts();
   const { user, isAdmin } = useAuth();
   const { settings } = useDealerSettings();
-  const { rules, getMatchingProducts } = useProductRules();
+  const { rules, getProductEligibility } = useProductRules();
   const { log } = useAudit();
   const { currentStore, tenant } = useTenant();
   const { byVin, captureSnapshot } = useAdvertisedPrices(currentStore?.id || "");
@@ -378,9 +379,22 @@ const Index = () => {
   // catalog (raw base name + base price + upgrade object) so the upgrade toggle
   // recomputes correctly instead of stacking onto an already-combined snapshot.
   const baseProducts = viewMode && loadedProducts ? loadedProducts : products;
-  const ruledProducts = settings.feature_product_rules && rules.length > 0 && !viewMode
-    ? getMatchingProducts(vehicleContext, baseProducts || [])
-    : baseProducts;
+  // Product rules read the vehicle's recorded condition and mileage (inventory
+  // record, listing import or vehicle-file link) through the same predicate the
+  // Administration applicability samples use. A product whose rule needs a
+  // value that is missing or unrecognized is held off the addendum and listed
+  // as undetermined; nothing is assumed. Saved addenda (view mode) keep their
+  // snapshot untouched.
+  const ruleVehicle = useMemo<VehicleContext>(
+    () => ({ ...vehicleContext, condition: vehicleDetails.condition ?? null, mileage: vehicleDetails.mileage ?? null }),
+    [vehicleContext, vehicleDetails.condition, vehicleDetails.mileage],
+  );
+  const rulesActive = settings.feature_product_rules && rules.length > 0 && !viewMode;
+  const eligibility = useMemo(
+    () => (rulesActive ? getProductEligibility(ruleVehicle, baseProducts || []) : null),
+    [rulesActive, getProductEligibility, ruleVehicle, baseProducts],
+  );
+  const ruledProducts = eligibility ? eligibility.eligible : baseProducts;
 
   // Install-proof regime — once any vendor/detail-shop has scanned this VIN
   // and verified an installation, the deal enters the proof regime: products
@@ -1526,11 +1540,24 @@ const Index = () => {
       )}
 
       {/* Rules notification */}
-      {settings.feature_product_rules && rules.length > 0 && vehicleContext.make && !viewMode && (
-        <div style={{ maxWidth: previewMaxWidth }} className="mx-auto mb-2 no-print">
+      {eligibility?.engaged && vehicleContext.make && (
+        <div style={{ maxWidth: previewMaxWidth }} className="mx-auto mb-2 no-print space-y-1" data-testid="product-rules-notice">
           <div className="bg-teal/10 border border-teal/30 rounded-md px-3 py-1.5 text-[11px] text-teal font-semibold">
             Product rules active — showing {displayProducts?.length || 0} products matching {vehicleContext.year} {vehicleContext.make} {vehicleContext.model}
           </div>
+          {eligibility.undetermined.length > 0 && (
+            <div role="status" className="bg-amber-50 border border-amber-200 rounded-md px-3 py-1.5 text-[11px] text-amber-900">
+              <span className="font-semibold">Eligibility not determined, left off this addendum: </span>
+              {eligibility.undetermined.map(({ product, evaluation }) => `${product.name} (${evaluation.unknown.map((f) => describeUnknown(f, ruleVehicle)).join(", ")})`).join("; ")}.
+              {" "}Open the addendum from the vehicle&apos;s inventory record or import its listing so condition and mileage are known.
+            </div>
+          )}
+          {eligibility.excluded.length > 0 && (
+            <div className="bg-muted/40 border border-border rounded-md px-3 py-1.5 text-[11px] text-muted-foreground">
+              <span className="font-semibold">Not applicable under product rules: </span>
+              {eligibility.excluded.map(({ product, evaluation }) => `${product.name} (${evaluation.reasons.join(" ")})`).join("; ")}
+            </div>
+          )}
         </div>
       )}
 

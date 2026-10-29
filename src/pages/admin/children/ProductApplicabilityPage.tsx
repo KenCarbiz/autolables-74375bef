@@ -36,6 +36,8 @@ import { AdminButton, AdminCard, AdminLinkButton, AdminTable, InlineNote, Skelet
 import { tenantIdOf, useInstallProofCounts, useProduct, useSampleVehicles, type AdminProduct } from "@/pages/admin/views/pricing/pricingData";
 import { AdminInput, AdminSelect, CheckRow } from "@/pages/admin/views/pricing/ui";
 import { cn } from "@/lib/utils";
+import { describeUnknown } from "@/lib/productEligibility";
+import { applicabilityWriter, PREVIEW_ONLY } from "./applicabilityWriter";
 
 // Product applicability: the condition, mileage and model-year limits for one
 // product, its price treatment, the evidence a vehicle needs before the
@@ -143,6 +145,16 @@ export default function ProductApplicabilityPage() {
 
   const productQuery = useProduct(productId, live);
   const { rules, loading: rulesLoading, addRule, updateRule } = useProductRules();
+  // The design fixture gets the preview adapter: every write rejects before a client is called.
+  const writer = useMemo(() => applicabilityWriter(!!fixture, {
+    updateRule,
+    addRule,
+    updateProduct: async (id, values) => {
+      const { error } = await supabase.from("products").update(values).eq("id", id);
+      return { error };
+    },
+    audit: (entry) => audit.log(entry as Parameters<typeof audit.log>[0]),
+  }), [fixture, updateRule, addRule, audit]);
   const vehiclesQuery = useSampleVehicles(tenantId, 6, live);
 
   const product = fixture?.product ?? productQuery.data ?? null;
@@ -199,26 +211,21 @@ export default function ProductApplicabilityPage() {
 
   const apply = async () => {
     if (!productId || !product) return;
+    if (writer.preview) { dispatch({ type: "error", message: PREVIEW_ONLY }); return; }
     const gate = canApply(state);
     if (!gate.ok) { dispatch({ type: "error", message: gate.reason ?? "The change cannot be applied." }); return; }
     dispatch({ type: "apply" });
     try {
       const patch = draftToRulePatch(draft.rule);
       let ruleId = rule?.id ?? null;
-      if (rule) await updateRule(rule.id, patch);
+      if (rule) await writer.updateRule(rule.id, patch);
       else {
-        const created = await addRule({ product_id: productId, makes: [], models: [], trims: [], body_styles: [], ...patch });
+        const created = await writer.addRule({ product_id: productId, makes: [], models: [], trims: [], body_styles: [], ...patch });
         ruleId = created.id;
       }
       const treatmentChanged = draft.treatment !== state.original.treatment || draft.price !== state.original.price;
-      if (treatmentChanged) {
-        const { error } = await supabase
-          .from("products")
-          .update({ badge_type: draft.treatment, price_label: draft.treatment === "installed" ? "Included in Selling Price" : "If Accepted", price: draft.price })
-          .eq("id", productId);
-        if (error) throw new Error(error.message);
-      }
-      audit.log({
+      if (treatmentChanged) await writer.updateTreatment(productId, draft.treatment, draft.price);
+      writer.audit({
         store_id: tenantId ?? "",
         user_id: user?.id ?? "",
         action: rule ? "rule_updated" : "rule_added",
@@ -445,7 +452,16 @@ export default function ProductApplicabilityPage() {
                             <p className="text-[14px] leading-[20px] font-semibold text-adm-ink whitespace-nowrap">{[r.vehicle.year, r.vehicle.make, r.vehicle.model].filter(Boolean).join(" ")}</p>
                             <p className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">{[r.vehicle.trim, r.vehicle.condition ? CONDITION_WORD[r.vehicle.condition.toLowerCase()] ?? r.vehicle.condition : null, r.vehicle.mileage != null ? `${r.vehicle.mileage.toLocaleString()} mi` : null].filter(Boolean).join(" · ")}</p>
                           </Td>
-                          <Td><StateMark icon={r.eligible ? CheckCircle2 : XCircle} tone={r.eligible ? "success" : "danger"}>{r.eligible ? "Yes" : "No"}</StateMark></Td>
+                          <Td>
+                            {r.status === "undetermined" ? (
+                              <>
+                                <StateMark icon={HelpCircle} tone="neutral">Unknown</StateMark>
+                                <p className="text-[12px] leading-[16px] text-adm-muted">{r.evaluation.unknown.map((f) => describeUnknown(f, r.vehicle)).join("; ")}</p>
+                              </>
+                            ) : (
+                              <StateMark icon={r.eligible ? CheckCircle2 : XCircle} tone={r.eligible ? "success" : "danger"}>{r.eligible ? "Yes" : "No"}</StateMark>
+                            )}
+                          </Td>
                           <Td>{proofsLoading && r.eligible && r.proof === "unknown" ? <span className="text-adm-muted text-[12px]">Checking…</span> : <StateMark icon={PROOF_MARK[r.proof].icon} tone={PROOF_MARK[r.proof].tone}>{PROOF_LABEL[r.proof]}</StateMark>}</Td>
                           <Td>{proofsLoading && r.eligible && r.publication === "unknown" ? <span className="text-adm-muted text-[12px]">Checking…</span> : <StateMark icon={PUBLICATION_MARK[r.publication].icon} tone={PUBLICATION_MARK[r.publication].tone}>{PUBLICATION_LABEL[r.publication]}</StateMark>}</Td>
                         </tr>
@@ -480,7 +496,7 @@ export default function ProductApplicabilityPage() {
                 </tbody>
               </AdminTable>
             </div>
-            <p className="mt-3 text-[12px] leading-[18px] text-adm-muted">{results.filter((r) => r.eligible).length} of {results.length} sampled vehicles would be eligible. Change will be audited.</p>
+            <p className="mt-3 text-[12px] leading-[18px] text-adm-muted">{results.filter((r) => r.eligible).length} of {results.length} sampled vehicles would be eligible{results.some((r) => r.status === "undetermined") ? `; ${results.filter((r) => r.status === "undetermined").length} could not be determined` : ""}. Change will be audited.</p>
           </AdminCard>
         )}
 
@@ -489,12 +505,13 @@ export default function ProductApplicabilityPage() {
           {reviewing ? (
             <>
               <AdminButton className="h-[42px] px-[18px] text-[15px]" onClick={() => dispatch({ type: "edit", draft })} disabled={state.phase === "applying"}>Back to edit</AdminButton>
-              <AdminButton variant="primary" className="h-[42px] px-[18px] text-[15px]" onClick={apply} disabled={state.phase === "applying" || !canApply(state).ok || !tenantId} data-landmark="applicability-apply">{state.phase === "applying" ? "Applying…" : "Apply changes"}</AdminButton>
+              <AdminButton variant="primary" className="h-[42px] px-[18px] text-[15px]" onClick={apply} disabled={writer.preview || state.phase === "applying" || !canApply(state).ok || !tenantId} data-landmark="applicability-apply">{state.phase === "applying" ? "Applying…" : "Apply changes"}</AdminButton>
             </>
           ) : (
             <AdminButton variant="primary" className="h-[42px] px-[18px] text-[15px]" onClick={startReview} disabled={!dirty || errors.length > 0} data-landmark="applicability-review">Review changes</AdminButton>
           )}
         </div>
+        {writer.preview && <p role="status" className="text-right text-[13px] leading-[18px] text-adm-muted">{PREVIEW_ONLY}</p>}
       </div>
     </ChildPageFrame>
   );

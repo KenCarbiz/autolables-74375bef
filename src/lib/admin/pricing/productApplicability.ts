@@ -1,4 +1,5 @@
-import { matchesRule, type ProductRule, type VehicleContext } from "@/hooks/useProductRules";
+import type { ProductRule } from "@/hooks/useProductRules";
+import { evaluateRule, readCondition, type EligibilityStatus, type RuleEvaluation } from "@/lib/productEligibility";
 
 // Product applicability as a reviewable draft over the existing product_rules
 // model, plus the distinctions the reference keeps apart: eligible is not
@@ -49,12 +50,10 @@ export function validateApplicabilityDraft(d: ApplicabilityDraft): string[] {
   return errors;
 }
 
+/** The vehicle's condition when it is recorded and recognized; null otherwise (never assumed Used). */
 export const conditionOfVehicle = (condition: string | null | undefined): ConditionKey | null => {
-  const c = (condition ?? "").toLowerCase();
-  if (!c) return null;
-  if (c === "new") return "new";
-  if (/cpo|certified/.test(c)) return "cpo";
-  return "used";
+  const c = readCondition(condition);
+  return c.kind === "known" ? c.value : null;
 };
 
 export interface SampleVehicle {
@@ -67,22 +66,21 @@ export interface SampleVehicle {
   mileage: number | null;
 }
 
-/** Eligibility through the same predicate the addendum builder uses. */
+/**
+ * Eligibility of a sample vehicle under the draft, through the same predicate
+ * the addendum builder uses (lib/productEligibility): the draft is turned
+ * into the stored rule shape first, so CPO follows Used exactly as it will
+ * once saved.
+ */
+export function vehicleEligibility(d: ApplicabilityDraft, v: SampleVehicle): RuleEvaluation {
+  if (!d.conditions.new && !d.conditions.used) return { status: "excluded", reasons: ["No condition is selected."], unknown: [] };
+  const rule = { makes: [], models: [], trims: [], body_styles: [], ...draftToRulePatch(d) };
+  return evaluateRule(rule, { year: v.year, make: v.make, model: v.model, trim: v.trim, condition: v.condition, mileage: v.mileage });
+}
+
+/** True only when the vehicle is known to qualify; an undetermined vehicle is not eligible. */
 export function vehicleEligible(d: ApplicabilityDraft, v: SampleVehicle): boolean {
-  const c = conditionOfVehicle(v.condition);
-  if (c && !d.conditions[c]) return false;
-  const patch = draftToRulePatch(d);
-  const rule: ProductRule = { id: "draft", product_id: "draft", makes: [], models: [], trims: [], body_styles: [], ...patch };
-  const ctx: VehicleContext = {
-    year: v.year == null ? "" : String(v.year),
-    make: v.make ?? "",
-    model: v.model ?? "",
-    trim: v.trim ?? "",
-    bodyStyle: "",
-    condition: c === "new" ? "new" : c ? "used" : undefined,
-    mileage: v.mileage ?? undefined,
-  };
-  return matchesRule(rule, ctx);
+  return vehicleEligibility(d, v).status === "eligible";
 }
 
 export type PriceTreatment = "installed" | "optional";
@@ -157,6 +155,9 @@ export type PublicationState = "blocked" | "ready_for_review" | "publishable" | 
 export interface SampleResult {
   vehicle: SampleVehicle;
   eligible: boolean;
+  /** eligible, excluded, or undetermined when a fact the rule needs is not recorded. */
+  status: EligibilityStatus;
+  evaluation: RuleEvaluation;
   proof: ProofState;
   publication: PublicationState;
 }
@@ -173,14 +174,16 @@ export function sampleResult(
   vehicle: SampleVehicle,
   verifiedProofs: number | null,
 ): SampleResult {
-  const eligible = vehicleEligible(d, vehicle);
-  if (!eligible) return { vehicle, eligible, proof: "excluded", publication: "not_published" };
+  const evaluation = vehicleEligibility(d, vehicle);
+  const base = { vehicle, status: evaluation.status, evaluation, eligible: evaluation.status === "eligible" };
+  if (evaluation.status === "undetermined") return { ...base, proof: "unknown", publication: "unknown" };
+  if (evaluation.status === "excluded") return { ...base, proof: "excluded", publication: "not_published" };
   if (treatment === "optional") {
-    return { vehicle, eligible, proof: "not_required", publication: policy.requireManagerApproval ? "ready_for_review" : "publishable" };
+    return { ...base, proof: "not_required", publication: policy.requireManagerApproval ? "ready_for_review" : "publishable" };
   }
-  if (verifiedProofs == null) return { vehicle, eligible, proof: "unknown", publication: "unknown" };
-  if (verifiedProofs <= 0) return { vehicle, eligible, proof: "missing", publication: "blocked" };
-  return { vehicle, eligible, proof: "attached", publication: policy.requireManagerApproval ? "ready_for_review" : "publishable" };
+  if (verifiedProofs == null) return { ...base, proof: "unknown", publication: "unknown" };
+  if (verifiedProofs <= 0) return { ...base, proof: "missing", publication: "blocked" };
+  return { ...base, proof: "attached", publication: policy.requireManagerApproval ? "ready_for_review" : "publishable" };
 }
 
 export const PROOF_LABEL: Record<ProofState, string> = {

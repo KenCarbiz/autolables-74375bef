@@ -86,3 +86,36 @@ describe("sample results keep eligible, installed and published apart", () => {
     expect(sampleResult(draft(), "optional", { requireManagerApproval: false }, vehicle, null)).toMatchObject({ proof: "not_required", publication: "publishable" });
   });
 });
+
+describe("screen 07 samples and the addendum builder agree", () => {
+  it("gives the same status for every saved rule shape and vehicle", async () => {
+    const { productEligibility } = await import("@/hooks/useProductRules");
+    const { draftFromRule, vehicleEligibility } = await import("./productApplicability");
+    const conditions = ["new", "used", "all"] as const;
+    const limits = [0, 28_115, 30_000];
+    const vehicles = [
+      { condition: "new", mileage: 12 },
+      { condition: "used", mileage: 28_115 },
+      { condition: "used", mileage: 28_116 },
+      { condition: "cpo", mileage: 96_480 },
+      { condition: "Certified Pre-Owned", mileage: 5_000 },
+      { condition: null, mileage: 10_000 },
+      { condition: "Fleet return", mileage: 10_000 },
+      { condition: "used", mileage: null },
+    ];
+    let compared = 0;
+    for (const condition of conditions) {
+      for (const mileage_max of limits) {
+        const saved = { id: "r", product_id: "p", year_min: "2020", year_max: "", makes: [], models: [], trims: [], body_styles: [], condition, mileage_max };
+        for (const v of vehicles) {
+          const sample = vehicleEligibility(draftFromRule(saved), { vin: "V", year: 2023, make: "Example", model: "S30", trim: null, condition: v.condition, mileage: v.mileage });
+          const addendum = productEligibility([saved], { year: "2023", make: "Example", model: "S30", trim: "", bodyStyle: "", condition: v.condition, mileage: v.mileage }, [{ id: "p" } as never]);
+          const addendumStatus = addendum.eligible.length ? "eligible" : addendum.excluded.length ? "excluded" : "undetermined";
+          expect(sample.status, `${condition} ${mileage_max} ${JSON.stringify(v)}`).toBe(addendumStatus);
+          compared++;
+        }
+      }
+    }
+    expect(compared).toBe(72);
+  });
+});

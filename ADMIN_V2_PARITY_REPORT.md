@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-29T07:08:05.765Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-29T07:51:06.552Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 

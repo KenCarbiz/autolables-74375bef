@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeInvalidate } from "./useRealtimeInvalidate";
 import { Product } from "./useProducts";
+import { evaluateProduct, type EligibilityVehicle, type ProductEvaluation } from "@/lib/productEligibility";
 
 // ──────────────────────────────────────────────────────────────
 // useProductRules — Supabase-backed, TanStack-Query-wrapped
@@ -13,9 +14,10 @@ import { Product } from "./useProducts";
 // public.product_rules (migration 20260518100000), tenant-scoped
 // via RLS so every device in the tenant sees the same set.
 //
-// Public API is preserved — no args, returns { rules, addRule,
-// updateRule, deleteRule, getMatchingProducts } — so Index.tsx
-// and Admin.tsx need no changes.
+// Returns { rules, addRule, updateRule, deleteRule,
+// getProductEligibility }. Eligibility goes through
+// lib/productEligibility, the same predicate the Administration
+// applicability samples use.
 // ──────────────────────────────────────────────────────────────
 
 export interface ProductRule {
@@ -37,8 +39,34 @@ export interface VehicleContext {
   model: string;
   trim: string;
   bodyStyle: string;
-  condition?: "new" | "used";
-  mileage?: number;
+  /** Condition label as recorded; read by lib/productEligibility (missing or unrecognized is unknown). */
+  condition?: string | null;
+  /** Odometer as recorded; missing or unreadable is unknown, never zero. */
+  mileage?: string | number | null;
+}
+
+export interface ProductEligibilityResult {
+  /** False before the vehicle is identified (no year, make or model): every product is listed, as before. */
+  engaged: boolean;
+  eligible: Product[];
+  excluded: Array<{ product: Product; evaluation: ProductEvaluation }>;
+  undetermined: Array<{ product: Product; evaluation: ProductEvaluation }>;
+}
+
+/** Sorts products by their rules through the canonical predicate in lib/productEligibility. */
+export function productEligibility(rules: ProductRule[], vehicle: VehicleContext, allProducts: Product[]): ProductEligibilityResult {
+  if (!vehicle.year && !vehicle.make && !vehicle.model) return { engaged: false, eligible: allProducts, excluded: [], undetermined: [] };
+  const byProduct = new Map<string, ProductRule[]>();
+  for (const r of rules) byProduct.set(r.product_id, [...(byProduct.get(r.product_id) ?? []), r]);
+  const subject: EligibilityVehicle = vehicle;
+  const result: ProductEligibilityResult = { engaged: true, eligible: [], excluded: [], undetermined: [] };
+  for (const p of allProducts) {
+    const evaluation = evaluateProduct(byProduct.get(p.id) ?? [], subject);
+    if (evaluation.status === "eligible") result.eligible.push(p);
+    else if (evaluation.status === "excluded") result.excluded.push({ product: p, evaluation });
+    else result.undetermined.push({ product: p, evaluation });
+  }
+  return result;
 }
 
 const productRulesKey = ["product_rules"] as const;
@@ -136,71 +164,10 @@ export const useProductRules = () => {
     [deleteRuleMutation],
   );
 
-  // Pure predicate — same logic as the localStorage version, now
-  // working over the Supabase-backed rules array.
-  const getMatchingProducts = useCallback(
-    (vehicle: VehicleContext, allProducts: Product[]): Product[] => {
-      if (!vehicle.year && !vehicle.make && !vehicle.model) return allProducts;
-
-      const matchedProductIds = new Set<string>();
-      const productsWithRules = new Set(rules.map(r => r.product_id));
-
-      // Products without ANY rule always show — rules are
-      // "include" filters; absence means "no constraint".
-      allProducts.forEach(p => {
-        if (!productsWithRules.has(p.id)) {
-          matchedProductIds.add(p.id);
-        }
-      });
-
-      for (const rule of rules) {
-        if (matchesRule(rule, vehicle)) {
-          matchedProductIds.add(rule.product_id);
-        }
-      }
-
-      return allProducts.filter(p => matchedProductIds.has(p.id));
-    },
+  const getProductEligibility = useCallback(
+    (vehicle: VehicleContext, allProducts: Product[]): ProductEligibilityResult => productEligibility(rules, vehicle, allProducts),
     [rules],
   );
 
-  return { rules, loading: q.isLoading, addRule, updateRule, deleteRule, getMatchingProducts };
+  return { rules, loading: q.isLoading, addRule, updateRule, deleteRule, getProductEligibility };
 };
-
-export function matchesRule(rule: ProductRule, vehicle: VehicleContext): boolean {
-  const vYear = parseInt(vehicle.year) || 0;
-  const rMin = parseInt(rule.year_min) || 0;
-  const rMax = parseInt(rule.year_max) || 9999;
-
-  if (vYear && (vYear < rMin || vYear > rMax)) return false;
-
-  if (rule.makes.length > 0 && vehicle.make) {
-    const vmake = vehicle.make.toLowerCase();
-    if (!rule.makes.some(m => m.toLowerCase() === vmake)) return false;
-  }
-
-  if (rule.models.length > 0 && vehicle.model) {
-    const vmodel = vehicle.model.toLowerCase();
-    if (!rule.models.some(m => m.toLowerCase() === vmodel)) return false;
-  }
-
-  if (rule.trims.length > 0 && vehicle.trim) {
-    const vtrim = vehicle.trim.toLowerCase();
-    if (!rule.trims.some(t => t.toLowerCase() === vtrim)) return false;
-  }
-
-  if (rule.body_styles.length > 0 && vehicle.bodyStyle) {
-    const vbody = vehicle.bodyStyle.toLowerCase();
-    if (!rule.body_styles.some(b => b.toLowerCase() === vbody)) return false;
-  }
-
-  if (rule.condition !== "all" && vehicle.condition && rule.condition !== vehicle.condition) {
-    return false;
-  }
-
-  if (rule.mileage_max > 0 && vehicle.mileage && vehicle.mileage > rule.mileage_max) {
-    return false;
-  }
-
-  return true;
-}
