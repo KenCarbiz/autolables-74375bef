@@ -154,6 +154,10 @@ async function screen07(browser) {
     await page.getByRole("heading", { name: "Review changes" }).scrollIntoViewIfNeeded();
     await page.evaluate(() => scrollBy(0, 120));
     await shot(page, "07", "reviewing", "Review step: before and after table, Back to edit and Apply changes");
+    // The design fixture is preview only: Apply is disabled and the notice sits under the action row.
+    await page.getByRole("button", { name: "Apply changes" }).scrollIntoViewIfNeeded();
+    await page.evaluate(() => scrollBy(0, 200));
+    await shot(page, "07", "reviewing-preview-only", "Design fixture: Apply changes disabled; \"Preview only — changes are not saved.\"");
     if (w === 1586) {
       await page.getByRole("button", { name: "Back to edit" }).click();
       await page.selectOption("#year-min", { index: 1 });

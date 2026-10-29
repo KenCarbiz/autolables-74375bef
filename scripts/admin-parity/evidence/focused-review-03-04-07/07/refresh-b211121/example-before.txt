@@ -1,0 +1,3 @@
+EXAMPLE {"condition":"used","mileage":28115} => ["Any Vehicle Coating","New Only Film","Used Only Warranty","All Conditions Kit","Low Mileage Plan","At Limit Plan","Used Under 30k Plan"]
+EXAMPLE {"condition":"new","mileage":12} => ["Any Vehicle Coating","New Only Film","Used Only Warranty","All Conditions Kit","Low Mileage Plan","At Limit Plan","Used Under 30k Plan"]
+EXAMPLE {"condition":null,"mileage":null} => ["Any Vehicle Coating","New Only Film","Used Only Warranty","All Conditions Kit","Low Mileage Plan","At Limit Plan","Used Under 30k Plan"]

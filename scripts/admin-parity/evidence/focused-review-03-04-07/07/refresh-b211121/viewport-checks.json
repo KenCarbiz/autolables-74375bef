@@ -1,0 +1,62 @@
+[
+ {
+  "screen": "07",
+  "viewport": "1586x992",
+  "pageOverflowPx": 0,
+  "pageHeight": 1074,
+  "captures": 2,
+  "scrollRegions": []
+ },
+ {
+  "screen": "07",
+  "viewport": "1366x768",
+  "pageOverflowPx": 0,
+  "pageHeight": 1756,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 28
+   }
+  ]
+ },
+ {
+  "screen": "07",
+  "viewport": "768x1024",
+  "pageOverflowPx": 0,
+  "pageHeight": 1744,
+  "captures": 2,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 397
+   }
+  ]
+ },
+ {
+  "screen": "07",
+  "viewport": "390x844",
+  "pageOverflowPx": 0,
+  "pageHeight": 2457,
+  "captures": 3,
+  "scrollRegions": [
+   {
+    "label": "Administration sections (scrolls sideways)",
+    "focusable": true,
+    "hidden": 759
+   },
+   {
+    "label": "Product views (scrolls sideways)",
+    "focusable": true,
+    "hidden": 152
+   },
+   {
+    "label": "Sample vehicle results (scrolls sideways)",
+    "focusable": true,
+    "hidden": 229
+   }
+  ]
+ }
+]

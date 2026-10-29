@@ -1,0 +1,40 @@
+Addendum product-rule enforcement: before / after through the real builder
+(src/pages/Index.tsx rendered with the real useProductRules and the
+vehicle-file link /addendum?vehicleId=&vin=&ymm=&mileage=; synthetic catalog
+and rules from src/pages/Index.productRules.test.tsx; no production data).
+
+Before = f94d1a0 (condition and mileage never reached the matcher).
+After  = b211121 (implementation of this correction).
+
+Rules: New Only Film = new; Used Only Warranty = used; All Conditions Kit =
+all; Low Mileage Plan = all, max 25,000 mi; At Limit Plan = all, max
+28,115 mi; Used Under 30k Plan = used, max 30,000 mi; Any Vehicle Coating has
+no rule.
+
+Vehicle: Used, 28,115 mi (from the inventory record)
+  Before: Any Vehicle Coating, New Only Film, Used Only Warranty, All
+          Conditions Kit, Low Mileage Plan, At Limit Plan, Used Under 30k Plan
+  After:  Any Vehicle Coating, Used Only Warranty, All Conditions Kit, At Limit
+          Plan, Used Under 30k Plan
+          Not applicable under product rules: New Only Film (Rule applies to
+          New vehicles; this vehicle is Used.); Low Mileage Plan (Mileage
+          28,115 is over the 25,000 mi limit.)
+          At Limit Plan stays: exactly at the limit applies.
+
+Vehicle: New, 12 mi
+  Before: all seven products
+  After:  Any Vehicle Coating, New Only Film, All Conditions Kit, Low Mileage
+          Plan, At Limit Plan
+          Not applicable: Used Only Warranty and Used Under 30k Plan (Rule
+          applies to Used and CPO vehicles; this vehicle is New.)
+
+Vehicle: condition and mileage not recorded
+  Before: all seven products
+  After:  Any Vehicle Coating, All Conditions Kit
+          Eligibility not determined, left off this addendum: New Only Film
+          (condition not recorded); Used Only Warranty (condition not
+          recorded); Low Mileage Plan (mileage not recorded); At Limit Plan
+          (mileage not recorded); Used Under 30k Plan (condition not recorded,
+          mileage not recorded).
+
+Raw output: example-before.txt, example-after.txt.

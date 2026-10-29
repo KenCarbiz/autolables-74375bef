@@ -1,4 +1,9 @@
 07 Product applicability - remaining differences from the reference
+Refresh at implementation b211121 (refresh-b211121/): visible change in the
+design fixture only, below the 992px frame: the "Preview only — changes are
+not saved." line under the action row, and Apply changes disabled in the
+review step. The scored 1586x992 capture is byte-identical (87.86%, 3.13%
+masked). Items 22-23 in refresh-b211121/annotated/.
 Implementation 2d7954d. Evidence ec43fe0 (captures). Annotated images:
 annotated-2d7954d/07-desktop.png (1-13, 20), 07-validation.png (10, 18-21),
 07-phone.png (14-16). Labels revised after f9ee8fe from the same captures.
@@ -96,32 +101,29 @@ F. PHONE 390x844 (no phone reference; not scored; not approved)
 17. Sample vehicle results scroll sideways inside a labelled region (229px
     hidden). No box.
 
-G. OPEN FINDING (reported, not changed; business-rule decision)
-20. The Sample vehicle results description says the vehicles are "run
-    through the same matcher the addendum uses". It is the same function
-    (matchesRule), but the addendum builder (src/pages/Index.tsx:382)
-    passes only year, make, model, trim and body style; it never passes
-    the vehicle's condition or mileage. matchesRule skips a check whose
-    input is missing.
-    - So today a product rule's condition (New / Used / All) and maximum
-      mileage are not applied when an addendum is built.
-    - Screen 07's sample results do apply them.
-    - The sample results can therefore show a vehicle as not eligible
-      that the addendum would still include. Example from the fixture:
-      2022 Example H20, CPO, 96,480 mi, against an 80,000 mi limit.
-    This predates V2 and is outside visual acceptance. Fixing the
-    addendum input or the wording is a separate decision.
+G. FINDING 20: RESOLVED IN b211121 (owner instruction 2026-10-29)
+20. The addendum builder now passes the vehicle's recorded condition and
+    mileage to the product rules, through the same predicate as these
+    sample results (src/lib/productEligibility.ts). The description "run
+    through the same matcher the addendum uses" is now accurate and was not
+    reworded. See refresh-b211121/ADDENDUM-RULES-BEFORE-AFTER.txt.
+    The sample results now show a vehicle whose condition or mileage is
+    missing or unrecognized as Unknown, with the missing value named. The
+    fixture vehicles all have both, so the default screen is unchanged.
 
 H. VERIFICATION SCOPE
  Browser-exercised (design fixture, Chromium):
  - edit, review step, Back to edit, the reversed-range validation, Review
    disabled and enabled states;
  - layout at 1586, 1366, 768 and 390; tab focus.
- Apply changes is ENABLED in the fixture's review step and was NOT
- pressed. Unlike 03/04, the 07 fixture does not block Apply: pressing it
- would call the real rule writer from the development-only fixture route
- (src/App.tsx: import.meta.env.DEV). Whether it writes in the fixture was
- not established. A fixture guard is proposed, not made.
+ Fixture writes (corrected in b211121): every write on this page goes
+ through one adapter (applicabilityWriter.ts). Under the design fixture the
+ preview adapter rejects the rule update, rule insert, price treatment write
+ and audit entry before any client is called; Apply is blocked in the handler
+ and disabled, and the page shows "Preview only — changes are not saved."
+ (refresh-b211121/annotated, items 22-23). Tests prove no fixture action
+ reaches the real writer (applicabilityWriter.test.ts;
+ ProductApplicabilityPage.test.tsx "is preview only").
  Unit-tested (vitest, mocked Supabase):
  - ProductApplicabilityPage.test.tsx: review before apply; Review disabled
    on load and after reverting; invalid changes and negative price
@@ -129,8 +131,13 @@ H. VERIFICATION SCOPE
    treatment written only when changed; refusals keep the draft.
  - ProductApplicabilityPage.writer.test.tsx: refused update and insert
    audited as nothing; accepted update applied and audited.
+ Integration-tested (vitest, real addendum builder and real useProductRules
+ with a simulated database): rules applied by condition, CPO and mileage;
+ missing and unrecognized values held and named; agreement with these sample
+ results (src/pages/Index.productRules.test.tsx).
  Not demonstrated:
  - a real rule write;
- - the addendum applying the rule to a real vehicle;
+ - the addendum applying a saved rule against a real database (no saved
+   product rules exist in the project database today);
  - CPO behaviour on a real addendum;
  - behaviour outside Chromium.

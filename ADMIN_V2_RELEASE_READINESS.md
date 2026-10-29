@@ -2022,6 +2022,156 @@ The results are reported as follows:
 | 07 sample results | computed in the browser from fixture vehicles and proof counts | matcher and checklist | do not match the addendum's behaviour (open finding) |
 | Focus return, dialog fit, tab focus | exercised in Chromium | not covered | not checked on real devices or other browsers |
 
+### 10.22 Product rules enforced on addenda; screen 07 fixture cannot write (2026-10-29)
+
+**Revisions.** Implementation `b211121`. Screen 07 refresh evidence is in
+`focused-review-03-04-07/07/refresh-b211121/`, committed after it. The seven
+usability fixes (`2d7954d`) and the strengthened acceptance register
+(`f9ee8fe`) are kept.
+
+**1. Screen 07 fixture is preview only.**
+- Every write on the page goes through one adapter
+  (`src/pages/admin/children/applicabilityWriter.ts`): the rule update, the
+  rule insert, the price treatment write and the audit entry.
+- Under the design fixture, the preview adapter rejects each of them before
+  any client is called.
+- Apply is also blocked in the handler and disabled. The page shows
+  "Preview only — changes are not saved."
+- Outside fixture mode the live adapter calls the same writers as before;
+  the existing live tests pass unchanged.
+- Tests:
+  - `applicabilityWriter.test.ts` checks both modes and refusals.
+  - `ProductApplicabilityPage.test.tsx` "is preview only": after an edit and
+    a review, no `updateRule` or `addRule` call, no audit entry, no table
+    write and no `products` call.
+
+**2. Addenda apply the dealer's saved product rules.**
+
+*Trace.*
+- `product_rules` is evaluated in exactly two places:
+  - the addendum builder (`src/pages/Index.tsx`, via `useProductRules`);
+  - the screen 07 samples (`productApplicability.ts`).
+- Every other reader only checks the `feature_product_rules` flag.
+- No edge function reads `product_rules`.
+- Saved addenda (view mode), signing and customer pages use the saved
+  `products_snapshot`, not the rules.
+
+*Authoritative sources* in the builder:
+- Condition comes from the `vehicle_listings.condition` row, loaded by
+  `vehicleId` or VIN; it is constrained to new, used or cpo. Otherwise it
+  comes from the condition on a listing-URL import.
+- Mileage comes from the vehicle-file link's `mileage` parameter, which is
+  the inventory value, then the `vehicle_listings.mileage` row, then a
+  listing import.
+- Manual entry has no condition or mileage field.
+
+*One predicate.* `src/lib/productEligibility.ts` is used by both the builder
+(`productEligibility` / `getProductEligibility`) and the screen 07 samples
+(`vehicleEligibility`); `matchesRule` is removed.
+- The stored rule shape is unchanged (new, used or all, and a mileage
+  limit, where 0 means no limit). CPO counts as Used, and there is no CPO
+  control. Saved rules are not changed.
+- Condition is read through the existing `canonicalCondition`:
+  - New and Demo read as new; Used and Pre-Owned as used; CPO and Certified
+    as cpo.
+  - A missing or unrecognized condition is unknown, never Used.
+- Mileage is a number, or text such as "28,115 mi". A missing or unreadable
+  mileage is unknown, never zero.
+- A limit exactly at the vehicle's mileage applies.
+- A rule that depends on an unknown value is **undetermined**, unless
+  another limit already excludes the vehicle.
+- In the builder:
+  - Excluded products are listed with the reason.
+  - Undetermined products are held off the addendum and named with the
+    missing value, with how to supply it (open the addendum from the
+    inventory record or import the listing).
+  - On screen 07, an undetermined sample shows Unknown.
+- Year, make, model, trim and body style keep their existing behaviour (a
+  limit is skipped when the vehicle does not state that field). Before a
+  vehicle is identified, every product is listed, as before.
+
+*Tests.*
+- `src/lib/productEligibility.test.ts` covers:
+  - New only, Used only and All;
+  - CPO under Used;
+  - mileage below, exactly at and above the limit;
+  - missing and unrecognized condition and mileage;
+  - combined limits.
+- The agreement matrix compares the screen 07 path and the addendum path in
+  72 cases (`productApplicability.test.ts`).
+- `src/pages/Index.productRules.test.tsx` runs through the real builder and
+  the real `useProductRules`, opened by the vehicle-file link:
+  - each rule case;
+  - agreement with the screen 07 samples;
+  - an unchanged product list, prices, disclosures and the voluntary notice
+    when every rule applies, compared with rules off.
+
+  7 of its 8 cases fail on the previous revision `f94d1a0`; the eighth is
+  the no-change check.
+
+*Before / after* (real builder; see `ADDENDUM-RULES-BEFORE-AFTER.txt`).
+
+| Vehicle | Before (`f94d1a0`) | After (`b211121`) |
+| --- | --- | --- |
+| Used, 28,115 mi | all 7 products, including New Only Film and Low Mileage Plan (25,000 mi limit) | 5 products; New Only Film excluded ("Rule applies to New vehicles; this vehicle is Used."); Low Mileage Plan excluded ("Mileage 28,115 is over the 25,000 mi limit."); At Limit Plan (28,115 mi) kept |
+| New, 12 mi | all 7 | Used Only Warranty and Used Under 30k Plan excluded |
+| Condition and mileage not recorded | all 7 | 2 products; 5 held as undetermined, each naming the missing value |
+
+*Existing behaviour checked.*
+- When every rule applies, the builder's product lines, prices,
+  disclosures, benefits and voluntary-purchase notice are identical to the
+  builder with rules off (integration test).
+- Optional-product selection, sale-method overrides, the upgrade tier, the
+  install-proof defaulting, pricing totals and disclosures all derive from
+  the eligible list exactly as before.
+- The compliance condition used by the disclosure gates is unchanged (it
+  still defaults an unknown condition to used for the Buyers Guide checks).
+  It is separate from eligibility.
+
+*Impact.*
+- **Published and historical documents:** none. View mode uses the saved
+  snapshot. Nothing is regenerated, altered or backfilled.
+- **Newly generated addenda** (new, or a saved addendum reopened for edit
+  and saved again):
+  - A product whose saved rule restricts condition or mileage is excluded
+    when the vehicle's recorded values do not qualify.
+  - It is held when they are not recorded.
+  - Removing an excluded or held installed product lowers the installed
+    total, so the price-integrity gate can flag a difference from an
+    advertised price that included it.
+- **Today, in the project database** (read-only counts, 2026-10-29):
+  - 0 saved product rules, so no dealer's new addenda change until a rule
+    is saved.
+  - 131 active listings, all with a recognized condition (20 CPO); 43 have
+    no mileage recorded. Those 43 would be held for any future
+    mileage-limited product.
+- **Other consumers:** the screen 07 samples now use the shared predicate.
+  - Demo now reads as New rather than Used.
+  - An unrecognized condition is Unknown rather than Used.
+  - The fixture's results are unchanged.
+
+**Checks at `b211121`.**
+- Typecheck clean.
+- Full suite: 7,270 passed, 3 failed, 1 skipped.
+  - Two failures fail identically on `f94d1a0`:
+    `complianceRedTeam.test.ts` "blocker=false when only warns" and
+    `complianceData.test.ts` "NO_MODEL_CAMPAIGNS_FOUND".
+  - The third, `functionAuth.test.ts`, a repository scan with a time limit,
+    passes 78 of 78 when run alone.
+- All 13 screens re-measured: every score is unchanged. The four accepted
+  screens are pixel-identical to their baselines. Screen 07's 1586x992
+  capture is byte-identical (the notice sits below the frame).
+- tabs-check passes.
+
+**Scope.**
+- 01, 06, 08 and 12 remain accepted.
+- 03, 04 and 07 remain visually pending.
+- 02, 05, 09, 10, 11 and 13 remain pending.
+- Visual acceptance does not establish permission enforcement or successful
+  database writes.
+- Default sorting, navigation and role permissions are unchanged.
+- No deployment, pricing migration or visual tuning.
+
 ## 11. Approvals requested
 
 1. Done: the fee preview fix was applied and verified (section 4).

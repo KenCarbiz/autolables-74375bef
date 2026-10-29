@@ -1,0 +1,474 @@
+[
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "unchanged-review-disabled",
+    "file": "07-1586x992-unchanged-review-disabled.png",
+    "note": "No change yet: Review changes is disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Back to applicability",
+        "disabled": false
+      },
+      {
+        "label": "Details",
+        "disabled": false
+      },
+      {
+        "label": "Applicability",
+        "disabled": false
+      },
+      {
+        "label": "Installation evidence",
+        "disabled": false
+      },
+      {
+        "label": "Disclosures",
+        "disabled": false
+      },
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "edited-review-enabled",
+    "file": "07-1586x992-edited-review-enabled.png",
+    "note": "Mileage set to No limit: Review changes is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Overview",
+        "disabled": false
+      },
+      {
+        "label": "Dealership & Brand",
+        "disabled": false
+      },
+      {
+        "label": "People & Access",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Customer Experience",
+        "disabled": false
+      },
+      {
+        "label": "Publishing",
+        "disabled": false
+      },
+      {
+        "label": "Documents & Service",
+        "disabled": false
+      },
+      {
+        "label": "Integrations",
+        "disabled": false
+      },
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Back to applicability",
+        "disabled": false
+      },
+      {
+        "label": "Details",
+        "disabled": false
+      },
+      {
+        "label": "Applicability",
+        "disabled": false
+      },
+      {
+        "label": "Installation evidence",
+        "disabled": false
+      },
+      {
+        "label": "Disclosures",
+        "disabled": false
+      },
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "reviewing",
+    "file": "07-1586x992-reviewing.png",
+    "note": "Review step: before and after table, Back to edit and Apply changes",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Back to applicability",
+        "disabled": false
+      },
+      {
+        "label": "Details",
+        "disabled": false
+      },
+      {
+        "label": "Applicability",
+        "disabled": false
+      },
+      {
+        "label": "Installation evidence",
+        "disabled": false
+      },
+      {
+        "label": "Disclosures",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "reviewing-preview-only",
+    "file": "07-1586x992-reviewing-preview-only.png",
+    "note": "Design fixture: Apply changes disabled; \"Preview only — changes are not saved.\"",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1586x992",
+    "state": "year-range-invalid",
+    "file": "07-1586x992-year-range-invalid.png",
+    "note": "Model year from later than to: validation message, Review changes disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Administration",
+        "disabled": false
+      },
+      {
+        "label": "Pricing & Products",
+        "disabled": false
+      },
+      {
+        "label": "Products",
+        "disabled": false
+      },
+      {
+        "label": "Back to applicability",
+        "disabled": false
+      },
+      {
+        "label": "Details",
+        "disabled": false
+      },
+      {
+        "label": "Applicability",
+        "disabled": false
+      },
+      {
+        "label": "Installation evidence",
+        "disabled": false
+      },
+      {
+        "label": "Disclosures",
+        "disabled": false
+      },
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "sample-results-full-width",
+    "file": "07-1366x768-sample-results-full-width.png",
+    "note": "Below 1536px the panels stack, so every Sample vehicle results column is visible",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "unchanged-review-disabled",
+    "file": "07-1366x768-unchanged-review-disabled.png",
+    "note": "No change yet: Review changes is disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "edited-review-enabled",
+    "file": "07-1366x768-edited-review-enabled.png",
+    "note": "Mileage set to No limit: Review changes is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "reviewing",
+    "file": "07-1366x768-reviewing.png",
+    "note": "Review step: before and after table, Back to edit and Apply changes",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": []
+  },
+  {
+    "screen": "07",
+    "viewport": "1366x768",
+    "state": "reviewing-preview-only",
+    "file": "07-1366x768-reviewing-preview-only.png",
+    "note": "Design fixture: Apply changes disabled; \"Preview only — changes are not saved.\"",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "390x844",
+    "state": "unchanged-review-disabled",
+    "file": "07-390x844-unchanged-review-disabled.png",
+    "note": "No change yet: Review changes is disabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": true
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "390x844",
+    "state": "edited-review-enabled",
+    "file": "07-390x844-edited-review-enabled.png",
+    "note": "Mileage set to No limit: Review changes is enabled",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Review changes",
+        "disabled": false
+      }
+    ]
+  },
+  {
+    "screen": "07",
+    "viewport": "390x844",
+    "state": "reviewing",
+    "file": "07-390x844-reviewing.png",
+    "note": "Review step: before and after table, Back to edit and Apply changes",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": []
+  },
+  {
+    "screen": "07",
+    "viewport": "390x844",
+    "state": "reviewing-preview-only",
+    "file": "07-390x844-reviewing-preview-only.png",
+    "note": "Design fixture: Apply changes disabled; \"Preview only — changes are not saved.\"",
+    "dialog": null,
+    "dialogFitsViewport": null,
+    "dialogScrollsInside": null,
+    "pageOverflow": 0,
+    "buttons": [
+      {
+        "label": "Cancel",
+        "disabled": false
+      },
+      {
+        "label": "Back to edit",
+        "disabled": false
+      },
+      {
+        "label": "Apply changes",
+        "disabled": true
+      }
+    ]
+  }
+]
