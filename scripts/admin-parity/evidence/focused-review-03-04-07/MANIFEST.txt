@@ -4,7 +4,8 @@ Administration V2 - focused visual review: 03 People & Access (Team),
 Implementation measured and captured: 2d7954d
 Evidence commit (captures): ec43fe0
 Annotated, defect and state sheets: committed after ec43fe0 from those
-captures (no new capture)
+captures (no new capture); labels revised after f9ee8fe to separate visual
+exceptions from behaviour and business rules (readiness 10.21)
 Before-fix captures: before-fix-2fe74e3/ (code 2fe74e3, before the 2d7954d
 fixes)
 
@@ -20,7 +21,10 @@ Scores (protocol v2 content, masked; all 13 screens measured in one run at
   03  90.70%  masked 3.71%  landmarks 9/9   (unchanged)
   04  89.87%  masked 0.95%  landmarks 1/8   (unchanged; 7 follow from the
                                              owner-decided section row)
-  07  87.86%  masked 3.13%  landmarks 9/9   (was 87.83% / 3.08%; same masks)
+  07  87.86%  masked 3.13%  landmarks 9/9   (at 2fe74e3: 87.83% with 3.08%
+              masked. Mask definitions unchanged; the effective masked area
+              grew because masked cells grew 2px where a label wraps, so the
+              scored pixel set changed. Not a visual improvement.)
   01, 06, 08, 12: identical to their accepted values (92.99/3.94,
   94.11/4.13, 92.12/0.27, 92.22/2.80). The other screens are unchanged.
 
@@ -53,7 +57,9 @@ Contents
   NN/viewport/     actual-viewport captures as the page scrolls
   NN/states/       interaction states (states.json describes each)
   NN/DIFFERENCES.txt
-  annotated-2d7954d/   numbered differences, desktop and phone
+  annotated-2d7954d/   numbered differences: desktop and phone for each
+                       screen, 03 role change review (desktop, phone),
+                       04 laptop stacked layout, 07 validation state
   defects/         before/after sheets for each corrected defect
   state-sheets/    labelled contact sheets of the states
   before-fix-2fe74e3/, after-fix-crops/

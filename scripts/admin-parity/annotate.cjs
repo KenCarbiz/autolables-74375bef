@@ -27,6 +27,10 @@ const COLORS = {
   responsive: "#db2777",
   defect: "#dc2626",
   corrected: "#0891b2",
+  wording: "#2563eb",
+  rule: "#111111",
+  simulated: "#9d174d",
+  finding: "#b91c1c",
 };
 const LABELS = {
   approved: "approved (cited owner decision)",
@@ -40,6 +44,10 @@ const LABELS = {
   responsive: "phone layout, no reference (not scored)",
   defect: "implementation defect",
   corrected: "defect corrected",
+  wording: "proposed visual exception: truthful wording",
+  rule: "behaviour / business rule (not decided by visual acceptance)",
+  simulated: "fixture-only: simulated, nothing written",
+  finding: "open finding (reported, not changed)",
 };
 
 async function main() {

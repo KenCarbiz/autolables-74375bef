@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | 4 of 13 accepted individually (appearance only): 01, 06, 08, 12; 9 pending | Acceptance register in section 10.19 and `scripts/admin-parity/acceptance.json`: 06 at 94.11% (approved, `7f4fa1a`); 01 at 92.99%, 08 at 92.12%, 12 at 92.22% (accepted with listed exceptions, `2fe74e3`, evidence `4958ce9`), re-measured unchanged at `2d7954d`. Masked scores; none meets 94% or 95% except 06 in the 94% review band. 03, 04 and 07 focused review delivered (10.20, implementation `2d7954d`, evidence `ec43fe0`), pending | Owner review of 03, 04, 07 and the remaining 6 |
+| 16 | Visual acceptance | 4 of 13 accepted individually (appearance only): 01, 06, 08, 12; 9 pending | Acceptance register in section 10.19 and `scripts/admin-parity/acceptance.json`, with baselines compared pixel by pixel (10.21): 06 at 94.11% (approved, `7f4fa1a`); 01 at 92.99%, 08 at 92.12%, 12 at 92.22% (accepted with listed exceptions, `2fe74e3`, evidence `4958ce9`); all four captures identical to their baselines at `2d7954d`. Masked scores; none meets 94% or 95% except 06 in the 94% review band. 03, 04 and 07 focused review delivered (10.20, 10.21; implementation `2d7954d`, evidence `ec43fe0`), pending | Owner review of 03, 04, 07 and the remaining 6; CPO rule and addendum condition/mileage finding are business decisions outside visual acceptance |
 
 ## 2. How the evidence was produced
 
@@ -1920,6 +1920,107 @@ design fixtures write nothing.
 03, 04 and 07 are pending the owner's screen-specific decision. Accepted
 screens remain exactly 01, 06, 08 and 12, and the other six pending
 screens (02, 05, 09, 10, 11, 13) await individual review.
+
+### 10.21 Focused review of 03, 04 and 07: visual exceptions separated from business rules (2026-10-29)
+
+**Owner decision, 2026-10-29.** The seven usability fixes in `2d7954d` are
+kept. 03, 04 and 07 remain pending. Exactly 01, 06, 08 and 12 remain
+accepted, and 02, 05, 09, 10, 11 and 13 remain pending.
+
+**Identifiers.**
+- Implementation `2d7954d`; evidence `ec43fe0`.
+- Annotated images were relabelled from the same captures. New images:
+  - 03 role change review (desktop and phone);
+  - 04 laptop stacked layout;
+  - 07 validation state.
+- Each screen's `DIFFERENCES.txt` now has separate sections: visual
+  exceptions, behaviour and business rules, data, approved, defects
+  corrected, phone, open findings and verification scope.
+
+**What visual acceptance can decide.** Only these are proposed for visual
+acceptance on 03, 04 and 07:
+- spacing, margins and tab-row sizes;
+- icon substitution;
+- truthful wording.
+
+Rendering differences are listed for information.
+
+Behaviour and business rules are recorded but are not decided by visual
+acceptance:
+- default sort order (03);
+- navigation links (04, 07);
+- Review changes disabled until a valid change exists (07; preserved);
+- the browser-computed role-change impact (03, 04);
+- "CPO follows Used" (07).
+
+10.20 listed "CPO following Used" among the proposed exceptions; it is
+withdrawn from them here.
+
+**CPO follows Used (business rule; not changed).**
+- `product_rules.condition` stores `new`, `used` or `all`; there is no CPO
+  value. A CPO vehicle is treated as used, so CPO cannot be included or
+  excluded separately from Used.
+- This predates V2: the schema and `matchesRule` date from `e5c1a60`
+  (2026-09-09). V2 (`587b2e3`) only made the derived CPO box visible.
+- The dealer sees it only on the product applicability page, as a
+  disabled CPO box with a tooltip and screen-reader text. The Applicability
+  rule editor offers All, New only and Used only, and no setting separates
+  CPO.
+
+**Open finding (reported, not changed).**
+- The addendum builder (`src/pages/Index.tsx`) never passes a vehicle's
+  condition or mileage to `matchesRule`, so a product rule's condition and
+  maximum mileage are not applied on addenda today.
+- Screen 07's sample results do apply them, and the page says the samples
+  run "through the same matcher the addendum uses".
+- The two can disagree. For example, the fixture's CPO vehicle at 96,480 mi
+  is shown as not eligible under an 80,000 mi limit, but the addendum would
+  include it.
+- This predates V2, and the fix (the addendum input, or the wording) is a
+  separate decision.
+
+**Screen 07 scoring.**
+- The mask definitions are unchanged.
+- The effective masked area increased from 3.08% to 3.13% because the
+  masked Vehicle cells grew 2px where a status label wraps (D4).
+- Because the excluded area changed, 87.83% to 87.86% is not a visual
+  improvement and is not reported as one.
+- No score tuning was done.
+
+**Acceptance register strengthened (`f9ee8fe`).** Each accepted screen
+keeps its baseline in `acceptance.json` and `scripts/admin-parity/acceptance/`.
+Recorded from its evidence commit by `record-acceptance-baseline.cjs`:
+- the accepted capture, byte for byte;
+- the reference and its hash;
+- the mask definitions as they stood;
+- the rail, frame, threshold and capture settings.
+
+The browser version is recorded from now on; earlier runs did not record
+it.
+
+Every report run checks each accepted screen three ways:
+- score and mask share;
+- contract: the reference, mask definitions and rail;
+- the capture itself, pixel by pixel.
+
+The results are reported as follows:
+- A changed capture is flagged **inspect**, with its changed-pixel count
+  and box, even when the scores match.
+- A changed score, mask share or contract is flagged **review**.
+- Nothing revokes an approval automatically.
+- At `2d7954d` all four accepted captures are identical to their
+  baselines.
+
+**Verification scope.**
+
+| Behaviour | Browser-exercised (design fixture, Chromium) | Unit-tested (vitest, mocked writers) | Production |
+| --- | --- | --- | --- |
+| 03 role change | dialog to the review step; Apply disabled by the fixture ("nothing is written") | applies only after review, re-reads the role, records the reason, reports refusals | not demonstrated; `set_tenant_member_role` was not run in this sign-off |
+| 03 remove member | confirmation opened and cancelled | not covered | not demonstrated |
+| 04 role permissions | matrix and cards displayed; Test role access is a preview computed in the browser that grants nothing | matrix values; review gating | enforcement not demonstrated; the page itself says "Policy draft" |
+| 07 rule edit | edit, review, validation, Review gating; Apply enabled in the fixture and **not pressed** (the 07 fixture does not block Apply; dev-only route; a guard is proposed, not made) | review before apply; writes and refusals with a mocked client | no real rule write; the addendum's use of the rule not demonstrated |
+| 07 sample results | computed in the browser from fixture vehicles and proof counts | matcher and checklist | do not match the addendum's behaviour (open finding) |
+| Focus return, dialog fit, tab focus | exercised in Chromium | not covered | not checked on real devices or other browsers |
 
 ## 11. Approvals requested
 
