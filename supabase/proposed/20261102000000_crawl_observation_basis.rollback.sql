@@ -1,12 +1,16 @@
 -- Rollback for the PROPOSED 20261102000000_crawl_observation_basis.sql.
--- Roll the crawler back to its previous revision FIRST: the new crawler
--- writes these columns. Export observation, listing_promotion and
--- listing_promotion_detail first if they must be kept; dropping them deletes
--- the fee basis records. advertised_price and every other column are untouched.
-DROP INDEX IF EXISTS public.ux_advertised_prices_tenant_idempotency;
-ALTER TABLE public.advertised_prices DROP CONSTRAINT IF EXISTS advertised_prices_listing_promotion_check;
-ALTER TABLE public.advertised_prices
-  DROP COLUMN IF EXISTS listing_promotion_detail,
-  DROP COLUMN IF EXISTS listing_promotion,
-  DROP COLUMN IF EXISTS idempotency_key,
-  DROP COLUMN IF EXISTS observation;
+--
+-- Rolling back keeps the evidence. The safe fallback for the price crawl is
+-- "crawler paused, observations retained, no further listing promotion"
+-- (ADMIN_V2_RELEASE_READINESS.md, crawl rollout): pause the cron job (jobid 1,
+-- autolabels_crawl_advertised_prices) and stop invoking the crawler. The
+-- defective pre-fix crawler is NOT redeployed or resumed as a rollback.
+--
+-- The added columns (observation, idempotency_key, listing_promotion,
+-- listing_promotion_detail), their CHECK constraint and the unique index all
+-- stay. They are nullable, so a row written without them is still valid, and
+-- they hold the fee basis record of every observation already collected.
+--
+-- Deliberately not done here: dropping those columns. That deletes the fee
+-- basis records and needs its own written approval after a verified export.
+SELECT 1;

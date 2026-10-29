@@ -1,9 +1,11 @@
 -- ROLLBACK for supabase/proposed/20261103000000_provider_tenant_budgets.sql.
 -- Stops the delivery schedule, restores provider_call_admit to the hosted
--- body (the platform budget only), and removes the per-dealership budget
--- tables and functions. provider_call_events rows written while the budgets
--- were in force stay; they are the ledger. Export provider_budget_alerts and
--- provider_tenant_budgets first if their history is wanted.
+-- body (the platform budget only) and removes the budget functions, so no
+-- dealership budget is enforced and the Budgets & alerts tab shows "not
+-- switched on". The four tables and their rows stay (budgets, prices, alert
+-- settings, alert history): nothing reads them once the gate is restored, and
+-- provider_call_events, the call ledger, is untouched. Dropping the tables
+-- deletes the alert history and needs its own approval after an export.
 
 DO $$ BEGIN
   IF to_regnamespace('cron') IS NOT NULL THEN
@@ -77,7 +79,3 @@ DROP FUNCTION IF EXISTS public.platform_require_admin();
 DROP FUNCTION IF EXISTS public.provider_tenant_budget_thresholds(uuid, text, text);
 DROP FUNCTION IF EXISTS public.provider_tenant_month_usage(uuid, text);
 
-DROP TABLE IF EXISTS public.provider_budget_alerts;
-DROP TABLE IF EXISTS public.platform_alert_settings;
-DROP TABLE IF EXISTS public.provider_unit_prices;
-DROP TABLE IF EXISTS public.provider_tenant_budgets;

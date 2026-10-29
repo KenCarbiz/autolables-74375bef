@@ -1,5 +1,13 @@
 -- Rollback for the PROPOSED 20261101000000_price_component_evidence.sql.
--- Drops the evidence table and everything it added. Export the table first
--- if any rows must be kept: the evidence is deleted with it.
-DROP TABLE IF EXISTS public.price_component_evidence;
-DROP FUNCTION IF EXISTS public.price_component_evidence_immutable();
+--
+-- Rolling back keeps the evidence. The safe fallback for the price crawl is
+-- "crawler paused, observations retained, no further listing promotion"
+-- (ADMIN_V2_RELEASE_READINESS.md, crawl rollout). Nothing here is needed to
+-- reach it: pause the cron job (jobid 1, autolabels_crawl_advertised_prices)
+-- and stop invoking the crawler. The table and its immutability trigger stay;
+-- with no writer they are inert, and the old crawler never read them.
+--
+-- Deliberately not done here: dropping public.price_component_evidence. That
+-- deletes collected evidence and needs its own written approval after a
+-- verified export of every row.
+SELECT 1;

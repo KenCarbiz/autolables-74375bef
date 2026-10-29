@@ -62,7 +62,7 @@
  40 of 40 checks passed
 
 == Stage proposed exit 0
-== Stage rollback: tables left 0; provider_call_admit fingerprint 9750c907de55ae223a0abf0bda565f8d (hosted 9750c907de55ae223a0abf0bda565f8d)
+== Stage rollback: tables kept 4 of 4; budget functions left 0; provider_call_admit fingerprint 9750c907de55ae223a0abf0bda565f8d (hosted 9750c907de55ae223a0abf0bda565f8d)
 
 ======== Stage rollback
  n | result |                                       label                                        | detail 

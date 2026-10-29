@@ -7,7 +7,8 @@
 #             of a dealership with no limit
 #   proposed  supabase/proposed/20261103000000 applied: every check
 #   rollback  applied, then its rollback: the hosted gate must be restored
-#             byte for byte and the platform rule must still hold
+#             byte for byte, the budget functions gone, the four tables (and
+#             their rows) kept, and the platform rule must still hold
 #
 # Uses a template database when BASE_DB names one (for example
 # crawl_verify_base from scripts/crawl-verify/e2e/run.sh); otherwise builds it.
@@ -48,9 +49,10 @@ for STAGE in hosted proposed rollback; do
   if [[ $STAGE == rollback ]]; then
     "${PSQL[@]}" -d "$DB" -1 -f "$ROLLBACK" >/dev/null 2>&1
     proposed=false
-    left=$("${PSQL[@]}" -tA -d "$DB" -c "SELECT count(*) FROM pg_class WHERE relname IN ('provider_tenant_budgets','provider_unit_prices','platform_alert_settings','provider_budget_alerts')")
-    echo "== Stage rollback: tables left $left; provider_call_admit fingerprint $(fp "$DB") (hosted $HOSTED_FP)"
-    [[ $left == 0 && $(fp "$DB") == "$HOSTED_FP" ]] || { echo "FAIL  rollback did not restore the hosted gate"; overall=1; }
+    kept=$("${PSQL[@]}" -tA -d "$DB" -c "SELECT count(*) FROM pg_class WHERE relname IN ('provider_tenant_budgets','provider_unit_prices','platform_alert_settings','provider_budget_alerts')")
+    fns=$("${PSQL[@]}" -tA -d "$DB" -c "SELECT count(*) FROM pg_proc WHERE proname LIKE 'platform\_%budget%' OR proname LIKE 'provider\_tenant\_%' OR proname IN ('platform_set_alert_settings','platform_set_unit_price','platform_require_admin','schedule_provider_budget_alerts')")
+    echo "== Stage rollback: tables kept $kept of 4; budget functions left $fns; provider_call_admit fingerprint $(fp "$DB") (hosted $HOSTED_FP)"
+    [[ $kept == 4 && $fns == 0 && $(fp "$DB") == "$HOSTED_FP" ]] || { echo "FAIL  rollback did not restore the hosted gate while keeping the tables"; overall=1; }
   fi
   echo
   echo "======== Stage $STAGE"

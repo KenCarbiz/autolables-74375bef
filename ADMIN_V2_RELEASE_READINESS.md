@@ -2546,8 +2546,8 @@ Pausing the job or deploying the fix is your decision. No job was changed.
 |---|---|---|---|
 | 0 | Decide on the 07:20 crawl job: pause it until step 3, or leave it running the old crawler | `cron.job` row | Re-enable |
 | 1 | Apply `20261101000000_price_component_evidence.sql`, then `20261102000000_crawl_observation_basis.sql` (additive) | Columns, check constraint and unique index exist; no row changed | The two `.rollback.sql` files, after step 3 is rolled back |
-| 2 | Deploy `marketcheck-sync` from the fix commit. The jobs stay paused; it takes effect at the next authorized sync | Function hash matches the commit | Redeploy the `3836dc3` version |
-| 3 | Deploy `crawl-advertised-prices` from the fix commit, then one authorized crawl run (renderer credits) | `listing_outcomes` in the run summary; `advertised_prices.listing_promotion` and `observation` on the run's rows; no listing pricing change except `promoted` rows, each with a screenshot hash | Redeploy the `3836dc3` version. Promoted rows can be reverted from the observation records; observations are kept |
+| 2 | Deploy `marketcheck-sync` from the fix commit. The jobs stay paused; it takes effect at the next authorized sync | Function hash matches the commit | Redeploy the `3836dc3` version (the sync only; superseded for the crawler, see "Crawler pause" below) |
+| 3 | Deploy `crawl-advertised-prices` from the fix commit, then one authorized crawl run (renderer credits) | `listing_outcomes` in the run summary; `advertised_prices.listing_promotion` and `observation` on the run's rows; no listing pricing change except `promoted` rows, each with a screenshot hash | **Superseded 2026-10-29:** not "redeploy `3836dc3`". The fallback is the crawler paused, observations retained, no further promotion; see "Crawler pause" below |
 | 4 | Review held vehicles with you and the dealer before any policy change on dealer-configured bases | `held_fee_basis` reasons | n/a |
 
 Order matters: the crawler may be deployed before the migration and is safe
@@ -2614,7 +2614,7 @@ A refusal is never mistaken for an answer from the provider:
 **Migration and rollback**
 
 - `supabase/proposed/20261103000000_provider_tenant_budgets.sql` (proposed, not applied).
-- Its `.rollback.sql`, which stops the schedule, restores the hosted `provider_call_admit` exactly, and drops the new tables and functions.
+- Its `.rollback.sql`, which stops the schedule, restores the hosted `provider_call_admit` exactly and removes the budget functions. It keeps the four tables and their rows (revised 2026-10-29; see "Crawler pause", section 4).
 
 **Shared modules**
 
@@ -2666,7 +2666,7 @@ A refusal is never mistaken for an answer from the provider:
   - Who can read and write, admin-only writes with audit, input validation.
   - The overview.
   - The schedule defined but not started.
-- **rollback, 3 of 3.** No table left behind. The gate's definition matches the hosted one (same md5), and the platform rule still holds.
+- **rollback, 3 of 3.** Rerun 2026-10-29 with the revised rollback: all 4 tables kept with their rows, budget functions removed. The gate's definition matches the hosted one (same md5), and the platform rule still holds.
 
 **Alert sender, `scripts/budget-verify/dispatch/run.sh`: 27 of 27** (results in `results/dispatch.txt`).
 
@@ -2711,3 +2711,194 @@ Order:
 - The functions are safe before the migration. The hosted gate answers "ungated", so nothing is refused.
 - Alerts queue from step 4 but are not sent until step 5. Step 5 should follow step 3, so the first real alert goes to recipients you have tested.
 - Text messages go through the existing `send-sms` (SignalHouse) and emails through `send-email` (Resend or SendGrid). They need those secrets set.
+
+## Crawler pause, evidence preservation, corrected rollout and rollback (2026-10-29)
+
+### 1. Crawler pause (authorized: this job only)
+
+| | Recorded |
+|---|---|
+| Identity, confirmed before the change | `cron.job` jobid **1**, `autolabels_crawl_advertised_prices`, database `postgres`, user `postgres`, target `functions/v1/crawl-advertised-prices`, command md5 `a90858e5…` (576 chars; the command was not printed). It is the only job whose name or command mentions the crawler |
+| Before | schedule `20 7 * * *` (07:20 UTC daily), **active = true** (read 14:19:54 UTC) |
+| Change | `cron.alter_job(job_id := 1, active := false)`, guarded on jobid, name, schedule and command md5 |
+| After | **active = false**, schedule and command md5 unchanged (verified 14:21:16 UTC). The other 21 jobs are unchanged. `marketcheck-sync`, `marketcheck-incentives` and `enrich-sweep-nightly` were already paused under earlier authorizations |
+| Active execution | **None.** The 07:20 cron run of 10-29 finished in 0.08 s; the job only posts the request. The crawler's last write was at 07:25:13 UTC (ledger 07:24:46, observation 07:24:58, audit 07:25:13). Nothing had been written in the 30 minutes before the pause, and no database session was touching the crawl. Nothing was terminated |
+| Resume (not authorized) | `SELECT cron.alter_job(job_id := 1, active := true);`, only on a separate approval, and only once the fixed crawler is deployed (see 4) |
+
+**Still able to start the crawler.** The pause stops only the schedule. The deployed crawler, which is the pre-fix version (see 3), can still be started by hand from three buttons:
+
+- the Inventory "price scrape" button (`InventoryModern.tsx`), which runs discovery too;
+- the single-vehicle re-scrape button (`Index.tsx`);
+- the admin "test URL" button (`WebsitesFeedsView.tsx`).
+
+The first two write listing prices the old way. Closing them is a separate decision (see 6).
+
+### 2. Evidence preservation
+
+**What was exported.** Exported through the same read-only database access at 14:20:32–14:20:57 UTC, before the pause:
+
+| Export | Rows |
+|---|---|
+| The crawl attempts ledger, all of it | 205 |
+| Observations captured since 10-20, with the listing's pricing fields at export time | 43 |
+| Crawl audit rows since 10-20 | 282 |
+| `price-evidence` object metadata since 10-20 (no image bytes) | 155 |
+| The job's run history since 10-01 | 29 |
+| The job row before the pause | 1 |
+
+The attempts ledger is the table each later attempt overwrites.
+
+**How it was checked.**
+
+- Each export was produced on the server as one text value, with its md5 in the same statement.
+- Every local copy matches its server md5. A sha256 manifest is included.
+- The checksums re-verified after the worker restart.
+
+**Where it is.** `/tmp/claude-0/-home-user-autolables-74375bef/4bd5b04c-fe84-5e26-8567-dd019c94e8b0/scratchpad/RESTRICTED-crawl-evidence-2026-10-29/`, mode 700, outside Git. It also holds a copy of the earlier screenshot provenance table.
+
+**Storage blocker, exactly.** That directory is in this session's container, which is discarded when the container is reclaimed. Every durable private destination either needs your authorization or is not connected:
+
+- Git is excluded.
+- An external service needs your authorization.
+- A private bucket in the project would be a production change, which is not authorized.
+- No computer folder is connected to this session: the listing is empty.
+
+To keep the copy, either:
+
+- name a destination; or
+- connect a folder on your computer through Remote Control, so the directory can be copied there and verified against the manifest.
+
+Until then, the copy is retained as is.
+
+**Not captured.** The screenshot images themselves (private bucket; no service key requested). Their metadata and paths are in the export.
+
+### 3. Verification gaps reconciled
+
+**Fee preview fix.**
+
+- The fix (`supabase/migrations/20261029120000_fix_fee_preview_warnings.sql`, one `CREATE OR REPLACE` of `admin_doc_fee_change_preview`) was applied on 10-28 as a direct function replacement.
+- Production today: `md5(pg_get_functiondef(admin_doc_fee_change_preview))` = `2a1468b9a62a9177b20193a345c77ce6`, the value recorded after the fix.
+- It has **no row** in `supabase_migrations.schema_migrations`. That ledger's latest rows are 20261027200000–20261027205000 and 20261028000000, so the ledger understates what is live. This needs a ledger entry on approval.
+
+**Policy B is not live.**
+
+- `supabase/proposed/20261031000000_doc_fee_basis_policy_b.sql` creates five new functions: `doc_fee_basis`, `doc_fee_row_plan`, `doc_fee_change_review`, `doc_fee_evidence_contradicts` and `doc_fee_setting_bool`. **None exists in production.**
+- It also replaces the preview, which is still the fix version above, and `admin_doc_fee_change_apply`, whose md5 is `259360533c…`.
+- Policy B remains pending. Nothing in this report should be read as saying it is applied.
+
+**Deployed function versions.** Edge function versions cannot be read from the database. What is on record:
+
+- `marketcheck-sync`, `vehicle-enrich`, `marketcheck-specs` and `marketcheck-comps` were deployed from `2b03c4e` on 10-27 at 22:56Z (blob hashes verified by the deploy agent).
+- Nothing has been deployed from `5a72606` or `dfea8dd`.
+- The 10-29 ledger supports this: 10 `captured` and 7 `vin_mismatch`, and none of the fixed crawler's outcomes (`held_*`, `promotion_*`, `identity_unverified`, `render_budget_refused`).
+- The deployed crawler is therefore the pre-fix one. Its exact hash is not on record.
+
+**The nine remaining `marketcheck-sync` type errors.**
+
+- Reproduced with `deno check` on both `3836dc3` (12 errors) and `dfea8dd` (9). The nine are the same nine, moved 30 lines down.
+- They are all in the tenant-selection preamble (lines 626–690):
+  - `select()` takes a column list built at run time, so the supabase-js types collapse to `GenericStringError`. That gives six TS2769/TS2345/TS2339/TS2352 errors on `.filter`, `.map`, `run_hour` and the `SyncConfig[]` cast.
+  - The declared request body has no `no_prune`, which is TS2339 at 633.
+- None is in a line the fix changed. The diff's hunks are at 147–309, 586–596, 674, 696 and later.
+- They are type-only. The sync harness runs this exact path at runtime, 26 of 26 both with and without the budget migration.
+- The three baseline errors that went away (`refused` and `endpoint` on the feed page) were in the changed path, and the new `FeedPage` type fixed them.
+
+**Test suite: not fully green.**
+
+| Commit | Passed | Skipped | Failed |
+|---|---|---|---|
+| `5a72606` | 7,313 | — | 2 |
+| `dfea8dd` | 7,346 | 1 | 2 |
+
+The failures at `dfea8dd` are the same two baseline failures: `complianceData` and `complianceRedTeam`, which also fail at `3836dc3`.
+
+### 4. Corrected crawler rollout and rollback
+
+**The safe fallback, at any point:**
+
+- the crawler paused;
+- observations retained;
+- no further listing promotion.
+
+The pre-fix crawler is never redeployed or resumed as a rollback.
+
+**The rollback files no longer delete evidence.**
+
+- `20261101000000…rollback.sql` and `20261102000000…rollback.sql` are now no-ops that explain the fallback.
+- `price_component_evidence` and the observation, idempotency and promotion columns stay. Dropping them needs its own approval after a verified export.
+- The budget rollback restores the hosted gate and removes the budget functions, but keeps the four tables and their rows. Re-verified: rollback stage 3 of 3; all 4 tables kept; budget functions removed; gate md5 identical to hosted.
+
+| Step | Action | Verify (read-only) | If it goes wrong |
+|---|---|---|---|
+| 0 (done) | Cron job 1 paused; evidence exported | Section 1 and 2 | — |
+| 1 | You name a durable private destination for the evidence | sha256 manifest matches at the destination | Copy stays in the session |
+| 2 | Decide the three manual buttons (see 6) | — | — |
+| 3 | Apply `20261101000000` and `20261102000000` (additive, nullable) | Columns, index and table exist; no row changed | Leave them; the fallback needs no schema change |
+| 4 | Deploy `crawl-advertised-prices` from the fix commit, still paused | Function hash matches the commit | Fallback: keep it paused and do not invoke it. Do not redeploy `3836dc3` |
+| 5 | One supervised, separately authorized run (renderer credits) | `listing_outcomes`; every promoted row has an observation and a screenshot hash; held vehicles listed | Fallback. Promoted rows can be reverted from their observation records |
+| 6 | Resume cron job 1 only on a separate approval after step 5 is reviewed | `active = true` | `cron.alter_job(1, active := false)` |
+
+**Gap in the fallback.** If the fixed crawler is deployed and then started by hand, it promotes. "No further promotion" during a fallback therefore depends on nobody pressing the buttons.
+
+A small promotion hold would close this. It is **proposed, not built**:
+
+- a platform switch the crawler reads before `commitObservation` promotes;
+- while the switch is set, observations are still stored, and the outcome is `held_paused`.
+
+It would be a code change plus a setting, and needs your approval before step 4.
+
+### 5. Budget protection: separate, scoped proposal (not implemented, no provider called)
+
+**MarketCheck fail-open.**
+
+- `admitProviderCall` admits a call whenever the gate cannot answer (`gate_unavailable`).
+- **Proposal:** fail closed for non-essential calls (sweep, comps, specs, recalls, title report). Fail open only for the essential feed. Log every fail-closed refusal, and queue a super-admin alert once the per-dealership alerts are live.
+- **Risk:** a gate outage would also stop enrichment until it recovers.
+
+**Paid calls still ungated in production today.** The `dfea8dd` gating is not deployed.
+
+| Path | Service | Status |
+|---|---|---|
+| `packet-backfill` → `oem-window-sticker` and `oem-brochure` / `oem-owners-manual` | VinAudit / MonroneyLabels, Firecrawl | **Ungated.** Runs daily from active cron job 27 (09:40 UTC). It has its own per-run caps, but no monthly cap |
+| `crawl-advertised-prices` renders | Firecrawl | Ungated (now paused, apart from the manual buttons) |
+| `blackbook-values` (from `vehicle-enrich` and `trade-appraisal`) | Black Book | Ungated |
+| `marketcheck-recalls`, `marketcheck-title-report`, `marketcheck-incentives` | MarketCheck | Ungated. Incentives' cron is paused; the first two run on demand |
+| `firecrawl-scrape` (vehicle URL scrape in the app) | Firecrawl | Ungated |
+| `google-reviews` | Google Places | Ungated |
+| `ai-description` / `description-orchestrate` | Anthropic, OpenAI | Own budget (`description_generation_budgets`) |
+| `market-valuation-write` | MarketCheck | Own budget (`market_provider_budgets`) |
+| `send-email`, `send-sms`, document deliveries, digests, escalation | Resend / SendGrid, SignalHouse | Not metered |
+
+`dfea8dd` gates the first three rows once deployed. The proposal for the others:
+
+- route them through `admitProviderCall` with a product name and a per-call price;
+- give `packet-backfill` a monthly platform cap of its own;
+- meter email and SMS by count only.
+
+Each is a separate change for your approval.
+
+### 6. Fee interpretation (unchanged position)
+
+- **Observations and promotion stay separate.** Every page observation is stored with its four-part fee basis, whether or not it changes a listing.
+- **The evidence rule is not relaxed.** Promotion requires page evidence (`page_verified`) or `not_applicable`, plus a stored screenshot. It is not relaxed to reduce the number of held vehicles.
+- **Dealer-configured fees are a separate decision.** Treating a dealer-configured fee basis as enough to promote, without page evidence (`dealer_configured_unverified`), is a **policy decision for you**, presented on its own with the held vehicles listed. It is not part of this rollout.
+
+### 7. Remaining release blockers
+
+**Decisions for you:**
+
+1. A durable private destination for the restricted evidence; until then it lives only in this session.
+2. The three manual crawler buttons. While they work, the pre-fix crawler can still be started by hand.
+3. Approval for the promotion hold (section 4), before the fixed crawler is deployed.
+
+**Approvals needed before deployment:**
+
+4. The crawl migrations and the crawler deployment (steps 3–4), and a supervised paid run (step 5).
+5. A ledger entry for the 10-28 fee-preview fix (20261029120000).
+6. Policy B: still pending, a separate decision.
+7. The budget migration and deployments (previous section), and the separate budget-protection proposal (section 5).
+
+**Still unresolved:**
+
+8. Screenshot review: still blocked until the files are supplied.
+9. The 2 baseline test failures and the 9 type-only sync errors: open, unchanged by this work.
