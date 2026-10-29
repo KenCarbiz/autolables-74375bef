@@ -27,20 +27,34 @@ export const ScrollRegion = ({
     const el = ref.current;
     if (!el) return;
     const update = () => setEdges({ left: el.scrollLeft > 1, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1 });
+    // Scrolls just enough that the element sits clear of both edge fades
+    // (24px left, 32px right, plus a little room), so neither the active tab
+    // nor a keyboard-focused one is left half under a gradient.
+    const bringIntoView = (target: HTMLElement) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      const box = el.getBoundingClientRect();
+      const r = target.getBoundingClientRect();
+      const left = r.left - box.left - 28;
+      const right = r.right - box.left - (el.clientWidth - 36);
+      if (left < 0) el.scrollLeft += left;
+      else if (right > 0) el.scrollLeft += Math.min(right, left);
+      update();
+    };
     update();
     if (revealSelector) {
       const target = el.querySelector<HTMLElement>(revealSelector);
-      if (target && el.scrollWidth > el.clientWidth) {
-        const left = target.offsetLeft - el.offsetLeft;
-        if (left + target.offsetWidth > el.clientWidth) el.scrollLeft = Math.max(0, left - 16);
-        update();
-      }
+      if (target) bringIntoView(target);
     }
+    const onFocus = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t !== el && el.contains(t)) bringIntoView(t);
+    };
     el.addEventListener("scroll", update, { passive: true });
+    el.addEventListener("focusin", onFocus);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
     ro?.observe(el);
     if (el.firstElementChild) ro?.observe(el.firstElementChild);
-    return () => { el.removeEventListener("scroll", update); ro?.disconnect(); };
+    return () => { el.removeEventListener("scroll", update); el.removeEventListener("focusin", onFocus); ro?.disconnect(); };
   }, [revealSelector]);
 
   const scrollable = edges.left || edges.right;

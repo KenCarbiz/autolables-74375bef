@@ -27,7 +27,7 @@ export const AdminSectionNav = ({ sections, activeId, tabFor, ariaLabel = "Admin
               to={adminTabHref(target.id)}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "inline-flex items-center h-[38px] text-[14px] leading-[20px] whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline-2 focus-visible:outline-adm-primary",
+                "inline-flex items-center h-[38px] text-[14px] leading-[20px] whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary",
                 active ? "font-semibold text-adm-primary border-adm-primary" : "font-medium text-adm-muted border-transparent hover:text-adm-ink",
               )}
             >
@@ -55,7 +55,7 @@ export const AdminChildTabs = ({ tabs, activeId, ariaLabel }: { tabs: AdminChild
                 to={adminTabHref(t.id)}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex items-center h-10 text-[14px] leading-[20px] whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline-2 focus-visible:outline-adm-primary",
+                  "inline-flex items-center h-10 text-[14px] leading-[20px] whitespace-nowrap border-b-2 -mb-px transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary",
                   active ? "font-semibold text-adm-primary border-adm-primary" : "font-medium text-adm-muted border-transparent hover:text-adm-ink",
                 )}
               >
