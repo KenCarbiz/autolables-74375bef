@@ -1531,13 +1531,31 @@ table in 10.8 and 10.9 is superseded by this one.
   $19,420 (no change).
 - The phone check had still expected the pre-correction total of $19,450.
   The check was updated to the corrected values; the screen was not changed.
-- **Known deviation from the mock, kept on purpose.** The reference shows the
-  pre-correction arithmetic: selling price unchanged, advertised total +$30.
-  Matching it would reintroduce the pricing error, so this difference stays
-  and counts against the score.
+- **Deviation from the mock: approved by the owner for policy B
+  (2026-10-29).** The reference shows the pre-correction arithmetic: selling
+  price unchanged, advertised total +$30. The screen keeps selling price
+  $18,495 + fee $925 = unchanged advertised total $19,420. The mock's
+  arithmetic is not to be restored, and the corrected phone check stays.
 - **Proposed rule, not live.** The behaviour shown is the policy B rule. The
   policy B migration is not applied in production, so the live dialog shows
   whatever the deployed server preview returns.
+
+**Approval status.** Screen 06 remains eligible for individual visual
+approval. Overall visual approval waits on the owner's review of the
+comparison package; the 94.11% score alone does not grant it.
+
+**Revisions.**
+- Measured implementation: `7f4fa1a`.
+- Review and evidence package: `a085c74`.
+
+**Verification limits.**
+- The short-viewport runs (390x500) simulate reduced space. They are not
+  proof of how a real phone keyboard behaves.
+- The held-review, no-permission and impact-not-computable states are
+  covered by unit tests. They have not been verified in a browser.
+- The demo screen does not exercise Apply. The apply path is not
+  browser-verified.
+- The policy B production migration remains on hold.
 
 **Current captures of 01, 08 and 12** for review before any tuning proposal:
 - `overlay/01.png`, `overlay/08.png`, `overlay/12.png`;
