@@ -4,6 +4,7 @@ import { FileText, Play } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { AdminButton, AdminCard, AdminLinkButton, EmptyState, ICON, InlineNote, SkeletonBlock, StatusChip } from "@/components/admin/v2/primitives";
+import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
 import { buildAdminNavSections, filterNavSections } from "@/components/layout/adminNav";
 import { adminTabHref, visibleSections } from "@/lib/admin/sections";
 import { enforcementRows, policyFullyEnforced } from "@/lib/admin/enforcementMap";
@@ -30,10 +31,11 @@ const RolePreviewDialog = ({ open, onOpenChange, role }: { open: boolean; onOpen
     hasFeature: () => true,
   }), [role, sections.length]);
   const capabilityCount = getDealerCapabilities(role).length;
+  const onCloseAutoFocus = useReturnFocus(open);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px] rounded-[12px]">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="sm:max-w-[640px] rounded-[12px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle className="text-[18px] leading-[26px] font-semibold text-adm-ink flex items-center gap-2">
             Preview as {label}
@@ -158,7 +160,7 @@ export default function MemberRolePage() {
       backLabel={backLabel}
       section="people"
     >
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_524px] gap-3">
+      <div className="grid grid-cols-1 min-[1536px]:grid-cols-[minmax(0,1fr)_524px] gap-3">
         <AdminCard
           title={<CardTitle>Role capabilities</CardTitle>}
           description={<CardDescription>{member ? <>Applied to <span data-parity="member-name">{member.email}</span> on this rooftop. Permissions apply across the application.</> : "Capability contract for this role on this rooftop. Permissions apply across the application."}</CardDescription>}

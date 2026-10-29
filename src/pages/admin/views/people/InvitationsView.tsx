@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AdminButton, AdminCard, AdminTable, EmptyState, InlineNote, SkeletonBlock, Td, Th } from "@/components/admin/v2/primitives";
+import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
 import type { TeamMember } from "@/lib/admin/people";
 import { InviteForm, MemberAvatar, MemberStatusText } from "./components";
 import { useTeamAuthority, useTeamMembers, useTeamWriters } from "./useTeamMembers";
@@ -15,6 +16,7 @@ export default function InvitationsView() {
   const writers = useTeamWriters();
   const [revokeFor, setRevokeFor] = useState<TeamMember | null>(null);
   const [flash, setFlash] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const onRevokeCloseAutoFocus = useReturnFocus(!!revokeFor);
   const pending = read.members ? read.members.filter((m) => m.status === "invited") : null;
 
   const confirmRevoke = async () => {
@@ -91,7 +93,7 @@ export default function InvitationsView() {
       </div>
 
       <AlertDialog open={!!revokeFor} onOpenChange={(o) => { if (!o) setRevokeFor(null); }}>
-        <AlertDialogContent className="rounded-[12px]">
+        <AlertDialogContent className="rounded-[12px]" onCloseAutoFocus={onRevokeCloseAutoFocus}>
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke the invitation for {revokeFor?.email}?</AlertDialogTitle>
             <AlertDialogDescription>The membership row is removed. You can invite this address again later.</AlertDialogDescription>

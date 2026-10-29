@@ -89,7 +89,7 @@ const CHIP_CLASS = "rounded-full px-3 py-1.5 text-[13px] leading-[18px]";
 // Status cell: a 19px mark (the reference's glyphs measure 16-17px) in the
 // tone colour beside ink text; neutral marks are filled, as drawn.
 const StateMark = ({ icon: Icon, tone, children }: { icon: MarkIcon; tone: Tone; children: ReactNode }) => (
-  <span className="inline-flex items-center gap-2 text-[13px] leading-[20px] text-adm-ink whitespace-nowrap">
+  <span className="inline-flex items-center gap-2 text-[13px] leading-[20px] text-adm-ink">
     <Icon className={cn("w-[19px] h-[19px] flex-shrink-0", MARK_TEXT[tone], tone === "neutral" && "fill-current stroke-white")} aria-hidden="true" />
     {children}
   </span>
@@ -283,7 +283,7 @@ export default function ProductApplicabilityPage() {
                 <Link
                   to={t.href}
                   aria-current={t.active ? "page" : undefined}
-                  className={cn("inline-flex items-center h-11 px-3.5 text-[14px] leading-[20px] font-semibold whitespace-nowrap border-b-2 -mb-px", t.active ? "text-adm-primary border-adm-primary" : "text-adm-muted border-transparent hover:text-adm-ink")}
+                  className={cn("inline-flex items-center h-11 px-3.5 text-[14px] leading-[20px] font-semibold whitespace-nowrap border-b-2 -mb-px focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary", t.active ? "text-adm-primary border-adm-primary" : "text-adm-muted border-transparent hover:text-adm-ink")}
                 >
                   {t.label}
                 </Link>
@@ -298,7 +298,7 @@ export default function ProductApplicabilityPage() {
         {state.phase === "applied" && state.result && <InlineNote tone="success" title="Applied">{state.result.message}</InlineNote>}
         {state.error && state.phase !== "applied" && <InlineNote tone="danger">{state.error}</InlineNote>}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,697fr)_minmax(0,583fr)] gap-[15px] items-start">
+        <div className="grid grid-cols-1 min-[1536px]:grid-cols-[minmax(0,697fr)_minmax(0,583fr)] gap-[15px] items-start">
           <Panel title="Applicability rules" description="Choose which inventory is eligible for this product." bodyClassName="pl-[21px] pr-[19px] pb-1">
             {/* Reference rows: 81, 101 and 108px with dividers inset 16px from the box edge. */}
             <div className="rounded-[8px] border border-adm-border bg-adm-surface" data-landmark="applicability-rules">

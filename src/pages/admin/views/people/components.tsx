@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useMemo, useReducer, useState, type FormEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useReducer, useState, type FormEvent, type ReactNode, type RefObject } from "react";
 import { AlertTriangle, Ban, Building, Car, Check, CheckCircle2, Code, Database, FileText, Link, Monitor, Share2, Tag, Users, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AdminButton, AdminLinkButton, AdminTable, ICON, ICON_BOX, InlineNote, KeyValueList, Td, Th } from "@/components/admin/v2/primitives";
+import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
 import { useAudit } from "@/contexts/AuditContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -396,6 +397,7 @@ export const MemberRoleReviewDialog = ({
   writers,
   onApplied,
   onReload,
+  returnFocusRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -405,8 +407,11 @@ export const MemberRoleReviewDialog = ({
   writers: TeamWriters;
   onApplied?: (role: string) => void;
   onReload?: () => void;
+  /** Where focus goes when the dialog closes, when it was opened from a menu item. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) => {
   const [state, dispatch] = useReducer(reducer, initialReviewApply<RoleDraft>({ role: member.role }));
+  const onCloseAutoFocus = useReturnFocus(open, returnFocusRef);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const { log } = useAudit();
@@ -482,7 +487,7 @@ export const MemberRoleReviewDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px] rounded-[12px]">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="sm:max-w-[640px] rounded-[12px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle className="text-[18px] leading-[26px] font-semibold text-adm-ink">Review role change</DialogTitle>
           <DialogDescription className="text-[13px] text-adm-muted">

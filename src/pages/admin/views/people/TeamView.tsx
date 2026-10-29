@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronDown, ChevronsUpDown, ChevronUp, MoreHorizontal, Search, UserPlus } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AdminButton, AdminCard, AdminLinkButton, AdminTable, EmptyState, ICON, InlineNote, SkeletonBlock, Td, Th } from "@/components/admin/v2/primitives";
+import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { applyTeamFilters, DEPARTMENTS, parseTeamFilters, teamFiltersToParams, type TeamFilters, type TeamMember } from "@/lib/admin/people";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,9 @@ export default function TeamView() {
   const [removeFor, setRemoveFor] = useState<TeamMember | null>(null);
   const [flash, setFlash] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [sort, setSort] = useState<Sort>(null);
+  // The row menu trigger that opened Change role or Remove; its menu item is gone by the time the dialog closes.
+  const rowTrigger = useRef<HTMLElement | null>(null);
+  const onRemoveCloseAutoFocus = useReturnFocus(!!removeFor, rowTrigger);
 
   const update = (patch: Partial<TeamFilters>) => {
     setSearchParams(teamFiltersToParams({ ...filters, ...patch }, searchParams), { replace: true });
@@ -143,7 +147,8 @@ export default function TeamView() {
     }
     // The scroll wrapper is positioned so the cells' screen-reader text stays inside it on narrow
     // screens. From 1536px, fixed columns from the reference (158/147/144/150/58, Employee takes the
-    // rest) keep every role and department on one line; below that the columns size to their content.
+    // rest) keep departments on one line; a role label longer than its column (Title Clerk / Office
+    // Mgr) wraps instead of running into Department. Below that the columns size to their content.
     // A long address wraps rather than truncating, since it is the member's only identifier.
     return (
       <AdminTable caption="Team members" inset className="relative mx-[18px] mb-[18px] rounded-lg xl:min-h-[554px] 2xl:[&_table]:table-fixed">
@@ -169,14 +174,14 @@ export default function TeamView() {
                     <span className="min-w-0 flex-1 [overflow-wrap:anywhere] font-semibold text-adm-ink group-hover:text-adm-primary group-hover:underline" data-parity="member-name"><BreakableAddress value={m.email} /></span>
                   </button>
                 </Td>
-                <Td className={cn(CELL, "2xl:whitespace-nowrap")}>{m.roleLabel}</Td>
+                <Td className={cn(CELL, "2xl:pr-3")}>{m.roleLabel}</Td>
                 <Td className={cn(CELL, "2xl:whitespace-nowrap")}>{m.department}</Td>
                 <Td className={cn(CELL, "whitespace-nowrap")}>This rooftop</Td>
                 <Td className={CELL}><MemberStatusText status={m.status} /></Td>
                 <Td align="right" className={CELL}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button type="button" aria-label={`Actions for ${m.email}`} className="w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-ink hover:bg-adm-workspace">
+                      <button type="button" aria-label={`Actions for ${m.email}`} onPointerDown={(e) => { rowTrigger.current = e.currentTarget; }} onFocus={(e) => { rowTrigger.current = e.currentTarget; }} className="w-8 h-8 inline-flex items-center justify-center rounded-md text-adm-ink hover:bg-adm-workspace">
                         <MoreHorizontal className={ICON.statusTight} aria-hidden="true" />
                       </button>
                     </DropdownMenuTrigger>
@@ -248,11 +253,12 @@ export default function TeamView() {
           readOnlyReason={writers.readOnlyReason ?? authority.reason}
           writers={writers}
           onReload={() => void read.refetch()}
+          returnFocusRef={rowTrigger}
         />
       )}
 
       <AlertDialog open={!!removeFor} onOpenChange={(o) => { if (!o) setRemoveFor(null); }}>
-        <AlertDialogContent className="rounded-[12px]">
+        <AlertDialogContent className="rounded-[12px]" onCloseAutoFocus={onRemoveCloseAutoFocus}>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {removeFor?.email} from the team?</AlertDialogTitle>
             <AlertDialogDescription>
