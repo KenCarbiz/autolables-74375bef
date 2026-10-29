@@ -1,0 +1,36 @@
+01 Overview - remaining differences from the reference
+Implementation b278995 (screen 01 code identical to 7f4fa1a). Protocol v2
+content 92.99% - below 94%: below the numeric target; no exception approved.
+Landmarks 10 of 10. Viewports: 0px page overflow at 390x844, 768x1024,
+1366x768 and 1586x992.
+
+A. Approved design changes (owner decision or standing rule)
+ 1. Readable-text floor: Recent activity detail and time stay at 11px where
+    the mock draws about 10px, so activity items wrap to 2-3 lines.
+    Standing rule: preserve readable text.
+ 2. Real data in the fixture: Active inventory 128 and Open exceptions 1,012
+    (mock 130 and 1,019); the "User added" row shows a full address. Values
+    are masked in scoring. Standing rule: real data semantics.
+
+B. Rendering differences
+ 3. Inter in Chromium sets text wider than the mock's renderer. Two settings
+    titles wrap ("Customer Experience", "Documents & Service"), tile
+    descriptions run 3-4 lines against the mock's 2, and the banner title
+    runs past the mock's detail text.
+ 4. Lucide glyphs against the mock's own drawings: tiles, queue marks,
+    settings, activity and policy rows.
+ 5. Shell gutter 24px against the mock's 20px: card edges sit 4px in on the
+    left and 5-6px on the right.
+ 6. The mock's banner edge colour varies along its length by more than the
+    32/255 tolerance.
+ 7. Product rail and header are flat stand-ins in the fixture. This affects
+    only the full-frame figure, not the content score.
+
+C. Unresolved (decision or defect)
+ 8. Page title size (open decision, exception-proposal item 2): the
+    Administration title uses the 28px token where the mock draws about
+    36px. It is not changed in this round (no typography tuning).
+ 9. Shared section tabs at 1366x768: the row scrolls sideways 28px with a
+    fade, so the last tab is partly hidden until scrolled. The same shared
+    component appears on every screen. Reported, not changed.
+ No other usability defect was found.

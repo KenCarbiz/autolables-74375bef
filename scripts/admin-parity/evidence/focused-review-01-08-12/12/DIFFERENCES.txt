@@ -1,0 +1,52 @@
+12 Inventory feed - remaining differences from the reference
+Implementation b278995 (includes the usability fix below). Protocol v2
+content 92.22% - below 94%: below the numeric target; no exception approved.
+The score is unchanged by the fix, because the 1586 reference layout is
+unchanged. Landmarks 11 of 12: only childTabs fails, the owner-decided
+heading placement.
+
+Usability defect found and corrected in this round (commit b278995)
+- Recent attempts table at 1366x768 (before-fix-bf89227/): the fixed
+  reference columns left the Details column about 26px wide. Its text
+  showed as faded fragments and could be read only by scrolling the table
+  57px sideways.
+- Refresh status: "On schedule" ran past the card's right edge.
+- At 768x1024 the attempts table scrolled 2px sideways.
+- Fix: the fixed column widths and the Refresh status column widths apply
+  from 1536px wide only. Below that, the columns size by content and text
+  wraps. The phone minimum table width is 700px (was 720).
+- After the fix: no sideways scroll at 1366 or 768; Details and Status are
+  fully visible (laptop-1366x768/, tablet-768x1024/).
+- Phones still scroll the table sideways by design (labelled, focusable
+  region).
+- Tests: Administration suites 248 of 248 pass; typecheck clean; audit clean
+  on 01, 08 and 12.
+
+A. Approved design changes (owner decision or standing rule)
+ 1. Heading placement: "Integrations & Data" sits under the child tabs; the
+    mock puts it above them (owner decision: no heading above the 12 tabs).
+    This is the failing childTabs landmark.
+ 2. A fifth child tab, "Jobs & Pipelines": a real view the mock predates.
+ 3. Truthful states and copy:
+    - "Previously validated" (mock "Verified");
+    - the banner adds "Last successful pull 2 days ago";
+    - "Do not clear identity on provider rate limits or errors" wraps to
+      two lines;
+    - Schedule reads "Every 24 hours, 06:00 UTC".
+    Standing rule: real data semantics.
+ 4. The Time column has no sort arrow because the table does not sort (the
+    mock draws one).
+
+B. Rendering differences
+ 5. Shell gutter 24px against the mock's 31px: left-anchored edges and
+    icons sit 6-7px in.
+ 6. Lucide car, database and globe glyphs against the mock's drawings.
+ 7. Inter text widths in the banner, tiles and table; the banner's resampled
+    2px button edge.
+ 8. Fixture data (run times, provider domain, rooftop pin, pager count) is
+    masked in scoring.
+ 9. "DESIGN CONCEPT" chip and caption: mock-only annotations.
+
+C. Unresolved (decision or defect)
+10. Shared section tabs at 1366x768 (same as 01 item 9).
+ No other usability defect was found.

@@ -1,6 +1,6 @@
 # Administration V2 visual parity report
 
-Generated 2026-10-29T05:30:19.165Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
+Generated 2026-10-29T06:04:04.526Z by `bun run admin:parity` against the development fixture route. Every screen is a synthetic fixture rendered by the real Administration components; no production data appears in any capture.
 
 ## Method
 
@@ -543,7 +543,7 @@ Masks (9): run timestamps (tile values and attempt times); fixture provider doma
 | Viewport | Page overflow | scrollWidth | innerWidth | Widest fixed element | Scroll regions | Capture |
 |---|---|---|---|---|---|---|
 | 1920x1080 | none | 1920 | 1920 | 1858 | none | `scripts/admin-parity/out/12-1920x1080.png` |
-| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)], div[Recent inventory feed attempts (scrolls sideways)] | `scripts/admin-parity/out/12-1366x768.png` |
+| 1366x768 | none | 1366 | 1366 | 1342 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/12-1366x768.png` |
 | 1024x768 | none | 1024 | 1024 | 1000 | div[Administration sections (scrolls sideways)] | `scripts/admin-parity/out/12-1024x768.png` |
 | 390x844 | none | 390 | 390 | 374 | div[Administration sections (scrolls sideways)], div[Integrations views (scrolls sideways)], div[Recent inventory feed attempts (scrolls sideways)] | `scripts/admin-parity/out/12-390x844.png` |
 

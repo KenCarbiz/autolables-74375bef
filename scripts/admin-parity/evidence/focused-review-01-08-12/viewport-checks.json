@@ -1,0 +1,172 @@
+[
+  {
+    "screen": "12",
+    "viewport": "390x844",
+    "pageOverflowPx": 0,
+    "pageHeight": 2527,
+    "captures": 3,
+    "scrollRegions": [
+      {
+        "label": "Administration sections (scrolls sideways)",
+        "focusable": true,
+        "hidden": 759
+      },
+      {
+        "label": "Integrations views (scrolls sideways)",
+        "focusable": true,
+        "hidden": 189
+      },
+      {
+        "label": "Recent inventory feed attempts (scrolls sideways)",
+        "focusable": true,
+        "hidden": 344
+      }
+    ]
+  },
+  {
+    "screen": "12",
+    "viewport": "768x1024",
+    "pageOverflowPx": 0,
+    "pageHeight": 1985,
+    "captures": 2,
+    "scrollRegions": [
+      {
+        "label": "Administration sections (scrolls sideways)",
+        "focusable": true,
+        "hidden": 397
+      }
+    ]
+  },
+  {
+    "screen": "12",
+    "viewport": "1366x768",
+    "pageOverflowPx": 0,
+    "pageHeight": 1351,
+    "captures": 2,
+    "scrollRegions": [
+      {
+        "label": "Administration sections (scrolls sideways)",
+        "focusable": true,
+        "hidden": 28
+      }
+    ]
+  },
+  {
+    "screen": "12",
+    "viewport": "1586x992",
+    "pageOverflowPx": 0,
+    "pageHeight": 1312,
+    "captures": 2,
+    "scrollRegions": []
+  },
+  {
+    "screen": "01",
+    "viewport": "390x844",
+    "pageOverflowPx": 0,
+    "pageHeight": 2241,
+    "captures": 3,
+    "scrollRegions": [
+      {
+        "label": "Administration sections (scrolls sideways)",
+        "focusable": true,
+        "hidden": 759
+      },
+      {
+        "label": "Ranked attention queue (scrolls sideways)",
+        "focusable": true,
+        "hidden": 358
+      }
+    ]
+  },
+  {
+    "screen": "01",
+    "viewport": "768x1024",
+    "pageOverflowPx": 0,
+    "pageHeight": 1787,
+    "captures": 2,
+    "scrollRegions": [
+      {
+        "label": "Administration sections (scrolls sideways)",
+        "focusable": true,
+        "hidden": 397
+      }
+    ]
+  },
+  {
+    "screen": "01",
+    "viewport": "1366x768",
+    "pageOverflowPx": 0,
+    "pageHeight": 1107,
+    "captures": 2,
+    "scrollRegions": [
+      {
+        "label": "Administration sections (scrolls sideways)",
+        "focusable": true,
+        "hidden": 28
+      }
+    ]
+  },
+  {
+    "screen": "01",
+    "viewport": "1586x992",
+    "pageOverflowPx": 0,
+    "pageHeight": 1019,
+    "captures": 2,
+    "scrollRegions": []
+  },
+  {
+    "screen": "08",
+    "viewport": "390x844",
+    "pageOverflowPx": 0,
+    "pageHeight": 6334,
+    "captures": 8,
+    "scrollRegions": [
+      {
+        "label": "Administration sections (scrolls sideways)",
+        "focusable": true,
+        "hidden": 760
+      },
+      {
+        "label": "Customer Experience views (scrolls sideways)",
+        "focusable": true,
+        "hidden": 217
+      }
+    ]
+  },
+  {
+    "screen": "08",
+    "viewport": "768x1024",
+    "pageOverflowPx": 0,
+    "pageHeight": 4294,
+    "captures": 5,
+    "scrollRegions": [
+      {
+        "label": "Administration sections (scrolls sideways)",
+        "focusable": true,
+        "hidden": 398
+      }
+    ]
+  },
+  {
+    "screen": "08",
+    "viewport": "1366x768",
+    "pageOverflowPx": 0,
+    "pageHeight": 3286,
+    "captures": 5,
+    "scrollRegions": [
+      {
+        "label": "Administration sections (scrolls sideways)",
+        "focusable": true,
+        "hidden": 29
+      }
+    ]
+  },
+  {
+    "screen": "08",
+    "viewport": "1586x992",
+    "pageOverflowPx": 0,
+    "pageHeight": 3082,
+    "captures": 4,
+    "scrollRegions": []
+  }
+]

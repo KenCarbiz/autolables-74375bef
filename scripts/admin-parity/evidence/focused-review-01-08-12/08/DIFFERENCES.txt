@@ -1,0 +1,43 @@
+08 Contact & Routing - remaining differences from the reference
+Implementation b278995 (screen 08 code identical to 7f4fa1a). Protocol v2
+content 92.12% - below 94%: below the numeric target; no exception approved.
+Landmarks 12 of 12. Viewports: 0px page overflow at 390x844, 768x1024,
+1366x768 and 1586x992.
+
+A. Approved design changes (owner decision or standing rule)
+ 1. Title block: the one-Administration title block and the section row
+    (owner decision).
+ 2. Review changes is disabled until the draft changes (the mock draws it
+    enabled). Correct behaviour.
+ 3. The Escalation switch lives on the Escalation child page, so the
+    Response card does not draw it. Correct behaviour.
+ 4. Truthful copy:
+    - "In-app notifications - Not supported yet" (mock: "Coming soon");
+    - the warning names what is missing ("Missing: BDC destination,
+      escalation destinations");
+    - the draft bar reads "No pending changes. Edits stay in this draft
+      until you review and apply them."
+    Standing rule: real data semantics.
+ 5. The scope box has no chevron, because routing is stored once per
+    account (no scope choice exists). Real data semantics.
+
+B. Rendering differences
+ 6. Inter text widths: "Customer should get a reply within:" and the timing
+    hints wrap differently from the mock.
+ 7. Lucide glyphs against the mock's own drawings: grip, user, users,
+    shield, clock, mail, bell, chevrons and chip marks.
+ 8. Switch knob and track rendering; 1px edge anti-aliasing where the mock
+    draws soft 2px borders.
+ 9. The shell's child-tab row is 13px text in a 36px row (mock 15px in a
+    45px row).
+10. The sticky Draft configuration bar is anchored to the viewport, so in
+    the frame it sits over the mock's card bottoms.
+11. "DESIGN CONCEPT" chip and caption: mock-only annotations.
+
+C. Unresolved (decision or defect)
+12. Live preview (shopper widget mirror): the Call and Contact icons render
+    at 14px, under the Administration 16px icon minimum. They mirror the
+    customer widget's own size, so they are reported, not changed.
+13. Shared section tabs at 1366x768 (same as 01 item 9).
+ No other usability defect was found. At 1366x768 every control is visible
+ and reachable as the page scrolls (laptop-1366x768 captures).

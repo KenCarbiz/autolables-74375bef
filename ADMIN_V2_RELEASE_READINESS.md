@@ -27,7 +27,7 @@ every production check was a read or a block that always rolled back.
 | 13 | Lead escalation function | Verified in isolation; first live escalation Untested | 22 checks running the deployed source unmodified | production has no valid destination and no leads, so it cannot send yet; a failed lead update after an accepted send would repeat the email (section 7) |
 | 14 | MarketCheck quota protection and paused sweep | Verified | ledger, scheduler and 38-screen mount test (section 8) | the daily feed retries a quota refusal twice (3 refused calls a day until Nov 1) |
 | 15 | Scheduled monitoring | Verified (configured) | trigger read back (section 9) | results arrive 2026-10-29 07:40 UTC |
-| 16 | Visual acceptance | 06 approved individually (appearance only); 12 screens pending | Protocol v2, all 13 screens measured on `7f4fa1a` (section 10.15): 06 at 94.11%, approved by the owner on review of package `a085c74`; 12 screens below 94% | Owner visual review of the remaining 12 |
+| 16 | Visual acceptance | 06 approved individually (appearance only); 12 screens pending | All 13 screens measured on `b278995` (section 10.16): 06 at 94.11% (approved on package `a085c74`, measuring `7f4fa1a`, with identical code); 12 screens below 94%; 01, 08 and 12 in focused review | Owner visual review of the remaining 12 |
 
 ## 2. How the evidence was produced
 
@@ -1587,6 +1587,66 @@ table in 10.8 and 10.9 is superseded by this one.
 - `screen-06-review/actual-{01,08,12}-1586x992.png`.
 
 No tuning is proposed until you have reviewed them.
+
+### 10.16 Focused visual review: 01, 08 and 12 (2026-10-29)
+
+**Revision.** Implementation `b278995`. All 13 screens were measured in one
+harness run at that revision, and every score equals its 10.15 value. The
+screen 06 capture and score are unchanged, and its approval and frozen
+direction stand.
+
+| # | Screen | v2 content | Band | Landmarks |
+| --- | --- | --- | --- | --- |
+| 01 | Overview | 92.99% | below 94 | 10 of 10 |
+| 02 | Dealership & Brand | 88.01% | below 94 | pass |
+| 03 | People & Access | 90.70% | below 94 | pass |
+| 04 | Member role | 89.87% | below 94 | fail (owner layout decision) |
+| 05 | Price rules | 89.87% | below 94 | pass |
+| 06 | Fee change review | 94.11% | approved individually (appearance) | pass |
+| 07 | Product applicability | 87.83% | below 94 | pass |
+| 08 | Contact & Routing | 92.12% | below 94 | 12 of 12 |
+| 09 | Escalation rules | 86.53% | below 94 | pass |
+| 10 | Effective policy | 89.53% | below 94 | fail (owner layout decision) |
+| 11 | Approval rules | 89.84% | below 94 | fail (approved title block) |
+| 12 | Inventory feed | 92.22% | below 94 | 11 of 12 (childTabs: owner decision) |
+| 13 | Sync run detail | 87.77% | below 94 | fail (owner layout decision) |
+
+01, 08 and 12 are below 94%. Each would need an explicit, screen-specific
+exception; none is proposed or approved here. The other nine screens remain
+pending.
+
+**Usability defect corrected (12, commit `b278995`).**
+- At 1366x768 the Recent attempts table's fixed reference columns left the
+  Details column about 26px wide. Its text could be read only by scrolling
+  the table 57px sideways.
+- Refresh status's "On schedule" ran past the card's edge.
+- At 768x1024 the table scrolled 2px sideways.
+- Fix: the fixed column widths now apply from 1536px wide. Below that,
+  columns size by content and wrap; the phone minimum table width is 700px.
+- The 1586 layout and its score are unchanged.
+- Checks: before and after captures; typecheck clean; Administration tests
+  248 of 248; audit clean on 01, 08 and 12; 0px page overflow at 390x844,
+  768x1024, 1366x768 and 1586x992 on all three screens.
+
+**Package** (`scripts/admin-parity/evidence/focused-review-01-08-12/`; ZIP
+delivered to the owner). For each screen:
+- reference, actual at 1586x992, side-by-side, and overlay with differences;
+- full-page captures at 1920, 1366, 1024 and 390;
+- actual-viewport captures as the page scrolls at 1586x992, 1366x768,
+  768x1024 and 390x844;
+- `DIFFERENCES.txt`: numbered, in three groups (approved design changes,
+  rendering differences, unresolved);
+- `viewport-checks.json`: overflow and scroll regions;
+- for 12, the pre-fix captures at 1366x768 and 768x1024 from `bf89227`.
+
+**Unresolved items reported, not changed:**
+- the open page-title-size decision (01);
+- the 14px Call and Contact icons in 08's shopper-widget preview, which
+  mirror the customer widget;
+- the shared section-tab row, which scrolls 28px sideways with a fade at
+  1366x768 on every screen.
+
+No typography or pixel tuning was done.
 
 ## 11. Approvals requested
 
