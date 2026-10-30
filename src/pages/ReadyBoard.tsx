@@ -319,10 +319,10 @@ export default function ReadyBoard() {
       <MetricStrip
         label="Ready Board summary"
         metrics={[
-          { label: "Waiting for acceptance", value: ready ? bucketCounts.acceptance : null, loading, href: "/ready-board?view=acceptance" },
-          { label: "Waiting for Get-Ready", value: ready ? bucketCounts.getready : null, loading, href: "/ready-board?view=getready" },
-          { label: "Ready", value: ready ? bucketCounts.ready : null, loading, href: "/ready-board?view=ready" },
-          { label: "Recall review", value: stats ? stats.recallBlocked : null, loading },
+          { label: "Waiting for acceptance", value: ready ? bucketCounts.acceptance : null, hint: total != null ? `of ${total.toLocaleString()} on the board` : undefined, loading, href: "/ready-board?view=acceptance" },
+          { label: "Waiting for Get-Ready", value: ready ? bucketCounts.getready : null, hint: "In service, detail or prep", loading, href: "/ready-board?view=getready" },
+          { label: "Ready", value: ready ? bucketCounts.ready : null, hint: "Every station clear", tone: "success", loading, href: "/ready-board?view=ready" },
+          { label: "Recall review", value: stats ? stats.recallBlocked : null, hint: "Need evidence or resolution", tone: "danger", loading },
         ]}
       />
       <div className="flex flex-col gap-3">
@@ -418,6 +418,8 @@ export default function ReadyBoard() {
                         : <StatusText tone="neutral">Unknown</StatusText>}
                     </Td>
                     <Td align="right">
+                      <span className="inline-flex items-center gap-1">
+                      <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => navigate(`/vehicle-file/${r.id}`)}>View</button>
                       <DropdownMenu>
                         <DropdownMenuTrigger aria-label={`More actions for ${r.ymm || r.vin}`} className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
                           <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
@@ -432,6 +434,7 @@ export default function ReadyBoard() {
                           <DropdownMenuItem onSelect={() => showQr(r.vin)}>Get-Ready QR</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      </span>
                     </Td>
                   </tr>
                 );

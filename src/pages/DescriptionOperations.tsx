@@ -11,7 +11,7 @@ import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import {
   useDescriptionOperations, useDescriptionPermissions, type DescriptionCaseRow,
 } from "@/hooks/useDescriptionOps";
-import { PageBody, PageHeader, MetricStrip, Button, InlineNote, StatusText, type Tone } from "@/components/product";
+import { PageBody, PageHeader, MetricStrip, Button, InlineNote, StatusText, FilterSelect, type Tone } from "@/components/product";
 import {
   VehicleDiagnosticPanel, type DiagnosticException,
 } from "@/components/description/VehicleDiagnosticPanel";
@@ -33,7 +33,7 @@ const STATE_META: Record<OpsState, { label: string; tone: Tone }> = {
   published:       { label: "Published",       tone: "success" },
   ready:           { label: "Ready",           tone: "success" },
   needs_review:    { label: "Needs review",    tone: "warning" },
-  waiting_on_data: { label: "Waiting on data", tone: "info" },
+  waiting_on_data: { label: "Waiting on data", tone: "warning" },
   failed:          { label: "Failed",          tone: "danger" },
   in_progress:     { label: "In progress",     tone: "neutral" },
 };
@@ -78,6 +78,22 @@ const confidenceBand = (n: number | null | undefined): { word: string; className
   if (n >= 50) return { word: "Partial", className: "text-amber-700" };
   return { word: "Unverified", className: "text-rose-600" };
 };
+
+const SHORT_STATE: Record<OpsState, string> = {
+  published: "Published", ready: "Ready", needs_review: "Review", waiting_on_data: "Waiting", failed: "Failed", in_progress: "In progress",
+};
+
+const sourceStatus = (caseRow: DescriptionCaseRow | null): string => {
+  if (!caseRow) return "Not started";
+  const cur = caseRow.current_source_data_version as string | null | undefined;
+  const done = caseRow.processed_source_data_version as string | null | undefined;
+  if (caseRow.potentially_stale || (cur && done && cur !== done)) return "Changed";
+  if (!done) return "Not processed";
+  return "Current";
+};
+
+const shortDateTime = (v: unknown) =>
+  v ? new Date(v as string).toLocaleString(undefined, { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "None";
 
 interface ExceptionRow extends DiagnosticException {
   vehicle_id: string;
@@ -206,6 +222,7 @@ export default function DescriptionOperations() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [syncing, setSyncing] = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [drawerTab, setDrawerTab] = useState<"overview" | "source">("overview");
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("vehicle");
@@ -342,8 +359,8 @@ export default function DescriptionOperations() {
     setSort((cur) => ({ key, dir: cur.key === key && cur.dir === "desc" ? "asc" : "desc" }));
 
   const SortHead = ({ k, children }: { k: SortKey; children: React.ReactNode }) => (
-    <th className="px-3 py-2.5">
-      <button type="button" onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 min-h-[44px] hover:text-foreground">
+    <th className="px-2 py-1">
+      <button type="button" onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 min-h-[36px] hover:text-foreground">
         {children}
         {sort.key === k && (sort.dir === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
       </button>
@@ -372,19 +389,20 @@ export default function DescriptionOperations() {
 
   const loadingRows = allRows === null;
   const metricList = [
-    { label: "Active vehicles", value: metricsLoading || metricsError ? null : metrics.activeInventory, loading: metricsLoading },
-    { label: "Published", value: loadingRows ? null : kpis.published, loading: loadingRows },
-    { label: "Needs review", value: loadingRows ? null : kpis.needs_review, loading: loadingRows },
-    { label: "Failed generation", value: loadingRows ? null : kpis.failed, loading: loadingRows },
+    { label: "Total vehicles", value: metricsLoading || metricsError ? null : metrics.activeInventory, hint: "Active inventory", loading: metricsLoading },
+    { label: "Published", value: loadingRows ? null : kpis.published, hint: "Description live", tone: "success" as Tone, loading: loadingRows },
+    { label: "Needs review", value: loadingRows ? null : kpis.needs_review, hint: "A person must check", tone: "warning" as Tone, loading: loadingRows },
+    { label: "Failed generation", value: loadingRows ? null : kpis.failed, hint: "Blocked or retryable", tone: "danger" as Tone, loading: loadingRows },
   ];
 
   const selectedRow = (allRows || []).find((r) => r.vehicleId === selectedId) ?? null;
 
 
+  const retryEligible = selectedRow ? selectedRow.state === "failed" || selectedRow.state === "needs_review" || selectedRow.state === "waiting_on_data" : false;
+
   const drawer = selectedRow ? (
     <>
-    <div className="fixed inset-0 z-40 bg-black/20" onClick={() => select(null)} aria-hidden />
-    <aside aria-label="Description record" className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[400px] flex-col border-l border-adm-border bg-adm-surface">
+    <aside aria-label="Description record" className="flex w-full shrink-0 flex-col self-start rounded-[6px] border border-adm-border bg-adm-surface lg:w-[340px] lg:sticky lg:top-4">
       <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="min-w-0">
           <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{vehicleStockNumber(selectedRow.vehicle) || "No stock number"}</p>
@@ -402,7 +420,7 @@ export default function DescriptionOperations() {
           </button>
         ))}
       </div>
-      <div className="flex-1 overflow-y-auto space-y-4 px-4 py-4 text-[14px] leading-[20px]">
+      <div className="space-y-4 px-4 py-4 text-[14px] leading-[20px]">
         {drawerTab === "overview" ? (
           <>
         <dl className="space-y-1.5">
@@ -441,6 +459,17 @@ export default function DescriptionOperations() {
             {selectedRow.caseRow?.last_orchestrated_at ? new Date(selectedRow.caseRow.last_orchestrated_at as string).toLocaleString() : "No attempt recorded"}
           </p>
           {selectedRow.caseRow?.status && <p className="text-adm-muted">{String(selectedRow.caseRow.status).replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase())}</p>}
+          {selectedRow.state === "failed" && (
+            <p className="text-adm-muted">{(selectedRow.caseRow?.last_error_message as string | null | undefined) || "No failure detail recorded"}</p>
+          )}
+        </div>
+        <div>
+          <p className="font-semibold text-adm-ink mb-1.5">Retry eligibility</p>
+          <p className="text-adm-muted">
+            {retryEligible
+              ? "A retry can regenerate this description and may incur cost. Review the record before it runs."
+              : "No retry needed for this vehicle."}
+          </p>
         </div>
           </>
         ) : (
@@ -463,7 +492,7 @@ export default function DescriptionOperations() {
         )}
       </div>
       <div className="flex flex-col gap-2 border-t border-adm-border px-4 py-3">
-        <Button variant="primary" onClick={() => navigate(`/description-intelligence/${selectedRow.vehicleId}`)}>Review description record</Button>
+        <Button variant="primary" onClick={() => navigate(`/description-intelligence/${selectedRow.vehicleId}`)}>{retryEligible ? "Review retry" : "Review description record"}</Button>
         <div className="flex gap-2">
           <Button className="flex-1" onClick={() => navigate(`/description-studio?vehicle=${selectedRow.vehicleId}`)}>Open studio</Button>
           <Button className="flex-1" onClick={() => navigate(`/vehicle-file/${selectedRow.vehicleId}`)}>Vehicle file</Button>
@@ -477,7 +506,7 @@ export default function DescriptionOperations() {
     <PageBody width="wide">
       <PageHeader
         title="Description Operations"
-        description="Which vehicles have a description, and which ones need a person."
+        description="Generate and manage vehicle descriptions from multiple sources."
         actions={
           <>
             <Button onClick={() => applyStateFilter("needs_review")}>
@@ -501,50 +530,26 @@ export default function DescriptionOperations() {
             onChange={(e) => { setQuery(e.target.value); setPage(0); }}
             placeholder="Search stock #, VIN, vehicle"
             aria-label="Search vehicles"
-            className="w-full h-10 pl-10 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px] focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full h-9 pl-10 pr-3 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
-        <select
-          value={stateFilter} aria-label="Filter by description state"
-          onChange={(e) => { setStateFilter(e.target.value as "all" | OpsState); setPage(0); }}
-          className="h-10 px-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
-        >
-          <option value="all">All description states</option>
-          {(Object.keys(STATE_META) as OpsState[]).map((s) => (
-            <option key={s} value={s}>{STATE_META[s].label}</option>
-          ))}
-        </select>
-        <select
-          value={conditionFilter} aria-label="Filter by condition"
-          onChange={(e) => { setConditionFilter(e.target.value); setPage(0); }}
-          className="h-10 px-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
-        >
-          <option value="all">New and used</option>
-          <option value="new">New</option>
-          <option value="used">Used</option>
-          <option value="cpo">CPO</option>
-        </select>
-        <select
-          value={channelFilter} aria-label="Filter by channel coverage"
-          onChange={(e) => { setChannelFilter(e.target.value); setPage(0); }}
-          className="h-10 px-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
-        >
-          <option value="all">Any channel coverage</option>
-          <option value="complete">Every channel covered</option>
-          <option value="partial">Some channels covered</option>
-          <option value="none">No channel copy</option>
-        </select>
+        <FilterSelect label="Filter by description state" value={stateFilter} onChange={(v) => { setStateFilter(v as "all" | OpsState); setPage(0); }}
+          options={[{ value: "all", label: "All description states" }, ...(Object.keys(STATE_META) as OpsState[]).map((k) => ({ value: k, label: STATE_META[k].label }))]} />
+        <FilterSelect label="Filter by condition" value={conditionFilter} onChange={(v) => { setConditionFilter(v); setPage(0); }}
+          options={[{ value: "all", label: "New and used" }, { value: "new", label: "New" }, { value: "used", label: "Used" }, { value: "cpo", label: "CPO" }]} />
+        <FilterSelect label="Filter by channel coverage" value={channelFilter} onChange={(v) => { setChannelFilter(v); setPage(0); }}
+          options={[{ value: "all", label: "Any channel coverage" }, { value: "complete", label: "Every channel covered" }, { value: "partial", label: "Some channels covered" }, { value: "none", label: "No channel copy" }]} />
         <button
           type="button"
           onClick={() => { setStateFilter("all"); setConditionFilter("all"); setChannelFilter("all"); setQuery(""); setPage(0); }}
-          className="h-10 px-3 text-[14px] font-semibold text-adm-primary hover:underline"
+          className="h-9 px-2 text-[14px] font-semibold text-adm-primary hover:underline"
         >
           Clear filters
         </button>
       </div>
 
-      <div>
-      <div className="min-w-0 rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
+      <div className="flex flex-col items-start gap-4 lg:flex-row">
+      <div className="min-w-0 w-full flex-1 rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
         {error || exceptionError ? (
           <div className="p-8 text-center">
             <XCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
@@ -578,17 +583,17 @@ export default function DescriptionOperations() {
           <>
             <table className="w-full table-fixed text-left border-collapse">
               <colgroup>
-                <col className="w-[24%]" /><col className="w-[10%]" /><col className="w-[16%]" /><col className="w-[20%]" /><col className="w-[16%]" /><col className="w-[8%]" /><col className="w-[6%]" />
+                <col className="w-[36px]" /><col className="w-[12%]" /><col className="w-[30%]" /><col className="w-[14%]" /><col className="w-[17%]" /><col className="w-[14%]" /><col className="w-[13%]" />
               </colgroup>
               <thead>
                 <tr className="text-[12px] leading-[18px] font-semibold text-adm-muted bg-adm-workspace border-b border-adm-border">
+                  <th className="pl-3 py-2.5"><input type="checkbox" aria-label="Select all vehicles on this page" className="h-4 w-4 rounded-[3px] border-adm-border" checked={paged.length > 0 && paged.every((r) => checked.has(r.vehicleId))} onChange={(e) => setChecked(e.target.checked ? new Set(paged.map((r) => r.vehicleId)) : new Set())} /></th>
+                  <th className="px-2 py-2.5">Stock #</th>
                   <SortHead k="vehicle">Vehicle</SortHead>
-                  <th className="px-3 py-2.5">Stock #</th>
-                  <SortHead k="state">Description state</SortHead>
-                  <th className="px-3 py-2.5">Primary issue</th>
-                  <th className="px-3 py-2.5">Latest attempt</th>
-                  <th className="px-3 py-2.5">Channels</th>
-                  <SortHead k="updated">Updated</SortHead>
+                  <th className="px-2 py-2.5">Source status</th>
+                  <SortHead k="updated">Latest attempt</SortHead>
+                  <th className="px-2 py-2.5">Next retry</th>
+                  <SortHead k="state">Status</SortHead>
                 </tr>
               </thead>
               <tbody className="divide-y divide-adm-border">
@@ -603,23 +608,20 @@ export default function DescriptionOperations() {
                       aria-selected={active}
                       className={`h-11 cursor-pointer transition-colors ${active ? "bg-adm-selected" : "hover:bg-adm-workspace"}`}
                     >
-                      <td className="px-3 text-[14px] font-semibold text-adm-ink truncate">
+                      <td className="pl-3" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" aria-label={`Select ${r.vehicle.ymm || "vehicle"}`} className="h-4 w-4 rounded-[3px] border-adm-border" checked={checked.has(r.vehicleId)}
+                          onChange={(e) => setChecked((cur) => { const n = new Set(cur); if (e.target.checked) n.add(r.vehicleId); else n.delete(r.vehicleId); return n; })} />
+                      </td>
+                      <td className="px-2 text-[13px] text-adm-muted truncate">{stock || "Unknown"}</td>
+                      <td className="px-2 text-[14px] text-adm-ink truncate">
                         <button type="button" onClick={(e) => { e.stopPropagation(); select(active ? null : r.vehicleId); }} className="text-left max-w-full truncate hover:underline focus-visible:underline">
                           {r.vehicle.ymm || "Vehicle"}
                         </button>
                       </td>
-                      <td className="px-3 text-[14px] text-adm-muted truncate">{stock || "Unknown"}</td>
-                      <td className="px-3"><StatusText tone={state.tone}>{state.label}</StatusText></td>
-                      <td className="px-3 text-[14px] text-adm-ink truncate">{r.issue || "None"}</td>
-                      <td className="px-3 text-[13px] text-adm-muted truncate">
-                        {r.caseRow?.last_orchestrated_at ? new Date(r.caseRow.last_orchestrated_at as string).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "None"}
-                      </td>
-                      <td className="px-3 text-[14px] tabular-nums text-adm-ink truncate">
-                        {configuredChannels.length === 0 ? "None" : `${r.channelsPresent.length}/${configuredChannels.length}`}
-                      </td>
-                      <td className="px-3 text-[13px] text-adm-muted whitespace-nowrap">
-                        {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Unknown"}
-                      </td>
+                      <td className="px-2 text-[13px] text-adm-ink truncate">{sourceStatus(r.caseRow)}</td>
+                      <td className="px-2 text-[13px] text-adm-muted truncate">{shortDateTime(r.caseRow?.last_orchestrated_at)}</td>
+                      <td className="px-2 text-[13px] text-adm-muted truncate">{r.state === "failed" ? "Manual review" : "None"}</td>
+                      <td className="px-2"><StatusText tone={state.tone}>{SHORT_STATE[r.state]}</StatusText></td>
                     </tr>
                   );
                 })}
@@ -636,7 +638,7 @@ export default function DescriptionOperations() {
                   <button
                     type="button" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}
                     aria-label="Previous page"
-                    className="w-11 h-11 grid place-items-center rounded-lg border border-border disabled:opacity-40"
+                    className="w-9 h-9 grid place-items-center rounded-[6px] border border-adm-border disabled:opacity-40"
                   >
                     <ChevronRight className="w-4 h-4 rotate-180" />
                   </button>
@@ -646,8 +648,8 @@ export default function DescriptionOperations() {
                     <button
                       key={n} type="button" onClick={() => setPage(n)}
                       aria-current={n === page ? "page" : undefined}
-                      className={`min-w-[44px] h-11 px-2 rounded-lg text-al-meta font-semibold ${
-                        n === page ? "bg-adm-primary text-white" : "border border-border text-foreground"}`}
+                      className={`min-w-[36px] h-9 px-2 rounded-[6px] text-al-meta font-semibold ${
+                        n === page ? "bg-adm-primary text-white" : "border border-adm-border text-foreground"}`}
                     >
                       {n + 1}
                     </button>
@@ -655,20 +657,15 @@ export default function DescriptionOperations() {
                   <button
                     type="button" onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={page >= pageCount - 1}
                     aria-label="Next page"
-                    className="w-11 h-11 grid place-items-center rounded-lg border border-border disabled:opacity-40"
+                    className="w-9 h-9 grid place-items-center rounded-[6px] border border-adm-border disabled:opacity-40"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
                 <label className="inline-flex items-center gap-1.5 text-al-meta text-muted-foreground">
                   Rows per page
-                  <select
-                    value={pageSize}
-                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
-                    className="h-11 px-2 rounded-lg border border-border bg-card text-al-meta font-medium"
-                  >
-                    {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
-                  </select>
+                  <FilterSelect label="Rows per page" className="min-w-[72px]" value={String(pageSize)} onChange={(v) => { setPageSize(Number(v)); setPage(0); }}
+                    options={PAGE_SIZES.map((n) => ({ value: String(n), label: String(n) }))} />
                 </label>
               </div>
             </div>

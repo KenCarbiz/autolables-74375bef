@@ -186,7 +186,7 @@ const fmtMoney = (n: number | null | undefined) =>
 const fmtDate = (d?: string | null) =>
   d ? new Date(d).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : null;
 
-const humanize = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+const humanize = (s: string) => s.toLowerCase().replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
 
 type Tone = "pass" | "fail" | "warn" | "info" | "off";
 const TONE_CLASS: Record<Tone, string> = {
@@ -1158,7 +1158,7 @@ export default function FactoryStickerWorkspace({
             )}
             </div>
             {!fixture && !!currentDoc && (
-              <div className="grid grid-cols-2 gap-3 border-t border-adm-border p-4">
+              <div className="grid grid-cols-2 gap-3 border-t border-adm-border p-4 [&>*]:whitespace-nowrap">
                 {pdfUrl ? (
                   <a
                     href={pdfUrl}
@@ -1168,7 +1168,11 @@ export default function FactoryStickerWorkspace({
                   >
                     Preview PDF
                   </a>
-                ) : <span />}
+                ) : (
+                  <span aria-disabled="true" title="The PDF file is not available for this version" className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold text-adm-muted">
+                    Preview PDF
+                  </span>
+                )}
                 {manager && genStatus !== "PUBLISHED" && (
                   <button
                     type="button"

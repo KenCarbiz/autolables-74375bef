@@ -81,12 +81,14 @@ export function FindingDetail({
   photos,
   vehicleFileHref,
   onAddPhotos,
+  inspectedLabel,
 }: {
   finding: Finding | null;
   repairLabel: string | null;
   photos: string[];
   vehicleFileHref: string;
   onAddPhotos?: (files: FileList | null) => void;
+  inspectedLabel?: string | null;
 }) {
   if (!finding) {
     return (
@@ -107,6 +109,7 @@ export function FindingDetail({
       titleSize="md"
     >
       <div className="flex flex-col gap-4 text-[14px] leading-[20px]">
+        {inspectedLabel && <p className="text-[13px] leading-[18px] text-adm-muted">{inspectedLabel}</p>}
         <p className="text-adm-ink">{finding.notes || "No notes were recorded for this item."}</p>
         {photos.length > 0 ? (
           <div className="grid grid-cols-3 gap-2">

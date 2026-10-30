@@ -188,7 +188,7 @@ const DocumentApproval = () => {
       <PageHeader
         title={tags}
         description={`${vehicleLabel}${stock ? ` (Stock ${stock})` : ""} | Version ${doc.version} | ${fmtDateTime(doc.created_at)}`}
-        actions={<Button onClick={() => void open(doc)} disabled={!storedUrl}>Open file</Button>}
+        actions={storedUrl ? <Button onClick={() => void open(doc)}>Open file</Button> : undefined}
       />
 
       <LocalTabs

@@ -206,6 +206,7 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload, str
       <VehicleSubHeader
         vehicle={vehicle}
         section="Compliance"
+        crumbs={false}
         title="Vehicle compliance"
         description="Review compliance status and resolve any blockers."
         strip={strip}

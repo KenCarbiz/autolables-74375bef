@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { resolveOperatingState } from "@/lib/dealerState";
-import { Button, EmptyState, LocalTabs, Panel, StatusText, Td, Th, WorkTable, type LocalTab, type Tone } from "@/components/product";
+import { Button, FilterSelect, EmptyState, LocalTabs, Panel, StatusText, Td, Th, WorkTable, type LocalTab, type Tone } from "@/components/product";
 import { ALL, FEDERAL_AND_PRODUCT_ROWS, filterLibrary, libraryRows, type LibraryRow, type LibraryType } from "./libraryData";
 
 const TYPE_TONE: Record<LibraryType, Tone> = {
@@ -58,19 +58,11 @@ export const LibrarySection = () => {
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-[14px] text-adm-muted">
           Jurisdiction
-          <select value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} className={FIELD} aria-label="Jurisdiction">
-            <option value={ALL}>All</option>
-            {jurisdictions.map((j) => <option key={j} value={j}>{j}</option>)}
-          </select>
+          <FilterSelect label="Jurisdiction" className="min-w-[120px]" value={jurisdiction} onChange={setJurisdiction} options={[{ value: ALL, label: "All" }, ...jurisdictions.map((j) => ({ value: j, label: j }))]} />
         </label>
         <label className="flex items-center gap-2 text-[14px] text-adm-muted">
           Type
-          <select value={type} onChange={(e) => setType(e.target.value)} className={FIELD} aria-label="Type">
-            <option value={ALL}>All</option>
-            <option value="Law">Law</option>
-            <option value="Dealer policy">Dealer policy</option>
-            <option value="Product check">Product check</option>
-          </select>
+          <FilterSelect label="Type" className="min-w-[140px]" value={type} onChange={setType} options={[{ value: ALL, label: "All" }, { value: "Law", label: "Law" }, { value: "Dealer policy", label: "Dealer policy" }, { value: "Product check", label: "Product check" }]} />
         </label>
         <label className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />

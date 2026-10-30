@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { downloadCsv } from "@/lib/csvExport";
 import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
-import { PageBody, PageHeader, Panel, WorkTable, Th, Td, Button, StatusText, InlineNote, QueryState, type Tone } from "@/components/product";
+import { PageBody, PageHeader, Panel, WorkTable, Th, Td, Button, StatusText, FilterSelect, InlineNote, QueryState, type Tone } from "@/components/product";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import {
@@ -30,7 +30,7 @@ const STAGE_TONE_MAP: Record<string, Tone> = {
 const Stage = ({ stage }: { stage: PipelineStage }) =>
   stage === "Not Applicable"
     ? <span className="text-adm-muted" aria-label="Not applicable">-</span>
-    : <StatusText tone={STAGE_TONE_MAP[STAGE_TONE[stage]] ?? "neutral"} className="whitespace-nowrap">{stage === "Enrichment Pending" ? "Pending" : stage}</StatusText>;
+    : <StatusText tone={STAGE_TONE_MAP[STAGE_TONE[stage]] ?? "neutral"} className="whitespace-nowrap !bg-transparent !px-0">{stage === "Enrichment Pending" ? "Pending" : stage}</StatusText>;
 
 const COLUMNS: Array<{ key: string; label: string; ids: Array<(typeof DOCUMENT_FAMILY_IDS)[number]> }> = [
   { key: "oem", label: "OEM sticker", ids: ["oem_window_sticker_reproduction"] },
@@ -204,30 +204,14 @@ export default function InventoryIntelligence() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="VIN, year, make or model"
-            className="w-full min-h-[36px] pl-8 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
+            className="w-full h-9 pl-8 pr-3 rounded-[6px] border border-adm-border bg-adm-surface text-[14px]"
             aria-label="Filter inventory"
           />
         </div>
-        <select
-          value={condition}
-          onChange={(e) => setCondition(e.target.value)}
-          aria-label="Filter by condition"
-          className="min-h-[36px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]"
-        >
-          <option value="all">All conditions</option>
-          <option value="new">New</option>
-          <option value="used">Used</option>
-          <option value="cpo">Certified</option>
-        </select>
-        <select
-          value={onlyBlocked ? "attention" : "all"}
-          onChange={(e) => setOnlyBlocked(e.target.value === "attention")}
-          aria-label="Filter by status"
-          className="min-h-[36px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]"
-        >
-          <option value="all">All statuses</option>
-          <option value="attention">{`Needs attention${blockedCount ? ` (${blockedCount})` : ""}`}</option>
-        </select>
+        <FilterSelect label="Filter by condition" value={condition} onChange={setCondition}
+          options={[{ value: "all", label: "All conditions" }, { value: "new", label: "New" }, { value: "used", label: "Used" }, { value: "cpo", label: "Certified" }]} />
+        <FilterSelect label="Filter by status" value={onlyBlocked ? "attention" : "all"} onChange={(v) => setOnlyBlocked(v === "attention")}
+          options={[{ value: "all", label: "All statuses" }, { value: "attention", label: `Needs attention${blockedCount ? ` (${blockedCount})` : ""}` }]} />
       </div>
 
       {error && (
@@ -242,7 +226,7 @@ export default function InventoryIntelligence() {
           emptyTitle="No vehicles match"
           emptyDetail="Clear the search or the attention filter to widen the list."
         >
-          <WorkTable className="[&_th]:px-2 [&_td]:px-2 [&_td]:py-2.5" caption="Document pipeline by vehicle and family" minWidth={900}>
+          <WorkTable className="[&_th]:px-2 [&_td]:px-2 [&_td]:py-2.5" caption="Document pipeline by vehicle and family" minWidth={820}>
             <thead>
               <tr>
                 <Th className="w-8">
@@ -274,8 +258,8 @@ export default function InventoryIntelligence() {
                       className="h-4 w-4 accent-[#2457D6]"
                     />
                   </Td>
-                  <Td className="whitespace-nowrap font-mono text-[12px]">{vehicleStockNumber(vehicle) ?? "Unknown"}</Td>
-                  <Td className="max-w-[260px]">
+                  <Td className="whitespace-nowrap font-mono text-[12px] text-adm-muted">{vehicleStockNumber(vehicle) ?? "Unknown"}</Td>
+                  <Td className="max-w-[210px]">
                     <span className="block truncate font-semibold text-adm-ink">{vehicle.ymm || "Vehicle"}</span>
                     <span className="block truncate font-mono text-[12px] leading-[16px] text-adm-muted">{vehicle.vin || "no VIN"}</span>
                   </Td>
@@ -284,7 +268,7 @@ export default function InventoryIntelligence() {
                     const f = c.ids.map((id) => intel.families.find((x) => x.family === id)).find((x) => x && x.stage !== "Not Applicable") ?? intel.families.find((x) => x.family === c.ids[0]);
                     return <Td key={c.key}>{f ? <Stage stage={f.stage} /> : null}</Td>;
                   })}
-                  <Td className="max-w-[160px]">
+                  <Td className="max-w-[130px]">
                     {intel.blocker
                       ? <span className="block truncate text-[13px] text-adm-warning" title={intel.blocker}>{intel.blocker}</span>
                       : <span className="text-[12px] text-adm-muted">None</span>}

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductIcon, type ProductIconName } from "@/components/design/ProductIcon";
 import {
   AdminButton,
@@ -268,3 +269,22 @@ export const QueryState = ({
   if (status === "empty") return <EmptyState title={emptyTitle} detail={emptyDetail} artwork={emptyArtwork} action={emptyAction} compact />;
   return <>{children}</>;
 };
+
+/** Compact 36px filter dropdown on the shadcn Select. */
+export const FilterSelect = ({ value, onChange, options, label, className, disabled }: {
+  disabled?: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  label: string;
+  className?: string;
+}) => (
+  <Select value={value} onValueChange={onChange} disabled={disabled}>
+    <SelectTrigger aria-label={label} className={cn("h-9 w-auto min-w-[140px] gap-2 rounded-[6px] border-adm-border bg-adm-surface px-3 py-0 text-[14px] text-adm-ink", className)}>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+    </SelectContent>
+  </Select>
+);

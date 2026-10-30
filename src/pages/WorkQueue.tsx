@@ -19,7 +19,7 @@ import { MoreHorizontal, AlertTriangle, Car, CheckCircle2, ClipboardList, Filter
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useSearchParams } from "react-router-dom";
-import { PageBody, PageHeader, LocalTabs, QueryState, Panel, WorkTable, Th, Td, Button, StatusText, InlineNote, type LocalTab } from "@/components/product";
+import { PageBody, PageHeader, LocalTabs, QueryState, Panel, WorkTable, Th, Td, Button, StatusText, InlineNote, FilterSelect, type LocalTab } from "@/components/product";
 
 type WorkStatus = "all" | "open" | "needs_approval" | "in_progress" | "completed" | "cancelled";
 type Department = "all" | "inventory" | "print" | "service" | "detail" | "compliance" | "manager" | "passport" | "finance" | "third_party";
@@ -314,6 +314,11 @@ const WorkQueue = () => {
       <PageHeader
         title="Work Queue"
         description="Your tasks and items across the team."
+        actions={tabKey !== "print" ? (
+          <Button onClick={confirmBuild} disabled={creating}>
+            {creating ? "Building queue..." : "Review and build from inventory"}
+          </Button>
+        ) : undefined}
       />
 
       <LocalTabs tabs={queueTabs} label="Work queue" />
@@ -322,34 +327,15 @@ const WorkQueue = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[220px] flex-1 max-w-md">
             <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search work" placeholder="Search VIN, stock, task, department" className="min-h-[36px] w-full rounded-md border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search work" placeholder="Search VIN, stock, task, department" className="h-9 w-full rounded-[6px] border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink" />
           </div>
-          <select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value as WorkStatus)} className="min-h-[36px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink">
-            <option value="all">All statuses</option>
-            <option value="open">Open</option>
-            <option value="needs_approval">Needs approval</option>
-            <option value="in_progress">In progress</option>
-            <option value="completed">Done</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          <select aria-label="Filter by department" value={department} onChange={(e) => setDepartment(e.target.value as Department)} className="min-h-[36px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink">
-            <option value="all">All departments</option>
-            <option value="inventory">Inventory</option>
-            <option value="print">Print</option>
-            <option value="service">Service</option>
-            <option value="detail">Detail</option>
-            <option value="third_party">Third party</option>
-            <option value="compliance">Compliance</option>
-            <option value="manager">Manager</option>
-            <option value="passport">Passport</option>
-            <option value="finance">Finance</option>
-          </select>
+          <FilterSelect label="Filter by status" value={status} onChange={(v) => setStatus(v as WorkStatus)}
+            options={[{ value: "all", label: "All statuses" }, { value: "open", label: "Open" }, { value: "needs_approval", label: "Needs approval" }, { value: "in_progress", label: "In progress" }, { value: "completed", label: "Done" }, { value: "cancelled", label: "Cancelled" }]} />
+          <FilterSelect label="Filter by department" value={department} onChange={(v) => setDepartment(v as Department)}
+            options={[{ value: "all", label: "All departments" }, ...(["inventory", "print", "service", "detail", "third_party", "compliance", "manager", "passport", "finance"] as const).map((d) => ({ value: d, label: d === "third_party" ? "Third party" : d.charAt(0).toUpperCase() + d.slice(1) }))]} />
           {filtersActive && (
             <Button size="sm" variant="ghost" onClick={() => { setStatus("all"); setDepartment("all"); setQ(""); }}>Clear filters</Button>
           )}
-          <Button className="ml-auto" onClick={confirmBuild} disabled={creating}>
-            {creating ? "Building queue..." : "Review and build from inventory"}
-          </Button>
         </div>
       )}
 
@@ -390,13 +376,14 @@ const WorkQueue = () => {
                 : undefined
             }
           >
-            <WorkTable caption="Work items" minWidth={820}>
+            <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Work items" minWidth={820}>
               <thead>
                 <tr>
                   <Th>Age</Th>
                   <Th>Task</Th>
                   <Th>Vehicle</Th>
                   <Th>Owner</Th>
+                  <Th>Type</Th>
                   <Th>Due</Th>
                   <Th>Status</Th>
                   <Th align="right"><span className="sr-only">Actions</span></Th>
@@ -457,17 +444,17 @@ function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate }: {
   const external = item.source === "description_exception";
 
   return (
-    <tr className="h-14 hover:bg-adm-workspace">
+    <tr className="h-12 hover:bg-adm-workspace">
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
-      <Td className="max-w-[300px]">
+      <Td className="max-w-[270px]">
         <p className="truncate font-semibold text-adm-ink" title={item.title}>
           {item.title}
-          {urgent && <StatusText tone="danger" className="ml-2">{item.priority}</StatusText>}
+          {urgent && item.priority && <StatusText tone="warning" className="ml-2">{item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}</StatusText>}
         </p>
-        <p className="truncate text-[12px] leading-[16px] capitalize text-adm-muted">{(item.department || "inventory").replace(/_/g, " ")}</p>
       </Td>
-      <Td className="max-w-[260px] truncate"><span title={vehicleLabel(item)}>{vehicleLabel(item)}</span></Td>
+      <Td className="max-w-[210px] truncate"><span title={vehicleLabel(item)}>{vehicleLabel(item)}</span></Td>
       <Td className="text-adm-muted">{owner}</Td>
+      <Td className="whitespace-nowrap capitalize text-adm-muted">{(item.department || "inventory").replace(/_/g, " ")}</Td>
       <Td className="whitespace-nowrap">
         <span className={due.overdue ? "text-adm-danger" : "text-adm-muted"}>{due.text}</span>
       </Td>
@@ -500,14 +487,14 @@ function ExceptionRow({ item, onOpen, onDismiss }: {
   const departed = item.vehicleActive === false;
 
   return (
-    <tr className="h-14 hover:bg-adm-workspace" title={[copy.why, showDetail ? detail : ""].filter(Boolean).join(" ")}>
+    <tr className="h-12 hover:bg-adm-workspace" title={[copy.why, showDetail ? detail : ""].filter(Boolean).join(" ")}>
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
       <Td className="max-w-[300px]">
         <p className="truncate font-semibold text-adm-ink" title={copy.label}>{copy.label}</p>
-        <p className="text-[12px] leading-[16px] text-adm-muted">System</p>
       </Td>
       <Td className="max-w-[260px] truncate">{vehicleLabel(item)}{departed ? " (left the lot)" : ""}</Td>
       <Td className="text-adm-muted">System</Td>
+      <Td className="whitespace-nowrap text-adm-muted">System</Td>
       <Td className="whitespace-nowrap text-adm-muted">
         {item.created_at ? format(new Date(item.created_at), "MMM d, yyyy") : "Unknown"}
       </Td>

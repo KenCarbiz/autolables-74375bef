@@ -167,7 +167,7 @@ const PrepSignOff = () => {
         <PageHeader
           title="Prep & Vendors"
           description="Shop foreman approves every vehicle before it hits the lot."
-          actions={<ProductButton variant="primary" onClick={() => setSearchParams({ view: "new" })}>New sign-off</ProductButton>}
+          actions={<ProductButton variant="primary" onClick={() => setSearchParams({ view: "new" })}>Assign vendor</ProductButton>}
         />
 
         <LocalTabs
@@ -186,10 +186,10 @@ const PrepSignOff = () => {
         <MetricStrip
           label="Prep sign-off summary"
           metrics={[
-            { label: "Pending sign-off", value: loaded ? pending.length : null, loading: !loaded },
-            { label: "Signed off today", value: loaded ? signedToday : null, loading: !loaded },
-            { label: "Rejected this week", value: loaded ? rejectedThisWeek : null, loading: !loaded },
-            { label: "Ready for listing", value: loaded ? ready.length : null, loading: !loaded },
+            { label: "Total prep items", value: loaded ? signOffs.length : null, hint: "Across all vehicles", loading: !loaded },
+            { label: "Awaiting proof", value: loaded ? pending.length : null, hint: "Need foreman sign-off", tone: "warning", loading: !loaded },
+            { label: "Signed off today", value: loaded ? signedToday : null, hint: "Completed today", tone: "success", loading: !loaded },
+            { label: "Rejected this week", value: loaded ? rejectedThisWeek : null, hint: "Sent back for rework", tone: "danger", loading: !loaded },
           ]}
         />
 
@@ -204,39 +204,37 @@ const PrepSignOff = () => {
               : `This filter shows ${filter} sign-offs only; ${signOffs.length} ${signOffs.length === 1 ? "request exists" : "requests exist"} in total.`}
           />
         ) : (
-          <div>
-            <div className="min-w-0">
-            <WorkTable caption="Prep sign-offs" minWidth={860}>
+          <div className="flex flex-col items-start gap-4 lg:flex-row">
+            <div className="min-w-0 w-full flex-1">
+            <WorkTable caption="Prep sign-offs" minWidth={0}>
               <thead>
                 <tr>
-                  <Th>Vehicle</Th>
-                  <Th>Task</Th>
-                  <Th>Vendor</Th>
-                  <Th className="whitespace-nowrap">Proof needed</Th>
-                  <Th>Status</Th>
-                  <Th>Updated</Th>
-                  <Th align="right"><span className="sr-only">Next action</span></Th>
+                  <Th className="!px-2">Vehicle</Th>
+                  <Th className="!px-2">Task</Th>
+                  <Th className="!px-2">Vendor</Th>
+                  <Th className="whitespace-nowrap !px-2">Proof needed</Th>
+                  <Th className="!px-2">Status</Th>
+                  <Th align="right" className="!px-2 whitespace-nowrap">Next action</Th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(s => (
                   <tr key={s.id} className={`h-11 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
-                    <Td className="max-w-[260px]">
+                    <Td className="max-w-[190px] !px-2">
                       <p className="truncate font-semibold text-adm-ink">{s.ymm || s.vin}</p>
                       <p className="truncate text-[12px] leading-[16px] text-adm-muted">{s.stock_number ? `Stock ${s.stock_number}` : s.vin}</p>
                     </Td>
-                    <Td className="max-w-[240px]">
+                    <Td className="max-w-[140px] !px-2">
                       <p className="truncate">{taskLabel(s.accessories_installed)}</p>
                     </Td>
-                    <Td className="whitespace-nowrap"><p>{vendorLabel(s.accessories_installed)}</p></Td>
-                    <Td className="whitespace-nowrap text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
-                    <Td>
+                    <Td className="max-w-[100px] !px-2"><p className="truncate">{vendorLabel(s.accessories_installed)}</p></Td>
+                    <Td className="whitespace-nowrap !px-2 text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
+                    <Td className="!px-2">
                       <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
                         {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
                       </StatusText>
                     </Td>
-                    <Td className="whitespace-nowrap text-adm-muted">{format(new Date(s.updated_at), "MMM d, h:mm a")}</Td>
-                    <Td align="right">
+                    <Td align="right" className="!px-2">
                       <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline whitespace-nowrap" onClick={(e) => { e.stopPropagation(); select(s.id); }}>
                         {s.status === "pending" ? "Review" : "View"}
                       </button>
@@ -248,7 +246,7 @@ const PrepSignOff = () => {
             </div>
             {selected && (
               <>
-              <aside aria-label="Sign-off detail" className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[400px] flex-col border-l border-adm-border bg-adm-surface">
+              <aside aria-label="Sign-off detail" className="flex w-full shrink-0 flex-col self-start rounded-[6px] border border-adm-border bg-adm-surface lg:sticky lg:top-4 lg:w-[340px]">
                 <div className="flex items-start justify-between gap-3 border-b border-adm-border px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">Detail work</p>
@@ -256,7 +254,7 @@ const PrepSignOff = () => {
                   </div>
                   <button type="button" onClick={() => select(null)} aria-label="Close detail" className="w-9 h-9 grid place-items-center rounded-md text-adm-muted hover:bg-adm-workspace"><X className="w-5 h-5" /></button>
                 </div>
-                <div className="flex-1 overflow-y-auto space-y-4 px-4 py-4 text-[14px] leading-[20px]">
+                <div className="space-y-4 px-4 py-4 text-[14px] leading-[20px]">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-semibold text-adm-ink">Install photo</p>
                     {selected.status === "pending" && (

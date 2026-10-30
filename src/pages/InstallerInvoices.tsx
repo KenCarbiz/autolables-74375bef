@@ -254,7 +254,7 @@ const InstallerInvoices = () => {
             </tbody>
           </WorkTable>
           <div className="flex items-center justify-between border-t border-adm-border px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
-            <span>Showing {shown.length} of {entries.length}</span>
+            <span>{shown.length} in {TAB_LABEL[tab]}</span>
             <span className="text-[14px] text-adm-ink">Total <span className="font-semibold tabular-nums">{money(shownTotal)}</span></span>
           </div>
         </Panel>

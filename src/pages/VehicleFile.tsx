@@ -302,9 +302,10 @@ const VehicleFile = () => {
 
               <ul aria-label="Vehicle status" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pt-1">
                 {summary.map((f) => (
-                  <li key={f.label} title={f.detail} className="inline-flex items-center gap-1.5 text-[12px] leading-[18px] text-adm-muted">
-                    {f.label}
-                    <StatusText tone={f.tone}>{f.value}</StatusText>
+                  <li key={f.label} title={f.detail}>
+                    <StatusText tone={f.tone} className="px-2.5 py-1 text-[13px]">
+                      <span className="font-medium opacity-80">{f.label}</span> {f.value}
+                    </StatusText>
                   </li>
                 ))}
               </ul>
@@ -313,11 +314,7 @@ const VehicleFile = () => {
             </div>
 
             <div className="flex flex-wrap gap-2 lg:shrink-0 lg:justify-end">
-              {published ? (
-                <LinkButton to={viewUrl} target="_blank" rel="noreferrer">
-                  <ExternalLink className="w-5 h-5" /> View shopper page
-                </LinkButton>
-              ) : (
+              {!published && (
                 <Button onClick={publish} disabled={publishing}>
                   <Globe className="w-5 h-5" /> {publishing ? "Publishing…" : "Publish to shopper portal"}
                 </Button>
@@ -330,6 +327,7 @@ const VehicleFile = () => {
                   <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {published && <DropdownMenuItem onSelect={() => window.open(viewUrl, "_blank", "noopener")}>View shopper page</DropdownMenuItem>}
                   <DropdownMenuItem onSelect={copyLink}>Copy shopper link</DropdownMenuItem>
                   <DropdownMenuItem onSelect={copyVin}>Copy VIN</DropdownMenuItem>
                 </DropdownMenuContent>

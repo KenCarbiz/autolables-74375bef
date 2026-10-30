@@ -2,12 +2,13 @@ import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Crumbs } from "@/components/detail/parts";
 import { AdminButton, AdminCard, SkeletonBlock } from "@/components/admin/v2/primitives";
-import { PageBody, PageHeader } from "@/components/product";
+import { FilterSelect, PageBody, PageHeader } from "@/components/product";
 import { adminTabHref } from "@/lib/admin/sections";
 import { useDealerPrintSettings } from "@/lib/stickerStudio/useDealerPrintSettings";
 import { DEFAULT_CALIBRATION, PAPER, type PrintCalibration } from "@/lib/stickerStudio/printConfig";
 import type { StickerType } from "@/lib/stickerStudio/templates";
 import { cn } from "@/lib/utils";
+import { Car } from "lucide-react";
 
 // Printer Calibration: measure, adjust, save, retest. The saved profile is
 // the dealer_print_settings row read by Sticker Studio and the /print routes;
@@ -52,9 +53,10 @@ const PagePreview = ({ type, cal, footer }: { type: StickerType; cal: PrintCalib
           {(narrow ? ["AutoLabels", "Test Page"] : ["AutoLabels Test Page"]).map((line, i) => (
             <text key={line} x={pad + w / 2} y={pad + h / 2 - 6 + i * 15} textAnchor="middle" fontSize="12" fontWeight="600" fill="#1D2433">{line}</text>
           ))}
-          {["Margins match", "the printed output"].map((line, i) => (
-            <text key={line} x={pad + w / 2} y={pad + h / 2 + (narrow ? 26 : 14) + i * 14} textAnchor="middle" fontSize="12" fill="#5B6578">{line}</text>
+          {(narrow ? ["Margins match", "output"] : ["Margins match", "the printed output"]).map((line, i) => (
+            <text key={line} x={pad + w / 2} y={pad + h / 2 + (narrow ? 26 : 14) + i * 14} textAnchor="middle" fontSize={narrow ? "10" : "12"} fill="#5B6578">{line}</text>
           ))}
+          <Car x={pad + w / 2 - 22} y={pad + h / 2 + (narrow ? 66 : 54)} width={44} height={44} stroke="#B4BDCC" strokeWidth={1.25} fill="none" aria-hidden="true" />
         </g>
         <line x1={pad} y1={pad - 14} x2={pad + w} y2={pad - 14} stroke="#8A94A6" />
         <text x={pad + w / 2} y={pad - 19} textAnchor="middle" fontSize="12" fill="#1D2433">{spec.widthIn} in ({Math.round(spec.widthIn * 96)} px at 96 dpi)</text>
@@ -78,6 +80,14 @@ export default function PrintCalibrationPage() {
   const [saving, setSaving] = useState(false);
   const cal = draft ?? calibration;
   const set = (p: Partial<PrintCalibration>) => setDraft({ ...cal, ...p });
+  const [customPrinter, setCustomPrinter] = useState(false);
+  const savedPrinter = calibration.printerName?.trim() ?? "";
+  const printerOptions = [
+    { value: "none", label: "Not specified" },
+    ...(savedPrinter ? [{ value: savedPrinter, label: savedPrinter }] : []),
+    { value: "other", label: "Other printer" },
+  ];
+  const printerChoice = customPrinter ? "other" : cal.printerName?.trim() === savedPrinter && savedPrinter ? savedPrinter : cal.printerName?.trim() ? "other" : "none";
 
   const onSave = async () => {
     setSaving(true);
@@ -132,13 +142,21 @@ export default function PrintCalibrationPage() {
                   <p className="text-[13px] leading-[18px] text-adm-muted">Print a test page, then measure how far the printed border sits from the paper edge. Right and down are positive.</p>
                   <label className={labelCls}>
                     Paper format
-                    <select className={fieldCls} value={format} onChange={(e) => setFormat(e.target.value as StickerType)}>
-                      {FORMATS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-                    </select>
+                    <FilterSelect label="Paper format" className="h-10 w-full" value={format} onChange={(v) => setFormat(v as StickerType)} options={FORMATS.map((f) => ({ value: f.key, label: f.label }))} />
                   </label>
                   <label className={labelCls}>
                     Printer
-                    <input className={fieldCls} value={cal.printerName || ""} onChange={(e) => set({ printerName: e.target.value })} placeholder="Printer name, for example Lobby HP LaserJet" />
+                    <FilterSelect label="Printer" className="h-10 w-full" value={printerChoice} onChange={(v) => { setCustomPrinter(v === "other"); if (v === "none") set({ printerName: "" }); else if (v !== "other") set({ printerName: v }); }} options={printerOptions} />
+                  </label>
+                  {printerChoice === "other" && (
+                    <label className={labelCls}>
+                      Printer name
+                      <input className={fieldCls} value={cal.printerName || ""} onChange={(e) => set({ printerName: e.target.value })} placeholder="Printer name, for example Lobby HP LaserJet" />
+                    </label>
+                  )}
+                  <label className={labelCls}>
+                    Profile
+                    <FilterSelect label="Profile" className="h-10 w-full" value={format} onChange={(v) => setFormat(v as StickerType)} options={[{ value: "window", label: "Default (Letter)" }, { value: "addendum", label: "Half letter (addendum)" }]} />
                   </label>
                   <div className="grid grid-cols-3 items-end gap-3">
                     <label className={labelCls}>Horizontal offset (in)<input type="number" step="0.01" className={fieldCls} value={num(cal.xOffsetIn)} onChange={(e) => set({ xOffsetIn: parseFloat(e.target.value) })} /></label>
@@ -186,9 +204,7 @@ export default function PrintCalibrationPage() {
                   <p className="text-[13px] leading-[18px] text-adm-muted">Print another test page with the saved profile and confirm the border lands clean. Test sheets are not recorded; keep the printed sheet with its date.</p>
                   <label className={labelCls}>
                     Paper format
-                    <select className={fieldCls} value={format} onChange={(e) => setFormat(e.target.value as StickerType)}>
-                      {FORMATS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-                    </select>
+                    <FilterSelect label="Paper format" className="h-10 w-full" value={format} onChange={(v) => setFormat(v as StickerType)} options={FORMATS.map((f) => ({ value: f.key, label: f.label }))} />
                   </label>
                   <AdminButton variant="outline" className="self-start" onClick={printTest}>Print test page</AdminButton>
                 </>

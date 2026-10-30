@@ -188,6 +188,7 @@ export const DocumentsTab = ({ vehicle, onReload }: { vehicle: VehicleRow; onRel
       <VehicleSubHeader
         vehicle={vehicle}
         section="Documents"
+        crumbs={false}
         title="Vehicle documents"
         description={`Manage documents for ${vehicle.ymm || vehicle.vin}${vehicleStockNumber(vehicle) ? ` (Stock # ${vehicleStockNumber(vehicle)})` : ""}`}
         actions={

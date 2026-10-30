@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowRight, Building2, Car, FileCheck, FileLock, FileSearch,
+  AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Building2, Car, FileCheck, FileLock, FileSearch,
   FileText, FileX, KeyRound, Layers, Lock, Package, Printer, QrCode,
   Tag,
 } from "lucide-react";
@@ -337,7 +337,7 @@ export default function DocumentsPrintCenter() {
                         </Td>
                         <Td><StatusText tone={productTone(d.internalStatus.tone)}>{d.internalStatus.label}</StatusText></Td>
                         <Td className="text-adm-muted whitespace-nowrap">{d.passportVisibility.label}</Td>
-                        <Td><StatusText tone={productTone(d.printStatus.tone)}>{d.printStatus.label}</StatusText></Td>
+                        <Td><StatusText tone={productTone(d.printStatus.tone)} className="!bg-transparent !px-0">{d.printStatus.label}</StatusText></Td>
                         <Td align="right">
                           <span className="inline-flex items-center justify-end gap-1">
                             {d.reprintCopy != null ? (
@@ -378,6 +378,7 @@ export default function DocumentsPrintCenter() {
               </WorkTable>
               <p className="border-t border-adm-border px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
                 {picked.size} of {docCount} documents selected · {counts.ready} ready · {counts.blocked} blocked · {counts.customerVisible} shown in the Passport
+                {passportHref ? <> · <a href={passportHref} target="_blank" rel="noreferrer" className="font-semibold text-adm-primary hover:underline">Open Passport view</a></> : null}
               </p>
             </Panel>
           )
@@ -387,7 +388,7 @@ export default function DocumentsPrintCenter() {
             <Panel title="Preview">
               {previewDoc ? (
                 <div className="flex flex-col gap-3">
-                  <div className="mx-auto flex aspect-[8.5/11] w-full max-w-[220px] flex-col justify-between rounded-[4px] border border-adm-border bg-white p-4 text-left">
+                  <div className="mx-auto flex aspect-[8.5/11] w-full max-w-[180px] flex-col justify-between rounded-[4px] border border-adm-border bg-white p-4 text-left">
                     <div>
                       <p className="text-[11px] leading-[16px] text-adm-muted">{vehicleLine}</p>
                       <p className="mt-1 text-[15px] leading-[20px] font-bold text-adm-ink">{previewDoc.label}</p>
@@ -395,6 +396,17 @@ export default function DocumentsPrintCenter() {
                     </div>
                     <p className="text-[11px] leading-[16px] text-adm-muted">{vehicle.vin}</p>
                   </div>
+                  {docCount > 1 && (
+                    <div className="flex items-center justify-center gap-3 text-[13px] leading-[18px] text-adm-muted">
+                      <button type="button" aria-label="Previous document" className="grid h-8 w-8 place-items-center rounded-[6px] border border-adm-border hover:bg-adm-workspace" onClick={() => setSelectedDoc(documents[(documents.indexOf(previewDoc) - 1 + docCount) % docCount].id)}>
+                        <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                      </button>
+                      <span className="tabular-nums">{documents.indexOf(previewDoc) + 1} of {docCount}</span>
+                      <button type="button" aria-label="Next document" className="grid h-8 w-8 place-items-center rounded-[6px] border border-adm-border hover:bg-adm-workspace" onClick={() => setSelectedDoc(documents[(documents.indexOf(previewDoc) + 1) % docCount].id)}>
+                        <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-3 text-[13px] leading-[18px]">
                     <span className="min-w-0 truncate text-adm-muted">{previewDoc.internalStatus.label} · {previewDoc.passportVisibility.label}</span>
                     {previewDoc.href && (previewDoc.href.startsWith("/")
@@ -406,13 +418,6 @@ export default function DocumentsPrintCenter() {
                 <p className="text-[14px] leading-[20px] text-adm-muted">Select a document to preview it.</p>
               )}
               <div className="mt-3 flex flex-col gap-3 border-t border-adm-border pt-3">
-                <CommandAction
-                  newTab
-                  variant="link"
-                  href={passportHref ?? undefined}
-                  disabledReason={passportHref ? null : "This vehicle has no published Passport yet."}>
-                  Open Passport View
-                </CommandAction>
                 {printAction}
               </div>
             </Panel>

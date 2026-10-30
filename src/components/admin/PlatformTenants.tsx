@@ -222,7 +222,7 @@ export const PlatformTenants = () => {
                 const mc = mcByTenant.get(t.id);
                 return (
                   <tr key={t.id}>
-                    <Td className="max-w-[180px]">
+                    <Td className="max-w-[260px]">
                       <Link to={`/platform-admin/tenants/${t.id}`} className="block truncate font-semibold text-adm-primary hover:underline" title={`${t.name} (${t.slug}${t.domain ? ` · ${t.domain}` : ""})`}>
                         {t.name}
                       </Link>

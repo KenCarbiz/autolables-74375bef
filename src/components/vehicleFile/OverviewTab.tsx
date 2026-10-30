@@ -100,8 +100,8 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
-        <Card title="Vehicle details" action={
+      <div className="grid gap-6 lg:grid-cols-3 lg:items-stretch">
+        <Card className="h-full" title="Vehicle details" action={
           <button onClick={repullMarket} disabled={repulling} className="text-[14px] font-semibold text-adm-primary hover:underline disabled:opacity-50" title="Re-pull market value, comparables, days-supply, recalls, VIN history and Black Book for this VIN">
             {repulling ? "Syncing…" : "Re-pull market data"}
           </button>
@@ -111,7 +111,7 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
 
         <DescriptionCard vehicleId={vehicle.id} />
 
-        <Card title={`Media (${gallery.length + videos.length})`} action={
+        <Card className="h-full" title={`Media (${gallery.length + videos.length})`} action={
           <button onClick={() => onTab("documents")} className="text-[14px] font-semibold text-adm-primary hover:underline">Manage media</button>
         }>
           {gallery.length === 0 && videos.length === 0 ? (
@@ -124,9 +124,13 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
               <p className="text-[14px] text-adm-muted">{gallery.length} photo{gallery.length === 1 ? "" : "s"} · {videos.length} video{videos.length === 1 ? "" : "s"}</p>
               {gallery.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
-                  {gallery.slice(0, 9).map((src, i) => (
+                  <img src={gallery[0]} alt="" className="col-span-3 aspect-[16/10] w-full rounded-[4px] border border-adm-border object-cover" />
+                  {gallery.slice(1, gallery.length > 7 ? 5 : 7).map((src, i) => (
                     <img key={`${src}-${i}`} src={src} alt="" className="aspect-[4/3] w-full rounded-[4px] border border-adm-border object-cover" />
                   ))}
+                  {gallery.length > 7 && (
+                    <span className="grid aspect-[4/3] place-items-center rounded-[4px] bg-adm-workspace text-[14px] font-semibold text-adm-muted">+{gallery.length - 5}</span>
+                  )}
                 </div>
               )}
             </>

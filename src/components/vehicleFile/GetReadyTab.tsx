@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  AlertTriangle, ArrowUpRight, CheckCircle2, Clock, Lock, Unlock, Wrench,
+  AlertTriangle, ArrowUpRight, Check, CheckCircle2, Clock, Lock, Unlock, Wrench,
 } from "lucide-react";
 import { Card, DeepLink, EmptyNote, Section, btn, fmtWhen } from "./primitives";
 import { VehicleSubHeader } from "./SubPageHeader";
@@ -42,7 +42,7 @@ interface GateEvent {
 }
 
 const STAGE_DOT: Record<StageState, string> = {
-  done: "bg-adm-selected text-adm-primary border-adm-primary",
+  done: "bg-adm-surface text-adm-primary border-adm-primary",
   current: "bg-adm-primary text-white border-adm-primary",
   future: "bg-adm-workspace text-adm-muted border-adm-border",
 };
@@ -57,8 +57,8 @@ const RailStrip = ({ state }: { state: LifecycleState | null }) => {
           <li key={stage.key} className="flex-1 min-w-0 flex sm:flex-col items-center sm:items-stretch gap-3 sm:gap-0">
             <div className="flex items-center sm:justify-center gap-0 shrink-0">
               {i > 0 && <span className={`hidden sm:block h-0.5 flex-1 ${s === "future" ? "bg-adm-border" : "bg-adm-primary"}`} />}
-              <span className={`w-8 h-8 rounded-full border inline-flex items-center justify-center shrink-0 ${STAGE_DOT[s]}`}>
-                <span className="text-[13px] font-bold tabular-nums">{i + 1}</span>
+              <span className={`w-7 h-7 rounded-full border inline-flex items-center justify-center shrink-0 ${STAGE_DOT[s]}`}>
+                {s === "done" ? <Check className="w-5 h-5" aria-hidden="true" /> : <span className="text-[13px] font-bold tabular-nums">{i + 1}</span>}
               </span>
               {i < RAIL.length - 1 && <span className={`hidden sm:block h-0.5 flex-1 ${states[RAIL[i + 1].key] === "future" ? "bg-adm-border" : "bg-adm-primary"}`} />}
             </div>
@@ -270,6 +270,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
             <div className="min-w-0 flex flex-col gap-4">
           {ready && (
         <Card title="Checklist" action={<span className="text-[13px] text-adm-muted tabular-nums">{ready.done} of {ready.checks.length} complete</span>}>
+          <p className="-mt-2 text-[13px] leading-[18px] text-adm-muted">Complete all items to make this vehicle retail ready.</p>
           <ul className="divide-y divide-adm-border">
             {ready.checks.map((c) => (
               <li key={c.label} className="flex items-center justify-between gap-3 py-2 text-[14px] leading-[20px]">
@@ -295,7 +296,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={1000}
-            rows={2}
+            rows={4}
             placeholder="Add a note for the team"
             className="w-full rounded-[6px] border border-adm-border bg-adm-surface px-3 py-2 text-[14px] leading-[20px] text-adm-ink focus:outline-none focus:ring-2 focus:ring-adm-primary"
           />

@@ -28,7 +28,7 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
 
   if (error) {
     return (
-      <Card title="Latest description">
+      <Card className="h-full" title="Latest description">
         <p className="text-al-body text-red-600 inline-flex items-center gap-1.5">
           <XCircle className="w-4 h-4 shrink-0" /> The description record could not be loaded: {error}
         </p>
@@ -38,7 +38,7 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
 
   if (!record) {
     return (
-      <Card title="Latest description">
+      <Card className="h-full" title="Latest description">
         <p className="text-al-body text-muted-foreground">Loading the description record…</p>
       </Card>
     );
@@ -54,7 +54,7 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
   const latest = record.versions[0];
 
   return (
-    <Card title="Latest description">
+    <Card className="h-full" title="Latest description">
       {!c ? (
         <p className="text-[14px] leading-[20px] text-adm-muted">
           No description case for this vehicle yet. Nothing is drafted until the feed or reconciliation creates one.

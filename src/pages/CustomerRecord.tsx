@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ExternalLink, Mail, Phone } from "lucide-react";
+import { ExternalLink, Mail, MessageSquare, Phone } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import Seo from "@/components/Seo";
 import { LinkButton, PageBody, PageHeader, Panel, QueryState } from "@/components/product";
@@ -153,9 +153,8 @@ const CustomerRecord = () => {
                 ))}
               </ul>
             )}
-          </Panel>
-
-          <Panel title="Intent timeline">
+          <div className="mt-5 border-t border-adm-border pt-4">
+          <h3 className="mb-3 text-[16px] leading-[22px] font-semibold text-adm-ink">Intent timeline</h3>
             {customer.activity.length === 0 ? (
               <p className="text-[14px] leading-[20px] text-adm-muted">Nothing has been captured for this customer yet.</p>
             ) : (
@@ -172,6 +171,7 @@ const CustomerRecord = () => {
                 ))}
               </ol>
             )}
+          </div>
           </Panel>
 
           <Panel
@@ -252,8 +252,9 @@ const CustomerRecord = () => {
           <Panel title="Contact actions">
             <div className="grid grid-cols-2 gap-2">
               {callHref ? <LinkButton variant="secondary" className="whitespace-nowrap px-2" to={callHref}><Phone className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Call</LinkButton> : null}
+              {customer.phone ? <LinkButton variant="secondary" className="whitespace-nowrap px-2" to={`sms:${customer.phone.replace(/[^\d+]/g, "")}`}><MessageSquare className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Send SMS</LinkButton> : null}
               {customer.email ? <LinkButton variant="secondary" className="whitespace-nowrap px-2" to={`mailto:${customer.email}`}><Mail className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Send email</LinkButton> : null}
-              {primaryVehicle?.slug ? <LinkButton variant="secondary" className="whitespace-nowrap px-2" to={`/v/${primaryVehicle.slug}`}><ExternalLink className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Open Passport</LinkButton> : null}
+              {primaryVehicle?.slug ? <LinkButton variant="secondary" className="whitespace-nowrap px-2" to={`/v/${primaryVehicle.slug}`}><ExternalLink className="h-5 w-5 shrink-0 text-adm-primary" aria-hidden="true" /> Open Passport</LinkButton> : null}
               {!callHref && !customer.email && !primaryVehicle?.slug ? (
                 <p className="text-[14px] leading-[20px] text-adm-muted">No contact method captured.</p>
               ) : null}

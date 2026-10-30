@@ -70,8 +70,8 @@ export default function JobDetailPage() {
       subtitle={`${spec.label}, scheduled job detail${row.lastAttemptAt ? `. Last invocation ${formatAt(row.lastAttemptAt)}` : ""}`}
       actions={banner ? undefined : <LinkButton variant="primary" to={spec.drillIn}>{spec.drillInLabel}</LinkButton>}
     >
-      <div className="grid gap-4 lg:grid-cols-3 items-start">
-        <Panel title="Job configuration" titleSize="md" inset="sm">
+      <div className="grid gap-4 lg:grid-cols-3 items-stretch">
+        <Panel title="Job configuration" titleSize="md" inset="sm" className="h-full">
           <KeyValueList
             rows={[
               { label: "Job name", value: spec.label },
@@ -85,7 +85,7 @@ export default function JobDetailPage() {
             ]}
           />
         </Panel>
-        <Panel title="Run timeline" titleSize="md" inset="sm">
+        <Panel title="Run timeline" titleSize="md" inset="sm" className="h-full">
           <ol>
             <Step n={1} tone={scheduler.tone} title="Scheduler">
               {scheduler.label}{row.schedule ? `, ${describeCron(row.schedule)}` : ""}
@@ -101,7 +101,7 @@ export default function JobDetailPage() {
             </Step>
           </ol>
         </Panel>
-        <Panel title="Outcome" titleSize="md" inset="sm">
+        <Panel title="Outcome" titleSize="md" inset="sm" className="h-full">
           <KeyValueList
             className="grid-cols-[minmax(96px,112px)_1fr] gap-x-4"
             rows={[

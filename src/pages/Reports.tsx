@@ -1,6 +1,6 @@
 import { Children, useState, type ComponentType, type ReactElement, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, type LocalTab } from "@/components/product";
+import { Button, FilterSelect, LocalTabs, MetricStrip, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { format } from "date-fns";
 import {
   AlertTriangle, ArrowLeft, ArrowUpRight, BarChart3, Car, CheckCircle2, Download, DollarSign,
@@ -133,11 +133,13 @@ const DailyChart = ({ title, data, days }: { title: string; data: { day: string;
   );
 };
 
+const shortDay = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
 const weeklyRows = (data: { day: string; count: number }[]) => {
   const rows: { range: string; count: number; days: number }[] = [];
   for (let i = 0; i < data.length; i += 7) {
     const chunk = data.slice(i, i + 7);
-    rows.push({ range: `${chunk[0].day} to ${chunk[chunk.length - 1].day}`, count: chunk.reduce((n, d) => n + d.count, 0), days: chunk.length });
+    rows.push({ range: `${shortDay(chunk[0].day)} - ${shortDay(chunk[chunk.length - 1].day)}`, count: chunk.reduce((n, d) => n + d.count, 0), days: chunk.length });
   }
   return rows;
 };
@@ -212,23 +214,15 @@ const Reports = () => {
           >
             <label className="flex items-center gap-2 text-[13px] leading-[18px] text-adm-ink">
               Timezone
-              <select className="h-10 min-w-[170px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" disabled value="local">
-                <option value="local">{Intl.DateTimeFormat().resolvedOptions().timeZone}</option>
-              </select>
+              <FilterSelect label="Timezone" disabled className="h-10 min-w-[170px]" value="local" onChange={() => undefined} options={[{ value: "local", label: Intl.DateTimeFormat().resolvedOptions().timeZone }]} />
             </label>
             <label className="flex items-center gap-2 text-[13px] leading-[18px] text-adm-ink">
               Scope
-              <select className="h-10 min-w-[170px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" disabled value="store">
-                <option value="store">{currentStore?.name || tenant?.name || "This dealership"}</option>
-              </select>
+              <FilterSelect label="Scope" disabled className="h-10 min-w-[170px]" value="store" onChange={() => undefined} options={[{ value: "store", label: currentStore?.name || tenant?.name || "This dealership" }]} />
             </label>
             <label className="flex items-center gap-2 text-[13px] leading-[18px] text-adm-ink">
               Date range
-              <select className="h-10 min-w-[170px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" value={draftDays} onChange={(e) => setDraftDays(Number(e.target.value))}>
-                <option value={7}>Last 7 days</option>
-                <option value={30}>Last 30 days</option>
-                <option value={90}>Last 90 days</option>
-              </select>
+              <FilterSelect label="Date range" className="h-10 min-w-[170px]" value={String(draftDays)} onChange={(v) => setDraftDays(Number(v))} options={[{ value: "7", label: "Last 7 days" }, { value: "30", label: "Last 30 days" }, { value: "90", label: "Last 90 days" }]} />
             </label>
             <Button type="submit" variant="primary" className="ml-auto min-h-[40px] px-6">Run report</Button>
           </form>

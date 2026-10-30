@@ -13,7 +13,7 @@ import { Button, EmptyState, KeyValueList, LinkButton, LocalTabs, PageBody, Page
 // One dealership, read from the same platform queries the Tenants list uses.
 // Plan changes are drafted here and applied only on an explicit confirm.
 
-export const planLabel = (tier: string | null | undefined) => (tier ? PLAN_TIER_LABELS[tier as PlanTier] ?? tier : null);
+export const planLabel = (tier: string | null | undefined) => (tier ? PLAN_TIER_LABELS[tier as PlanTier] ?? tier.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : null);
 
 export const formatDate = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : null);
 
@@ -187,7 +187,7 @@ const PlatformTenantDetail = () => {
                 })}
               </tbody>
             </WorkTable>
-            {limit && tenantMembers.length > limit && (
+            {limit && (
               <div className="px-4 py-3 text-right">
                 <Link to={tabHref("members")} className="text-[13px] font-semibold text-adm-primary hover:underline">View all members</Link>
               </div>
@@ -312,7 +312,7 @@ const PlatformTenantDetail = () => {
               {summary}
               {entitlementsCompact}
             </div>
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-stretch [&>*]:h-full">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-start">
               {providerPanel}
               {membersPanel(5)}
             </div>

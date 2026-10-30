@@ -70,7 +70,12 @@ export default function ProviderDetailPage() {
       crumbs={crumbs}
       title={spec.label}
       subtitle={spec.affectedOutput}
-      actions={<LinkButton variant="primary" to={providerDrillIn(spec, data.latestRunId)}>{spec.drillInLabel}</LinkButton>}
+      actions={
+        <>
+          <LinkButton variant="outline" to={providerDrillIn(spec, data.latestRunId)}>{spec.drillInLabel}</LinkButton>
+          <LinkButton variant="primary" to={`${base}?tab=configuration`}>Edit configuration</LinkButton>
+        </>
+      }
       tabs={
         <LocalTabs
           label="Provider sections"
@@ -96,10 +101,11 @@ export default function ProviderDetailPage() {
             { label: "Data freshness", value: card.lastSuccessAt ? describeAge(card.lastSuccessAt, Date.now()) : "No data", hint: freshness ? `Window ${freshness}` : "Window not set" },
           ]}
         />
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_320px] items-start">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_320px] items-stretch">
           {(tab === "overview" || tab === "configuration" || tab === "data") && (
-            <Panel title={tab === "data" ? "Data and cache" : tab === "configuration" ? "Configuration" : "Capability details"} titleSize="md" inset="sm">
+            <Panel title={tab === "data" ? "Data and cache" : tab === "configuration" ? "Configuration" : "Capability details"} titleSize="md" inset="sm" className="h-full">
               <KeyValueList
+                className="grid-cols-[124px_1fr] gap-x-3"
                 rows={[
                   ...(tab === "data" ? [{ label: "Affects", value: spec.affectedOutput }] : []),
                   ...(tab === "overview" ? [{ label: "Output", value: spec.affectedOutput }] : []),
@@ -114,7 +120,7 @@ export default function ProviderDetailPage() {
             </Panel>
           )}
           {(tab === "overview" || tab === "attempts") && (
-            <Panel title="Recent attempts" titleSize="md" inset="sm" flush action={tab === "overview" && attempts.length > 0 ? <Link to={`${base}?tab=attempts`} className="text-[13px] font-medium text-adm-primary hover:underline">View all attempts</Link> : undefined}>
+            <Panel title="Recent attempts" titleSize="md" inset="sm" flush className="h-full" action={tab === "overview" ? <Link to={`${base}?tab=attempts`} className="text-[13px] font-medium text-adm-primary hover:underline">View all attempts</Link> : undefined}>
               <WorkTable caption="Recent provider calls">
                 <thead>
                   <tr><Th>Date and time</Th><Th>Product</Th><Th>Outcome</Th><Th align="right">HTTP</Th></tr>
@@ -140,7 +146,7 @@ export default function ProviderDetailPage() {
           )}
           {(tab === "overview" || tab === "quota") && (
             <aside aria-label="Guidance" className={tab === "quota" ? "xl:col-span-3" : undefined}>
-              <Panel title="Quota and guidance" titleSize="md" inset="sm">
+              <Panel title="Quota and guidance" titleSize="md" inset="sm" className="h-full">
                 <div className="space-y-3">
                   <StatusText tone={meta.tone}>{meta.label}</StatusText>
                   <p className="text-[14px] font-semibold text-adm-ink">{card.verdict.headline}</p>

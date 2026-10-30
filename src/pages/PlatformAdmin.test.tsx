@@ -27,9 +27,9 @@ const renderAt = (url: string) =>
 
 describe("Platform Console local navigation", () => {
   it("lists every platform section as a link, without needing the palette", () => {
-    renderAt("/platform-admin");
+    renderAt("/platform-admin?tab=health");
     const links = Array.from(document.querySelectorAll("nav[aria-label='Platform sections'] a, nav[aria-label='Platform tools'] a"));
-    expect(links).toHaveLength(11);
+    expect(links).toHaveLength(12);
     expect(links.map((a) => a.getAttribute("href"))).toContain("/platform-admin?tab=budgets");
   });
 

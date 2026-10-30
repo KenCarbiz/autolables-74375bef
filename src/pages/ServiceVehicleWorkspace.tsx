@@ -462,6 +462,9 @@ export default function ServiceVehicleWorkspace() {
                 repairLabel={activeFailure ? REPAIR_STATE_LABELS[activeFailure.repair_state as RepairState] ?? null : null}
                 photos={Array.isArray(activeFailure?.photos) ? activeFailure.photos : []}
                 vehicleFileHref={`/vehicle-file/${veh.id}`}
+                inspectedLabel={newestSigned?.signed_at
+                  ? `Inspected ${new Date(newestSigned.signed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}${newestSigned.inspector_name ? ` | Technician ${newestSigned.inspector_name}` : ""}`
+                  : null}
                 onAddPhotos={activeFailure && canCompleteWork ? async (files) => {
                   if (!files?.length) return;
                   const urls: string[] = [];

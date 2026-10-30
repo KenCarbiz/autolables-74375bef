@@ -393,7 +393,6 @@ const GmHome = () => {
               : `${greeting}, ${name}. ${attention} item${attention === 1 ? "" : "s"} need${attention === 1 ? "s" : ""} you today: ${approvals.length} awaiting a decision, ${stuck.length} vehicle${stuck.length === 1 ? "" : "s"} stuck, ${systemIssues} system issue${systemIssues === 1 ? "" : "s"}.`
         }
         meta={reading ? undefined : `Last updated ${new Date().toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}`}
-        actions={canViewInventory ? <LinkButton to="#today-work" variant="primary">Review work</LinkButton> : undefined}
       />
 
       {metricsError && (
@@ -412,11 +411,12 @@ const GmHome = () => {
 
       <MetricStrip
         label="Today at a glance"
+        action={canViewInventory ? <LinkButton to="#today-work" variant="primary">Review work</LinkButton> : undefined}
         metrics={[
-          { label: "Needs decision", value: reading ? null : approvals.length, loading: reading, tone: approvals.length > 0 ? "warning" : "neutral" },
-          { label: "Vehicles at risk", value: reading ? null : stuck.length, loading: reading, tone: stuck.length > 0 ? "warning" : "neutral" },
-          { label: "Customer opportunities", value: openLeads.length },
-          { label: "System issues", value: metricsError ? null : systemIssues, loading: metricsLoading, tone: systemIssues > 0 ? "danger" : "neutral" },
+          { label: "Needs decision", value: reading ? null : approvals.length, hint: "Awaiting authorization", loading: reading, tone: approvals.length > 0 ? "warning" : "neutral" },
+          { label: "Vehicles at risk", value: reading ? null : stuck.length, hint: "Stuck in a stage", loading: reading, tone: stuck.length > 0 ? "warning" : "neutral" },
+          { label: "Customer opportunities", value: openLeads.length, hint: "Open leads" },
+          { label: "System issues", value: metricsError ? null : systemIssues, hint: "Exceptions and blockers", loading: metricsLoading, tone: systemIssues > 0 ? "danger" : "neutral" },
         ]}
       />
 

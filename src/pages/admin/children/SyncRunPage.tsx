@@ -173,8 +173,8 @@ export default function SyncRunPage() {
           </dl>
         </AdminCard>
 
-        <div className="mt-5 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_561px] gap-4 xl:gap-x-[23px] items-start">
-          <AdminCard id="run-diagnosis" className={cn("xl:min-h-[209px]", DIAGNOSIS_PANEL[diagnosis.tone])} bodyClassName="px-[22px] pt-[22px] pb-6">
+        <div className="mt-5 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_561px] gap-4 xl:gap-x-[23px] items-stretch">
+          <AdminCard id="run-diagnosis" className={cn(diagnosis.tone !== "success" && "xl:min-h-[209px]", DIAGNOSIS_PANEL[diagnosis.tone])} bodyClassName="px-[22px] pt-[22px] pb-6">
             <div className="flex items-start gap-[15px]">
               <DiagnosisIcon className={cn("w-[34px] h-[34px] flex-shrink-0", DIAGNOSIS_COLOR[diagnosis.tone])} aria-hidden="true" />
               <div className="min-w-0">
@@ -337,7 +337,7 @@ export default function SyncRunPage() {
               <div className={INSET_RULE} aria-hidden="true" />
               <div className="pl-[18px] pr-[22px] pt-[14px] pb-[19px]">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <AdminLinkButton to={feedHref} variant="outline" className="min-h-[44px] sm:min-h-[44px] text-[15px] font-medium gap-3">
+                  <AdminLinkButton to={feedHref} variant={meta.retryable ? "outline" : "primary"} className="min-h-[44px] sm:min-h-[44px] text-[15px] font-medium gap-3">
                     <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                     Back to feed
                   </AdminLinkButton>

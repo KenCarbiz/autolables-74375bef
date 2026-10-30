@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button, Panel, QueryState, StatusText, Td, Th, WorkTable } from "@/components/product";
+import { Button, FilterSelect, Panel, QueryState, StatusText, Td, Th, WorkTable } from "@/components/product";
 import { activityLabel, entityKindLabel } from "@/lib/admin/integrations/activity";
 import { formatDateTime } from "./primitives";
 
@@ -27,7 +27,6 @@ const WINDOWS = [
 ];
 const PAGE_SIZES = [25, 50, 100];
 
-const selectCls = "h-10 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary";
 
 const detailText = (r: AuditRow): string => {
   const d = r.details;
@@ -127,34 +126,19 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
       <div>
         <div className="flex flex-wrap items-end gap-4">
           <FilterField label="Date range">
-            <select className={selectCls} value={draft.days} onChange={(e) => setDraft({ ...draft, days: Number(e.target.value) })}>
-              {WINDOWS.map((w) => <option key={w.days} value={w.days}>{w.label}</option>)}
-            </select>
+            <FilterSelect label="Date range" className="w-[170px]" value={String(draft.days)} onChange={(v) => setDraft({ ...draft, days: Number(v) })} options={WINDOWS.map((w) => ({ value: String(w.days), label: w.label }))} />
           </FilterField>
           <FilterField label="Actor">
-            <select className={selectCls} value={draft.actor} onChange={(e) => setDraft({ ...draft, actor: e.target.value })}>
-              <option value="all">All</option>
-              {options.actors.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
+            <FilterSelect label="Actor" className="w-[170px]" value={draft.actor} onChange={(v) => setDraft({ ...draft, actor: v })} options={[{ value: "all", label: "All" }, ...options.actors.map((a) => ({ value: a, label: a }))]} />
           </FilterField>
           <FilterField label="Action">
-            <select className={selectCls} value={draft.action} onChange={(e) => setDraft({ ...draft, action: e.target.value })}>
-              <option value="all">All</option>
-              {options.actions.map((a) => <option key={a} value={a}>{activityLabel(a)}</option>)}
-            </select>
+            <FilterSelect label="Action" className="w-[170px]" value={draft.action} onChange={(v) => setDraft({ ...draft, action: v })} options={[{ value: "all", label: "All" }, ...options.actions.map((a) => ({ value: a, label: activityLabel(a) }))]} />
           </FilterField>
           <FilterField label="Entity">
-            <select className={selectCls} value={draft.entity} onChange={(e) => setDraft({ ...draft, entity: e.target.value })}>
-              <option value="all">All</option>
-              {options.entities.map((a) => <option key={a} value={a}>{entityKindLabel(a)}</option>)}
-            </select>
+            <FilterSelect label="Entity" className="w-[170px]" value={draft.entity} onChange={(v) => setDraft({ ...draft, entity: v })} options={[{ value: "all", label: "All" }, ...options.entities.map((a) => ({ value: a, label: entityKindLabel(a) }))]} />
           </FilterField>
           <FilterField label="Outcome">
-            <select className={selectCls} value={draft.outcome} onChange={(e) => setDraft({ ...draft, outcome: e.target.value })}>
-              <option value="all">All</option>
-              <option value="Success">Success</option>
-              <option value="Failed">Failed</option>
-            </select>
+            <FilterSelect label="Outcome" className="w-[150px]" value={draft.outcome} onChange={(v) => setDraft({ ...draft, outcome: v })} options={[{ value: "all", label: "All" }, { value: "Success", label: "Success" }, { value: "Failed", label: "Failed" }]} />
           </FilterField>
           <div className="flex items-center gap-4">
             <span className="whitespace-nowrap text-[13px] leading-[18px] text-adm-muted">{loading ? "Loading events" : `${rows.length.toLocaleString()} events (${filtered.length.toLocaleString()} after filters)`}</span>
@@ -214,9 +198,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
             <label className="flex items-center gap-2">
               Rows per page
-              <select className="h-9 rounded-md border border-adm-border bg-adm-surface px-2 text-adm-ink" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}>
-                {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
+              <FilterSelect label="Rows per page" className="min-w-[80px]" value={String(pageSize)} onChange={(v) => { setPageSize(Number(v)); setPage(1); }} options={PAGE_SIZES.map((n) => ({ value: String(n), label: String(n) }))} />
             </label>
             <span>Showing {(current - 1) * pageSize + 1}-{Math.min(current * pageSize, filtered.length)} of {filtered.length.toLocaleString()} filtered</span>
             <div className="flex items-center gap-1">

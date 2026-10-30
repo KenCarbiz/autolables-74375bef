@@ -23,7 +23,7 @@ import {
   Search, QrCode, ChevronRight, CircleDot, Circle, Wrench, ArrowUp, ArrowDown, Minus, FileText, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MetricStrip, StatusText, Th, Td, WorkTable, type Tone } from "@/components/product";
+import { MetricStrip, FilterSelect, StatusText, Th, Td, WorkTable, type Tone } from "@/components/product";
 
 // ──────────────────────────────────────────────────────────────
 // Service Desk queue — "Vehicles Requiring Service Action" (desktop comp).
@@ -459,23 +459,12 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
       </div>
       {mode === "desk" && (
         <>
-          <select value={tab} onChange={(e) => setTab(e.target.value)} aria-label="Filter by status"
-            className="h-10 rounded-[6px] border border-adm-border bg-adm-surface px-2 text-[14px]">
-            {TABS.map((f) => <option key={f.key} value={f.key}>{f.key === "all" ? "Status: all" : f.label}</option>)}
-          </select>
-          <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} aria-label="Filter by technician"
-            className="h-10 rounded-[6px] border border-adm-border bg-adm-surface px-2 text-[14px]">
-            <option value="any">Technician: any</option>
-            <option value="unassigned">Unassigned</option>
-            {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-          <select value={urgencyFilter} onChange={(e) => setUrgencyFilter(e.target.value)} aria-label="Filter by delivery urgency"
-            className="h-10 rounded-[6px] border border-adm-border bg-adm-surface px-2 text-[14px]">
-            <option value="any">Delivery: any</option>
-            <option value="today">Delivery today</option>
-            <option value="scheduled">Delivery scheduled</option>
-            <option value="unscheduled">No delivery scheduled</option>
-          </select>
+          <FilterSelect label="Filter by status" value={tab} onChange={setTab}
+            options={TABS.map((f) => ({ value: f.key, label: f.key === "all" ? "Status: all" : f.label }))} />
+          <FilterSelect label="Filter by technician" value={techFilter} onChange={setTechFilter}
+            options={[{ value: "any", label: "Technician: any" }, { value: "unassigned", label: "Unassigned" }, ...technicians.map(([id, name]) => ({ value: id, label: name }))]} />
+          <FilterSelect label="Filter by delivery urgency" value={urgencyFilter} onChange={setUrgencyFilter}
+            options={[{ value: "any", label: "Delivery: any" }, { value: "today", label: "Delivery today" }, { value: "scheduled", label: "Delivery scheduled" }, { value: "unscheduled", label: "No delivery scheduled" }]} />
         </>
       )}
       <button onClick={openScan} className="inline-flex h-10 items-center gap-2 rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px] font-semibold hover:bg-adm-workspace">
@@ -486,10 +475,10 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
 
   const strip = mode === "my_work" ? (
     <MetricStrip label="My work" metrics={[
-      { label: "My assigned", value: assignedMine.length + inProgressMine.length, tone: "info" },
-      { label: "Due today", value: dueToday },
-      { label: "Overdue", value: overdueCount, tone: overdueCount > 0 ? "danger" : "neutral" },
-      { label: "Awaiting approval", value: awaitingCount, tone: awaitingCount > 0 ? "warning" : "neutral" },
+      { label: "In my queue", value: myWorkRows.length, hint: "Matches the My work tab" },
+      { label: "Due today", value: dueToday, hint: "Delivery target today" },
+      { label: "Overdue", value: overdueCount, hint: "Past the service window", tone: overdueCount > 0 ? "danger" : "neutral" },
+      { label: "Awaiting approval", value: awaitingCount, hint: "Manager decision needed", tone: awaitingCount > 0 ? "warning" : "neutral" },
     ]} />
   ) : (
     <MetricStrip label="Service desk totals" metrics={[

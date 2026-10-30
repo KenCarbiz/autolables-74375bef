@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { LinkButton, LocalTabs, PageBody, PageHeader } from "@/components/product";
+import { LinkButton, LocalTabs, PageBody, PageHeader, Panel } from "@/components/product";
 import { useAuth } from "@/contexts/AuthContext";
 import PlatformTenants from "@/components/admin/PlatformTenants";
 import PlatformMembers from "@/components/admin/PlatformMembers";
@@ -25,8 +25,8 @@ import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound, Layo
 // whole route on isAdmin = true.
 // ──────────────────────────────────────────────────────────────
 
-type PlatformTab = "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing" | "stripe" | "templates" | "passport-engagement" | "api-usage" | "budgets";
-const VALID: PlatformTab[] = ["tenants", "members", "entitlements", "audit", "recalls", "billing", "stripe", "templates", "passport-engagement", "api-usage", "budgets"];
+type PlatformTab = "health" | "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing" | "stripe" | "templates" | "passport-engagement" | "api-usage" | "budgets";
+const VALID: PlatformTab[] = ["health", "tenants", "members", "entitlements", "audit", "recalls", "billing", "stripe", "templates", "passport-engagement", "api-usage", "budgets"];
 
 const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "tenants",      label: "Tenants",      icon: Store },
@@ -43,6 +43,7 @@ const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
 ];
 
 const PRIMARY: PlatformTab[] = ["tenants", "members", "entitlements", "templates", "audit"];
+const HEALTH_TOOLS = TABS.filter((t) => !PRIMARY.includes(t.id));
 
 const PlatformAdmin = () => {
   const { user, isAdmin, loading } = useAuth();
@@ -59,6 +60,12 @@ const PlatformAdmin = () => {
   if (loading) return null;
   if (!isAdmin) return null;
   const primaryTabs = PRIMARY.map((id) => TABS.find((t) => t.id === id)!);
+  const inHealth = tab === "health" || !PRIMARY.includes(tab);
+  const navTabs = [
+    ...primaryTabs.filter((t) => t.id !== "audit").map((t) => ({ key: t.id, label: t.label, to: `/platform-admin?tab=${t.id}`, active: !inHealth && t.id === tab })),
+    { key: "health", label: "Health", to: "/platform-admin?tab=health", active: inHealth },
+    { key: "audit", label: "Platform audit", to: "/platform-admin?tab=audit", active: tab === "audit" },
+  ];
 
   return (
     <div data-product-surface="platform">
@@ -70,9 +77,19 @@ const PlatformAdmin = () => {
         <LocalTabs
           label="Platform sections"
           defaultKey="tenants"
-          tabs={primaryTabs.map((t) => ({ key: t.id, label: t.label, to: `/platform-admin?tab=${t.id}`, active: t.id === tab }))}
+          tabs={navTabs}
         />
-        <section aria-label={TABS.find((t) => t.id === tab)?.label} className="flex flex-col gap-4">
+        <section aria-label={TABS.find((t) => t.id === tab)?.label ?? "Health"} className="flex flex-col gap-4">
+          {inHealth && tab !== "health" && <Link to="/platform-admin?tab=health" className="text-[14px] font-semibold text-adm-primary hover:underline">All platform tools</Link>}
+          {tab === "health" && (
+            <Panel title="Platform health and diagnostics" titleSize="md" inset="sm">
+              <nav aria-label="Platform tools" className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+                {HEALTH_TOOLS.map((t) => (
+                  <Link key={t.id} to={`/platform-admin?tab=${t.id}`} className="flex h-11 items-center justify-between border-b border-adm-border text-[14px] font-semibold text-adm-primary hover:underline">{t.label}</Link>
+                ))}
+              </nav>
+            </Panel>
+          )}
           {tab === "tenants"      && <PlatformTenants />}
           {tab === "members"      && <PlatformMembers />}
           {tab === "entitlements" && <PlatformEntitlements />}
@@ -85,14 +102,6 @@ const PlatformAdmin = () => {
           {tab === "api-usage"    && <MarketcheckApiUsagePanel />}
           {tab === "budgets"      && <ProviderBudgetsPanel />}
         </section>
-        <details className="group" open={!PRIMARY.includes(tab)}>
-          <summary className="cursor-pointer list-none text-[14px] font-semibold text-adm-primary hover:underline">More platform tools</summary>
-          <nav aria-label="Platform tools" className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
-            {TABS.filter((t) => !PRIMARY.includes(t.id)).map((t) => (
-              <Link key={t.id} to={`/platform-admin?tab=${t.id}`} aria-current={t.id === tab ? "page" : undefined} className={t.id === tab ? "text-[14px] font-semibold text-adm-primary" : "text-[14px] text-adm-muted hover:text-adm-ink"}>{t.label}</Link>
-            ))}
-          </nav>
-        </details>
       </PageBody>
     </div>
   );
