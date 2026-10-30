@@ -152,6 +152,7 @@ const ThemeLab = lazy(() => import("./pages/ThemeLab"));
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
+const DocumentReview = lazy(() => import("./pages/DocumentReview"));
 const Leads = lazy(() => import("./pages/Leads"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
@@ -345,7 +346,7 @@ const App = () => (
                         <Route path="/dashboard/classic" element={<ProcessDashboard />} />
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />
-                        <Route path="/dashboard/document-review" element={<ComplianceTabRedirect tab="price" />} />
+                        <Route path="/dashboard/document-review" element={<DocumentReview />} />
                         {/* Setup folded into Admin Home; the route stays so old links don't 404. */}
                         <Route path="/setup" element={<Navigate to="/admin?tab=home" replace />} />
                         <Route path="/queue" element={<QueueRoute />} />
