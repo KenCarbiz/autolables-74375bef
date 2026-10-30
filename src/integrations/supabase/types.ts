@@ -4697,6 +4697,260 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_feed_bindings: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          disabled_at: string | null
+          disabled_by: string | null
+          id: string
+          identity_acknowledged: Json | null
+          note: string | null
+          path: string
+          proposed_at: string | null
+          proposed_by: string | null
+          provider: string
+          status: string
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          disabled_at?: string | null
+          disabled_by?: string | null
+          id?: string
+          identity_acknowledged?: Json | null
+          note?: string | null
+          path: string
+          proposed_at?: string | null
+          proposed_by?: string | null
+          provider?: string
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          disabled_at?: string | null
+          disabled_by?: string | null
+          id?: string
+          identity_acknowledged?: Json | null
+          note?: string | null
+          path?: string
+          proposed_at?: string | null
+          proposed_by?: string | null
+          provider?: string
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_feed_bindings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_feed_bindings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_feed_events: {
+        Row: {
+          action: string
+          applied_as_latest: boolean
+          destination: string | null
+          digest: string
+          event_at: string | null
+          file_id: string | null
+          id: string
+          path: string
+          provider: string
+          received_at: string
+          size: number | null
+        }
+        Insert: {
+          action: string
+          applied_as_latest?: boolean
+          destination?: string | null
+          digest: string
+          event_at?: string | null
+          file_id?: string | null
+          id?: string
+          path: string
+          provider?: string
+          received_at?: string
+          size?: number | null
+        }
+        Update: {
+          action?: string
+          applied_as_latest?: boolean
+          destination?: string | null
+          digest?: string
+          event_at?: string | null
+          file_id?: string | null
+          id?: string
+          path?: string
+          provider?: string
+          received_at?: string
+          size?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_feed_events_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_feed_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_feed_files: {
+        Row: {
+          created_at: string
+          discovered_at: string | null
+          id: string
+          last_content_sha256: string | null
+          last_run_id: string | null
+          latest_action: string | null
+          latest_event_at: string | null
+          latest_event_size: number | null
+          latest_notified_at: string | null
+          path: string
+          provider: string
+          quarantine_reason: string | null
+          remote_checksum: string | null
+          remote_mtime: string | null
+          remote_size: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          discovered_at?: string | null
+          id?: string
+          last_content_sha256?: string | null
+          last_run_id?: string | null
+          latest_action?: string | null
+          latest_event_at?: string | null
+          latest_event_size?: number | null
+          latest_notified_at?: string | null
+          path: string
+          provider?: string
+          quarantine_reason?: string | null
+          remote_checksum?: string | null
+          remote_mtime?: string | null
+          remote_size?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          discovered_at?: string | null
+          id?: string
+          last_content_sha256?: string | null
+          last_run_id?: string | null
+          latest_action?: string | null
+          latest_event_at?: string | null
+          latest_event_size?: number | null
+          latest_notified_at?: string | null
+          path?: string
+          provider?: string
+          quarantine_reason?: string | null
+          remote_checksum?: string | null
+          remote_mtime?: string | null
+          remote_size?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory_feed_runs: {
+        Row: {
+          binding_id: string | null
+          binding_status: string | null
+          content_sha256: string | null
+          failure_reason: string | null
+          file_id: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          path: string
+          provider: string
+          remote_mtime: string | null
+          remote_size: number | null
+          report: Json | null
+          started_at: string
+          status: string
+          tenant_id: string | null
+          triggered_by: string | null
+        }
+        Insert: {
+          binding_id?: string | null
+          binding_status?: string | null
+          content_sha256?: string | null
+          failure_reason?: string | null
+          file_id?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          path: string
+          provider?: string
+          remote_mtime?: string | null
+          remote_size?: number | null
+          report?: Json | null
+          started_at?: string
+          status?: string
+          tenant_id?: string | null
+          triggered_by?: string | null
+        }
+        Update: {
+          binding_id?: string | null
+          binding_status?: string | null
+          content_sha256?: string | null
+          failure_reason?: string | null
+          file_id?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          path?: string
+          provider?: string
+          remote_mtime?: string | null
+          remote_size?: number | null
+          report?: Json | null
+          started_at?: string
+          status?: string
+          tenant_id?: string | null
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_feed_runs_binding_id_fkey"
+            columns: ["binding_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_feed_bindings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_feed_runs_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_feed_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_sync_errors: {
         Row: {
           code: string | null
@@ -11328,6 +11582,17 @@ export type Database = {
         Returns: boolean
       }
       expire_overdue_equipment_proofs: { Args: never; Returns: number }
+      filescom_record_event: {
+        Args: {
+          p_action: string
+          p_destination: string
+          p_digest: string
+          p_event_at: string
+          p_path: string
+          p_size: number
+        }
+        Returns: Json
+      }
       find_abandoned_signings: {
         Args: {
           _limit?: number
