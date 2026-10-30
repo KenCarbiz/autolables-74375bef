@@ -253,11 +253,10 @@ describe("AppShell rail rendering", () => {
     expect(within(primaryNav()).queryByRole("link", { name: "Create" })).toBeNull();
   });
 
-  it("prints a page heading only where the page renders none of its own", () => {
+  it("prints no page heading of its own; each page renders its single title", () => {
     const inventory = renderShell("/inventory");
-    expect(screen.getByRole("heading", { level: 1, name: "Inventory Command Center" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Inventory Command Center" })).toBeNull();
     inventory.unmount();
-    // Admin V2 renders its own title, so the frame adds nothing there.
     renderShell("/admin");
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
   });

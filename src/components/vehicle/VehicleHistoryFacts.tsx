@@ -27,13 +27,11 @@ export const VehicleHistoryFacts = ({ vehicle }: { vehicle: HistoryFactSources }
   const badges = facts.map((f) => (
     <span
       key={f.key}
-      className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5"
+      className="inline-flex items-center gap-1.5 rounded-[2px] bg-adm-success-bg px-2 py-[3px] text-[12px] leading-[18px] font-semibold text-adm-success"
     >
-      <f.icon className="w-4 h-4 text-emerald-600 shrink-0" />
-      <span className="min-w-0">
-        <span className="block text-al-body font-semibold text-emerald-800 leading-tight">{f.title}</span>
-        <span className="block text-al-meta text-emerald-700 leading-tight">{f.sub}</span>
-      </span>
+      <f.icon className="w-5 h-5 shrink-0" />
+      {f.title}
+      <span className="font-normal">{f.sub}</span>
     </span>
   ));
 
@@ -45,11 +43,11 @@ export const VehicleHistoryFacts = ({ vehicle }: { vehicle: HistoryFactSources }
       target="_blank"
       rel="noreferrer"
       title="Open the vehicle history report behind these facts"
-      className="flex flex-wrap items-center gap-2 rounded-xl hover:opacity-90 transition-opacity"
+      className="flex flex-wrap items-center gap-2 hover:opacity-90 transition-opacity"
     >
       {badges}
-      <span className="text-al-meta font-semibold text-primary inline-flex items-center gap-1.5">
-        View history report <ExternalLink className="w-3.5 h-3.5" />
+      <span className="text-[12px] leading-[18px] font-semibold text-adm-primary inline-flex items-center gap-1.5">
+        View history report <ExternalLink className="w-5 h-5" />
       </span>
     </a>
   );

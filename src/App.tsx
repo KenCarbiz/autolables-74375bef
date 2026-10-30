@@ -52,6 +52,9 @@ const VendorHome = lazy(() => import("./pages/VendorHome"));
 const ServiceWriterDesk = lazy(() => import("./pages/ServiceWriterDesk"));
 const CustomerRecord = lazy(() => import("./pages/CustomerRecord"));
 const DealsPage = lazy(() => import("./pages/Deals"));
+const DealDetailPage = lazy(() => import("./pages/DealDetail"));
+const DocumentApprovalPage = lazy(() => import("./pages/DocumentApproval"));
+const ReconEstimateDetailPage = lazy(() => import("./pages/ReconEstimateDetail"));
 const LotCaptureQueue = lazy(() => import("./pages/LotCaptureQueue"));
 const Index = lazy(() => import("./pages/Index"));
 const Landing = lazy(() => import("./pages/Landing"));
@@ -76,6 +79,8 @@ const DescriptionVoiceSettings = lazy(() => import("./pages/DescriptionVoiceSett
 const WebsiteEmbed = lazy(() => import("./pages/WebsiteEmbed"));
 const AdminSpecsBackfillOne = lazy(() => import("./pages/AdminSpecsBackfillOne"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
+const PlatformTenantDetail = lazy(() => import("./pages/PlatformTenantDetail"));
+const PlatformMemberDetail = lazy(() => import("./pages/PlatformMemberDetail"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const InventoryCommandCenterV2 = lazy(() => import("./pages/InventoryCommandCenterV2"));
 const VehicleFile = lazy(() => import("./pages/VehicleFile"));
@@ -343,6 +348,7 @@ const App = () => (
                         <Route path="/customers" element={<Leads />} />
                         <Route path="/customers/:id" element={<CustomerRecord />} />
                         <Route path="/deals" element={<DealsPage />} />
+                        <Route path="/deals/:id" element={<DealDetailPage />} />
                         <Route path="/dashboard/classic" element={<ProcessDashboard />} />
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />
@@ -356,6 +362,7 @@ const App = () => (
                         <Route path="/inventory-v2" element={<InventoryCommandCenterV2 />} />
                         <Route path="/dashboard-legacy" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/vehicle-file/:id" element={<VehicleFile />} />
+                        <Route path="/vehicle-file/:id/documents/:docId" element={<DocumentApprovalPage />} />
                         <Route path="/factory-sticker/:vehicleId" element={<FactoryStickerWorkspace />} />
                         <Route path="/window-sticker-studio" element={<WindowStickerStudio />} />
                         <Route path="/inventory-intelligence" element={<InventoryIntelligence />} />
@@ -421,6 +428,7 @@ const App = () => (
                         <Route path="/prep" element={<PrepSignOff />} />
                         <Route path="/prep/:vin" element={<PrepMobile />} />
                         <Route path="/recon" element={<ReconBoard />} />
+                        <Route path="/recon/estimates/:id" element={<ReconEstimateDetailPage />} />
                         <Route path="/service" element={<ServiceDesk />} />
                         <Route path="/service/approvals" element={<ServiceApprovals />} />
                         {/* The ONE shared vehicle workspace; the Service QR
@@ -437,6 +445,8 @@ const App = () => (
 
                       <Route element={<AdminLayout />}>
                         <Route path="/platform-admin" element={<PlatformAdmin />} />
+                        <Route path="/platform-admin/tenants/:tenantId" element={<PlatformTenantDetail />} />
+                        <Route path="/platform-admin/members/:memberId" element={<PlatformMemberDetail />} />
                       </Route>
 
                       {/* Development only: deterministic Administration screens

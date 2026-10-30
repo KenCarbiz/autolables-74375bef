@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ChevronRight, FilePlus2, Printer } from "lucide-react";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
@@ -10,6 +10,8 @@ import DealDocumentsPanel from "@/components/vehicle/DealDocumentsPanel";
 import { Card, TabHeader, btnLarge } from "./primitives";
 import { WorkTable, Th, Td, StatusText, type Tone } from "@/components/product";
 import { useDealRecord, dealDocStatus } from "@/hooks/useDealRecord";
+import { useVehicleDocuments } from "@/lib/stickerStudio/useVehicleDocuments";
+import { STATUS_META } from "@/lib/stickerStudio/documentWorkflow";
 import { BrochureFinderRow, OwnersManualFinderRow } from "./OemDocFinders";
 import StickerGenerators from "./StickerGenerators";
 import AddendumSection from "./AddendumSection";
@@ -51,6 +53,7 @@ interface RegisterRow {
   tone: Tone;
   packet: string;
   href?: string;
+  to?: string;
 }
 
 // One grouped register of what is on file for this VIN, read from the listing
@@ -59,6 +62,7 @@ interface RegisterRow {
 // Nothing here generates or publishes anything.
 const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
   const { record, loading } = useDealRecord(vehicle.vin, vehicle.id, vehicle.tenant_id);
+  const { documents: generated } = useVehicleDocuments(vehicle.id);
   const isUsed = vehicle.condition !== "new";
   const modules = vehicle.packet_modules || {};
   const packetFor = (key: string) => (key in modules ? (modules[key] ? "Included" : "Not included") : "Unknown");
@@ -76,6 +80,20 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
   }
   (vehicle.documents || []).forEach((d, i) => {
     rows.push({ key: `up-${i}`, group: groupForType(d.type, d.name), name: d.name || d.type || "Document", status: "On file", tone: "success", packet: packetFor(d.type), href: d.url });
+  });
+
+  const GENERATED_LABEL: Record<string, string> = { window: "Window sticker", addendum: "Addendum", passport: "Vehicle passport", cpo_sheet: "CPO sheet", buyers_guide: "Buyers Guide", factory_sticker: "Factory build record" };
+  const GENERATED_TONE: Record<string, Tone> = { approved: "success", printed: "success", published: "success", pending_approval: "warning", rejected: "danger" };
+  generated.forEach((d) => {
+    rows.push({
+      key: `gen-${d.id}`,
+      group: d.document_type === "buyers_guide" ? "Sales & Disclosure" : "Stickers & Build Record",
+      name: `${GENERATED_LABEL[d.document_type] || d.document_type} v${d.version}`,
+      status: STATUS_META[d.document_status]?.label || d.document_status,
+      tone: GENERATED_TONE[d.document_status] || "neutral",
+      packet: "Stored version",
+      to: `/vehicle-file/${vehicle.id}/documents/${d.id}`,
+    });
   });
 
   const grouped = GROUP_ORDER.map((g) => ({ g, items: rows.filter((r) => r.group === g) })).filter((x) => x.items.length > 0);
@@ -96,7 +114,7 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
               <Td><StatusText tone={r.tone}>{r.status}</StatusText></Td>
               <Td className="text-adm-muted">{r.packet}</Td>
               <Td align="right">
-                {r.href ? <a className="text-adm-primary underline" href={r.href} target="_blank" rel="noreferrer">Open</a> : <span className="text-adm-muted">-</span>}
+                {r.to ? <Link className="text-adm-primary underline" to={r.to}>Review</Link> : r.href ? <a className="text-adm-primary underline" href={r.href} target="_blank" rel="noreferrer">Open</a> : <span className="text-adm-muted">-</span>}
               </Td>
             </tr>
             )),

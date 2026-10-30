@@ -199,7 +199,7 @@ export default function ProviderBudgetsPanel() {
   });
 
   const inputCls = "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm";
-  const labelCls = "text-[11px] font-bold uppercase tracking-wide text-muted-foreground";
+  const labelCls = "text-[12px] font-semibold text-muted-foreground";
 
   return (
     <div className="space-y-4">
@@ -320,7 +320,7 @@ export default function ProviderBudgetsPanel() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <tr className="text-left text-[12px] text-muted-foreground">
                   <th className="py-2 pr-3">Dealership</th><th className="py-2 pr-3">Provider</th><th className="py-2 pr-3">Mode</th>
                   <th className="py-2 pr-3">Used</th><th className="py-2 pr-3">Limit</th><th className="py-2 pr-3">Refused</th><th className="py-2" />
                 </tr>
@@ -391,7 +391,7 @@ export default function ProviderBudgetsPanel() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <tr className="text-left text-[12px] text-muted-foreground">
                   <th className="py-2 pr-3">When</th><th className="py-2 pr-3">Dealership</th><th className="py-2 pr-3">Alert</th>
                   <th className="py-2 pr-3">Email</th><th className="py-2">Text</th>
                 </tr>

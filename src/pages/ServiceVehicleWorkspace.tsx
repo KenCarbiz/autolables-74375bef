@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveRecallView, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { LocalTabs, PageHeader } from "@/components/product";
+import { FactStrip } from "@/components/detail/parts";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -79,11 +80,11 @@ interface AuditRow { id: string; action: string; created_at: string; details: Re
 interface Clearance { state: string; reason_codes: string[]; computed_at?: string | null; }
 
 const TONE_BOX: Record<Tone, string> = {
-  slate: "border-adm-border bg-adm-workspace",
-  amber: "border-adm-warning-bg bg-adm-warning-bg",
-  red: "border-adm-border bg-adm-danger-bg",
-  blue: "border-adm-border bg-adm-selected",
-  emerald: "border-adm-border bg-adm-success-bg",
+  slate: "border-adm-border border-l-adm-muted bg-adm-surface",
+  amber: "border-adm-border border-l-[#D98B00] bg-adm-surface",
+  red: "border-adm-border border-l-adm-danger bg-adm-surface",
+  blue: "border-adm-border border-l-adm-primary bg-adm-surface",
+  emerald: "border-adm-border border-l-adm-success bg-adm-surface",
 };
 
 const REPAIR_STATE_LABELS: Record<RepairState, string> = {
@@ -339,7 +340,6 @@ export default function ServiceVehicleWorkspace() {
     <CommandCapabilityProvider role={role} isAdmin={isAdmin}>
       <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-4 pb-28 sm:px-6 sm:py-6 lg:pb-6">
         <PageHeader
-          scope="Vehicle service workspace"
           title={ymm}
           description={`VIN ${vin}${stock ? ` · Stock ${stock}` : ""}`}
           actions={
@@ -355,20 +355,16 @@ export default function ServiceVehicleWorkspace() {
         />
         <WorkspaceTabs />
 
-        <VehicleIdentityStrip
-          imageUrl={veh.hero_image_url}
-          ymm={[identity.year, identity.make, identity.model].filter(Boolean).join(" ") || ymm}
-          trim={trim}
-          stockNumber={stock}
-          vin={vin}
-          conditionLabel={veh.condition}
+        <FactStrip
+          label="Vehicle facts"
+          className="lg:grid-cols-5"
           facts={[
-            { label: "Mileage", value: veh.mileage != null ? `${Number(veh.mileage).toLocaleString("en-US")} mi` : null },
-            { label: "Assigned to", value: assignedMember ? memberName(assignedMember) : gr?.assigned_technician || null },
+            { label: "Condition", value: <span className="capitalize">{veh.condition || "Unknown"}</span> },
+            { label: "Mileage", value: veh.mileage != null ? `${Number(veh.mileage).toLocaleString("en-US")} mi` : "Unknown" },
+            { label: "Assigned to", value: assignedMember ? memberName(assignedMember) : gr?.assigned_technician || "Unassigned" },
             { label: "Sold status", value: sold ? "Sold" : "In stock" },
-            { label: "Delivery target", value: gr?.delivery_target ? formatCommandDateTime(gr.delivery_target) : null },
+            { label: "Delivery target", value: gr?.delivery_target ? formatCommandDateTime(gr.delivery_target) : "Unknown" },
           ]}
-          onCopyVin={() => void copyWithToast(vin, "VIN")}
         />
 
         <StatusBannerCard ws={ws} onAction={onPrimaryAction} />
@@ -511,32 +507,22 @@ export default function ServiceVehicleWorkspace() {
 /* ───────────────────────────── banner ───────────────────────────── */
 
 function StatusBannerCard({ ws, onAction }: { ws: WorkspaceStatus; onAction: (k: WorkspaceActionKey) => void }) {
-  const Icon = ws.key === "cleared" ? CheckCircle2
-    : ws.tone === "red" ? AlertTriangle
-    : ws.key === "ready_for_k208" ? ShieldCheck
-    : ws.key === "not_started" ? Clock
-    : Wrench;
   return (
     <section
       role="status"
-      className={cn("rounded-2xl border p-4 flex items-center justify-between gap-3 flex-wrap", TONE_BOX[ws.tone])}
+      className={cn("rounded-[6px] border border-l-[3px] p-4 flex items-center justify-between gap-3 flex-wrap", TONE_BOX[ws.tone])}
     >
-      <div className="flex items-center gap-3 min-w-0">
-        <span className={cn("w-11 h-11 rounded-xl bg-adm-surface/70 grid place-items-center shrink-0", TONE_TEXT[ws.tone])}>
-          <Icon className="w-5 h-5" aria-hidden="true" />
-        </span>
-        <div className="min-w-0">
-          <p className={cn("text-[15px] font-bold leading-tight", TONE_TEXT[ws.tone])}>{ws.label}</p>
-          {ws.blockerLabel
-            ? <p className="text-caption text-adm-muted">{ws.blockerLabel}</p>
-            : <p className="text-caption text-adm-muted">Next: {ws.action.label}</p>}
-        </div>
+      <div className="min-w-0">
+        <p className={cn("text-[15px] font-bold leading-tight", TONE_TEXT[ws.tone])}>{ws.label}</p>
+        {ws.blockerLabel
+          ? <p className="text-caption text-adm-muted">{ws.blockerLabel}</p>
+          : <p className="text-caption text-adm-muted">Next: {ws.action.label}</p>}
       </div>
       <button
         type="button"
         onClick={() => onAction(ws.action.key)}
         className={cn(
-          "min-h-[44px] px-4 rounded-lg text-sm font-semibold inline-flex items-center gap-1.5 shrink-0",
+          "min-h-[40px] px-4 rounded-md text-sm font-semibold inline-flex items-center gap-1.5 shrink-0",
           ws.tone === "red" ? "bg-red-600 text-white" : ws.key === "cleared" ? "border border-adm-border bg-adm-surface text-adm-ink" : "bg-primary text-primary-foreground",
         )}
       >

@@ -119,7 +119,6 @@ export default function InventoryFeedView() {
 
   return (
     <div className="space-y-4">
-      <h2 className="pb-1 text-[28px] leading-[36px] font-bold text-adm-ink">Integrations &amp; Data</h2>
       {banner && (
         <FeedBanner
           verdict={banner}

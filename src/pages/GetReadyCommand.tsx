@@ -1,17 +1,17 @@
-import { PageBody } from "@/components/product";
+import { PageBody, PageHeader, Panel, StatusText, Td, Th, WorkTable, type Tone as ProductTone } from "@/components/product";
+import { Crumbs, SummaryList } from "@/components/detail/parts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
-  Activity, AlertTriangle, ArrowRight, Building2, Calendar, Car, CheckCircle2, ClipboardList,
-  Clock, DollarSign, Gauge, Info, Loader2, Lock, Mail, Printer, Users, Wrench, type LucideIcon,
+  AlertTriangle, ArrowRight, Building2, Car, CheckCircle2, Copy, Loader2, Lock, Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   capabilityDenialReason, capabilityForHref, CommandAction,
-  CommandCallout, CommandCapabilityProvider, CommandCard, CommandIconTile, CommandStepper,
-  copyWithToast, DegradedNotice, EM_DASH, EmptyState, ErrorCard, formatCommandDate,
-  formatCommandDateTime, LoadingCard, StatusPill, TimelineRail, TONE_FILL, TONE_TEXT,
-  useDisabledReason, VehicleIdentityStrip, type Tone,
+  CommandCallout, CommandCapabilityProvider,
+  conditionLabel, copyWithToast, DegradedNotice, EM_DASH, EmptyState, ErrorCard, formatCommandDate,
+  formatCommandDateTime, LoadingCard, TimelineRail, TONE_FILL, TONE_TEXT,
+  useDisabledReason, type Tone,
 } from "@/components/command/CommandPrimitives";
 import {
   useGetReadyCommand,
@@ -70,37 +70,64 @@ const DEPT_LABEL: Record<string, string> = {
 const deptLabel = (d: string) =>
   DEPT_LABEL[d] ?? d.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-function SummaryRow({ Icon, value, label, tone }: {
-  Icon: LucideIcon; value: React.ReactNode; label: string; tone: Tone;
-}) {
+const PRODUCT_TONE: Record<Tone, ProductTone> = {
+  slate: "neutral",
+  blue: "info",
+  amber: "warning",
+  red: "danger",
+  emerald: "success",
+  violet: "info",
+};
+
+const StatusPill = ({ tone, children }: { tone: Tone; children: React.ReactNode }) => (
+  <StatusText tone={PRODUCT_TONE[tone]}>{children}</StatusText>
+);
+
+const CommandCard = ({ title, subtitle, children, className }: { title?: string; subtitle?: string; children: React.ReactNode; className?: string }) => (
+  <Panel title={title} description={subtitle} titleSize="sm" inset="sm" className={className}>{children}</Panel>
+);
+
+const COMPACT_ACTION = "min-h-[36px] rounded-md";
+
+function ProposedWork({ columns }: { columns: GetReadyColumn[] }) {
+  const rows = columns.flatMap((c) => c.items.map((item) => ({ column: c, item })));
   return (
-    <div className="flex items-center gap-3 py-2">
-      <CommandIconTile Icon={Icon} tone={tone} />
-      <span className="min-w-0">
-        <span className="block text-[22px] font-bold text-adm-ink leading-none">{value}</span>
-        <span className="block text-[11.5px] text-adm-muted mt-1 leading-tight">{label}</span>
-      </span>
-    </div>
+    <Panel title="Proposed work" titleSize="sm" inset="sm" description="Prepared upstream. Nothing starts until you authorize." flush headerClassName="pb-3">
+      <WorkTable caption="Proposed work by department" minWidth={640}>
+        <thead>
+          <tr><Th>Department</Th><Th>Work item</Th><Th>Status</Th><Th>Due</Th></tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr><Td className="text-adm-muted">No work items are assigned to any department for this vehicle.</Td></tr>
+          ) : rows.map(({ column, item }) => {
+            const done = item.status === "complete";
+            return (
+              <tr key={`${column.key}-${item.id}`}>
+                <Td className="whitespace-nowrap text-adm-muted">{column.title}</Td>
+                <Td>
+                  <p className="font-semibold text-adm-ink">{item.label || "Work item"}</p>
+                  {item.sublabel && <p className="text-[12px] leading-[18px] text-adm-muted">{item.sublabel}</p>}
+                </Td>
+                <Td>
+                  <StatusPill tone={done ? "emerald" : "amber"}>{done ? "Completed" : item.status === "pending_proof" ? "Pending proof" : "Pending"}</StatusPill>
+                </Td>
+                <Td className="whitespace-nowrap text-adm-muted">{item.dueLabel || EM_DASH}</Td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </WorkTable>
+    </Panel>
   );
 }
 
-function DepartmentColumn({ column, onSaveNote }: {
-  column: GetReadyColumn;
-  onSaveNote: (key: string, note: string) => Promise<void>;
-}) {
+function DepartmentNote({ column, onSaveNote }: { column: GetReadyColumn; onSaveNote: (key: string, note: string) => Promise<void> }) {
   const [note, setNote] = useState(column.managerNote);
   const [saving, setSaving] = useState(false);
-  const showNote = column.key === "service" || column.key === "prep";
-  // A department with nothing assigned is neither done nor overdue, so it must
-  // not wear the amber "pending" badge that means real work is outstanding.
-  const empty = column.total === 0;
-  const complete = !empty && column.tone === "emerald";
-  const HeadIcon = empty ? ClipboardList : complete ? CheckCircle2 : AlertTriangle;
-
   // The reload that follows our own save re-delivers the value the manager has
   // already typed past, so adopt the server note only while the textarea is
-  // still showing the last value we saw from the server. Anything else is an
-  // edit in progress and outranks the refetch.
+  // still showing the last value we saw from the server.
   const serverNote = useRef(column.managerNote);
   useEffect(() => {
     setNote((local) => (local === serverNote.current ? column.managerNote : local));
@@ -115,111 +142,52 @@ function DepartmentColumn({ column, onSaveNote }: {
   };
 
   return (
-    <CommandCard
-      className="flex flex-col"
-      title={column.title}
-      subtitle={column.headline}
-      leading={
-        <span className={cn(
-          "grid place-items-center w-9 h-9 rounded-full shrink-0 text-white",
-          TONE_FILL[empty ? "slate" : complete ? "emerald" : "amber"],
-        )}>
-          <HeadIcon className="w-5 h-5" aria-hidden="true" />
-        </span>
-      }>
-      <div className="divide-y divide-border/70">
-        {column.items.length === 0 ? (
-          <p className="text-[11.5px] text-adm-muted py-2">No work items assigned to this department.</p>
-        ) : column.items.map((item) => {
-          const done = item.status === "complete";
-          return (
-            <div key={item.id} className="flex items-start gap-2.5 py-2.5">
-              {done
-                ? <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", TONE_TEXT.emerald)} aria-hidden="true" />
-                : <Clock className={cn("w-4 h-4 mt-0.5 shrink-0", TONE_TEXT.amber)} aria-hidden="true" />}
-              <div className="min-w-0 flex-1">
-                <p className="text-[12.5px] font-medium text-adm-ink leading-tight">{item.label}</p>
-                {item.sublabel && <p className="text-[11.5px] text-adm-muted mt-0.5">{item.sublabel}</p>}
-              </div>
-              <div className="shrink-0 text-right">
-                {done ? (
-                  <StatusPill tone="emerald">Completed</StatusPill>
-                ) : (
-                  <StatusPill tone="amber">{item.status === "pending_proof" ? "Pending Proof" : "Pending"}</StatusPill>
-                )}
-                {item.dueLabel && <p className="text-[10.5px] text-adm-muted mt-1">{item.dueLabel}</p>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+    <div>
+      <label className="block text-[13px] leading-[18px] font-semibold text-adm-ink mb-1" htmlFor={`note-${column.key}`}>
+        {column.title} note (optional)
+      </label>
+      <textarea
+        id={`note-${column.key}`}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onBlur={blur}
+        placeholder="Add a note for this department"
+        className="w-full min-h-[72px] rounded-md border border-adm-border bg-adm-surface p-2.5 text-[14px] leading-[20px] focus:outline-none focus:ring-2 focus:ring-adm-primary" />
+      {saving && (
+        <p className="text-[12px] leading-[18px] text-adm-muted mt-1 inline-flex items-center gap-1">
+          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Saving note
+        </p>
+      )}
+    </div>
+  );
+}
 
-      {showNote && (
-        <div className="mt-3">
-          <label className="block text-[11.5px] font-semibold text-adm-ink mb-1.5" htmlFor={`note-${column.key}`}>
-            Manager Note (Optional)
-          </label>
-          <textarea
-            id={`note-${column.key}`}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onBlur={blur}
-            placeholder="Add a note for this department…"
-            className="w-full min-h-[92px] rounded-xl border border-adm-border bg-adm-surface p-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary" />
-          {saving && (
-            <p className="text-[10.5px] text-adm-muted mt-1 inline-flex items-center gap-1">
-              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Saving note…
-            </p>
-          )}
+function VendorAssignments({ column }: { column: GetReadyColumn }) {
+  return (
+    <Panel title="Vendor assignments" titleSize="sm" inset="sm">
+      {!column.vendors || column.vendors.length === 0 ? (
+        <p className="text-[14px] leading-[20px] text-adm-muted">No vendors are assigned to this vehicle.</p>
+      ) : (
+        <div className="divide-y divide-adm-border">
+          {column.vendors.map((v, i) => (
+            <div key={`${v.name}-${i}`} className="flex items-center gap-3 py-2">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink truncate">{v.name}</span>
+                <span className="block text-[12px] leading-[18px] text-adm-muted truncate">{v.category}</span>
+              </span>
+              <CommandAction
+                Icon={Mail}
+                className={COMPACT_ACTION}
+                wrapperClassName="shrink-0"
+                href={v.email ? `mailto:${v.email}` : undefined}
+                disabledReason={v.email ? null : "No email is on file for this vendor."}>
+                Contact
+              </CommandAction>
+            </div>
+          ))}
         </div>
       )}
-
-      {column.key === "vendor" && (
-        <div className="mt-3 pt-3 border-t border-adm-border">
-          <p className="text-[11.5px] font-semibold text-adm-ink mb-1.5">Vendor Assignments</p>
-          {!column.vendors || column.vendors.length === 0 ? (
-            <p className="text-[11.5px] text-adm-muted py-2">No vendors assigned to this vehicle.</p>
-          ) : (
-            <div className="divide-y divide-border/70">
-              {column.vendors.map((v, i) => (
-                <div key={`${v.name}-${i}`} className="flex items-center gap-2.5 py-2">
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[12.5px] font-bold text-adm-ink leading-tight truncate">{v.name}</span>
-                    <span className="block text-[11.5px] text-adm-muted truncate">{v.category}</span>
-                  </span>
-                  <CommandAction
-                    Icon={Mail}
-                    wrapperClassName="shrink-0"
-                    href={v.email ? `mailto:${v.email}` : undefined}
-                    disabledReason={v.email ? null : "No email is on file for this vendor."}>
-                    Contact
-                  </CommandAction>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="mt-auto pt-3 border-t border-adm-border flex items-center justify-between gap-2 flex-wrap">
-        <span className="min-w-0">
-          <span className="block text-[11.5px] text-adm-muted">Estimated Cost</span>
-          {/* Body weight, not the card-title token: this is a data value, and
-              text-[13px] font-bold is reserved for a card heading. */}
-          <span className="block text-[12.5px] font-bold text-adm-ink leading-tight">{money(column.estimatedCost)}</span>
-        </span>
-        {/* The three report destinations are in-app routes (useCommandCenter
-            emits only /k208 and /vehicle-file), so they change the route rather
-            than reloading the SPA into a new tab — and therefore wear no
-            ExternalLink; CommandAction adds that only for a real new tab. */}
-        <CommandAction
-          href={column.reportHref}
-          capability={capabilityForHref(column.reportHref)}
-          disabledReason={column.reportHref ? null : "No report has been generated for this department yet."}>
-          {REPORT_LABEL[column.key]}
-        </CommandAction>
-      </div>
-    </CommandCard>
+    </Panel>
   );
 }
 
@@ -240,7 +208,7 @@ function ChecklistRow({ label, checked, busy, onToggle }: {
       <label
         title={title}
         className={cn(
-          "flex items-center gap-2.5 min-h-[44px] px-1 rounded-lg hover:bg-adm-workspace",
+          "flex items-center gap-2.5 min-h-[40px] px-1 rounded-md hover:bg-adm-workspace",
           busy ? "cursor-progress" : "cursor-pointer",
         )}>
         <input
@@ -251,14 +219,14 @@ function ChecklistRow({ label, checked, busy, onToggle }: {
           aria-describedby={describedBy}
           onChange={(e) => { if (!busy) onToggle(e.target.checked); }} />
         <span className={cn(
-          "grid place-items-center w-5 h-5 rounded border shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-primary",
+          "grid place-items-center w-5 h-5 rounded-[4px] border shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-primary",
           checked ? cn(TONE_FILL.blue, "border-transparent text-white") : "border-adm-border bg-adm-surface text-transparent",
         )}>
           {busy
             ? <Loader2 className={cn("w-4 h-4 animate-spin", checked ? "text-white" : "text-adm-muted")} aria-hidden="true" />
             : <CheckCircle2 className="w-4 h-4" aria-hidden="true" />}
         </span>
-        <span className="text-[12.5px] text-adm-ink leading-tight">{label}</span>
+        <span className="text-[14px] leading-[20px] text-adm-ink">{label}</span>
       </label>
       {reasonNode}
     </div>
@@ -332,7 +300,7 @@ function DeliveryPriorityCard({ deliveryTarget, priority, canEdit, onSaveDate, o
             onChange={(e) => { if (!denied && !saving) setLocalDate(e.target.value); }}
             onBlur={commitDate}
             className={cn(
-              "w-full min-h-[44px] rounded-xl border border-adm-border bg-adm-surface px-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary",
+              "w-full min-h-[40px] rounded-md border border-adm-border bg-adm-surface px-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary",
               denied && "opacity-50 cursor-not-allowed",
             )} />
         </div>
@@ -348,7 +316,7 @@ function DeliveryPriorityCard({ deliveryTarget, priority, canEdit, onSaveDate, o
             onChange={(e) => void commitPriority(e.target.value)}
             disabled={denied || !!saving}
             className={cn(
-              "w-full min-h-[44px] rounded-xl border border-adm-border bg-adm-surface px-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary",
+              "w-full min-h-[40px] rounded-md border border-adm-border bg-adm-surface px-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary",
               denied && "opacity-50 cursor-not-allowed",
             )}>
             <option value="">Not set</option>
@@ -434,13 +402,13 @@ function DeptProgressCard({ column, worklistHref }: { column: GetReadyColumn; wo
   return (
     <CommandCard title={column.title} subtitle={column.total === 0 ? "No work items" : `${column.completed} of ${column.total} complete · ${pct}%`}>
       <div
-        className="h-2 rounded-full bg-adm-workspace overflow-hidden"
+        className="h-2 rounded-[2px] bg-adm-workspace overflow-hidden"
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label={`${column.title} completion`}>
-        <div className={cn("h-full rounded-full", TONE_FILL[tone])} style={{ width: `${pct}%` }} />
+        <div className={cn("h-full", TONE_FILL[tone])} style={{ width: `${pct}%` }} />
       </div>
       <p className="text-[12.5px] text-adm-ink mt-3">
         {column.total === 0
@@ -501,22 +469,25 @@ function RepairApprovalRow({ req, canApprove, busy, onDecide }: {
         onChange={(e) => setNote(e.target.value)}
         placeholder="Note to the technician (optional)"
         aria-label={`Decision note for ${req.workRequested}`}
-        className="w-full min-h-[56px] rounded-xl border border-adm-border bg-adm-surface p-2.5 text-[12.5px] mt-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+        className="w-full min-h-[56px] rounded-md border border-adm-border bg-adm-surface p-2.5 text-[14px] leading-[20px] mt-2 focus:outline-none focus:ring-2 focus:ring-adm-primary" />
       <div className="flex flex-wrap items-center gap-2 mt-2">
         <CommandAction
           variant="primary"
+          className={COMPACT_ACTION}
           busy={running}
           disabledReason={reason}
           onClick={() => onDecide(req.id, "approved", note)}>
           Approve
         </CommandAction>
         <CommandAction
+          className={COMPACT_ACTION}
           busy={running}
           disabledReason={reason}
           onClick={() => onDecide(req.id, "declined", note)}>
           Decline
         </CommandAction>
         <CommandAction
+          className={COMPACT_ACTION}
           busy={running}
           disabledReason={reason}
           onClick={() => onDecide(req.id, "clarify", note)}>
@@ -614,18 +585,17 @@ export default function GetReadyCommand() {
     }
   }, [decideServiceRequest]);
 
-  // AppShell renders the title in the desktop chrome, so the in-content copy is
-  // mobile-only — same convention as DescriptionOperations.
-  const header = (
-    <div className="min-w-0 lg:hidden mb-4">
-      <h1 className="text-[24px] leading-[32px] font-bold text-adm-ink">Get Ready Command</h1>
-      <p className="text-sm text-adm-muted mt-1">Review the work AutoLabels prepared, then authorize once.</p>
-    </div>
-  );
-
-  const shell = (children: React.ReactNode) => (
+  const shell = (children: React.ReactNode, header?: React.ReactNode) => (
     <CommandCapabilityProvider role={member?.role} isAdmin={isAdmin}>
-      <PageBody width="wide">{header}{children}</PageBody>
+      <PageBody width="wide">
+        {header ?? (
+          <>
+            <Crumbs items={[{ label: "Get Ready Command", to: "/get-ready-command" }, { label: "Review vehicle" }]} />
+            <PageHeader title="Review vehicle" description="Review the work AutoLabels prepared, then authorize once." />
+          </>
+        )}
+        {children}
+      </PageBody>
     </CommandCapabilityProvider>
   );
 
@@ -633,13 +603,10 @@ export default function GetReadyCommand() {
   // real content never shifts the page.
   const skeleton = (
     <>
-      <div className="min-w-0 mb-4"><LoadingCard rows={1} /></div>
-      <div className="mb-4"><LoadingCard rows={2} /></div>
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
-        <div className="min-w-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => <LoadingCard key={i} rows={5} />)}
-        </div>
-        <div className="w-full min-w-0 lg:w-[300px] space-y-4">
+      <LoadingCard rows={2} />
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+        <LoadingCard rows={6} />
+        <div className="w-full min-w-0 space-y-6">
           <LoadingCard rows={4} />
           <LoadingCard rows={5} />
         </div>
@@ -740,15 +707,96 @@ export default function GetReadyCommand() {
       ? (vehicle.vin ? `/service/vehicle/${vinKey(vehicle.vin)}` : undefined)
       : column.reportHref;
 
+  const stepTitle = STEPS.find((st) => st.n === data.currentStep)?.title ?? STEPS[0].title;
+  const conditionText = conditionLabel(vehicle.condition);
+
+  const authorizeAction = authorized ? null : (
+    <CommandAction
+      variant="primary"
+      Icon={Lock}
+      busy={authorizing}
+      className={COMPACT_ACTION}
+      disabledReason={authorizing ? "Authorization is already running." : canAuthorize ? null : authorizeBlockedReason}
+      onClick={onAuthorize}>
+      Authorize Get Ready
+    </CommandAction>
+  );
+
+  const header = (
+    <>
+      <Crumbs items={[{ label: "Get Ready Command", to: "/get-ready-command" }, { label: vehicle.ymm || "Vehicle" }]} />
+      <PageHeader
+        title={authorized ? "Get Ready authorized" : "Review vehicle"}
+        description={authorized
+          ? `Authorized${authorizedLabel ? ` ${authorizedLabel}` : ""}${authorizedByEmail ? ` by ${authorizedByEmail}` : ""}. The instruction snapshot is frozen and work orders cannot be re-sent from here.`
+          : `Step ${data.currentStep} of ${STEPS.length}, ${stepTitle}. Review the work AutoLabels prepared, then authorize once.`}
+        actions={authorizeAction}
+      />
+    </>
+  );
+
+  const identity = (
+    <section aria-label="Vehicle identity" className="flex flex-col gap-4 rounded-[6px] border border-adm-border bg-adm-surface p-4 sm:flex-row sm:items-center">
+      <div className="flex h-[88px] w-[132px] shrink-0 items-center justify-center overflow-hidden rounded-[4px] bg-adm-workspace text-[13px] text-adm-muted">
+        {vehicle.heroImageUrl ? <img src={vehicle.heroImageUrl} alt={vehicle.ymm} className="h-full w-full object-cover" /> : "No photo"}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[18px] leading-[26px] font-semibold text-adm-ink">{vehicle.ymm}</p>
+        <p className="text-[14px] leading-[20px] text-adm-muted">{[vehicle.trim, conditionText].filter(Boolean).join(" | ") || EM_DASH}</p>
+        <dl className="mt-2 flex flex-wrap gap-x-8 gap-y-1 text-[14px] leading-[20px]">
+          <div className="flex items-center gap-1.5">
+            <dt className="text-adm-muted">VIN</dt>
+            <dd className="font-mono text-adm-ink">{vehicle.vin}</dd>
+            <button type="button" onClick={copyVin} aria-label="Copy VIN" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace hover:text-adm-ink">
+              <Copy className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+          <div className="flex gap-1.5"><dt className="text-adm-muted">Stock</dt><dd className="text-adm-ink">{vehicle.stockNumber || EM_DASH}</dd></div>
+          <div className="flex items-center gap-1.5">
+            <dt className="text-adm-muted">Priority</dt>
+            <dd className="inline-flex items-center gap-1.5 text-adm-ink">
+              {priority ? (
+                <>
+                  <span className={cn("h-2 w-2 rounded-full", TONE_FILL[PRIORITY_TONE[priority]])} aria-hidden="true" />
+                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                </>
+              ) : EM_DASH}
+            </dd>
+          </div>
+          <div className="flex gap-1.5"><dt className="text-adm-muted">Delivery target</dt><dd className="text-adm-ink">{delivery || EM_DASH}</dd></div>
+        </dl>
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:items-stretch">
+        <CommandAction className={COMPACT_ACTION} capability="can_view_inventory" href={`/vin-command/${vehicle.id}`}>VIN Command Center</CommandAction>
+        <CommandAction className={COMPACT_ACTION} capability="can_view_print_queue" href={`/print-center/${vehicle.id}`}>Print Center</CommandAction>
+        <CommandAction className={COMPACT_ACTION} capability="can_view_inventory" href={`/vehicle-file/${vehicle.id}`}>View vehicle details</CommandAction>
+      </div>
+    </section>
+  );
+
+  const summaryRows = authorized
+    ? [
+        { label: "Work items", value: summary.workItems },
+        { label: "Estimated total cost", value: money(summary.estimatedTotal) },
+        { label: "Items still open", value: summary.needAttention },
+      ]
+    : [
+        { label: "Work items", value: summary.workItems },
+        { label: "Departments", value: summary.departments },
+        { label: "Estimated total cost", value: money(summary.estimatedTotal) },
+        { label: "Items need attention", value: summary.needAttention },
+      ];
+  const summaryPanel = (
+    <Panel title={authorized ? "Dispatch summary" : "Review summary"} titleSize="sm" inset="sm">
+      <SummaryList rows={summaryRows} />
+    </Panel>
+  );
+
+  const vendorColumn = columns.find((c) => c.key === "vendor");
+
   return shell(
     <>
-      <DegradedNotice degraded={degraded} className="mb-4" />
-
-      {/* CommandStepper scrolls inside itself; this only bounds it so a 375px
-          viewport never scrolls the page. */}
-      <div className="min-w-0 mb-4">
-        <CommandStepper steps={STEPS} current={data.currentStep} />
-      </div>
+      <DegradedNotice degraded={degraded} />
 
       {/* The authorization is one-shot: a recipient the dispatcher never reached
           can never be re-sent from here, so it has to stay on the page after the
@@ -762,7 +810,6 @@ export default function GetReadyCommand() {
         <CommandCallout
           tone="red"
           Icon={AlertTriangle}
-          className="mb-4"
           title="Some work orders were never sent">
           {dispatchFailures.map(deptLabel).join(" and ")}{" "}
           {dispatchFailures.length === 1 ? "was" : "were"} not reached when Get Ready was authorized
@@ -772,96 +819,28 @@ export default function GetReadyCommand() {
         </CommandCallout>
       )}
 
-      <div className="mb-4">
-        <VehicleIdentityStrip
-          imageUrl={vehicle.heroImageUrl}
-          ymm={vehicle.ymm}
-          trim={vehicle.trim}
-          trimBelow
-          stockNumber={vehicle.stockNumber}
-          vin={vehicle.vin}
-          conditionLabel={vehicle.condition}
-          onCopyVin={copyVin}
-          facts={[{
-            label: "Priority",
-            // No fallback string: the strip owns the null rule and renders the
-            // em dash. See the dead-branch note on PRIORITY_TONE above.
-            value: priority ? (
-              <span className="inline-flex items-center gap-1.5">
-                <span className={cn("w-2 h-2 rounded-full", TONE_FILL[PRIORITY_TONE[priority]])} aria-hidden="true" />
-                {priority.charAt(0).toUpperCase() + priority.slice(1)}
-              </span>
-            ) : null,
-          }]}
-          footer={{ label: "Delivery Target", Icon: Calendar, value: delivery }}
-          action={
-            <>
-              {/* The three command surfaces are one set, and each carries a door
-                  to both siblings — VIN Command Center has no nav row by §6, and
-                  Get Ready to Print for the same vehicle used to cost two hops
-                  through it. */}
-              <CommandAction
-                Icon={Gauge}
-                capability="can_view_inventory"
-                href={`/vin-command/${vehicle.id}`}>
-                VIN Command Center
-              </CommandAction>
-              <CommandAction
-                Icon={Printer}
-                capability="can_view_print_queue"
-                href={`/print-center/${vehicle.id}`}>
-                Print Center
-              </CommandAction>
-              <CommandAction
-                capability="can_view_inventory"
-                href={`/vehicle-file/${vehicle.id}`}>
-                View Vehicle Details
-              </CommandAction>
-            </>
-          }
-        />
-      </div>
+      {identity}
 
       {authorized ? (
         <>
-          {/* Panel 3 — Department Dispatch & Approvals. The one-shot review is
-              done; this is the living view of the dispatched work. */}
           {authOutcome && <AuthorizationResults outcome={authOutcome} />}
 
-          <CommandCard
-            className="mb-4"
-            title="Get Ready Authorized & Dispatched"
-            subtitle={`Authorized${authorizedLabel ? ` ${authorizedLabel}` : ""}${authorizedByEmail ? ` by ${authorizedByEmail}` : ""}. The instruction snapshot is frozen — work orders cannot be re-sent from here.`}
-            leading={
-              <span className={cn("grid place-items-center w-9 h-9 rounded-full shrink-0 text-white", TONE_FILL.emerald)}>
-                <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
-              </span>
-            }>
-            <div className="divide-y divide-border/70">
-              <SummaryRow Icon={ClipboardList} value={summary.workItems} label="Work Items" tone="blue" />
-              <SummaryRow Icon={DollarSign} value={money(summary.estimatedTotal)} label="Estimated Total Cost" tone="emerald" />
-              <SummaryRow Icon={AlertTriangle} value={summary.needAttention} label="Items Still Open" tone="amber" />
-            </div>
-          </CommandCard>
-
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
-            <div className="min-w-0">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {columns.map((c) => (
-                  <DeptProgressCard key={c.key} column={c} worklistHref={worklistHrefFor(c.key, c)} />
-                ))}
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+            <div className="min-w-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {columns.map((c) => (
+                <DeptProgressCard key={c.key} column={c} worklistHref={worklistHrefFor(c.key, c)} />
+              ))}
             </div>
 
-            <div className="w-full min-w-0 lg:w-[300px] space-y-4">
+            <div className="w-full min-w-0 flex flex-col gap-6">
+              {summaryPanel}
               {deliveryPriorityCard}
 
               {serviceRequests.length > 0 && (
                 <CommandCard
-                  title="Repair Approvals"
-                  subtitle="Additional work service found. A message alone never authorizes repairs."
-                  leading={<CommandIconTile Icon={Wrench} tone="amber" />}>
-                  <div className="divide-y divide-border/70">
+                  title="Repair approvals"
+                  subtitle="Additional work service found. A message alone never authorizes repairs.">
+                  <div className="divide-y divide-adm-border">
                     {serviceRequests.map((req) => (
                       <RepairApprovalRow
                         key={req.id}
@@ -875,79 +854,52 @@ export default function GetReadyCommand() {
                 </CommandCard>
               )}
 
-              <CommandCard title="Activity" leading={<CommandIconTile Icon={Activity} tone="slate" />}>
+              <CommandCard title="Activity">
                 <TimelineRail entries={activity.map((e) => ({ ...e, at: formatCommandDateTime(e.at) }))} />
               </CommandCard>
             </div>
           </div>
         </>
       ) : (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
-            {/* Three department columns. The hook always emits the three §4
-                departments, so the empty state that matters is the per-column one
-                inside each card, not a page-level one that could never render. */}
-            <div className="min-w-0">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {columns.map((c) => <DepartmentColumn key={c.key} column={c} onSaveNote={onSaveNote} />)}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+          <div className="min-w-0 flex flex-col gap-6">
+            <ProposedWork columns={columns} />
+            <Panel title="Manager notes" titleSize="sm" inset="sm">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {columns.filter((c) => c.key === "service" || c.key === "prep").map((c) => (
+                  <DepartmentNote key={c.key} column={c} onSaveNote={onSaveNote} />
+                ))}
               </div>
-            </div>
-
-            {/* Right rail */}
-            <div className="w-full min-w-0 lg:w-[300px] space-y-4">
-              <CommandCard title="Get Ready Summary">
-                <div className="divide-y divide-border/70">
-                  <SummaryRow Icon={ClipboardList} value={summary.workItems} label="Work Items" tone="blue" />
-                  <SummaryRow Icon={Users} value={summary.departments} label="Departments" tone="slate" />
-                  <SummaryRow Icon={DollarSign} value={money(summary.estimatedTotal)} label="Estimated Total Cost" tone="emerald" />
-                  <SummaryRow Icon={AlertTriangle} value={summary.needAttention} label="Items Need Attention" tone="amber" />
-                </div>
-              </CommandCard>
-
-              {deliveryPriorityCard}
-
-              {/* CHECKLIST_ITEMS is a fixed five-element literal mapped 1:1, so the
-                  "no items" branch that used to sit here could not execute. */}
-              <CommandCard title="Authorization Checklist">
-                <div className="space-y-0.5">
-                  {checklist.map((c) => (
-                    <ChecklistRow
-                      key={c.key}
-                      label={c.label}
-                      checked={checkOverride[c.key] ?? c.done}
-                      busy={busyKey === c.key}
-                      onToggle={(next) => onToggle(c.key, next)}
-                    />
-                  ))}
-                </div>
-              </CommandCard>
-
-              {/* CommandAction publishes aria-busy and the live region itself, so
-                  this is a layout wrapper only. */}
-              <div>
-                <CommandAction
-                  variant="primary"
-                  Icon={Lock}
-                  busy={authorizing}
-                  className="w-full"
-                  wrapperClassName="flex w-full"
-                  disabledReason={authorizing ? "Authorization is already running." : canAuthorize ? null : authorizeBlockedReason}
-                  onClick={onAuthorize}>
-                  Authorize Get Ready &amp; Dispatch
-                </CommandAction>
-                <p className="text-[11px] text-adm-muted text-center mt-2">
-                  Creates immutable instructions, sends assignments, and releases eligible print jobs.
-                </p>
-              </div>
-            </div>
+            </Panel>
+            {vendorColumn && <VendorAssignments column={vendorColumn} />}
+            <p className="text-[13px] leading-[18px] text-adm-muted">
+              Third-party items show Pending proof until vendors upload completion proof. Items are due within five (5) business days.
+            </p>
           </div>
 
-          <CommandCallout tone="blue" Icon={Info} className="rounded-2xl mt-4">
-            Third-party items show "Pending Proof" until vendors upload completion proof. Items are
-            due within five (5) business days.
-          </CommandCallout>
-        </>
+          <div className="w-full min-w-0 flex flex-col gap-6">
+            {summaryPanel}
+            {deliveryPriorityCard}
+            <CommandCard title="Authorization checklist">
+              <div className="space-y-0.5">
+                {checklist.map((c) => (
+                  <ChecklistRow
+                    key={c.key}
+                    label={c.label}
+                    checked={checkOverride[c.key] ?? c.done}
+                    busy={busyKey === c.key}
+                    onToggle={(next) => onToggle(c.key, next)}
+                  />
+                ))}
+              </div>
+              <p className="mt-3 text-[13px] leading-[18px] text-adm-muted">
+                Authorizing creates immutable instructions, sends assignments, and releases eligible print jobs.
+              </p>
+            </CommandCard>
+          </div>
+        </div>
       )}
     </>,
+    header,
   );
 }

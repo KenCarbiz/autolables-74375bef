@@ -209,6 +209,10 @@ export interface DealEntry {
   customerName: string | null;
   customerId: string | null;
   amount: number | null;
+  sellingPrice: number | null;
+  customerEmail: string | null;
+  customerSignedAt: string | null;
+  employeeSignedAt: string | null;
   state: DealState;
   stateLabel: string;
   stateDetail: string;
@@ -611,6 +615,10 @@ export function buildCustomerBook(input: CustomerBookInput): CustomerBook {
       customerName: norm(d.customer_name) || null,
       customerId: identityKey(d.customer_email, d.customer_name, d.vehicle_vin),
       amount: typeof d.total_with_optional === "number" ? d.total_with_optional : d.selling_price,
+      sellingPrice: d.selling_price,
+      customerEmail: norm(d.customer_email) || null,
+      customerSignedAt: d.customer_signed_at,
+      employeeSignedAt: d.employee_signed_at,
       state,
       stateLabel: label,
       stateDetail: detail,

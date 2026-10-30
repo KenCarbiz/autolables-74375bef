@@ -94,11 +94,8 @@ describe("the shell chrome renders on the tokens", () => {
   const rail = readFileSync(
     join(__dirname, "../../components/layout/AppRail.tsx"), "utf8");
 
-  it("puts the page title and subtitle on the type scale", () => {
-    expect(shell).toMatch(/text-al-section/);
-    expect(shell).toMatch(/text-al-meta/);
-    // The scale carries weight and tracking, so the ad-hoc pair it replaced
-    // must not survive alongside it.
+  it("prints no page heading of its own, so each page owns its single title", () => {
+    expect(shell).not.toMatch(/SHELL_HEADINGS/);
     expect(shell).not.toMatch(/text-xl font-black tracking-tight text-foreground/);
   });
 

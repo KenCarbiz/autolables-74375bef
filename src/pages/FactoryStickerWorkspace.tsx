@@ -197,11 +197,8 @@ const TONE_CLASS: Record<Tone, string> = {
 };
 
 const Badge = ({ tone, children }: { tone: Tone; children: React.ReactNode }) => (
-  <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border ${TONE_CLASS[tone]}`}>
-    {tone === "pass" && <CheckCircle2 className="w-3 h-3" />}
-    {tone === "fail" && <XCircle className="w-3 h-3" />}
-    {tone === "warn" && <AlertTriangle className="w-3 h-3" />}
-    {children}
+  <span className={`inline-flex items-center gap-1 text-[12px] leading-[18px] font-semibold px-2 py-[3px] rounded-[2px] ${TONE_CLASS[tone]}`}>
+        {children}
   </span>
 );
 
@@ -210,8 +207,8 @@ const qaLabel = (s: string | null | undefined): string => (s === "PASS" ? "Passe
 
 const StatusRow = ({ label, value, tone }: { label: string; value: React.ReactNode; tone?: Tone }) => (
   <div className="flex items-center justify-between gap-2 py-1.5 border-b border-border/60 last:border-0">
-    <span className="text-[11px] text-muted-foreground">{label}</span>
-    {tone ? <Badge tone={tone}>{value}</Badge> : <span className="text-[11px] font-semibold text-foreground text-right">{value}</span>}
+    <span className="text-[13px] leading-[18px] text-adm-muted">{label}</span>
+    {tone ? <Badge tone={tone}>{value}</Badge> : <span className="text-[13px] leading-[18px] font-semibold text-adm-ink text-right">{value}</span>}
   </div>
 );
 
@@ -662,7 +659,7 @@ export default function FactoryStickerWorkspace({
     if (record.qr_identity_qa_status === "FAIL") publishBlockers.push("passport QR QA failed");
   }
 
-  const title = data?.title || (vehicle?.condition === "new" ? "Factory Window Sticker" : "Original Factory Build & MSRP Record");
+  const title = "Factory Build Record";
 
   if (!fixture && loading) {
     return (
@@ -719,9 +716,9 @@ export default function FactoryStickerWorkspace({
           as={embedded ? "h2" : "h1"}
           title={title}
           description={<>
-            {data ? `${data.identity.year} ${data.identity.make} ${data.identity.model}${data.identity.trim ? ` ${data.identity.trim}` : ""}` : "Factory sticker workspace"}
-            {currentDoc ? ` | v${currentDoc.version}` : ""}
-            {" | "}Generated build record, not the original OEM Monroney.
+            Generated factory build record (not the original Monroney).
+            {data ? ` ${data.identity.year} ${data.identity.make} ${data.identity.model}${data.identity.trim ? ` ${data.identity.trim}` : ""}` : ""}
+            {currentDoc ? `, v${currentDoc.version}` : ""}
           </>}
           actions={
             <>
@@ -731,97 +728,19 @@ export default function FactoryStickerWorkspace({
                   to={`/vehicle-file/${vehicle.id}`}
                   className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-md border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" /> Vehicle File
+                  <ArrowLeft className="w-5 h-5" /> Vehicle File
                 </Link>
               )}
             </>
           }
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)_340px] gap-4 items-start">
-          {/* LEFT — vehicle and data status */}
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-              {hero ? (
-                <img src={hero} alt="Vehicle" className="w-full aspect-[4/3] object-cover rounded-xl border border-border" />
-              ) : (
-                <div className="w-full aspect-[4/3] rounded-xl border border-dashed border-border bg-muted/30 flex items-center justify-center text-[11px] text-muted-foreground">
-                  {fixture ? "Fixture vehicle — no photo" : "No photo on file"}
-                </div>
-              )}
-              <div>
-                <p className="text-sm font-bold text-foreground">
-                  {data ? `${data.identity.year} ${data.identity.make} ${data.identity.model}` : "—"}
-                </p>
-                {data?.identity.trim && <p className="text-[11px] text-muted-foreground">{data.identity.trim}</p>}
-              </div>
-              <div className="space-y-0">
-                <StatusRow label="VIN" value={<span className="font-mono">{data?.vin || vehicle?.vin || "—"}</span>} />
-                {stockNo && <StatusRow label="Stock #" value={stockNo} />}
-                <StatusRow label="Condition" value={humanize(data?.condition || vehicle?.condition || "unknown")} />
-                {!fixture && vehicle?.status && <StatusRow label="Listing status" value={humanize(vehicle.status)} />}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Data sources</h2>
-              <StatusRow
-                label="Saved NeoVIN build sheet"
-                tone={fixture ? "info" : buildSheet ? "pass" : "fail"}
-                value={fixture ? "Fixture data" : buildSheet ? "Saved" : "Missing"}
-              />
-              <StatusRow
-                label="Source provider"
-                value={fixture ? "fixture" : record?.source_provider || "—"}
-              />
-              <StatusRow
-                label="Source confidence"
-                tone={record?.confidence_level === "HIGH" ? "pass" : record?.confidence_level ? "warn" : fixture ? "info" : "off"}
-                value={fixture ? "Benchmark" : record?.confidence_level ? humanize(record.confidence_level) : "Not run"}
-              />
-              <StatusRow
-                label="OEM resolution"
-                tone={fixture ? "info" : record?.canonical_oem_id ? "pass" : record ? "warn" : "off"}
-                value={fixture ? "INFINITI" : record?.canonical_oem_id
-                  ? `${record.canonical_oem_id}${record.oem_resolution_confidence ? ` (${record.oem_resolution_confidence.toLowerCase()})` : ""}`
-                  : record?.detected_make_value ? `Unresolved: ${record.detected_make_value}` : "Not run"}
-              />
-              <StatusRow
-                label="OEM theme"
-                value={fixture ? "oem-INFINITI" : record?.oem_theme_id ? `${record.oem_theme_id} v${record.oem_theme_version || "1"}` : "—"}
-              />
-              <StatusRow
-                label="Logo asset"
-                value={fixture ? "Wordmark (built-in)" : record?.logo_asset_id || "Wordmark (built-in)"}
-              />
-              <StatusRow
-                label="Passport route"
-                tone={fixture ? "info" : record?.canonical_passport_url ? "pass" : "off"}
-                value={fixture
-                  ? "/v/demo-qx80"
-                  : record?.passport_slug ? `/v/${record.passport_slug}` : record?.canonical_passport_url ? "Resolved" : "Not resolved"}
-              />
-            </div>
-
-            {(record?.review_reason || record?.last_error || data?.generic) && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-1.5">
-                <h2 className="text-[11px] font-bold uppercase tracking-wide text-amber-800">Data warnings</h2>
-                {data?.generic && (
-                  <p className="text-[11px] text-amber-800">
-                    Generic decode — this is a typical factory configuration for the trim, not a VIN-exact build. The
-                    document labels itself accordingly.
-                  </p>
-                )}
-                {record?.review_reason && <p className="text-[11px] text-amber-800">Review: {record.review_reason}</p>}
-                {record?.last_error && <p className="text-[11px] text-rose-700">Last error: {record.last_error}</p>}
-              </div>
-            )}
-          </div>
-
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+          <div className="min-w-0 space-y-4">
           {/* CENTER — large live document preview */}
           <div className={fullscreen
             ? "fixed inset-0 z-50 bg-slate-900/95 p-6 overflow-auto"
-            : "rounded-2xl border border-border bg-card p-4 space-y-3"}>
+            : "rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3"}>
             <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
               <p className={`text-[11px] ${fullscreen ? "text-slate-300" : "text-muted-foreground"}`}>
                 Landscape Letter (11 × 8.5 in) · renderer v{record?.renderer_version || "1.0.0"} — the identical
@@ -952,10 +871,91 @@ export default function FactoryStickerWorkspace({
             )}
           </div>
 
+          {/* LEFT — vehicle and data status */}
+          <div className="space-y-4">
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3">
+              {hero ? (
+                <img src={hero} alt="Vehicle" className="w-full aspect-[4/3] object-cover rounded-xl border border-border" />
+              ) : (
+                <div className="w-full aspect-[4/3] rounded-xl border border-dashed border-border bg-muted/30 flex items-center justify-center text-[11px] text-muted-foreground">
+                  {fixture ? "Fixture vehicle — no photo" : "No photo on file"}
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-bold text-foreground">
+                  {data ? `${data.identity.year} ${data.identity.make} ${data.identity.model}` : "—"}
+                </p>
+                {data?.identity.trim && <p className="text-[11px] text-muted-foreground">{data.identity.trim}</p>}
+              </div>
+              <div className="space-y-0">
+                <StatusRow label="VIN" value={<span className="font-mono">{data?.vin || vehicle?.vin || "—"}</span>} />
+                {stockNo && <StatusRow label="Stock #" value={stockNo} />}
+                <StatusRow label="Condition" value={humanize(data?.condition || vehicle?.condition || "unknown")} />
+                {!fixture && vehicle?.status && <StatusRow label="Listing status" value={humanize(vehicle.status)} />}
+              </div>
+            </div>
+
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Data sources</h2>
+              <StatusRow
+                label="Saved NeoVIN build sheet"
+                tone={fixture ? "info" : buildSheet ? "pass" : "fail"}
+                value={fixture ? "Fixture data" : buildSheet ? "Saved" : "Missing"}
+              />
+              <StatusRow
+                label="Source provider"
+                value={fixture ? "fixture" : record?.source_provider || "—"}
+              />
+              <StatusRow
+                label="Source confidence"
+                tone={record?.confidence_level === "HIGH" ? "pass" : record?.confidence_level ? "warn" : fixture ? "info" : "off"}
+                value={fixture ? "Benchmark" : record?.confidence_level ? humanize(record.confidence_level) : "Not run"}
+              />
+              <StatusRow
+                label="OEM resolution"
+                tone={fixture ? "info" : record?.canonical_oem_id ? "pass" : record ? "warn" : "off"}
+                value={fixture ? "INFINITI" : record?.canonical_oem_id
+                  ? `${record.canonical_oem_id}${record.oem_resolution_confidence ? ` (${record.oem_resolution_confidence.toLowerCase()})` : ""}`
+                  : record?.detected_make_value ? `Unresolved: ${record.detected_make_value}` : "Not run"}
+              />
+              <StatusRow
+                label="OEM theme"
+                value={fixture ? "oem-INFINITI" : record?.oem_theme_id ? `${record.oem_theme_id} v${record.oem_theme_version || "1"}` : "—"}
+              />
+              <StatusRow
+                label="Logo asset"
+                value={fixture ? "Wordmark (built-in)" : record?.logo_asset_id || "Wordmark (built-in)"}
+              />
+              <StatusRow
+                label="Passport route"
+                tone={fixture ? "info" : record?.canonical_passport_url ? "pass" : "off"}
+                value={fixture
+                  ? "/v/demo-qx80"
+                  : record?.passport_slug ? `/v/${record.passport_slug}` : record?.canonical_passport_url ? "Resolved" : "Not resolved"}
+              />
+            </div>
+
+            {(record?.review_reason || record?.last_error || data?.generic) && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-1.5">
+                <h2 className="text-[14px] leading-[20px] font-semibold text-amber-800">Data warnings</h2>
+                {data?.generic && (
+                  <p className="text-[11px] text-amber-800">
+                    Generic decode — this is a typical factory configuration for the trim, not a VIN-exact build. The
+                    document labels itself accordingly.
+                  </p>
+                )}
+                {record?.review_reason && <p className="text-[11px] text-amber-800">Review: {record.review_reason}</p>}
+                {record?.last_error && <p className="text-[11px] text-rose-700">Last error: {record.last_error}</p>}
+              </div>
+            )}
+          </div>
+
+          </div>
+
           {/* RIGHT — validation and publication */}
           <div className="space-y-4">
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Source & classification</h2>
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Source & classification</h2>
               <StatusRow
                 label="Classification"
                 value={fixture ? "Benchmark fixture" : record?.source_classification ? humanize(record.source_classification) : "Not run"}
@@ -981,7 +981,7 @@ export default function FactoryStickerWorkspace({
             )}
 
             {!fixture && vehicle?.tenant_id && vehicleId && record && (
-              <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
                 <TemplateOverrideControl
                   tenantId={vehicle.tenant_id}
                   vehicleId={vehicleId}
@@ -991,8 +991,8 @@ export default function FactoryStickerWorkspace({
               </div>
             )}
 
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">MSRP reconciliation</h2>
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">MSRP reconciliation</h2>
               {pricing ? (
                 <>
                   <StatusRow label="Base MSRP" value={fmtMoney(pricing.baseMsrp)} />
@@ -1023,8 +1023,8 @@ export default function FactoryStickerWorkspace({
               )}
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Identity & QA</h2>
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Identity & QA</h2>
               <StatusRow
                 label="VIN vs vehicle record"
                 tone={vinMatch == null ? (fixture ? "info" : "off") : vinMatch ? "pass" : "fail"}
@@ -1058,8 +1058,8 @@ export default function FactoryStickerWorkspace({
               )}
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-4 space-y-2.5">
-              <h2 className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Publication</h2>
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-2.5">
+              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Publication</h2>
               <StatusRow
                 label="Eligibility"
                 tone={fixture ? "info" : eligible && publishBlockers.length === 0 ? "pass" : "warn"}
@@ -1184,7 +1184,7 @@ export default function FactoryStickerWorkspace({
             </div>
 
             {oemOriginalUrl && (
-              <div className="rounded-2xl border border-border bg-card p-4 flex items-center gap-3">
+              <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-foreground">Original OEM Window Sticker</p>
                   <p className="text-[10px] text-muted-foreground">The manufacturer's own file — shown to shoppers in place of the generated record when preferred.</p>

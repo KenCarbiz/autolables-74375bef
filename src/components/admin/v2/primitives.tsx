@@ -63,7 +63,7 @@ export const StatusChip = ({ tone = "neutral", children, className, icon = false
 };
 
 export const HealthChip = ({ state, className }: { state: HealthState; className?: string }) => (
-  <StatusChip tone={HEALTH_META[state].tone} className={className} icon>
+  <StatusChip tone={HEALTH_META[state].tone} className={className}>
     {HEALTH_META[state].label}
   </StatusChip>
 );
@@ -245,7 +245,7 @@ export const Th = ({ children, className, align = "left" }: { children?: ReactNo
 );
 
 export const Td = ({ children, className, align = "left" }: { children?: ReactNode; className?: string; align?: "left" | "right" }) => (
-  <td className={cn("px-3 py-3 border-b border-adm-border align-middle", align === "right" ? "text-right tabular-nums" : "text-left", className)}>{children}</td>
+  <td className={cn("px-3 py-3.5 border-b border-adm-border align-middle", align === "right" ? "text-right tabular-nums" : "text-left", className)}>{children}</td>
 );
 
 export const KeyValueList = ({ rows, className }: { rows: Array<{ label: ReactNode; value: ReactNode }>; className?: string }) => (

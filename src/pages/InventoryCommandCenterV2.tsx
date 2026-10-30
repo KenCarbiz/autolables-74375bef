@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/product";
 import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
 import { presentLegacyPosition } from "@/lib/market/presentation";
 
@@ -279,8 +280,7 @@ const InventoryCommandCenterV2 = () => {
 
   return (
     <div className="p-4 lg:px-6 lg:py-5 max-w-[1600px] mx-auto">
-      {/* The page title now lives in the global AppShell header (pageTitles).
-          This thin row only carries the draft marker + admin settings. */}
+      <PageHeader className="mb-4" title="Inventory Command Center" description="Manage, optimize, and publish your inventory with confidence." />
       <div className="flex items-center justify-between gap-3 mb-4">
         <span className="text-al-meta font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">V2 Draft</span>
         <div className="relative shrink-0">

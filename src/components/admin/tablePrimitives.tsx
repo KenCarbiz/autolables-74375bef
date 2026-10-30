@@ -102,7 +102,7 @@ export const SortHeader = ({
   const sortable = !!sortKey;
   const active = sortable && activeKey === sortKey;
   return (
-    <th className={`text-${align} px-3 py-2 font-semibold ${className}`}>
+    <th className={`text-${align} px-3 py-3 text-[12px] font-semibold ${className}`}>
       {sortable ? (
         <button
           type="button"

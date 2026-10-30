@@ -153,7 +153,7 @@ export const PlatformEntitlements = () => {
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-al-meta uppercase tracking-wide text-muted-foreground">
+            <thead className="bg-adm-workspace text-[12px] text-adm-muted">
               <tr>
                 <SortHeader label="Tenant"     sortKey="tenant"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
                 <SortHeader label="App"        sortKey="app_slug"      activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
@@ -241,10 +241,10 @@ const EntRow = ({ row, tenantName, editing, rowClass, onEdit, onClose, onSubmit 
     return (
       <tr>
         <td className={`${rowClass} font-semibold text-foreground`}>{tenantName}</td>
-        <td className={`${rowClass} uppercase text-xs tracking-wider`}>{row.app_slug}</td>
+        <td className={`${rowClass} capitalize text-sm`}>{row.app_slug}</td>
         <td className={`${rowClass} capitalize`}>{row.plan_tier}</td>
         <td className={rowClass}>
-          <span className={`text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusColor(row.status)}`}>
+          <span className={`text-[12px] font-semibold px-1.5 py-0.5 rounded-[2px] ${statusColor(row.status)}`}>
             {row.status}
           </span>
         </td>
@@ -266,7 +266,7 @@ const EntRow = ({ row, tenantName, editing, rowClass, onEdit, onClose, onSubmit 
   return (
     <tr className="bg-muted/20">
       <td className={`${rowClass} font-semibold text-foreground`}>{tenantName}</td>
-      <td className={`${rowClass} uppercase text-xs tracking-wider`}>{row.app_slug}</td>
+      <td className={`${rowClass} capitalize text-sm`}>{row.app_slug}</td>
       <td className={rowClass}>
         <select value={planTier} onChange={(e) => setPlanTier(e.target.value)} className="h-8 px-2 rounded-md border border-border bg-background text-xs">
           {planTierOptions(row.plan_tier).map((p) => <option key={p} value={p}>{p}</option>)}

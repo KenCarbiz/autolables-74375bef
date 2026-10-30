@@ -45,6 +45,8 @@ export interface AdminSection {
   id: AdminSectionId;
   label: string;
   description: string;
+  /** Page title when it differs from the section label. */
+  heading?: string;
   /** Header lines the approved mock draws above the section row; the h1 is always shown. */
   intro?: { breadcrumb?: boolean; description?: boolean };
   tabs: AdminChildTab[];
@@ -135,6 +137,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
   {
     id: "integrations",
     label: "Integrations",
+    heading: "Integrations & Data",
     description: "System, provider, feed and job health center.",
     tabs: [
       { id: "inventory-feed", label: "Inventory feed", aliases: ["inventory"], capabilities: ["can_manage_settings"] },
@@ -163,6 +166,8 @@ export const ADMIN_CHILD_ROUTES = {
   productApplicability: (productId: string) => `/admin/products/${encodeURIComponent(productId)}/applicability`,
   escalation: "/admin/customer-experience/escalation",
   syncRun: (runId: string) => `/admin/integrations/runs/${encodeURIComponent(runId)}`,
+  providerDetail: (providerId: string) => `/admin/integrations/providers/${encodeURIComponent(providerId)}`,
+  jobDetail: (jobId: string) => `/admin/integrations/jobs/${encodeURIComponent(jobId)}`,
 } as const;
 
 export const adminTabHref = (tabId: string, panel?: string | null): string =>

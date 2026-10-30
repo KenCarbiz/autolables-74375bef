@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useViewFixture, useAdminNow } from "@/lib/admin/dataSource";
 import { needsAttention } from "@/lib/admin/health";
+import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import { deriveProviderCard, PROVIDER_CARDS, providerDrillIn, type CrawlFacts, type ProviderEventRow } from "@/lib/admin/integrations/providers";
 import { loadCrawlFacts, loadLedgerHeads, loadProviderEvents } from "@/lib/admin/integrations/queries";
 import { AdminCard, HealthChip, KeyValueList, SectionTitle, SkeletonBlock } from "@/components/admin/v2/primitives";
@@ -22,7 +23,7 @@ export interface ProvidersViewFixture {
 
 const DAY_MS = 86_400_000;
 
-export default function ProvidersView() {
+export function useProvidersData() {
   const fixture = useViewFixture<ProvidersViewFixture>("providers");
   const now = useAdminNow();
   const viewer = useViewer();
@@ -50,6 +51,12 @@ export default function ProvidersView() {
     return PROVIDER_CARDS.map((spec) => deriveProviderCard({ spec, events: data.events, crawl: data.crawl, flags: { blackbook: data.blackbook ?? viewer.blackbook }, backendOk: data.backendOk, now }));
   }, [data, viewer.blackbook, now]);
 
+  return { data, cards, formatAt, now };
+}
+
+export default function ProvidersView() {
+  const { data, cards, formatAt } = useProvidersData();
+
   if (!data) {
     return (
       <div className="space-y-4" aria-busy="true" aria-label="Loading providers">
@@ -71,7 +78,7 @@ export default function ProvidersView() {
       <ReadNote failed={data.events === null || data.crawl === null} />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {cards.map((card) => (
-          <AdminCard key={card.spec.id} title={card.spec.label} action={<HealthChip state={card.verdict.state} />}>
+          <AdminCard key={card.spec.id} title={<Link to={ADMIN_CHILD_ROUTES.providerDetail(card.spec.id)} className="hover:underline">{card.spec.label}</Link>} action={<HealthChip state={card.verdict.state} />}>
             <div className="space-y-3">
               <div>
                 <p className="text-[14px] font-semibold text-adm-ink">{card.verdict.headline}</p>

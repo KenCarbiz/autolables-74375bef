@@ -10,8 +10,10 @@ const TIER_LABEL: Record<PlanTier, string> = {
 };
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X, Pencil, Database } from "lucide-react";
-import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv, useTableDensity, DensityToggle } from "./tablePrimitives";
+import { Link } from "react-router-dom";
+import { ArrowDown, ArrowUp, Building2, Search, Plus, X, Database } from "lucide-react";
+import { AdminButton, AdminCard, AdminTable, KeyValueList, StatusChip as StatusText, Td, Th } from "@/components/admin/v2/primitives";
+import { TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
 import { pickStr, brandsToStr, mapAutocurbProfile } from "@/lib/autocurbProfile";
 
@@ -21,17 +23,8 @@ const formatDate = (s: string | null) => {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 };
 
-const sourceBadge = (source: TenantSummary["source"]) => {
-  const colors: Record<TenantSummary["source"], string> = {
-    autocurb: "bg-violet-100 text-violet-700",
-    autolabels: "bg-blue-100 text-blue-700",
-    manual: "bg-muted text-foreground",
-  };
-  return colors[source] || colors.manual;
-};
-
 export const PlatformTenants = () => {
-  const { tenants, setTenantActive, createTenant, marketcheck, setTenantTier, saveMarketcheckConfig, clearSyncedInventory, runMarketcheckNow, entitlements } = useAdminPlatform();
+  const { tenants, createTenant, marketcheck, setTenantTier, saveMarketcheckConfig, clearSyncedInventory, runMarketcheckNow, entitlements } = useAdminPlatform();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [creating, setCreating] = useState(false);
@@ -77,23 +70,16 @@ export const PlatformTenants = () => {
       });
   }, [tenants.data, q, filter]);
 
-  const toggle = async (t: TenantSummary) => {
-    const ok = await setTenantActive(t.id, !t.is_active);
-    if (ok) toast.success(`${t.name} ${t.is_active ? "suspended" : "reactivated"}`);
-    else toast.error("Action failed");
-  };
-
   const sortPag = useSortAndPaginate<TenantSummary>(rows, {
     defaultSortKey: "name",
     defaultSortDir: "asc",
     defaultPageSize: 50,
     getSortValue: (row, key) => {
       if (key === "status") return row.is_active ? 1 : 0;
+      if (key === "plan") return tierByTenant.get(row.id) ?? "essential";
       return (row as unknown as Record<string, unknown>)[key];
     },
   });
-
-  const { density, setDensity, rowClass } = useTableDensity();
 
   const handleExport = () => {
     const csv = toCsv<TenantSummary>(sortPag.sorted, [
@@ -112,55 +98,59 @@ export const PlatformTenants = () => {
     downloadCsv(`platform-tenants-${stamp}.csv`, csv);
   };
 
+  const stats = useMemo(() => {
+    const all = tenants.data || [];
+    const latest = all.reduce<string | null>((acc, t) => (t.last_activity && (!acc || t.last_activity > acc) ? t.last_activity : acc), null);
+    return {
+      total: all.length,
+      active: all.filter((t) => t.is_active).length,
+      suspended: all.filter((t) => !t.is_active).length,
+      members: all.reduce((n, t) => n + t.member_count, 0),
+      latest,
+    };
+  }, [tenants.data]);
+
+  const sortTh = (label: string, key: string, align: "left" | "right" = "left") => (
+    <Th align={align} className="whitespace-nowrap">
+      <button type="button" onClick={() => sortPag.toggleSort(key)} className="inline-flex items-center gap-1 hover:text-adm-ink" aria-label={`Sort by ${label.toLowerCase()}`}>
+        {label}
+        {sortPag.sortKey === key && (sortPag.sortDir === "asc" ? <ArrowUp className="w-4 h-4" aria-hidden="true" /> : <ArrowDown className="w-4 h-4" aria-hidden="true" />)}
+      </button>
+    </Th>
+  );
+
   return (
-    <div className="space-y-4">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
+      <div className="space-y-4 min-w-0">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-            <Building2 className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-foreground">Tenants</h2>
-            <p className="text-[11px] text-muted-foreground">
-              {tenants.data?.length ?? 0} total · {rows.length} visible
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
-            title="Search Autocurb and import a dealer"
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            Import from Autocurb
-          </button>
-          <button
-            onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-semibold"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New Tenant
-          </button>
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-5 h-5 text-adm-muted" aria-hidden="true" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search name, slug, domain…"
-              className="h-9 pl-7 pr-3 rounded-md border border-border bg-background text-sm w-64"
+              placeholder="Search name, slug, domain"
+              aria-label="Search tenants"
+              className="h-9 pl-9 pr-3 rounded-md border border-adm-border bg-adm-surface text-sm w-64"
             />
           </div>
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as typeof filter)}
-            className="h-9 px-2 rounded-md border border-border bg-background text-sm"
+            aria-label="Filter by status"
+            className="h-9 px-2 rounded-md border border-adm-border bg-adm-surface text-sm"
           >
-            <option value="all">All</option>
+            <option value="all">All tenants</option>
             <option value="active">Active only</option>
             <option value="inactive">Suspended only</option>
           </select>
-          <DensityToggle density={density} setDensity={setDensity} />
+        </div>
+        <div className="flex items-center gap-2">
+          <AdminButton onClick={() => setCreating(true)} title="Search Autocurb and import a dealer">Import from Autocurb</AdminButton>
+          <AdminButton variant="primary" onClick={() => setCreating(true)}>
+            <Plus className="w-5 h-5" aria-hidden="true" />
+            Add tenant
+          </AdminButton>
         </div>
       </div>
 
@@ -204,7 +194,7 @@ export const PlatformTenants = () => {
       )}
 
       {tenants.isLoading ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">Loading tenants…</div>
+        <div className="py-10 text-center text-sm text-adm-muted">Loading tenants</div>
       ) : rows.length === 0 ? (
         <TableEmptyState
           icon={Building2}
@@ -218,115 +208,62 @@ export const PlatformTenants = () => {
           onCta={q || filter !== "all" ? undefined : () => setCreating(true)}
         />
       ) : (
-        <div className="rounded-xl border border-border bg-card overflow-x-auto">
-          <table className="w-full min-w-[920px] text-sm">
-            <thead className="bg-muted/50 text-al-meta uppercase tracking-wide text-muted-foreground">
+        <div className="rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
+          <AdminTable caption="Tenants">
+            <thead>
               <tr>
-                <SortHeader label="Dealer"        sortKey="name"          activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
-                <SortHeader label="Source"        sortKey="source"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
-                <SortHeader label="Apps"          sortKey="active_apps"   activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
-                <SortHeader label="Members"       sortKey="member_count"  activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
-                <SortHeader label="Created"       sortKey="created_at"    activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
-                <SortHeader label="Last activity" sortKey="last_activity" activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
-                <th className="px-3 py-2 text-left font-semibold">Plan</th>
-                <SortHeader label="Status"        sortKey="status"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} align="right" />
+                {sortTh("Tenant", "name")}
+                {sortTh("Plan", "plan")}
+                {sortTh("Status", "status")}
+                {sortTh("Members", "member_count", "right")}
+                {sortTh("Last activity", "last_activity")}
+                <Th align="right"><span className="sr-only">Actions</span></Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {sortPag.paginated.map((t) => (
-                <tr key={t.id} className={t.is_active ? "" : "opacity-60"}>
-                  <td className={rowClass}>
-                    <div className="font-semibold text-foreground">{t.name}</div>
-                    <div className="text-[11px] text-muted-foreground font-mono">
-                      {t.slug}
-                      {t.domain ? ` · ${t.domain}` : ""}
-                    </div>
-                  </td>
-                  <td className={rowClass}>
-                    <span className={`text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${sourceBadge(t.source)}`}>
-                      {t.source}
-                    </span>
-                  </td>
-                  <td className={rowClass}>
-                    <div className="flex items-center gap-1.5">
-                      <AppWindow className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="font-semibold">{t.active_apps}</span>
-                      {t.app_slugs.length > 0 && (
-                        <span className="text-[10px] text-muted-foreground">
-                          ({t.app_slugs.join(", ")})
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className={rowClass}>
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="font-semibold">{t.member_count}</span>
-                    </div>
-                  </td>
-                  <td className={rowClass}>
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {formatDate(t.created_at)}
-                    </div>
-                  </td>
-                  <td className={`${rowClass} text-muted-foreground`}>
-                    {formatDate(t.last_activity)}
-                  </td>
-                  <td className={rowClass}>
-                    {(() => {
-                      const mc = mcByTenant.get(t.id);
-                      const current = (tierByTenant.get(t.id) as PlanTier | undefined) ?? "essential";
-                      return (
-                        <div className="flex items-center gap-1.5">
-                          <select
-                            value={current}
-                            disabled={savingTier === t.id}
-                            onChange={(e) => changeTier(t, e.target.value as PlanTier)}
-                            className="h-7 rounded-md border border-border bg-background px-1.5 text-[11px] font-semibold text-foreground disabled:opacity-50"
-                          >
-                            <option value="essential">Essential</option>
-                            <option value="unlimited">Unlimited</option>
-                            <option value="compliance_pro">Compliance Pro</option>
-                          </select>
-                          {mc?.allowed && (
-                            <span
-                              title={`MarketCheck scrape ${mc.enabled ? "on" : "granted, dealer not enabled yet"}${mc.last_run_at ? ` · last run ${formatDate(mc.last_run_at)}` : ""}`}
-                              className={`inline-flex items-center gap-1 text-[10px] font-semibold ${mc.enabled ? "text-emerald-600" : "text-amber-600"}`}
-                            >
-                              <Database className="w-3 h-3" />
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td className={`${rowClass} text-right`}>
-                    <div className="inline-flex items-center gap-1 justify-end">
-                      <button
-                        onClick={() => setEditing(t)}
-                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md text-foreground hover:bg-muted"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => toggle(t)}
-                        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md ${
-                          t.is_active
-                            ? "text-destructive hover:bg-destructive/10"
-                            : "text-emerald-600 hover:bg-emerald-50"
-                        }`}
-                      >
-                        {t.is_active ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
-                        {t.is_active ? "Suspend" : "Reactivate"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+            <tbody>
+              {sortPag.paginated.map((t) => {
+                const current = (tierByTenant.get(t.id) as PlanTier | undefined) ?? "essential";
+                const mc = mcByTenant.get(t.id);
+                return (
+                  <tr key={t.id}>
+                    <Td className="max-w-[180px]">
+                      <Link to={`/platform-admin/tenants/${t.id}`} className="block truncate font-semibold text-adm-primary hover:underline" title={`${t.name} (${t.slug}${t.domain ? ` · ${t.domain}` : ""})`}>
+                        {t.name}
+                      </Link>
+                    </Td>
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={current}
+                          disabled={savingTier === t.id}
+                          onChange={(e) => changeTier(t, e.target.value as PlanTier)}
+                          aria-label={`Plan for ${t.name}`}
+                          className="h-8 w-[124px] rounded-md border border-adm-border bg-adm-surface px-1.5 text-[13px] text-adm-ink disabled:opacity-50"
+                        >
+                          <option value="essential">Essential</option>
+                          <option value="unlimited">Unlimited</option>
+                          <option value="compliance_pro">Compliance Pro</option>
+                        </select>
+                        {mc?.allowed && (
+                          <span title={`MarketCheck scrape ${mc.enabled ? "on" : "granted, dealer not enabled yet"}${mc.last_run_at ? ` · last run ${formatDate(mc.last_run_at)}` : ""}`} className={mc.enabled ? "text-adm-success" : "text-adm-warning"}>
+                            <Database className="w-5 h-5" aria-hidden="true" />
+                          </span>
+                        )}
+                      </div>
+                    </Td>
+                    <Td><StatusText tone={t.is_active ? "success" : "neutral"}>{t.is_active ? "Active" : "Suspended"}</StatusText></Td>
+                    <Td align="right">{t.member_count}</Td>
+                    <Td className="whitespace-nowrap text-adm-muted">{formatDate(t.last_activity)}</Td>
+                    <Td align="right">
+                      <div className="inline-flex items-center gap-1 justify-end">
+                        <AdminButton variant="ghost" size="sm" className="px-2" onClick={() => setEditing(t)}>Edit</AdminButton>
+                      </div>
+                    </Td>
+                  </tr>
+                );
+              })}
             </tbody>
-          </table>
+          </AdminTable>
           <TablePagination
             page={sortPag.page}
             totalPages={sortPag.totalPages}
@@ -340,6 +277,20 @@ export const PlatformTenants = () => {
           />
         </div>
       )}
+      </div>
+
+      <AdminCard title="System summary" titleSize="md" inset="sm" className="xl:sticky xl:top-4">
+        <KeyValueList
+          className="grid-cols-[1fr_auto]"
+          rows={[
+            { label: "Tenants", value: <span className="font-semibold tabular-nums">{tenants.isLoading ? "" : stats.total}</span> },
+            { label: "Active tenants", value: <span className="font-semibold tabular-nums">{tenants.isLoading ? "" : stats.active}</span> },
+            { label: "Suspended tenants", value: <span className="font-semibold tabular-nums">{tenants.isLoading ? "" : stats.suspended}</span> },
+            { label: "Total members", value: <span className="font-semibold tabular-nums">{tenants.isLoading ? "" : stats.members}</span> },
+            { label: "Latest activity", value: <span className="text-right block">{formatDate(stats.latest)}</span> },
+          ]}
+        />
+      </AdminCard>
     </div>
   );
 };

@@ -191,7 +191,7 @@ export const PlatformAudit = () => {
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-al-meta uppercase tracking-wide text-muted-foreground">
+            <thead className="bg-adm-workspace text-[12px] text-adm-muted">
               <tr>
                 <SortHeader label="When"    sortKey="created_at"  activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
                 <SortHeader label="Action"  sortKey="action"      activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
@@ -211,7 +211,7 @@ export const PlatformAudit = () => {
                       <span className="text-muted-foreground text-xs">—</span>}
                   </td>
                   <td className={`${rowClass} text-muted-foreground text-xs`}>
-                    <span className="uppercase tracking-wider text-[10px]">{r.entity_type}</span>
+                    <span className="text-[12px]">{r.entity_type}</span>
                     <span className="ml-1 font-mono">{r.entity_id.slice(0, 10)}</span>
                   </td>
                   <td className={`${rowClass} text-muted-foreground text-xs font-mono`}>

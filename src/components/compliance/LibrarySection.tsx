@@ -1,545 +1,165 @@
-import { AlertTriangle, BookOpen, Building2, CheckCircle2, FileText, Gavel, Globe, Scale, ShieldCheck } from "lucide-react";
-import Logo from "@/components/brand/Logo";
+import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
-import { getStateCompliance } from "@/data/stateCompliance";
 import { resolveOperatingState } from "@/lib/dealerState";
+import { Button, EmptyState, Panel, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
 import { SectionHeading } from "./primitives";
+import { ALL, filterLibrary, libraryRows, type LibraryType } from "./libraryData";
+
+const TYPE_TONE: Record<LibraryType, Tone> = {
+  Law: "info",
+  "Dealer policy": "warning",
+  "Product check": "neutral",
+};
+
+const FIELD = "h-10 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink focus:outline-none focus:ring-2 focus:ring-adm-primary";
 
 export const LibrarySection = () => {
   const { currentStore } = useTenant();
   const { settings } = useDealerSettings();
   const dealerState = resolveOperatingState(settings, currentStore?.state);
-  const compliance = getStateCompliance(dealerState);
-  const storeName = currentStore?.name || settings.dealer_name || "Your Dealership";
+  const all = useMemo(() => libraryRows(dealerState), [dealerState]);
+  const jurisdictions = useMemo(() => Array.from(new Set(all.map((r) => r.jurisdiction))), [all]);
+  const [jurisdiction, setJurisdiction] = useState(ALL);
+  const [type, setType] = useState(ALL);
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const rows = useMemo(() => filterLibrary(all, { jurisdiction, type, query }), [all, jurisdiction, type, query]);
+  const selected = rows.find((r) => r.id === selectedId) || rows[0] || null;
+  const filtered = jurisdiction !== ALL || type !== ALL || query.trim() !== "";
+  const clear = () => {
+    setJurisdiction(ALL);
+    setType(ALL);
+    setQuery("");
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <SectionHeading
         title="Library"
-        description="Every disclosure, requirement, and best practice the platform builds into your documents, with the federal and state authority behind each one. This is reference material, not legal advice."
+        description="Requirements the platform builds into your documents, with the authority behind each. Reference material, not legal advice: verify against the official source before relying on a row."
       />
 
-      {/* Your state */}
-      {dealerState && (
-        <div className="bg-adm-selected border border-adm-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <Building2 className="w-4 h-4 text-adm-primary" />
-            <h2 className="text-[14px] leading-[20px] font-semibold text-adm-primary">Your Dealership: {storeName}</h2>
-          </div>
-          <p className="text-[12px] leading-[18px] text-adm-primary">
-            State: <strong>{compliance.stateName || dealerState}</strong> · Doc fee terminology: <strong>{compliance.docFeeTerminology}</strong>
-            {compliance.docFeeMaxCap !== null && <> · Max cap: <strong>${compliance.docFeeMaxCap}</strong></>}
-            {compliance.carsActState && <> · <span className="text-adm-warning font-bold">California SB 766 applies (eff. Oct 1, 2026)</span></>}
-          </p>
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-[14px] text-adm-muted">
+          Jurisdiction
+          <select value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} className={FIELD} aria-label="Jurisdiction">
+            <option value={ALL}>All</option>
+            {jurisdictions.map((j) => <option key={j} value={j}>{j}</option>)}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-[14px] text-adm-muted">
+          Type
+          <select value={type} onChange={(e) => setType(e.target.value)} className={FIELD} aria-label="Type">
+            <option value={ALL}>All</option>
+            <option value="Law">Law</option>
+            <option value="Dealer policy">Dealer policy</option>
+            <option value="Product check">Product check</option>
+          </select>
+        </label>
+        <label className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search requirements, source, or keyword"
+            aria-label="Search the library"
+            className={`${FIELD} w-full pl-10`}
+          />
+        </label>
+        <span className="text-[14px] text-adm-muted tabular-nums">{rows.length} of {all.length} items</span>
+        <Button variant="primary" onClick={clear} disabled={!filtered}>Clear filters</Button>
+      </div>
 
-      {/* Section 1: Why compliance matters */}
-      <Section icon={Scale} title="Why This Matters" id="why">
-        <div className="space-y-3 text-[14px] leading-[20px] text-adm-muted leading-relaxed">
-          <p>In 2024-2026, the Federal Trade Commission and state Attorneys General have aggressively enforced consumer protection laws against auto dealers. Settlements have reached <strong>$78 million</strong> (Maryland, April 2026), <strong>$20 million</strong> (Illinois, December 2024), and <strong>$2.6 million</strong> (Arizona, August 2024) — all for deceptive add-on and pricing practices.</p>
-          <p>This platform is built to protect your dealership by ensuring every sticker, every addendum, and every customer interaction complies with federal and state law. Every disclosure you see on your addendums is there for a legal reason.</p>
-          <p>Our goal: <strong>No dealer using this platform should ever face an FTC enforcement action or state AG investigation for their addendum practices.</strong></p>
-        </div>
-      </Section>
-
-      {/* Section 2: The two documents */}
-      <Section icon={FileText} title="Understanding Your Documents" id="documents">
-        <div className="grid md:grid-cols-2 gap-4">
-          <Card title="Window Sticker (On the Vehicle)" color="blue">
-            <ul className="space-y-1.5 text-[12px] leading-[18px] text-adm-muted">
-              <li><Check /> Goes on the actual vehicle window</li>
-              <li><Check /> Shows dealer logo, vehicle info, equipment, pricing</li>
-              <li><Check /> Informational only — no signatures needed</li>
-              <li><Check /> Contains a QR code linking to the legal addendum</li>
-              <li><Check /> Does NOT contain full FTC disclosures</li>
-              <li><Check /> Customer can review it at their own pace on the lot</li>
-            </ul>
-          </Card>
-          <Card title="Legal Addendum (At the Desk)" color="emerald">
-            <ul className="space-y-1.5 text-[12px] leading-[18px] text-adm-muted">
-              <li><Check /> The compliance document — this is what protects you legally</li>
-              <li><Check /> Full FTC and state disclosures</li>
-              <li><Check /> Customer must initial EVERY product</li>
-              <li><Check /> Customer must accept or decline EVERY optional item</li>
-              <li><Check /> Requires customer + employee signatures</li>
-              <li><Check /> Timestamped, audit-logged, immutable record</li>
-              <li><Check /> Financing impact disclosure (cost over loan life)</li>
-              <li><Check /> Window sticker matching acknowledgment</li>
-            </ul>
-          </Card>
-        </div>
-      </Section>
-
-      {/* Section 3: Federal requirements */}
-      <Section icon={Globe} title="Federal Requirements" id="federal">
-        <SubSection title="FTC Used Car Rule (16 CFR § 455)">
-          <p className="text-[12px] leading-[18px] text-adm-muted mb-3">Applies to any dealer selling 5+ used vehicles in 12 months. Requires a Buyers Guide on every used vehicle.</p>
-          <div className="space-y-2">
-            <Requirement req="Buyers Guide must be displayed on every used vehicle" status="built" />
-            <Requirement req="Must show: year, make, model, VIN, mileage at time of sale" status="built" />
-            <Requirement req="Must disclose warranty status: As-Is, Implied, or Warranty" status="built" />
-            <Requirement req="Must list covered systems if warranty offered" status="built" />
-            <Requirement req='Must state "Spoken promises are difficult to enforce"' status="built" />
-            <Requirement req='Must state "Ask to have this vehicle inspected by your mechanic"' status="built" />
-            <Requirement req="Minimum size: 11 inches × 7¼ inches" status="built" />
-            <Requirement req="100% black ink on white stock" status="built" />
-            <Requirement req="No logos or symbols allowed on the Buyers Guide" status="built" />
-            <Requirement req="Fine: $16,000 per violation" status="info" />
-          </div>
-        </SubSection>
-
-        <SubSection title="Monroney Act (New Cars)">
-          <p className="text-[12px] leading-[18px] text-adm-muted mb-3">The factory window sticker must remain on the vehicle until sold. Federal law prohibits dealers from removing or modifying it. Our addendum is a SEPARATE document.</p>
-          <div className="space-y-2">
-            <Requirement req="Factory Monroney sticker must not be removed or modified" status="built" />
-            <Requirement req="Dealer addendum clearly labeled as separate from factory sticker" status="built" />
-            <Requirement req="Dealer accessories itemized separately with pricing" status="built" />
-          </div>
-        </SubSection>
-
-        <SubSection title="Express, Informed Consent">
-          <p className="text-[12px] leading-[18px] text-adm-muted mb-3">Before charging for ANY add-on, the customer must give clear consent after seeing what it costs — including over the life of the loan.</p>
-          <div className="space-y-2">
-            <Requirement req="Customer must initial each product" status="built" />
-            <Requirement req="Customer must accept or decline each optional product" status="built" />
-            <Requirement req="Financing impact shown (cost over 48/60/72 month terms)" status="built" />
-            <Requirement req="Products clearly marked as installed vs. optional" status="built" />
-            <Requirement req="No product may be charged without affirmative consent" status="built" />
-          </div>
-        </SubSection>
-      </Section>
-
-      {/* Section 4: State requirements */}
-      {dealerState && (
-        <Section icon={Building2} title={`${compliance.stateName || dealerState} State Requirements`} id="state">
-          {compliance.docFeeDisclosures.length > 0 && (
-            <SubSection title={`${compliance.docFeeTerminology} Disclosures`}>
-              <div className="space-y-2">
-                {compliance.docFeeDisclosures.map((d, i) => (
-                  <Requirement key={i} req={d} status="built" />
-                ))}
-              </div>
-            </SubSection>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <Panel flush>
+          {rows.length === 0 ? (
+            <EmptyState title="No requirement matches these filters" detail="Clear a filter or change the search." compact />
+          ) : (
+            <WorkTable caption="Compliance requirements" minWidth={720}>
+              <thead>
+                <tr>
+                  <Th className="px-2.5">Jurisdiction</Th>
+                  <Th className="px-2.5">Requirement</Th>
+                  <Th className="px-2.5">Type</Th>
+                  <Th className="px-2.5">Source</Th>
+                  <Th className="px-2.5">Workflow</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const on = selected?.id === r.id;
+                  return (
+                    <tr
+                      key={r.id}
+                      onClick={() => setSelectedId(r.id)}
+                      className={`cursor-pointer ${on ? "bg-adm-selected" : "hover:bg-adm-workspace"}`}
+                      aria-selected={on}
+                    >
+                      <Td className="whitespace-nowrap px-2.5 text-adm-muted">{r.jurisdiction}</Td>
+                      <Td className="max-w-[210px] truncate px-2.5 font-semibold">
+                        <button type="button" onClick={() => setSelectedId(r.id)} className="max-w-full truncate text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">{r.requirement}</button>
+                      </Td>
+                      <Td className="whitespace-nowrap px-2.5"><StatusText tone={TYPE_TONE[r.type]}>{r.type}</StatusText></Td>
+                      <Td className="max-w-[150px] truncate px-2.5 text-adm-muted">{r.source}</Td>
+                      <Td className="max-w-[110px] truncate px-2.5 text-adm-muted">{r.workflow}</Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </WorkTable>
           )}
+        </Panel>
 
-          {compliance.carsActState && (
-            <SubSection title="California SB 766">
-              <div className="bg-adm-warning-bg border border-adm-warning-bg rounded-lg p-3 mb-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-adm-warning mt-0.5 flex-shrink-0" />
-                  <p className="text-[12px] leading-[18px] text-adm-warning font-medium">Effective October 1, 2026. This is the most comprehensive state-level auto dealer disclosure law in the country.</p>
-                </div>
+        <aside aria-label="Selected requirement">
+          {selected ? (
+            <Panel title={selected.requirement} titleSize="md" inset="sm">
+              <div className="flex flex-wrap items-center gap-2 text-[13px] text-adm-muted">
+                <span>{selected.jurisdiction}</span>
+                <StatusText tone={TYPE_TONE[selected.type]}>{selected.type}</StatusText>
               </div>
-              <div className="space-y-2">
-                <Requirement req="12-point bold type headings on disclosures" status="built" />
-                <Requirement req="10-point bold body text on disclosures" status="built" />
-                <Requirement req="Disclosures circumscribed by a line above signature" status="built" />
-                <Requirement req="Multi-language: Spanish, Chinese, Tagalog, Vietnamese, Korean" status="built" />
-                <Requirement req="10-day post-sale window for optional add-on purchases" status="built" />
-                <Requirement req="Prohibition on no-benefit add-ons (nitrogen < 95%, etc.)" status="built" />
-                <Requirement req="2-year minimum record retention" status="built" />
-              </div>
-            </SubSection>
-          )}
-        </Section>
-      )}
-
-      {/* Section 5: Best practices */}
-      <Section icon={BookOpen} title="Best Practices" id="best-practices">
-        <div className="space-y-4 text-[14px] leading-[20px] text-adm-muted leading-relaxed">
-          <BestPractice num="01" title="Never surprise the customer">
-            Every product and every charge should be visible on the window sticker BEFORE the customer sits down.
-            The addendum signing should confirm what they already saw — not introduce new items.
-          </BestPractice>
-          <BestPractice num="02" title="Always explain the difference between installed and optional">
-            Pre-installed items cannot be removed. Optional items can be declined with zero impact on the deal.
-            Make this crystal clear every time.
-          </BestPractice>
-          <BestPractice num="03" title="Never pressure on optional products">
-            The FTC and state AGs are specifically targeting dealers who make customers feel they must accept optional products.
-            "Declining will not affect your financing" is not just a disclosure — it must be true.
-          </BestPractice>
-          <BestPractice num="04" title="Keep every record">
-            Every addendum, every signature, every timestamp. This platform retains everything automatically.
-            If an AG or the FTC comes asking, your records are ready.
-          </BestPractice>
-          <BestPractice num="05" title="Have your attorney review your disclosures">
-            This platform provides industry-standard FTC-aligned disclosures. But YOUR attorney should review them
-            for your specific state and business. You can customize any disclosure through the admin panel.
-          </BestPractice>
-        </div>
-      </Section>
-
-      {/* Section 6: Dealer legal sign-off */}
-      {/* FTC Buyers Guide Rules */}
-      <Section icon={FileText} title="FTC Buyers Guide — The Rules" id="buyers-guide-rules">
-        <SubSection title="What the Law Requires">
-          <p className="text-[12px] leading-[18px] text-adm-muted mb-3 leading-relaxed">
-            Under <strong>16 CFR § 455</strong> (the FTC Used Car Rule), every dealer selling 5 or more used
-            vehicles in a 12-month period must display a Buyers Guide on every used vehicle offered for sale.
-            This applies to vehicles on your lot, consignment vehicles, off-site sales events, and auctions open to consumers.
-          </p>
-          <div className="space-y-2">
-            <Requirement req="Must be displayed on EVERY used vehicle (GVWR under 8,500 lbs, curb weight under 6,000 lbs)" status="built" />
-            <Requirement req="Must show: year, make, model, VIN, and mileage at time of sale" status="built" />
-            <Requirement req="Must disclose warranty status: As-Is, Implied Warranties Only, or Dealer Warranty" status="built" />
-            <Requirement req='Must include: "Spoken promises are difficult to enforce. Ask the dealer to put all promises in writing."' status="built" />
-            <Requirement req='Must include: "Ask to have this vehicle inspected by your mechanic either on or off the lot."' status="built" />
-            <Requirement req="Must list major mechanical and electrical systems and potential problems" status="built" />
-            <Requirement req="Must disclose service contract availability" status="built" />
-            <Requirement req="Spanish version required if negotiation is conducted in Spanish" status="built" />
-          </div>
-        </SubSection>
-
-        <SubSection title="Can You Print Your Own?">
-          <div className="bg-adm-success-bg border border-adm-border rounded-lg p-3 mb-3">
-            <p className="text-[12px] leading-[18px] text-adm-success font-medium">
-              <strong>YES.</strong> The FTC does NOT require you to use their official printed form.
-              You can generate your own Buyers Guide on a computer, print it yourself, or get it from
-              any supplier — as long as you match the EXACT specifications.
-            </p>
-          </div>
-          <p className="text-[12px] leading-[18px] text-adm-muted mb-3 leading-relaxed">
-            This platform generates FTC-aligned Buyers Guides built to the 16 CFR § 455 specifications.
-            However, you must ensure:
-          </p>
-          <div className="space-y-2">
-            <Requirement req="100% black ink on white stock (no colored ink for the form itself)" status="built" />
-            <Requirement req="Minimum size: 11 inches high × 7¼ inches wide" status="built" />
-            <Requirement req="Exact wording as specified in 16 CFR § 455 appendix figures" status="built" />
-            <Requirement req="Exact type style and type sizes as shown in the FTC model" status="built" />
-            <Requirement req="Exact format and layout matching the FTC model" status="built" />
-            <Requirement req="NO logos, dealer branding, or other symbols anywhere on the form" status="built" />
-            <Requirement req="Both sides must be readable when displayed" status="built" />
-          </div>
-        </SubSection>
-
-        <SubSection title="Penalties">
-          <div className="bg-adm-danger-bg border border-adm-border rounded-lg p-3">
-            <p className="text-[12px] leading-[18px] text-adm-danger font-medium">
-              <strong>$16,000 per violation.</strong> Each vehicle without a proper Buyers Guide is a separate violation.
-              A lot with 50 cars missing guides could face $800,000 in fines.
-            </p>
-          </div>
-        </SubSection>
-
-        <SubSection title="Contract Integration">
-          <p className="text-[12px] leading-[18px] text-adm-muted leading-relaxed">
-            The FTC requires the following clause in every sales contract: <em>"The information you see
-            on the window form for this vehicle is part of this contract. Information on the window form
-            overrides any contrary provisions in the contract of sale."</em> This platform automatically
-            generates this clause for inclusion in your deal jacket.
-          </p>
-        </SubSection>
-      </Section>
-
-      {/* Pricing Format Rules */}
-      <Section icon={Scale} title="Pricing Format — New vs. Used" id="pricing-rules">
-        <SubSection title="New Car Addendum Pricing">
-          <p className="text-[12px] leading-[18px] text-adm-muted mb-3 leading-relaxed">
-            The factory Monroney sticker (required by the Automobile Information Disclosure Act of 1958)
-            must remain on the vehicle until sold. Federal law prohibits removing or modifying it.
-            Your dealer addendum is a SEPARATE document that sits alongside the Monroney.
-          </p>
-          <div className="bg-adm-surface rounded-lg border border-adm-border p-3 font-mono text-[12px] leading-[18px] space-y-1">
-            <div className="flex justify-between"><span>Manufacturer's Suggested Retail Price (MSRP)</span><span>$32,500.00</span></div>
-            <div className="flex justify-between text-adm-muted"><span>Paint Protection Film</span><span>$995.00</span></div>
-            <div className="flex justify-between text-adm-muted"><span>Ceramic Coating</span><span>$799.00</span></div>
-            <div className="flex justify-between text-adm-muted"><span>Window Tint</span><span>$399.00</span></div>
-            <div className="flex justify-between text-adm-muted"><span>Documentation Fee</span><span>$499.00</span></div>
-            <div className="flex justify-between border-t-2 border-foreground pt-1 font-bold"><span>TOTAL SUGGESTED RETAIL PRICE</span><span>$35,192.00</span></div>
-          </div>
-        </SubSection>
-
-        <SubSection title="Used Car Addendum Pricing">
-          <p className="text-[12px] leading-[18px] text-adm-muted mb-3 leading-relaxed">
-            Used vehicles start with market value (not MSRP). Accessories are added to the market value.
-            The total reflects what the customer will pay for the vehicle with all dealer additions.
-          </p>
-          <div className="bg-adm-surface rounded-lg border border-adm-border p-3 font-mono text-[12px] leading-[18px] space-y-1">
-            <div className="flex justify-between"><span>Market Value</span><span>$18,900.00</span></div>
-            <div className="flex justify-between text-adm-muted"><span>Paint Protection Film</span><span>$995.00</span></div>
-            <div className="flex justify-between text-adm-muted"><span>Theft Deterrent System</span><span>$499.00</span></div>
-            <div className="flex justify-between text-adm-muted"><span>Documentation Fee</span><span>$499.00</span></div>
-            <div className="flex justify-between border-t-2 border-foreground pt-1 font-bold"><span>TOTAL PRICE</span><span>$20,893.00</span></div>
-          </div>
-        </SubSection>
-      </Section>
-
-      {/* FTC March 2026 Warning Letters */}
-      <Section icon={AlertTriangle} title="FTC Warning Letters — March 2026" id="ftc-warnings">
-        <div className="bg-adm-warning-bg border border-adm-warning-bg rounded-xl p-5 mb-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-adm-warning mt-0.5 flex-shrink-0" />
-            <div>
-              <h3 className="text-[14px] leading-[20px] font-semibold text-adm-warning">97 Dealer Groups Warned by the FTC</h3>
-              <p className="text-[12px] leading-[18px] text-adm-warning mt-1 leading-relaxed">
-                On March 13, 2026, even after the federal CARS Rule was vacated by the Fifth Circuit,
-                the FTC sent warning letters to 97 auto dealership groups across the United States
-                regarding their advertising and pricing practices.
+              <dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 text-[14px] leading-[20px]">
+                <dt className="text-adm-muted">Source</dt>
+                <dd className="text-adm-ink">{selected.source}</dd>
+                <dt className="text-adm-muted">Last reviewed</dt>
+                <dd className="text-adm-ink">{selected.reviewed ?? "Not recorded"}</dd>
+                {selected.effective && (
+                  <>
+                    <dt className="text-adm-muted">Effective</dt>
+                    <dd className="text-adm-ink">{selected.effective}</dd>
+                  </>
+                )}
+              </dl>
+              <h4 className="mt-4 text-[14px] leading-[20px] font-semibold text-adm-ink">Summary</h4>
+              <p className="mt-1 text-[14px] leading-[20px] text-adm-ink">{selected.summary}</p>
+              {selected.requirements.length > 0 && (
+                <>
+                  <h4 className="mt-4 text-[14px] leading-[20px] font-semibold text-adm-ink">Key requirements</h4>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-[14px] leading-[20px] text-adm-ink">
+                    {selected.requirements.map((q, i) => <li key={i}>{q}</li>)}
+                  </ul>
+                </>
+              )}
+              <h4 className="mt-4 text-[14px] leading-[20px] font-semibold text-adm-ink">Applies in AutoLabels</h4>
+              <p className="mt-1 text-[14px] leading-[20px] text-adm-ink">{selected.applies}</p>
+              <p className="mt-4 text-[14px] leading-[20px]">
+                {selected.sourceUrl ? (
+                  <a href={selected.sourceUrl} target="_blank" rel="noreferrer" className="font-semibold text-adm-primary hover:underline">View official source</a>
+                ) : (
+                  <span className="text-adm-muted">No official source link is recorded for this row.</span>
+                )}
               </p>
-            </div>
-          </div>
-        </div>
-
-        <SubSection title="What the FTC Said">
-          <p className="text-[12px] leading-[18px] text-adm-muted mb-3 leading-relaxed">
-            The FTC demanded that <strong>advertised vehicle prices reflect the total price consumers
-            are actually required to pay</strong>. The letters specifically called out:
-          </p>
-          <div className="space-y-2 mb-3">
-            <Requirement req="Advertising prices that exclude mandatory fees" status="info" />
-            <Requirement req="Requiring add-ons not disclosed in advertising" status="info" />
-            <Requirement req="Conditioning advertised prices on dealer financing" status="info" />
-            <Requirement req="Charging for add-ons without express, informed consent" status="info" />
-            <Requirement req="Adding nitrogen tires, VIN etch, paint protection without clear disclosure" status="info" />
-          </div>
-        </SubSection>
-
-        <SubSection title="Why This Matters Even Though the CARS Rule Was Repealed">
-          <p className="text-[12px] leading-[18px] text-adm-muted leading-relaxed mb-3">
-            The CARS Rule was vacated in January 2025 — but the FTC's authority under <strong>Section 5
-            of the FTC Act</strong> (prohibiting unfair or deceptive practices) was NOT affected. The March 2026
-            letters prove the FTC is actively using Section 5 to enforce the same principles the CARS Rule
-            would have codified.
-          </p>
-          <p className="text-[12px] leading-[18px] text-adm-muted leading-relaxed mb-3">
-            Additionally, states are filling the gap with their own laws. California's SB 766
-            takes effect October 1, 2026 with even stricter requirements than the vacated federal
-            rule would have imposed.
-          </p>
-          <p className="text-[12px] leading-[18px] text-adm-ink font-semibold leading-relaxed">
-            This is exactly why this platform exists. Whether the requirement comes from federal law,
-            state law, or FTC enforcement guidance — your addendums are compliant because we build
-            compliance into every document automatically.
-          </p>
-        </SubSection>
-
-        <SubSection title="Recent Enforcement Settlements">
-          <div className="space-y-3">
-            <EnforcementCase amount="$78,000,000" parties="FTC + Maryland AG v. Dealer Group" date="April 2026" desc="Systematic deceptive pricing and add-on practices. Largest FTC auto retail settlement in history." />
-            <EnforcementCase amount="$20,000,000" parties="FTC + Illinois AG v. Major Dealer" date="December 2024" desc="Deceptive practices in car sales, financing, and product add-ons." />
-            <EnforcementCase amount="$2,600,000" parties="FTC + Arizona AG v. Coulter Motor" date="August 2024" desc="Unauthorized nitrogen, tint, etch, paint coating add-ons. Discriminatory pricing to Latino customers." />
-            <EnforcementCase amount="$136,000" parties="NJ AG v. Sansone Hyundai" date="September 2024" desc='Charging for aftermarket items listed at "no charge" on contracts.' />
-          </div>
-        </SubSection>
-      </Section>
-
-      {/* Connecticut-specific K-208 */}
-      {(dealerState === "CT" || !dealerState) && (
-        <Section icon={ShieldCheck} title="Connecticut: Form K-208 Safety Inspection" id="ct-k208">
-          <SubSection title="Mandatory for Every Used Vehicle Sale">
-            <p className="text-[12px] leading-[18px] text-adm-muted mb-3 leading-relaxed">
-              Under <strong>CGS 14-62(g)</strong>, every Connecticut licensed dealer must complete a safety
-              inspection on every used motor vehicle before offering it for retail sale. The inspection
-              must be documented on <strong>Form K-208</strong> (CT Licensed Dealer Vehicle Inspection Form).
-            </p>
-            <div className="space-y-2 mb-3">
-              <Requirement req="Inspection must be performed BEFORE offering the vehicle for sale" status="built" />
-              <Requirement req="Form K-208 must be completed with all inspection items checked" status="built" />
-              <Requirement req="Inspector (service manager) must sign the certification" status="built" />
-              <Requirement req="Customer must receive a copy of the completed form" status="built" />
-              <Requirement req="Dealer must retain a copy in the deal file" status="built" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-adm-danger-bg border border-adm-border rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-adm-danger">$500</p>
-                <p className="text-[12px] leading-[18px] text-adm-danger font-medium mt-1">Fine for NOT performing the safety inspection</p>
-              </div>
-              <div className="bg-adm-warning-bg border border-adm-warning-bg rounded-lg p-3 text-center">
-                <p className="text-xl font-bold text-adm-warning">$250</p>
-                <p className="text-[12px] leading-[18px] text-adm-warning font-medium mt-1">Fine for NOT providing customer copy</p>
-              </div>
-            </div>
-          </SubSection>
-
-          <SubSection title="What's Inspected (13 Categories, 60+ Items)">
-            <p className="text-[12px] leading-[18px] text-adm-muted mb-2 leading-relaxed">
-              The K-208 covers a comprehensive safety inspection including:
-            </p>
-            <div className="grid grid-cols-2 gap-1 text-[12px] leading-[18px] text-adm-ink">
-              {["Service Brakes", "Parking Brake", "Steering System", "Tires & Wheels",
-                "Lights & Signals", "Horn & Mirrors", "Windshield & Wipers", "Exhaust System",
-                "Suspension", "Body & Frame", "Safety Equipment", "Fluid Levels & Leaks", "Emissions"
-              ].map(cat => (
-                <div key={cat} className="flex items-center gap-1.5 py-0.5">
-                  <CheckCircle2 className="w-3 h-3 text-adm-success flex-shrink-0" />
-                  <span>{cat}</span>
-                </div>
-              ))}
-            </div>
-          </SubSection>
-        </Section>
-      )}
-
-      {/* Window Sticker vs. Addendum */}
-      <Section icon={FileText} title="Window Sticker vs. Signing Addendum" id="sticker-vs-addendum">
-        <SubSection title="What Goes Where">
-          <p className="text-[12px] leading-[18px] text-adm-muted mb-3 leading-relaxed">
-            The financing impact disclosure, full FTC disclosures, initials, accept/decline, and
-            signatures belong on the <strong>signing addendum</strong> — NOT on the window sticker.
-            The window sticker is the marketing/pricing document. The addendum is the legal sign-off.
-          </p>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div className="bg-adm-selected border border-adm-border rounded-lg p-3">
-              <p className="text-[12px] leading-[18px] font-bold text-adm-primary mb-2">Window Sticker (On the Car)</p>
-              <div className="space-y-1 text-[12px] leading-[18px] text-adm-primary">
-                <p>• Dealer logo & branding</p>
-                <p>• Vehicle info + equipment list</p>
-                <p>• Pricing: MSRP or Market Value → accessories → total</p>
-                <p>• QR code linking to signing addendum</p>
-                <p>• NOT: disclosures, signatures, financing impact</p>
-              </div>
-            </div>
-            <div className="bg-adm-success-bg border border-adm-border rounded-lg p-3">
-              <p className="text-[12px] leading-[18px] font-bold text-adm-success mb-2">Signing Addendum (At the Desk)</p>
-              <div className="space-y-1 text-[12px] leading-[18px] text-adm-success">
-                <p>• Full FTC + state disclosures</p>
-                <p>• Product initials (every product)</p>
-                <p>• Accept / Decline for optional items</p>
-                <p>• Financing impact over loan life</p>
-                <p>• FTC warranty acknowledgment + mileage</p>
-                <p>• Window sticker match confirmation</p>
-                <p>• Customer + co-buyer + employee signatures</p>
-                <p>• Timestamped, audit-logged, immutable</p>
-              </div>
-            </div>
-          </div>
-        </SubSection>
-      </Section>
-
-      <Section icon={Gavel} title="Dealer Legal Adoption Agreement" id="legal">
-        <div className="bg-adm-surface rounded-xl border-2 border-foreground p-6 space-y-4">
-          <p className="text-[12px] leading-[18px] text-adm-muted leading-relaxed">
-            By using this platform, the dealership ("<strong>{storeName}</strong>") acknowledges the following:
-          </p>
-
-          <div className="space-y-3 text-[12px] leading-[18px] text-adm-ink leading-relaxed">
-            <p><strong>1. OPPORTUNITY FOR LEGAL REVIEW.</strong> The dealership has been given the opportunity to have its legal counsel review all disclosure language, addendum verbiage, and compliance templates provided by this platform before adoption and use.</p>
-
-            <p><strong>2. CUSTOMIZATION RIGHTS.</strong> The dealership may request modifications to any disclosure language, addendum wording, or compliance template at any time. Requested changes will be reviewed and implemented by the platform provider in a reasonable timeframe.</p>
-
-            <p><strong>3. ADOPTION OF DISCLOSURES.</strong> If the dealership proceeds without requesting changes, the dealership voluntarily adopts all standard disclosure language, addendum templates, and compliance verbiage as its own. The dealership represents that it is satisfied with the content and accuracy of these materials for its jurisdiction and business operations.</p>
-
-            <p><strong>4. DUAL SIGNATURE RECOMMENDATION.</strong> We strongly recommend that both the dealership principal AND the dealership's legal counsel sign this adoption agreement. However, if only the dealership principal signs, the principal acknowledges that they were given the opportunity to involve legal counsel and chose to proceed independently.</p>
-
-            <p><strong>5. NOT LEGAL COUNSEL.</strong> The platform provider is NOT a law firm, does NOT provide legal advice, does NOT offer legal remedies, and does NOT represent the dealership in any legal capacity. This platform provides disclosure language and compliance templates based on industry best practices and current federal and state law research. We highly recommend that every dealership seeks the review and approval of their own legal counsel to verify that all disclosure verbiage, addendum language, and compliance templates are satisfactory for their specific jurisdiction and business operations.</p>
-
-            <p><strong>6. CHANGES & MODIFICATIONS.</strong> Any changes to the verbiage, disclosures, or templates are welcomed. The dealership may submit requested modifications at any time, and the platform provider will make the appropriate changes. Upon implementation of changes, the dealership will be asked to review and re-sign this agreement reflecting the updated language. All prior versions will be retained in the compliance audit trail.</p>
-
-            <p><strong>7. ASSUMPTION OF LIABILITY.</strong> By signing this agreement, the dealership acknowledges that: (a) at the time of signing, they have been given full opportunity to have their own legal counsel review all disclosure language; (b) the dealership places its own liability on the accuracy and appropriateness of the disclosure language used; (c) the platform provider shall not be held liable for any regulatory action, fine, penalty, or legal proceeding resulting from the dealership's use of these templates; (d) if the dealership chose not to have legal counsel review the disclosures, the dealership assumes full responsibility for that decision and its consequences.</p>
-
-            <p><strong>8. STATE-SPECIFIC COMPLIANCE.</strong> The disclosure templates have been configured for the state of <strong>{compliance.stateName || "your state"}</strong> based on our research of current state requirements. State laws change. The dealership is responsible for notifying the platform provider of any changes in state requirements that may affect their disclosures.</p>
-
-            <p><strong>9. RECORD RETENTION.</strong> All signed addendums, customer interactions, and compliance records are retained for a minimum of {compliance.recordRetentionYears} years in accordance with applicable federal and state record retention requirements.</p>
-          </div>
-
-          <div className="border-t-2 border-foreground pt-4 mt-4 space-y-4">
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-[12px] leading-[18px] font-bold uppercase tracking-wider text-adm-muted mb-2">Dealership Principal</p>
-                <div className="border-b-2 border-foreground h-10 mb-1" />
-                <p className="text-[12px] leading-[18px] text-adm-muted">Signature</p>
-                <div className="border-b border-adm-border-custom h-6 mt-2 mb-1" />
-                <p className="text-[12px] leading-[18px] text-adm-muted">Printed Name & Title</p>
-                <div className="border-b border-adm-border-custom h-6 mt-2 mb-1" />
-                <p className="text-[12px] leading-[18px] text-adm-muted">Date</p>
-              </div>
-              <div>
-                <p className="text-[12px] leading-[18px] font-bold uppercase tracking-wider text-adm-muted mb-2">Dealership Legal Counsel (Recommended)</p>
-                <div className="border-b-2 border-foreground h-10 mb-1" />
-                <p className="text-[12px] leading-[18px] text-adm-muted">Signature</p>
-                <div className="border-b border-adm-border-custom h-6 mt-2 mb-1" />
-                <p className="text-[12px] leading-[18px] text-adm-muted">Printed Name & Firm</p>
-                <div className="border-b border-adm-border-custom h-6 mt-2 mb-1" />
-                <p className="text-[12px] leading-[18px] text-adm-muted">Date</p>
-              </div>
-            </div>
-            <p className="text-[12px] leading-[18px] text-adm-muted italic">
-              If only the dealership principal signs above, the principal acknowledges that they were given
-              the full opportunity to have legal counsel review all disclosure language and compliance templates,
-              and they chose to proceed without such review. The dealership adopts all standard disclosures as its own.
-            </p>
-          </div>
-        </div>
-      </Section>
-
-      {/* Footer */}
-      <div className="text-center py-8 border-t border-adm-border">
-        <Logo variant="full" size={28} />
-        <p className="text-[12px] leading-[18px] text-adm-muted mt-3">
-          This compliance guide is provided for educational purposes. It does not constitute legal advice.
-          Always consult with your dealership's legal counsel for jurisdiction-specific guidance.
-        </p>
-        <p className="text-[12px] leading-[18px] text-adm-muted mt-2">
-          Last updated: {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-        </p>
+            </Panel>
+          ) : (
+            <Panel title="Requirement detail" titleSize="md" inset="sm">
+              <p className="text-[14px] leading-[20px] text-adm-muted">Select a requirement to see its source and what it means here.</p>
+            </Panel>
+          )}
+        </aside>
       </div>
     </div>
   );
 };
-
-const Section = ({ icon: Icon, title, id, children }: { icon: typeof ShieldCheck; title: string; id: string; children: React.ReactNode }) => (
-  <section id={id} className="scroll-mt-20">
-    <div className="flex items-center gap-2 mb-4">
-      <Icon className="w-4 h-4 text-adm-primary flex-shrink-0" />
-      <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink">{title}</h2>
-    </div>
-    {children}
-  </section>
-);
-
-const SubSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="bg-adm-surface rounded-xl border border-adm-border shadow-premium p-5 mb-4">
-    <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-3">{title}</h3>
-    {children}
-  </div>
-);
-
-const Card = ({ title, color, children }: { title: string; color: "blue" | "emerald"; children: React.ReactNode }) => (
-  <div className={`rounded-xl border p-5 ${color === "blue" ? "border-adm-border bg-adm-selected/50" : "border-adm-border bg-adm-success-bg/50"}`}>
-    <h3 className={`text-[14px] leading-[20px] font-semibold mb-3 ${color === "blue" ? "text-adm-primary" : "text-adm-success"}`}>{title}</h3>
-    {children}
-  </div>
-);
-
-const Check = () => <CheckCircle2 className="w-3 h-3 text-adm-success inline-block mr-1.5 -mt-0.5 flex-shrink-0" />;
-
-const Requirement = ({ req, status }: { req: string; status: "built" | "info" }) => (
-  <div className="flex items-start gap-2 py-1">
-    {status === "built" ? (
-      <span className="text-[12px] leading-[18px] font-bold bg-adm-success-bg text-adm-success px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0">BUILT</span>
-    ) : (
-      <span className="text-[12px] leading-[18px] font-bold bg-adm-selected text-adm-primary px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0">INFO</span>
-    )}
-    <p className="text-[12px] leading-[18px] text-adm-ink">{req}</p>
-  </div>
-);
-
-const EnforcementCase = ({ amount, parties, date, desc }: { amount: string; parties: string; date: string; desc: string }) => (
-  <div className="bg-adm-surface rounded-lg border border-adm-border p-3">
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <p className="text-[12px] leading-[18px] font-semibold text-adm-ink">{parties}</p>
-        <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{date} — {desc}</p>
-      </div>
-      <span className="text-[14px] leading-[20px] font-semibold text-adm-danger tabular-nums flex-shrink-0">{amount}</span>
-    </div>
-  </div>
-);
-
-const BestPractice = ({ num, title, children }: { num: string; title: string; children: React.ReactNode }) => (
-  <div className="bg-adm-surface rounded-xl border border-adm-border shadow-premium p-5">
-    <div className="flex items-start gap-3">
-      <span className="text-[12px] leading-[18px] font-bold text-adm-primary tabular-nums flex-shrink-0">{num}</span>
-      <div>
-        <h4 className="text-[14px] leading-[20px] font-semibold text-adm-ink">{title}</h4>
-        <p className="text-[12px] leading-[18px] text-adm-muted mt-1 leading-relaxed">{children}</p>
-      </div>
-    </div>
-  </div>
-);
-
 export default LibrarySection;

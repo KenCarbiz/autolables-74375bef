@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
-  ArrowLeft, Car, ChevronRight, Copy, ExternalLink, FolderCheck, Gauge, Globe,
+  ArrowLeft, Car, ChevronRight, Copy, ExternalLink, Globe,
 } from "lucide-react";
 import { PageBody, LocalTabs, Button, LinkButton, StatusText, EmptyState, SkeletonBlock, type LocalTab } from "@/components/product";
+import { Crumbs } from "@/components/detail/parts";
 import { useRecallTask } from "@/hooks/useRecallTask";
 import VehicleHistoryFacts from "@/components/vehicle/VehicleHistoryFacts";
 import { listingGallery } from "@/lib/photos";
@@ -135,7 +136,7 @@ const VehicleFile = () => {
     return (
       <PageBody width="wide">
         <div role="status" aria-label="Loading vehicle" className="flex flex-col gap-3">
-          <SkeletonBlock className="h-[150px] w-full" />
+          <SkeletonBlock className="h-[132px] w-full" />
           <SkeletonBlock className="h-10 w-2/3" />
           <SkeletonBlock className="h-64 w-full" />
         </div>
@@ -223,15 +224,12 @@ const VehicleFile = () => {
 
   return (
     <PageBody width="wide" className="pb-24 lg:pb-8">
-      <Link to="/inventory" className="text-[13px] font-semibold text-adm-muted hover:text-adm-ink inline-flex items-center gap-1.5 w-fit">
-        <ArrowLeft className="w-3.5 h-3.5" /> Back to inventory
-      </Link>
+      <Crumbs items={[{ label: "Vehicles", to: "/inventory" }, { label: vehicle.ymm || vehicle.vin }]} />
 
-      {/* Record header: compact media and identity */}
-      <section className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="sm:w-[176px] shrink-0">
-            <div className="h-[118px] rounded-[4px] overflow-hidden bg-adm-workspace flex items-center justify-center">
+      <section aria-label="Vehicle identity" className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="sm:w-[148px] shrink-0">
+            <div className="h-[100px] rounded-[4px] overflow-hidden bg-adm-workspace flex items-center justify-center">
               {gallery.length ? (
                 <div className="relative w-full h-full">
                   <img src={gallery[safeImg]} alt={vehicle.ymm ? `${vehicle.ymm} photo ${safeImg + 1} of ${gallery.length}` : "Vehicle photo"} className="w-full h-full object-cover" />
@@ -241,14 +239,14 @@ const VehicleFile = () => {
                         type="button"
                         onClick={() => setImgIdx((i) => (i - 1 + gallery.length) % gallery.length)}
                         aria-label="Previous photo"
-                        className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-foreground/50 text-background flex items-center justify-center"
-                      ><ArrowLeft className="w-4 h-4" /></button>
+                        className="absolute left-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-[4px] bg-foreground/50 text-background flex items-center justify-center"
+                      ><ArrowLeft className="w-5 h-5" /></button>
                       <button
                         type="button"
                         onClick={() => setImgIdx((i) => (i + 1) % gallery.length)}
                         aria-label="Next photo"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-foreground/50 text-background flex items-center justify-center"
-                      ><ChevronRight className="w-4 h-4" /></button>
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-[4px] bg-foreground/50 text-background flex items-center justify-center"
+                      ><ChevronRight className="w-5 h-5" /></button>
                       <span className="absolute bottom-1 left-1 text-[12px] font-semibold px-1.5 rounded-[2px] bg-foreground/60 text-background tabular-nums">
                         {safeImg + 1} / {gallery.length}
                       </span>
@@ -256,24 +254,18 @@ const VehicleFile = () => {
                   )}
                 </div>
               ) : (
-                <Car className="w-12 h-12 text-adm-muted" strokeWidth={1.25} aria-label="No photo on file" />
+                <Car className="w-10 h-10 text-adm-muted" strokeWidth={1.25} aria-label="No photo on file" />
               )}
             </div>
           </div>
 
-          <div className="flex-1 min-w-0 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            <div className="min-w-0 space-y-1.5">
-              <p className="text-[12px] leading-[18px] font-semibold text-adm-muted capitalize">
-                {vehicle.condition || "unknown"} | {vehicle.status}
-              </p>
+          <div className="flex-1 min-w-0 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+            <div className="min-w-0 space-y-1">
               <h1 className="text-[24px] leading-[32px] sm:text-[28px] sm:leading-[36px] font-bold text-adm-ink">
                 {vehicle.ymm || "Vehicle needs a VIN decode"}
               </h1>
-              {vehicle.trim ? <p className="text-[14px] leading-[20px] text-adm-muted">{vehicle.trim}</p> : null}
 
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[14px] leading-[20px]">
-                {/* The stock number is how the lot, the DMS and the desk all
-                    refer to this car, so it is always stated. */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] leading-[20px]">
                 {stockNo ? (
                   <span className="inline-flex items-center gap-1.5">
                     <span className="text-adm-muted">Stock</span>
@@ -286,53 +278,43 @@ const VehicleFile = () => {
                   <span className="text-adm-muted">VIN</span>
                   <span className="font-mono truncate">{vehicle.vin}</span>
                   <button onClick={copyVin} title="Copy VIN" aria-label="Copy VIN" className="text-adm-muted hover:text-adm-ink shrink-0 min-w-[24px] min-h-[24px] inline-flex items-center justify-center">
-                    <Copy className="w-3.5 h-3.5" />
+                    <Copy className="w-5 h-5" />
                   </button>
                 </span>
-                <span className="inline-flex items-center gap-1.5 text-adm-muted">
-                  <Gauge className="w-4 h-4" />
-                  {vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : "Mileage not recorded"}
-                </span>
-                <span className="font-semibold tabular-nums">
-                  {vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced"}
-                </span>
+                {vehicle.trim ? <span className="text-adm-muted">{vehicle.trim}</span> : null}
+                <span className="text-adm-muted capitalize">{vehicle.condition || "unknown"}</span>
+                <span className="text-adm-muted">{vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : "Mileage not recorded"}</span>
+                <span className="font-semibold tabular-nums">{vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced"}</span>
               </div>
+
+              <ul aria-label="Vehicle status" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pt-1">
+                {summary.map((f) => (
+                  <li key={f.label} title={f.detail} className="inline-flex items-center gap-1.5 text-[12px] leading-[18px] text-adm-muted">
+                    {f.label}
+                    <StatusText tone={f.tone}>{f.value}</StatusText>
+                  </li>
+                ))}
+              </ul>
 
               <VehicleHistoryFacts vehicle={vehicle} />
             </div>
 
-            <div className="flex flex-wrap lg:flex-col gap-2 lg:w-[220px] shrink-0">
+            <div className="flex flex-wrap gap-2 lg:shrink-0 lg:justify-end">
+              <Button onClick={copyLink} aria-label="Copy shopper link">
+                <Copy className="w-5 h-5" /> Copy link
+              </Button>
               {published ? (
-                <LinkButton to={viewUrl} variant="primary" target="_blank" rel="noreferrer" className="flex-1 lg:flex-none">
-                  <ExternalLink className="w-4 h-4" /> View shopper page
+                <LinkButton to={viewUrl} variant="primary" target="_blank" rel="noreferrer">
+                  <ExternalLink className="w-5 h-5" /> View shopper page
                 </LinkButton>
               ) : (
-                <Button variant="primary" onClick={publish} disabled={publishing} className="flex-1 lg:flex-none">
-                  <Globe className="w-4 h-4" /> {publishing ? "Publishing…" : "Publish to shopper portal"}
+                <Button variant="primary" onClick={publish} disabled={publishing}>
+                  <Globe className="w-5 h-5" /> {publishing ? "Publishing…" : "Publish to shopper portal"}
                 </Button>
               )}
-              <Button onClick={() => setTab("documents")} className="flex-1 lg:flex-none">
-                <FolderCheck className="w-4 h-4" /> Generate document
-              </Button>
-              <Button onClick={copyLink} size="sm" className="flex-1 lg:flex-none">
-                <Copy className="w-3.5 h-3.5" /> Copy shopper link
-              </Button>
             </div>
           </div>
         </div>
-
-        {/* Factual summary strip: each question answered on its own */}
-        <dl className="mt-4 grid grid-cols-2 lg:grid-cols-6 border-t border-adm-border pt-3 gap-x-4 gap-y-3" aria-label="Vehicle status">
-          {summary.map((f) => (
-            <div key={f.label} className="min-w-0">
-              <dt className="text-[12px] leading-[18px] text-adm-muted">{f.label}</dt>
-              <dd className="mt-0.5">
-                <StatusText tone={f.tone} icon={f.tone !== "neutral" && f.tone !== "info"}>{f.value}</StatusText>
-                {f.detail && <span className="block text-[12px] leading-[18px] text-adm-muted mt-0.5">{f.detail}</span>}
-              </dd>
-            </div>
-          ))}
-        </dl>
       </section>
 
       <LocalTabs tabs={tabs} label="Vehicle file sections" />

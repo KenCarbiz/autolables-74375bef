@@ -23,8 +23,8 @@ const fmtWhen = (d?: string | null) =>
 
 const Field = ({ label, value }: { label: string; value: string }) => (
   <div className="min-w-0">
-    <dt className="text-al-meta font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-    <dd className="text-[12px] text-foreground break-words">{value}</dd>
+    <dt className="text-[12px] leading-[18px] text-adm-muted">{label}</dt>
+    <dd className="text-[13px] leading-[18px] text-adm-ink break-words">{value}</dd>
   </div>
 );
 
@@ -33,8 +33,8 @@ export default function StickerBlockersPanel({
 }: Props) {
   if (!blockers.length) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-4">
-        <h2 className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Blockers</h2>
+      <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+        <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Blockers</h2>
         <p className="text-[12.5px] text-emerald-700 inline-flex items-center gap-1.5">
           <CheckCircle2 className="w-4 h-4" /> Nothing is blocking this document.
         </p>
@@ -43,8 +43,8 @@ export default function StickerBlockersPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-      <h2 className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">
+    <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3">
+      <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink">
         Blockers ({blockers.length})
       </h2>
 
@@ -58,17 +58,17 @@ export default function StickerBlockersPanel({
         return (
           <div
             key={`${b.code}-${b.affectedField ?? ""}`}
-            className={`rounded-xl border p-3.5 space-y-2.5 ${blocking ? "border-rose-200 bg-rose-50/40" : "border-amber-200 bg-amber-50/40"}`}
+            className={`rounded-[6px] border border-adm-border border-l-[3px] bg-adm-surface p-3.5 space-y-2.5 ${blocking ? "border-l-adm-danger" : "border-l-[#D98B00]"}`}
           >
             <div className="flex items-start gap-2">
               {blocking
-                ? <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                : <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />}
+                ? <AlertTriangle className="w-5 h-5 text-adm-danger shrink-0" />
+                : <Info className="w-5 h-5 text-adm-warning shrink-0" />}
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-foreground">{b.title}</p>
+                <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{b.title}</p>
                 <p className="text-[10px] font-mono text-muted-foreground mt-0.5">{b.code}</p>
               </div>
-              <span className={`text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${blocking ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>
+              <span className={`text-[12px] leading-[18px] font-semibold px-2 py-[3px] rounded-[2px] whitespace-nowrap ${blocking ? "bg-adm-danger-bg text-adm-danger" : "bg-adm-warning-bg text-adm-warning"}`}>
                 {blocking ? "Blocks publishing" : "Review"}
               </span>
             </div>
@@ -85,9 +85,9 @@ export default function StickerBlockersPanel({
               )}
             </dl>
 
-            <div className="rounded-lg bg-background/70 border border-border/60 p-2.5">
-              <p className="text-al-meta font-semibold uppercase tracking-wide text-muted-foreground">Recommended resolution</p>
-              <p className="text-[12px] text-foreground mt-0.5">{b.recommendedResolution}</p>
+            <div className="rounded-[4px] bg-adm-workspace p-2.5">
+              <p className="text-[12px] leading-[18px] font-semibold text-adm-muted">Recommended resolution</p>
+              <p className="text-[13px] leading-[18px] text-adm-ink mt-0.5">{b.recommendedResolution}</p>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">

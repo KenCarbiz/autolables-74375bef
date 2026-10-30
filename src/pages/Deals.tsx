@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import Seo from "@/components/Seo";
@@ -185,11 +185,11 @@ const Deals = () => {
         <EmptyBlock title={`No deals in ${TAB_LABEL[tab]}`} body={needle ? "No deal matches that search in this tab." : TAB_EMPTY[tab]} />
       ) : (
         <>
-          <div className="hidden lg:block bg-adm-surface rounded-2xl border border-adm-border shadow-premium overflow-hidden">
+          <div className="hidden lg:block bg-adm-surface rounded-[6px] border border-adm-border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] text-left">
+              <table className="w-full min-w-[980px] text-left">
                 <thead className="bg-adm-workspace">
-                  <tr className="text-[12px] leading-[18px] uppercase tracking-wider text-adm-muted">
+                  <tr className="text-[12px] leading-[18px] text-adm-muted">
                     <th className="font-semibold px-5 py-2.5">Date</th>
                     <th className="font-semibold py-2.5">Vehicle</th>
                     <th className="font-semibold py-2.5">Stock</th>
@@ -228,14 +228,13 @@ const Deals = () => {
                         </td>
                         <td className="py-3.5 pr-5">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => view(deal)}
-                              className="inline-flex items-center h-8 px-3 rounded-md bg-primary text-primary-foreground text-[12px] leading-[18px] font-semibold hover:brightness-110 transition-all"
+                            <Link
+                              to={`/deals/${encodeURIComponent(deal.id)}`}
+                              className="inline-flex items-center h-8 px-3 rounded-md border border-adm-primary text-adm-primary text-[13px] leading-[18px] font-semibold hover:bg-adm-selected transition-colors"
                             >
-                              View
-                            </button>
-                            <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} onOpenVehicleFile={(id) => navigate(`/vehicle-file/${id}`)} onOpenCustomer={(id) => navigate(`/customers/${encodeURIComponent(id)}`)} />
+                              Open
+                            </Link>
+                            <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} onView={view} onOpenVehicleFile={(id) => navigate(`/vehicle-file/${id}`)} onOpenCustomer={(id) => navigate(`/customers/${encodeURIComponent(id)}`)} />
                           </div>
                         </td>
                       </tr>
@@ -269,14 +268,13 @@ const Deals = () => {
                     <NextActionCell action={deal.nextAction} />
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => view(deal)}
-                      className="inline-flex items-center h-9 px-4 rounded-md bg-primary text-primary-foreground text-[14px] leading-[20px] font-semibold"
+                    <Link
+                      to={`/deals/${encodeURIComponent(deal.id)}`}
+                      className="inline-flex items-center h-9 px-4 rounded-md border border-adm-primary text-adm-primary text-[14px] leading-[20px] font-semibold"
                     >
-                      View
-                    </button>
-                    <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} onOpenVehicleFile={(id) => navigate(`/vehicle-file/${id}`)} onOpenCustomer={(id) => navigate(`/customers/${encodeURIComponent(id)}`)} />
+                      Open
+                    </Link>
+                    <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} onView={view} onOpenVehicleFile={(id) => navigate(`/vehicle-file/${id}`)} onOpenCustomer={(id) => navigate(`/customers/${encodeURIComponent(id)}`)} />
                   </div>
                 </article>
               );
@@ -293,6 +291,7 @@ const DealMenu = ({
   customer,
   onCopy,
   onText,
+  onView,
   onOpenVehicleFile,
   onOpenCustomer,
 }: {
@@ -300,6 +299,7 @@ const DealMenu = ({
   customer: CustomerEntry | null;
   onCopy: (deal: DealEntry) => void;
   onText: (deal: DealEntry, phone: string) => void;
+  onView: (deal: DealEntry) => void;
   onOpenVehicleFile: (listingId: string) => void;
   onOpenCustomer: (customerId: string) => void;
 }) => {
@@ -313,6 +313,7 @@ const DealMenu = ({
         <MoreHorizontal className="w-4 h-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
+        {deal.signingToken && <DropdownMenuItem onSelect={() => onView(deal)}>View signing page</DropdownMenuItem>}
         {deal.signingToken && <DropdownMenuItem onSelect={() => onCopy(deal)}>Copy signing link</DropdownMenuItem>}
         {deal.signingToken && phone && <DropdownMenuItem onSelect={() => onText(deal, phone)}>Text the signing link</DropdownMenuItem>}
         {deal.listingId && <DropdownMenuItem onSelect={() => onOpenVehicleFile(deal.listingId as string)}>Open vehicle file</DropdownMenuItem>}

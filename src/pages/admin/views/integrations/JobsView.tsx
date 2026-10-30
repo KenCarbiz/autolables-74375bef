@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useViewFixture, useAdminNow } from "@/lib/admin/dataSource";
 import { needsAttention } from "@/lib/admin/health";
+import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import { deriveJobRow, describeCron, JOB_CATALOG } from "@/lib/admin/integrations/jobs";
 import { loadCrawlFacts, loadJobLedgers, loadJobStatus, loadLedgerHeads, type JobLedgers, type JobStatusResult } from "@/lib/admin/integrations/queries";
 import { AdminCard, AdminTable, HealthChip, InlineNote, SectionTitle, SkeletonBlock, Td, Th } from "@/components/admin/v2/primitives";
@@ -19,7 +20,7 @@ export interface JobsViewFixture {
 
 const CRON_NAMES = Array.from(new Set(JOB_CATALOG.map((j) => j.cronName)));
 
-export default function JobsView() {
+export function useJobsData() {
   const fixture = useViewFixture<JobsViewFixture>("jobs");
   const now = useAdminNow();
   const viewer = useViewer();
@@ -48,6 +49,12 @@ export default function JobsView() {
       return deriveJobRow({ spec, cron, ledger, ledgerLoadFailed, now });
     });
   }, [data, now]);
+
+  return { data, rows, formatAt, now };
+}
+
+export default function JobsView() {
+  const { data, rows, formatAt } = useJobsData();
 
   if (!data) {
     return (
@@ -86,7 +93,7 @@ export default function JobsView() {
             {rows.map((row) => (
               <tr key={row.spec.id}>
                 <Td>
-                  <p className="font-semibold text-adm-ink">{row.spec.label}</p>
+                  <Link to={ADMIN_CHILD_ROUTES.jobDetail(row.spec.id)} className="font-semibold text-adm-primary hover:underline">{row.spec.label}</Link>
                   <p className="text-[12px] leading-[18px] text-adm-muted">{row.verdict.headline} · Affects: {row.spec.affectedOutput}</p>
                 </Td>
                 <Td><HealthChip state={row.verdict.state} /></Td>

@@ -1,97 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useReconEstimates, type ReconEstimate, type ReconLine, type ReconMessage, type NewLine } from "@/hooks/useReconEstimates";
+import { useReconEstimates, type ReconEstimate, type NewLine } from "@/hooks/useReconEstimates";
 import { useDealerSettings, type ReconCannedService } from "@/contexts/DealerSettingsContext";
 import NextStepBanner from "@/components/workflow/NextStepBanner";
-import { useSearchParams } from "react-router-dom";
-import { CheckCircle2, XCircle, Plus, Trash2, Printer, Send, Loader2 } from "lucide-react";
-import { Button, InlineNote, KeyValueList, LocalTabs, MetricStrip, PageBody, PageHeader, Panel, QueryState, SkeletonBlock, StatusText, Td, Th, WorkTable, type LocalTab, type Tone } from "@/components/product";
-
-const money = (n: number | null | undefined) => (n == null ? "—" : `$${Math.round(n).toLocaleString("en-US")}`);
-const photoUrls = (p: unknown[]): string[] => (Array.isArray(p) ? p : []).map((x) => typeof x === "string" ? x : (x as { url?: string })?.url || "").filter(Boolean);
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Plus, Trash2, Send, Loader2 } from "lucide-react";
+import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, Panel, QueryState, Td, Th, WorkTable, type LocalTab } from "@/components/product";
+import { EstimateState, ageOf, money } from "@/components/recon/estimateParts";
 
 type ReconView = "pending" | "in-recon" | "closed" | "all";
-const STATUS: Record<string, { label: string; tone: Tone }> = {
-  pending: { label: "Pending", tone: "warning" },
-  approved: { label: "Approved", tone: "success" },
-  auto_approved: { label: "Auto-approved", tone: "success" },
-  declined: { label: "Declined", tone: "danger" },
-  deferred: { label: "Deferred", tone: "neutral" },
-};
 const CATEGORIES = ["mechanical", "safety", "tires", "glass", "cosmetic", "interior", "detail", "keys", "sublet"];
 
-// HTML-escape every tenant-supplied field before interpolation: recon line
-// descriptions/categories and vehicle ymm/vin all come from user-writable
-// rows, so unescaped interpolation was a stored-XSS sink in the print window.
-const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-
-const printWorkOrder = (est: ReconEstimate, lines: ReconLine[]) => {
-  const todo = lines.filter((l) => l.approval_status === "approved" || l.approval_status === "auto_approved");
-  const rows = todo.map((l) => `<tr><td>${esc(l.category || "")}</td><td>${esc(l.description)}</td><td style="text-align:right">${esc(money(l.line_total))}</td></tr>`).join("");
-  const w = window.open("", "_blank", "width=700,height=800");
-  if (!w) return;
-  w.document.write(`<html><head><title>Recon Work Order — ${esc(est.vin)}</title>
-    <style>body{font-family:Inter,Arial,sans-serif;color:#0F172A;padding:32px}h1{font-size:20px;margin:0}p{color:#64748B;margin:4px 0 16px}
-    table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #E6E8EC;font-size:14px;text-align:left}
-    tfoot td{font-weight:700;border-top:2px solid #0F172A}</style></head><body>
-    <h1>Recon Work Order</h1><p>${esc(est.ymm || "Vehicle")} &middot; VIN ${esc(est.vin)} &middot; Approved work to perform</p>
-    <table><thead><tr><th>Category</th><th>Work</th><th style="text-align:right">Cost</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="3">No approved work.</td></tr>'}</tbody>
-    <tfoot><tr><td colspan="2">Approved total</td><td style="text-align:right">${esc(money(est.approved_total))}</td></tr></tfoot></table>
-    </body></html>`);
-  w.document.close(); w.focus(); w.print();
-};
-
 export default function ReconBoard() {
-  const { estimates, isManager, loading, reload, loadDetail, submit, decide, postMessage, sendToService } = useReconEstimates();
+  const { estimates, isManager, loading, submit } = useReconEstimates();
   const { settings } = useDealerSettings();
   const canned = settings.recon_canned_services || [];
-  // The view and the open estimate live in the URL: reload, back and links
-  // from Today land on the exact estimate.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const selId = searchParams.get("estimate");
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const viewParam = searchParams.get("view");
   const view: ReconView = viewParam === "in-recon" || viewParam === "closed" || viewParam === "all" ? viewParam : "pending";
-  const [detail, setDetail] = useState<{ lines: ReconLine[]; messages: ReconMessage[] } | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [declineFor, setDeclineFor] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
-  const [msg, setMsg] = useState("");
   const [showNew, setShowNew] = useState(false);
-
-  const sel = estimates.find((e) => e.id === selId) || null;
-
-  const refreshDetail = useCallback(async (id: string) => setDetail(await loadDetail(id)), [loadDetail]);
-  useEffect(() => { if (selId) refreshDetail(selId); else setDetail(null); }, [selId, refreshDetail, estimates]);
+  const legacyEstimate = searchParams.get("estimate");
 
   const groups = useMemo(() => ({
     needs: estimates.filter((e) => e.status === "submitted"),
     inRecon: estimates.filter((e) => e.status === "approved" || e.status === "partially_approved"),
     closed: estimates.filter((e) => e.status === "declined" || e.status === "completed" || e.status === "voided"),
   }), [estimates]);
-
-  const onDecide = async (lineId: string | null, action: "approve" | "decline", r?: string) => {
-    if (!sel) return;
-    setBusy(lineId || "all");
-    const ok = await decide(sel.id, lineId, action, r);
-    setBusy(null); setDeclineFor(null); setReason("");
-    if (ok) { await refreshDetail(sel.id); } else toast.error("Couldn't record that decision.");
-  };
-  const onPost = async () => {
-    if (!sel || !msg.trim()) return;
-    const ok = await postMessage(sel.id, msg.trim());
-    if (ok) { setMsg(""); await refreshDetail(sel.id); } else toast.error("Couldn't post.");
-  };
-  // UCM OKs a staged intake estimate: approve everything still pending, then
-  // release it to service in one tap.
-  const onOkAndSend = async () => {
-    if (!sel) return;
-    setBusy("send");
-    if (detail?.lines.some((l) => l.approval_status === "pending")) await decide(sel.id, null, "approve");
-    const ok = await sendToService(sel.id);
-    setBusy(null);
-    if (ok) { await refreshDetail(sel.id); toast.success("Sent to service"); } else toast.error("Couldn't send to service.");
-  };
 
   const tabDefs: Array<{ id: ReconView; label: string; items: ReconEstimate[] }> = [
     { id: "pending", label: isManager ? "Pending review" : "Awaiting approval", items: groups.needs },
@@ -107,17 +42,10 @@ export default function ReconBoard() {
     active: t.id === view,
   }));
   const shown = tabDefs.find((t) => t.id === view)!;
-  const openEstimate = (id: string) => {
-    const q = new URLSearchParams(searchParams);
-    q.set("estimate", id);
-    setSearchParams(q);
-  };
-  const closeEstimate = () => {
-    const q = new URLSearchParams(searchParams);
-    q.delete("estimate");
-    setSearchParams(q);
-  };
+  const openEstimate = (id: string) => navigate(`/recon/estimates/${encodeURIComponent(id)}`);
   const status = loading ? "loading" : shown.items.length === 0 ? "empty" : "ready";
+
+  if (legacyEstimate) return <Navigate to={`/recon/estimates/${encodeURIComponent(legacyEstimate)}`} replace />;
 
   return (
     <PageBody width="wide">
@@ -161,7 +89,7 @@ export default function ReconBoard() {
             </thead>
             <tbody>
               {shown.items.map((e) => (
-                <tr key={e.id} className={selId === e.id ? "bg-adm-selected" : undefined}>
+                <tr key={e.id}>
                   <Td>
                     <p className="font-semibold text-adm-ink">{e.ymm || "Vehicle"}</p>
                     <p className="font-mono text-[12px] text-adm-muted">VIN …{e.vin.slice(-6)}</p>
@@ -179,137 +107,9 @@ export default function ReconBoard() {
         </QueryState>
       </Panel>
 
-      {selId && !sel && !loading && (
-        <InlineNote tone="warning" title="That estimate is not in your list." action={<Button size="sm" onClick={closeEstimate}>Dismiss</Button>}>
-          It may have been removed or belongs to another rooftop.
-        </InlineNote>
-      )}
-
-      {sel && !detail && <div role="status" aria-label="Loading" className="flex flex-col gap-2"><SkeletonBlock className="h-24 w-full" /><SkeletonBlock className="h-24 w-full" /></div>}
-
-      {sel && detail && (
-        <section aria-label="Recon estimate" className="flex flex-col gap-4">
-          <Panel
-            title={sel.ymm || "Vehicle"}
-            description={`VIN ${sel.vin}${sel.submitted_by ? ` · submitted by ${sel.submitted_by}` : ""}`}
-            action={
-              <>
-                {sel.origin === "ingest" && <StatusText tone="info">From intake</StatusText>}
-                {sel.sent_to_service_at && <StatusText tone="success" icon>Sent to service</StatusText>}
-                <Button size="sm" onClick={() => printWorkOrder(sel, detail.lines)}><Printer className="h-3.5 w-3.5" aria-hidden="true" /> Print work order</Button>
-                <Button size="sm" variant="ghost" onClick={closeEstimate}>Close</Button>
-              </>
-            }
-          >
-            {isManager && sel.origin === "ingest" && !sel.sent_to_service_at && (
-              <Button variant="primary" className="mb-4 w-full" disabled={busy === "send"} onClick={onOkAndSend}>{busy === "send" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />} OK &amp; send to service</Button>
-            )}
-            <KeyValueList
-              rows={[
-                { label: "Estimate", value: <span className="tabular-nums">{money(sel.subtotal)}</span> },
-                { label: "Approved", value: <span className="tabular-nums">{money(sel.approved_total)}</span> },
-                { label: "Items", value: String(detail.lines.length) },
-              ]}
-            />
-            {sel.notes && <p className="mt-3 text-[13px] text-adm-muted">“{sel.notes}”</p>}
-          </Panel>
-
-          <WorkTable caption="Itemized labor, parts and sublet" minWidth={760}>
-            <thead>
-              <tr>
-                <Th>Item</Th>
-                <Th>Severity</Th>
-                <Th>Status</Th>
-                <Th align="right">Cost</Th>
-                <Th align="right">Decision</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.lines.map((l) => {
-                const st = STATUS[l.approval_status] || STATUS.pending;
-                const photos = photoUrls(l.photos);
-                const canAct = isManager && l.approval_status === "pending";
-                return (
-                  <tr key={l.id}>
-                    <Td className="min-w-[240px]">
-                      <p className="font-semibold text-adm-ink">{l.description}</p>
-                      <p className="text-[12px] text-adm-muted">{[l.category, l.labor_cost > 0 && `Labor ${money(l.labor_cost)}`, l.parts_cost > 0 && `Parts ${money(l.parts_cost)}`, l.sublet_cost > 0 && `Sublet ${money(l.sublet_cost)}`, l.vendor].filter(Boolean).join(" · ")}</p>
-                      {l.approval_status === "declined" && l.decline_reason && <p className="mt-1 text-[12px] text-adm-danger">Declined: {l.decline_reason}</p>}
-                      {photos.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{photos.slice(0, 6).map((u, i) => <a key={i} href={u} target="_blank" rel="noreferrer" className="block h-14 w-14 overflow-hidden rounded-md border border-adm-border bg-adm-workspace"><img src={u} alt="" className="h-full w-full object-cover" /></a>)}</div>}
-                    </Td>
-                    <Td><StatusText tone={l.severity === "required" ? "danger" : l.severity === "ok" ? "success" : l.severity === "na" ? "neutral" : "warning"}>{l.severity}</StatusText></Td>
-                    <Td><StatusText tone={st.tone} icon>{st.label}</StatusText></Td>
-                    <Td align="right" className="font-semibold">{money(l.line_total)}</Td>
-                    <Td align="right">
-                      {canAct && (declineFor === l.id ? (
-                        <div className="flex min-w-[220px] flex-col gap-2">
-                          <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for declining (required)" aria-label="Reason for declining" className="h-9 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" />
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="danger" className="flex-1" disabled={!reason.trim() || busy === l.id} onClick={() => onDecide(l.id, "decline", reason.trim())}>Confirm decline</Button>
-                            <Button size="sm" onClick={() => { setDeclineFor(null); setReason(""); }}>Cancel</Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="primary" disabled={busy === l.id} onClick={() => onDecide(l.id, "approve")}>{busy === l.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />} Approve</Button>
-                          <Button size="sm" variant="danger" onClick={() => setDeclineFor(l.id)}><XCircle className="h-3.5 w-3.5" aria-hidden="true" /> Decline</Button>
-                        </div>
-                      ))}
-                    </Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </WorkTable>
-          {isManager && groups.needs.some((e) => e.id === sel.id) && !(sel.origin === "ingest" && !sel.sent_to_service_at) && (
-            <Button variant="primary" className="w-full" disabled={busy === "all"} onClick={() => onDecide(null, "approve")}>{busy === "all" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />} Approve all remaining</Button>
-          )}
-
-          <Panel title="Questions & notes">
-            <div className="mb-3 flex max-h-72 flex-col gap-3 overflow-y-auto">
-              {detail.messages.length === 0 && <p className="text-[13px] text-adm-muted">No messages yet. Ask service a question or leave a note.</p>}
-              {detail.messages.map((m) => (
-                <div key={m.id} className="text-[14px]">
-                  <span className="font-semibold text-adm-ink">{m.author_name || "Someone"}</span>
-                  {m.author_role && <span className="text-[12px] text-adm-muted"> · {m.author_role}</span>}
-                  <p className="text-adm-ink">{m.body}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onPost(); }} placeholder={isManager ? "Ask service about this recon…" : "Reply / add a note…"} aria-label="Message" className="h-10 flex-1 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" />
-              <Button variant="primary" disabled={!msg.trim()} onClick={onPost}><Send className="h-4 w-4" aria-hidden="true" /> Send</Button>
-            </div>
-          </Panel>
-        </section>
-      )}
-
       {showNew && <NewEstimateModal canned={canned} onClose={() => setShowNew(false)} onSubmit={async (input) => { const ok = await submit(input); if (ok) { setShowNew(false); toast.success("Recon estimate submitted"); } else toast.error("Couldn't submit — check the VIN belongs to your inventory."); return ok; }} />}
     </PageBody>
   );
-}
-
-const ageOf = (iso: string | null | undefined): string => {
-  if (!iso) return "—";
-  const ms = Date.now() - Date.parse(iso);
-  if (!Number.isFinite(ms) || ms < 0) return "—";
-  const d = Math.floor(ms / 86_400_000);
-  if (d >= 1) return `${d}d`;
-  const h = Math.floor(ms / 3_600_000);
-  return h >= 1 ? `${h}h` : "<1h";
-};
-
-const ESTIMATE_STATE: Record<string, { label: string; tone: Tone }> = {
-  submitted: { label: "Pending review", tone: "warning" },
-  approved: { label: "Authorized", tone: "success" },
-  partially_approved: { label: "Partly authorized", tone: "info" },
-  declined: { label: "Declined", tone: "danger" },
-  completed: { label: "Completed", tone: "neutral" },
-  voided: { label: "Voided", tone: "neutral" },
-};
-function EstimateState({ status }: { status: string }) {
-  const s = ESTIMATE_STATE[status] || { label: status, tone: "neutral" as Tone };
-  return <StatusText tone={s.tone} icon>{s.label}</StatusText>;
 }
 
 function NewEstimateModal({ canned, onClose, onSubmit }: { canned: ReconCannedService[]; onClose: () => void; onSubmit: (input: { vin: string; ymm?: string; notes?: string; lines: NewLine[] }) => Promise<boolean> }) {

@@ -74,24 +74,6 @@ const FAMILY_APPS: FamilyApp[] = [
   { id: "autofilm",   name: "AutoFilm",   icon: Video, url: "https://autofilm.io/sso", entitlementKey: "autofilm"   },
 ];
 
-const underSegment = (base: string) => (p: string) => p === base || p.startsWith(`${base}/`);
-
-// The frame prints a page heading only where the page renders no h1 of its
-// own on desktop, so no page shows its title twice and none loses it. An
-// explicit list: pages are lazy, so the DOM cannot be asked at render time.
-const SHELL_HEADINGS: { match: (pathname: string) => boolean; title: string; subtitle: string }[] = [
-  { match: (p) => p === "/inventory" || p === "/inventory-v2", title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
-  { match: (p) => p === "/add-inventory", title: "Add to Inventory", subtitle: "Scan or enter a VIN to add the vehicle." },
-  { match: (p) => p === "/description-operations", title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
-  { match: underSegment("/print-center"), title: "Documents & Print Center", subtitle: "One versioned document package for the vehicle, printer, and customer Passport." },
-  { match: (p) => p.startsWith("/get-ready-command/"), title: "Get Ready Command", subtitle: "Review the work AutoLabels prepared, then authorize once." },
-  { match: underSegment("/vin-command"), title: "VIN Command Center", subtitle: "Everything created automatically. Review exceptions and authorize the next step." },
-  { match: (p) => p.startsWith("/service/vehicle/"), title: "Vehicle Service Workspace", subtitle: "One shared task from inspection to K-208 execution and delivery clearance." },
-  { match: (p) => p.startsWith("/service/scan/"), title: "Service Desk", subtitle: "Safety inspections, get-ready work, and K-208 execution." },
-  { match: (p) => p.startsWith("/k208/"), title: "K-208 Inspection Form", subtitle: "The completed CT DMV K-208, ready to print as the buyer's copy." },
-  { match: (p) => p.startsWith("/addendum-label/"), title: "Addendum Label", subtitle: "The 4.5 x 11 in addendum label, ready to print." },
-];
-
 // A platform administrator with no dealership membership is admitted on the
 // house tenant; the rooftop slot names where they are instead of asking them
 // to pick a store there is no control for.
@@ -145,8 +127,6 @@ const AppShell = ({ children }: AppShellProps) => {
   // the same element, so both read this.
   const visibleSections = navSectionsForViewer({ role, isAdmin, badges, hasFeature });
   const activeLeaf = findActiveNavItem(visibleSections, location.pathname, location.search);
-
-  const shellHeading = SHELL_HEADINGS.find((h) => h.match(location.pathname));
 
   // The header names the dealer GROUP on line 1 and the rooftop on line 2 --
   // two different facts, never sourced from the same field. The house
@@ -670,14 +650,6 @@ const AppShell = ({ children }: AppShellProps) => {
           />
 
           <main ref={mainRef} id="app-scroll" tabIndex={-1} className="flex-1 overflow-y-auto pb-24 focus:outline-none lg:pb-0">
-            {shellHeading && (
-              <div className="hidden lg:block print:hidden px-6 pt-6">
-                {/* The scale carries size, line-height, weight and tracking
-                    together, so a heading cannot drift to the wrong weight. */}
-                <h1 className="text-al-section text-foreground">{shellHeading.title}</h1>
-                <p className="mt-0.5 text-al-meta text-muted-foreground">{shellHeading.subtitle}</p>
-              </div>
-            )}
             {children}
           </main>
 
