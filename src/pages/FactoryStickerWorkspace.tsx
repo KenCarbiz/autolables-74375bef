@@ -687,7 +687,7 @@ export default function FactoryStickerWorkspace({
   }
 
   return (
-    <div className={fixture ? "min-h-screen bg-muted p-4 md:p-6" : embedded ? "" : "p-4 md:p-6"}>
+    <div className={fixture ? "min-h-screen bg-muted p-4 md:p-6" : embedded ? "" : "px-4 py-4 sm:px-6 sm:py-6 text-adm-ink"}>
       <div className={embedded ? "space-y-4" : "max-w-[1600px] mx-auto space-y-4"}>
         {fixture && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 space-y-2">
@@ -725,10 +725,12 @@ export default function FactoryStickerWorkspace({
               </Link>
             )}
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-foreground truncate inline-flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600 shrink-0" /> {title}
-              </h1>
-              <p className="text-[11px] text-muted-foreground">
+              {embedded ? (
+                <h2 className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{title}</h2>
+              ) : (
+                <h1 className="text-[24px] leading-[32px] sm:text-[28px] sm:leading-[36px] font-bold text-adm-ink truncate">{title}</h1>
+              )}
+              <p className="text-[13px] leading-[18px] text-adm-muted">
                 {data ? `${data.identity.year} ${data.identity.make} ${data.identity.model}${data.identity.trim ? ` ${data.identity.trim}` : ""}` : "Factory sticker workspace"}
                 {currentDoc ? ` · v${currentDoc.version}` : ""}
               </p>
@@ -899,6 +901,7 @@ export default function FactoryStickerWorkspace({
             {pageSvg ? (
               <div className={zoom === "fit" ? "" : "overflow-auto"}>
                 <div
+                  data-product-surface="document"
                   className="border border-border bg-white shadow-sm [&>svg]:block [&>svg]:h-auto"
                   // Actual print size: 11in at CSS 96dpi = 1056px page width.
                   style={zoom === "fit" ? undefined : { width: 1056 * (zoom as number) }}
