@@ -61,8 +61,8 @@ export default function DealProgressPanel({ vehicle }: {
     return nextDealAction(record, flow, { vehicleId: vehicle.id, vin: vehicle.vin, canProcess });
   }, [record, flow, canProcess, vehicle.id, vehicle.vin]);
 
-  if (loading) return <p className="text-body-sm text-muted-foreground">Loading deal flow…</p>;
-  if (!record || !flow) return <p className="text-body-sm text-muted-foreground">No deal record yet for this vehicle.</p>;
+  if (loading) return <p className="text-body-sm text-adm-muted">Loading deal flow…</p>;
+  if (!record || !flow) return <p className="text-body-sm text-adm-muted">No deal record yet for this vehicle.</p>;
 
   const s = dealDocStatus(record);
   const cta = nextAction?.cta;
@@ -82,15 +82,15 @@ export default function DealProgressPanel({ vehicle }: {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-title font-display font-semibold text-foreground">Deal flow</h2>
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${flow.badge.cls}`}>{flow.badge.label}</span>
+            <h2 className="text-title font-display font-semibold text-adm-ink">Deal flow</h2>
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-[2px] ${flow.badge.cls}`}>{flow.badge.label}</span>
           </div>
-          <p className="text-body-sm text-muted-foreground mt-0.5">
+          <p className="text-body-sm text-adm-muted mt-0.5">
             One guided process — every document ready before delivery. Assembled by VIN <span className="font-mono">{vehicle.vin}</span>.
           </p>
         </div>
         {flow.processed ? (
-          <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-md bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200">
+          <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-md bg-adm-success-bg text-adm-success text-sm font-semibold border border-adm-border">
             <CheckCircle2 className="w-4 h-4" /> Filed {fmt(record.processedAt)}
           </span>
         ) : canProcess ? (
@@ -107,7 +107,7 @@ export default function DealProgressPanel({ vehicle }: {
       </div>
 
       {/* Five-stage progress rail — horizontal on desktop, vertical on mobile */}
-      <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+      <div className="rounded-2xl border border-adm-border bg-adm-surface p-4 sm:p-5">
         {/* desktop */}
         <div className="hidden sm:flex items-start">
           {STAGES.map((st, i) => {
@@ -122,17 +122,17 @@ export default function DealProgressPanel({ vehicle }: {
                 <span
                   className={`relative z-10 w-12 h-12 rounded-2xl flex items-center justify-center ring-4 ring-offset-0 ${
                     state === "complete"
-                      ? "bg-emerald-100 text-emerald-700 ring-emerald-50"
+                      ? "bg-adm-success-bg text-adm-success ring-emerald-50"
                       : state === "active"
                         ? TONE_ACTIVE[st.tone]
-                        : "bg-muted text-muted-foreground ring-transparent"
+                        : "bg-adm-workspace text-adm-muted ring-transparent"
                   }`}
                 >
                   <Icon className="w-6 h-6" strokeWidth={2} />
                 </span>
-                <p className={`mt-2.5 text-[15px] font-semibold leading-tight px-1 ${state === "upcoming" ? "text-muted-foreground" : "text-foreground"}`}>{st.label}</p>
-                <p className="text-[13px] text-muted-foreground mt-0.5 px-1">
-                  {state === "active" ? <span className="text-foreground font-medium">In progress</span> : st.sub}
+                <p className={`mt-2.5 text-[15px] font-semibold leading-tight px-1 ${state === "upcoming" ? "text-adm-muted" : "text-adm-ink"}`}>{st.label}</p>
+                <p className="text-[13px] text-adm-muted mt-0.5 px-1">
+                  {state === "active" ? <span className="text-adm-ink font-medium">In progress</span> : st.sub}
                 </p>
               </div>
             );
@@ -150,10 +150,10 @@ export default function DealProgressPanel({ vehicle }: {
                   <span
                     className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
                       state === "complete"
-                        ? "bg-emerald-100 text-emerald-700"
+                        ? "bg-adm-success-bg text-adm-success"
                         : state === "active"
                           ? TONE_ACTIVE[st.tone]
-                          : "bg-muted text-muted-foreground"
+                          : "bg-adm-workspace text-adm-muted"
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -161,8 +161,8 @@ export default function DealProgressPanel({ vehicle }: {
                   {!isLast && <span className={`w-0.5 flex-1 my-1 ${state === "complete" ? "bg-emerald-400" : "bg-border"}`} />}
                 </div>
                 <div className="pt-1.5 pb-4">
-                  <p className={`text-[15px] font-semibold leading-tight ${state === "upcoming" ? "text-muted-foreground" : "text-foreground"}`}>{st.label}</p>
-                  <p className="text-[13px] text-muted-foreground mt-0.5">{state === "active" ? "In progress" : st.sub}</p>
+                  <p className={`text-[15px] font-semibold leading-tight ${state === "upcoming" ? "text-adm-muted" : "text-adm-ink"}`}>{st.label}</p>
+                  <p className="text-[13px] text-adm-muted mt-0.5">{state === "active" ? "In progress" : st.sub}</p>
                 </div>
               </li>
             );
@@ -172,15 +172,15 @@ export default function DealProgressPanel({ vehicle }: {
 
       {/* Attention required — the single next action */}
       {nextAction && (
-        <div className={`rounded-2xl border p-4 sm:p-5 ${flow.delivered ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+        <div className={`rounded-2xl border p-4 sm:p-5 ${flow.delivered ? "border-adm-border bg-adm-success-bg" : "border-adm-warning-bg bg-adm-warning-bg"}`}>
           <div className="flex items-start gap-3">
-            <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${flow.delivered ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+            <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${flow.delivered ? "bg-adm-success-bg text-adm-success" : "bg-adm-warning-bg text-adm-warning"}`}>
               {flow.delivered ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
             </span>
             <div className="flex-1 min-w-0">
-              <p className={`text-body font-semibold ${flow.delivered ? "text-emerald-900" : "text-amber-900"}`}>{nextAction.title}</p>
-              <p className={`text-body-sm mt-0.5 ${flow.delivered ? "text-emerald-800" : "text-amber-800"}`}>{nextAction.why}</p>
-              <p className="text-caption text-muted-foreground mt-1.5">Owner: <span className="font-semibold text-foreground">{nextAction.owner}</span></p>
+              <p className={`text-body font-semibold ${flow.delivered ? "text-adm-success" : "text-adm-warning"}`}>{nextAction.title}</p>
+              <p className={`text-body-sm mt-0.5 ${flow.delivered ? "text-adm-success" : "text-adm-warning"}`}>{nextAction.why}</p>
+              <p className="text-caption text-adm-muted mt-1.5">Owner: <span className="font-semibold text-adm-ink">{nextAction.owner}</span></p>
             </div>
             {cta && (
               <button

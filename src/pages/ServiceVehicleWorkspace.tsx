@@ -1,7 +1,8 @@
 import { identityFromListing, identityTrim } from "@/lib/factorySticker/vehicleIdentity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveRecallView, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { LocalTabs, PageHeader } from "@/components/product";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -337,14 +338,22 @@ export default function ServiceVehicleWorkspace() {
   return (
     <CommandCapabilityProvider role={role} isAdmin={isAdmin}>
       <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-4 pb-28 sm:px-6 sm:py-6 lg:pb-6">
-        <div className={ACTION_GROUP}>
-          <Link to="/service" className={BTN_SECONDARY}>
-            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Service Desk
-          </Link>
-          <Link to={`/vehicle-file/${veh.id}`} className={BTN_SECONDARY}>
-            <FileText className="w-4 h-4" aria-hidden="true" /> Vehicle File
-          </Link>
-        </div>
+        <PageHeader
+          scope="Vehicle service workspace"
+          title={ymm}
+          description={`VIN ${vin}${stock ? ` · Stock ${stock}` : ""}`}
+          actions={
+            <>
+              <Link to="/service" className={BTN_SECONDARY}>
+                <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Service Desk
+              </Link>
+              <Link to={`/vehicle-file/${veh.id}`} className={BTN_SECONDARY}>
+                <FileText className="w-4 h-4" aria-hidden="true" /> Vehicle File
+              </Link>
+            </>
+          }
+        />
+        <WorkspaceTabs />
 
         <VehicleIdentityStrip
           imageUrl={veh.hero_image_url}
@@ -1749,4 +1758,18 @@ function TitleMcoUpload({ tenantId, veh }: { tenantId: string; veh: { id: string
       </div>
     </CommandCard>
   );
+}
+
+// Flat jump tabs over the sections this page already has. They scroll to an
+// existing section; they do not add or hide any work.
+function WorkspaceTabs() {
+  const { hash } = useLocation();
+  const current = hash || "#inspection";
+  const tabs = [
+    { key: "inspection", label: "K-208 inspection", to: "#inspection" },
+    { key: "failures", label: "Repairs and reinspection", to: "#failures" },
+    { key: "approvals", label: "Approvals", to: "#approvals" },
+    { key: "summary", label: "Summary and history", to: "#summary" },
+  ];
+  return <LocalTabs label="Workspace sections" tabs={tabs.map((t) => ({ ...t, active: t.to === current }))} />;
 }

@@ -93,8 +93,8 @@ const PrepSignOff = () => {
   if (!storeId)
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="rounded-2xl bg-card border border-border p-8 shadow-premium">
-          <p className="text-foreground">Sign in to a dealership to continue.</p>
+        <div className="rounded-2xl bg-adm-surface border border-adm-border p-8 shadow-premium">
+          <p className="text-adm-ink">Sign in to a dealership to continue.</p>
         </div>
       </div>
     );
@@ -113,7 +113,7 @@ const PrepSignOff = () => {
   // INSTALL PROOF VIEW — the get-ready work surface (moved from /admin?tab=getready)
   if (view === "installs") {
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="bg-adm-workspace px-4 py-4 sm:px-6 sm:py-6">
         <div className="max-w-6xl mx-auto">
           {viewTabs}
           <InstallProofView storeId={storeId} storeName={currentStore?.name || tenant?.name || "Your dealership"} />
@@ -126,7 +126,7 @@ const PrepSignOff = () => {
   if (view === "list") {
     const loaded = !signOffsLoading;
     return (
-      <PageBody width="wide" className="bg-background">
+      <PageBody width="wide" className="bg-adm-surface">
         <div>{viewTabs}</div>
         <NextStepBanner stage="prep" />
         <PageHeader
@@ -271,33 +271,33 @@ const PrepSignOff = () => {
     };
 
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="bg-adm-workspace px-4 py-4 sm:px-6 sm:py-6">
         <div className="max-w-2xl mx-auto">
-          <button onClick={() => setSearchParams({ view: "list" })} className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium">
+          <button onClick={() => setSearchParams({ view: "list" })} className="flex items-center gap-2 text-adm-primary hover:text-adm-primary mb-6 font-medium">
             <ChevronLeft className="w-4 h-4" /> Back to list
           </button>
 
-          <div className="rounded-2xl bg-card border border-border p-8 shadow-premium">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Create Sign-Off Request</h2>
+          <div className="rounded-2xl bg-adm-surface border border-adm-border p-8 shadow-premium">
+            <h2 className="text-[24px] leading-[32px] sm:text-[28px] sm:leading-[36px] font-bold text-adm-ink mb-6">Create Sign-Off Request</h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">VIN *</label>
+                <label className="block text-sm font-medium text-adm-ink mb-2">VIN *</label>
                 <input
                   type="text"
                   placeholder="Vehicle Identification Number"
                   value={newForm.vin}
                   onChange={e => setNewForm(prev => ({ ...prev, vin: e.target.value.toUpperCase() }))}
-                  className="w-full h-10 px-4 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-10 px-4 border border-adm-border rounded-md bg-adm-surface text-adm-ink focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Get-Ready Record</label>
+                <label className="block text-sm font-medium text-adm-ink mb-2">Get-Ready Record</label>
                 <select
                   value={newForm.get_ready_record_id}
                   onChange={e => handleGetReadySelect(e.target.value)}
-                  className="w-full h-10 px-4 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-10 px-4 border border-adm-border rounded-md bg-adm-surface text-adm-ink focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">-- Select a record --</option>
                   {getReadyRecords.filter(r => !signOffs.find(s => s.vin === r.vin)).map(r => (
@@ -308,32 +308,32 @@ const PrepSignOff = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">YMM</label>
+                  <label className="block text-sm font-medium text-adm-ink mb-2">YMM</label>
                   <input
                     type="text"
                     value={newForm.ymm}
                     onChange={e => setNewForm(prev => ({ ...prev, ymm: e.target.value }))}
-                    className="w-full h-10 px-4 border border-border rounded-md bg-background text-foreground"
+                    className="w-full h-10 px-4 border border-adm-border rounded-md bg-adm-surface text-adm-ink"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Stock Number</label>
+                  <label className="block text-sm font-medium text-adm-ink mb-2">Stock Number</label>
                   <input
                     type="text"
                     value={newForm.stock_number}
                     onChange={e => setNewForm(prev => ({ ...prev, stock_number: e.target.value }))}
-                    className="w-full h-10 px-4 border border-border rounded-md bg-background text-foreground"
+                    className="w-full h-10 px-4 border border-adm-border rounded-md bg-adm-surface text-adm-ink"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Inspection Form</label>
+                  <label className="block text-sm font-medium text-adm-ink mb-2">Inspection Form</label>
                   <select
                     value={newForm.inspection_form_type}
                     onChange={e => setNewForm(prev => ({ ...prev, inspection_form_type: e.target.value }))}
-                    className="w-full h-10 px-4 border border-border rounded-md bg-background text-foreground"
+                    className="w-full h-10 px-4 border border-adm-border rounded-md bg-adm-surface text-adm-ink"
                   >
                     <option value="None">None</option>
                     <option value="CT-K208">CT-K208</option>
@@ -350,27 +350,27 @@ const PrepSignOff = () => {
                       onChange={e => setNewForm(prev => ({ ...prev, inspection_passed: e.target.checked }))}
                       className="w-4 h-4"
                     />
-                    <span className="text-sm font-medium text-foreground">Inspection passed</span>
+                    <span className="text-sm font-medium text-adm-ink">Inspection passed</span>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Foreman Name</label>
+                <label className="block text-sm font-medium text-adm-ink mb-2">Foreman Name</label>
                 <input
                   type="text"
                   value={newForm.foreman_name}
                   onChange={e => setNewForm(prev => ({ ...prev, foreman_name: e.target.value }))}
-                  className="w-full h-10 px-4 border border-border rounded-md bg-background text-foreground"
+                  className="w-full h-10 px-4 border border-adm-border rounded-md bg-adm-surface text-adm-ink"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Accessories</label>
+                <label className="block text-sm font-medium text-adm-ink mb-2">Accessories</label>
                 <div className="space-y-2">
                   {newForm.accessories.map((acc, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-muted rounded-md">
-                      <span className="text-foreground">{acc.product_name}</span>
+                    <div key={i} className="flex items-center justify-between p-3 bg-adm-workspace rounded-md">
+                      <span className="text-adm-ink">{acc.product_name}</span>
                       {acc.installed_date ? (
                         <span className="text-xs text-green-600 font-medium">✓ Installed</span>
                       ) : (
@@ -384,7 +384,7 @@ const PrepSignOff = () => {
                             };
                             setNewForm(prev => ({ ...prev, accessories: updated }));
                           }}
-                          className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          className="text-xs px-2 py-1 bg-adm-primary text-white rounded hover:bg-adm-primary-hover"
                         >
                           Mark Installed
                         </button>
@@ -395,7 +395,7 @@ const PrepSignOff = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Install Photos</label>
+                <label className="block text-sm font-medium text-adm-ink mb-2">Install Photos</label>
                 <input
                   type="file"
                   multiple
@@ -445,7 +445,7 @@ const PrepSignOff = () => {
                       if (!uploaded) toast.error(`Upload failed for ${files[i].name}: ${uploadError}`);
                     }
                   }}
-                  className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700"
+                  className="block w-full text-sm text-adm-muted file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-adm-selected file:text-adm-primary"
                 />
 
                 {/* Upload status grid — thumbnails with spinner, failed badge,
@@ -459,23 +459,23 @@ const PrepSignOff = () => {
                         <div
                           key={i}
                           className={`relative aspect-square rounded-md overflow-hidden border ${
-                            isFailed ? "border-red-400" : isUploading ? "border-amber-300" : "border-emerald-300"
-                          } bg-muted`}
+                            isFailed ? "border-adm-border" : isUploading ? "border-adm-warning-bg" : "border-adm-border"
+                          } bg-adm-workspace`}
                         >
                           <img src={ph.url} alt="" className="w-full h-full object-cover" />
-                          <div className="absolute inset-x-0 bottom-0 px-1.5 py-1 text-al-meta font-bold uppercase tracking-label bg-black/50 text-white flex items-center justify-between">
+                          <div className="absolute inset-x-0 bottom-0 px-1.5 py-1 text-[12px] leading-[18px] font-bold uppercase tracking-label bg-black/50 text-white flex items-center justify-between">
                             {isUploading ? (
                               <span className="inline-flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse" />
+                                <span className="w-2 h-2 rounded-full bg-adm-warning-bg animate-pulse" />
                                 Uploading
                               </span>
                             ) : isFailed ? (
-                              <span className="inline-flex items-center gap-1 text-red-300">
+                              <span className="inline-flex items-center gap-1 text-adm-danger">
                                 <span className="w-2 h-2 rounded-full bg-red-400" />
                                 Failed
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-emerald-300">
+                              <span className="inline-flex items-center gap-1 text-adm-success">
                                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
                                 Saved
                               </span>
@@ -499,23 +499,23 @@ const PrepSignOff = () => {
                   </div>
                 )}
                 {newForm.install_photos.some((ph) => ph.caption?.startsWith("__uploading:")) && (
-                  <p className="mt-2 text-[11px] text-amber-700 font-semibold">
+                  <p className="mt-2 text-[11px] text-adm-warning font-semibold">
                     Waiting on photo upload to finish before sign-off is allowed.
                   </p>
                 )}
                 {newForm.install_photos.some((ph) => ph.caption?.startsWith("__failed:")) && (
-                  <p className="mt-2 text-[11px] text-red-600 font-semibold">
+                  <p className="mt-2 text-[11px] text-adm-danger font-semibold">
                     Some photos failed to upload. Remove and try again to unblock sign-off.
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Notes</label>
+                <label className="block text-sm font-medium text-adm-ink mb-2">Notes</label>
                 <textarea
                   value={newForm.notes}
                   onChange={e => setNewForm(prev => ({ ...prev, notes: e.target.value }))}
-                  className="w-full h-24 px-4 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-24 px-4 py-2 border border-adm-border rounded-md bg-adm-surface text-adm-ink focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -525,13 +525,13 @@ const PrepSignOff = () => {
                   disabled={newForm.install_photos.some(
                     (ph) => ph.caption?.startsWith("__uploading:") || ph.caption?.startsWith("__failed:")
                   )}
-                  className="flex-1 h-10 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 h-10 bg-adm-primary text-white rounded-md hover:bg-adm-primary-hover font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create Sign-Off Request
                 </button>
                 <button
                   onClick={() => setSearchParams({ view: "list" })}
-                  className="h-10 px-6 border border-border text-foreground rounded-md hover:bg-muted"
+                  className="h-10 px-6 border border-adm-border text-adm-ink rounded-md hover:bg-adm-workspace"
                 >
                   Cancel
                 </button>
@@ -548,13 +548,13 @@ const PrepSignOff = () => {
     const record = signOffs.find(s => s.id === id);
     if (!record) {
       return (
-        <div className="min-h-screen bg-background p-6">
+        <div className="bg-adm-workspace px-4 py-4 sm:px-6 sm:py-6">
           <div className="max-w-3xl mx-auto">
-            <button onClick={() => setSearchParams({ view: "list" })} className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium">
+            <button onClick={() => setSearchParams({ view: "list" })} className="flex items-center gap-2 text-adm-primary hover:text-adm-primary mb-6 font-medium">
               <ChevronLeft className="w-4 h-4" /> Back to list
             </button>
-            <div className="rounded-2xl bg-card border border-border p-12 shadow-premium text-center">
-              <p className="text-foreground">Sign-off not found</p>
+            <div className="rounded-2xl bg-adm-surface border border-adm-border p-12 shadow-premium text-center">
+              <p className="text-adm-ink">Sign-off not found</p>
             </div>
           </div>
         </div>
@@ -563,9 +563,9 @@ const PrepSignOff = () => {
 
     const gate = isListingAllowed(record.vin);
     const statusColors: Record<string, string> = {
-      pending: "bg-amber-100 border-amber-300 text-amber-900",
+      pending: "bg-adm-warning-bg border-adm-warning-bg text-adm-warning",
       signed: "bg-green-100 border-green-300 text-green-900",
-      rejected: "bg-red-100 border-red-300 text-red-900",
+      rejected: "bg-red-100 border-adm-border text-adm-danger",
       overridden: "bg-orange-100 border-orange-300 text-orange-900",
     };
 
@@ -592,9 +592,9 @@ const PrepSignOff = () => {
     };
 
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="bg-adm-workspace px-4 py-4 sm:px-6 sm:py-6">
         <div className="max-w-4xl mx-auto">
-          <button onClick={() => setSearchParams({ view: "list" })} className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium">
+          <button onClick={() => setSearchParams({ view: "list" })} className="flex items-center gap-2 text-adm-primary hover:text-adm-primary mb-6 font-medium">
             <ChevronLeft className="w-4 h-4" /> Back to list
           </button>
 
@@ -605,46 +605,46 @@ const PrepSignOff = () => {
             </div>
           </div>
 
-          <div className="rounded-2xl bg-card border border-border p-6 shadow-premium mb-6">
-            <h2 className="text-lg font-bold text-foreground mb-3">Vehicle</h2>
+          <div className="rounded-2xl bg-adm-surface border border-adm-border p-6 shadow-premium mb-6">
+            <h2 className="text-[17px] leading-[24px] font-semibold text-adm-ink mb-3">Vehicle</h2>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <p className="text-muted-foreground text-sm">VIN</p>
-                <p className="text-foreground font-medium">{record.vin}</p>
+                <p className="text-adm-muted text-sm">VIN</p>
+                <p className="text-adm-ink font-medium">{record.vin}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-sm">YMM</p>
-                <p className="text-foreground font-medium">{record.ymm}</p>
+                <p className="text-adm-muted text-sm">YMM</p>
+                <p className="text-adm-ink font-medium">{record.ymm}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-sm">Stock</p>
-                <p className="text-foreground font-medium">{record.stock_number}</p>
+                <p className="text-adm-muted text-sm">Stock</p>
+                <p className="text-adm-ink font-medium">{record.stock_number}</p>
               </div>
             </div>
           </div>
 
-          <div className={`rounded-2xl border-2 p-6 mb-6 ${gate.allowed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+          <div className={`rounded-2xl border-2 p-6 mb-6 ${gate.allowed ? "bg-green-50 border-green-200" : "bg-adm-danger-bg border-adm-border"}`}>
             <div className="flex items-start gap-3">
-              {gate.allowed ? <Check className="w-5 h-5 text-green-600 mt-0.5" /> : <X className="w-5 h-5 text-red-600 mt-0.5" />}
+              {gate.allowed ? <Check className="w-5 h-5 text-green-600 mt-0.5" /> : <X className="w-5 h-5 text-adm-danger mt-0.5" />}
               <div>
-                <p className="font-bold text-foreground">{gate.allowed ? "Ready to list" : "Listing locked"}</p>
-                <p className={gate.allowed ? "text-green-700" : "text-red-700"}>{gate.allowed ? "Vehicle may be published to the public shopper portal." : gate.reason}</p>
+                <p className="font-bold text-adm-ink">{gate.allowed ? "Ready to list" : "Listing locked"}</p>
+                <p className={gate.allowed ? "text-green-700" : "text-adm-danger"}>{gate.allowed ? "Vehicle may be published to the public shopper portal." : gate.reason}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-card border border-border p-6 shadow-premium mb-6">
-            <h3 className="text-lg font-bold text-foreground mb-4">Accessories</h3>
+          <div className="rounded-2xl bg-adm-surface border border-adm-border p-6 shadow-premium mb-6">
+            <h3 className="text-lg font-bold text-adm-ink mb-4">Accessories</h3>
             <div className="space-y-2">
               {record.accessories_installed.map((acc, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-muted rounded-md">
-                  <span className="text-foreground">{acc.product_name}</span>
+                <div key={i} className="flex items-center justify-between p-3 bg-adm-workspace rounded-md">
+                  <span className="text-adm-ink">{acc.product_name}</span>
                   {acc.installed_date ? (
                     <span className="text-xs text-green-600 font-medium">
                       ✓ {format(new Date(acc.installed_date), "MMM d, h:mm a")} {acc.installed_by && `by ${acc.installed_by}`}
                     </span>
                   ) : (
-                    <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Not yet installed</span>
+                    <span className="text-xs bg-red-100 text-adm-danger px-2 py-1 rounded">Not yet installed</span>
                   )}
                 </div>
               ))}
@@ -652,14 +652,14 @@ const PrepSignOff = () => {
           </div>
 
           {record.install_photos && record.install_photos.length > 0 && (
-            <div className="rounded-2xl bg-card border border-border p-6 shadow-premium mb-6">
-              <h3 className="text-lg font-bold text-foreground mb-4">Install Photos</h3>
+            <div className="rounded-2xl bg-adm-surface border border-adm-border p-6 shadow-premium mb-6">
+              <h3 className="text-lg font-bold text-adm-ink mb-4">Install Photos</h3>
               <div className="grid grid-cols-4 gap-4">
                 {record.install_photos.map((photo, i) => (
                   <button
                     key={i}
                     onClick={() => { setSelectedPhoto(photo); dialogRef?.showModal(); }}
-                    className="h-20 bg-muted rounded-md overflow-hidden hover:opacity-75 transition"
+                    className="h-20 bg-adm-workspace rounded-md overflow-hidden hover:opacity-75 transition"
                   >
                     <img src={photo.url} alt={`Install ${i}`} className="w-full h-full object-cover" />
                   </button>
@@ -684,20 +684,20 @@ const PrepSignOff = () => {
             </div>
           )}
 
-          <div className="rounded-2xl bg-card border border-border p-6 shadow-premium mb-6">
-            <h3 className="text-lg font-bold text-foreground mb-3">Inspection</h3>
+          <div className="rounded-2xl bg-adm-surface border border-adm-border p-6 shadow-premium mb-6">
+            <h3 className="text-[17px] leading-[24px] font-semibold text-adm-ink mb-3">Inspection</h3>
             <div className="flex items-center justify-between">
-              <span className="text-foreground">{record.inspection_form_type}</span>
-              <span className={`text-xs px-2 py-1 rounded font-medium ${record.inspection_passed ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+              <span className="text-adm-ink">{record.inspection_form_type}</span>
+              <span className={`text-xs px-2 py-1 rounded font-medium ${record.inspection_passed ? "bg-green-100 text-green-800" : "bg-red-100 text-adm-danger"}`}>
                 {record.inspection_passed ? "Passed" : "Failed"}
               </span>
             </div>
           </div>
 
           {record.status === "pending" && (
-            <div className="rounded-2xl bg-card border border-border p-6 shadow-premium mb-6">
-              <h3 className="text-lg font-bold text-foreground mb-4">Sign Off</h3>
-              <div className="bg-muted p-4 rounded-lg mb-4 text-sm text-foreground space-y-1">
+            <div className="rounded-2xl bg-adm-surface border border-adm-border p-6 shadow-premium mb-6">
+              <h3 className="text-lg font-bold text-adm-ink mb-4">Sign Off</h3>
+              <div className="bg-adm-workspace p-4 rounded-lg mb-4 text-sm text-adm-ink space-y-1">
                 <p>I confirm:</p>
                 <ul className="list-disc list-inside space-y-1 mt-2">
                   <li>All accessories installed per spec</li>
@@ -714,7 +714,7 @@ const PrepSignOff = () => {
                   onChange={e => setAckCheckbox(e.target.checked)}
                   className="w-4 h-4"
                 />
-                <span className="text-sm text-foreground">I understand signing here unlocks this vehicle for public listing.</span>
+                <span className="text-sm text-adm-ink">I understand signing here unlocks this vehicle for public listing.</span>
               </label>
 
               <SignaturePad
@@ -727,7 +727,7 @@ const PrepSignOff = () => {
                 <button
                   onClick={handleSignOff}
                   disabled={!foremanSig?.data || !ackCheckbox}
-                  className="flex-1 h-10 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 h-10 bg-adm-primary text-white rounded-md hover:bg-adm-primary-hover font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Sign & Unlock Listing
                 </button>
@@ -737,34 +737,34 @@ const PrepSignOff = () => {
                     setRejectNotes("");
                     setRejectOpen(true);
                   }}
-                  className="h-10 px-4 border-2 border-red-600 text-red-600 rounded-md hover:bg-red-50 font-medium"
+                  className="h-10 px-4 border-2 border-adm-border text-adm-danger rounded-md hover:bg-adm-danger-bg font-medium"
                 >
                   Reject
                 </button>
                 <button
                   onClick={() => setOverridePanel(!overridePanel)}
-                  className="h-10 px-4 border-2 border-amber-500 text-amber-600 rounded-md hover:bg-amber-50 font-medium"
+                  className="h-10 px-4 border-2 border-adm-warning-bg0 text-adm-warning rounded-md hover:bg-adm-warning-bg font-medium"
                 >
                   Override
                 </button>
               </div>
 
               {overridePanel && (
-                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
-                  <p className="text-sm text-amber-900 font-medium">Override logs a permanent compliance exception — use sparingly.</p>
+                <div className="mt-4 p-4 bg-adm-warning-bg border border-adm-warning-bg rounded-lg space-y-3">
+                  <p className="text-sm text-adm-warning font-medium">Override logs a permanent compliance exception — use sparingly.</p>
                   <input
                     type="text"
                     placeholder="Override manager name"
                     value={overrideForm.overriderName}
                     onChange={e => setOverrideForm(prev => ({ ...prev, overriderName: e.target.value }))}
-                    className="w-full h-10 px-4 border border-amber-300 rounded-md bg-card text-foreground"
+                    className="w-full h-10 px-4 border border-adm-warning-bg rounded-md bg-adm-surface text-adm-ink"
                   />
                   <input
                     type="text"
                     placeholder="Reason for override"
                     value={overrideForm.reason}
                     onChange={e => setOverrideForm(prev => ({ ...prev, reason: e.target.value }))}
-                    className="w-full h-10 px-4 border border-amber-300 rounded-md bg-card text-foreground"
+                    className="w-full h-10 px-4 border border-adm-warning-bg rounded-md bg-adm-surface text-adm-ink"
                   />
                   <button
                     onClick={async () => {
@@ -787,15 +787,15 @@ const PrepSignOff = () => {
               {record.foreman_signature_data && (
                 <img src={record.foreman_signature_data} alt="Foreman signature" className="h-24 object-contain mb-4" />
               )}
-              <p className="text-foreground"><strong>Signed by:</strong> {record.foreman_name}</p>
-              <p className="text-muted-foreground"><strong>Date:</strong> {format(new Date(record.signed_at!), "MMM d, yyyy h:mm a")}</p>
+              <p className="text-adm-ink"><strong>Signed by:</strong> {record.foreman_name}</p>
+              <p className="text-adm-muted"><strong>Date:</strong> {format(new Date(record.signed_at!), "MMM d, yyyy h:mm a")}</p>
             </div>
           )}
 
           {record.status === "rejected" && (
-            <div className="rounded-2xl bg-red-50 border-2 border-red-200 p-6 shadow-premium">
-              <p className="font-bold text-red-900 mb-2">Rejection Reason</p>
-              <p className="text-red-800">{record.rejection_reason}</p>
+            <div className="rounded-2xl bg-adm-danger-bg border-2 border-adm-border p-6 shadow-premium">
+              <p className="font-bold text-adm-danger mb-2">Rejection Reason</p>
+              <p className="text-adm-danger">{record.rejection_reason}</p>
             </div>
           )}
 
@@ -863,16 +863,16 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-blue-600" />
-            <h3 className="text-sm font-semibold text-foreground">Vehicle Get-Ready Tracker</h3>
+            <Clock className="w-4 h-4 text-adm-primary" />
+            <h3 className="text-sm font-semibold text-adm-ink">Vehicle Get-Ready Tracker</h3>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-adm-muted mt-0.5">
             Track vehicle preparation from acquisition to inventory-ready. Proves accessories installed before listing date.
           </p>
         </div>
         <button
           onClick={() => setStartGetReadyOpen(true)}
-          className="h-10 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 inline-flex items-center gap-2 shrink-0"
+          className="h-10 px-4 rounded-xl bg-adm-primary text-white text-sm font-semibold hover:bg-adm-primary-hover shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 inline-flex items-center gap-2 shrink-0"
         >
           <Plus className="w-4 h-4" /> Start Get-Ready
         </button>
@@ -880,22 +880,22 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
       <StartGetReadyModal open={startGetReadyOpen} onClose={() => setStartGetReadyOpen(false)} onCreate={createGetReady} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <InstallStat icon={Clock} label="Pending" value={getReadyRecords.filter(r => r.status === "pending" || r.status === "in_progress").length} color="text-amber-600" />
-        <InstallStat icon={CheckCircle2} label="Ready" value={getReadyRecords.filter(r => r.status === "ready").length} color="text-emerald-600" />
-        <InstallStat icon={Car} label="In Inventory" value={getReadyRecords.filter(r => r.status === "inventory").length} color="text-blue-600" />
-        <InstallStat icon={FileText} label="Total" value={getReadyRecords.length} color="text-foreground" />
+        <InstallStat icon={Clock} label="Pending" value={getReadyRecords.filter(r => r.status === "pending" || r.status === "in_progress").length} color="text-adm-warning" />
+        <InstallStat icon={CheckCircle2} label="Ready" value={getReadyRecords.filter(r => r.status === "ready").length} color="text-adm-success" />
+        <InstallStat icon={Car} label="In Inventory" value={getReadyRecords.filter(r => r.status === "inventory").length} color="text-adm-primary" />
+        <InstallStat icon={FileText} label="Total" value={getReadyRecords.length} color="text-adm-ink" />
       </div>
 
-      <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
+      <div className="bg-adm-surface rounded-xl border border-adm-border shadow-premium overflow-hidden">
         {getReadyRecords.length === 0 ? (
           <div className="px-5 py-12 text-center">
-            <Clock className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm font-medium text-foreground">No get-ready records yet</p>
-            <p className="text-xs text-muted-foreground mt-1">When you create a sticker for a vehicle, a get-ready record can be generated automatically.</p>
+            <Clock className="w-8 h-8 text-adm-muted/30 mx-auto mb-3" />
+            <p className="text-sm font-medium text-adm-ink">No get-ready records yet</p>
+            <p className="text-xs text-adm-muted mt-1">When you create a sticker for a vehicle, a get-ready record can be generated automatically.</p>
           </div>
         ) : (
           <div>
-            <div className="px-5 py-2.5 bg-muted/30 text-al-meta font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+            <div className="px-5 py-2.5 bg-adm-workspace text-[12px] leading-[18px] font-semibold uppercase tracking-wider text-adm-muted flex items-center justify-between">
               <span>{getReadyRecords.length} vehicle{getReadyRecords.length !== 1 ? "s" : ""}</span>
               <span>{getPendingGetReady().length} pending</span>
             </div>
@@ -906,20 +906,20 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
               const pct = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
               return (
-                <div key={record.id} className="px-5 py-4 border-b border-border last:border-0">
+                <div key={record.id} className="px-5 py-4 border-b border-adm-border last:border-0">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground truncate">{record.ymm}</p>
+                        <p className="text-sm font-semibold text-adm-ink truncate">{record.ymm}</p>
                         <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                          record.status === "inventory" ? "bg-blue-50 text-blue-700" :
-                          record.status === "ready" ? "bg-emerald-50 text-emerald-700" :
-                          "bg-amber-50 text-amber-700"
+                          record.status === "inventory" ? "bg-adm-selected text-adm-primary" :
+                          record.status === "ready" ? "bg-adm-success-bg text-adm-success" :
+                          "bg-adm-warning-bg text-adm-warning"
                         }`}>{record.status.replace(/_/g, " ")}</span>
                         {record.inspectionRequired && (
                           <span
                             className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                              record.inspectionComplete ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                              record.inspectionComplete ? "bg-adm-success-bg text-adm-success" : "bg-adm-warning-bg text-adm-warning"
                             }`}
                             title={record.inspectionComplete ? "Safety inspection on file" : "Safety inspection required before delivery"}
                           >
@@ -928,7 +928,7 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 mt-0.5 text-xs text-adm-muted">
                         <span className="font-mono">{record.vin}</span>
                         {record.stockNumber && <span>Stock: {record.stockNumber}</span>}
                         <button
@@ -940,38 +940,38 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
                       </div>
 
                       <div className="mt-2 flex flex-wrap gap-3 text-[10px]">
-                        <span className="text-muted-foreground">Acquired: <strong className="text-foreground">{record.acquiredDate ? format(new Date(record.acquiredDate), "M/d/yy") : "—"}</strong></span>
-                        <span className="text-muted-foreground">Get-Ready: <strong className="text-foreground">{record.getReadyCompleteDate ? format(new Date(record.getReadyCompleteDate), "M/d/yy") : "In progress"}</strong></span>
-                        <span className="text-muted-foreground">Inventory: <strong className="text-foreground">{record.inventoryDate ? format(new Date(record.inventoryDate), "M/d/yy") : "Pending"}</strong></span>
+                        <span className="text-adm-muted">Acquired: <strong className="text-adm-ink">{record.acquiredDate ? format(new Date(record.acquiredDate), "M/d/yy") : "—"}</strong></span>
+                        <span className="text-adm-muted">Get-Ready: <strong className="text-adm-ink">{record.getReadyCompleteDate ? format(new Date(record.getReadyCompleteDate), "M/d/yy") : "In progress"}</strong></span>
+                        <span className="text-adm-muted">Inventory: <strong className="text-adm-ink">{record.inventoryDate ? format(new Date(record.inventoryDate), "M/d/yy") : "Pending"}</strong></span>
                       </div>
 
                       <div className="mt-2 flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${pct === 100 ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${pct}%` }} />
+                        <div className="flex-1 h-1.5 bg-adm-workspace rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${pct === 100 ? "bg-adm-success-bg0" : "bg-adm-selected0"}`} style={{ width: `${pct}%` }} />
                         </div>
-                        <span className="text-[10px] text-muted-foreground tabular-nums">{completedItems}/{totalItems}</span>
+                        <span className="text-[10px] text-adm-muted tabular-nums">{completedItems}/{totalItems}</span>
                       </div>
 
                       {/* Work checklist. Completing the last item is what
                           moves the record to "ready" — the step that unlocks
                           "send to inventory". */}
                       {totalItems > 0 && (
-                        <div className="mt-3 rounded-lg border border-border divide-y divide-border">
+                        <div className="mt-3 rounded-lg border border-adm-border divide-y divide-border">
                           {record.items.map(item => {
                             const done = item.status === "complete";
                             const busy = completingItem === `${record.id}:${item.id}`;
                             return (
                               <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2">
                                 <div className="min-w-0">
-                                  <p className={`text-xs font-medium truncate ${done ? "text-muted-foreground line-through" : "text-foreground"}`}>{item.label}</p>
+                                  <p className={`text-xs font-medium truncate ${done ? "text-adm-muted line-through" : "text-adm-ink"}`}>{item.label}</p>
                                   {done && item.completedAt && (
-                                    <p className="text-[10px] text-muted-foreground">
+                                    <p className="text-[10px] text-adm-muted">
                                       {format(new Date(item.completedAt), "M/d/yy")}{item.completedBy ? ` · ${item.completedBy}` : ""}
                                     </p>
                                   )}
                                 </div>
                                 {done ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                  <CheckCircle2 className="w-4 h-4 text-adm-success shrink-0" />
                                 ) : (
                                   <button
                                     disabled={busy}
@@ -986,7 +986,7 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
                                         setCompletingItem(null);
                                       }
                                     }}
-                                    className="h-7 px-2.5 rounded-md border border-border text-[10px] font-semibold text-foreground hover:bg-muted disabled:opacity-60 shrink-0"
+                                    className="h-7 px-2.5 rounded-md border border-adm-border text-[10px] font-semibold text-adm-ink hover:bg-adm-workspace disabled:opacity-60 shrink-0"
                                   >
                                     {busy ? "Saving…" : "Mark done"}
                                   </button>
@@ -1002,7 +1002,7 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
                       {!timeline.valid && (
                         <div className="mt-2 space-y-1">
                           {timeline.warnings.map((w, i) => (
-                            <p key={i} className="text-[10px] text-destructive font-medium flex items-start gap-1">
+                            <p key={i} className="text-[10px] text-adm-danger font-medium flex items-start gap-1">
                               <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" /> {w}
                             </p>
                           ))}
@@ -1084,10 +1084,10 @@ const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: 
 };
 
 const InstallStat = ({ icon: Icon, label, value, color }: { icon: typeof FileText; label: string; value: number; color: string }) => (
-  <div className="bg-card rounded-xl border border-border shadow-premium p-4">
+  <div className="bg-adm-surface rounded-xl border border-adm-border shadow-premium p-4">
     <Icon className={`w-4 h-4 ${color} mb-2`} />
-    <div className="text-2xl font-semibold tracking-tight font-display tabular-nums text-foreground">{value}</div>
-    <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+    <div className="text-2xl font-semibold tracking-tight font-display tabular-nums text-adm-ink">{value}</div>
+    <p className="text-[11px] text-adm-muted mt-0.5">{label}</p>
   </div>
 );
 
@@ -1124,27 +1124,27 @@ const RejectModal = ({
       onClick={onClose}
     >
       <div
-        className="bg-card w-full md:max-w-lg md:rounded-2xl rounded-t-[28px] overflow-hidden shadow-2xl"
+        className="bg-adm-surface w-full md:max-w-lg md:rounded-2xl rounded-t-[28px] overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="pt-2 md:hidden flex justify-center">
           <div className="w-10 h-1 rounded-full bg-slate-300" />
         </div>
-        <div className="px-5 py-4 border-b border-border">
-          <h3 className="text-base font-black font-display tracking-tight text-foreground">
+        <div className="px-5 py-4 border-b border-adm-border">
+          <h3 className="text-base font-black font-display tracking-tight text-adm-ink">
             Reject prep sign-off
           </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">VIN {vin}</p>
+          <p className="text-[11px] text-adm-muted mt-0.5 font-mono">VIN {vin}</p>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-al-meta font-bold uppercase tracking-label text-muted-foreground">
+            <label className="text-[12px] leading-[18px] font-bold uppercase tracking-label text-adm-muted">
               Reason *
             </label>
             <select
               value={category}
               onChange={(e) => onCategory(e.target.value)}
-              className="mt-1 w-full h-11 rounded-lg border border-border px-3 text-sm bg-card"
+              className="mt-1 w-full h-11 rounded-lg border border-adm-border px-3 text-sm bg-adm-surface"
             >
               {REJECT_CATEGORIES.map((c) => (
                 <option key={c.id} value={c.id}>{c.label}</option>
@@ -1152,7 +1152,7 @@ const RejectModal = ({
             </select>
           </div>
           <div>
-            <label className="text-al-meta font-bold uppercase tracking-label text-muted-foreground">
+            <label className="text-[12px] leading-[18px] font-bold uppercase tracking-label text-adm-muted">
               Notes
             </label>
             <textarea
@@ -1160,17 +1160,17 @@ const RejectModal = ({
               onChange={(e) => onNotes(e.target.value)}
               rows={3}
               placeholder="Specifics the service/detail team needs to fix..."
-              className="mt-1 w-full rounded-lg border border-border p-3 text-sm focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+              className="mt-1 w-full rounded-lg border border-adm-border p-3 text-sm focus:outline-none focus:border-adm-border focus:ring-2 focus:ring-red-500/20"
             />
           </div>
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-900">
+          <div className="rounded-lg bg-adm-warning-bg border border-adm-warning-bg p-3 text-[11px] text-adm-warning">
             Rejecting keeps the listing locked. The vehicle won't be publishable
             until prep runs again and a foreman signs off.
           </div>
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               onClick={onClose}
-              className="h-10 px-4 rounded-lg text-sm font-semibold text-muted-foreground hover:bg-muted"
+              className="h-10 px-4 rounded-lg text-sm font-semibold text-adm-muted hover:bg-adm-workspace"
             >
               Cancel
             </button>

@@ -309,7 +309,7 @@ export default function DealDocumentsPanel({ vehicle }: { vehicle: { id: string;
           and signs, distinct from the technician's inspection. */}
       {certifyOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => !certifying && setCertifyOpen(false)}>
-          <div className="w-full sm:max-w-lg bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-xl max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+          <div data-product-surface="document" className="w-full sm:max-w-lg bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-xl max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card">
               <h3 className="text-body font-semibold text-foreground inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4 text-slate-700" /> Certify K-208 (licensee)</h3>
               <button onClick={() => setCertifyOpen(false)} disabled={certifying} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
