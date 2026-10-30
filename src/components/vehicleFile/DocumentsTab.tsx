@@ -112,10 +112,10 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
         </thead>
         <tbody>
           {grouped.flatMap(({ g, items }) => [
-            <tr key={`g-${g}`}><td colSpan={6} className="bg-adm-workspace px-3 py-2 text-[12px] leading-[18px] font-semibold text-adm-muted border-b border-adm-border">{g} ({items.length})</td></tr>,
+            <tr key={`g-${g}`}><td colSpan={6} className="bg-adm-workspace px-3 py-2.5 text-[14px] leading-[20px] font-bold text-adm-ink border-b border-adm-border">{g}</td></tr>,
             ...items.map((r) => (
             <tr key={r.key}>
-              <Td className="font-semibold">{r.name}</Td>
+              <Td>{r.name}</Td>
               <Td className="text-adm-muted">{r.version ?? "-"}</Td>
               <Td><StatusText tone={r.tone}>{r.status}</StatusText></Td>
               <Td className="text-adm-muted">{r.packet}</Td>
@@ -128,9 +128,6 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
           ])}
         </tbody>
       </WorkTable>
-      <p className="text-[12px] leading-[18px] text-adm-muted">
-        Visibility shows Unknown where the packet settings do not name the document. Titles, registrations and identity documents are private and are not listed here.
-      </p>
     </div>
   );
 };

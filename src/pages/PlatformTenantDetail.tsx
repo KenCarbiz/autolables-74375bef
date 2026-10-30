@@ -126,7 +126,7 @@ const PlatformTenantDetail = () => {
   };
 
   const dealershipPanel = (
-    <Panel title="Dealership information" titleSize="md" inset="sm">
+    <Panel title="Dealership information" titleSize="md" inset="sm" className="h-full">
       <KeyValueList
         rows={[
           { label: "Legal name", value: profile.data?.display_name || tenant.name },
@@ -173,7 +173,7 @@ const PlatformTenantDetail = () => {
                 {shown.map((m) => {
                   const st = memberStatus(m);
                   return (
-                    <tr key={m.id}>
+                    <tr key={m.id} className="[&>td]:!py-2.5">
                       <Td className="max-w-[240px]">
                         <Link to={`/platform-admin/members/${m.id}`} className="block truncate font-semibold text-adm-primary hover:underline">
                           {memberLabel(m) ?? "Pending seat"}
@@ -224,7 +224,7 @@ const PlatformTenantDetail = () => {
   );
 
   const entitlementsCompact = (
-    <Panel title="Effective entitlements" titleSize="md" inset="sm">
+    <Panel title="Effective entitlements" titleSize="md" inset="sm" className="h-full">
       {tenantEntitlements.length === 0 ? (
         <p className="text-[14px] text-adm-muted">No app is entitled for this tenant.</p>
       ) : (
@@ -244,8 +244,8 @@ const PlatformTenantDetail = () => {
   );
 
   const summary = (
-    <aside className="flex flex-col gap-4" aria-label="Plan and status">
-      <Panel title="Plan and status" titleSize="md" inset="sm">
+    <aside className="flex h-full flex-col gap-4" aria-label="Plan and status">
+      <Panel title="Plan and status" titleSize="md" inset="sm" className="h-full">
         <KeyValueList
           className="grid-cols-[1fr_auto]"
           rows={[
@@ -307,12 +307,10 @@ const PlatformTenantDetail = () => {
         />
         {tab === "overview" ? (
           <div className="flex flex-col gap-4">
-            <div className="grid gap-4 xl:grid-cols-3 items-stretch [&>*]:h-full">
-              {dealershipPanel}
-              {summary}
-              {entitlementsCompact}
+            <div className="grid gap-4 xl:grid-cols-3 items-stretch">
+              {[dealershipPanel, summary, entitlementsCompact].map((card, i) => <div key={i} className="min-w-0 [&>*]:h-full">{card}</div>)}
             </div>
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-start">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] items-start">
               {providerPanel}
               {membersPanel(5)}
             </div>

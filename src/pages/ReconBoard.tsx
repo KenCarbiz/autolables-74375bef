@@ -63,13 +63,13 @@ export default function ReconBoard() {
     <PageBody width="wide">
       <PageHeader
         title="Recon Approvals"
-        description={isManager ? "Approve or decline recon work and ask service questions." : "Submit recon work and track approvals."}
         actions={<Button variant="primary" onClick={() => setShowNew(true)}>New estimate</Button>}
       />
 
       <LocalTabs label="Recon estimate states" tabs={tabs} />
 
       <MetricStrip
+        numberFirst
         label="Recon estimate totals"
         metrics={[
           { label: isManager ? "Pending review" : "Awaiting approval", value: loading ? null : groups.needs.length, loading, tone: "warning" },
@@ -89,10 +89,10 @@ export default function ReconBoard() {
             <thead>
               <tr>
                 <Th>Age</Th>
+                <Th>Estimate #</Th>
                 <Th>Vehicle</Th>
                 <Th>Owner</Th>
                 <Th align="right">Total</Th>
-                <Th align="right">Approved</Th>
                 <Th>Status</Th>
                 <Th>Next action</Th>
               </tr>
@@ -101,10 +101,10 @@ export default function ReconBoard() {
               {shown.items.map((e) => (
                 <tr key={e.id} className="h-14 hover:bg-adm-workspace">
                   <Td className="whitespace-nowrap text-adm-muted">{ageOf(e.created_at)}</Td>
-                  <Td className="max-w-[300px] truncate font-semibold text-adm-ink">{e.ymm || "Vehicle"}</Td>
+                  <Td className="whitespace-nowrap font-mono text-[13px] text-adm-muted">{`REC-${e.id.slice(0, 8).toUpperCase()}`}</Td>
+                  <Td className="max-w-[300px] truncate font-medium text-adm-ink">{e.ymm || "Vehicle"}</Td>
                   <Td className="text-adm-muted">{(e.submitted_by && names[e.submitted_by]) || "Unknown"}</Td>
                   <Td align="right" className="tabular-nums">{money(e.subtotal)}</Td>
-                  <Td align="right" className="tabular-nums">{e.approved_total > 0 ? money(e.approved_total) : "-"}</Td>
                   <Td><EstimateState status={e.status} /></Td>
                   <Td><button type="button" onClick={() => openEstimate(e.id)} aria-label={`Review estimate for ${e.ymm || e.vin}`} className="text-[14px] font-semibold text-adm-primary hover:underline">{e.status === "submitted" ? "Review" : "View"}</button></Td>
                 </tr>

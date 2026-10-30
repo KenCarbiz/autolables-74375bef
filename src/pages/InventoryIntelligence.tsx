@@ -30,13 +30,12 @@ const STAGE_TONE_MAP: Record<string, Tone> = {
 const Stage = ({ stage }: { stage: PipelineStage }) =>
   stage === "Not Applicable"
     ? <span className="text-adm-muted" aria-label="Not applicable">-</span>
-    : <StatusText tone={STAGE_TONE_MAP[STAGE_TONE[stage]] ?? "neutral"} className="whitespace-nowrap !bg-transparent !px-0">{stage === "Enrichment Pending" ? "Pending" : stage}</StatusText>;
+    : <StatusText tone={STAGE_TONE_MAP[STAGE_TONE[stage]] ?? "neutral"} className="whitespace-nowrap">{stage === "Enrichment Pending" ? "Pending" : stage}</StatusText>;
 
 const COLUMNS: Array<{ key: string; label: string; ids: Array<(typeof DOCUMENT_FAMILY_IDS)[number]> }> = [
   { key: "oem", label: "OEM sticker", ids: ["oem_window_sticker_reproduction"] },
   { key: "addendum", label: "Addendum", ids: ["new_vehicle_addendum", "used_vehicle_addendum"] },
   { key: "bg", label: "Buyers Guide", ids: ["ftc_buyers_guide"] },
-  { key: "used", label: "Used sticker", ids: ["used_vehicle_window_sticker"] },
 ];
 
 interface Vehicle {
@@ -82,6 +81,7 @@ export default function InventoryIntelligence() {
   const [query, setQuery] = useState("");
   const [onlyBlocked, setOnlyBlocked] = useState(false);
   const [condition, setCondition] = useState("all");
+  const [docFilter, setDocFilter] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
@@ -153,10 +153,15 @@ export default function InventoryIntelligence() {
     return rows.filter((r) => {
       if (onlyBlocked && !r.intel.blocker) return false;
       if (condition !== "all" && r.vehicle.condition !== condition) return false;
+      if (docFilter !== "all") {
+        const col = COLUMNS.find((c) => c.key === docFilter);
+        const stages = col ? col.ids.map((id) => r.intel.families.find((x) => x.family === id)?.stage) : [];
+        if (!stages.some((st) => st && STAGE_TONE[st] !== "good" && st !== "Not Applicable")) return false;
+      }
       if (!term) return true;
       return `${r.vehicle.vin ?? ""} ${r.vehicle.ymm ?? ""}`.toLowerCase().includes(term);
     });
-  }, [rows, query, onlyBlocked, condition]);
+  }, [rows, query, onlyBlocked, condition, docFilter]);
 
   const exportRows = filtered ? (selected.size ? filtered.filter((r) => selected.has(r.vehicle.id)) : filtered) : null;
 
@@ -190,11 +195,6 @@ export default function InventoryIntelligence() {
       <PageHeader
         title="Inventory Intelligence"
         description="Document status and source data for each vehicle."
-        actions={
-          <Button variant="primary" onClick={exportCsv} disabled={!exportRows || exportRows.length === 0}>
-            {selected.size ? `Export ${selected.size} selected` : "Export"}
-          </Button>
-        }
       />
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -212,6 +212,11 @@ export default function InventoryIntelligence() {
           options={[{ value: "all", label: "All conditions" }, { value: "new", label: "New" }, { value: "used", label: "Used" }, { value: "cpo", label: "Certified" }]} />
         <FilterSelect label="Filter by status" value={onlyBlocked ? "attention" : "all"} onChange={(v) => setOnlyBlocked(v === "attention")}
           options={[{ value: "all", label: "All statuses" }, { value: "attention", label: `Needs attention${blockedCount ? ` (${blockedCount})` : ""}` }]} />
+        <FilterSelect label="Filter by document" value={docFilter} onChange={setDocFilter}
+          options={[{ value: "all", label: "All documents" }, ...COLUMNS.map((c) => ({ value: c.key, label: `${c.label} not approved` }))]} />
+        <Button variant="primary" className="ml-auto" onClick={exportCsv} disabled={!exportRows || exportRows.length === 0}>
+          {selected.size ? `Export ${selected.size} selected` : "Export"}
+        </Button>
       </div>
 
       {error && (
@@ -226,7 +231,7 @@ export default function InventoryIntelligence() {
           emptyTitle="No vehicles match"
           emptyDetail="Clear the search or the attention filter to widen the list."
         >
-          <WorkTable className="[&_th]:px-2 [&_td]:px-2 [&_td]:py-2.5" caption="Document pipeline by vehicle and family" minWidth={820}>
+          <WorkTable className="[&_th]:px-1.5 [&_td]:px-1.5 [&_td]:py-2" caption="Document pipeline by vehicle and family" minWidth={780}>
             <thead>
               <tr>
                 <Th className="w-8">
@@ -240,6 +245,7 @@ export default function InventoryIntelligence() {
                 </Th>
                 <Th className="whitespace-nowrap">Stock #</Th>
                 <Th>Vehicle</Th>
+                <Th>VIN</Th>
                 <Th>Source data</Th>
                 {COLUMNS.map((c) => <Th key={c.key} className="whitespace-nowrap">{c.label}</Th>)}
                 <Th>Blocker</Th>
@@ -259,23 +265,21 @@ export default function InventoryIntelligence() {
                     />
                   </Td>
                   <Td className="whitespace-nowrap font-mono text-[12px] text-adm-muted">{vehicleStockNumber(vehicle) ?? "Unknown"}</Td>
-                  <Td className="max-w-[210px]">
-                    <span className="block truncate font-semibold text-adm-ink">{vehicle.ymm || "Vehicle"}</span>
-                    <span className="block truncate font-mono text-[12px] leading-[16px] text-adm-muted">{vehicle.vin || "no VIN"}</span>
-                  </Td>
+                  <Td className="whitespace-nowrap text-[13px] font-medium text-adm-ink">{vehicle.ymm || "Vehicle"}</Td>
+                  <Td className="whitespace-nowrap font-mono text-[11px] text-adm-muted">{vehicle.vin || "Unknown"}</Td>
                   <Td><Stage stage={intel.sourceStage} /></Td>
                   {COLUMNS.map((c) => {
                     const f = c.ids.map((id) => intel.families.find((x) => x.family === id)).find((x) => x && x.stage !== "Not Applicable") ?? intel.families.find((x) => x.family === c.ids[0]);
                     return <Td key={c.key}>{f ? <Stage stage={f.stage} /> : null}</Td>;
                   })}
-                  <Td className="max-w-[130px]">
+                  <Td className="max-w-[150px]">
                     {intel.blocker
-                      ? <span className="block truncate text-[13px] text-adm-warning" title={intel.blocker}>{intel.blocker}</span>
+                      ? <span className="block truncate" title={intel.blocker}><StatusText tone="warning" className="max-w-full truncate">{intel.blocker}</StatusText></span>
                       : <span className="text-[12px] text-adm-muted">None</span>}
                   </Td>
                   <Td align="right">
                     <div className="flex items-center justify-end gap-3 whitespace-nowrap text-[14px] font-semibold">
-                      <Link to={`/vehicle-file/${vehicle.id}`} className="text-adm-primary hover:underline">Review</Link>
+                      <Link to={`/vehicle-file/${vehicle.id}`} className="inline-flex h-8 items-center rounded-[6px] border border-[#C9D6F5] bg-[#EEF3FD] px-3 text-adm-primary hover:bg-[#E2EBFB]">Review</Link>
                     </div>
                   </Td>
                 </tr>

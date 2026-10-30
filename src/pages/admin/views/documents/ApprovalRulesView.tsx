@@ -101,7 +101,7 @@ export default function ApprovalRulesView() {
   };
 
   return (
-    <div className="pt-[37px] space-y-3">
+    <div className="pt-[12px] space-y-3">
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_494px] gap-4 xl:gap-[13px]">
         <AdminCard flush className="min-w-0">
           <div className="pl-[29px] pr-[26px] pt-[21px]">

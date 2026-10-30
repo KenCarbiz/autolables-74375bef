@@ -158,9 +158,9 @@ export default function PrintCalibrationPage() {
                     Profile
                     <FilterSelect label="Profile" className="h-10 w-full" value={format} onChange={(v) => setFormat(v as StickerType)} options={[{ value: "window", label: "Default (Letter)" }, { value: "addendum", label: "Half letter (addendum)" }]} />
                   </label>
-                  <div className="grid grid-cols-3 items-end gap-3">
-                    <label className={labelCls}>Horizontal offset (in)<input type="number" step="0.01" className={fieldCls} value={num(cal.xOffsetIn)} onChange={(e) => set({ xOffsetIn: parseFloat(e.target.value) })} /></label>
-                    <label className={labelCls}>Vertical offset (in)<input type="number" step="0.01" className={fieldCls} value={num(cal.yOffsetIn)} onChange={(e) => set({ yOffsetIn: parseFloat(e.target.value) })} /></label>
+                  <div className="grid grid-cols-[1.25fr_1.1fr_0.9fr] items-end gap-2">
+                    <label className={labelCls}><span className="whitespace-nowrap">Horizontal offset (in)</span><input type="number" step="0.01" className={fieldCls} value={num(cal.xOffsetIn)} onChange={(e) => set({ xOffsetIn: parseFloat(e.target.value) })} /></label>
+                    <label className={labelCls}><span className="whitespace-nowrap">Vertical offset (in)</span><input type="number" step="0.01" className={fieldCls} value={num(cal.yOffsetIn)} onChange={(e) => set({ yOffsetIn: parseFloat(e.target.value) })} /></label>
                     <label className={labelCls}>Scale (%)<input type="number" step="0.5" className={fieldCls} value={num(cal.scalePct)} onChange={(e) => set({ scalePct: parseFloat(e.target.value) })} /></label>
                   </div>
                   <button type="button" onClick={() => set({ xOffsetIn: DEFAULT_CALIBRATION.xOffsetIn, yOffsetIn: DEFAULT_CALIBRATION.yOffsetIn, scalePct: DEFAULT_CALIBRATION.scalePct })} className="self-start text-[14px] font-semibold text-adm-primary hover:underline">Reset to default</button>

@@ -751,7 +751,7 @@ export default function FactoryStickerWorkspace({
           <div className={fullscreen
             ? "fixed inset-0 z-50 bg-slate-900/95 p-6 overflow-auto"
             : "rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3"}>
-            {pageSvg && <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
+            {pageSvg && (fullscreen || (model && model.pages.length > 1)) && <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {([
                   ["Fit", "fit"],
@@ -824,7 +824,9 @@ export default function FactoryStickerWorkspace({
               <div className={zoom === "fit" ? "" : "overflow-auto"}>
                 <div
                   data-product-surface="document"
-                  className="border border-border bg-white shadow-sm [&>svg]:block [&>svg]:h-auto"
+                  className={`border border-border bg-white shadow-sm [&>svg]:block [&>svg]:h-auto ${fullscreen ? "" : "cursor-zoom-in"}`}
+                  onClick={fullscreen ? undefined : () => setFullscreen(true)}
+                  title={fullscreen ? undefined : "Open full screen"}
                   // Actual print size: 11in at CSS 96dpi = 1056px page width.
                   style={zoom === "fit" ? undefined : { width: 1056 * (zoom as number) }}
                   dangerouslySetInnerHTML={{

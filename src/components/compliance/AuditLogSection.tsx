@@ -47,7 +47,7 @@ const entityRef = (r: AuditRow): string => {
 };
 
 const FilterField = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <label className="flex min-w-[140px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+  <label className="flex min-w-[140px] flex-none flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
     {label}
     {children}
   </label>
@@ -122,7 +122,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div>
         <div className="flex flex-wrap items-end gap-4">
           <FilterField label="Date range">
@@ -140,7 +140,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
           <FilterField label="Outcome">
             <FilterSelect label="Outcome" className="w-[150px]" value={draft.outcome} onChange={(v) => setDraft({ ...draft, outcome: v })} options={[{ value: "all", label: "All" }, { value: "Success", label: "Success" }, { value: "Failed", label: "Failed" }]} />
           </FilterField>
-          <div className="flex items-center gap-4">
+          <div className="ml-auto flex flex-col items-end gap-1.5">
             <span className="whitespace-nowrap text-[13px] leading-[18px] text-adm-muted">{loading ? "Loading events" : `${rows.length.toLocaleString()} events (${filtered.length.toLocaleString()} after filters)`}</span>
             <Button variant="primary" onClick={apply}>Apply filters</Button>
           </div>
@@ -170,7 +170,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
             <tbody>
               {shown.map((r) => (
                 <Fragment key={r.id}>
-                  <tr>
+                  <tr className="[&>td]:!py-2">
                     <Td className="whitespace-nowrap text-adm-muted">{formatDateTime(r.created_at)}</Td>
                     <Td className="max-w-[230px] truncate">{r.user_email || "System"}</Td>
                     <Td className="whitespace-nowrap">{activityLabel(r.action)}</Td>

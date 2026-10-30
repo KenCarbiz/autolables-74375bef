@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  AlertTriangle, ArrowUpRight, Check, CheckCircle2, Clock, Lock, Unlock, Wrench,
+  AlertTriangle, ArrowUpRight, CheckCircle2, Check, Clock, Lock, MoreHorizontal, Unlock, Wrench,
 } from "lucide-react";
 import { Card, DeepLink, EmptyNote, Section, btn, fmtWhen } from "./primitives";
 import { VehicleSubHeader } from "./SubPageHeader";
@@ -14,6 +14,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "sonner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { VEHICLE_NOTE_ACTION, cleanNote, notesFromAudit, type NoteAuditRow } from "./vehicleNotes";
 import { STATE_LABEL, type LifecycleState } from "@/lib/lifecycle/states";
 import type { ReadinessSummary, VehicleRow } from "./types";
@@ -58,7 +59,7 @@ const RailStrip = ({ state }: { state: LifecycleState | null }) => {
             <div className="flex items-center sm:justify-center gap-0 shrink-0">
               {i > 0 && <span className={`hidden sm:block h-0.5 flex-1 ${s === "future" ? "bg-adm-border" : "bg-adm-primary"}`} />}
               <span className={`w-7 h-7 rounded-full border inline-flex items-center justify-center shrink-0 ${STAGE_DOT[s]}`}>
-                {s === "done" ? <Check className="w-5 h-5" aria-hidden="true" /> : <span className="text-[13px] font-bold tabular-nums">{i + 1}</span>}
+                <span className="text-[13px] font-bold tabular-nums">{i + 1}</span>
               </span>
               {i < RAIL.length - 1 && <span className={`hidden sm:block h-0.5 flex-1 ${states[RAIL[i + 1].key] === "future" ? "bg-adm-border" : "bg-adm-primary"}`} />}
             </div>
@@ -197,9 +198,21 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
       description="Move this vehicle through each stage to become retail ready."
       strip={strip}
       actions={
-        <Button variant="primary" onClick={() => navigate(`/get-ready-command/${vehicle.id}`)}>
-          Open Get Ready Command <ArrowUpRight className="w-5 h-5" />
-        </Button>
+        <>
+          <Button variant="primary" onClick={() => navigate(`/get-ready-command/${vehicle.id}`)}>
+            Open Get Ready Command <ArrowUpRight className="w-5 h-5" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger aria-label="More actions" className="h-10 w-10 grid place-items-center rounded-[6px] border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace">
+              <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => navigate(`/vehicle-file/${vehicle.id}`)}>Open vehicle file</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate(`/ready-board`)}>Open Ready Board</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => { void navigator.clipboard?.writeText(vehicle.vin); toast.success("VIN copied"); }}>Copy VIN</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
       }
     />
   );
@@ -275,7 +288,9 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
             {ready.checks.map((c) => (
               <li key={c.label} className="flex items-center justify-between gap-3 py-2 text-[14px] leading-[20px]">
                 <span className="inline-flex items-center gap-2 min-w-0">
-                  <input type="checkbox" checked={c.ok} readOnly disabled aria-label={c.ok ? "Complete" : c.blocks ? "Open, blocks publish" : "Open"} className="h-4 w-4 shrink-0 accent-[#2457D6]" />
+                  <span role="img" aria-label={c.ok ? "Complete" : c.blocks ? "Open, blocks publish" : "Open"} className={`h-4 w-4 shrink-0 rounded-[3px] border inline-flex items-center justify-center ${c.ok ? "bg-adm-primary border-adm-primary text-white" : "bg-adm-surface border-adm-border"}`}>
+                    {c.ok && <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" />}
+                  </span>
                   <span className="truncate">{c.label}</span>
                 </span>
                 <span className="text-[12px] leading-[18px] text-adm-muted shrink-0">
@@ -295,13 +310,14 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
             id="vehicle-note"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            maxLength={1000}
+            maxLength={500}
             rows={4}
             placeholder="Add a note for the team"
             className="w-full rounded-[6px] border border-adm-border bg-adm-surface px-3 py-2 text-[14px] leading-[20px] text-adm-ink focus:outline-none focus:ring-2 focus:ring-adm-primary"
           />
-          <div className="flex justify-end">
-            <Button type="submit" disabled={savingNote || !draft.trim()}>{savingNote ? "Saving" : "Add note"}</Button>
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] leading-[18px] text-adm-muted tabular-nums">{draft.length} / 500</span>
+            <Button type="submit" disabled={savingNote || !draft.trim()}>{savingNote ? "Saving" : "Save note"}</Button>
           </div>
         </form>
         {historyLoading ? (
@@ -313,7 +329,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
             ...prep.filter((r) => r.notes && r.notes.trim()).map((r) => ({ key: r.id, when: r.updated_at, who: r.foreman_name || "Prep sign-off", text: r.notes as string })),
           ];
           return notes.length === 0 ? (
-            <p className="text-[14px] leading-[20px] text-adm-muted">No notes are recorded for this vehicle. Notes entered on prep sign-offs and manager gates appear here.</p>
+            null
           ) : (
             <ul className="divide-y divide-adm-border">
               {notes.map((n) => (

@@ -145,6 +145,7 @@ export interface ListingRow {
   ymm: string | null;
   slug: string | null;
   stock_number?: string | null;
+  hero_image_url?: string | null;
 }
 
 export interface AgentRow {
@@ -177,6 +178,7 @@ export interface VehicleOfInterest {
   stock: string | null;
   listingId: string | null;
   slug: string | null;
+  photo?: string | null;
   sources: string[];
 }
 
@@ -787,6 +789,7 @@ function finishCustomer(
       stock: stock || listing?.stock_number || null,
       listingId: listing?.id || null,
       slug: listing?.slug || vin,
+      photo: listing?.hero_image_url || null,
       sources: [source],
     });
   };

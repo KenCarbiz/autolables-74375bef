@@ -10,7 +10,7 @@ import {
   type CustomerEntry,
   type DealEntry,
 } from "@/components/customers/customerBook";
-import { Button, InlineNote, LocalTabs, MetricStrip, PageBody, PageHeader, type LocalTab } from "@/components/product";
+import { Button, FilterSelect, InlineNote, LocalTabs, MetricStrip, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { useCustomerBook } from "@/components/customers/useCustomerBook";
 import {
   Chip,
@@ -86,15 +86,17 @@ const Deals = () => {
     return m;
   }, [book.customers]);
 
+  const [docState, setDocState] = useState("all");
   const needle = q.trim().toLowerCase();
   const searched = useMemo(
     () =>
       book.deals.filter((d) =>
-        !needle
+        (docState === "all" || d.state === docState) &&
+        (!needle
           ? true
-          : `${d.vehicleLabel} ${d.stock || ""} ${d.vin || ""} ${d.customerName || ""} ${d.employeeName || ""}`.toLowerCase().includes(needle),
+          : `${d.vehicleLabel} ${d.stock || ""} ${d.vin || ""} ${d.customerName || ""} ${d.employeeName || ""}`.toLowerCase().includes(needle)),
       ),
-    [book.deals, needle],
+    [book.deals, needle, docState],
   );
 
   const tabs = useMemo(
@@ -151,10 +153,7 @@ const Deals = () => {
     <PageBody width="wide">
       <Seo title="Deals" description="Every deal, its signature state, its price integrity, and what it needs next." path="/deals" />
 
-      <PageHeader
-        title="Deals"
-        description="Every deal, its signature state and what it needs next."
-      />
+      <PageHeader title="Deals" />
 
       {error && (
         <InlineNote tone="danger" title="Some deal data failed to load" action={<Button size="sm" onClick={refetch}>Retry</Button>}>
@@ -167,7 +166,30 @@ const Deals = () => {
         tabs={tabs.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/deals?state=${t.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`, count: loading && !book.deals.length ? null : t.count, active: t.key === tab }))}
       />
       <MetricStrip
+        numberFirst
         label="Deal totals"
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterSelect label="Filter by document state" value={docState} onChange={setDocState} className="min-w-[170px]"
+              options={[
+                { value: "all", label: "All document states" },
+                { value: "draft", label: "Draft" },
+                { value: "out_for_signature", label: "Out for signature" },
+                { value: "signed", label: "Signed" },
+                { value: "delivered", label: "Delivered" },
+              ]} />
+            <label className="relative block">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search deals..."
+                aria-label="Search deals"
+                className="h-9 w-[220px] rounded-[6px] border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink placeholder:text-adm-muted focus:outline-none focus:ring-2 focus:ring-adm-primary"
+              />
+            </label>
+          </div>
+        }
         metrics={[
           { label: "Total deals", value: loading && !book.deals.length ? null : searched.length },
           { label: "Out for signature", value: loading && !book.deals.length ? null : searched.filter((d) => d.state === "out_for_signature").length },
@@ -175,16 +197,7 @@ const Deals = () => {
           { label: "Delivered", value: loading && !book.deals.length ? null : searched.filter((d) => d.state === "delivered").length },
         ]}
       />
-      <label className="relative block max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search vehicle, stock, VIN, customer"
-          aria-label="Search deals"
-          className="h-10 w-full rounded-md border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink placeholder:text-adm-muted focus:outline-none focus:ring-2 focus:ring-adm-primary"
-        />
-      </label>
+
 
       {loading && !book.deals.length ? (
         <div role="status" aria-label="Loading" className="rounded-[6px] border border-adm-border bg-adm-surface px-5 py-12 text-center">
@@ -198,8 +211,8 @@ const Deals = () => {
             <table className="w-full table-fixed text-left">
               <thead className="bg-adm-workspace">
                 <tr className="text-[12px] leading-[18px] text-adm-muted">
-                  <th className="font-semibold px-4 py-2.5 w-[7%]">Stock #</th>
-                  <th className="font-semibold py-2.5 w-[24%]">Vehicle</th>
+                  <th className="font-semibold px-4 py-2.5 w-[9%]">Stock #</th>
+                  <th className="font-semibold py-2.5 w-[22%]">Vehicle</th>
                   <th className="font-semibold py-2.5 w-[12%]">Customer</th>
                   <th className="font-semibold py-2.5 w-[8%] text-right pr-4">Amount</th>
                   <th className="font-semibold py-2.5 w-[13%]">Document state</th>
@@ -216,7 +229,7 @@ const Deals = () => {
                     <tr key={deal.id} className="h-14 border-t border-adm-border hover:bg-adm-workspace transition-colors">
                       <td className="px-4 pr-3 text-[13px] text-adm-muted truncate">{deal.stock || "Unknown"}</td>
                       <td className="pr-3 text-[14px] truncate">
-                        <Link to={`/deals/${encodeURIComponent(deal.id)}`} className="font-semibold text-adm-primary hover:underline">{deal.vehicleLabel}</Link>
+                        <Link to={`/deals/${encodeURIComponent(deal.id)}`} className="font-medium text-adm-ink hover:text-adm-primary hover:underline">{deal.vehicleLabel}</Link>
                       </td>
                       <td className="pr-3 text-[14px] text-adm-ink truncate">
                         {deal.customerName && deal.customerId
@@ -302,10 +315,10 @@ const DealMenu = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-adm-border text-adm-muted hover:bg-adm-workspace transition-colors"
+        className="inline-flex items-center justify-center h-8 w-8 rounded-md text-adm-muted hover:bg-adm-workspace transition-colors"
         aria-label={`More actions for ${deal.vehicleLabel}`}
       >
-        <MoreHorizontal className="w-4 h-4" />
+        <MoreHorizontal className="w-5 h-5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         {deal.signingToken && <DropdownMenuItem onSelect={() => onView(deal)}>View signing page</DropdownMenuItem>}

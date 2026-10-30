@@ -295,11 +295,20 @@ export default function DocumentsPrintCenter() {
               detail="Window stickers, addendums, guides, and QR items appear here as they are generated for this vehicle."
             />
           ) : (
+            <>
             <Panel flush>
               <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Documents for this vehicle" minWidth={700}>
                 <thead>
                   <tr>
-                    <Th className="w-10"><span className="sr-only">Select</span></Th>
+                    <Th className="w-10">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all documents for the print bundle"
+                        checked={documents.some((d) => d.kind === "doc") && documents.filter((d) => d.kind === "doc").every((d) => picked.has(d.id))}
+                        onChange={(e) => setPicked(e.target.checked ? new Set(documents.filter((d) => d.kind === "doc").map((d) => d.id)) : new Set())}
+                        className="h-4 w-4 accent-[#2457D6]"
+                      />
+                    </Th>
                     <Th>Document</Th>
                     <Th>Version</Th>
                     <Th className="whitespace-nowrap">Internal status</Th>
@@ -376,11 +385,12 @@ export default function DocumentsPrintCenter() {
                   })}
                 </tbody>
               </WorkTable>
-              <p className="border-t border-adm-border px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
+            </Panel>
+            <p className="px-1 pt-3 text-[13px] leading-[18px] text-adm-muted">
                 {picked.size} of {docCount} documents selected · {counts.ready} ready · {counts.blocked} blocked · {counts.customerVisible} shown in the Passport
                 {passportHref ? <> · <a href={passportHref} target="_blank" rel="noreferrer" className="font-semibold text-adm-primary hover:underline">Open Passport view</a></> : null}
               </p>
-            </Panel>
+            </>
           )
         }
         aside={
@@ -417,10 +427,8 @@ export default function DocumentsPrintCenter() {
               ) : (
                 <p className="text-[14px] leading-[20px] text-adm-muted">Select a document to preview it.</p>
               )}
-              <div className="mt-3 flex flex-col gap-3 border-t border-adm-border pt-3">
-                {printAction}
-              </div>
             </Panel>
+            {printAction}
 
             <Panel title="Print bundle">
               <ul className="divide-y divide-adm-border">

@@ -101,7 +101,7 @@ const MinutesSelect = ({ id, label, value, onChange, allowOff = false, disabled 
 };
 
 const Step = ({ n, title, hint, last = false, className, children }: { n: number; title: string; hint: string; last?: boolean; className?: string; children: ReactNode }) => (
-  <li data-landmark="escalation-tier" className={cn("relative pl-[57px]", last ? "pb-[9px]" : "pb-[15px]", className)}>
+  <li data-landmark="escalation-tier" className={cn("relative pl-[57px]", last ? "pb-[6px]" : "pb-[8px]", className)}>
     {!last && <span aria-hidden="true" className="absolute left-4 top-[38px] bottom-0 w-px bg-adm-border" />}
     <span className="absolute left-0 top-0 w-[34px] h-[34px] rounded-full bg-adm-selected text-adm-primary text-[14px] font-semibold flex items-center justify-center">{n}</span>
     <p className="text-[14px] leading-[20px] font-semibold text-adm-ink pt-0.5">{title}</p>
@@ -376,7 +376,7 @@ export default function EscalationPage() {
                   note={<p className="h-4 flex items-center text-[12px] leading-[16px] text-adm-muted">No one is notified at this step.</p>}
                 />
               </Step>
-              <Step n={2} title="BDC escalation" hint="If there is still no response, notify the BDC desk." className="pb-[17px]">
+              <Step n={2} title="BDC escalation" hint="If there is still no response, notify the BDC desk." className="pb-[8px]">
                 <TierControls
                   minutes={<MinutesSelect id="bdc-after" label="Escalate to BDC after" value={rules.escalateToBdcAfterMinutes ?? rules.firstResponseSlaMinutes} allowOff disabled={inputsOff} onChange={(v) => patchRules({ escalateToBdcAfterMinutes: v })} />}
                   destination={<DestinationSelect label="BDC desk" tier="BDC escalation" missing={bdcMissing} />}
@@ -403,7 +403,7 @@ export default function EscalationPage() {
               </Step>
             </ol>
 
-            <div className="pt-3 border-t border-adm-border">
+            <div className="pt-2 border-t border-adm-border">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Scope</p>
               <p className="text-[12px] leading-[18px] text-adm-muted">Escalation rules are stored once per account and apply to every rooftop.</p>
               <div className="mt-[6px] inline-flex items-center h-[29px] min-w-[232px] px-3 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold text-adm-ink">
@@ -414,7 +414,7 @@ export default function EscalationPage() {
               </div>
             </div>
 
-            <div className="mt-[13px]">
+            <div className="mt-[9px]">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Notification methods</p>
               <p className="text-[12px] leading-[18px] text-adm-muted">Select how escalation notifications are sent.</p>
               <div className="mt-[6px] grid grid-cols-2 sm:grid-cols-[148fr_149fr_152fr_154fr] gap-2 sm:mr-1" role="group" aria-label="Notification methods">

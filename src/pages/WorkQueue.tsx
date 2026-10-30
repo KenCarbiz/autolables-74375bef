@@ -90,7 +90,7 @@ const dueLabel = (item: WorkItem) => {
   const due = new Date(item.due_at);
   if (Number.isNaN(due.getTime())) return { text: "No due date", overdue: false };
   const overdue = due.getTime() < Date.now() && item.status !== "completed" && item.status !== "cancelled";
-  return { text: `${overdue ? "Overdue " : ""}${format(due, "MMM d, yyyy")}`, overdue };
+  return { text: `${overdue ? "Overdue " : ""}${format(due, "MMM d")}`, overdue };
 };
 
 const LANE_LABEL: Record<WorkLane, string> = {
@@ -118,6 +118,9 @@ const WorkQueue = () => {
   const [department, setDepartment] = useState<Department>("all");
   const [includeDeparted, setIncludeDeparted] = useState(false);
   const [q, setQ] = useState("");
+  const [age, setAge] = useState("all");
+  const [owner, setOwner] = useState("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async () => {
     if (!tenant?.id) return;
@@ -188,13 +191,21 @@ const WorkQueue = () => {
     const needle = q.trim().toLowerCase();
     return items.filter((item) => {
       if (status !== "all" && item.status !== status) return false;
+      if (age !== "all") {
+        const days = item.created_at ? Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000) : null;
+        if (days === null || (age === "today" ? days > 0 : age === "week" ? days < 1 || days > 7 : days <= 7)) return false;
+      }
+      if (owner !== "all") {
+        const mine = !!item.assigned_to && item.assigned_to === user?.id;
+        if (owner === "me" ? !mine : owner === "unassigned" ? !!item.assigned_to : !item.assigned_to || mine) return false;
+      }
       if (department !== "all" && item.department !== department) return false;
       if (!needle) return true;
       return [item.title, item.description, item.vin, item.stock, item.vehicle_title, item.work_type, item.department]
         .filter(Boolean)
         .some((value) => `${value}`.toLowerCase().includes(needle));
     });
-  }, [items, status, department, q]);
+  }, [items, status, department, age, owner, q, user?.id]);
 
   const byLane = useMemo(() => {
     const buckets: Record<WorkLane, WorkItem[]> = {
@@ -284,7 +295,13 @@ const WorkQueue = () => {
     return buildSelfAwareWorkItems({ id: item.vehicle_id, vin: item.vin, stock: item.stock, ymm: item.vehicle_title, condition: item.condition }, {});
   };
 
-  const filtersActive = status !== "all" || department !== "all" || q.trim().length > 0;
+  const filtersActive = status !== "all" || department !== "all" || age !== "all" || owner !== "all" || q.trim().length > 0;
+  const selectable = laneItems.filter((i) => !isSystemException(i) && i.source !== "description_exception" && i.status !== "completed");
+  const allSelected = selectable.length > 0 && selectable.every((i) => selected.has(i.id));
+  const completeSelected = async () => {
+    for (const item of selectable.filter((i) => selected.has(i.id))) await updateStatus(item, "completed");
+    setSelected(new Set());
+  };
 
   const myWorkEmptyNote = (() => {
     const others = laneCount("team") + laneCount("waiting") + laneCount("system_exception");
@@ -314,11 +331,6 @@ const WorkQueue = () => {
       <PageHeader
         title="Work Queue"
         description="Your tasks and items across the team."
-        actions={tabKey !== "print" ? (
-          <Button onClick={confirmBuild} disabled={creating}>
-            {creating ? "Building queue..." : "Review and build from inventory"}
-          </Button>
-        ) : undefined}
       />
 
       <LocalTabs tabs={queueTabs} label="Work queue" />
@@ -329,13 +341,21 @@ const WorkQueue = () => {
             <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
             <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search work" placeholder="Search VIN, stock, task, department" className="h-9 w-full rounded-[6px] border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink" />
           </div>
+          <FilterSelect label="Filter by type" value={department} onChange={(v) => setDepartment(v as Department)}
+            options={[{ value: "all", label: "All types" }, ...(["inventory", "print", "service", "detail", "third_party", "compliance", "manager", "passport", "finance"] as const).map((d) => ({ value: d, label: d === "third_party" ? "Third party" : d.charAt(0).toUpperCase() + d.slice(1) }))]} />
+          <FilterSelect label="Filter by age" value={age} onChange={setAge}
+            options={[{ value: "all", label: "All ages" }, { value: "today", label: "Today" }, { value: "week", label: "1 to 7 days" }, { value: "older", label: "Over 7 days" }]} />
+          <FilterSelect label="Filter by owner" value={owner} onChange={setOwner}
+            options={[{ value: "all", label: "All owners" }, { value: "me", label: "Me" }, { value: "team", label: "Teammates" }, { value: "unassigned", label: "Unassigned" }]} />
           <FilterSelect label="Filter by status" value={status} onChange={(v) => setStatus(v as WorkStatus)}
             options={[{ value: "all", label: "All statuses" }, { value: "open", label: "Open" }, { value: "needs_approval", label: "Needs approval" }, { value: "in_progress", label: "In progress" }, { value: "completed", label: "Done" }, { value: "cancelled", label: "Cancelled" }]} />
-          <FilterSelect label="Filter by department" value={department} onChange={(v) => setDepartment(v as Department)}
-            options={[{ value: "all", label: "All departments" }, ...(["inventory", "print", "service", "detail", "third_party", "compliance", "manager", "passport", "finance"] as const).map((d) => ({ value: d, label: d === "third_party" ? "Third party" : d.charAt(0).toUpperCase() + d.slice(1) }))]} />
           {filtersActive && (
-            <Button size="sm" variant="ghost" onClick={() => { setStatus("all"); setDepartment("all"); setQ(""); }}>Clear filters</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setStatus("all"); setDepartment("all"); setAge("all"); setOwner("all"); setQ(""); }}>Clear filters</Button>
           )}
+          {selected.size > 0 && <Button size="sm" onClick={() => void completeSelected()}>Mark {selected.size} done</Button>}
+          <Button size="sm" variant="ghost" className="ml-auto" onClick={confirmBuild} disabled={creating}>
+            {creating ? "Building queue..." : "Review and build from inventory"}
+          </Button>
         </div>
       )}
 
@@ -376,12 +396,16 @@ const WorkQueue = () => {
                 : undefined
             }
           >
-            <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Work items" minWidth={820}>
+            <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Work items" minWidth={760}>
               <thead>
                 <tr>
+                  <Th className="w-8">
+                    <input type="checkbox" aria-label="Select all" checked={allSelected} disabled={selectable.length === 0}
+                      onChange={(e) => setSelected(e.target.checked ? new Set(selectable.map((i) => i.id)) : new Set())} className="h-4 w-4 accent-[#2457D6]" />
+                  </Th>
                   <Th>Age</Th>
-                  <Th>Task</Th>
                   <Th>Vehicle</Th>
+                  <Th>Task</Th>
                   <Th>Owner</Th>
                   <Th>Type</Th>
                   <Th>Due</Th>
@@ -398,6 +422,8 @@ const WorkQueue = () => {
                     item={item}
                     currentUserId={user?.id}
                     previews={previewVehicleWork(item).length}
+                    selected={selected.has(item.id)}
+                    onSelect={(on) => setSelected((prev) => { const n = new Set(prev); if (on) n.add(item.id); else n.delete(item.id); return n; })}
                     onOpen={navigate}
                     onUpdate={updateStatus}
                   />
@@ -428,8 +454,10 @@ function RowMenu({ children, label }: { children: ReactNode; label: string }) {
   );
 }
 
-function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate }: {
+function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate, selected, onSelect }: {
   item: WorkItem;
+  selected: boolean;
+  onSelect: (on: boolean) => void;
   currentUserId?: string | null;
   previews: number;
   onOpen: (to: string) => void;
@@ -445,14 +473,17 @@ function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate }: {
 
   return (
     <tr className="h-12 hover:bg-adm-workspace">
+      <Td className="w-8">
+        <input type="checkbox" aria-label={`Select ${item.title}`} checked={selected} disabled={external || item.status === "completed"} onChange={(e) => onSelect(e.target.checked)} className="h-4 w-4 accent-[#2457D6]" />
+      </Td>
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
+      <Td className="max-w-[220px] truncate"><span title={vehicleLabel(item)}>{vehicleLabel(item)}</span></Td>
       <Td className="max-w-[270px]">
-        <p className="truncate font-semibold text-adm-ink" title={item.title}>
+        <p className="truncate font-medium text-adm-ink" title={item.title}>
           {item.title}
           {urgent && item.priority && <StatusText tone="warning" className="ml-2">{item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}</StatusText>}
         </p>
       </Td>
-      <Td className="max-w-[210px] truncate"><span title={vehicleLabel(item)}>{vehicleLabel(item)}</span></Td>
       <Td className="text-adm-muted">{owner}</Td>
       <Td className="whitespace-nowrap capitalize text-adm-muted">{(item.department || "inventory").replace(/_/g, " ")}</Td>
       <Td className="whitespace-nowrap">
@@ -488,15 +519,16 @@ function ExceptionRow({ item, onOpen, onDismiss }: {
 
   return (
     <tr className="h-12 hover:bg-adm-workspace" title={[copy.why, showDetail ? detail : ""].filter(Boolean).join(" ")}>
+      <Td className="w-8"><input type="checkbox" aria-label="Exception rows are resolved from the vehicle" disabled className="h-4 w-4 accent-[#2457D6]" /></Td>
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
-      <Td className="max-w-[300px]">
-        <p className="truncate font-semibold text-adm-ink" title={copy.label}>{copy.label}</p>
-      </Td>
       <Td className="max-w-[260px] truncate">{vehicleLabel(item)}{departed ? " (left the lot)" : ""}</Td>
+      <Td className="max-w-[300px]">
+        <p className="truncate font-medium text-adm-ink" title={copy.label}>{copy.label}</p>
+      </Td>
       <Td className="text-adm-muted">System</Td>
       <Td className="whitespace-nowrap text-adm-muted">System</Td>
       <Td className="whitespace-nowrap text-adm-muted">
-        {item.created_at ? format(new Date(item.created_at), "MMM d, yyyy") : "Unknown"}
+        {item.created_at ? format(new Date(item.created_at), "MMM d") : "Unknown"}
       </Td>
       <Td className="whitespace-nowrap">{statusLabels[item.status] || item.status}</Td>
       <Td align="right">

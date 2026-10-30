@@ -37,6 +37,14 @@
   --al-r-hero: 8px;
 }
 
+/* The V2 workspace ground (#F5F6F8) replaces the darker .al-admin grey. */
+.al-admin[data-product-surface="dealer"],
+.al-admin[data-product-surface="platform"],
+[data-product-surface="dealer"] .al-admin,
+[data-product-surface="platform"] .al-admin {
+  --background: 220 17% 97%;
+}
+
 /* No static shadows on working surfaces; floating layers keep theirs. */
 [data-product-surface="dealer"] :is(.shadow-premium, .shadow-premium-md, .shadow-premium-lg):not(:is([data-product-surface="customer"], [data-product-surface="document"]) *),
 [data-product-surface="platform"] :is(.shadow-premium, .shadow-premium-md, .shadow-premium-lg):not(:is([data-product-surface="customer"], [data-product-surface="document"]) *) {

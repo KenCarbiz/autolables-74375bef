@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Crumbs, DetailLayout, fmtDateTime } from "@/components/detail/parts";
-import { InlineNote, LinkButton, LocalTabs, PageBody, PageHeader, Panel, QueryState, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
+import { LinkButton, LocalTabs, PageBody, PageHeader, Panel, QueryState, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
 import { PRICE_STATE_LABEL, money, type PriceRow, type PriceState } from "./complianceData";
 import { useComplianceCenterData } from "./useComplianceCenterData";
 import { complianceVinParam } from "./childLinks";
@@ -192,9 +192,9 @@ export default function PriceReviewPage() {
                       </tbody>
                     </WorkTable>
                     <div className="space-y-3 px-4 py-3">
-                      <InlineNote tone="info">
+                      <p className="rounded-md bg-[#EEF3FF] px-3 py-2.5 text-[13px] leading-[19px] text-adm-ink">
                         {row.difference == null || row.difference === 0 ? "No change is proposed." : `Proposed is the ${row.referenceLabel === "Feed" ? "feed" : "confirmed"} price, ${money(Math.abs(row.difference))} ${row.difference > 0 ? "below" : "above"} the website. Correct it in the vehicle file; the nightly crawl then re-checks the website.`}
-                      </InlineNote>
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         <LinkButton to={`/vehicle-file/${row.vehicleId}`} variant="primary">Open vehicle file</LinkButton>
                         <LinkButton to="/compliance?tab=price">Cancel</LinkButton>

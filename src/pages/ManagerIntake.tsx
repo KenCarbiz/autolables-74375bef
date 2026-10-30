@@ -60,6 +60,7 @@ export default function ManagerIntake() {
   const [rows, setRows] = useState<Row[]>([]);
   const [authorizedToday, setAuthorizedToday] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [loadError, setLoadError] = useState<string | null>(null);
   // Filter, search and the open review live in the URL so reload and back
   // return to the same queue state.
@@ -219,9 +220,8 @@ export default function ManagerIntake() {
     <PageBody width="wide">
       <PageHeader
         title="Manager Intake"
-        description="Vehicles waiting for authorization before get-ready work starts."
         actions={
-          <Button variant="primary" disabled={visible.length === 0} onClick={() => { setDrawer(visible[0]); setReason(""); }}>
+          <Button variant="primary" disabled={visible.length === 0} onClick={() => { setDrawer(visible.find((r) => picked.has(r.vehicleId)) ?? visible[0]); setReason(""); }}>
             Review vehicle
           </Button>
         }
@@ -230,12 +230,13 @@ export default function ManagerIntake() {
       <LocalTabs label="Intake queue filters" tabs={tabs} />
 
       <MetricStrip
+        numberFirst
         label="Intake queue summary"
         metrics={[
-          { label: "Awaiting authorization", value: ready ? counts.awaiting : null, loading, href: "/get-ready-command?gate=awaiting" },
-          { label: "Holds", value: ready ? counts.holds : null, loading, href: "/get-ready-command?gate=holds" },
-          { label: "Exceptions", value: ready ? counts.exceptions : null, loading, href: "/get-ready-command?gate=exceptions" },
-          { label: "Authorized today", value: ready ? authorizedToday : null, loading },
+          { label: "Awaiting authorization", value: ready ? counts.awaiting : null, hint: "In queue for review", loading, href: "/get-ready-command?gate=awaiting" },
+          { label: "Holds", value: ready ? counts.holds : null, hint: "Waiting for information", loading, href: "/get-ready-command?gate=holds" },
+          { label: "Exceptions", value: ready ? counts.exceptions : null, hint: "Need manager attention", loading, href: "/get-ready-command?gate=exceptions" },
+          { label: "Authorized today", value: ready ? authorizedToday : null, hint: "Cleared for get-ready", loading },
         ]}
       />
 
@@ -255,14 +256,19 @@ export default function ManagerIntake() {
           emptyTitle={q ? "No vehicles match that search." : `Nothing is waiting in ${tabLabel}.`}
           emptyDetail="New vehicles from tonight's ingest arrive in this queue automatically. This is the selected filter only. Existing inventory was grandfathered as authorized at rollout."
         >
-          <WorkTable caption="Intake authorization queue" minWidth={900}>
+          <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Intake authorization queue" minWidth={900}>
             <thead>
               <tr>
+                <Th className="w-8">
+                  <input type="checkbox" aria-label="Select all vehicles" className="h-4 w-4 accent-[#2457D6]"
+                    checked={visible.length > 0 && visible.every((r) => picked.has(r.vehicleId))}
+                    onChange={(e) => setPicked(e.target.checked ? new Set(visible.map((r) => r.vehicleId)) : new Set())} />
+                </Th>
                 <Th>Vehicle</Th>
-                <Th align="right">Age (days)</Th>
+                <Th align="right" className="whitespace-nowrap">Age (days)</Th>
                 <Th>Condition</Th>
-                <Th>Recall (evidence)</Th>
-                <Th align="right">Asking price</Th>
+                <Th className="whitespace-nowrap">Recall (evidence)</Th>
+                <Th align="right" className="whitespace-nowrap">Asking price</Th>
                 <Th>Owner</Th>
                 <Th>Status</Th>
                 <Th align="right"><span className="sr-only">Action</span></Th>
@@ -273,6 +279,10 @@ export default function ManagerIntake() {
                 const dnd = /do_not_drive|do-not-drive/i.test(r.recall);
                 return (
                   <tr key={r.vehicleId} className="h-14 cursor-pointer hover:bg-adm-workspace" onClick={() => { setDrawer(r); setReason(""); }}>
+                    <Td className="w-8">
+                      <input type="checkbox" aria-label={`Select ${r.ymm}`} className="h-4 w-4 accent-[#2457D6]" checked={picked.has(r.vehicleId)} onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setPicked((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.vehicleId); else n.delete(r.vehicleId); return n; })} />
+                    </Td>
                     <Td>
                       <div className="flex items-center gap-3">
                         {r.photo
@@ -290,7 +300,7 @@ export default function ManagerIntake() {
                       {dnd ? <StatusText tone="danger">Do-not-drive</StatusText>
                         : r.recall ? <span className="capitalize text-adm-ink">{r.recall.replace(/_/g, " ")}</span>
                         : <span className="text-adm-ink">Unknown</span>}
-                      <p className="text-[12px] leading-[16px] text-adm-muted">{r.recall ? "Stored recall check" : "No report on file"}</p>
+                      <p className="whitespace-nowrap text-[12px] leading-[16px] text-adm-muted">{r.recall ? "Stored recall check" : "No report on file"}</p>
                     </Td>
                     <Td align="right">{r.price != null ? `$${r.price.toLocaleString("en-US")}` : <span className="text-adm-muted">Unknown</span>}</Td>
                     <Td className="whitespace-nowrap text-adm-muted">{STATE_OWNER[r.state as keyof typeof STATE_OWNER] ?? "Unknown"}</Td>
@@ -298,7 +308,7 @@ export default function ManagerIntake() {
                       <StatusText tone={(STATE_PILL[r.state] ?? { tone: "neutral" as Tone }).tone}>{(STATE_PILL[r.state] ?? { label: r.state }).label}</StatusText>
                     </Td>
                     <Td align="right">
-                      <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</button>
+                      <button type="button" className="inline-flex h-8 items-center rounded-[6px] bg-adm-primary px-4 text-[14px] font-medium text-white hover:opacity-90" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</button>
                     </Td>
                   </tr>
                 );

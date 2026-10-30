@@ -40,6 +40,12 @@ const workSummary = (lines: InvoiceLine[]) => {
   return lines.length === 1 ? lines[0].label : `${lines[0].label} +${lines.length - 1} more`;
 };
 
+const installerOf = (lines: InvoiceLine[]) => {
+  const names = Array.from(new Set(lines.filter((l) => l.kind === "accessory").map((l) => (l.detail || "").split(" · ")[0].trim()).filter(Boolean)));
+  if (names.length === 0) return lines.length > 0 ? "In house" : "Unknown";
+  return names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`;
+};
+
 const printInvoice = (e: InvoiceEntry, dealerName: string) => {
   const rows = e.lines
     .map((l) => `<tr><td>${esc(l.kind === "accessory" ? "Accessory install" : "Service")}</td><td>${esc(l.label)}${l.detail ? `<div class="sub">${esc(l.detail)}</div>` : ""}</td><td style="text-align:right">${esc(money(l.amount))}</td></tr>`)
@@ -71,6 +77,7 @@ const InstallerInvoices = () => {
   const { rows, loading, available, markInvoiced, markPaid } = useInstallerInvoices(tenantId);
   const [productPrices, setProductPrices] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [params, setParams] = useSearchParams();
   const stateParam = params.get("state");
   const tab: InvoiceTab = stateParam === "invoiced" || stateParam === "paid" ? stateParam : "ready";
@@ -138,6 +145,19 @@ const InstallerInvoices = () => {
     else toast.error(e.invoice ? "Could not update the invoice" : "Could not save the invoice");
   };
 
+  const createInvoices = async () => {
+    const targets = shown.filter((e) => e.tab === "ready" && (picked.size === 0 || picked.has(e.derived.recordId)));
+    if (targets.length === 0) return;
+    if (picked.size === 0 && !window.confirm(`Create invoices for all ${targets.length} ready ${targets.length === 1 ? "vehicle" : "vehicles"}?`)) return;
+    setBusy("bulk");
+    let saved = 0;
+    for (const e of targets) if (await markInvoiced(e.derived)) saved += 1;
+    setBusy(null);
+    setPicked(new Set());
+    if (saved === targets.length) toast.success(saved === 1 ? "Invoice created" : `${saved} invoices created`);
+    else toast.error(`${saved} of ${targets.length} invoices were saved`);
+  };
+
   const exportCsv = () => {
     type CsvRow = { invoice: string; status: string; vin: string; ymm: string; stock: string; ro: string; kind: string; label: string; detail: string; amount: number };
     const flat: CsvRow[] = [];
@@ -171,8 +191,12 @@ const InstallerInvoices = () => {
       <Seo title="Installer invoices" path="/invoices" description="Invoices for installed accessories and internal services" />
       <PageHeader
         title="Installer invoices"
-        description="Invoices for installed accessories and services from completed Get Ready work."
-        actions={<Button variant="secondary" onClick={exportCsv}>Export CSV</Button>}
+        description="Manage vendor work invoices for installed accessories and services."
+        actions={
+          <Button variant="primary" onClick={() => void createInvoices()} disabled={!available || tab !== "ready" || shown.length === 0 || busy === "bulk"}>
+            Create invoice
+          </Button>
+        }
       />
       <LocalTabs label="Invoice state" tabs={tabs} />
       <MetricStrip
@@ -198,13 +222,19 @@ const InstallerInvoices = () => {
         />
       ) : (
         <Panel flush>
-          <WorkTable caption="Installer invoices" minWidth={900}>
+          <WorkTable caption="Installer invoices" minWidth={960}>
             <thead>
               <tr>
+                <Th className="w-8">
+                  <input type="checkbox" aria-label="Select all invoices" className="h-4 w-4 accent-[#2457D6]" disabled={tab !== "ready"}
+                    checked={tab === "ready" && shown.length > 0 && shown.every((e) => picked.has(e.derived.recordId))}
+                    onChange={(ev) => setPicked(ev.target.checked ? new Set(shown.map((e) => e.derived.recordId)) : new Set())} />
+                </Th>
                 <Th>{tab === "ready" ? "Completed" : tab === "paid" ? "Paid" : "Invoiced"}</Th>
                 <Th>RO</Th>
                 <Th>Vehicle</Th>
                 <Th>VIN</Th>
+                <Th>Installer / Vendor</Th>
                 <Th>Work performed</Th>
                 <Th align="right">Amount</Th>
                 <Th>Status</Th>
@@ -217,11 +247,17 @@ const InstallerInvoices = () => {
                 const next = nextAction(e);
                 return (
                   <tr key={e.derived.recordId} className="hover:bg-adm-workspace">
+                    <Td className="w-8">
+                      <input type="checkbox" aria-label={`Select ${e.derived.ymm || e.derived.vin}`} className="h-4 w-4 accent-[#2457D6]" disabled={e.tab !== "ready"}
+                        checked={picked.has(e.derived.recordId)}
+                        onChange={(ev) => setPicked((prev) => { const n = new Set(prev); if (ev.target.checked) n.add(e.derived.recordId); else n.delete(e.derived.recordId); return n; })} />
+                    </Td>
                     <Td className="whitespace-nowrap">{fmtDay(e.date)}</Td>
                     <Td className="whitespace-nowrap">{e.derived.roNumber || "Unknown"}</Td>
-                    <Td className="max-w-[170px]"><span className="block truncate font-semibold">{e.derived.ymm || "Vehicle"}</span></Td>
+                    <Td className="max-w-[190px]"><span className="block truncate font-medium" title={e.derived.ymm}>{e.derived.ymm || "Vehicle"}</span></Td>
                     <Td className="whitespace-nowrap font-mono text-[12px]">{e.derived.vin}</Td>
-                    <Td className="max-w-[170px]"><span className="block truncate">{workSummary(e.lines)}</span></Td>
+                    <Td className="max-w-[130px]"><span className="block truncate">{installerOf(e.lines)}</span></Td>
+                    <Td className="max-w-[190px]"><span className="block truncate" title={workSummary(e.lines)}>{workSummary(e.lines)}</span></Td>
                     <Td align="right" className="whitespace-nowrap">{money(e.total)}</Td>
                     <Td>
                       <StatusText tone={e.tab === "paid" ? "success" : e.tab === "invoiced" ? "info" : "warning"}>{TAB_LABEL[e.tab]}</StatusText>
@@ -254,7 +290,7 @@ const InstallerInvoices = () => {
             </tbody>
           </WorkTable>
           <div className="flex items-center justify-between border-t border-adm-border px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
-            <span>{shown.length} in {TAB_LABEL[tab]}</span>
+            <span>Showing {shown.length} of {entries.length} <button type="button" onClick={exportCsv} className="ml-3 font-semibold text-adm-primary hover:underline">Export CSV</button></span>
             <span className="text-[14px] text-adm-ink">Total <span className="font-semibold tabular-nums">{money(shownTotal)}</span></span>
           </div>
         </Panel>

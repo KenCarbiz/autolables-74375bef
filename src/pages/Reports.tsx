@@ -214,11 +214,11 @@ const Reports = () => {
           >
             <label className="flex items-center gap-2 text-[13px] leading-[18px] text-adm-ink">
               Timezone
-              <FilterSelect label="Timezone" disabled className="h-10 min-w-[170px]" value="local" onChange={() => undefined} options={[{ value: "local", label: Intl.DateTimeFormat().resolvedOptions().timeZone }]} />
+              <span className="inline-flex h-10 min-w-[170px] items-center rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] leading-[20px] text-adm-ink" aria-label="Timezone">{Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
             </label>
             <label className="flex items-center gap-2 text-[13px] leading-[18px] text-adm-ink">
               Scope
-              <FilterSelect label="Scope" disabled className="h-10 min-w-[170px]" value="store" onChange={() => undefined} options={[{ value: "store", label: currentStore?.name || tenant?.name || "This dealership" }]} />
+              <span className="inline-flex h-10 min-w-[170px] items-center rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] leading-[20px] text-adm-ink" aria-label="Scope">{currentStore?.name || tenant?.name || "This dealership"}</span>
             </label>
             <label className="flex items-center gap-2 text-[13px] leading-[18px] text-adm-ink">
               Date range
@@ -238,7 +238,15 @@ const Reports = () => {
               </Strip>
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] items-start">
-                <DailyChart title="Documents generated" data={r.genByDay} days={days} />
+                <div className="flex flex-col gap-3">
+                  <DailyChart title="Documents generated" data={r.genByDay} days={days} />
+                  {docTypes.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
+                      <span className="font-semibold text-adm-ink">By type</span>
+                      {docTypes.map(([type, count]) => <span key={type} className="whitespace-nowrap">{type.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())} <span className="font-semibold tabular-nums text-adm-ink">{count.toLocaleString()}</span></span>)}
+                    </div>
+                  )}
+                </div>
                 <section className="rounded-[6px] border border-adm-border bg-adm-surface">
                   <h3 className="px-4 pt-4 text-[16px] leading-[22px] font-semibold text-adm-ink">Activity by week</h3>
                   <table className="mt-3 w-full text-left text-[14px] leading-[20px]">
@@ -261,30 +269,6 @@ const Reports = () => {
                   </table>
                 </section>
               </div>
-
-              <section className="rounded-[6px] border border-adm-border bg-adm-surface">
-                <h3 className="px-4 pt-4 text-[16px] leading-[22px] font-semibold text-adm-ink">Documents by type</h3>
-                {docTypes.length === 0 ? (
-                  <p className="px-4 pb-4 pt-2 text-[14px] leading-[20px] text-adm-muted">{NO_DATA}</p>
-                ) : (
-                  <table className="mt-3 w-full text-left text-[14px] leading-[20px]">
-                    <thead>
-                      <tr className="bg-adm-workspace text-[12px] leading-[18px] font-semibold text-adm-muted">
-                        <th className="px-4 py-2.5">Document type</th>
-                        <th className="px-4 py-2.5 text-right">Generated</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {docTypes.map(([type, count]) => (
-                        <tr key={type} className="border-t border-adm-border">
-                          <td className="px-4 py-2.5 capitalize text-adm-ink">{type.replace(/_/g, " ")}</td>
-                          <td className="px-4 py-2.5 text-right tabular-nums text-adm-ink">{count.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </section>
             </>
           )}
         </section>

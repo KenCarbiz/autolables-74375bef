@@ -5,7 +5,6 @@ import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight } from "lucide-
 import VehicleTruthCard from "@/components/vehicle/VehicleTruthCard";
 import { listingGallery } from "@/lib/photos";
 import { Link } from "react-router-dom";
-import { SummaryList } from "@/components/detail/parts";
 import { Card, EmptyNote, StatRow, btn, fmtWhen } from "./primitives";
 import { type LifecycleResult } from "./lifecycle";
 import DescriptionCard from "./DescriptionCard";
@@ -106,7 +105,14 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
             {repulling ? "Syncing…" : "Re-pull market data"}
           </button>
         }>
-          <SummaryList dense rows={infoPairs.map((p) => ({ label: p.label, value: p.value }))} />
+          <dl className="text-[14px] leading-[20px] border-t border-adm-border">
+            {infoPairs.map((p) => (
+              <div key={p.label} className="grid grid-cols-[130px_minmax(0,1fr)] gap-3 border-b border-adm-border py-1">
+                <dt className="text-adm-muted">{p.label}</dt>
+                <dd className="min-w-0 break-words text-adm-ink">{p.value}</dd>
+              </div>
+            ))}
+          </dl>
         </Card>
 
         <DescriptionCard vehicleId={vehicle.id} />

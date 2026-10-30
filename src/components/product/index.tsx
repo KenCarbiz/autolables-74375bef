@@ -67,6 +67,7 @@ export const PageHeader = ({
   actions,
   className,
   as: Tag = "h1",
+  inlineMeta = false,
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -75,6 +76,7 @@ export const PageHeader = ({
   actions?: ReactNode;
   className?: string;
   as?: "h1" | "h2";
+  inlineMeta?: boolean;
 }) => (
   <header className={cn("flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6", className)}>
     <div className="min-w-0">
@@ -83,7 +85,7 @@ export const PageHeader = ({
       {description && <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">{description}</p>}
     </div>
     {(actions || meta) && (
-      <div className="flex flex-col gap-2 sm:items-end flex-shrink-0">
+      <div className={cn("flex flex-shrink-0", inlineMeta ? "flex-col gap-2 sm:flex-row sm:items-center sm:gap-6" : "flex-col gap-2 sm:items-end")}>
         {meta && <div className="text-[12px] leading-[18px] text-adm-muted">{meta}</div>}
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -173,29 +175,36 @@ export interface Metric {
 }
 
 /** Four or fewer primary metrics in one strip, each with its own denominator. */
-export const MetricStrip = ({ metrics, label, className, action }: { metrics: Metric[]; label: string; className?: string; action?: ReactNode }) => {
+export const MetricStrip = ({ metrics, label, className, action, numberFirst = false }: { metrics: Metric[]; label: string; className?: string; action?: ReactNode; numberFirst?: boolean }) => {
   const shown = metrics.slice(0, 6);
   return (
     <section aria-label={label} className={cn("border-y border-adm-border", className)}>
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         <dl className={cn("grid flex-1 grid-cols-2", shown.length >= 6 ? "lg:grid-cols-6" : shown.length >= 4 ? "lg:grid-cols-4" : shown.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
           {shown.map((m, i) => {
-            const body = (
+            const valueTone = m.value === 0 || m.value === "0" ? "text-adm-ink" : m.tone === "danger" ? "text-adm-danger" : m.tone === "success" ? "text-adm-success" : m.tone === "warning" ? "text-[#B45309]" : "text-adm-ink";
+            const valueNode = m.loading ? <SkeletonBlock className="h-7 w-16" /> : <ValueOrUnknown value={m.value} />;
+            const body = numberFirst ? (
+              <>
+                <dd className={cn("font-bold tabular-nums text-[28px] leading-[34px]", valueTone)}>{valueNode}</dd>
+                <dt className="text-[14px] leading-[20px] font-medium text-adm-ink">{m.label}</dt>
+                {m.hint && <dd className="truncate text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}
+              </>
+            ) : (
               <>
                 <dt className="text-[12px] leading-[18px] font-medium text-adm-muted">{m.label}</dt>
-                <dd className={cn("mt-0.5 font-bold tabular-nums", shown.length >= 6 ? "truncate text-[20px] leading-[28px]" : "text-[24px] leading-[32px]", m.value === 0 || m.value === "0" ? "text-adm-ink" : m.tone === "danger" ? "text-adm-danger" : m.tone === "success" ? "text-adm-success" : m.tone === "warning" ? "text-[#B45309]" : "text-adm-ink")}>
-                  {m.loading ? <SkeletonBlock className="h-7 w-16" /> : <ValueOrUnknown value={m.value} />}
+                <dd className={cn("mt-0.5 font-bold tabular-nums", shown.length >= 6 ? "truncate text-[20px] leading-[28px]" : "text-[24px] leading-[32px]", valueTone)}>
+                  {valueNode}
                 </dd>
                 {m.hint && <dd className="truncate text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}
               </>
             );
-            const barred = !m.loading && m.value !== 0 && m.value !== "0" && (m.tone === "danger" || m.tone === "success" || m.tone === "warning");
+            const barred = numberFirst ? !m.loading : !m.loading && m.value !== 0 && m.value !== "0" && (m.tone === "danger" || m.tone === "success" || m.tone === "warning");
+            const barColor = m.tone === "danger" ? "before:bg-adm-danger" : m.tone === "success" ? "before:bg-adm-success" : m.tone === "warning" ? "before:bg-[#B45309]" : "before:bg-adm-border";
             const cell = cn(
               "relative block py-3 px-5 min-w-0",
               barred && "before:absolute before:left-0 before:top-3 before:bottom-3 before:w-[3px]",
-              barred && m.tone === "danger" && "before:bg-adm-danger",
-              barred && m.tone === "success" && "before:bg-adm-success",
-              barred && m.tone === "warning" && "before:bg-[#B45309]",
+              barred && barColor,
               i % 2 === 1 && "border-l border-adm-border",
               i >= 2 && "border-t border-adm-border lg:border-t-0",
               i >= 1 && "lg:border-l",

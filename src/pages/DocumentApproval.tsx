@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { Check, X } from "lucide-react";
+import { Check, FileText, Minus, Plus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Seo from "@/components/Seo";
 import { useAuth } from "@/contexts/AuthContext";
@@ -66,6 +66,7 @@ const DocumentApproval = () => {
   const manager = hasDealerCapability(member?.role, "can_approve_print", isAdmin);
   const { documents, loading, available, reload } = useVehicleDocuments(id);
   const [vehicle, setVehicle] = useState<VehicleBits | null>(null);
+  const [zoom, setZoom] = useState(100);
   const [stock, setStock] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -166,12 +167,7 @@ const DocumentApproval = () => {
     { label: "Approver capability", ok: manager, note: manager ? "Your role can approve and print" : "Your role cannot approve" },
   ];
 
-  const tags = (
-    <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-      {label}
-      <StatusText tone={STATUS_TONE[doc.document_status] || "neutral"}>{meta.label}</StatusText>
-    </span>
-  );
+  const tags = <span className="block text-[22px] leading-[30px]">{`${label} - ${vehicleLabel}${stock ? ` (Stock ${stock})` : ""}`}</span>;
 
   return (
     <PageBody width="wide">
@@ -187,7 +183,13 @@ const DocumentApproval = () => {
 
       <PageHeader
         title={tags}
-        description={`${vehicleLabel}${stock ? ` (Stock ${stock})` : ""} | Version ${doc.version} | ${fmtDateTime(doc.created_at)}`}
+        inlineMeta
+        meta={
+          <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] leading-[20px] text-adm-ink">
+            <StatusText tone={STATUS_TONE[doc.document_status] || "neutral"}>{meta.label}</StatusText>
+            <span><span className="font-semibold">Version {doc.version}</span> <span className="text-adm-muted">{fmtDateTime(doc.created_at)}</span></span>
+          </span>
+        }
         actions={storedUrl ? <Button onClick={() => void open(doc)}>Open file</Button> : undefined}
       />
 
@@ -204,9 +206,19 @@ const DocumentApproval = () => {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_300px] lg:items-start">
         <Panel title="Document preview" titleSize="sm" inset="sm" id="preview">
           {doc.png_url && !isSignedStorageUrl(doc.png_url) ? (
-            <img src={doc.png_url} alt={`${label} version ${doc.version}`} className="w-full rounded-[4px] border border-adm-border" />
+            <>
+              <div className="mb-3 flex items-center gap-2 text-[14px] text-adm-ink">
+                <Button size="sm" aria-label="Zoom out" disabled={zoom <= 50} onClick={() => setZoom((z) => Math.max(50, z - 25))}><Minus className="h-5 w-5" aria-hidden="true" /></Button>
+                <span className="w-12 text-center tabular-nums" aria-live="polite">{zoom}%</span>
+                <Button size="sm" aria-label="Zoom in" disabled={zoom >= 200} onClick={() => setZoom((z) => Math.min(200, z + 25))}><Plus className="h-5 w-5" aria-hidden="true" /></Button>
+              </div>
+              <div className="overflow-auto rounded-[4px] border border-adm-border">
+                <img src={doc.png_url} alt={`${label} version ${doc.version}`} style={{ width: `${zoom}%`, maxWidth: "none" }} />
+              </div>
+            </>
           ) : (
-            <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 rounded-[4px] border border-dashed border-adm-border bg-adm-workspace px-6 text-center">
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-[4px] border border-dashed border-adm-border bg-adm-workspace px-6 text-center">
+              <FileText className="h-14 w-14 text-adm-muted" strokeWidth={1.25} aria-hidden="true" />
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">No preview image is stored</p>
               <p className="text-[13px] leading-[18px] text-adm-muted max-w-sm">
                 The stored file opens from its own address so the preview is never a re-drawn copy of an official form.

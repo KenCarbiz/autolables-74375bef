@@ -102,14 +102,16 @@ export const PlatformTenants = () => {
   const stats = useMemo(() => {
     const all = tenants.data || [];
     const latest = all.reduce<string | null>((acc, t) => (t.last_activity && (!acc || t.last_activity > acc) ? t.last_activity : acc), null);
+    const latestSync = (marketcheck.data || []).reduce<string | null>((acc, r) => (r.last_run_at && (!acc || r.last_run_at > acc) ? r.last_run_at : acc), null);
     return {
+      latestSync,
       total: all.length,
       active: all.filter((t) => t.is_active).length,
       suspended: all.filter((t) => !t.is_active).length,
       members: all.reduce((n, t) => n + t.member_count, 0),
       latest,
     };
-  }, [tenants.data]);
+  }, [tenants.data, marketcheck.data]);
 
   const sortTh = (label: string, key: string, align: "left" | "right" = "left") => (
     <Th align={align} className="whitespace-nowrap">
@@ -213,6 +215,7 @@ export const PlatformTenants = () => {
                 {sortTh("Status", "status")}
                 {sortTh("Members", "member_count", "right")}
                 {sortTh("Last activity", "last_activity")}
+                <Th className="whitespace-nowrap">Last sync</Th>
                 <Th align="right"><span className="sr-only">Actions</span></Th>
               </tr>
             </thead>
@@ -240,6 +243,7 @@ export const PlatformTenants = () => {
                     <Td><StatusText tone={t.is_active ? "success" : "neutral"}>{t.is_active ? "Active" : "Suspended"}</StatusText></Td>
                     <Td align="right">{t.member_count}</Td>
                     <Td className="whitespace-nowrap text-adm-muted">{formatDate(t.last_activity)}</Td>
+                    <Td className="whitespace-nowrap text-adm-muted">{mc?.last_run_at ? formatDate(mc.last_run_at) : "No sync"}</Td>
                     <Td align="right">
                       <div className="inline-flex items-center gap-1 justify-end">
                         <AdminButton variant="ghost" size="sm" className="px-2" onClick={() => setEditing(t)}>Edit</AdminButton>
@@ -274,6 +278,7 @@ export const PlatformTenants = () => {
             { label: "Suspended tenants", value: <span className="font-semibold tabular-nums">{tenants.isLoading ? "" : stats.suspended}</span> },
             { label: "Total members", value: <span className="font-semibold tabular-nums">{tenants.isLoading ? "" : stats.members}</span> },
             { label: "Latest activity", value: <span className="text-right block">{formatDate(stats.latest)}</span> },
+            { label: "Last sync (all)", value: <span className="text-right block">{stats.latestSync ? formatDate(stats.latestSync) : "No sync"}</span> },
           ]}
         />
       </AdminCard>

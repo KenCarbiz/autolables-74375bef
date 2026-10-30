@@ -29,7 +29,7 @@ export const OverviewSection = ({
   issueRows,
   loading,
   failed = false,
-  onNavigate,
+  onNavigate: _onNavigate,
 }: {
   overview: OverviewCounts;
   issueRows: IssueRow[];
@@ -45,6 +45,7 @@ export const OverviewSection = ({
   return (
     <>
       <MetricStrip
+        numberFirst
         label="Compliance summary"
         metrics={[
           { label: "Critical", value: n(overview.critical), hint: scope, tone: overview.critical > 0 ? "danger" : "neutral", loading },
@@ -58,7 +59,6 @@ export const OverviewSection = ({
         title="Top blockers"
         flush
         inset="sm"
-        action={<button type="button" onClick={() => onNavigate("issues")} className="text-[14px] font-semibold text-adm-primary hover:underline">All issues</button>}
       >
         <QueryState
           status={status}

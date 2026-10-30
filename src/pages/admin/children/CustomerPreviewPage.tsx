@@ -2,7 +2,7 @@ import { useState } from "react";
 import { FileText } from "lucide-react";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import { Crumbs } from "@/components/detail/parts";
-import { PageBody, PageHeader } from "@/components/product";
+import { FilterSelect, PageBody, PageHeader } from "@/components/product";
 import { adminTabHref } from "@/lib/admin/sections";
 
 // Dealer-only picker for the served customer Passport. It sets the preview
@@ -10,8 +10,12 @@ import { adminTabHref } from "@/lib/admin/sections";
 // frame; nothing here restyles or reimplements the Passport.
 
 const SCENARIOS = [
-  { key: "new2026", label: "New vehicle" },
-  { key: "usedfee", label: "Used vehicle with doc fee" },
+  { key: "new", label: "New vehicle" },
+  { key: "used", label: "Used vehicle" },
+] as const;
+
+const DENSITIES = [
+  { key: "standard", label: "Standard" },
   { key: "sparse", label: "Sparse data" },
 ] as const;
 
@@ -20,13 +24,15 @@ const STATES = [
   { key: "verification", label: "Verification report" },
 ] as const;
 
-const selectCls = "h-10 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary";
-
-const previewSrc = (scenario: string, state: string): string =>
-  state === "verification" ? "/v/demo/verification?preview=1&scenario=review" : `/v/demo?preview=1&scenario=${scenario}`;
+const previewSrc = (scenario: string, density: string, state: string): string => {
+  if (state === "verification") return "/v/demo/verification?preview=1&scenario=review";
+  const key = density === "sparse" ? "sparse" : scenario === "used" ? "usedfee" : "new2026";
+  return `/v/demo?preview=1&scenario=${key}`;
+};
 
 export default function CustomerPreviewPage() {
-  const [scenario, setScenario] = useState<string>("new2026");
+  const [scenario, setScenario] = useState<string>("new");
+  const [density, setDensity] = useState<string>("standard");
   const [state, setState] = useState<string>("passport");
   const [src, setSrc] = useState<string | null>(null);
 
@@ -42,28 +48,26 @@ export default function CustomerPreviewPage() {
         className="flex flex-wrap items-end gap-4"
         onSubmit={(e) => {
           e.preventDefault();
-          setSrc(previewSrc(scenario, state));
+          setSrc(previewSrc(scenario, density, state));
         }}
       >
-        <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+        <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
           Scenario
-          <select className={selectCls} value={scenario} onChange={(e) => setScenario(e.target.value)} disabled={state === "verification"}>
-            {SCENARIOS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
+          <FilterSelect label="Scenario" className="h-9 w-full" value={scenario} onChange={setScenario} disabled={state === "verification"} options={SCENARIOS.map((s) => ({ value: s.key, label: s.label }))} />
         </label>
-        <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+        <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
           Vehicle
-          <select className={selectCls} defaultValue="example" disabled>
-            <option value="example">Example vehicle (synthetic)</option>
-          </select>
+          <FilterSelect label="Vehicle" className="h-9 w-full" value="example" onChange={() => undefined} disabled options={[{ value: "example", label: "Example vehicle" }]} />
         </label>
-        <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
-          State
-          <select className={selectCls} value={state} onChange={(e) => setState(e.target.value)}>
-            {STATES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
+        <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+          Data density
+          <FilterSelect label="Data density" className="h-9 w-full" value={density} onChange={setDensity} disabled={state === "verification"} options={DENSITIES.map((s) => ({ value: s.key, label: s.label }))} />
         </label>
-        <AdminButton type="submit" variant="primary" className="min-h-[40px] px-6">Generate preview</AdminButton>
+        <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+          Verification state
+          <FilterSelect label="Verification state" className="h-9 w-full" value={state} onChange={setState} options={STATES.map((s) => ({ value: s.key, label: s.label }))} />
+        </label>
+        <AdminButton type="submit" variant="primary" className="min-h-[36px] px-6">Generate preview</AdminButton>
       </form>
       <section aria-label="Preview" className="overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface">
         {src ? (

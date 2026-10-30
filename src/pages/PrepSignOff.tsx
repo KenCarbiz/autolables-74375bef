@@ -166,7 +166,6 @@ const PrepSignOff = () => {
       <PageBody width="wide">
         <PageHeader
           title="Prep & Vendors"
-          description="Shop foreman approves every vehicle before it hits the lot."
           actions={<ProductButton variant="primary" onClick={() => setSearchParams({ view: "new" })}>Assign vendor</ProductButton>}
         />
 
@@ -212,7 +211,7 @@ const PrepSignOff = () => {
                   <Th className="!px-2">Vehicle</Th>
                   <Th className="!px-2">Task</Th>
                   <Th className="!px-2">Vendor</Th>
-                  <Th className="whitespace-nowrap !px-2">Proof needed</Th>
+                  <Th className="whitespace-nowrap !px-2">Proof</Th>
                   <Th className="!px-2">Status</Th>
                   <Th align="right" className="!px-2 whitespace-nowrap">Next action</Th>
                 </tr>
@@ -221,13 +220,13 @@ const PrepSignOff = () => {
                 {filtered.map(s => (
                   <tr key={s.id} className={`h-11 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
                     <Td className="max-w-[190px] !px-2">
-                      <p className="truncate font-semibold text-adm-ink">{s.ymm || s.vin}</p>
+                      <p className="truncate text-[13px] font-semibold text-adm-ink" title={s.ymm || s.vin}>{s.ymm || s.vin}</p>
                       <p className="truncate text-[12px] leading-[16px] text-adm-muted">{s.stock_number ? `Stock ${s.stock_number}` : s.vin}</p>
                     </Td>
-                    <Td className="max-w-[140px] !px-2">
-                      <p className="truncate">{taskLabel(s.accessories_installed)}</p>
+                    <Td className="max-w-[125px] !px-2">
+                      <p className="truncate" title={taskLabel(s.accessories_installed)}>{taskLabel(s.accessories_installed)}</p>
                     </Td>
-                    <Td className="max-w-[100px] !px-2"><p className="truncate">{vendorLabel(s.accessories_installed)}</p></Td>
+                    <Td className="max-w-[90px] !px-2"><p className="truncate">{vendorLabel(s.accessories_installed)}</p></Td>
                     <Td className="whitespace-nowrap !px-2 text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
                     <Td className="!px-2">
                       <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
@@ -235,7 +234,7 @@ const PrepSignOff = () => {
                       </StatusText>
                     </Td>
                     <Td align="right" className="!px-2">
-                      <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline whitespace-nowrap" onClick={(e) => { e.stopPropagation(); select(s.id); }}>
+                      <button type="button" className={`inline-flex h-8 items-center whitespace-nowrap rounded-[6px] px-3 text-[14px] font-medium ${s.status === "pending" ? "bg-adm-primary text-white hover:opacity-90" : "border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace"}`} onClick={(e) => { e.stopPropagation(); select(s.id); }}>
                         {s.status === "pending" ? "Review" : "View"}
                       </button>
                     </Td>

@@ -60,6 +60,7 @@ export default function ReadyBoard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState<string | null>(null);
   const [accepting, setAccepting] = useState<string | null>(null);
   // The selected view lives in the URL so reload and back keep it.
@@ -287,10 +288,10 @@ export default function ReadyBoard() {
   const total = rows?.length ?? null;
   const ready = rows != null && !loading;
   const VIEWS: Array<{ id: Bucket; label: string; count: number | null; empty: string }> = [
+    { id: "all", label: "All", count: total, empty: "No vehicles" },
     { id: "acceptance", label: "Waiting for acceptance", count: ready ? bucketCounts.acceptance : null, empty: "No vehicles are waiting for acceptance" },
     { id: "getready", label: "Waiting for Get-Ready", count: ready ? bucketCounts.getready : null, empty: "No vehicles are in Get-Ready" },
     { id: "ready", label: "Ready", count: ready ? bucketCounts.ready : null, empty: "No vehicles have cleared every station" },
-    { id: "all", label: "All", count: total, empty: "No vehicles" },
   ];
   const tabs: LocalTab[] = VIEWS.map((v) => ({
     key: v.id,
@@ -311,12 +312,12 @@ export default function ReadyBoard() {
     <PageBody width="wide">
       <PageHeader
         title="Ready Board"
-        description="Vehicle lifecycle workboard across service, detail, prep, recon and recall."
       />
 
       <LocalTabs label="Ready Board views" tabs={tabs} />
 
       <MetricStrip
+        numberFirst
         label="Ready Board summary"
         metrics={[
           { label: "Waiting for acceptance", value: ready ? bucketCounts.acceptance : null, hint: total != null ? `of ${total.toLocaleString()} on the board` : undefined, loading, href: "/ready-board?view=acceptance" },
@@ -334,6 +335,12 @@ export default function ReadyBoard() {
             aria-label="Search the board"
             className="h-10 w-full max-w-[320px] rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px]"
           />
+          {canAccept && picked.size > 0 && (
+            <Button size="sm" variant="primary" onClick={async () => {
+              for (const r of visibleRows.filter((x) => picked.has(x.vin) && bucketOf(x) === "acceptance")) await acceptAndDispatch(r);
+              setPicked(new Set());
+            }}>Authorize and dispatch {picked.size}</Button>
+          )}
           <button type="button" onClick={() => setTodayOnly((v) => !v)} aria-pressed={todayOnly} className="text-[14px] font-semibold text-adm-primary hover:underline">
             {todayOnly ? "Showing today's intake" : "Today's intake only"}
           </button>
@@ -346,12 +353,17 @@ export default function ReadyBoard() {
           emptyTitle={`${current.empty}${scopeNote ? scopeNote : " in this view"}.`}
           emptyDetail={bucket === "all" && !todayOnly ? "No vehicles in inventory yet." : `This is the ${current.label} view only; it does not say the rest of the pipeline is clear.${otherViews}`}
         >
-          <WorkTable caption="Vehicles and their get-ready stations" minWidth={960}>
+          <WorkTable className="[&_td]:py-1.5" caption="Vehicles and their get-ready stations" minWidth={960}>
             <thead>
               <tr>
+                <Th className="w-8">
+                  <input type="checkbox" aria-label="Select all vehicles" className="h-4 w-4 accent-[#2457D6]"
+                    checked={visibleRows.length > 0 && visibleRows.every((x) => picked.has(x.vin))}
+                    onChange={(e) => setPicked(e.target.checked ? new Set(visibleRows.map((x) => x.vin)) : new Set())} />
+                </Th>
                 <Th>Vehicle</Th>
                 <Th>Current stage</Th>
-                <Th>Days in stage</Th>
+                <Th className="whitespace-nowrap">Days in stage</Th>
                 <Th>Next action</Th>
                 <Th>Owner</Th>
                 <Th>Recall</Th>
@@ -382,6 +394,10 @@ export default function ReadyBoard() {
                         : null;
                 return (
                   <tr key={r.vin} className="h-12 hover:bg-adm-workspace">
+                    <Td className="w-8">
+                      <input type="checkbox" aria-label={`Select ${r.ymm || r.vin}`} className="h-4 w-4 accent-[#2457D6]" checked={picked.has(r.vin)}
+                        onChange={(e) => setPicked((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.vin); else n.delete(r.vin); return n; })} />
+                    </Td>
                     <Td className="max-w-[340px]">
                       <div className="flex items-center gap-3">
                         {r.hero_image_url
@@ -397,7 +413,7 @@ export default function ReadyBoard() {
                         </div>
                       </div>
                     </Td>
-                    <Td className="whitespace-nowrap"><StatusText tone="neutral">{stage}</StatusText></Td>
+                    <Td className="whitespace-nowrap"><StatusText tone={stage === "Recall review" ? "danger" : stage === "All stations clear" ? "success" : stage === "Recon" ? "warning" : "info"}>{stage}</StatusText></Td>
                     <Td className="whitespace-nowrap tabular-nums text-adm-muted">{days == null ? "Unknown" : days}</Td>
                     <Td className="whitespace-nowrap">
                       {primary ? (
@@ -419,7 +435,7 @@ export default function ReadyBoard() {
                     </Td>
                     <Td align="right">
                       <span className="inline-flex items-center gap-1">
-                      <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => navigate(`/vehicle-file/${r.id}`)}>View</button>
+                      <button type="button" className="inline-flex h-8 items-center rounded-[6px] border border-[#C9D6F5] bg-[#EEF3FD] px-3 text-[14px] font-medium text-adm-primary hover:bg-[#E2EBFB]" onClick={() => navigate(`/vehicle-file/${r.id}`)}>View</button>
                       <DropdownMenu>
                         <DropdownMenuTrigger aria-label={`More actions for ${r.ymm || r.vin}`} className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
                           <MoreHorizontal className="h-5 w-5" aria-hidden="true" />

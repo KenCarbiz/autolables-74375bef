@@ -56,9 +56,18 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
   return (
     <Card className="h-full" title="Latest description">
       {!c ? (
-        <p className="text-[14px] leading-[20px] text-adm-muted">
-          No description case for this vehicle yet. Nothing is drafted until the feed or reconciliation creates one.
-        </p>
+        <>
+          <span className="inline-flex w-fit text-[12px] leading-[18px] font-semibold px-2 py-[3px] rounded-[2px] bg-adm-workspace text-adm-muted">Not started</span>
+          <dl className="text-[14px] leading-[20px] border-t border-adm-border">
+            {[["Source", "Unknown"], ["Length", "Not drafted"], ["Status", "No description case yet"]].map(([k, v]) => (
+              <div key={k} className="grid grid-cols-[90px_minmax(0,1fr)] gap-3 border-b border-adm-border py-1">
+                <dt className="text-adm-muted">{k}</dt>
+                <dd className="text-adm-ink">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-[14px] leading-[20px] text-adm-muted">Nothing is drafted until the feed or reconciliation creates a case.</p>
+        </>
       ) : (
         <>
           <div className="flex items-center gap-2 flex-wrap">

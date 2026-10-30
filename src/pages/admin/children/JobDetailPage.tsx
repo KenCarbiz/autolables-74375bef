@@ -73,6 +73,7 @@ export default function JobDetailPage() {
       <div className="grid gap-4 lg:grid-cols-3 items-stretch">
         <Panel title="Job configuration" titleSize="md" inset="sm" className="h-full">
           <KeyValueList
+            divided
             rows={[
               { label: "Job name", value: spec.label },
               { label: "Scheduler", value: <StatusText tone={scheduler.tone}>{scheduler.label}</StatusText> },
@@ -103,7 +104,8 @@ export default function JobDetailPage() {
         </Panel>
         <Panel title="Outcome" titleSize="md" inset="sm" className="h-full">
           <KeyValueList
-            className="grid-cols-[minmax(96px,112px)_1fr] gap-x-4"
+            divided
+            className="grid-cols-[minmax(96px,112px)_1fr]"
             rows={[
               { label: "Last outcome", value: row.lastOutcome ? <>{outcomeText}{row.lastOutcome && !row.lastSuccessAt && succeeded ? " (scheduler run)" : ""}</> : <span className="text-adm-muted">None recorded</span> },
               { label: "Last success", value: row.lastSuccessAt ? formatAt(row.lastSuccessAt) : <span className="text-adm-muted">{succeeded ? "None confirmed" : "None recorded"}</span> },

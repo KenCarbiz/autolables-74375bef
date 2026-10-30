@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
-import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import { compareServicePriority, deriveServicePriority, type ServicePriority } from "@/lib/service/priority";
 import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
 import {
@@ -74,15 +73,14 @@ const NEXT_ACTION: Record<ServiceFloorState, string> = {
 const DESK_STATES = new Set<string>(SERVICE_FLOOR_STATES);
 
 type TabKey =
-  | "all" | "unassigned" | "inspection" | "waiting" | "authorized"
+  | "all" | "unassigned" | "inspection" | "waiting"
   | "in_repair" | "reinspect" | "k208" | "completed";
 
 const TAB_STATES: Record<Exclude<TabKey, "all">, string[]> = {
   unassigned: ["SERVICE_UNASSIGNED"],
   inspection: ["AUTHORIZED_FOR_GET_READY", "K208_IN_PROGRESS"],
   waiting: ["WAITING_FOR_MANAGER_DECISION", "SERVICE_FINDINGS_RECORDED", "RETURNED_FOR_CLARIFICATION"],
-  authorized: ["WORK_AUTHORIZED"],
-  in_repair: ["REPAIR_IN_PROGRESS"],
+  in_repair: ["WORK_AUTHORIZED", "REPAIR_IN_PROGRESS"],
   reinspect: ["REPAIR_VERIFICATION_REQUIRED"],
   k208: ["K208_READY_TO_CERTIFY", "K208_FINALIZED"],
   completed: ["DETAIL_PENDING", "DETAIL_IN_PROGRESS", "FINAL_READY_VERIFICATION", "K208_FINALIZED"],
@@ -93,7 +91,6 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "unassigned", label: "Unassigned" },
   { key: "inspection", label: "Inspection" },
   { key: "waiting", label: "Waiting" },
-  { key: "authorized", label: "Authorized" },
   { key: "in_repair", label: "In repair" },
   { key: "reinspect", label: "Reinspect" },
   { key: "k208", label: "K-208" },
@@ -117,13 +114,9 @@ const TAB_EMPTY: Record<TabKey, { title: string; detail: string }> = {
     title: "Nothing is waiting on a manager.",
     detail: "Recorded findings, pending estimates and anything a manager sent back for clarification land here.",
   },
-  authorized: {
-    title: "No approved work is waiting to start.",
-    detail: "A vehicle arrives here when a manager approves the estimate and the repair has not begun.",
-  },
   in_repair: {
     title: "No repairs are open on the floor.",
-    detail: "Authorized work moves here once a technician starts it.",
+    detail: "Approved work and repairs in progress appear here.",
   },
   reinspect: {
     title: "Nothing is waiting for reinspection.",
@@ -180,7 +173,7 @@ export default function ServiceWriterDesk() {
   const { tenant } = useTenant();
   const { settings } = useDealerSettings();
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
-  const { metrics, loading: metricsLoading, error: metricsError, reload: reloadMetrics } = useOperatingMetrics(tenantId);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const [rows, setRows] = useState<DeskRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -374,7 +367,7 @@ export default function ServiceWriterDesk() {
 
   if (!tenantId) return null;
 
-  if (loading || metricsLoading) {
+  if (loading) {
     return (
       <div className="max-w-[1200px] mx-auto p-4 md:p-6 space-y-4">
         <LoadingCard rows={2} />
@@ -383,29 +376,28 @@ export default function ServiceWriterDesk() {
     );
   }
 
-  if (loadError || metricsError) {
+  if (loadError) {
     return (
       <div className="max-w-[1200px] mx-auto p-4 md:p-6">
         <ErrorCard
           message="We could not load the service desk."
-          detail={loadError || metricsError}
-          onRetry={() => { void load(); void reloadMetrics(); }}
+          detail={loadError}
+          onRetry={() => { void load(); }}
         />
       </div>
     );
   }
 
   const tabs = TABS.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/service-desk?tab=${t.key}`, count: counts[t.key], active: t.key === tab }));
-  const PRODUCT_TONE: Record<StatusKey, ProductTone> = { WAITING: "neutral", IN_PROGRESS: "info", AUTHORIZED: "info", NEEDS_REVIEW: "warning", COMPLETED: "success" };
+  const PRODUCT_TONE: Record<StatusKey, ProductTone> = { WAITING: "warning", IN_PROGRESS: "info", AUTHORIZED: "info", NEEDS_REVIEW: "warning", COMPLETED: "success" };
 
   return (
     <PageBody width="wide">
       <PageHeader
         title="Service Writer Desk"
-        description="Every vehicle in the service pipeline, highest priority first."
         actions={
           visible.length > 0 ? (
-            <LinkButton variant="primary" to={`/service/vehicle/${encodeURIComponent((visible.find((r) => !r.assignedName) ?? visible[0]).vin)}`}>
+            <LinkButton variant="primary" to={`/service/vehicle/${encodeURIComponent((visible.find((r) => picked.has(r.vehicleId)) ?? visible.find((r) => !r.assignedName) ?? visible[0]).vin)}`}>
               Assign to technician
             </LinkButton>
           ) : undefined
@@ -415,12 +407,13 @@ export default function ServiceWriterDesk() {
       <LocalTabs label="Service pipeline stages" tabs={tabs} />
 
       <MetricStrip
+        numberFirst
         label="Service pipeline summary"
         metrics={[
-          { label: "In the pipeline", value: rows.length },
-          { label: "Unassigned", value: counts.unassigned, tone: counts.unassigned > 0 ? "warning" : "neutral" },
-          { label: "Inside get ready", value: metrics.inGetReady },
-          { label: "Retail ready", value: metrics.retailReady },
+          { label: "Unassigned", value: counts.unassigned, hint: "Needs a writer", tone: counts.unassigned > 0 ? "warning" : "neutral" },
+          { label: "In inspection", value: counts.inspection, hint: "Initial multi-point" },
+          { label: "In repair", value: counts.in_repair, hint: "Active work" },
+          { label: "K-208", value: counts.k208, hint: `of ${rows.length} in the pipeline` },
         ]}
       />
 
@@ -431,6 +424,11 @@ export default function ServiceWriterDesk() {
           <WorkTable caption="Vehicles in the service pipeline, highest priority first" minWidth={960}>
             <thead>
               <tr>
+                <Th className="w-8">
+                  <input type="checkbox" aria-label="Select all vehicles" className="h-4 w-4 accent-[#2457D6]"
+                    checked={visible.length > 0 && visible.slice(0, 100).every((r) => picked.has(r.vehicleId))}
+                    onChange={(e) => setPicked(e.target.checked ? new Set(visible.slice(0, 100).map((r) => r.vehicleId)) : new Set())} />
+                </Th>
                 <Th>Vehicle</Th>
                 <Th>Stage</Th>
                 <Th>Technician</Th>
@@ -443,6 +441,10 @@ export default function ServiceWriterDesk() {
             <tbody>
               {visible.slice(0, 100).map((r) => (
                 <tr key={r.vehicleId} className="h-14 hover:bg-adm-workspace">
+                  <Td className="w-8">
+                    <input type="checkbox" aria-label={`Select ${r.ymm}`} className="h-4 w-4 accent-[#2457D6]" checked={picked.has(r.vehicleId)}
+                      onChange={(e) => setPicked((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.vehicleId); else n.delete(r.vehicleId); return n; })} />
+                  </Td>
                   <Td className="max-w-[300px]">
                     <div className="flex items-center gap-3">
                       {r.photo
@@ -455,14 +457,14 @@ export default function ServiceWriterDesk() {
                     </div>
                   </Td>
                   <Td className="whitespace-nowrap">
-                    <StatusText tone={PRODUCT_TONE[STATE_STATUS[r.state as ServiceFloorState] || "WAITING"]}>{stateLabel(r.state)}</StatusText>
+                    <StatusText tone={r.state === "SERVICE_UNASSIGNED" ? "neutral" : PRODUCT_TONE[STATE_STATUS[r.state as ServiceFloorState] || "WAITING"]}>{stateLabel(r.state)}</StatusText>
                   </Td>
                   <Td className="text-adm-muted">{r.assignedName ?? "Unassigned"}</Td>
                   <Td align="right" className="tabular-nums whitespace-nowrap">{durationLabel(r.ageHours)}</Td>
                   <Td className="text-adm-muted whitespace-nowrap">{formatCommandDate(r.deliveryTarget) ?? EM_DASH}</Td>
                   <Td className="whitespace-nowrap">{NEXT_ACTION[r.state as ServiceFloorState] || "Open file"}</Td>
                   <Td align="right">
-                    <LinkButton size="sm" to={`/service/vehicle/${encodeURIComponent(r.vin)}`}>{r.assignedName ? "View" : "Assign"}</LinkButton>
+                    <LinkButton size="sm" variant={!r.assignedName && r.vehicleId === visible.find((x) => !x.assignedName)?.vehicleId ? "primary" : undefined} to={`/service/vehicle/${encodeURIComponent(r.vin)}`}>{r.assignedName ? "View" : "Assign"}</LinkButton>
                   </Td>
                 </tr>
               ))}
@@ -475,10 +477,6 @@ export default function ServiceWriterDesk() {
           ) : null}
         </div>
       )}
-
-      <p className="text-[12px] leading-[18px] text-adm-muted">
-        K-208 certification authority comes from the store&apos;s K-208 policy and is enforced by the server, never by a job title.
-      </p>
     </PageBody>
   );
 }

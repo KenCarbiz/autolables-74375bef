@@ -172,7 +172,7 @@ const PlatformMemberDetail = () => {
                         <Td className="whitespace-nowrap !py-2">{row.label}</Td>
                         {entitledSeats.map(({ seat, ent }) => {
                           const level = levels(seat, isEntitled(ent))[i];
-                          return <Td key={seat.id} className={`!py-2 text-center text-[13px] font-semibold ${CELL_FILL[LEVEL_TONE[level]]}`}>{level}</Td>;
+                          return <Td key={seat.id} className="!px-3 !py-1.5 text-center text-[13px] font-semibold"><span className={`block rounded-[3px] px-2 py-1 ${CELL_FILL[LEVEL_TONE[level]]}`}>{level}</span></Td>;
                         })}
                       </tr>
                     ))}
@@ -211,6 +211,10 @@ const PlatformMemberDetail = () => {
                       { label: "Affected tenant", value: tenantName(member.tenant_id) },
                     ]}
                   />
+                  <div className="rounded-md bg-adm-workspace px-3 py-2 text-[13px] leading-[18px] text-adm-ink">
+                    <p>This change would affect 1 tenant.</p>
+                    <p className="mt-1 text-adm-muted">{tenantName(member.tenant_id)}</p>
+                  </div>
                   <p className="text-[13px] leading-[18px] text-adm-muted">Review access change opens a role change for this seat. Nothing is written until you apply it.</p>
                 </div>
               ) : (

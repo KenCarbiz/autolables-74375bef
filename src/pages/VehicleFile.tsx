@@ -243,8 +243,8 @@ const VehicleFile = () => {
     <PageBody width="wide" className="pb-24 lg:pb-8 gap-4">
       {!subPage && <section aria-label="Vehicle identity">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="sm:w-[132px] shrink-0">
-            <div className="h-[88px] rounded-[4px] overflow-hidden bg-adm-workspace flex items-center justify-center">
+          <div className="sm:w-[184px] shrink-0">
+            <div className="h-[120px] rounded-[4px] overflow-hidden bg-adm-workspace flex items-center justify-center">
               {gallery.length ? (
                 <div className="relative w-full h-full">
                   <img src={gallery[safeImg]} alt={vehicle.ymm ? `${vehicle.ymm} photo ${safeImg + 1} of ${gallery.length}` : "Vehicle photo"} className="w-full h-full object-cover" />
@@ -303,8 +303,8 @@ const VehicleFile = () => {
               <ul aria-label="Vehicle status" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pt-1">
                 {summary.map((f) => (
                   <li key={f.label} title={f.detail}>
-                    <StatusText tone={f.tone} className="px-2.5 py-1 text-[13px]">
-                      <span className="font-medium opacity-80">{f.label}</span> {f.value}
+                    <StatusText tone={f.tone} className="px-3 py-1.5 text-[14px] leading-[20px]">
+                      {f.value === "Unknown" ? <><span className="font-medium opacity-80">{f.label}</span> {f.value}</> : f.value}
                     </StatusText>
                   </li>
                 ))}

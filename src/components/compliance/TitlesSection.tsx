@@ -46,7 +46,7 @@ export const TitlesSection = ({
           </button>
         </div>
         <div className="flex items-center gap-4 pb-1">
-          <label className="relative block w-56">
+          {rows.length > 12 && <label className="relative block w-56">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
             <input
               value={q}
@@ -55,7 +55,7 @@ export const TitlesSection = ({
               aria-label="Search title documents"
               className="h-9 w-full rounded-md border border-adm-border bg-adm-surface pl-10 pr-3 text-[14px] leading-[20px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
             />
-          </label>
+          </label>}
           <Link to={adminTabHref("store-settings")} className="text-[14px] font-semibold text-adm-primary hover:underline">Configure clerk</Link>
         </div>
       </div>
@@ -88,7 +88,7 @@ export const TitlesSection = ({
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.vehicleId} className="[&>td]:!py-2.5">
-                  <Td className="whitespace-nowrap font-semibold" title={r.title}>{r.title.split(" ").slice(0, 3).join(" ")}</Td>
+                  <Td className="whitespace-nowrap font-medium" title={r.title}>{r.title.split(" ").slice(0, 3).join(" ")}</Td>
                   <Td className="font-mono text-[12px] text-adm-muted whitespace-nowrap">{r.vin}</Td>
                   <Td className="whitespace-nowrap">{r.requirement.kind === "mco" ? "MCO" : "Title"}</Td>
                   <Td className="whitespace-nowrap text-adm-muted">{r.requirement.back ? "Front and back" : "Front only"}</Td>

@@ -1,10 +1,13 @@
 import { useMemo } from "react";
+import { MoreVertical } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { HEALTH_META, describeAge } from "@/lib/admin/health";
 import { PROVIDER_CARDS, providerDrillIn, aggregateEvents, type ProviderEventRow } from "@/lib/admin/integrations/providers";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { EmptyState, KeyValueList, LinkButton, LocalTabs, MetricStrip, Panel, SkeletonBlock, StatusText, Td, Th, WorkTable } from "@/components/product";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ICON } from "@/components/admin/v2/primitives";
 import { useProvidersData } from "@/pages/admin/views/integrations/ProvidersView";
 
 // One external provider, read from the same derived card the Providers list
@@ -72,8 +75,17 @@ export default function ProviderDetailPage() {
       subtitle={spec.affectedOutput}
       actions={
         <>
-          <LinkButton variant="outline" to={providerDrillIn(spec, data.latestRunId)}>{spec.drillInLabel}</LinkButton>
           <LinkButton variant="primary" to={`${base}?tab=configuration`}>Edit configuration</LinkButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" aria-label="More provider actions" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-adm-border bg-white text-adm-ink hover:bg-adm-workspace">
+                <MoreVertical className={ICON.statusTight} aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[200px]">
+              <DropdownMenuItem asChild><Link to={providerDrillIn(spec, data.latestRunId)}>{spec.drillInLabel}</Link></DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </>
       }
       tabs={
@@ -151,6 +163,9 @@ export default function ProviderDetailPage() {
                   <StatusText tone={meta.tone}>{meta.label}</StatusText>
                   <p className="text-[14px] font-semibold text-adm-ink">{card.verdict.headline}</p>
                   <p className="text-[13px] leading-[18px] text-adm-muted">{card.verdict.detail}</p>
+                  {(cacheState === "Stale" || state === "unknown" || state === "not_configured") && (
+                    <p className="rounded-md bg-adm-warning-bg px-3 py-2 text-[13px] leading-[18px] text-adm-ink">{cacheState === "Stale" ? "Data is currently stale. Review quota and back off before the next call to avoid rate-limited responses." : "No successful call is on record. Confirm the configuration before relying on this source."}</p>
+                  )}
                   {card.attempts !== null && <p className="text-[13px] leading-[18px] text-adm-muted">{`${card.attempts} calls in the last 30 days${card.refusals ? `, ${card.refusals} refused` : ""}.`}</p>}
                 </div>
               </Panel>

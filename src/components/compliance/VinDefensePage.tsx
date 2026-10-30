@@ -92,10 +92,11 @@ export default function VinDefensePage() {
       <PageHeader
         title={title ? `VIN defense — ${title.split(" ").slice(0, 3).join(" ")}` : "VIN defense"}
         description={<span className="font-mono">VIN {vin}</span>}
+        inlineMeta
         meta={
           packet ? (
             <span className="flex items-center gap-6">
-              <span>Last assembled<br /><span className="text-[14px] font-semibold text-adm-ink">{fmtDateTime(packet.manifest.generated_at)}</span></span>
+              <span>Last assembled<br /><span className="text-[13px] font-medium text-adm-ink">{fmtDateTime(packet.manifest.generated_at)}</span></span>
               <span>Status<br /><StatusText tone={missing === 0 ? "success" : "warning"}>{missing === 0 ? "Complete" : "Incomplete"}</StatusText></span>
             </span>
           ) : undefined
@@ -133,17 +134,17 @@ export default function VinDefensePage() {
                       <Th>Section</Th>
                       <Th>Description</Th>
                       <Th align="right">Artifacts</Th>
-                      <Th>Latest source time</Th>
+                      <Th className="whitespace-nowrap">Latest source time</Th>
                       <Th>Status</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {lines.map((l) => (
-                      <tr key={l.label}>
+                      <tr key={l.label} className="[&>td]:!py-2.5">
                         <Td className="whitespace-nowrap font-medium">{l.label}</Td>
-                        <Td className="max-w-[190px] truncate text-adm-muted">{l.description}</Td>
+                        <Td className="max-w-[200px] truncate text-adm-muted">{l.description}</Td>
                         <Td align="right">{l.count}</Td>
-                        <Td className="whitespace-nowrap">{l.section ? formatDateTime(latestSourceTime(sectionData(l.section))) : "Unknown"}</Td>
+                        <Td className="whitespace-nowrap pr-3">{l.section ? formatDateTime(latestSourceTime(sectionData(l.section))) : "Unknown"}</Td>
                         <Td><StatusText tone={l.count > 0 ? "success" : "danger"}>{l.count > 0 ? "Complete" : "Missing"}</StatusText></Td>
                       </tr>
                     ))}
@@ -152,8 +153,8 @@ export default function VinDefensePage() {
               </Panel>
             }
             aside={
-              <>
-                <Panel title="Packet summary" inset="sm">
+              <Panel title="Packet summary" inset="sm">
+                <>
                   <SummaryList
                     rows={[
                       { label: "Total artifacts", value: total },
@@ -162,8 +163,7 @@ export default function VinDefensePage() {
                       { label: "Last assembled", value: fmtDateTime(packet.manifest.generated_at) },
                     ]}
                   />
-                </Panel>
-                <Panel title="Integrity verification" inset="sm">
+                <h3 className="mt-4 border-t border-adm-border pt-3 text-[15px] font-semibold text-adm-ink">Integrity verification</h3>
                   <SummaryList
                     rows={[
                       { label: "SHA-256 root", value: <code className="font-mono text-[12px]">{packet.manifest.chain_root.slice(0, 16)}</code> },
@@ -176,8 +176,8 @@ export default function VinDefensePage() {
                     <p className="mt-3 text-[13px] leading-[18px] text-adm-warning">No vehicle listing exists for this VIN under this store. Confirm the VIN before relying on this packet.</p>
                   )}
                   <Button variant="outline" className="mt-4 w-full" onClick={exportHtml}>Export packet (HTML)</Button>
-                </Panel>
-              </>
+                </>
+              </Panel>
             }
           />
         )}

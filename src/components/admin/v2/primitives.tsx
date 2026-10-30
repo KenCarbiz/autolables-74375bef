@@ -252,12 +252,12 @@ export const Td = ({ children, className, align = "left", colSpan, title }: { ch
   <td colSpan={colSpan} title={title} className={cn("px-3 py-[11px] border-b border-adm-border align-middle", align === "right" ? "text-right tabular-nums" : "text-left", className)}>{children}</td>
 );
 
-export const KeyValueList = ({ rows, className }: { rows: Array<{ label: ReactNode; value: ReactNode }>; className?: string }) => (
-  <dl className={cn("grid grid-cols-[minmax(120px,160px)_1fr] gap-x-6 gap-y-2 text-[14px] leading-[20px]", className)}>
+export const KeyValueList = ({ rows, className, divided = false }: { rows: Array<{ label: ReactNode; value: ReactNode }>; className?: string; divided?: boolean }) => (
+  <dl className={cn("grid grid-cols-[minmax(120px,160px)_1fr] text-[14px] leading-[20px]", divided ? "gap-x-0 gap-y-0" : "gap-x-6 gap-y-2", className)}>
     {rows.map((r, i) => (
       <div key={i} className="contents">
-        <dt className="text-adm-muted">{r.label}</dt>
-        <dd className="text-adm-ink min-w-0">{r.value}</dd>
+        <dt className={cn("text-adm-muted", divided && "border-b border-adm-border py-1.5 pr-4")}>{r.label}</dt>
+        <dd className={cn("text-adm-ink min-w-0", divided && "border-b border-adm-border py-1.5")}>{r.value}</dd>
       </div>
     ))}
   </dl>

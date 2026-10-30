@@ -378,7 +378,7 @@ export default function ProductApplicabilityPage() {
               <div className="px-4 pt-[13px] pb-[25px]">
                 <h4 className="text-[18px] leading-[24px] font-semibold text-adm-ink">Price treatment</h4>
                 <p className="mt-[3px] text-[13px] leading-[18px] text-adm-muted">Select how this product is priced and enter the amount.</p>
-                <div className="mt-[11px] grid grid-cols-1 gap-y-3">
+                <div className="mt-[11px] grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-[minmax(0,1fr)_190px] sm:items-start">
                   <div className="pt-1.5 space-y-[18px]">
                     <CheckRow size="lg" type="radio" name="treatment" controlClassName="mt-[3px]" labelClassName="text-[14px]" checked={draft.treatment === "installed"} onChange={() => dispatch({ type: "edit", draft: { ...draft, treatment: "installed" } })} label={<span className="font-semibold">Installed product</span>} detail="Added to the vehicle; itemized in the advertised price." />
                     <CheckRow size="lg" type="radio" name="treatment" controlClassName="mt-[3px]" labelClassName="text-[14px]" checked={draft.treatment === "optional"} onChange={() => dispatch({ type: "edit", draft: { ...draft, treatment: "optional" } })} label={<span className="font-semibold">Optional accessory</span>} detail="Customer can choose to add at time of purchase." />
@@ -442,7 +442,7 @@ export default function ProductApplicabilityPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {results.map((r) => (
+                      {results.slice(0, 3).map((r) => (
                         <tr key={r.vehicle.vin}>
                           <Td>
                             <p className="text-[14px] leading-[20px] font-semibold text-adm-ink whitespace-nowrap">{[r.vehicle.year, r.vehicle.make, r.vehicle.model].filter(Boolean).join(" ")}</p>
@@ -498,7 +498,7 @@ export default function ProductApplicabilityPage() {
           </AdminCard>
         )}
 
-        <div className="flex items-center justify-end gap-3 flex-wrap">
+        <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-end gap-3 border-t border-adm-border bg-adm-workspace px-1 py-3">
           <AdminLinkButton to={adminTabHref("applicability")} className="h-[42px] px-[29px] text-[15px]">Cancel</AdminLinkButton>
           {reviewing ? (
             <>

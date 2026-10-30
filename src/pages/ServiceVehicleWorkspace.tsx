@@ -266,7 +266,13 @@ export default function ServiceVehicleWorkspace() {
     canExecute,
   }), [newestSigned, newestActive, signedScopedOpen, signedScopedFailures, pendingRequests, grStarted, veh, clearance, canExecute]);
 
-  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const { hash: locHash } = useLocation();
+  const tab = ["#failures", "#reinspection", "#k208", "#approvals", "#summary"].includes(locHash) ? locHash : "#inspection";
+  const scrollTo = (id: string) => {
+    const target = id === "inspection" ? "#k208" : `#${id}`;
+    navigate({ hash: target }, { replace: true });
+    window.scrollTo({ top: 0 });
+  };
 
   const startInspection = useCallback(async () => {
     if (newestActive && newestActive.status === "pending" && newestActive.inspection_state === "not_started") {
@@ -356,26 +362,32 @@ export default function ServiceVehicleWorkspace() {
             sold ? "Sold" : null,
             assignedMember ? memberName(assignedMember) : gr?.assigned_technician || "Unassigned",
           ].filter(Boolean).join(" | ")}
-          actions={
-            <>
-              {veh.hero_image_url && <img src={veh.hero_image_url} alt="" className="hidden sm:block h-12 w-[72px] rounded-[4px] border border-adm-border object-cover" />}
-              <button
-                type="button"
-                onClick={() => onPrimaryAction(ws.action.key)}
-                className={ws.key === "cleared" ? BTN_SECONDARY : BTN_PRIMARY}
-              >
-                {ws.action.label}
-              </button>
-            </>
-          }
+          actions={veh.hero_image_url ? <img src={veh.hero_image_url} alt="" className="hidden sm:block h-[72px] w-[128px] rounded-[6px] border border-adm-border object-cover" /> : undefined}
         />
         <WorkspaceTabs findings={findings.length} repairs={failures.length} reinspections={reinspections} k208={newestActive || newestSigned ? 1 : 0} approvals={pendingRequests} />
 
         <DetailLayout
           main={
             <>
-              <FindingsTable findings={findings} selectedId={activeFinding?.id ?? null} onSelect={setSelectedFinding} />
-              <div id="k208" />
+              {tab === "#inspection" && (
+                <>
+                  <FindingsTable findings={findings} selectedId={activeFinding?.id ?? null} onSelect={setSelectedFinding} />
+              {newestAny?.status === "voided" && (
+                <CommandCallout tone="amber" Icon={AlertTriangle} title="A K-208 on this VIN was voided">
+                  {newestSigned
+                    ? "The most recent inspection record was voided; the newest remaining signed inspection below is the standing record."
+                    : "The prior inspection record was voided. A new inspection is required, no signed K-208 stands for this vehicle."}
+                </CommandCallout>
+              )}
+                </>
+              )}
+              {tab === "#k208" && (
+                <>
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => onPrimaryAction(ws.action.key)} className={ws.key === "cleared" ? BTN_SECONDARY : BTN_PRIMARY}>
+                      {ws.action.label}
+                    </button>
+                  </div>
               {newestAny?.status === "voided" && (
                 <CommandCallout tone="amber" Icon={AlertTriangle} title="A K-208 on this VIN was voided">
                   {newestSigned
@@ -413,7 +425,10 @@ export default function ServiceVehicleWorkspace() {
                 />
               )}
 
-              <div id="reinspection" />
+                </>
+              )}
+              {tab === "#reinspection" && (
+                <>
               {(failures.length > 0 || isFailedInspection(newestSigned)) && (
                 <div id="failures">
                   <FailedItemsPanel
@@ -430,6 +445,25 @@ export default function ServiceVehicleWorkspace() {
                 </div>
               )}
 
+                </>
+              )}
+              {(tab === "#failures" || tab === "#approvals") && (
+                <>
+              {tab === "#failures" && (failures.length > 0 || isFailedInspection(newestSigned)) && (
+                <div>
+                  <FailedItemsPanel
+                    tenantId={tenantId}
+                    vin={vin}
+                    newestSigned={newestSigned}
+                    failures={failures}
+                    members={members}
+                    canReinspect={canReinspect}
+                    canConduct={canConduct}
+                    onChanged={() => void load()}
+                    logAudit={log}
+                  />
+                </div>
+              )}
               <div id="approvals">
                 <CommandCard
                   title="Additional work"
@@ -453,34 +487,10 @@ export default function ServiceVehicleWorkspace() {
                 onChanged={() => void load()}
                 logAudit={log}
               />
-            </>
-          }
-          aside={
-            <>
-              <FindingDetail
-                finding={activeFinding}
-                repairLabel={activeFailure ? REPAIR_STATE_LABELS[activeFailure.repair_state as RepairState] ?? null : null}
-                photos={Array.isArray(activeFailure?.photos) ? activeFailure.photos : []}
-                vehicleFileHref={`/vehicle-file/${veh.id}`}
-                inspectedLabel={newestSigned?.signed_at
-                  ? `Inspected ${new Date(newestSigned.signed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}${newestSigned.inspector_name ? ` | Technician ${newestSigned.inspector_name}` : ""}`
-                  : null}
-                onAddPhotos={activeFailure && canCompleteWork ? async (files) => {
-                  if (!files?.length) return;
-                  const urls: string[] = [];
-                  for (const file of Array.from(files)) {
-                    try {
-                      const up = await uploadPhoto("prep-photos", file, { tenantId, vin });
-                      if (up?.url) urls.push(up.url);
-                    } catch { toast.error(`Couldn't upload ${file.name}`); }
-                  }
-                  if (!urls.length) return;
-                  const { error } = await (supabase as any).from("safety_inspection_item_failures").update({ photos: [...(activeFailure.photos || []), ...urls] }).eq("id", activeFailure.id);
-                  if (error) { toast.error("Couldn't save the photo."); return; }
-                  log({ action: "failure_photo_added", entity_type: "vehicle", entity_id: vin, store_id: tenantId, user_id: "", details: { failure_id: activeFailure.id, item_id: activeFailure.item_id, photos: urls } });
-                  void load();
-                } : undefined}
-              />
+                </>
+              )}
+              {tab === "#summary" && (
+                <>
               <div id="summary">
                 <SummaryCard findings={findings} newestSigned={newestSigned} openFailures={openFailures.length} clearance={clearance} items={grItems} />
               </div>
@@ -505,6 +515,43 @@ export default function ServiceVehicleWorkspace() {
               </CommandCard>
               <ServiceQrCard tenantId={tenantId} vin={vin} />
               <TitleMcoUpload tenantId={tenantId} veh={{ id: veh.id, vin }} />
+                </>
+              )}
+            </>
+          }
+          aside={
+            <>
+              {tab === "#inspection" && (
+              <FindingDetail
+                finding={activeFinding}
+                repairLabel={activeFailure ? REPAIR_STATE_LABELS[activeFailure.repair_state as RepairState] ?? null : null}
+                photos={Array.isArray(activeFailure?.photos) ? activeFailure.photos : []}
+                vehicleFileHref={`/vehicle-file/${veh.id}`}
+                inspectedLabel={newestSigned?.signed_at
+                  ? `Inspected ${new Date(newestSigned.signed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}${newestSigned.inspector_name ? ` | Technician ${newestSigned.inspector_name}` : ""}`
+                  : null}
+                onAddPhotos={activeFailure && canCompleteWork ? async (files) => {
+                  if (!files?.length) return;
+                  const urls: string[] = [];
+                  for (const file of Array.from(files)) {
+                    try {
+                      const up = await uploadPhoto("prep-photos", file, { tenantId, vin });
+                      if (up?.url) urls.push(up.url);
+                    } catch { toast.error(`Couldn't upload ${file.name}`); }
+                  }
+                  if (!urls.length) return;
+                  const { error } = await (supabase as any).from("safety_inspection_item_failures").update({ photos: [...(activeFailure.photos || []), ...urls] }).eq("id", activeFailure.id);
+                  if (error) { toast.error("Couldn't save the photo."); return; }
+                  log({ action: "failure_photo_added", entity_type: "vehicle", entity_id: vin, store_id: tenantId, user_id: "", details: { failure_id: activeFailure.id, item_id: activeFailure.item_id, photos: urls } });
+                  void load();
+                } : undefined}
+              />
+              )}
+              {tab !== "#summary" && tab !== "#inspection" && (
+              <div id="summary">
+                <SummaryCard findings={findings} newestSigned={newestSigned} openFailures={openFailures.length} clearance={clearance} items={grItems} />
+              </div>
+              )}
             </>
           }
         />
