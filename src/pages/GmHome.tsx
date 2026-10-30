@@ -9,10 +9,9 @@ import { useLeads } from "@/hooks/useLeads";
 import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import { useAdvertisedPrices, assessDrift } from "@/hooks/useAdvertisedPrices";
 import { hasDealerCapability, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import EmptyState from "@/components/ui/empty-state";
 import {
-  AlertTriangle, ArrowRight, CheckCircle2, ClipboardCheck, Clock, ShieldAlert, Users,
-} from "lucide-react";
+  PageBody, PageHeader, SectionHeading, MetricStrip, QueryState, LinkButton, Panel, WorkTable, Th, Td, StatusText, InlineNote,
+} from "@/components/product";
 
 // A vehicle counts as stuck when its canonical lifecycle state has not moved
 // for this long. Stated as a rule so the table never implies a judgement the
@@ -49,6 +48,7 @@ interface ListingRow {
   slug: string | null;
   status: string | null;
   price: number | null;
+  scrape_last_synced_at?: string | null;
 }
 
 interface MemberRow {
@@ -96,6 +96,8 @@ interface ApprovalItem {
   at: string | null;
   href: string;
   urgent: boolean;
+  owner: string;
+  next: string;
 }
 
 interface StuckRow {
@@ -171,7 +173,7 @@ const GmHome = () => {
           .select("vehicle_id, vin, state, state_changed_at, state_changed_by, gate_reason")
           .eq("tenant_id", tenantId).limit(1000),
         db.from("vehicle_listings")
-          .select("id, vin, ymm, slug, status, price")
+          .select("id, vin, ymm, slug, status, price, scrape_last_synced_at")
           .eq("tenant_id", tenantId).neq("status", "archived").limit(1000),
         db.rpc("list_tenant_members", { p_tenant_id: tenantId }),
       ]);
@@ -212,8 +214,10 @@ const GmHome = () => {
         detail: `${money(a.sticker)} on the sticker · ${a.delta > 0 ? "+" : ""}${money(a.delta)} against advertised`,
         amount: null,
         at: null,
-        href: "/inventory",
+        href: `/vehicle-file/${l.id}`,
         urgent: true,
+        owner: "Unassigned",
+        next: "Review price",
       });
     }
     return out;
@@ -233,8 +237,10 @@ const GmHome = () => {
             : `Requested${r.requested_by_name ? ` by ${r.requested_by_name}` : ""}`,
           amount: r.est_total,
           at: r.created_at,
-          href: "/service/approvals",
+          href: `/service/vehicle/${encodeURIComponent(r.vin)}`,
           urgent: r.is_safety,
+          owner: r.requested_by_name || "Unassigned",
+          next: r.status === "clarify" ? "Review clarification" : "Decide repair",
         });
       }
       for (const r of data?.recon || []) {
@@ -246,8 +252,10 @@ const GmHome = () => {
           detail: r.submitted_by ? `Submitted by ${r.submitted_by}` : "Submitted by the shop",
           amount: r.subtotal,
           at: r.created_at,
-          href: "/recon",
+          href: `/service/vehicle/${encodeURIComponent(r.vin)}`,
           urgent: false,
+          owner: r.submitted_by || "Shop",
+          next: "Decide estimate",
         });
       }
     }
@@ -264,6 +272,8 @@ const GmHome = () => {
           at: r.return_requested_at,
           href: "/returns",
           urgent: true,
+          owner: r.signer_name || "Buyer",
+          next: "Decide return",
         });
       }
     }
@@ -299,6 +309,56 @@ const GmHome = () => {
   const systemIssues = metrics.usedMissingLifecycle;
   const attention = approvals.length + stuck.length + systemIssues;
 
+  // One ranked list: urgent decisions first, then the longest-waiting item of
+  // either kind. Bounded to eight so the page is a worklist, not a log.
+  const TODAY_LIMIT = 8;
+  const ranked = useMemo(() => {
+    const rows = [
+      ...approvals.map((a) => ({
+        id: a.id,
+        urgent: a.urgent,
+        age: a.at ? hoursSince(a.at) : 0,
+        kind: a.kind,
+        vehicle: a.vehicle,
+        issue: a.title,
+        detail: a.detail,
+        owner: a.owner,
+        next: a.next,
+        href: a.href,
+        amount: a.amount,
+      })),
+      ...(canViewInventory
+        ? stuck.map((r) => ({
+            id: `stuck-${r.vehicleId}`,
+            urgent: false,
+            age: r.hours,
+            kind: "Stuck vehicle",
+            vehicle: r.vehicle,
+            issue: r.stage,
+            detail: r.blocker || "No blocker recorded",
+            owner: r.owner,
+            next: "Open vehicle",
+            href: `/vin-command/${r.vehicleId}`,
+            amount: null as number | null,
+          }))
+        : []),
+    ];
+    return rows.sort((a, b) => Number(b.urgent) - Number(a.urgent) || b.age - a.age);
+  }, [approvals, stuck, canViewInventory]);
+  const shown = ranked.slice(0, TODAY_LIMIT);
+
+  // Feed freshness is read from the listings already loaded. It is a reading
+  // only: nothing here starts a provider sync.
+  const feedNote = useMemo(() => {
+    const stamps = (data?.listings || [])
+      .map((l) => (l.scrape_last_synced_at ? Date.parse(l.scrape_last_synced_at) : NaN))
+      .filter((t) => !Number.isNaN(t));
+    if (!data || stamps.length === 0) return null;
+    const newest = Math.max(...stamps);
+    const hours = (Date.now() - newest) / 3_600_000;
+    return hours > 48 ? { hours, at: new Date(newest) } : null;
+  }, [data]);
+
   const greeting = (() => {
     const h = new Date().getHours();
     if (h < 12) return "Good morning";
@@ -317,222 +377,137 @@ const GmHome = () => {
     { label: "Ready", value: metrics.retailReady, href: "/inventory" },
   ];
 
+  const reading = isLoading || metricsLoading;
+  const readFailed = !reading && !!tenantId && !data;
+  const scopeName = currentStore?.name || tenant?.name || "Your dealership";
+
   return (
-    <div className="p-4 lg:p-6 max-w-[1600px] mx-auto space-y-5">
-      <header className="rounded-2xl bg-card border border-border px-5 lg:px-6 py-5 shadow-sm">
-        <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
-          {currentStore?.name || tenant?.name || "Your dealership"}
-        </p>
-        <h1 className="font-display text-al-page text-foreground mt-1">{greeting}, {name}.</h1>
-        <p className="text-al-body text-muted-foreground mt-2">
-          {isLoading || metricsLoading
-            ? "Reading today's operating position…"
+    <PageBody width="wide">
+      <PageHeader
+        title="Today"
+        scope={scopeName}
+        description={
+          reading
+            ? "Reading today's operating position..."
             : attention === 0
-              ? "Nothing needs a decision from you right now."
-              : `${attention} item${attention === 1 ? "" : "s"} need${attention === 1 ? "s" : ""} you today — ${approvals.length} awaiting a decision, ${stuck.length} vehicle${stuck.length === 1 ? "" : "s"} stuck, ${systemIssues} system issue${systemIssues === 1 ? "" : "s"}.`}
-        </p>
-        {metricsError && (
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-al-meta font-semibold text-amber-800">
-            <AlertTriangle className="w-3.5 h-3.5" strokeWidth={2} />
-            Operating counts are unavailable: {metricsError}
-          </p>
-        )}
-      </header>
+              ? `${greeting}, ${name}. Nothing needs a decision from you right now.`
+              : `${greeting}, ${name}. ${attention} item${attention === 1 ? "" : "s"} need${attention === 1 ? "s" : ""} you today: ${approvals.length} awaiting a decision, ${stuck.length} vehicle${stuck.length === 1 ? "" : "s"} stuck, ${systemIssues} system issue${systemIssues === 1 ? "" : "s"}.`
+        }
+        actions={canViewInventory ? <LinkButton to="/inventory" variant="primary">Open inventory</LinkButton> : undefined}
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <SummaryTile
-          label="Needs decision"
-          value={approvals.length}
-          caption={approvals.length === 1 ? "approval waiting" : "approvals waiting"}
-          icon={ClipboardCheck}
-          alert={approvals.length > 0}
-        />
-        <SummaryTile
-          label="Vehicles at risk"
-          value={stuck.length}
-          caption={`no stage change in ${STUCK_HOURS / 24}+ days`}
-          icon={AlertTriangle}
-          alert={stuck.length > 0}
-        />
-        <SummaryTile
-          label="Customer opportunities"
-          value={openLeads.length}
-          caption={openLeads.length === 1 ? "open lead" : "open leads"}
-          icon={Users}
-          alert={false}
-        />
-        <SummaryTile
-          label="System issues"
-          value={systemIssues}
-          caption={systemIssues === 0 ? "no data defects" : "used vehicles missing a lifecycle row"}
-          icon={ShieldAlert}
-          alert={systemIssues > 0}
-        />
-      </div>
-
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            My approvals
-          </h2>
-          {approvals.length > 0 && (
-            <span className="text-al-meta font-semibold text-muted-foreground tabular-nums">
-              {approvals.length} waiting
-            </span>
-          )}
-        </div>
-        {approvals.length === 0 ? (
-          <EmptyState
-            compact
-            icon={CheckCircle2}
-            title="Nothing is waiting on your signature"
-            description="Service repairs, recon estimates, price discrepancies and compliance decisions land here the moment they are raised."
-          />
-        ) : (
-          <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden">
-            {approvals.map((a) => (
-              <Link
-                key={a.id}
-                to={a.href}
-                className="group flex items-start gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors"
-              >
-                <span className={`mt-0.5 shrink-0 inline-flex h-6 items-center rounded-md px-2 text-al-meta font-bold uppercase tracking-[0.1em] ${
-                  a.urgent ? "bg-rose-100 text-rose-700" : "bg-muted text-muted-foreground"
-                }`}>
-                  {a.kind}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-al-card text-foreground truncate">{a.title}</p>
-                  <p className="text-al-meta text-muted-foreground mt-0.5 truncate">
-                    {a.vehicle} · {a.detail}
-                    {a.at ? ` · ${shortDate(a.at)}` : ""}
-                  </p>
-                </div>
-                {a.amount !== null && a.amount > 0 && (
-                  <span className="shrink-0 text-al-card tabular-nums text-foreground">{money(a.amount)}</span>
-                )}
-                <ArrowRight className="w-4 h-4 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-0.5" />
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {canViewInventory && (
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
-              Vehicles stuck
-            </h2>
-            <span className="text-al-meta text-muted-foreground">
-              No lifecycle change in {STUCK_HOURS / 24}+ days
-            </span>
-          </div>
-          {stuck.length === 0 ? (
-            <EmptyState
-              compact
-              icon={Clock}
-              title="No vehicle has been sitting in one stage"
-              description={`Every vehicle with a lifecycle record moved stage inside the last ${STUCK_HOURS / 24} days.`}
-            />
-          ) : (
-            <div className="rounded-2xl border border-border bg-card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-al-body">
-                  <thead className="bg-muted/40 text-al-meta uppercase tracking-[0.14em] text-muted-foreground">
-                    <tr>
-                      <th className="text-left px-4 py-2 font-bold">Vehicle</th>
-                      <th className="text-left px-4 py-2 font-bold">Stage</th>
-                      <th className="text-left px-4 py-2 font-bold">Time in stage</th>
-                      <th className="text-left px-4 py-2 font-bold">Owner</th>
-                      <th className="text-left px-4 py-2 font-bold">Blocker</th>
-                      <th className="text-right px-4 py-2 font-bold">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {stuck.slice(0, 25).map((r) => (
-                      <tr key={r.vehicleId} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="text-al-card text-foreground">{r.vehicle}</p>
-                          <p className="text-al-meta text-muted-foreground font-mono">…{(r.vin || "").slice(-8)}</p>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{r.stage}</td>
-                        <td className="px-4 py-3 tabular-nums whitespace-nowrap text-foreground">{duration(r.hours)}</td>
-                        <td className="px-4 py-3 text-muted-foreground truncate max-w-[180px]">{r.owner}</td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {r.blocker || <span className="text-muted-foreground/70">No blocker recorded</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Link
-                            to={`/vin-command/${r.vehicleId}`}
-                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-al-meta font-semibold text-foreground hover:bg-muted transition-colors"
-                          >
-                            Review
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {stuck.length > 25 && (
-                <p className="px-4 py-2.5 text-al-meta text-muted-foreground border-t border-border">
-                  Showing the 25 longest-standing of {stuck.length}.
-                </p>
-              )}
-            </div>
-          )}
-        </section>
+      {metricsError && (
+        <InlineNote tone="warning" title="Operating counts are unavailable">{metricsError}</InlineNote>
       )}
 
+      {feedNote && (
+        <InlineNote
+          tone="warning"
+          title="Inventory feed may be stale"
+          action={<LinkButton to="/admin?tab=inventory-feed" size="sm">Review feed health</LinkButton>}
+        >
+          Newest listing sync {feedNote.at.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}, {Math.floor(feedNote.hours / 24)} days ago.
+        </InlineNote>
+      )}
+
+      <MetricStrip
+        label="Today at a glance"
+        metrics={[
+          { label: "Needs decision", value: reading ? null : approvals.length, loading: reading, hint: approvals.length === 1 ? "approval waiting" : "approvals waiting", tone: approvals.length > 0 ? "warning" : "neutral" },
+          { label: "Vehicles at risk", value: reading ? null : stuck.length, loading: reading, hint: `no stage change in ${STUCK_HOURS / 24}+ days`, tone: stuck.length > 0 ? "warning" : "neutral" },
+          { label: "Customer opportunities", value: openLeads.length, hint: openLeads.length === 1 ? "open lead" : "open leads" },
+          { label: "System issues", value: metricsError ? null : systemIssues, loading: metricsLoading, hint: systemIssues === 0 ? "no data defects" : "used vehicles missing a lifecycle row", tone: systemIssues > 0 ? "danger" : "neutral" },
+        ]}
+      />
+
+      <section aria-labelledby="today-work" className="flex flex-col gap-3">
+        <SectionHeading
+          id="today-work"
+          title="Work for today"
+          description={
+            reading || readFailed
+              ? undefined
+              : `Ranked by urgency, then time waiting. Showing ${shown.length} of ${ranked.length} open items for ${scopeName}.`
+          }
+        />
+        <Panel>
+          <QueryState
+            status={reading ? "loading" : readFailed ? "error" : ranked.length === 0 ? "empty" : "ready"}
+            errorTitle="Today's work could not be read."
+            errorDetail="Nothing is being shown as clear. Reload to try again."
+            emptyTitle="Nothing is waiting on you"
+            emptyDetail="Service repairs, recon estimates, price discrepancies, stuck vehicles and compliance decisions appear here when they are raised."
+          >
+            <WorkTable caption="Ranked work for today" minWidth={760}>
+              <thead>
+                <tr>
+                  <Th>Item</Th>
+                  <Th>Issue</Th>
+                  <Th>Owner</Th>
+                  <Th>Waiting</Th>
+                  <Th align="right">Amount</Th>
+                  <Th align="right">Next step</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((r) => (
+                  <tr key={r.id} className="hover:bg-adm-workspace">
+                    <Td>
+                      <p className="font-semibold">{r.vehicle}</p>
+                      <p className="text-[12px] leading-[18px] text-adm-muted">{r.kind}</p>
+                    </Td>
+                    <Td className="max-w-[320px]">
+                      <p className="truncate">{r.issue}</p>
+                      <p className="truncate text-[12px] leading-[18px] text-adm-muted">{r.detail}</p>
+                    </Td>
+                    <Td className="max-w-[180px] truncate text-adm-muted">{r.owner}</Td>
+                    <Td className="whitespace-nowrap tabular-nums">
+                      {r.age > 0 ? duration(r.age) : <span className="text-adm-muted">Unknown</span>}
+                      {r.urgent && <StatusText tone="danger" className="ml-2">Urgent</StatusText>}
+                    </Td>
+                    <Td align="right">{r.amount !== null && r.amount > 0 ? money(r.amount) : <span className="text-adm-muted">-</span>}</Td>
+                    <Td align="right">
+                      <LinkButton to={r.href} size="sm">{r.next}</LinkButton>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </WorkTable>
+            {ranked.length > shown.length && (
+              <p className="border-t border-adm-border px-4 py-3 text-[12px] leading-[18px] text-adm-muted">
+                {ranked.length - shown.length} more open items. Service repairs are listed in{" "}
+                <Link className="text-adm-primary underline" to="/service/approvals">Service approvals</Link>, recon in{" "}
+                <Link className="text-adm-primary underline" to="/recon">Recon</Link>, and stuck vehicles in{" "}
+                <Link className="text-adm-primary underline" to="/ready-board">Ready board</Link>.
+              </p>
+            )}
+          </QueryState>
+        </Panel>
+      </section>
+
       {canViewGetReady && (
-        <section>
-          <h2 className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground mb-2">
-            Lifecycle
-          </h2>
-          <div className="rounded-2xl border border-border bg-card grid grid-cols-3 md:grid-cols-6 divide-x divide-y md:divide-y-0 divide-border overflow-hidden">
-            {lifecycleStrip.map((s) => (
-              <Link key={s.label} to={s.href} className="px-4 py-3.5 hover:bg-muted/40 transition-colors">
-                <p className="text-al-meta font-bold uppercase tracking-[0.14em] text-muted-foreground">{s.label}</p>
-                <p className={`font-display text-2xl tabular-nums leading-none mt-1.5 ${s.value === 0 ? "text-muted-foreground" : "text-foreground"}`}>
-                  {s.value}
-                </p>
-              </Link>
-            ))}
-          </div>
-          <p className="text-al-meta text-muted-foreground mt-2">
+        <section aria-labelledby="today-lifecycle" className="flex flex-col gap-3">
+          <SectionHeading id="today-lifecycle" title="Lifecycle" />
+          <Panel>
+            <ul className="grid grid-cols-3 md:grid-cols-6 divide-x divide-y md:divide-y-0 divide-adm-border">
+              {lifecycleStrip.map((s) => (
+                <li key={s.label}>
+                  <Link to={s.href} className="block min-h-[56px] px-4 py-3 hover:bg-adm-workspace">
+                    <p className="text-[12px] leading-[18px] font-medium text-adm-muted">{s.label}</p>
+                    <p className="text-[20px] leading-[28px] font-bold tabular-nums text-adm-ink">{metricsError ? "Unknown" : s.value}</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+          <p className="text-[12px] leading-[18px] text-adm-muted">
             Unique vehicles, from the canonical operating metrics. Recon is counted from open estimates and
             overlaps the Service stage, so the strip is not a total.
           </p>
         </section>
       )}
-    </div>
+    </PageBody>
   );
 };
-
-interface SummaryTileProps {
-  label: string;
-  value: number;
-  caption: string;
-  icon: typeof Users;
-  alert: boolean;
-}
-
-const SummaryTile = ({ label, value, caption, icon: Icon, alert }: SummaryTileProps) => (
-  <div className={`rounded-2xl border bg-card p-5 flex flex-col gap-2 ${alert ? "border-amber-200" : "border-border"}`}>
-    <div className="flex items-start justify-between gap-2">
-      <p className="text-al-meta font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-      <span className={`w-8 h-8 rounded-lg inline-flex items-center justify-center ${
-        alert ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
-      }`}>
-        <Icon className="w-4 h-4" strokeWidth={2.25} />
-      </span>
-    </div>
-    <p className="font-display text-[32px] lg:text-[36px] font-bold tabular-nums leading-none text-foreground">
-      {value}
-    </p>
-    <p className="text-al-meta text-muted-foreground">{caption}</p>
-  </div>
-);
 
 export default GmHome;
