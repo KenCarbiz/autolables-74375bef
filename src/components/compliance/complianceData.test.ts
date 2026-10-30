@@ -322,7 +322,10 @@ describe("issues and overview", () => {
         open_recall_count: 0,
         recall_status: "clear",
         recall_payload: {
-          source: "nhtsa", checked_at: "2026-09-08T03:00:00Z",
+          // Fresh on purpose: a model answer older than RECALL_STALE_DAYS reads
+          // "out of date" rather than "No campaigns", which would make this
+          // test depend on the calendar instead of the contract.
+          source: "nhtsa", checked_at: new Date().toISOString(),
           model_in_catalog: true, open_recall_count: 0,
         },
       })],
@@ -331,6 +334,22 @@ describe("issues and overview", () => {
     expect(recall).toHaveLength(1);
     expect(recall[0].label).toBe("Recall verification unavailable for this VIN");
     expect(recall[0].detail).toMatch(/No campaigns on this model/);
+  });
+
+  it("keeps a stale model-level answer as an exception too, never a clearance", () => {
+    const { issueRows } = build({
+      listings: [listing({
+        open_recall_count: 0,
+        recall_status: "clear",
+        recall_payload: {
+          source: "nhtsa", checked_at: "2020-01-01T00:00:00Z",
+          model_in_catalog: true, open_recall_count: 0,
+        },
+      })],
+    });
+    const recall = issueRows[0].issues.filter((i) => i.category === "recall");
+    expect(recall).toHaveLength(1);
+    expect(recall[0].label).toBe("Recall verification unavailable for this VIN");
   });
 
   it("clears the recall exception only on a VIN-level answer", () => {
