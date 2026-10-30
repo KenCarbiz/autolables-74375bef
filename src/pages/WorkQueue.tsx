@@ -17,6 +17,8 @@ import {
 } from "@/lib/work/workClassification";
 import { AlertTriangle, Car, CheckCircle2, ClipboardList, Filter, Inbox, PlayCircle, Printer, RefreshCw, RotateCcw, ScanLine, ShieldCheck, Sparkles, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
+import { PageBody, PageHeader, LocalTabs, QueryState, Panel, WorkTable, Th, Td, Button, StatusText, InlineNote, type LocalTab } from "@/components/product";
 
 type WorkStatus = "all" | "open" | "needs_approval" | "in_progress" | "completed" | "cancelled";
 type Department = "all" | "inventory" | "print" | "service" | "detail" | "compliance" | "manager" | "passport" | "finance" | "third_party";
@@ -90,6 +92,14 @@ const dueLabel = (item: WorkItem) => {
   return { text: `${overdue ? "Overdue " : ""}${format(due, "MMM d, yyyy")}`, overdue };
 };
 
+const LANE_LABEL: Record<WorkLane, string> = {
+  needs_me: "My work",
+  team: "Team",
+  waiting: "Waiting",
+  system_exception: "System exceptions",
+  completed: "Completed",
+};
+
 const WorkQueue = () => {
   const { tenant } = useTenant();
   const { user } = useAuth();
@@ -97,7 +107,12 @@ const WorkQueue = () => {
   const [items, setItems] = useState<WorkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [lane, setLane] = useState<WorkLane>("needs_me");
+  // The selected tab lives in the URL so reload and back return to it.
+  const [searchParams] = useSearchParams();
+  const rawTab = searchParams.get("lane");
+  const tabKey: WorkLane | "print" =
+    rawTab === "print" ? "print" : (WORK_LANES.find((l) => l.key === rawTab)?.key ?? "needs_me");
+  const lane: WorkLane = tabKey === "print" ? "needs_me" : tabKey;
   const [status, setStatus] = useState<WorkStatus>("all");
   const [department, setDepartment] = useState<Department>("all");
   const [includeDeparted, setIncludeDeparted] = useState(false);
@@ -270,56 +285,53 @@ const WorkQueue = () => {
 
   const filtersActive = status !== "all" || department !== "all" || q.trim().length > 0;
 
+  const myWorkEmptyNote = (() => {
+    const others = laneCount("team") + laneCount("waiting") + laneCount("system_exception");
+    return others > 0
+      ? `${laneCount("team")} team, ${laneCount("waiting")} waiting and ${laneCount("system_exception")} system exception items remain in the other tabs.`
+      : undefined;
+  })();
+
+  const queueTabs: LocalTab[] = [
+    ...WORK_LANES.map((l) => ({
+      key: l.key,
+      label: LANE_LABEL[l.key],
+      to: l.key === "needs_me" ? "/queue" : `/queue?lane=${l.key}`,
+      count: loading ? null : laneCount(l.key),
+      active: tabKey === l.key,
+    })),
+    { key: "print", label: "Print queue", to: "/queue?lane=print", active: tabKey === "print" },
+  ];
+
+  const confirmBuild = () => {
+    if (typeof window !== "undefined" && !window.confirm("Build work items from up to 150 current inventory vehicles? This creates queue items for the gaps it finds.")) return;
+    void generateFromInventory();
+  };
+
   return (
-    <div className="mx-auto max-w-[1500px] space-y-5 p-4 lg:p-6">
-      <section className="rounded-2xl border border-border bg-card px-5 py-5 shadow-sm lg:px-6 lg:py-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">Work</p>
-            <h1 className="font-display text-al-page text-foreground mt-1">What needs a person today.</h1>
-            <p className="text-al-body text-muted-foreground mt-2 max-w-2xl">
-              Tasks people own come first. Everything the sync recorded about a vehicle sits in its own lane, so a feed
-              event never counts as somebody&apos;s job.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={load} disabled={loading} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-al-button text-foreground transition-colors hover:bg-muted disabled:opacity-60">
-              <RefreshCw className="h-4 w-4" /> Refresh
-            </button>
-            <button onClick={generateFromInventory} disabled={creating} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-al-button text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
-              <PlayCircle className="h-4 w-4" /> {creating ? "Building queue..." : "Build from inventory"}
-            </button>
-          </div>
-        </div>
-      </section>
+    <PageBody width="wide">
+      <PageHeader
+        title="Work Queue"
+        description="Tasks people own come first. Everything the sync recorded about a vehicle sits in its own tab, so a feed event never counts as somebody's job."
+        actions={
+          <>
+            <Button onClick={load} disabled={loading}><RefreshCw className="h-4 w-4" /> Refresh</Button>
+            <Button variant="primary" onClick={confirmBuild} disabled={creating}>
+              <PlayCircle className="h-4 w-4" /> {creating ? "Building queue..." : "Review and build from inventory"}
+            </Button>
+          </>
+        }
+      />
 
-      <section className="rounded-2xl border border-border bg-card p-2 shadow-sm">
-        <div className="flex gap-1 overflow-x-auto">
-          {WORK_LANES.map((l) => {
-            const active = l.key === lane;
-            const count = laneCount(l.key);
-            return (
-              <button
-                key={l.key}
-                onClick={() => setLane(l.key)}
-                aria-current={active ? "page" : undefined}
-                className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-al-button transition-colors ${active ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60"}`}
-              >
-                {l.label}
-                <span className={`rounded-full px-2 py-0.5 text-al-meta ${active ? "bg-card text-foreground" : "bg-muted text-muted-foreground"}`}>{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      <LocalTabs tabs={queueTabs} label="Work queue" />
 
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      {tabKey !== "print" && (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] flex-1">
-            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN, stock, task, department..." className="h-10 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-al-body text-foreground outline-none focus:border-primary" />
+          <div className="relative min-w-[220px] flex-1 max-w-md">
+            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search work" placeholder="Search VIN, stock, task, department" className="min-h-[36px] w-full rounded-md border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink" />
           </div>
-          <select value={status} onChange={(e) => setStatus(e.target.value as WorkStatus)} className="h-10 rounded-xl border border-border bg-card px-3 text-al-button text-foreground">
+          <select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value as WorkStatus)} className="min-h-[36px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink">
             <option value="all">All statuses</option>
             <option value="open">Open</option>
             <option value="needs_approval">Needs approval</option>
@@ -327,7 +339,7 @@ const WorkQueue = () => {
             <option value="completed">Done</option>
             <option value="cancelled">Cancelled</option>
           </select>
-          <select value={department} onChange={(e) => setDepartment(e.target.value as Department)} className="h-10 rounded-xl border border-border bg-card px-3 text-al-button text-foreground">
+          <select aria-label="Filter by department" value={department} onChange={(e) => setDepartment(e.target.value as Department)} className="min-h-[36px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink">
             <option value="all">All departments</option>
             <option value="inventory">Inventory</option>
             <option value="print">Print</option>
@@ -339,101 +351,88 @@ const WorkQueue = () => {
             <option value="passport">Passport</option>
             <option value="finance">Finance</option>
           </select>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
           <QuickFilter label="Needs approval" onClick={() => { setStatus("needs_approval"); setDepartment("all"); }} />
-          <QuickFilter label="Print queue" onClick={() => { setDepartment("print"); setStatus("all"); }} />
           <QuickFilter label="Get-ready" onClick={() => { setDepartment("service"); setStatus("all"); }} />
           <QuickFilter label="Compliance" onClick={() => { setDepartment("compliance"); setStatus("all"); }} />
           {filtersActive && (
-            <button onClick={() => { setStatus("all"); setDepartment("all"); setQ(""); }} className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3 text-al-meta text-muted-foreground transition-colors hover:bg-muted">
-              Clear filters
-            </button>
+            <Button size="sm" variant="ghost" onClick={() => { setStatus("all"); setDepartment("all"); setQ(""); }}>Clear filters</Button>
           )}
         </div>
-      </section>
+      )}
 
-      {lane === "system_exception" && (
-        <section className="rounded-2xl border border-border bg-muted/40 px-4 py-3">
-          <label className="flex flex-wrap items-center gap-2 text-al-body text-muted-foreground">
+      {tabKey === "system_exception" && (
+        <InlineNote tone="info" title="Exceptions on current inventory">
+          <label className="inline-flex flex-wrap items-center gap-2">
             <input
               type="checkbox"
               checked={includeDeparted}
               onChange={(e) => setIncludeDeparted(e.target.checked)}
               className="h-4 w-4 rounded border-border accent-current"
             />
-            Include exceptions about vehicles that have left the lot
-            {departedCount > 0 ? ` (${departedCount} hidden)` : ""}
+            Include exceptions about vehicles that have left the lot{departedCount > 0 ? ` (${departedCount} hidden)` : ""}.
+            A sold car&apos;s exception is a record of what happened, not work anybody can do.
           </label>
-          <p className="text-al-meta text-muted-foreground mt-1">
-            Off by default: a sold car&apos;s exception is a record of what happened, not work anybody can do.
-          </p>
-        </section>
+        </InlineNote>
       )}
 
-      {(department === "all" || department === "print") && <VinPrintQueue />}
-
-      <section className="space-y-3">
-        {loading ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-al-body text-muted-foreground">Loading work...</div>
-        ) : laneItems.length === 0 ? (
-          filtersActive ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
-              <Filter className="mx-auto h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-              <h2 className="text-al-section text-foreground mt-3">Nothing matches these filters</h2>
-              <p className="text-al-body text-muted-foreground mt-1">Clear the search, status, or department filter to see this lane again.</p>
-            </div>
-          ) : (
-            <LaneEmpty lane={lane} departedCount={lane === "system_exception" ? departedCount : 0} onShowDeparted={() => setIncludeDeparted(true)} />
-          )
-        ) : laneItems.map((item) => isSystemException(item) ? (
-          <ExceptionRow key={item.id} item={item} onOpen={navigate} onDismiss={updateStatus} />
-        ) : (
-          <HumanTaskRow
-            key={item.id}
-            item={item}
-            currentUserId={user?.id}
-            previews={previewVehicleWork(item).length}
-            onOpen={navigate}
-            onUpdate={updateStatus}
-          />
-        ))}
-      </section>
-    </div>
+      {tabKey === "print" ? (
+        <VinPrintQueue />
+      ) : (
+        <Panel>
+          <QueryState
+            status={loading ? "loading" : laneItems.length === 0 ? "empty" : "ready"}
+            emptyTitle={
+              filtersActive
+                ? "Nothing matches these filters"
+                : lane === "needs_me" ? "No items in My work" : (WORK_LANES.find((l) => l.key === lane)?.empty ?? "No items")
+            }
+            emptyDetail={
+              filtersActive
+                ? "Clear the search, status or department filter to see this tab again."
+                : lane === "needs_me" ? (myWorkEmptyNote ?? laneCopy[lane]) : laneCopy[lane]
+            }
+            emptyAction={
+              !filtersActive && lane === "system_exception" && departedCount > 0
+                ? <Button size="sm" onClick={() => setIncludeDeparted(true)}>Show {departedCount} about vehicles that left</Button>
+                : undefined
+            }
+          >
+            <WorkTable caption="Work items" minWidth={820}>
+              <thead>
+                <tr>
+                  <Th>Task</Th>
+                  <Th>Vehicle or customer</Th>
+                  <Th>Owner</Th>
+                  <Th>Due</Th>
+                  <Th>Status</Th>
+                  <Th align="right">Next step</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {laneItems.map((item) => isSystemException(item) ? (
+                  <ExceptionRow key={item.id} item={item} onOpen={navigate} onDismiss={updateStatus} />
+                ) : (
+                  <HumanTaskRow
+                    key={item.id}
+                    item={item}
+                    currentUserId={user?.id}
+                    previews={previewVehicleWork(item).length}
+                    onOpen={navigate}
+                    onUpdate={updateStatus}
+                  />
+                ))}
+              </tbody>
+            </WorkTable>
+          </QueryState>
+        </Panel>
+      )}
+    </PageBody>
   );
 };
 
 function QuickFilter({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="inline-flex h-8 items-center rounded-full border border-border bg-card px-3 text-al-meta text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-      {label}
-    </button>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-al-meta uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <div className="text-al-body text-foreground mt-0.5 truncate">{children}</div>
-    </div>
-  );
-}
-
-function LaneEmpty({ lane, departedCount, onShowDeparted }: { lane: WorkLane; departedCount: number; onShowDeparted: () => void }) {
-  const copy = WORK_LANES.find((l) => l.key === lane);
-  const Icon = lane === "completed" ? ClipboardList : lane === "system_exception" ? Inbox : CheckCircle2;
-  return (
-    <div className="rounded-2xl border border-border bg-card p-10 text-center shadow-sm">
-      <Icon className="mx-auto h-10 w-10 text-muted-foreground" strokeWidth={1.5} />
-      <h2 className="text-al-section text-foreground mt-4">{copy?.empty || "You're caught up."}</h2>
-      <p className="text-al-body text-muted-foreground mt-2 mx-auto max-w-md">{laneCopy[lane]}</p>
-      {lane === "system_exception" && departedCount > 0 && (
-        <button onClick={onShowDeparted} className="mt-4 inline-flex h-9 items-center rounded-xl border border-border bg-card px-4 text-al-button text-foreground transition-colors hover:bg-muted">
-          Show {departedCount} about vehicles that left
-        </button>
-      )}
-    </div>
+    <Button size="sm" variant="ghost" onClick={onClick}>{label}</Button>
   );
 }
 
@@ -444,7 +443,6 @@ function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate }: {
   onOpen: (to: string) => void;
   onUpdate: (item: WorkItem, nextStatus: string) => void;
 }) {
-  const Icon = departmentIcon(item.department);
   const urgent = item.priority === "urgent" || item.priority === "high";
   const due = dueLabel(item);
   const owner = item.assigned_to
@@ -454,81 +452,51 @@ function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate }: {
   const external = item.source === "description_exception";
 
   return (
-    <article className="rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:bg-muted/30">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
-            <Icon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-al-meta uppercase tracking-[0.14em] ${urgent ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border bg-muted text-muted-foreground"}`}>
-                {urgent && <AlertTriangle className="h-3 w-3" />}
-                {item.priority || "normal"}
-              </span>
-              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-al-meta uppercase tracking-[0.14em] text-muted-foreground">
-                {statusLabels[item.status] || item.status}
-              </span>
-              <span className="rounded-full border border-border bg-card px-2.5 py-0.5 text-al-meta uppercase tracking-[0.14em] text-muted-foreground">
-                {item.department || "inventory"}
-              </span>
-            </div>
-            <h2 className="text-al-card text-foreground mt-2">{item.title}</h2>
-            <p className="text-al-meta uppercase tracking-[0.14em] text-muted-foreground mt-2">Why</p>
-            <p className="text-al-body text-muted-foreground mt-0.5">
-              {item.description || "Created from this vehicle's state during the last inventory sync."}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {link && (
-            <button onClick={() => onOpen(link)} className="h-9 rounded-xl border border-border bg-card px-3 text-al-button text-foreground transition-colors hover:bg-muted">
-              Open record
-            </button>
-          )}
+    <tr className="hover:bg-adm-workspace align-top">
+      <Td className="max-w-[360px]">
+        <p className="font-semibold text-adm-ink">{item.title}</p>
+        <p className="text-[12px] leading-[18px] text-adm-muted">
+          {item.description || "Created from this vehicle's state during the last inventory sync."}
+        </p>
+        <p className="text-[12px] leading-[18px] text-adm-muted capitalize">
+          {item.department || "inventory"}
+          {urgent && <StatusText tone="danger" icon className="ml-2">{item.priority}</StatusText>}
+        </p>
+        {previews > 0 && item.status !== "completed" && (
+          <p className="text-[12px] leading-[18px] text-adm-muted">
+            Next-best-action engine sees {previews} possible requirement{previews === 1 ? "" : "s"} for this vehicle.
+          </p>
+        )}
+      </Td>
+      <Td className="max-w-[200px] truncate">{vehicleLabel(item)}</Td>
+      <Td className="text-adm-muted">{owner}</Td>
+      <Td className="whitespace-nowrap">
+        <span className={due.overdue ? "text-adm-danger" : "text-adm-muted"}>{due.text}</span>
+      </Td>
+      <Td className="whitespace-nowrap">{statusLabels[item.status] || item.status}</Td>
+      <Td align="right">
+        <div className="flex flex-wrap justify-end gap-2">
+          {link && <Button size="sm" onClick={() => onOpen(link)}>Open record</Button>}
           {/* A description exception is not a dealer_work_items row, so Start /
-              Mark done cannot act on it — rendering them made the primary
-              button on the card a permanent no-op. */}
+              Mark done cannot act on it. */}
           {!external && (
             <>
               {item.status !== "in_progress" && item.status !== "completed" && (
-                <button onClick={() => onUpdate(item, "in_progress")} className="h-9 rounded-xl border border-border bg-muted px-3 text-al-button text-foreground transition-colors hover:bg-card">
-                  Start
-                </button>
+                <Button size="sm" onClick={() => onUpdate(item, "in_progress")}>Start</Button>
               )}
-              {item.department === "print" && (
-                <button onClick={() => onUpdate(item, "completed")} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-al-button text-primary-foreground transition-opacity hover:opacity-90">
+              {item.department === "print" && item.status !== "completed" && (
+                <Button size="sm" variant="primary" onClick={() => onUpdate(item, "completed")}>
                   <Printer className="h-4 w-4" /> Approve done
-                </button>
+                </Button>
               )}
               {item.status !== "completed" && item.department !== "print" && (
-                <button onClick={() => onUpdate(item, "completed")} className="h-9 rounded-xl bg-primary px-3 text-al-button text-primary-foreground transition-opacity hover:opacity-90">
-                  Mark done
-                </button>
+                <Button size="sm" variant="primary" onClick={() => onUpdate(item, "completed")}>Mark done</Button>
               )}
             </>
           )}
         </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Vehicle or customer">{vehicleLabel(item)}</Field>
-        <Field label="Owner">{owner}</Field>
-        <Field label="Due">
-          <span className={due.overdue ? "text-destructive" : undefined}>{due.text}</span>
-        </Field>
-        <Field label="Next action">
-          {external ? "Open the description record" : item.status === "in_progress" ? "Finish and mark done" : "Start this task"}
-        </Field>
-      </div>
-
-      {previews > 0 && item.status !== "completed" && (
-        <p className="text-al-meta text-muted-foreground mt-3">
-          Next-best-action engine sees {previews} possible requirement{previews === 1 ? "" : "s"} for this vehicle.
-        </p>
-      )}
-    </article>
+      </Td>
+    </tr>
   );
 }
 
@@ -545,45 +513,37 @@ function ExceptionRow({ item, onOpen, onDismiss }: {
   const departed = item.vehicleActive === false;
 
   return (
-    <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <Inbox className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-al-card text-foreground">{copy.label}</h2>
-            <p className="text-al-body text-muted-foreground mt-1">{copy.why}</p>
-            {showDetail && <p className="text-al-body text-muted-foreground mt-1">{detail}</p>}
-            <div className="text-al-meta text-muted-foreground mt-2 flex flex-wrap gap-x-3 gap-y-1">
-              <span>{vehicleLabel(item)}</span>
-              {item.vin && <span>VIN {item.vin}</span>}
-              {item.created_at && <span>Recorded {format(new Date(item.created_at), "MMM d, yyyy")}</span>}
-              {departed && <span>Vehicle no longer in inventory</span>}
-            </div>
-            <details className="mt-2">
-              <summary className="text-al-meta cursor-pointer text-muted-foreground">Diagnostics</summary>
-              <p className="text-al-meta text-muted-foreground mt-1 break-all font-mono">
-                {item.work_type} · {item.source || "unknown source"} · {item.status} · {item.id}
-              </p>
-            </details>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {copy.nextAction && link && (
-            <button onClick={() => onOpen(link)} className="h-9 rounded-xl bg-primary px-3 text-al-button text-primary-foreground transition-opacity hover:opacity-90">
-              {copy.nextAction}
-            </button>
-          )}
+    <tr className="hover:bg-adm-workspace align-top">
+      <Td className="max-w-[360px]">
+        <p className="font-semibold text-adm-ink">{copy.label}</p>
+        <p className="text-[12px] leading-[18px] text-adm-muted">{copy.why}</p>
+        {showDetail && <p className="text-[12px] leading-[18px] text-adm-muted">{detail}</p>}
+        <details className="mt-1">
+          <summary className="text-[12px] leading-[18px] cursor-pointer text-adm-muted">Diagnostics</summary>
+          <p className="text-[12px] leading-[18px] text-adm-muted break-all font-mono">
+            {item.work_type} | {item.source || "unknown source"} | {item.status} | {item.id}
+          </p>
+        </details>
+      </Td>
+      <Td className="max-w-[220px]">
+        <p className="truncate">{vehicleLabel(item)}</p>
+        {item.vin && <p className="text-[12px] leading-[18px] text-adm-muted font-mono truncate">VIN {item.vin}</p>}
+        {departed && <p className="text-[12px] leading-[18px] text-adm-muted">Vehicle no longer in inventory</p>}
+      </Td>
+      <Td className="text-adm-muted">System</Td>
+      <Td className="whitespace-nowrap text-adm-muted">
+        {item.created_at ? `Recorded ${format(new Date(item.created_at), "MMM d, yyyy")}` : "Unknown"}
+      </Td>
+      <Td className="whitespace-nowrap">{statusLabels[item.status] || item.status}</Td>
+      <Td align="right">
+        <div className="flex flex-wrap justify-end gap-2">
+          {copy.nextAction && link && <Button size="sm" variant="primary" onClick={() => onOpen(link)}>{copy.nextAction}</Button>}
           {!external && item.status !== "completed" && (
-            <button onClick={() => onDismiss(item, "completed")} className="h-9 rounded-xl border border-border bg-card px-3 text-al-button text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-              Dismiss
-            </button>
+            <Button size="sm" onClick={() => onDismiss(item, "completed")}>Dismiss</Button>
           )}
         </div>
-      </div>
-    </article>
+      </Td>
+    </tr>
   );
 }
 
