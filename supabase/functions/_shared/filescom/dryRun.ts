@@ -69,7 +69,7 @@ export function runDryRun(headers: string[], rows: string[][], existing: Existin
       dealerId: get(r, "DealerId"), dealerName: get(r, "Dealer Name"), address: get(r, "Dealer Address"),
       city: get(r, "Dealer City"), postal: get(r, "Dealer Postal Code"), region: get(r, "Dealer Region"),
     };
-    identities.set(`${ident.dealerId}\u0000${ident.dealerName}`, ident);
+    identities.set([ident.dealerId, ident.dealerName, ident.address, ident.city, ident.postal, ident.region].map((v) => v.trim().replace(/\s+/g, " ").toUpperCase()).join("\u0000"), ident);
     const vin = get(r, "VIN").toUpperCase();
     if (!vin) return void errors.push({ row: rowNo, code: "vin_missing" });
     if (!VIN.test(vin)) return void errors.push({ row: rowNo, vin, code: "vin_malformed" });
