@@ -23,6 +23,7 @@ export const ADMIN_CHILD_ROUTE_ELEMENTS: AdminChildRoute[] = [
   { path: "/admin/integrations/runs/:runId", element: lazyElement(() => import("./children/SyncRunPage")) },
   { path: "/admin/integrations/providers/:providerId", element: lazyElement(() => import("./children/ProviderDetailPage")) },
   { path: "/admin/integrations/jobs/:jobId", element: lazyElement(() => import("./children/JobDetailPage")) },
+  { path: "/admin/integrations/files-com", element: lazyElement(() => import("./children/FilesComFeedPage")) },
 ];
 
 export { lazyElement };
