@@ -1,3 +1,4 @@
+import { PageBody } from "@/components/product";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
@@ -76,8 +77,8 @@ function SummaryRow({ Icon, value, label, tone }: {
     <div className="flex items-center gap-3 py-2">
       <CommandIconTile Icon={Icon} tone={tone} />
       <span className="min-w-0">
-        <span className="block text-[22px] font-bold text-foreground leading-none">{value}</span>
-        <span className="block text-[11.5px] text-muted-foreground mt-1 leading-tight">{label}</span>
+        <span className="block text-[22px] font-bold text-adm-ink leading-none">{value}</span>
+        <span className="block text-[11.5px] text-adm-muted mt-1 leading-tight">{label}</span>
       </span>
     </div>
   );
@@ -128,7 +129,7 @@ function DepartmentColumn({ column, onSaveNote }: {
       }>
       <div className="divide-y divide-border/70">
         {column.items.length === 0 ? (
-          <p className="text-[11.5px] text-muted-foreground py-2">No work items assigned to this department.</p>
+          <p className="text-[11.5px] text-adm-muted py-2">No work items assigned to this department.</p>
         ) : column.items.map((item) => {
           const done = item.status === "complete";
           return (
@@ -137,8 +138,8 @@ function DepartmentColumn({ column, onSaveNote }: {
                 ? <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", TONE_TEXT.emerald)} aria-hidden="true" />
                 : <Clock className={cn("w-4 h-4 mt-0.5 shrink-0", TONE_TEXT.amber)} aria-hidden="true" />}
               <div className="min-w-0 flex-1">
-                <p className="text-[12.5px] font-medium text-foreground leading-tight">{item.label}</p>
-                {item.sublabel && <p className="text-[11.5px] text-muted-foreground mt-0.5">{item.sublabel}</p>}
+                <p className="text-[12.5px] font-medium text-adm-ink leading-tight">{item.label}</p>
+                {item.sublabel && <p className="text-[11.5px] text-adm-muted mt-0.5">{item.sublabel}</p>}
               </div>
               <div className="shrink-0 text-right">
                 {done ? (
@@ -146,7 +147,7 @@ function DepartmentColumn({ column, onSaveNote }: {
                 ) : (
                   <StatusPill tone="amber">{item.status === "pending_proof" ? "Pending Proof" : "Pending"}</StatusPill>
                 )}
-                {item.dueLabel && <p className="text-[10.5px] text-muted-foreground mt-1">{item.dueLabel}</p>}
+                {item.dueLabel && <p className="text-[10.5px] text-adm-muted mt-1">{item.dueLabel}</p>}
               </div>
             </div>
           );
@@ -155,7 +156,7 @@ function DepartmentColumn({ column, onSaveNote }: {
 
       {showNote && (
         <div className="mt-3">
-          <label className="block text-[11.5px] font-semibold text-foreground mb-1.5" htmlFor={`note-${column.key}`}>
+          <label className="block text-[11.5px] font-semibold text-adm-ink mb-1.5" htmlFor={`note-${column.key}`}>
             Manager Note (Optional)
           </label>
           <textarea
@@ -164,9 +165,9 @@ function DepartmentColumn({ column, onSaveNote }: {
             onChange={(e) => setNote(e.target.value)}
             onBlur={blur}
             placeholder="Add a note for this department…"
-            className="w-full min-h-[92px] rounded-xl border border-border bg-background p-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary" />
+            className="w-full min-h-[92px] rounded-xl border border-adm-border bg-adm-surface p-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary" />
           {saving && (
-            <p className="text-[10.5px] text-muted-foreground mt-1 inline-flex items-center gap-1">
+            <p className="text-[10.5px] text-adm-muted mt-1 inline-flex items-center gap-1">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Saving note…
             </p>
           )}
@@ -174,17 +175,17 @@ function DepartmentColumn({ column, onSaveNote }: {
       )}
 
       {column.key === "vendor" && (
-        <div className="mt-3 pt-3 border-t border-border">
-          <p className="text-[11.5px] font-semibold text-foreground mb-1.5">Vendor Assignments</p>
+        <div className="mt-3 pt-3 border-t border-adm-border">
+          <p className="text-[11.5px] font-semibold text-adm-ink mb-1.5">Vendor Assignments</p>
           {!column.vendors || column.vendors.length === 0 ? (
-            <p className="text-[11.5px] text-muted-foreground py-2">No vendors assigned to this vehicle.</p>
+            <p className="text-[11.5px] text-adm-muted py-2">No vendors assigned to this vehicle.</p>
           ) : (
             <div className="divide-y divide-border/70">
               {column.vendors.map((v, i) => (
                 <div key={`${v.name}-${i}`} className="flex items-center gap-2.5 py-2">
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[12.5px] font-bold text-foreground leading-tight truncate">{v.name}</span>
-                    <span className="block text-[11.5px] text-muted-foreground truncate">{v.category}</span>
+                    <span className="block text-[12.5px] font-bold text-adm-ink leading-tight truncate">{v.name}</span>
+                    <span className="block text-[11.5px] text-adm-muted truncate">{v.category}</span>
                   </span>
                   <CommandAction
                     Icon={Mail}
@@ -200,12 +201,12 @@ function DepartmentColumn({ column, onSaveNote }: {
         </div>
       )}
 
-      <div className="mt-auto pt-3 border-t border-border flex items-center justify-between gap-2 flex-wrap">
+      <div className="mt-auto pt-3 border-t border-adm-border flex items-center justify-between gap-2 flex-wrap">
         <span className="min-w-0">
-          <span className="block text-[11.5px] text-muted-foreground">Estimated Cost</span>
+          <span className="block text-[11.5px] text-adm-muted">Estimated Cost</span>
           {/* Body weight, not the card-title token: this is a data value, and
               text-[13px] font-bold is reserved for a card heading. */}
-          <span className="block text-[12.5px] font-bold text-foreground leading-tight">{money(column.estimatedCost)}</span>
+          <span className="block text-[12.5px] font-bold text-adm-ink leading-tight">{money(column.estimatedCost)}</span>
         </span>
         {/* The three report destinations are in-app routes (useCommandCenter
             emits only /k208 and /vehicle-file), so they change the route rather
@@ -239,7 +240,7 @@ function ChecklistRow({ label, checked, busy, onToggle }: {
       <label
         title={title}
         className={cn(
-          "flex items-center gap-2.5 min-h-[44px] px-1 rounded-lg hover:bg-muted/40",
+          "flex items-center gap-2.5 min-h-[44px] px-1 rounded-lg hover:bg-adm-workspace",
           busy ? "cursor-progress" : "cursor-pointer",
         )}>
         <input
@@ -251,13 +252,13 @@ function ChecklistRow({ label, checked, busy, onToggle }: {
           onChange={(e) => { if (!busy) onToggle(e.target.checked); }} />
         <span className={cn(
           "grid place-items-center w-5 h-5 rounded border shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-primary",
-          checked ? cn(TONE_FILL.blue, "border-transparent text-white") : "border-border bg-background text-transparent",
+          checked ? cn(TONE_FILL.blue, "border-transparent text-white") : "border-adm-border bg-adm-surface text-transparent",
         )}>
           {busy
-            ? <Loader2 className={cn("w-4 h-4 animate-spin", checked ? "text-white" : "text-muted-foreground")} aria-hidden="true" />
+            ? <Loader2 className={cn("w-4 h-4 animate-spin", checked ? "text-white" : "text-adm-muted")} aria-hidden="true" />
             : <CheckCircle2 className="w-4 h-4" aria-hidden="true" />}
         </span>
-        <span className="text-[12.5px] text-foreground leading-tight">{label}</span>
+        <span className="text-[12.5px] text-adm-ink leading-tight">{label}</span>
       </label>
       {reasonNode}
     </div>
@@ -318,7 +319,7 @@ function DeliveryPriorityCard({ deliveryTarget, priority, canEdit, onSaveDate, o
     <CommandCard title="Delivery & Priority" subtitle="The commitment the shop is working against.">
       <div className="space-y-3">
         <div>
-          <label className="block text-[11.5px] font-semibold text-foreground mb-1.5" htmlFor="gr-delivery-target">
+          <label className="block text-[11.5px] font-semibold text-adm-ink mb-1.5" htmlFor="gr-delivery-target">
             Delivery Target
           </label>
           <input
@@ -331,12 +332,12 @@ function DeliveryPriorityCard({ deliveryTarget, priority, canEdit, onSaveDate, o
             onChange={(e) => { if (!denied && !saving) setLocalDate(e.target.value); }}
             onBlur={commitDate}
             className={cn(
-              "w-full min-h-[44px] rounded-xl border border-border bg-background px-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary",
+              "w-full min-h-[44px] rounded-xl border border-adm-border bg-adm-surface px-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary",
               denied && "opacity-50 cursor-not-allowed",
             )} />
         </div>
         <div>
-          <label className="block text-[11.5px] font-semibold text-foreground mb-1.5" htmlFor="gr-priority">
+          <label className="block text-[11.5px] font-semibold text-adm-ink mb-1.5" htmlFor="gr-priority">
             Priority
           </label>
           <select
@@ -347,7 +348,7 @@ function DeliveryPriorityCard({ deliveryTarget, priority, canEdit, onSaveDate, o
             onChange={(e) => void commitPriority(e.target.value)}
             disabled={denied || !!saving}
             className={cn(
-              "w-full min-h-[44px] rounded-xl border border-border bg-background px-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary",
+              "w-full min-h-[44px] rounded-xl border border-adm-border bg-adm-surface px-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary",
               denied && "opacity-50 cursor-not-allowed",
             )}>
             <option value="">Not set</option>
@@ -357,12 +358,12 @@ function DeliveryPriorityCard({ deliveryTarget, priority, canEdit, onSaveDate, o
           </select>
         </div>
         {saving && (
-          <p className="text-[10.5px] text-muted-foreground inline-flex items-center gap-1">
+          <p className="text-[10.5px] text-adm-muted inline-flex items-center gap-1">
             <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Saving…
           </p>
         )}
         {(denied || busyReason) && (
-          <p id={reasonId} className="text-[10.5px] text-muted-foreground">
+          <p id={reasonId} className="text-[10.5px] text-adm-muted">
             {denied ? "Only a manager can set the delivery target and priority." : busyReason}
           </p>
         )}
@@ -415,8 +416,8 @@ function AuthorizationResults({ outcome }: { outcome: AuthorizationOutcome }) {
               ? <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", TONE_TEXT.emerald)} aria-hidden="true" />
               : <AlertTriangle className={cn("w-4 h-4 mt-0.5 shrink-0", TONE_TEXT.amber)} aria-hidden="true" />}
             <div className="min-w-0">
-              <p className="text-[12.5px] font-semibold text-foreground leading-tight">{l.label}</p>
-              <p className="text-[11.5px] text-muted-foreground mt-0.5">{l.detail}</p>
+              <p className="text-[12.5px] font-semibold text-adm-ink leading-tight">{l.label}</p>
+              <p className="text-[11.5px] text-adm-muted mt-0.5">{l.detail}</p>
             </div>
           </div>
         ))}
@@ -433,7 +434,7 @@ function DeptProgressCard({ column, worklistHref }: { column: GetReadyColumn; wo
   return (
     <CommandCard title={column.title} subtitle={column.total === 0 ? "No work items" : `${column.completed} of ${column.total} complete · ${pct}%`}>
       <div
-        className="h-2 rounded-full bg-muted overflow-hidden"
+        className="h-2 rounded-full bg-adm-workspace overflow-hidden"
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
@@ -441,7 +442,7 @@ function DeptProgressCard({ column, worklistHref }: { column: GetReadyColumn; wo
         aria-label={`${column.title} completion`}>
         <div className={cn("h-full rounded-full", TONE_FILL[tone])} style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-[12.5px] text-foreground mt-3">
+      <p className="text-[12.5px] text-adm-ink mt-3">
         {column.total === 0
           ? "Nothing was assigned to this department."
           : next
@@ -449,9 +450,9 @@ function DeptProgressCard({ column, worklistHref }: { column: GetReadyColumn; wo
             : "All work complete."}
       </p>
       {column.managerNote && (
-        <p className="text-[11.5px] text-muted-foreground mt-1.5">Manager note: {column.managerNote}</p>
+        <p className="text-[11.5px] text-adm-muted mt-1.5">Manager note: {column.managerNote}</p>
       )}
-      <div className="mt-3 pt-3 border-t border-border">
+      <div className="mt-3 pt-3 border-t border-adm-border">
         <CommandAction
           href={worklistHref}
           capability={capabilityForHref(worklistHref)}
@@ -480,27 +481,27 @@ function RepairApprovalRow({ req, canApprove, busy, onDecide }: {
     <div className="py-3 first:pt-0 last:pb-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[12.5px] font-semibold text-foreground leading-tight">{req.workRequested}</p>
-          <p className="text-[11.5px] text-muted-foreground mt-0.5">
+          <p className="text-[12.5px] font-semibold text-adm-ink leading-tight">{req.workRequested}</p>
+          <p className="text-[11.5px] text-adm-muted mt-0.5">
             {[req.requestedByName, formatCommandDate(req.createdAt), req.roNumber ? `RO ${req.roNumber}` : null]
               .filter(Boolean).join(" · ") || "Requested by service"}
           </p>
         </div>
         <div className="shrink-0 text-right space-y-1">
           {req.isSafety && <StatusPill tone="red">Safety</StatusPill>}
-          <p className="text-[12.5px] font-bold text-foreground">{money(req.estTotal)}</p>
+          <p className="text-[12.5px] font-bold text-adm-ink">{money(req.estTotal)}</p>
         </div>
       </div>
-      {req.reason && <p className="text-[11.5px] text-muted-foreground mt-1.5">{req.reason}</p>}
+      {req.reason && <p className="text-[11.5px] text-adm-muted mt-1.5">{req.reason}</p>}
       {req.deliveryImpact && (
-        <p className="text-[11.5px] text-muted-foreground mt-1">Delivery impact: {req.deliveryImpact}</p>
+        <p className="text-[11.5px] text-adm-muted mt-1">Delivery impact: {req.deliveryImpact}</p>
       )}
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="Note to the technician (optional)"
         aria-label={`Decision note for ${req.workRequested}`}
-        className="w-full min-h-[56px] rounded-xl border border-border bg-background p-2.5 text-[12.5px] mt-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+        className="w-full min-h-[56px] rounded-xl border border-adm-border bg-adm-surface p-2.5 text-[12.5px] mt-2 focus:outline-none focus:ring-2 focus:ring-primary" />
       <div className="flex flex-wrap items-center gap-2 mt-2">
         <CommandAction
           variant="primary"
@@ -617,14 +618,14 @@ export default function GetReadyCommand() {
   // mobile-only — same convention as DescriptionOperations.
   const header = (
     <div className="min-w-0 lg:hidden mb-4">
-      <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">Get Ready Command</h1>
-      <p className="text-sm text-muted-foreground mt-1">Review the work AutoLabels prepared, then authorize once.</p>
+      <h1 className="text-[24px] leading-[32px] font-bold text-adm-ink">Get Ready Command</h1>
+      <p className="text-sm text-adm-muted mt-1">Review the work AutoLabels prepared, then authorize once.</p>
     </div>
   );
 
   const shell = (children: React.ReactNode) => (
     <CommandCapabilityProvider role={member?.role} isAdmin={isAdmin}>
-      <div className="max-w-[1480px] mx-auto p-4 sm:p-6">{header}{children}</div>
+      <PageBody width="wide">{header}{children}</PageBody>
     </CommandCapabilityProvider>
   );
 
@@ -934,7 +935,7 @@ export default function GetReadyCommand() {
                   onClick={onAuthorize}>
                   Authorize Get Ready &amp; Dispatch
                 </CommandAction>
-                <p className="text-[11px] text-muted-foreground text-center mt-2">
+                <p className="text-[11px] text-adm-muted text-center mt-2">
                   Creates immutable instructions, sends assignments, and releases eligible print jobs.
                 </p>
               </div>
