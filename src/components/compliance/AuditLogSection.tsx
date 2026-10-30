@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { History, RefreshCw, Search } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { EmptyState, Panel, SectionHeading, TableShell, formatDateTime } from "./primitives";
+import { Button, Panel, QueryState, Td, Th, WorkTable } from "@/components/product";
+import { formatDateTime } from "./primitives";
 
 // deno-lint-ignore no-explicit-any
 const sb = () => supabase as any;
@@ -19,16 +20,37 @@ interface AuditRow {
 }
 
 const WINDOWS = [
-  { days: 7, label: "7 days" },
-  { days: 30, label: "30 days" },
-  { days: 90, label: "90 days" },
+  { days: 7, label: "Last 7 days" },
+  { days: 30, label: "Last 30 days" },
+  { days: 90, label: "Last 90 days" },
 ];
+const PAGE_SIZES = [25, 50, 100];
+
+const selectCls = "h-10 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary";
+
+const detailText = (r: AuditRow): string => {
+  const d = r.details;
+  if (d && typeof d.summary === "string" && d.summary) return d.summary;
+  return (r.content_hash || r.row_hash || "").slice(0, 16) || "No details recorded";
+};
+
+const FilterField = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <label className="flex min-w-[140px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+    {label}
+    {children}
+  </label>
+);
 
 export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [days, setDays] = useState(30);
-  const [q, setQ] = useState("");
+  const [draft, setDraft] = useState({ days: 30, actor: "all", action: "all", entity: "all" });
+  const [applied, setApplied] = useState({ actor: "all", action: "all", entity: "all" });
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
+  const [open, setOpen] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) {
@@ -37,18 +59,21 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
       return;
     }
     setLoading(true);
+    setFailed(false);
     try {
       const since = new Date(Date.now() - days * 86_400_000).toISOString();
-      const { data } = await sb()
+      const { data, error } = await sb()
         .from("audit_log")
         .select("id, action, entity_type, entity_id, user_email, created_at, content_hash, row_hash, details")
         .eq("store_id", tenantId)
         .gte("created_at", since)
         .order("created_at", { ascending: false })
         .limit(500);
+      if (error) throw error;
       setRows((data as AuditRow[]) || []);
     } catch {
       setRows([]);
+      setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -56,100 +81,130 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((r) =>
-      [r.action, r.entity_type, r.entity_id, r.user_email, JSON.stringify(r.details ?? {})]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [rows, q]);
+  const options = useMemo(() => {
+    const uniq = (f: (r: AuditRow) => string | null) => [...new Set(rows.map(f).filter((v): v is string => !!v))].sort();
+    return { actors: uniq((r) => r.user_email), actions: uniq((r) => r.action), entities: uniq((r) => r.entity_type) };
+  }, [rows]);
+
+  const filtered = useMemo(
+    () =>
+      rows.filter(
+        (r) =>
+          (applied.actor === "all" || (r.user_email || "System") === applied.actor) &&
+          (applied.action === "all" || r.action === applied.action) &&
+          (applied.entity === "all" || r.entity_type === applied.entity),
+      ),
+    [rows, applied],
+  );
+
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const current = Math.min(page, pages);
+  const shown = filtered.slice((current - 1) * pageSize, current * pageSize);
+  const status = loading ? "loading" : failed ? "error" : filtered.length === 0 ? "empty" : "ready";
+
+  const apply = () => {
+    setDays(draft.days);
+    setApplied({ actor: draft.actor, action: draft.action, entity: draft.entity });
+    setPage(1);
+  };
 
   return (
-    <div className="space-y-5">
-      <SectionHeading
-        title="Audit log"
-        description="The immutable event record for this store. Every entry carries its actor, timestamp, and hash — this is the trail an evidence packet quotes."
-        action={
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={loading}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-adm-border bg-adm-surface px-4 text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace disabled:opacity-60"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </button>
-        }
-      />
+    <div className="flex flex-col gap-6">
+      <Panel inset="sm" bodyClassName="pt-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <FilterField label="Date range">
+            <select className={selectCls} value={draft.days} onChange={(e) => setDraft({ ...draft, days: Number(e.target.value) })}>
+              {WINDOWS.map((w) => <option key={w.days} value={w.days}>{w.label}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Actor">
+            <select className={selectCls} value={draft.actor} onChange={(e) => setDraft({ ...draft, actor: e.target.value })}>
+              <option value="all">All</option>
+              {options.actors.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Action">
+            <select className={selectCls} value={draft.action} onChange={(e) => setDraft({ ...draft, action: e.target.value })}>
+              <option value="all">All</option>
+              {options.actions.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Entity">
+            <select className={selectCls} value={draft.entity} onChange={(e) => setDraft({ ...draft, entity: e.target.value })}>
+              <option value="all">All</option>
+              {options.entities.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </FilterField>
+          <div className="flex items-center gap-4">
+            <span className="whitespace-nowrap text-[13px] leading-[18px] text-adm-muted">{loading ? "Loading events" : `${rows.length.toLocaleString()} events (${filtered.length.toLocaleString()} after filters)`}</span>
+            <Button variant="primary" onClick={apply}>Apply filters</Button>
+          </div>
+        </div>
+      </Panel>
 
-      <Panel
-        title={`${filtered.length.toLocaleString()} event${filtered.length === 1 ? "" : "s"}`}
-        meta={`Most recent 500 events in the last ${days} days.`}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            {WINDOWS.map((w) => (
-              <button
-                key={w.days}
-                type="button"
-                onClick={() => setDays(w.days)}
-                className={`h-9 rounded-lg border px-3 text-[12px] leading-[18px] font-semibold ${
-                  days === w.days
-                    ? "border-adm-primary bg-adm-selected text-adm-primary"
-                    : "border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace"
-                }`}
-              >
-                {w.label}
-              </button>
-            ))}
-            <div className="relative w-full max-w-xs">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search action, entity, user"
-                className="h-9 w-full rounded-lg border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] leading-[20px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
-              />
+      <Panel flush inset="sm">
+        <QueryState
+          status={status}
+          onRetry={() => void load()}
+          errorTitle="Audit events could not be loaded"
+          emptyTitle="No audit events match"
+          emptyDetail="Nothing was recorded for these filters. Widen the date range or clear a filter."
+        >
+          <WorkTable caption="Audit log" minWidth={820}>
+            <thead>
+              <tr>
+                <Th>Date / Time</Th>
+                <Th>Actor</Th>
+                <Th>Action</Th>
+                <Th>Entity</Th>
+                <Th>Details</Th>
+                <Th><span className="sr-only">Expand</span></Th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((r) => (
+                <Fragment key={r.id}>
+                  <tr>
+                    <Td className="whitespace-nowrap text-adm-muted">{formatDateTime(r.created_at)}</Td>
+                    <Td className="max-w-[200px] truncate">{r.user_email || "System"}</Td>
+                    <Td>{r.action}</Td>
+                    <Td className="max-w-[200px] truncate">{r.entity_type}</Td>
+                    <Td className="max-w-[280px] truncate text-adm-muted">{detailText(r)}</Td>
+                    <Td align="right">
+                      <button type="button" aria-expanded={open === r.id} aria-label="Show event detail" onClick={() => setOpen(open === r.id ? null : r.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-adm-primary hover:bg-adm-selected">
+                        <ChevronDown className={`h-5 w-5 transition-transform ${open === r.id ? "rotate-180" : ""}`} aria-hidden="true" />
+                      </button>
+                    </Td>
+                  </tr>
+                  {open === r.id && (
+                    <tr>
+                      <td colSpan={6} className="border-b border-adm-border bg-adm-workspace px-3 py-3 text-[13px] leading-[18px] text-adm-muted">
+                        <p>Entity id <span className="font-mono text-adm-ink">{r.entity_id}</span></p>
+                        <p>Hash <span className="font-mono text-adm-ink">{r.content_hash || r.row_hash || "Unknown"}</span></p>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </WorkTable>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
+            <label className="flex items-center gap-2">
+              Rows per page
+              <select className="h-9 rounded-md border border-adm-border bg-adm-surface px-2 text-adm-ink" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}>
+                {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+            <span>Showing {(current - 1) * pageSize + 1}-{Math.min(current * pageSize, filtered.length)} of {filtered.length.toLocaleString()} filtered</span>
+            <div className="flex items-center gap-1">
+              <button type="button" aria-label="Previous page" disabled={current <= 1} onClick={() => setPage(current - 1)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-adm-border text-adm-ink disabled:opacity-40"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
+              {Array.from({ length: Math.min(pages, 5) }, (_, i) => i + 1).map((n) => (
+                <button key={n} type="button" aria-current={n === current ? "page" : undefined} onClick={() => setPage(n)} className={`h-9 min-w-9 rounded-md border px-2 text-[14px] font-semibold ${n === current ? "border-adm-primary bg-adm-primary text-white" : "border-adm-border text-adm-ink"}`}>{n}</button>
+              ))}
+              <button type="button" aria-label="Next page" disabled={current >= pages} onClick={() => setPage(current + 1)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-adm-border text-adm-ink disabled:opacity-40"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
             </div>
           </div>
-        }
-      >
-        {loading ? (
-          <p className="px-4 py-10 text-center text-[14px] leading-[20px] text-adm-muted">Loading events…</p>
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            icon={History}
-            headline={q ? "No events match that search." : "No audit events in this window."}
-            body={
-              q
-                ? "Try a different action name, entity id, or user."
-                : "Nothing has been recorded for this store in the selected period. Widen the window to look further back."
-            }
-          />
-        ) : (
-          <TableShell headers={["When", "Action", "Entity", "User", "Hash"]}>
-            {filtered.map((r) => (
-              <tr key={r.id} className="hover:bg-adm-workspace">
-                <td className="whitespace-nowrap px-4 py-2.5 text-[12px] leading-[18px] text-adm-muted">
-                  {formatDateTime(r.created_at)}
-                </td>
-                <td className="px-4 py-2.5 text-[14px] leading-[20px] text-adm-ink">{r.action}</td>
-                <td className="px-4 py-2.5">
-                  <p className="text-[12px] leading-[18px] text-adm-ink">{r.entity_type}</p>
-                  <p className="font-mono text-[12px] leading-[18px] text-adm-muted">{r.entity_id}</p>
-                </td>
-                <td className="px-4 py-2.5 text-[12px] leading-[18px] text-adm-muted">{r.user_email || "System"}</td>
-                <td className="px-4 py-2.5">
-                  <code className="font-mono text-[12px] leading-[18px] text-adm-muted">
-                    {(r.content_hash || r.row_hash || "").slice(0, 16) || "—"}
-                  </code>
-                </td>
-              </tr>
-            ))}
-          </TableShell>
-        )}
+        </QueryState>
       </Panel>
     </div>
   );

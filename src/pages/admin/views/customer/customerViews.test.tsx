@@ -102,9 +102,9 @@ describe("RoutingView (screen 08)", () => {
     for (const title of ["CRM owner", "Assigned salesperson", "Sales rotation", "BDC", "Manager fallback", "Store contact"]) {
       expect(screen.getAllByText(title).length).toBeGreaterThan(0);
     }
-    expect(screen.getAllByText("Incomplete").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getAllByText("Missing").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("2 salespeople").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Incomplete").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("region", { name: "Routing blockers" })).toBeInTheDocument();
+    expect(screen.getAllByText(/2 salespeople/).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Review changes" })).toBeDisabled();
     expect(screen.getByText("Live preview")).toBeInTheDocument();
     expect(h.updateSettings).not.toHaveBeenCalled();

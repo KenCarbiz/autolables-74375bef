@@ -1,6 +1,6 @@
-import type { ComponentType } from "react";
+import { Children, useState, type ComponentType, type ReactElement, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
+import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { format } from "date-fns";
 import {
   AlertTriangle, ArrowLeft, ArrowUpRight, BarChart3, Car, CheckCircle2, Download, DollarSign,
@@ -63,17 +63,30 @@ interface KpiProps {
   money?: boolean;
 }
 
-const Kpi = ({ label, value, scope, icon: Icon, money: isMoney }: KpiProps) => (
-  <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
-    <p className="text-[12px] leading-[18px] font-bold uppercase tracking-wider text-adm-muted inline-flex items-center gap-1">
-      {Icon && <Icon className="w-3 h-3" />} {label}
-    </p>
-    <p className="text-[28px] leading-[36px] font-bold text-adm-ink mt-1 tabular-nums">
-      {typeof value === "number" ? (isMoney ? money(value) : value.toLocaleString()) : value}
-    </p>
-    <p className="text-[12px] leading-[18px] text-adm-muted mt-1">{scope}</p>
-  </div>
-);
+// A Kpi is declared as an element so every metric states its scope, then
+// laid out by Strip as a flat metric strip of four or fewer per row.
+const Kpi = (_: KpiProps) => null;
+
+const Strip = ({ children }: { children: ReactNode }) => {
+  const items = Children.toArray(children) as ReactElement<KpiProps>[];
+  const rows: ReactElement<KpiProps>[][] = [];
+  for (let i = 0; i < items.length; i += 4) rows.push(items.slice(i, i + 4));
+  return (
+    <div className="flex flex-col gap-3">
+      {rows.map((row, i) => (
+        <MetricStrip
+          key={i}
+          label="Report metrics"
+          metrics={row.map((e) => ({
+            label: e.props.label,
+            value: typeof e.props.value === "number" ? (e.props.money ? money(e.props.value) : e.props.value.toLocaleString()) : e.props.value,
+            hint: e.props.scope,
+          }))}
+        />
+      ))}
+    </div>
+  );
+};
 
 const ViewHeader = ({ title, scope }: { title: string; scope: string }) => (
   <div>
@@ -82,38 +95,48 @@ const ViewHeader = ({ title, scope }: { title: string; scope: string }) => (
   </div>
 );
 
-const DailyChart = ({ title, data }: { title: string; data: { day: string; count: number }[] }) => {
+const DailyChart = ({ title, data, days }: { title: string; data: { day: string; count: number }[]; days: number }) => {
   const total = data.reduce((n, d) => n + d.count, 0);
   const max = Math.max(1, ...data.map((d) => d.count));
-  const first = data[0]?.day;
-  const last = data[data.length - 1]?.day;
+  const W = 640;
+  const H = 220;
+  const L = 36;
+  const B = 24;
+  const step = data.length > 1 ? (W - L - 8) / (data.length - 1) : 0;
+  const y = (c: number) => H - B - (c / max) * (H - B - 12);
+  const pts = data.map((d, i) => `${L + i * step},${y(d.count)}`);
+  const ticks = [0, Math.ceil(max / 2), max];
   return (
-    <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
-      <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">{title}</h3>
-      <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">
-        Daily count, last {WINDOW_DAYS} days - {total.toLocaleString()} total
-      </p>
+    <section className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+      <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{title}</h3>
+      <p className="text-[13px] leading-[18px] text-adm-muted">Daily count, last {days} days, {total.toLocaleString()} total</p>
       {total === 0 ? (
         <p className="text-[14px] leading-[20px] text-adm-muted mt-4">{NO_DATA}</p>
       ) : (
-        <>
-          <div className="flex items-end gap-0.5 h-24 mt-3" role="img"
-            aria-label={`${title}: ${total} over the last ${WINDOW_DAYS} days, peak ${max} in one day`}>
-            {data.map((d) => (
-              <div key={d.day} className="flex-1 flex flex-col items-center justify-end" title={`${d.day}: ${d.count}`}>
-                <div className="w-full rounded-t bg-primary/70" style={{ height: `${(d.count / max) * 100}%`, minHeight: d.count ? 2 : 0 }} />
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center justify-between text-[12px] leading-[18px] text-adm-muted mt-1.5">
-            <span>{first}</span>
-            <span>peak {max}/day</span>
-            <span>{last}</span>
-          </div>
-        </>
+        <svg role="img" viewBox={`0 0 ${W} ${H}`} className="mt-3 h-auto w-full" aria-label={`${title}: ${total} over the last ${days} days, peak ${max} in one day`}>
+          {ticks.map((t) => (
+            <g key={t}>
+              <line x1={L} x2={W - 8} y1={y(t)} y2={y(t)} stroke="#E3E7EC" />
+              <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#5B6578">{t}</text>
+            </g>
+          ))}
+          <polygon points={`${L},${H - B} ${pts.join(" ")} ${L + (data.length - 1) * step},${H - B}`} fill="#2457D6" opacity="0.1" />
+          <polyline points={pts.join(" ")} fill="none" stroke="#2457D6" strokeWidth="2" strokeLinejoin="round" />
+          <text x={L} y={H - 6} fontSize="11" fill="#5B6578">{data[0]?.day}</text>
+          <text x={W - 8} y={H - 6} textAnchor="end" fontSize="11" fill="#5B6578">{data[data.length - 1]?.day}</text>
+        </svg>
       )}
-    </div>
+    </section>
   );
+};
+
+const weeklyRows = (data: { day: string; count: number }[]) => {
+  const rows: { range: string; count: number }[] = [];
+  for (let i = 0; i < data.length; i += 7) {
+    const chunk = data.slice(i, i + 7);
+    rows.push({ range: `${chunk[0].day} to ${chunk[chunk.length - 1].day}`, count: chunk.reduce((n, d) => n + d.count, 0) });
+  }
+  return rows;
 };
 
 const Reports = () => {
@@ -123,7 +146,9 @@ const Reports = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const view = resolveView(searchParams.get("tab"));
 
-  const r = useAutoLabelsReports(WINDOW_DAYS);
+  const [days, setDays] = useState(WINDOW_DAYS);
+  const [draftDays, setDraftDays] = useState(WINDOW_DAYS);
+  const r = useAutoLabelsReports(days);
   const { metrics, loading: metricsLoading, error: metricsError } = useOperatingMetrics(tenantId);
   const { entries: auditEntries } = useAudit();
 
@@ -165,10 +190,7 @@ const Reports = () => {
 
   return (
     <PageBody width="wide">
-      <PageHeader
-        title="Reports"
-        description="Every number states what it counted and the period it covers. Period totals and current snapshots are never mixed in one row."
-      />
+      <PageHeader title="Reports" />
 
       <LocalTabs
         label="Report views"
@@ -176,48 +198,94 @@ const Reports = () => {
       />
 
       {view === "operations" && (
-        <section className="space-y-4">
-          <ViewHeader
-            title="Document operations"
-            scope={`Documents this dealership produced, counted per document. Period: ${LAST_30.toLowerCase()}.`}
-          />
+        <section className="flex flex-col gap-4">
+          <form
+            aria-label="Report filters"
+            className="flex flex-wrap items-end gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setDays(draftDays);
+            }}
+          >
+            <label className="flex min-w-[180px] flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+              Timezone
+              <select className="h-10 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" disabled value="local">
+                <option value="local">{Intl.DateTimeFormat().resolvedOptions().timeZone}</option>
+              </select>
+            </label>
+            <label className="flex min-w-[200px] flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+              Scope
+              <select className="h-10 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" disabled value="store">
+                <option value="store">{currentStore?.name || tenant?.name || "This dealership"}</option>
+              </select>
+            </label>
+            <label className="flex min-w-[180px] flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+              Date range
+              <select className="h-10 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" value={draftDays} onChange={(e) => setDraftDays(Number(e.target.value))}>
+                <option value={7}>Last 7 days</option>
+                <option value={30}>Last 30 days</option>
+                <option value={90}>Last 90 days</option>
+              </select>
+            </label>
+            <Button type="submit" variant="primary" className="min-h-[40px] px-6">Run report</Button>
+          </form>
           {r.loading ? (
-            <p className="text-[14px] leading-[20px] text-adm-muted">Loading the last {WINDOW_DAYS} days…</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">Loading the last {days} days…</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Kpi icon={FileText} label="Stickers generated" value={r.generated} scope={LAST_30} />
-                <Kpi icon={FileText} label="Printed" value={r.printed} scope={CREATED_30} />
-                <Kpi icon={ShieldCheck} label="Published documents" value={r.published} scope={CREATED_30} />
-                <Kpi icon={AlertTriangle} label="Pending approval" value={r.pendingApproval} scope={CREATED_30} />
+              <Strip>
+                <Kpi label="Stickers generated" value={r.generated} scope={`Last ${days} days`} />
+                <Kpi label="Printed" value={r.printed} scope={CREATED_30.replace("30", String(days))} />
+                <Kpi label="Published documents" value={r.published} scope={CREATED_30.replace("30", String(days))} />
+                <Kpi label="Pending approval" value={r.pendingApproval} scope={CREATED_30.replace("30", String(days))} />
+              </Strip>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] items-start">
+                <DailyChart title="Documents generated" data={r.genByDay} days={days} />
+                <section className="rounded-[6px] border border-adm-border bg-adm-surface">
+                  <h3 className="px-4 pt-4 text-[16px] leading-[22px] font-semibold text-adm-ink">Activity by week</h3>
+                  <table className="mt-3 w-full text-left text-[14px] leading-[20px]">
+                    <thead>
+                      <tr className="bg-adm-workspace text-[12px] leading-[18px] font-semibold text-adm-muted">
+                        <th className="px-4 py-2.5">Week</th>
+                        <th className="px-4 py-2.5 text-right">Generated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeklyRows(r.genByDay).map((w) => (
+                        <tr key={w.range} className="border-t border-adm-border">
+                          <td className="px-4 py-2.5 text-adm-ink">{w.range}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-adm-ink">{w.count.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
               </div>
 
-              <DailyChart title="Documents generated" data={r.genByDay} />
-
-              <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
-                <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Documents by type</h3>
-                <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{LAST_30}</p>
+              <section className="rounded-[6px] border border-adm-border bg-adm-surface">
+                <h3 className="px-4 pt-4 text-[16px] leading-[22px] font-semibold text-adm-ink">Documents by type</h3>
                 {docTypes.length === 0 ? (
-                  <p className="text-[14px] leading-[20px] text-adm-muted mt-3">{NO_DATA}</p>
+                  <p className="px-4 pb-4 pt-2 text-[14px] leading-[20px] text-adm-muted">{NO_DATA}</p>
                 ) : (
-                  <table className="w-full mt-3">
+                  <table className="mt-3 w-full text-left text-[14px] leading-[20px]">
                     <thead>
-                      <tr className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted text-left border-b border-adm-border">
-                        <th className="py-1.5 pr-3">Document type</th>
-                        <th className="py-1.5 pl-2 text-right">Generated</th>
+                      <tr className="bg-adm-workspace text-[12px] leading-[18px] font-semibold text-adm-muted">
+                        <th className="px-4 py-2.5">Document type</th>
+                        <th className="px-4 py-2.5 text-right">Generated</th>
                       </tr>
                     </thead>
                     <tbody>
                       {docTypes.map(([type, count]) => (
-                        <tr key={type} className="border-b border-adm-border last:border-0">
-                          <td className="py-1.5 pr-3 text-[14px] leading-[20px] text-adm-ink capitalize">{type.replace(/_/g, " ")}</td>
-                          <td className="py-1.5 pl-2 text-right text-[14px] leading-[20px] tabular-nums text-adm-ink">{count.toLocaleString()}</td>
+                        <tr key={type} className="border-t border-adm-border">
+                          <td className="px-4 py-2.5 capitalize text-adm-ink">{type.replace(/_/g, " ")}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-adm-ink">{count.toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 )}
-              </div>
+              </section>
             </>
           )}
         </section>
@@ -235,12 +303,12 @@ const Reports = () => {
             <p className="text-[14px] leading-[20px] text-adm-muted">Loading the current snapshot…</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Strip>
                 <Kpi icon={Car} label="Active vehicles" value={metrics.activeInventory} scope={`${SNAPSHOT} - not archived`} />
                 <Kpi icon={Car} label="New" value={metrics.newInventory} scope={`${SNAPSHOT} - condition new`} />
                 <Kpi icon={Car} label="Used and CPO" value={metrics.usedInventory} scope={`${SNAPSHOT} - condition used or CPO`} />
                 <Kpi icon={ShieldCheck} label="Published listings" value={metrics.publishedInventory} scope={`${SNAPSHOT} - status published`} />
-              </div>
+              </Strip>
               <p className="text-[12px] leading-[18px] text-adm-muted">
                 Active inventory is measured on listing status. A publication date stays set after a
                 vehicle is archived, so it is historical evidence and never a test of what is on the lot today.
@@ -262,7 +330,7 @@ const Reports = () => {
             <p className="text-[14px] leading-[20px] text-adm-muted">Loading the current snapshot…</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Strip>
                 <Kpi icon={Wrench} label="In Get Ready" value={metrics.inGetReady} scope={`${SNAPSHOT} - intake, service, prep or verification`} />
                 <Kpi icon={Wrench} label="Intake" value={metrics.getReadyIntake} scope={`${SNAPSHOT} - lifecycle bucket intake`} />
                 <Kpi icon={Wrench} label="Service" value={metrics.getReadyService} scope={`${SNAPSHOT} - lifecycle bucket service`} />
@@ -271,7 +339,7 @@ const Reports = () => {
                 <Kpi icon={AlertTriangle} label="Awaiting authorization" value={metrics.awaitingAuthorization} scope={`${SNAPSHOT} - waiting on a manager`} />
                 <Kpi icon={CheckCircle2} label="Retail ready" value={metrics.retailReady} scope={`${SNAPSHOT} - lifecycle state retail ready`} />
                 <Kpi icon={Wrench} label="Open recon estimates" value={metrics.getReadyRecon} scope={`${SNAPSHOT} - distinct vehicles with a submitted estimate`} />
-              </div>
+              </Strip>
               {metrics.gated > 0 && (
                 <p className="text-[12px] leading-[18px] text-adm-muted">
                   {metrics.gated} active vehicle{metrics.gated === 1 ? " is" : "s are"} on hold or marked wholesale and are outside the retail lifecycle.
@@ -299,11 +367,11 @@ const Reports = () => {
             <p className="text-[14px] leading-[20px] text-adm-muted">Loading the last {WINDOW_DAYS} days…</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Strip>
                 <Kpi icon={QrCode} label="QR scans" value={r.qrScans} scope={`${LAST_30} - scan events`} />
                 <Kpi icon={FileText} label="Packets signed" value={r.packetsSigned} scope={`${CREATED_30} - addendums with a signature`} />
-              </div>
-              <DailyChart title="QR scans" data={r.qrByDay} />
+              </Strip>
+              <DailyChart title="QR scans" data={r.qrByDay} days={days} />
             </>
           )}
           <div className="space-y-4">
@@ -320,12 +388,12 @@ const Reports = () => {
             title="Compliance activity"
             scope="Addendum activity recorded for this store. These counts cover only the most recent recorded events, so they are a recent sample and not a full-period total."
           />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Strip>
             <Kpi icon={FileText} label="Addendums created" value={auditCount("addendum_created")} scope="Most recent 500 audit events" />
             <Kpi icon={ArrowUpRight} label="Sent to customer" value={auditCount("addendum_sent")} scope="Most recent 500 audit events" />
             <Kpi icon={Download} label="PDFs generated" value={auditCount("addendum_pdf")} scope="Most recent 500 audit events" />
             <Kpi icon={CheckCircle2} label="Printed" value={auditCount("addendum_printed")} scope="Most recent 500 audit events" />
-          </div>
+          </Strip>
 
           <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
             <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Recent compliance events</h3>
@@ -363,7 +431,7 @@ const Reports = () => {
             <p className="text-[14px] leading-[20px] text-adm-muted">Loading the last {WINDOW_DAYS} days…</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Strip>
                 <Kpi icon={DollarSign} label="Accepted add-on revenue" value={r.acceptedAddonRevenue} money scope={CREATED_30} />
                 <Kpi icon={TrendingUp} label="Add-ons offered" value={r.addons.length} scope={`${CREATED_30} - distinct products`} />
                 <Kpi icon={FileText} label="Add-on presentations" value={addonShown} scope={`${CREATED_30} - times an add-on was shown`} />
@@ -373,7 +441,7 @@ const Reports = () => {
                   value={addonRate == null ? "—" : `${addonRate}%`}
                   scope={addonRate == null ? "No decisions recorded in this period" : `${CREATED_30} - accepted of decided`}
                 />
-              </div>
+              </Strip>
 
               <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
                 <div className="flex items-center justify-between gap-3 mb-1">
@@ -395,7 +463,7 @@ const Reports = () => {
                   <div className="overflow-x-auto mt-3">
                     <table className="w-full">
                       <thead>
-                        <tr className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted text-left border-b border-adm-border">
+                        <tr className="text-[12px] leading-[18px] font-semibold text-adm-muted text-left border-b border-adm-border">
                           <th className="py-1.5 pr-3">Add-on</th>
                           <th className="py-1.5 px-2 text-right">Shown</th>
                           <th className="py-1.5 px-2 text-right">Accepted</th>

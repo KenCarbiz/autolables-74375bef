@@ -3,19 +3,20 @@ import { useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, Building2, Car, FileCheck, FileLock, FileSearch,
   FileText, FileX, Gauge, KeyRound, Layers, Lock, Package, Printer, QrCode,
-  RefreshCw, Rocket, Tag,
+  Tag,
 } from "lucide-react";
 import { toast } from "sonner";
-import { PageBody, PageHeader, MetricStrip, WorkTable, Th, Td } from "@/components/product";
+import { PageBody, PageHeader, Panel, WorkTable, Th, Td, StatusText } from "@/components/product";
+import { DetailLayout, productTone } from "@/components/detail/parts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { dealerRoleHome, hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { usePrintCenter, type DocRow } from "@/hooks/useCommandCenter";
 import {
   capabilityDenialReason, CommandAction, CommandCallout,
-  CommandCapabilityProvider, CommandCard, CommandKebab, CommandMenu, commandRowMenuItems,
-  CommandStatCard, copyWithToast, DegradedNotice, EmptyState, ErrorCard, LoadingCard, StatusPill,
-  useCommandNavigate, VehicleIdentityStrip,
+  CommandCapabilityProvider, CommandKebab, CommandMenu, commandRowMenuItems,
+  copyWithToast, DegradedNotice, EmptyState, ErrorCard, LoadingCard,
+  useCommandNavigate,
 } from "@/components/command/CommandPrimitives";
 
 // /print-center/:vehicleId — one versioned document package for the vehicle,
@@ -91,12 +92,13 @@ export default function DocumentsPrintCenter() {
     }
   };
 
-  const shell = (children: React.ReactNode) => (
+  const shell = (children: React.ReactNode, actions?: React.ReactNode) => (
     <CommandCapabilityProvider role={member?.role} isAdmin={isAdmin}>
       <PageBody width="wide">
         <PageHeader
           title="Print Center"
-          description="One versioned document package for the vehicle, printer, and customer Passport. Printing does not publish, approve or rewrite a stored document."
+          description="Review the versioned documents for a vehicle and print the bundle. Printing does not publish, approve or rewrite a stored document."
+          actions={actions}
         />
         {children}
       </PageBody>
@@ -227,266 +229,221 @@ export default function DocumentsPrintCenter() {
         ? "This vehicle has no VIN, so a stock label cannot be printed."
         : null;
 
+  const vehicleLine = [vehicle.ymm, vehicle.trim].filter(Boolean).join(" ") || "Vehicle";
+  const vehicleMeta = [
+    vehicle.stockNumber ? `Stock ${vehicle.stockNumber}` : null,
+    vehicle.vin ? `VIN ${vehicle.vin}` : null,
+    vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : null,
+  ].filter(Boolean).join("  ·  ");
+
+  const printAction = (
+    <>
+    <CommandAction Icon={Gauge} capability="can_view_inventory" href={`/vin-command/${vehicle.id}`}>VIN Command Center</CommandAction>
+    <CommandAction
+      variant="primary"
+      capability="can_print"
+      Icon={Printer}
+      busy={busy === "packet"}
+      disabledReason={packetReason}
+      onClick={() => runPrint("packet")}>
+      Print bundle
+    </CommandAction>
+    </>
+  );
+
   return shell(
     <>
-      <DegradedNotice degraded={degraded} className="mb-4" />
+      <DegradedNotice degraded={degraded} />
 
-      {/* Vehicle identity + the four accent-topped counters, one row on desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,560px)] gap-3 items-start mb-4">
-        <VehicleIdentityStrip
-          imageUrl={vehicle.heroImageUrl}
-          ymm={vehicle.ymm}
-          trim={vehicle.trim}
-          stockNumber={vehicle.stockNumber}
-          vin={vehicle.vin}
-          conditionLabel={vehicle.condition}
-          meta={[{
-            label: "Mileage",
-            value: vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : null,
-          }]}
-          onCopyVin={() => copyWithToast(vehicle.vin, "VIN")}
-          action={
-            /* The three command surfaces are one set, and each carries a door
-               to both siblings — VIN Command Center has no nav row by §6, and
-               Print to Get Ready for the same vehicle used to cost two hops
-               through it. */
-            <>
-              <CommandAction
-                Icon={Gauge}
-                capability="can_view_inventory"
-                href={`/vin-command/${vehicle.id}`}>
-                VIN Command Center
-              </CommandAction>
-              <CommandAction
-                Icon={Rocket}
-                capability="can_view_get_ready"
-                href={`/get-ready-command/${vehicle.id}`}>
-                Get Ready Command
-              </CommandAction>
-            </>
-          }
-        />
-      </div>
-
-      <MetricStrip
-        label="Document status for this vehicle"
-        className="mb-4"
-        metrics={[
-          { label: "Ready", value: counts.ready, hint: `of ${docCount} documents`, tone: "success" },
-          { label: "Blocked", value: counts.blocked, hint: `of ${docCount} documents`, tone: counts.blocked > 0 ? "danger" : "neutral" },
-          { label: "Customer visible", value: counts.customerVisible, hint: "shown in the Passport" },
-          { label: "Internal only", value: counts.internalOnly, hint: "not shown to the customer" },
-        ]}
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
-        {/* Documents table. With no rows the EmptyState IS the card — nested
-            inside CommandCard it drew a bordered card inside a bordered card. */}
-        {docCount === 0 ? (
-          <EmptyState
-            Icon={FileText}
-            title="No documents have been generated yet"
-            detail="Window stickers, addendums, guides, and QR items appear here as they are generated for this vehicle."
-          />
-        ) : (
-          <CommandCard title="Documents">
-            <>
-              <WorkTable caption="Documents for this vehicle" minWidth={860}>
-                  <thead>
-                    <tr>
-                      <Th>Document</Th>
-                      <Th>Current version</Th>
-                      <Th>Internal status</Th>
-                      <Th>Passport visibility</Th>
-                      <Th>Print status</Th>
-                      <Th align="right">Action</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {documents.map((d) => {
-                      const RowIcon = d.kind === "qr" ? QrCode : FileText;
-                      // A non-current row is not automatically a draft — it can be
-                      // superseded or archived — so only label what the status says.
-                      const versionNote = d.isCurrent
-                        ? "Current"
-                        : d.internalStatus.label === "Draft" ? "Draft" : null;
-                      return (
-                        <tr key={d.id} className="hover:bg-adm-workspace">
-                          <Td>
-                            <span className="inline-flex items-center gap-2 min-w-0">
-                              <RowIcon className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                              <span className="text-[12.5px] font-semibold text-foreground truncate">{d.label}</span>
-                            </span>
-                          </Td>
-                          <Td className="whitespace-nowrap">
-                            <span className="text-[12.5px] font-bold text-foreground">{d.version}</span>
-                            {versionNote ? (
-                              <span className="text-[11.5px] text-muted-foreground ml-1.5">{versionNote}</span>
-                            ) : null}
-                          </Td>
-                          <Td>
-                            <StatusPill tone={d.internalStatus.tone}>{d.internalStatus.label}</StatusPill>
-                          </Td>
-                          <Td>
-                            <StatusPill tone={d.passportVisibility.tone}>{d.passportVisibility.label}</StatusPill>
-                          </Td>
-                          <Td>
-                            <StatusPill tone={d.printStatus.tone}>{d.printStatus.label}</StatusPill>
-                          </Td>
-                          <Td align="right">
-                            <span className="inline-flex items-center gap-1 justify-end">
-                              {/* Reprint follows the same confirm-at-the-printer
-                                  pattern as the packet: nothing is recorded
-                                  until the sheet reports paper. */}
-                              {d.reprintCopy != null && (
-                                <CommandAction
-                                  variant="link"
-                                  capability="can_print"
-                                  Icon={Printer}
-                                  busy={busyRow?.id === d.id && busyRow.kind === "reprint"}
-                                  disabledReason={
-                                    busyRow?.id === d.id && busyRow.kind === "reprint"
-                                      ? "Waiting for the print confirmation in the reprint tab."
-                                      : busyRow ? "Another document action is already running." : null
-                                  }
-                                  onClick={() => runReprint(d)}>
-                                  Reprint (copy {d.reprintCopy})
-                                </CommandAction>
-                              )}
-                              {(d.generateKind || d.generateBlockedReason) && (
-                                <CommandAction
-                                  variant="link"
-                                  capability="can_create_documents"
-                                  Icon={RefreshCw}
-                                  busy={busyRow?.id === d.id && busyRow.kind === "generate"}
-                                  disabledReason={
-                                    d.generateBlockedReason
-                                      ? d.generateBlockedReason
-                                      : busyRow?.id === d.id && busyRow.kind === "generate"
-                                        ? "The form is being generated."
-                                        : busyRow ? "Another document action is already running." : null
-                                  }
-                                  onClick={() => runGenerate(d)}>
-                                  Generate
-                                </CommandAction>
-                              )}
-                              <CommandKebab
-                                label={`More actions for ${d.label}`}
-                                expanded={menu?.id === d.id}
-                                onOpen={(trigger) =>
-                                  setMenu((m) => (m?.id === d.id ? null : { id: d.id, row: d, trigger }))
-                                }
-                              />
-                            </span>
-                          </Td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-              </WorkTable>
-              <p className="text-[12px] leading-[18px] text-adm-muted mt-3">
-                Showing 1 to {docCount} of {docCount} documents
-              </p>
-            </>
-          </CommandCard>
-        )}
-
-        {/* Right rail */}
-        <div className="w-full min-w-0 lg:w-[320px] space-y-4">
-          <CommandCard
-            title="Vehicle Print Bundle"
-            subtitle="Media prepared for this vehicle. The packet button releases the paper groups.">
-            {/* Five fixed media groups; a group with nothing in it reads "0 docs"
-                rather than dropping out, so the rail has no empty state. Two of
-                the five are physical media the packet button never touches, and
-                the rail said all five were "included in the complete vehicle
-                packet" — so each line now says which it is. */}
-            <ul className="divide-y divide-border/70">
-              {bundle.map((b) => {
-                const Icon = BUNDLE_ICON(b.label);
-                return (
-                  <li key={b.label} className="flex items-center gap-2.5 py-2.5">
-                    <Icon className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5 self-start" aria-hidden="true" />
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-[12.5px] text-foreground truncate">{b.label}</span>
-                      {!b.releasedByPacket && (
-                        <span className="block text-[10.5px] text-muted-foreground">
-                          Printed separately — the packet button does not release this.
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-[11.5px] text-muted-foreground whitespace-nowrap self-start mt-0.5">
-                      {b.count} {b.unit}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {bundleNote && (
-              <CommandCallout tone="amber" Icon={AlertTriangle} className="mt-3">
-                {bundleNote}
-              </CommandCallout>
-            )}
-
-            {/* CommandAction publishes aria-busy and its own live region, and
-                announces the same sentence it states as the disabled reason. */}
-            <div className="mt-3 space-y-2">
-              <CommandAction
-                variant="primary"
-                capability="can_print"
-                Icon={Printer}
-                busy={busy === "packet"}
-                disabledReason={packetReason}
-                className="w-full"
-                wrapperClassName="flex w-full"
-                onClick={() => runPrint("packet")}>
-                Print bundle
-              </CommandAction>
-              <CommandAction
-                capability="can_print"
-                Icon={Printer}
-                busy={busy === "stock"}
-                disabledReason={stockReason}
-                className="w-full"
-                wrapperClassName="flex w-full"
-                onClick={() => runPrint("stock")}>
-                Print by Stock
-              </CommandAction>
-            </div>
-          </CommandCard>
-
-          <CommandCard
-            title="Passport Preview"
-            subtitle="Documents visible to the customer in their Passport.">
-            {passportPreview.length === 0 ? (
-              <p className="text-[11.5px] text-muted-foreground py-2">
-                No documents are shared to the customer Passport yet.
-              </p>
-            ) : (
-              <ul className="divide-y divide-border/70">
-                {passportPreview.map((p) => (
-                  <li key={`${p.label}-${p.version}`} className="flex items-center gap-2.5 py-2.5">
-                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                    <span className="text-[12.5px] text-foreground flex-1 min-w-0 truncate">{p.label}</span>
-                    <span className="text-[11.5px] text-muted-foreground whitespace-nowrap">{p.version}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="mt-3 pt-3 border-t border-border">
-              <CommandAction
-                newTab
-                href={passportHref ?? undefined}
-                disabledReason={passportHref ? null : "This vehicle has no published Passport yet."}
-                className="w-full"
-                wrapperClassName="flex w-full">
-                Open Passport View
-              </CommandAction>
-            </div>
-          </CommandCard>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0">
+          <p className="mb-1 text-[13px] leading-[18px] font-semibold text-adm-ink">Vehicle</p>
+          <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-[6px] border border-adm-border bg-adm-surface px-3">
+            <span className="min-w-0 truncate text-[14px] leading-[20px] text-adm-ink">
+              <span className="font-semibold">{vehicleLine}</span>
+              {vehicleMeta ? <span className="text-adm-muted">{`  ·  ${vehicleMeta}`}</span> : null}
+            </span>
+          </div>
+        </div>
+        <div className="min-w-0">
+          <p className="mb-1 text-[13px] leading-[18px] font-semibold text-adm-ink">Printer profile</p>
+          <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px] leading-[20px]">
+            <span className="truncate text-adm-ink">Browser print dialog</span>
+          </div>
         </div>
       </div>
+
+      <DetailLayout
+        main={
+          docCount === 0 ? (
+            <EmptyState
+              Icon={FileText}
+              title="No documents have been generated yet"
+              detail="Window stickers, addendums, guides, and QR items appear here as they are generated for this vehicle."
+            />
+          ) : (
+            <Panel flush>
+              <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Documents for this vehicle" minWidth={700}>
+                <thead>
+                  <tr>
+                    <Th>Document</Th>
+                    <Th>Version</Th>
+                    <Th className="whitespace-nowrap">Internal status</Th>
+                    <Th>Passport</Th>
+                    <Th className="whitespace-nowrap">Print status</Th>
+                    <Th align="right">Action</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {documents.map((d) => {
+                    const RowIcon = d.kind === "qr" ? QrCode : FileText;
+                    const versionNote = d.isCurrent ? null : d.internalStatus.label === "Draft" ? "Draft" : null;
+                    const reprinting = busyRow?.id === d.id && busyRow.kind === "reprint";
+                    const generating = busyRow?.id === d.id && busyRow.kind === "generate";
+                    return (
+                      <tr key={d.id} className="hover:bg-adm-workspace">
+                        <Td className="max-w-[190px]">
+                          <span className="inline-flex max-w-full items-center gap-2">
+                            <RowIcon className="h-5 w-5 shrink-0 text-adm-muted" aria-hidden="true" />
+                            <span className="truncate text-[14px] font-semibold text-adm-ink">{d.label}</span>
+                          </span>
+                        </Td>
+                        <Td className="whitespace-nowrap">
+                          <span className="font-semibold">{d.version}</span>
+                          {versionNote ? <span className="ml-1.5 text-[12px] text-adm-muted">{versionNote}</span> : null}
+                        </Td>
+                        <Td><StatusText tone={productTone(d.internalStatus.tone)}>{d.internalStatus.label}</StatusText></Td>
+                        <Td><StatusText tone={productTone(d.passportVisibility.tone)}>{d.passportVisibility.label}</StatusText></Td>
+                        <Td><StatusText tone={productTone(d.printStatus.tone)}>{d.printStatus.label}</StatusText></Td>
+                        <Td align="right">
+                          <span className="inline-flex items-center justify-end gap-1">
+                            {d.reprintCopy != null ? (
+                              <CommandAction
+                                variant="link"
+                                capability="can_print"
+                                busy={reprinting}
+                                disabledReason={
+                                  reprinting
+                                    ? "Waiting for the print confirmation in the reprint tab."
+                                    : busyRow ? "Another document action is already running." : null
+                                }
+                                onClick={() => runReprint(d)}>
+                                Reprint
+                              </CommandAction>
+                            ) : (d.generateKind || d.generateBlockedReason) ? (
+                              <CommandAction
+                                variant="link"
+                                capability="can_create_documents"
+                                busy={generating}
+                                disabledReason={
+                                  d.generateBlockedReason
+                                    ? d.generateBlockedReason
+                                    : generating
+                                      ? "The form is being generated."
+                                      : busyRow ? "Another document action is already running." : null
+                                }
+                                onClick={() => runGenerate(d)}>
+                                Generate
+                              </CommandAction>
+                            ) : null}
+                            <CommandKebab
+                              label={`More actions for ${d.label}`}
+                              expanded={menu?.id === d.id}
+                              onOpen={(trigger) =>
+                                setMenu((m) => (m?.id === d.id ? null : { id: d.id, row: d, trigger }))
+                              }
+                            />
+                          </span>
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </WorkTable>
+              <p className="border-t border-adm-border px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
+                {docCount} documents · {counts.ready} ready · {counts.blocked} blocked · {counts.customerVisible} shown in the Passport
+              </p>
+            </Panel>
+          )
+        }
+        aside={
+          <>
+            <Panel title="Preview" description="Documents visible to the customer in their Passport.">
+              {passportPreview.length === 0 ? (
+                <p className="text-[14px] leading-[20px] text-adm-muted">No documents are shared to the customer Passport yet.</p>
+              ) : (
+                <ul className="divide-y divide-adm-border">
+                  {passportPreview.map((p) => (
+                    <li key={`${p.label}-${p.version}`} className="flex items-center gap-2.5 py-2">
+                      <FileText className="h-5 w-5 shrink-0 text-adm-muted" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate text-[14px] text-adm-ink">{p.label}</span>
+                      <span className="whitespace-nowrap text-[13px] text-adm-muted">{p.version}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 border-t border-adm-border pt-3">
+                <CommandAction
+                  newTab
+                  href={passportHref ?? undefined}
+                  disabledReason={passportHref ? null : "This vehicle has no published Passport yet."}
+                  className="w-full"
+                  wrapperClassName="flex w-full">
+                  Open Passport View
+                </CommandAction>
+              </div>
+            </Panel>
+
+            <Panel title="Print bundle" description="Paper groups the bundle releases.">
+              <ul className="divide-y divide-adm-border">
+                {bundle.map((b) => {
+                  const Icon = BUNDLE_ICON(b.label);
+                  return (
+                    <li key={b.label} className="flex items-center gap-2.5 py-2">
+                      <Icon className="h-5 w-5 shrink-0 text-adm-muted" aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] text-adm-ink">{b.label}</span>
+                        {!b.releasedByPacket && (
+                          <span className="block text-[12px] text-adm-muted">Printed separately</span>
+                        )}
+                      </span>
+                      <span className="whitespace-nowrap text-[13px] text-adm-muted">{b.count} {b.unit}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {bundleNote && (
+                <CommandCallout tone="amber" Icon={AlertTriangle} className="mt-3">
+                  {bundleNote}
+                </CommandCallout>
+              )}
+              <div className="mt-3 flex flex-col gap-2">
+                <CommandAction
+                  variant="primary"
+                  capability="can_print"
+                  Icon={Printer}
+                  busy={busy === "packet"}
+                  disabledReason={packetReason}
+                  className="w-full"
+                  wrapperClassName="flex w-full"
+                  onClick={() => runPrint("packet")}>
+                  Print bundle
+                </CommandAction>
+                <CommandAction
+                  capability="can_print"
+                  Icon={Printer}
+                  busy={busy === "stock"}
+                  disabledReason={stockReason}
+                  className="w-full"
+                  wrapperClassName="flex w-full"
+                  onClick={() => runPrint("stock")}>
+                  Print by stock
+                </CommandAction>
+              </div>
+            </Panel>
+          </>
+        }
+      />
 
       {menu && (
         <CommandMenu
@@ -497,5 +454,6 @@ export default function DocumentsPrintCenter() {
         />
       )}
     </>,
+    printAction,
   );
 }

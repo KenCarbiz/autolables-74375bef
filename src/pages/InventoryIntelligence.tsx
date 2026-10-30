@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  ExternalLink, Loader2, RefreshCw, Search,
+  Search,
 } from "lucide-react";
 import { PageBody, PageHeader, Panel, WorkTable, Th, Td, Button, StatusText, InlineNote, QueryState, type Tone } from "@/components/product";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,9 +30,18 @@ const STAGE_TONE_MAP: Record<string, Tone> = {
 
 // Compact status text: unknown and not-applicable stay distinct words, not
 // repeated bright badges.
-const Stage = ({ stage }: { stage: PipelineStage }) => (
-  <StatusText tone={STAGE_TONE_MAP[STAGE_TONE[stage]] ?? "neutral"}>{stage}</StatusText>
-);
+const Stage = ({ stage }: { stage: PipelineStage }) =>
+  stage === "Not Applicable"
+    ? <span className="text-adm-muted" aria-label="Not applicable">-</span>
+    : <StatusText tone={STAGE_TONE_MAP[STAGE_TONE[stage]] ?? "neutral"} className="whitespace-nowrap">{stage === "Enrichment Pending" ? "Pending" : stage}</StatusText>;
+
+const FAMILY_SHORT: Record<string, string> = {
+  "OEM Window Sticker": "OEM sticker",
+  "New Vehicle Addendum": "New addendum",
+  "Used Vehicle Addendum": "Used addendum",
+  "FTC Buyers Guide": "Buyers Guide",
+  "Used Car Window Sticker": "Used sticker",
+};
 
 interface Vehicle {
   id: string;
@@ -183,8 +192,8 @@ export default function InventoryIntelligence() {
     <PageBody width="wide">
       <PageHeader
         title="Inventory Intelligence"
-        description="What the ingest pipeline did to each vehicle, per document family. No combined score: a vehicle can be approved on one document and blocked on another."
-        actions={<Button onClick={load}><RefreshCw className="w-3.5 h-3.5" /> Refresh</Button>}
+        description="Document status and source data for each vehicle."
+        actions={<Button onClick={load}>Refresh</Button>}
       />
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -208,7 +217,7 @@ export default function InventoryIntelligence() {
         <InlineNote tone="danger" title="Could not load inventory" action={<Button size="sm" onClick={load}>Retry</Button>}>{error}</InlineNote>
       )}
 
-      <Panel>
+      <Panel flush>
         <QueryState
           status={filtered === null ? "loading" : error ? "error" : filtered.length === 0 ? "empty" : "ready"}
           errorTitle="Inventory intelligence could not be read."
@@ -216,57 +225,47 @@ export default function InventoryIntelligence() {
           emptyTitle="No vehicles match"
           emptyDetail="Clear the search or the attention filter to widen the list."
         >
-          <WorkTable caption="Document pipeline by vehicle and family" minWidth={1100}>
+          <WorkTable className="[&_th]:px-2 [&_td]:px-2 [&_td]:py-2.5" caption="Document pipeline by vehicle and family" minWidth={1000}>
             <thead>
               <tr>
                 <Th>Vehicle</Th>
                 <Th>Source data</Th>
                 {DOCUMENT_FAMILY_IDS.map((id) => (
-                  <Th key={id} className="whitespace-nowrap">{DOCUMENT_FAMILIES[id].adminTitle}</Th>
+                  <Th key={id} className="whitespace-nowrap">{FAMILY_SHORT[DOCUMENT_FAMILIES[id].adminTitle] ?? DOCUMENT_FAMILIES[id].adminTitle}</Th>
                 ))}
                 <Th>Blocker</Th>
-                <Th align="right">Actions</Th>
+                <Th align="right">Review</Th>
               </tr>
             </thead>
             <tbody>
               {filtered?.map(({ vehicle, intel }) => (
-                <tr key={vehicle.id} className="align-top hover:bg-adm-workspace">
-                  <Td>
-                    <span className="block font-semibold text-adm-ink">{vehicle.ymm || "Vehicle"}</span>
-                    <span className="block text-[12px] leading-[18px] font-mono text-adm-muted">{vehicle.vin || "no VIN"}</span>
-                    <span className="block text-[12px] leading-[18px] text-adm-muted">
-                      {intel.conditionClass} | refreshed {fmtWhen(vehicle.updated_at)}
-                    </span>
+                <tr key={vehicle.id} className="hover:bg-adm-workspace">
+                  <Td className="max-w-[190px]">
+                    <span className="block truncate font-semibold text-adm-ink">{vehicle.ymm || "Vehicle"}</span>
+                    <span className="block truncate font-mono text-[12px] leading-[16px] text-adm-muted">{vehicle.vin || "no VIN"}</span>
                   </Td>
                   <Td><Stage stage={intel.sourceStage} /></Td>
                   {DOCUMENT_FAMILY_IDS.map((id) => {
                     const f = intel.families.find((x) => x.family === id);
                     return <Td key={id}>{f ? <Stage stage={f.stage} /> : null}</Td>;
                   })}
-                  <Td className="max-w-[260px]">
+                  <Td className="max-w-[130px]">
                     {intel.blocker
-                      ? <span className="text-[12px] leading-[18px] text-adm-warning">{intel.blocker}</span>
+                      ? <span className="block truncate text-[13px] text-adm-warning" title={intel.blocker}>{intel.blocker}</span>
                       : <span className="text-[12px] text-adm-muted">None</span>}
                   </Td>
                   <Td align="right">
-                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                      <Link
-                        to={`/vehicle-file/${vehicle.id}`}
-                        className="min-h-[32px] px-2.5 rounded-md border border-adm-border bg-adm-surface text-[13px] font-semibold hover:bg-adm-workspace inline-flex items-center gap-1"
-                      >
-                        <ExternalLink className="w-3 h-3" /> File
-                      </Link>
+                    <div className="flex items-center justify-end gap-3 whitespace-nowrap text-[14px] font-semibold">
+                      <Link to={`/vehicle-file/${vehicle.id}`} className="text-adm-primary hover:underline">Review</Link>
                       {canRegenerate && (
-                        <Button
-                          size="sm"
+                        <button
+                          type="button"
                           onClick={() => processVin(vehicle.id)}
                           disabled={busy || working === vehicle.id}
+                          className="text-adm-primary hover:underline disabled:opacity-50"
                         >
-                          {working === vehicle.id
-                            ? <Loader2 className="w-3 h-3 animate-spin" />
-                            : <RefreshCw className="w-3 h-3" />}
-                          Process
-                        </Button>
+                          {working === vehicle.id ? "Processing" : "Process"}
+                        </button>
                       )}
                     </div>
                   </Td>

@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight, ImageIcon, RefreshCw, Video } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight } from "lucide-react";
 import VehicleTruthCard from "@/components/vehicle/VehicleTruthCard";
 import { listingGallery } from "@/lib/photos";
-import { Card, DeepLink, EmptyNote, Pair, StatRow, TabHeader, btn, fmtWhen, sinceLabel } from "./primitives";
+import { Link } from "react-router-dom";
+import { FactStrip, SummaryList } from "@/components/detail/parts";
+import { Card, EmptyNote, StatRow, btn, fmtWhen } from "./primitives";
 import { type LifecycleResult } from "./lifecycle";
 import { STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER } from "@/lib/lifecycle/states";
 import DescriptionCard from "./DescriptionCard";
 import { type ReadinessSummary, type TabId, type VehicleRow } from "./types";
-import { deriveStatusFacts } from "./statusFacts";
 
 interface Interest {
   lastView: string | null;
@@ -60,7 +61,6 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
   const { row: lifecycleRow, loading: lifecycleLoading, tracked } = lifecycle;
   const interest = useCustomerInterest(vehicle);
   const [repulling, setRepulling] = useState(false);
-  const facts = deriveStatusFacts({ vehicle, ready, lifecycle });
   const gallery = listingGallery(vehicle);
   const videos = vehicle.videos || [];
   const state = lifecycleRow?.state ?? null;
@@ -70,7 +70,7 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
     { label: "Year / make / model", value: vehicle.ymm || "Needs VIN decode" },
     { label: "Trim", value: vehicle.trim || "Not decoded" },
     { label: "Stock #", value: stockNumber || "Not on the feed" },
-    { label: "Condition", value: (vehicle.condition || "unknown").toUpperCase() },
+    { label: "Condition", value: <span className="capitalize">{vehicle.condition || "unknown"}</span> },
     { label: "Mileage", value: vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : "Not recorded" },
     { label: "Advertised price", value: vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced" },
     { label: "Created", value: new Date(vehicle.created_at).toLocaleDateString() },
@@ -100,103 +100,80 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
     }
   };
 
+  const daysInStock = Math.max(0, Math.floor((Date.now() - new Date(vehicle.created_at).getTime()) / 86400000));
+  const nextAction = state ? STATE_NEXT_ACTION[state] : tracked ? "Wait for the first lifecycle recompute after intake" : "Build this vehicle's documents and publish it";
+
   return (
     <div className="space-y-6">
-      <TabHeader
-        title="Overview"
-        description="What this vehicle is, where it stands, and what is holding it back. Every number here comes from a stored record."
+      <FactStrip
+        label="Vehicle summary"
+        className="lg:grid-cols-6"
+        facts={[
+          { label: "Owner", value: state ? STATE_OWNER[state] : tracked ? "Inventory intake" : "Merchandising" },
+          { label: "Condition", value: <span className="capitalize">{vehicle.condition || "Unknown"}</span> },
+          { label: "State", value: lifecycleLoading ? "Reading" : !tracked ? "Not tracked" : state ? STATE_LABEL[state] : "No record" },
+          { label: "Price", value: vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced" },
+          { label: "Days in inventory", value: String(daysInStock) },
+          { label: "Next action", value: nextAction },
+        ]}
       />
 
-      <Card title="Status" action={
-        <span className={`text-[12px] leading-[18px] font-semibold px-2 py-[3px] rounded-[2px] ${
-          facts.retail.ready ? "bg-adm-success-bg text-adm-success" : "bg-adm-warning-bg text-adm-warning"
-        }`}>{facts.retail.value}{facts.retail.detail ? `: ${facts.retail.detail}` : ""}</span>
-      }>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <Pair
-            label="Lifecycle stage"
-            value={lifecycleLoading ? "Reading…" : !tracked ? "Not tracked (new stock)" : state ? STATE_LABEL[state] : "No lifecycle record yet"}
-          />
-          <Pair label="Owner" value={state ? STATE_OWNER[state] : tracked ? "Inventory intake" : "Merchandising"} />
-          <Pair label="Time in stage" value={state ? (sinceLabel(lifecycleRow?.state_changed_at) ?? "Unknown") : "Not applicable"} />
-          <Pair label="Publication" value={vehicle.status === "published" ? "Published to the shopper portal" : vehicle.status === "archived" ? "Archived" : "Draft, not published"} />
-        </div>
+      <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
+        <Card title="Vehicle details" action={
+          <button onClick={repullMarket} disabled={repulling} className="text-[14px] font-semibold text-adm-primary hover:underline disabled:opacity-50" title="Re-pull market value, comparables, days-supply, recalls, VIN history and Black Book for this VIN">
+            {repulling ? "Syncing…" : "Re-pull market data"}
+          </button>
+        }>
+          <SummaryList dense rows={infoPairs.map((p) => ({ label: p.label, value: p.value }))} />
+        </Card>
 
-        <div className="rounded-xl border border-border bg-muted/30 p-4">
-          <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Next action</p>
-          <p className="text-al-body text-foreground mt-0.5">
-            {state ? STATE_NEXT_ACTION[state] : tracked ? "Wait for the first lifecycle recompute after intake" : "Build this vehicle's documents and publish it"}
-          </p>
-        </div>
+        <DescriptionCard vehicleId={vehicle.id} />
 
-        <div>
-          <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            Blockers ({ready.blockers.length})
-          </p>
-          {ready.blockers.length === 0 ? (
-            <p className="text-al-body text-emerald-700 inline-flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4" /> Nothing is blocking this vehicle from going live.
-            </p>
+        <Card title={`Media (${gallery.length + videos.length})`} action={
+          <button onClick={() => onTab("documents")} className="text-[14px] font-semibold text-adm-primary hover:underline">Manage media</button>
+        }>
+          {gallery.length === 0 && videos.length === 0 ? (
+            <EmptyNote
+              title="No photos or video on file"
+              detail="Photos arrive with the inventory feed or are attached to the vehicle record."
+            />
           ) : (
-            <ul className="space-y-1.5">
-              {ready.blockers.map((b) => (
-                <li key={b.label} className="text-al-body text-amber-700 inline-flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 shrink-0" /> {b.label}
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="text-[14px] text-adm-muted">{gallery.length} photo{gallery.length === 1 ? "" : "s"} · {videos.length} video{videos.length === 1 ? "" : "s"}</p>
+              {gallery.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {gallery.slice(0, 9).map((src, i) => (
+                    <img key={`${src}-${i}`} src={src} alt="" className="aspect-[4/3] w-full rounded-[4px] border border-adm-border object-cover" />
+                  ))}
+                </div>
+              )}
+            </>
           )}
+        </Card>
+      </div>
+
+      <Card title={`Blockers (${ready.blockers.length})`}>
+        {ready.blockers.length === 0 ? (
+          <p className="inline-flex items-center gap-1.5 text-[14px] text-adm-success">
+            <CheckCircle2 className="w-5 h-5" /> Nothing is blocking this vehicle from going live.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {ready.blockers.map((b) => (
+              <li key={b.label} className="inline-flex items-center gap-1.5 text-[14px] text-adm-warning">
+                <AlertTriangle className="w-5 h-5 shrink-0" /> {b.label}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] font-semibold text-adm-primary">
           {ready.remaining.length > ready.blockers.length && (
-            <button onClick={() => onTab("compliance")} className="mt-3 text-al-meta font-semibold text-primary inline-flex items-center gap-1 hover:underline">
-              {ready.remaining.length - ready.blockers.length} other open item{ready.remaining.length - ready.blockers.length === 1 ? "" : "s"} <ChevronRight className="w-3.5 h-3.5" />
+            <button onClick={() => onTab("compliance")} className="inline-flex items-center gap-1 hover:underline">
+              {ready.remaining.length - ready.blockers.length} other open item{ready.remaining.length - ready.blockers.length === 1 ? "" : "s"} <ChevronRight className="w-5 h-5" />
             </button>
           )}
+          {tracked && <Link to={`/get-ready-command/${vehicle.id}`} className="hover:underline">Open Get Ready Command</Link>}
         </div>
-
-        {tracked && (
-          <DeepLink to={`/get-ready-command/${vehicle.id}`} label="Get Ready Command" detail="Move this vehicle through its stage" />
-        )}
-      </Card>
-
-      <Card title="Vehicle information" action={
-        <button onClick={repullMarket} disabled={repulling} className={btn} title="Re-pull market value, comparables, days-supply, recalls, VIN history and Black Book for this VIN">
-          <RefreshCw className={`w-3.5 h-3.5 ${repulling ? "animate-spin" : ""}`} /> {repulling ? "Syncing…" : "Re-pull market data"}
-        </button>
-      }>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-          {infoPairs.map((p) => <Pair key={p.label} label={p.label} value={p.value} />)}
-        </div>
-      </Card>
-
-      <DescriptionCard vehicleId={vehicle.id} />
-
-      <Card title="Media" action={
-        <button onClick={() => onTab("documents")} className={btn}>Manage packet <ArrowUpRight className="w-3.5 h-3.5" /></button>
-      }>
-        {gallery.length === 0 && videos.length === 0 ? (
-          <EmptyNote
-            title="No photos or video on file"
-            detail="Photos arrive with the inventory feed or are attached to the vehicle record. The shopper passport shows a placeholder until at least one photo exists."
-          />
-        ) : (
-          <>
-            <div className="flex items-center gap-6">
-              <span className="text-al-body text-foreground inline-flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-muted-foreground" /> {gallery.length} photo{gallery.length === 1 ? "" : "s"}
-              </span>
-              <span className="text-al-body text-foreground inline-flex items-center gap-2">
-                <Video className="w-4 h-4 text-muted-foreground" /> {videos.length} video{videos.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            {gallery.length > 0 && (
-              <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
-                {gallery.slice(0, 16).map((src, i) => (
-                  <img key={`${src}-${i}`} src={src} alt="" className="w-full aspect-[4/3] object-cover rounded-lg border border-border" />
-                ))}
-              </div>
-            )}
-          </>
-        )}
       </Card>
 
       <VehicleTruthCard tenantId={vehicle.tenant_id} vehicleId={vehicle.id} />

@@ -55,7 +55,7 @@ const BTN_BASE =
   "inline-flex items-center justify-center gap-2 rounded-xl min-h-[44px] px-4 text-[13px] font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none";
 // Exported so the page agents share one recipe. Keeping these private is what
 // let three parallel builders drift into three different button treatments.
-export const BTN_PRIMARY = cn(BTN_BASE, "bg-primary text-primary-foreground hover:opacity-90");
+export const BTN_PRIMARY = cn(BTN_BASE, "bg-adm-primary text-white hover:bg-adm-primary-hover");
 export const BTN_SECONDARY = cn(BTN_BASE, "border border-border bg-card text-foreground hover:border-primary hover:bg-muted");
 // The one in-table / in-card text link. Same disabled treatment as the buttons
 // so a dead link never invents its own opacity.

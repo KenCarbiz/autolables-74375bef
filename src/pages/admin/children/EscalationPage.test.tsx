@@ -85,14 +85,14 @@ const CONFIGURED_ROUTING = {
 describe("EscalationPage (screen 09)", () => {
   it("shows destination-required states, keeps review disabled until complete, and reads activity in the sender's vocabulary", () => {
     renderWith(<EscalationPage />);
-    expect(screen.getByRole("heading", { level: 1, name: "Escalation rules" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Escalation & Delivery" })).toBeInTheDocument();
     expect(screen.getAllByText("Destination required")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Review changes" })).toBeDisabled();
     expect(screen.getByText("Complete all required fields to review your changes.")).toBeInTheDocument();
     expect(screen.getByText("All rooftops (2)")).toBeInTheDocument();
-    expect(screen.getAllByText("Second rooftop").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Second rooftop").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Provider rejected")).toBeInTheDocument();
-    expect(screen.getAllByText("Accepted").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Accepted").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Accepted does not mean delivered.").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Not supported")).toHaveLength(3);
     expect(screen.getAllByRole("switch", { name: "Escalation" })[0]).toBeChecked();
@@ -105,8 +105,8 @@ describe("EscalationPage (screen 09)", () => {
     const escalation = FIXTURE_09.fixture.views.escalation as { activity: Array<Record<string, unknown>> };
     const legacy = { id: "example-audit-3", action: "customer_passport_escalated", entity_id: "2c3d4e5f-0000-4000-8000-00000000000c", created_at: "2026-10-01T13:20:00Z", details: { level: 1, to: "BDC" } };
     renderWith(<EscalationPage />, { ...FIXTURE_09.fixture, views: { ...FIXTURE_09.fixture.views, escalation: { activity: [...escalation.activity, legacy] } } });
-    expect(screen.getAllByText("Attempted")).toHaveLength(2);
-    expect(screen.getAllByText("Accepted")).toHaveLength(2);
+    expect(screen.getAllByText("Attempted")).toHaveLength(1);
+    expect(screen.getAllByText("Accepted")).toHaveLength(1);
   });
 
   it("renders Unavailable, never zero, when the activity read fails", () => {

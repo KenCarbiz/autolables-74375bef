@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { AlertTriangle, ChevronRight, History, Pencil, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronRight, XCircle } from "lucide-react";
 import { useDescriptionCase, useDescriptionPermissions } from "@/hooks/useDescriptionOps";
 import { ELIGIBILITY_META, STATUS_META, TONE_CLASS, factConfidenceLabel, type DescriptionStatus } from "@/lib/description/model";
-import { Card, EmptyNote, btn, fmtWhen } from "./primitives";
+import { Card, EmptyNote, fmtWhen } from "./primitives";
 
 // The vehicle's shopper-facing description, read from the SAME description
 // case the Description Operations Center uses — there is no second description
@@ -28,7 +28,7 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
 
   if (error) {
     return (
-      <Card title="Description">
+      <Card title="Latest description">
         <p className="text-al-body text-red-600 inline-flex items-center gap-1.5">
           <XCircle className="w-4 h-4 shrink-0" /> The description record could not be loaded: {error}
         </p>
@@ -38,7 +38,7 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
 
   if (!record) {
     return (
-      <Card title="Description">
+      <Card title="Latest description">
         <p className="text-al-body text-muted-foreground">Loading the description record…</p>
       </Card>
     );
@@ -53,22 +53,8 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
   const exceptions = record.exceptions ?? [];
   const latest = record.versions[0];
 
-  const actions = (
-    <div className="flex items-center gap-2 flex-wrap">
-      <button onClick={open} className={btn} disabled={!perms.canEdit} title={perms.canEdit ? undefined : "Your role cannot edit descriptions"}>
-        <Pencil className="w-3.5 h-3.5" /> Edit
-      </button>
-      <button onClick={regenerate} className={btn} disabled={busy || !perms.canGenerate} title={perms.canGenerate ? undefined : "Your role cannot generate descriptions"}>
-        <RefreshCw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} /> {busy ? "Working…" : "Regenerate"}
-      </button>
-      <button onClick={() => setShowHistory((v) => !v)} className={btn} aria-expanded={showHistory}>
-        <History className="w-3.5 h-3.5" /> History
-      </button>
-    </div>
-  );
-
   return (
-    <Card title="Description" action={actions}>
+    <Card title="Latest description">
       {!c ? (
         <EmptyNote
           title="No description case for this vehicle yet"
@@ -77,13 +63,13 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
       ) : (
         <>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`inline-flex items-center gap-1 text-al-meta font-semibold px-2 py-0.5 rounded-full border ${TONE_CLASS[meta.tone]}`}>{meta.label}</span>
-            <span className={`inline-flex text-al-meta font-semibold px-2 py-0.5 rounded-full border ${TONE_CLASS[elig.tone]}`}>{elig.label}</span>
-            <span className={`inline-flex text-al-meta font-semibold px-2 py-0.5 rounded-full border ${TONE_CLASS[conf.tone]}`}>Facts {conf.label}</span>
+            <span className={`inline-flex items-center gap-1 text-[12px] leading-[18px] font-semibold px-2 py-[3px] rounded-[2px] ${TONE_CLASS[meta.tone]}`}>{meta.label}</span>
+            <span className={`inline-flex text-[12px] leading-[18px] font-semibold px-2 py-[3px] rounded-[2px] ${TONE_CLASS[elig.tone]}`}>{elig.label}</span>
+            <span className={`inline-flex text-[12px] leading-[18px] font-semibold px-2 py-[3px] rounded-[2px] ${TONE_CLASS[conf.tone]}`}>Facts {conf.label}</span>
           </div>
 
           {exceptions.length > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <div className="rounded-[6px] border border-amber-200 bg-amber-50 p-3">
               <p className="text-al-body font-semibold text-amber-900 inline-flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 {exceptions.length} open exception{exceptions.length === 1 ? "" : "s"} — {String(exceptions[0].title ?? "see Description Intelligence")}
@@ -93,7 +79,7 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
 
           {published ? (
             <div className="space-y-1.5">
-              <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[13px] leading-[18px] font-semibold text-adm-muted">
                 Published version v{String(published.version_number)}
               </p>
               <p className="text-al-body text-foreground leading-relaxed line-clamp-5 whitespace-pre-wrap">{String(published.content ?? "")}</p>
@@ -116,7 +102,7 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
           )}
 
           {showHistory && (
-            <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-1.5">
+            <div className="rounded-[6px] border border-adm-border bg-adm-workspace p-3 space-y-1.5">
               {record.versions.length === 0 ? (
                 <p className="text-al-body text-muted-foreground">No versions have been produced for this vehicle yet.</p>
               ) : (
@@ -133,9 +119,15 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
             </div>
           )}
 
-          <button onClick={open} className="text-al-meta font-semibold text-primary inline-flex items-center gap-1 hover:underline">
-            Open Description Intelligence <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] font-semibold text-adm-primary">
+            <button onClick={open} className="inline-flex items-center gap-1 hover:underline">
+              View description <ChevronRight className="w-5 h-5" />
+            </button>
+            <button onClick={regenerate} className="hover:underline disabled:opacity-50" disabled={busy || !perms.canGenerate} title={perms.canGenerate ? undefined : "Your role cannot generate descriptions"}>
+              {busy ? "Working…" : "Regenerate"}
+            </button>
+            <button onClick={() => setShowHistory((v) => !v)} className="hover:underline" aria-expanded={showHistory}>History</button>
+          </div>
         </>
       )}
     </Card>

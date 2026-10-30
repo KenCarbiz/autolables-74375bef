@@ -52,6 +52,7 @@ const VendorHome = lazy(() => import("./pages/VendorHome"));
 const ServiceWriterDesk = lazy(() => import("./pages/ServiceWriterDesk"));
 const CustomerRecord = lazy(() => import("./pages/CustomerRecord"));
 const DealsPage = lazy(() => import("./pages/Deals"));
+const InstallerInvoicesPage = lazy(() => import("./pages/InstallerInvoices"));
 const DealDetailPage = lazy(() => import("./pages/DealDetail"));
 const DocumentApprovalPage = lazy(() => import("./pages/DocumentApproval"));
 const ReconEstimateDetailPage = lazy(() => import("./pages/ReconEstimateDetail"));
@@ -111,6 +112,8 @@ const BrandGuide = lazy(() => import("./pages/BrandGuide"));
 const ScanPage = lazy(() => import("./pages/ScanPage"));
 const CheckIn = lazy(() => import("./pages/CheckIn"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
+const PriceReviewPage = lazy(() => import("./components/compliance/PriceReviewPage"));
+const VinDefensePage = lazy(() => import("./components/compliance/VinDefensePage"));
 // Legacy per-VIN portal is retired — /vehicle/:vin redirects to the single
 // canonical Passport at /v/:vin so there is only one shopper page.
 const VehicleVinRedirect = () => {
@@ -349,6 +352,7 @@ const App = () => (
                         <Route path="/customers/:id" element={<CustomerRecord />} />
                         <Route path="/deals" element={<DealsPage />} />
                         <Route path="/deals/:id" element={<DealDetailPage />} />
+                        <Route path="/invoices" element={<InstallerInvoicesPage />} />
                         <Route path="/dashboard/classic" element={<ProcessDashboard />} />
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />
@@ -402,6 +406,8 @@ const App = () => (
                         <Route path="/new-car-sticker-legacy" element={<NewCarSticker />} />
                         <Route path="/cpo-sheet" element={<CpoSheet />} />
                         <Route path="/compliance" element={<ComplianceCenter />} />
+                        <Route path="/compliance/price-review/:vin" element={<PriceReviewPage />} />
+                        <Route path="/compliance/vin-defense/:vin" element={<VinDefensePage />} />
                         <Route path="/compliance-center" element={<ComplianceTabRedirect tab="issues" />} />
                         {/* Fleet operations is the primary description surface; the
                             manual studio stays available as an authorized override. */}

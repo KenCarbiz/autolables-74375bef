@@ -12,9 +12,9 @@ import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { canDispatchGetReady } from "@/lib/commandCenter/dispatchAuthority";
 import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
 import { toast } from "sonner";
-import { CheckCircle2, MinusCircle, Loader2, RefreshCw, QrCode, AlertTriangle, ShieldCheck, X, Printer, Send, Wrench, FolderCheck } from "lucide-react";
+import { CheckCircle2, MinusCircle, Loader2, MoreHorizontal, RefreshCw, X, Printer, Wrench } from "lucide-react";
 import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, Panel, QueryState, StatusText, Td, Th, WorkTable, type LocalTab } from "@/components/product";
-import NextStepBanner from "@/components/workflow/NextStepBanner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // /ready-board — the used-car manager's daily cockpit. Every car and where it
 // stands across the get-ready stations (Service K-208, Detail, Prep/install,
@@ -318,7 +318,7 @@ export default function ReadyBoard() {
         }
       />
 
-      <NextStepBanner stage="ready-board" />
+      <LocalTabs label="Ready Board views" tabs={tabs} />
 
       <MetricStrip
         label="Ready Board summary"
@@ -326,28 +326,10 @@ export default function ReadyBoard() {
           { label: "Waiting for acceptance", value: ready ? bucketCounts.acceptance : null, loading, hint: total != null ? `of ${total.toLocaleString()} on the board` : undefined, tone: "warning", href: "/ready-board?view=acceptance" },
           { label: "Waiting for Get-Ready", value: ready ? bucketCounts.getready : null, loading, hint: total != null ? `of ${total.toLocaleString()} on the board` : undefined, tone: "info", href: "/ready-board?view=getready" },
           { label: "Ready", value: ready ? bucketCounts.ready : null, loading, hint: "every station cleared", tone: "success", href: "/ready-board?view=ready" },
-          { label: "Recall review", value: stats ? stats.recallBlocked : null, loading, hint: "can overlap the groups above", tone: stats && stats.recallBlocked > 0 ? "danger" : "neutral" },
+          { label: "Recall review", value: stats ? stats.recallBlocked : null, loading, hint: "before they can be sold", tone: stats && stats.recallBlocked > 0 ? "danger" : "neutral" },
         ]}
       />
-      {stats && (
-        <p className="text-[13px] leading-[18px] text-adm-muted">
-          Across all {stats.total.toLocaleString()} vehicles: {stats.todayIntake.toLocaleString()} from today's intake, {stats.reconNeeds.toLocaleString()} need recon approval, {stats.needService.toLocaleString()} still need a service inspection. A vehicle with no draft addendum appears only under All.
-        </p>
-      )}
-
-      {stats && stats.recallBlocked > 0 && (
-        <StatusText tone="danger" icon className="w-fit whitespace-normal">
-          {stats.recallBlocked} vehicle{stats.recallBlocked === 1 ? "" : "s"} need a recall review before they can be sold. Check the Recall column below.
-        </StatusText>
-      )}
-
-      <LocalTabs label="Ready Board views" tabs={tabs} />
-
-      <Panel
-        flush
-        title={ready ? `${visibleRows.length.toLocaleString()} ${visibleRows.length === 1 ? "vehicle" : "vehicles"} in ${current.label}${scopeNote}` : current.label}
-        description={ready && bucket !== "all" && total != null ? `Showing this view only, out of ${total.toLocaleString()} on the board.` : undefined}
-      >
+      <Panel flush>
         <QueryState
           status={status}
           onRetry={load}
@@ -356,7 +338,7 @@ export default function ReadyBoard() {
           emptyTitle={`${current.empty}${scopeNote ? scopeNote : " in this view"}.`}
           emptyDetail={bucket === "all" && !todayOnly ? "No vehicles in inventory yet." : `This is the ${current.label} view only; it does not say the rest of the pipeline is clear.${otherViews}`}
         >
-          <WorkTable caption="Vehicles and their get-ready stations" minWidth={1020}>
+          <WorkTable caption="Vehicles and their get-ready stations" minWidth={900}>
             <thead>
               <tr>
                 <Th>Vehicle</Th>
@@ -387,12 +369,12 @@ export default function ReadyBoard() {
                     <Td><Cell on={prep.has(r.vin)} /></Td>
                     <Td>
                       {reconNeeds.has(r.vin)
-                        ? <button onClick={() => navigate("/recon")} className="inline-flex items-center gap-1 text-[13px] font-semibold text-adm-warning hover:underline"><Wrench className="h-4 w-4" aria-hidden="true" /> OK work</button>
-                        : <CheckCircle2 className="inline h-4 w-4 text-adm-success" aria-label="No recon approval pending" />}
+                        ? <button onClick={() => navigate("/recon")} className="inline-flex items-center gap-1 whitespace-nowrap text-[13px] font-semibold text-adm-warning hover:underline"><Wrench className="h-4 w-4" aria-hidden="true" /> OK work</button>
+                        : <CheckCircle2 className="inline h-5 w-5 text-adm-success" aria-label="No recon approval pending" />}
                     </Td>
                     <Td>
                       {recallReview.has(r.vin) ? <span title="Open recall — service review required"><StatusText tone="danger" icon>Review</StatusText></span>
-                        : rc === "ok" ? <CheckCircle2 className="inline h-4 w-4 text-adm-success" aria-label="Recall check current" />
+                        : rc === "ok" ? <CheckCircle2 className="inline h-5 w-5 text-adm-success" aria-label="Recall check current" />
                         : rc === "dnd" ? <span title="Do-not-drive recall"><StatusText tone="danger" icon>Do not drive</StatusText></span>
                         : <span title="Recall check stale or missing"><StatusText tone="warning" icon>Unverified</StatusText></span>}
                     </Td>
@@ -401,34 +383,39 @@ export default function ReadyBoard() {
                         : <span className="text-adm-muted">—</span>}
                     </Td>
                     <Td align="right">
-                      <div className="flex flex-wrap items-center justify-end gap-1.5">
-                        {lifecycleOf(r) === "RETAIL_READY" && (
-                          <StatusText tone="success" icon>Retail Ready</StatusText>
-                        )}
-                        {canDecideRetailReady && lifecycleOf(r) === "FINAL_READY_VERIFICATION" && (
-                          <Button size="sm" variant="primary" onClick={() => markRetailReady(r)} disabled={marking === r.vin} title="Final acceptance — mark this vehicle retail ready">
-                            {marking === r.vin ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />} Mark Retail Ready
-                          </Button>
-                        )}
-                        {staleVins.has(r.vin) && addMap.get(r.vin) && (
-                          <Button size="sm" onClick={() => navigate(`/addendum?id=${addMap.get(r.vin)!.id}&edit=1`)} title="Get-Ready changed — rebuild the addendum from the latest installs">
-                            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Update
-                          </Button>
-                        )}
-                        {canAccept && bucketOf(r) === "acceptance" && (
-                          <Button size="sm" variant="primary" onClick={() => acceptAndDispatch(r)} disabled={accepting === r.vin} title="Authorize & Dispatch — accept the addendum and send each department its get-ready work order">
-                            {accepting === r.vin ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />} Authorize &amp; Dispatch
-                          </Button>
-                        )}
-                        {bucketOf(r) === "ready" && (
-                          r.deal_processed_at
-                            ? <span title={`Deal filed ${new Date(r.deal_processed_at).toLocaleDateString()}`}><StatusText tone="success" icon>Filed</StatusText></span>
-                            : <Button size="sm" variant="primary" onClick={() => navigate(`/vehicle-file/${r.id}?tab=deal`)} title="Open the deal record to process this deal"><FolderCheck className="h-3.5 w-3.5" aria-hidden="true" /> Deal</Button>
-                        )}
-                        {service.has(r.vin) && <Button size="sm" onClick={() => navigate(`/k208/${r.vin}`)} title="Print K-208" aria-label="Print K-208"><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /></Button>}
-                        <Button size="sm" onClick={() => printSticker(r)} title="Print window sticker" aria-label="Print window sticker"><Printer className="h-3.5 w-3.5" aria-hidden="true" /></Button>
-                        <Button size="sm" onClick={() => sendGetReady(r)} disabled={sending === r.vin} title="Send get-ready to detail" aria-label="Send get-ready to detail">{sending === r.vin ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Send className="h-3.5 w-3.5" aria-hidden="true" />}</Button>
-                        <Button size="sm" onClick={() => showQr(r.vin)} title="Get-Ready QR" aria-label="Get-Ready QR"><QrCode className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                        {lifecycleOf(r) === "RETAIL_READY" && <StatusText tone="success">Retail ready</StatusText>}
+                        {(() => {
+                          const primary: { label: string; run: () => void; busy: boolean } | null =
+                            canDecideRetailReady && lifecycleOf(r) === "FINAL_READY_VERIFICATION"
+                              ? { label: "Mark retail ready", run: () => markRetailReady(r), busy: marking === r.vin }
+                              : canAccept && bucketOf(r) === "acceptance"
+                                ? { label: "Authorize and dispatch", run: () => acceptAndDispatch(r), busy: accepting === r.vin }
+                                : bucketOf(r) === "ready" && !r.deal_processed_at
+                                  ? { label: "Open deal", run: () => navigate(`/vehicle-file/${r.id}?tab=deal`), busy: false }
+                                  : null;
+                          return primary ? (
+                            <button type="button" onClick={primary.run} disabled={primary.busy} className="text-[14px] font-semibold text-adm-primary hover:underline disabled:opacity-50">
+                              {primary.busy ? "Working…" : primary.label}
+                            </button>
+                          ) : bucketOf(r) === "ready" && r.deal_processed_at ? (
+                            <span title={`Deal filed ${new Date(r.deal_processed_at).toLocaleDateString()}`}><StatusText tone="success">Filed</StatusText></span>
+                          ) : null;
+                        })()}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger aria-label={`More actions for ${r.ymm || r.vin}`} className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
+                            <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {staleVins.has(r.vin) && addMap.get(r.vin) && (
+                              <DropdownMenuItem onSelect={() => navigate(`/addendum?id=${addMap.get(r.vin)!.id}&edit=1`)}>Update addendum</DropdownMenuItem>
+                            )}
+                            {service.has(r.vin) && <DropdownMenuItem onSelect={() => navigate(`/k208/${r.vin}`)}>Print K-208</DropdownMenuItem>}
+                            <DropdownMenuItem onSelect={() => printSticker(r)}>Print window sticker</DropdownMenuItem>
+                            <DropdownMenuItem disabled={sending === r.vin} onSelect={() => sendGetReady(r)}>Send get-ready to detail</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => showQr(r.vin)}>Get-Ready QR</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </Td>
                   </tr>
@@ -463,7 +450,7 @@ export default function ReadyBoard() {
 }
 
 function Cell({ on, dim }: { on: boolean; dim?: boolean }) {
-  if (on) return <CheckCircle2 className="inline h-4 w-4 text-adm-success" aria-label="Done" />;
+  if (on) return <CheckCircle2 className="inline h-5 w-5 text-adm-success" aria-label="Done" />;
   if (dim) return <span className="text-[12px] text-adm-muted">n/a</span>;
-  return <MinusCircle className="inline h-4 w-4 text-adm-muted" aria-label="Not done" />;
+  return <MinusCircle className="inline h-5 w-5 text-adm-muted" aria-label="Not done" />;
 }

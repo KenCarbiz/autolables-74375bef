@@ -18,7 +18,6 @@ import { ShieldCheck, Camera, Check, X, AlertTriangle, Clock, CheckCircle2, Clip
 import EmptyState from "@/components/ui/empty-state";
 import { LocalTabs, MetricStrip, PageBody, PageHeader, Button as ProductButton, Panel as ProductPanel, WorkTable, Th, Td, StatusText, type LocalTab } from "@/components/product";
 import { uploadPhoto } from "@/lib/storage";
-import NextStepBanner from "@/components/workflow/NextStepBanner";
 
 const PrepSignOff = () => {
   const { user } = useAuth();
@@ -126,13 +125,25 @@ const PrepSignOff = () => {
   if (view === "list") {
     const loaded = !signOffsLoading;
     return (
-      <PageBody width="wide" className="bg-adm-surface">
-        <div>{viewTabs}</div>
-        <NextStepBanner stage="prep" />
+      <PageBody width="wide">
         <PageHeader
-          title="Prep & Install Sign-Off"
+          title="Prep & Vendors"
           description="Shop foreman approves every vehicle before it hits the lot."
           actions={<ProductButton variant="primary" onClick={() => setSearchParams({ view: "new" })}>New sign-off request</ProductButton>}
+        />
+
+        <LocalTabs
+          label="Prep views"
+          tabs={[
+            ...(["all", "pending", "signed", "rejected"] as const).map((f): LocalTab => ({
+              key: f,
+              label: f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1),
+              to: f === "all" ? "/prep" : `/prep?filter=${f}`,
+              active: filter === f,
+              count: loaded ? (f === "all" ? signOffs.length : signOffs.filter((x) => x.status === f).length) : null,
+            })),
+            { key: "installs", label: "Install proof", to: "/prep?view=installs", active: false },
+          ]}
         />
 
         <MetricStrip
@@ -143,16 +154,6 @@ const PrepSignOff = () => {
             { label: "Rejected this week", value: loaded ? rejectedThisWeek : null, loading: !loaded, tone: "danger" },
             { label: "Ready for listing", value: loaded ? ready.length : null, loading: !loaded, tone: "info", hint: "signed off and unlocked" },
           ]}
-        />
-
-        <LocalTabs
-          label="Sign-off status filters"
-          tabs={(["all", "pending", "signed", "rejected"] as const).map((f): LocalTab => ({
-            key: f,
-            label: f.charAt(0).toUpperCase() + f.slice(1),
-            to: f === "all" ? "/prep" : `/prep?filter=${f}`,
-            active: filter === f,
-          }))}
         />
 
         {!loaded ? (
@@ -166,40 +167,44 @@ const PrepSignOff = () => {
               : `This filter shows ${filter} sign-offs only; ${signOffs.length} ${signOffs.length === 1 ? "request exists" : "requests exist"} in total.`}
           />
         ) : (
-          <ProductPanel flush title={`${filtered.length} ${filtered.length === 1 ? "sign-off" : "sign-offs"}`}>
-            <WorkTable caption="Prep sign-offs" minWidth={900}>
+          <ProductPanel flush>
+            <WorkTable caption="Prep sign-offs" minWidth={760}>
               <thead>
                 <tr>
-                  <Th>Status</Th>
                   <Th>Vehicle</Th>
-                  <Th>Accessories</Th>
+                  <Th>Status</Th>
+                  <Th>Accessories installed</Th>
                   <Th>Photos</Th>
                   <Th>Foreman</Th>
                   <Th>Updated</Th>
-                  <Th>Action</Th>
+                  <Th align="right">Next action</Th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(s => (
-                  <tr key={s.id}>
+                  <tr key={s.id} className="hover:bg-adm-workspace">
+                    <Td className="max-w-[240px]">
+                      <p className="truncate font-semibold text-adm-ink">{s.ymm || s.vin}</p>
+                      <p className="truncate text-[12px] leading-[16px] text-adm-muted">{s.stock_number ? `Stock ${s.stock_number} · ` : ""}{s.vin}</p>
+                    </Td>
                     <Td>
-                      <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"} icon>
+                      <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
                         {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
                       </StatusText>
                     </Td>
-                    <Td>
-                      <p className="font-semibold text-adm-ink">{s.vin}</p>
-                      <p className="text-adm-muted">{s.ymm} • {s.stock_number}</p>
-                    </Td>
-                    <Td>{s.accessories_installed.filter(a => a.installed_date).length} of {s.accessories_installed.length}</Td>
+                    <Td className="whitespace-nowrap">{s.accessories_installed.filter(a => a.installed_date).length} of {s.accessories_installed.length}</Td>
                     <Td>{s.install_photos?.length || 0}</Td>
-                    <Td>{s.foreman_name}</Td>
-                    <Td className="text-adm-muted">{format(new Date(s.updated_at), "MMM d, h:mm a")}</Td>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <ProductButton size="sm" variant="primary" onClick={() => setSearchParams({ view: "detail", id: s.id })}>Review & Sign</ProductButton>
-                        <ProductButton size="sm" onClick={() => navigate(`/prep/${s.vin}`)} title="Open the QR mobile work-event flow for this VIN">Mobile flow</ProductButton>
-                      </div>
+                    <Td className="whitespace-nowrap">{s.foreman_name}</Td>
+                    <Td className="whitespace-nowrap text-adm-muted">{format(new Date(s.updated_at), "MMM d, h:mm a")}</Td>
+                    <Td align="right">
+                      <span className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
+                        <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => setSearchParams({ view: "detail", id: s.id })}>
+                          {s.status === "pending" ? "Review and sign" : "View"}
+                        </button>
+                        <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => navigate(`/prep/${s.vin}`)} title="Open the QR mobile work-event flow for this VIN">
+                          Mobile flow
+                        </button>
+                      </span>
                     </Td>
                   </tr>
                 ))}

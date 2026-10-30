@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, ExternalLink, ShieldCheck, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { CheckCircle2, ExternalLink, ShieldCheck } from "lucide-react";
+import { MetricStrip } from "@/components/product";
+import { priceReviewHref } from "./childLinks";
 import {
-  CountTile,
   EmptyState,
   Panel,
   RowAction,
-  SectionHeading,
   StateBadge,
   TableShell,
   formatDateTime,
@@ -27,68 +28,7 @@ const STATE_TONE: Record<PriceState, "neutral" | "critical" | "attention" | "cle
   no_price: "attention",
 };
 
-const VinTimeline = ({ row, onClose }: { row: PriceRow; onClose: () => void }) => (
-  <div className="fixed inset-0 z-50 flex justify-end bg-foreground/30" role="dialog" aria-modal="true">
-    <button type="button" aria-label="Close" className="flex-1" onClick={onClose} />
-    <div className="flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-adm-border bg-adm-surface">
-      <header className="flex items-start justify-between gap-3 border-b border-adm-border px-5 py-4">
-        <div>
-          <h3 className="text-[17px] leading-[24px] font-semibold font-display text-adm-ink">{row.title}</h3>
-          <p className="mt-0.5 font-mono text-[12px] leading-[18px] text-adm-muted">{row.vin}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-adm-border text-adm-muted hover:bg-adm-workspace"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </header>
-
-      <div className="grid grid-cols-3 gap-px border-b border-adm-border bg-adm-border">
-        {[
-          { label: "Dealer-confirmed", value: money(row.confirmedPrice), at: row.confirmedAt },
-          { label: "Feed", value: money(row.feedPrice), at: null },
-          { label: "Website", value: money(row.websitePrice), at: row.websiteAt },
-        ].map((c) => (
-          <div key={c.label} className="bg-adm-surface px-4 py-3">
-            <p className="text-[12px] leading-[18px] font-bold uppercase tracking-label text-adm-muted">{c.label}</p>
-            <p className="mt-0.5 font-display text-[17px] leading-[24px] font-semibold tabular-nums text-adm-ink">{c.value}</p>
-            {c.at && <p className="text-[12px] leading-[18px] text-adm-muted">{formatDateTime(c.at)}</p>}
-          </div>
-        ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        <p className="text-[12px] leading-[18px] font-bold uppercase tracking-label text-adm-muted">
-          Price and document events ({row.events.length})
-        </p>
-        {row.events.length === 0 ? (
-          <p className="mt-3 text-[14px] leading-[20px] text-adm-muted">
-            No price snapshots or document flags have been recorded for this VIN.
-          </p>
-        ) : (
-          <ol className="mt-3 space-y-3 border-l border-adm-border pl-4">
-            {row.events.map((e) => (
-              <li key={e.id} className="relative">
-                <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-adm-border" />
-                <p className="text-[12px] leading-[18px] text-adm-muted">{formatDateTime(e.at)}</p>
-                <p className="text-[14px] leading-[20px] text-adm-ink">{e.label}</p>
-                <p className="text-[12px] leading-[18px] text-adm-muted">{e.detail}</p>
-                {e.kind === "document_flag" && e.status && (
-                  <p className="mt-0.5 text-[12px] leading-[18px] text-adm-muted">Flag status: {e.status}</p>
-                )}
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-    </div>
-  </div>
-);
-
 export const PriceIntegritySection = ({ rows, loading }: { rows: PriceRow[]; loading: boolean }) => {
-  const [openVin, setOpenVin] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   const review = useMemo(() => priceRowsNeedingReview(rows), [rows]);
@@ -97,44 +37,18 @@ export const PriceIntegritySection = ({ rows, loading }: { rows: PriceRow[]; loa
   const matched = rows.filter((r) => r.state === "matched").length;
   const historicalEvents = rows.reduce((s, r) => s + r.historicalEvents, 0);
   const listed = showAll ? rows : rows.filter((r) => r.state !== "not_monitored");
-  const selected = rows.find((r) => r.vin === openVin) ?? null;
 
   return (
-    <div className="space-y-5">
-      <SectionHeading
-        title="Price integrity"
-        description="What a shopper is quoted must reconcile to what the dealership will charge. Three reads of the same number per vehicle: the price a person confirmed, the price the inventory feed carries, and the price the nightly crawl found on the website."
+    <div className="flex flex-col gap-6">
+      <MetricStrip
+        label="Price integrity summary"
+        metrics={[
+          { label: "Needs review", value: loading ? null : unresolved, hint: "Live discrepancy or open flag", tone: unresolved > 0 ? "danger" : "success", loading },
+          { label: "Website monitored", value: loading ? null : monitored, hint: "With a real price snapshot", loading },
+          { label: "Reconciled", value: loading ? null : matched, hint: "Website matches reference", tone: matched > 0 ? "success" : "neutral", loading },
+          { label: "Historical events", value: loading ? null : historicalEvents.toLocaleString(), hint: "Snapshots and document flags", loading },
+        ]}
       />
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <CountTile loading={loading}
-          label="Needs review"
-          value={unresolved}
-          tone={unresolved > 0 ? "critical" : "clear"}
-          means="Vehicles with an unresolved price problem right now: a live website discrepancy or an open document flag. This is the number a navigation badge may show."
-        />
-        <CountTile loading={loading}
-          label="Website monitored"
-          value={monitored}
-          means="Vehicles with at least one real website price snapshot on record. A seeded URL with no capture yet does not count."
-        />
-        <CountTile loading={loading}
-          label="Reconciled"
-          value={matched}
-          tone={matched > 0 ? "clear" : "neutral"}
-          means="Monitored vehicles where the website price matches the reference price, allowing for the doc fee."
-        />
-        <CountTile loading={loading}
-          label="Historical events"
-          value={historicalEvents.toLocaleString()}
-          means="Every price snapshot and document flag ever recorded across these vehicles. History, not a task list — it lives in each VIN's timeline."
-        />
-      </div>
-
-      <p className="text-[12px] leading-[18px] text-adm-muted">
-        Website monitoring is configured in Admin, under Price Integrity: seed your vehicle-detail-page URL
-        pattern once and the nightly crawl captures a snapshot per vehicle from then on.
-      </p>
 
       <Panel
         title="Price change review"
@@ -168,7 +82,7 @@ export const PriceIntegritySection = ({ rows, loading }: { rows: PriceRow[]; loa
                 <td className="px-4 py-3 text-[14px] leading-[20px] tabular-nums text-adm-ink">{r.historicalEvents}</td>
                 <td className="px-4 py-3 text-[12px] leading-[18px] text-adm-muted">{formatDateTime(r.lastCheckedAt)}</td>
                 <td className="px-4 py-3 text-right">
-                  <RowAction onClick={() => setOpenVin(r.vin)}>Review</RowAction>
+                  <Link to={priceReviewHref(r.vin)} className="font-semibold text-adm-primary hover:underline">Review</Link>
                 </td>
               </tr>
             ))}
@@ -249,7 +163,7 @@ export const PriceIntegritySection = ({ rows, loading }: { rows: PriceRow[]; loa
                         <ExternalLink className="h-3.5 w-3.5" /> Listing
                       </RowAction>
                     )}
-                    <RowAction onClick={() => setOpenVin(r.vin)}>Timeline</RowAction>
+                    <Link to={priceReviewHref(r.vin)} className="font-semibold text-adm-primary hover:underline">History</Link>
                   </div>
                 </td>
               </tr>
@@ -258,7 +172,6 @@ export const PriceIntegritySection = ({ rows, loading }: { rows: PriceRow[]; loa
         )}
       </Panel>
 
-      {selected && <VinTimeline row={selected} onClose={() => setOpenVin(null)} />}
     </div>
   );
 };

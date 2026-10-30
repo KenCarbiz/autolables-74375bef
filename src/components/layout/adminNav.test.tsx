@@ -153,7 +153,7 @@ describe("buildAdminNavSections — the rail's eight groups", () => {
       "/description-operations",
       "/queue",
       "/print-center",
-      "/admin?tab=invoices",
+      "/invoices",
       "/get-ready-command",
       "/service-desk",
       "/service",
@@ -199,7 +199,7 @@ describe("rail groups", () => {
     expect(groupHref(group(only("can_view_work_queue"), "vehicles")!)).toBe("/queue");
     expect(groupHref(group(only("can_assign_service_work"), "getready")!)).toBe("/service-desk");
     expect(groupHref(group(only("can_view_print_queue"), "merchandising")!)).toBe("/print-center");
-    expect(groupHref(group(only("can_manage_invoices"), "customers")!)).toBe("/admin?tab=invoices");
+    expect(groupHref(group(only("can_manage_invoices"), "customers")!)).toBe("/invoices");
   });
 
   it("hides a group with no permitted leaf", () => {

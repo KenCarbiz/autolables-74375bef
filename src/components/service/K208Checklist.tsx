@@ -54,18 +54,18 @@ export default function K208Checklist({ marks, onMark, onPassAll, onClearAll, fa
         </p>
         <div className="flex items-center gap-2">
           {answered > 0 && onClearAll && (
-            <button onClick={onClearAll} className="h-9 px-3 rounded-md border border-border text-xs font-semibold text-muted-foreground hover:bg-muted">Clear all</button>
+            <button onClick={onClearAll} className="h-10 px-3 rounded-[6px] border border-adm-border text-[14px] font-semibold text-adm-muted hover:bg-adm-workspace">Clear all</button>
           )}
           {/* One tap passes every line (the "Clear all" beside it is the undo). */}
-          <button onClick={onPassAll} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-emerald-700">
-            <CheckCheck className="w-3.5 h-3.5" /> {passAllLabel || "Mark all passed"}
+          <button onClick={onPassAll} className="h-10 px-3 rounded-[6px] border border-adm-border bg-adm-surface text-adm-primary text-[14px] font-semibold inline-flex items-center gap-1.5 hover:bg-adm-workspace">
+            <CheckCheck className="w-5 h-5" /> {passAllLabel || "Mark all passed"}
           </button>
         </div>
       </div>
 
       {K208_INSPECTION_CATEGORIES.map((cat) => (
-        <div key={cat.category} className="rounded-2xl border border-border bg-card overflow-hidden">
-          <div className="px-4 py-2.5 bg-muted/50 text-xs font-bold uppercase tracking-wider text-foreground">{cat.category}</div>
+        <div key={cat.category} className="rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
+          <div className="px-4 py-2.5 bg-adm-workspace text-[14px] leading-[20px] font-semibold text-adm-ink">{cat.category}</div>
           <div className="divide-y divide-border/60">
             {cat.items.map((item) => {
               const failed = marks[item.id] === "fail";
@@ -81,20 +81,20 @@ export default function K208Checklist({ marks, onMark, onPassAll, onClearAll, fa
                         const active = marks[item.id] === m;
                         const Icon = m === "pass" ? Check : X;
                         const on = m === "pass"
-                          ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-red-600 text-white border-red-600";
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-600"
+                          : "bg-red-50 text-red-800 border-red-600";
                         const off = m === "pass"
-                          ? "bg-background text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-                          : "bg-background text-red-700 border-red-300 hover:bg-red-50";
+                          ? "bg-adm-surface text-adm-muted border-adm-border hover:bg-adm-workspace"
+                          : "bg-adm-surface text-adm-muted border-adm-border hover:bg-adm-workspace";
                         return (
                           <button
                             key={m}
                             type="button"
                             aria-pressed={active}
                             onClick={() => onMark(item.id, active ? "" : m)}
-                            className={`h-11 w-[76px] rounded-md text-[12px] font-bold border inline-flex items-center justify-center gap-1 transition-colors ${active ? on : off}`}
+                            className={`h-10 w-[72px] rounded-[6px] text-[13px] font-semibold border inline-flex items-center justify-center gap-1 transition-colors ${active ? on : off}`}
                           >
-                            <Icon className="w-3.5 h-3.5" strokeWidth={3} /> {m === "pass" ? "Pass" : "Fail"}
+                            <Icon className="w-4 h-4" strokeWidth={2.5} /> {m === "pass" ? "Pass" : "Fail"}
                           </button>
                         );
                       })}
@@ -113,15 +113,15 @@ export default function K208Checklist({ marks, onMark, onPassAll, onClearAll, fa
       ))}
 
       {anyFail && !onItemNote && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 space-y-2">
-          <label className="text-xs font-bold text-red-800 uppercase tracking-wider">Explanation of defects or repairs needed</label>
+        <div className="rounded-[6px] border border-red-200 bg-red-50 p-4 space-y-2">
+          <label className="text-[14px] font-semibold text-red-800">Explanation of defects or repairs needed</label>
           <textarea value={failureNotes} onChange={(e) => onFailureNotes(e.target.value)} rows={3}
             className="w-full rounded-lg border border-red-200 bg-card p-3 text-sm" placeholder="Describe failures and corrective action taken before sale…" />
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-        <label className="text-xs font-bold text-foreground uppercase tracking-wider">Notes (optional)</label>
+      <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3">
+        <label className="text-[14px] font-semibold text-adm-ink">Notes (optional)</label>
         <textarea value={notes} onChange={(e) => onNotes(e.target.value)} rows={2} className="w-full rounded-lg border border-border bg-background p-3 text-sm" placeholder="Anything else to record…" />
       </div>
     </div>

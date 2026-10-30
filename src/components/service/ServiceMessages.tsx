@@ -148,15 +148,13 @@ export function ManagerMessagesRail({ tenantId, vehicles }: {
   // permanent empty panel beside the queue.
   if ((rows ?? []).length === 0 && !composing) {
     return (
-      <div className="rounded-2xl border border-adm-border bg-adm-surface p-3.5 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <MessageSquare className="w-4 h-4 text-adm-muted shrink-0" aria-hidden="true" />
-          <p className="text-xs text-adm-muted truncate">No manager messages</p>
-        </div>
+      <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+        <h2 className="text-[16px] leading-[22px] font-semibold text-adm-ink">Messages from Service Manager</h2>
+        <p className="mt-2 text-[14px] leading-[20px] text-adm-muted">No manager messages.</p>
         <button
           type="button"
           onClick={() => setComposing(true)}
-          className="h-9 px-3 rounded-lg border border-adm-border text-xs font-semibold text-adm-ink hover:bg-adm-workspace shrink-0"
+          className="mt-3 h-10 px-3 rounded-[6px] border border-adm-border text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace"
         >
           New message
         </button>
@@ -166,8 +164,7 @@ export function ManagerMessagesRail({ tenantId, vehicles }: {
 
   return (
     <CommandCard
-      title="Manager messages"
-      leading={<MessageSquare className="w-4 h-4 text-primary" aria-hidden="true" />}
+      title="Messages from Service Manager"
       action={
         <select
           value={filter}

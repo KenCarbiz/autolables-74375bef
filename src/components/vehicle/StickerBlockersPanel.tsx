@@ -58,7 +58,7 @@ export default function StickerBlockersPanel({
         return (
           <div
             key={`${b.code}-${b.affectedField ?? ""}`}
-            className={`rounded-[6px] border border-adm-border border-l-[3px] bg-adm-surface p-3.5 space-y-2.5 ${blocking ? "border-l-adm-danger" : "border-l-[#D98B00]"}`}
+            className="space-y-2.5 border-t border-adm-border pt-3 first:border-t-0 first:pt-0"
           >
             <div className="flex items-start gap-2">
               {blocking
@@ -66,7 +66,6 @@ export default function StickerBlockersPanel({
                 : <Info className="w-5 h-5 text-adm-warning shrink-0" />}
               <div className="min-w-0 flex-1">
                 <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{b.title}</p>
-                <p className="text-[10px] font-mono text-muted-foreground mt-0.5">{b.code}</p>
               </div>
               <span className={`text-[12px] leading-[18px] font-semibold px-2 py-[3px] rounded-[2px] whitespace-nowrap ${blocking ? "bg-adm-danger-bg text-adm-danger" : "bg-adm-warning-bg text-adm-warning"}`}>
                 {blocking ? "Blocks publishing" : "Review"}
@@ -85,7 +84,7 @@ export default function StickerBlockersPanel({
               )}
             </dl>
 
-            <div className="rounded-[4px] bg-adm-workspace p-2.5">
+            <div>
               <p className="text-[12px] leading-[18px] font-semibold text-adm-muted">Recommended resolution</p>
               <p className="text-[13px] leading-[18px] text-adm-ink mt-0.5">{b.recommendedResolution}</p>
             </div>
@@ -102,7 +101,7 @@ export default function StickerBlockersPanel({
                   type="button"
                   onClick={onRetrieveSourceData}
                   disabled={busy}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[12.5px] font-semibold disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-[6px] bg-adm-primary hover:bg-adm-primary-hover text-white text-[14px] font-semibold disabled:opacity-50"
                 >
                   Retrieve vehicle data <ArrowRight className="w-3.5 h-3.5" />
                 </button>
@@ -112,7 +111,7 @@ export default function StickerBlockersPanel({
                   type="button"
                   onClick={onRegenerate}
                   disabled={busy}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border bg-background text-[12.5px] font-semibold hover:bg-muted/40 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace disabled:opacity-50"
                 >
                   Regenerate after correcting <ArrowRight className="w-3.5 h-3.5" />
                 </button>

@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import { Settings } from "lucide-react";
-import { InlineNote, LocalTabs, PageBody, PageHeader, LinkButton } from "@/components/product";
-import NextStepBanner from "@/components/workflow/NextStepBanner";
+import { LocalTabs, PageBody, PageHeader, LinkButton } from "@/components/product";
 import ServiceQueue from "@/components/service/ServiceQueue";
 import { ManagerMessagesRail } from "@/components/service/ServiceMessages";
 import { CommandCapabilityProvider } from "@/components/command/CommandPrimitives";
@@ -39,7 +37,7 @@ export default function ServiceDesk() {
   const [storedView] = useState<DeskView>(() => {
     const stored = typeof localStorage !== "undefined" ? localStorage.getItem(viewKey) : null;
     if (stored === "my_work" || stored === "desk") return stored;
-    return canAssign ? "desk" : "my_work";
+    return "my_work";
   });
   // A URL view wins (reload, back and shared links); otherwise the remembered
   // per-person default applies.
@@ -48,7 +46,7 @@ export default function ServiceDesk() {
     try { localStorage.setItem(viewKey, v); } catch { /* private mode */ }
   };
   const [railVehicles, setRailVehicles] = useState<{ vin: string; ymm: string }[]>([]);
-  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [counts, setCounts] = useState<{ mine: number; desk: number } | null>(null);
 
   useEffect(() => {
     if (!tenantId) return;
@@ -63,62 +61,38 @@ export default function ServiceDesk() {
       setRailVehicles(((data as { vin: string | null; ymm: string | null }[]) || [])
         .filter((v) => v.vin)
         .map((v) => ({ vin: String(v.vin).toUpperCase(), ymm: v.ymm || "Vehicle" })));
-      // deno-lint-ignore no-explicit-any
-      const { count } = await (supabase as any).from("service_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .in("status", ["pending", "clarify"]);
-      setPendingApprovals(count ?? 0);
     })();
   }, [tenantId]);
 
   if (!tenantId) return null;
 
+  const today = new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+
   return (
     <CommandCapabilityProvider role={member?.role} isAdmin={isAdmin}>
       <PageBody width="wide">
         <PageHeader
-          title={view === "my_work" ? "My Service Work" : "Service Desk"}
-          description={view === "my_work"
-            ? "Your inspections and available vehicles, one action each."
-            : "Safety inspections, get-ready work, and K-208 execution."}
-          actions={canManageSettings ? (
-            <LinkButton to="/service/settings" aria-label="Service Desk settings — K-208 Policy">
-              <Settings className="h-4 w-4" aria-hidden="true" /> Settings
-            </LinkButton>
-          ) : undefined}
+          title="Service Desk"
+          meta={today}
+          actions={canManageSettings ? <LinkButton to="/service/settings" aria-label="Service Desk settings, K-208 Policy">Settings</LinkButton> : undefined}
         />
 
         <div onClick={(e) => { const a = (e.target as HTMLElement).closest("a[href*='view=']"); const m = a?.getAttribute("href")?.match(/view=(my_work|desk)/); if (m) rememberView(m[1] as DeskView); }}>
           <LocalTabs
             label="Service Desk views"
             tabs={[
-              { key: "my_work", label: "My Work", to: "/service?view=my_work", active: view === "my_work" },
-              { key: "desk", label: "Full Desk", to: "/service?view=desk", active: view === "desk" },
+              { key: "my_work", label: "My work", to: "/service?view=my_work", active: view === "my_work", count: counts?.mine ?? null },
+              { key: "desk", label: "Full desk", to: "/service?view=desk", active: view === "desk", count: counts?.desk ?? null },
             ]}
           />
         </div>
 
-        {view === "my_work" ? (
-          <ServiceQueue mode="my_work" />
-        ) : (
-          <>
-            <NextStepBanner stage="service" />
-            {pendingApprovals > 0 && (
-              <InlineNote
-                tone="warning"
-                title={`${pendingApprovals} additional-work ${pendingApprovals === 1 ? "request needs" : "requests need"} a manager decision`}
-                action={<LinkButton size="sm" to="/service/approvals">Review</LinkButton>}
-              />
-            )}
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
-              <ServiceQueue />
-              <div className="xl:sticky xl:top-4">
-                <ManagerMessagesRail tenantId={tenantId} vehicles={railVehicles} />
-              </div>
-            </div>
-          </>
-        )}
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+          <ServiceQueue key={view} mode={view} onCounts={setCounts} />
+          <div className="xl:sticky xl:top-4">
+            <ManagerMessagesRail tenantId={tenantId} vehicles={railVehicles} />
+          </div>
+        </div>
       </PageBody>
     </CommandCapabilityProvider>
   );

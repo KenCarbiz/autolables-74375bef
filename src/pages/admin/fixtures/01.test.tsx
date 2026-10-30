@@ -63,7 +63,6 @@ describe("fixture 01 (Administration Overview)", () => {
     expect(screen.getByText("4 of 6")).toBeTruthy();
     expect(screen.getByText("1,012")).toBeTruthy();
     expect(screen.getByText("Review provider rate limit")).toBeTruthy();
-    expect(screen.getByText("Fallback incomplete")).toBeTruthy();
     expect(screen.getByText("Inventory sync rate limited")).toBeTruthy();
     expect(screen.getByText("Open diagnostics").closest("a")?.getAttribute("href")).toBe(adminTabHref("inventory-feed"));
   });

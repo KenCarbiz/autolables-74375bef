@@ -726,7 +726,7 @@ export default function GetReadyCommand() {
     <>
       <Crumbs items={[{ label: "Get Ready Command", to: "/get-ready-command" }, { label: vehicle.ymm || "Vehicle" }]} />
       <PageHeader
-        title={authorized ? "Get Ready authorized" : "Review vehicle"}
+        title={authorized ? "Get Ready authorized" : "Review Vehicle"}
         description={authorized
           ? `Authorized${authorizedLabel ? ` ${authorizedLabel}` : ""}${authorizedByEmail ? ` by ${authorizedByEmail}` : ""}. The instruction snapshot is frozen and work orders cannot be re-sent from here.`
           : `Step ${data.currentStep} of ${STEPS.length}, ${stepTitle}. Review the work AutoLabels prepared, then authorize once.`}
@@ -766,10 +766,10 @@ export default function GetReadyCommand() {
           <div className="flex gap-1.5"><dt className="text-adm-muted">Delivery target</dt><dd className="text-adm-ink">{delivery || EM_DASH}</dd></div>
         </dl>
       </div>
-      <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:items-stretch">
-        <CommandAction className={COMPACT_ACTION} capability="can_view_inventory" href={`/vin-command/${vehicle.id}`}>VIN Command Center</CommandAction>
-        <CommandAction className={COMPACT_ACTION} capability="can_view_print_queue" href={`/print-center/${vehicle.id}`}>Print Center</CommandAction>
-        <CommandAction className={COMPACT_ACTION} capability="can_view_inventory" href={`/vehicle-file/${vehicle.id}`}>View vehicle details</CommandAction>
+      <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 sm:flex-col sm:items-end sm:gap-y-0">
+        <CommandAction variant="link" capability="can_view_inventory" href={`/vin-command/${vehicle.id}`}>VIN Command Center</CommandAction>
+        <CommandAction variant="link" capability="can_view_print_queue" href={`/print-center/${vehicle.id}`}>Print Center</CommandAction>
+        <CommandAction variant="link" capability="can_view_inventory" href={`/vehicle-file/${vehicle.id}`}>View vehicle details</CommandAction>
       </div>
     </section>
   );

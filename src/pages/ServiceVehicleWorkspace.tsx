@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveRecallView, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { LocalTabs, PageHeader } from "@/components/product";
-import { FactStrip } from "@/components/detail/parts";
+import { Crumbs, DetailLayout, FactStrip } from "@/components/detail/parts";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -339,17 +339,20 @@ export default function ServiceVehicleWorkspace() {
   return (
     <CommandCapabilityProvider role={role} isAdmin={isAdmin}>
       <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-4 pb-28 sm:px-6 sm:py-6 lg:pb-6">
+        <Crumbs items={[{ label: "Service Desk", to: "/service" }, { label: ymm }]} />
         <PageHeader
           title={ymm}
-          description={`VIN ${vin}${stock ? ` · Stock ${stock}` : ""}`}
+          description={`VIN ${vin}${stock ? ` · Stock ${stock}` : ""} · ${ws.label}${ws.blockerLabel ? ` · ${ws.blockerLabel}` : ""}`}
           actions={
             <>
-              <Link to="/service" className={BTN_SECONDARY}>
-                <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Service Desk
-              </Link>
-              <Link to={`/vehicle-file/${veh.id}`} className={BTN_SECONDARY}>
-                <FileText className="w-4 h-4" aria-hidden="true" /> Vehicle File
-              </Link>
+              <Link to={`/vehicle-file/${veh.id}`} className={BTN_SECONDARY}>Vehicle file</Link>
+              <button
+                type="button"
+                onClick={() => onPrimaryAction(ws.action.key)}
+                className={ws.key === "cleared" ? BTN_SECONDARY : BTN_PRIMARY}
+              >
+                {ws.action.label}
+              </button>
             </>
           }
         />
@@ -367,122 +370,117 @@ export default function ServiceVehicleWorkspace() {
           ]}
         />
 
-        <StatusBannerCard ws={ws} onAction={onPrimaryAction} />
-
-        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)_340px] gap-4 items-start">
-          {/* Left region: assignment + progress + vehicle utilities */}
-          <div className="space-y-4 order-2 xl:order-1">
-            <AssignmentCard
-              inspection={newestActive}
-              members={members}
-              canAssign={canAssign}
-              onAssigned={() => void load()}
-            />
-            <ProgressCard items={grItems} />
-            <ServiceQrCard tenantId={tenantId} vin={vin} />
-            <TitleMcoUpload tenantId={tenantId} veh={{ id: veh.id, vin }} />
-          </div>
-
-          {/* Center region: the work */}
-          <div className="space-y-4 order-1 xl:order-2">
-            <div id="k208" />
-            {newestAny?.status === "voided" && (
-              <CommandCallout tone="amber" Icon={AlertTriangle} title="A K-208 on this VIN was voided">
-                {newestSigned
-                  ? "The most recent inspection record was voided; the newest remaining signed inspection below is the standing record."
-                  : "The prior inspection record was voided. A new inspection is required — no signed K-208 stands for this vehicle."}
-              </CommandCallout>
-            )}
-            <div id="inspection">
-              <K208Panel
-                tenantId={tenantId}
-                veh={veh}
-                newestSigned={newestSigned}
-                newestActive={newestActive}
-                openFailureCount={openFailures.length}
-                ws={ws}
-                canConduct={canConduct}
-                canExecute={canExecute}
-                members={members}
-                passAllEnabled={settings.service_pass_all_enabled !== false}
-                failurePhotoRequired={settings.service_failure_photo_required === true}
-                signerUsers={settings.k208_authorized_users || []}
-                signerRoles={settings.k208_authority_roles || []}
-                onChanged={() => void load()}
-                logAudit={log}
-              />
-            </div>
-
-            {newestSigned && (
-              <VoidInspectionCard
-                tenantId={tenantId}
-                vin={vin}
-                inspection={newestSigned}
-                canVoid={canVoid}
-                onChanged={() => void load()}
-              />
-            )}
-
-            {(failures.length > 0 || isFailedInspection(newestSigned)) && (
-              <div id="failures">
-                <FailedItemsPanel
+        <DetailLayout
+          main={
+            <>
+              <div id="k208" />
+              {newestAny?.status === "voided" && (
+                <CommandCallout tone="amber" Icon={AlertTriangle} title="A K-208 on this VIN was voided">
+                  {newestSigned
+                    ? "The most recent inspection record was voided; the newest remaining signed inspection below is the standing record."
+                    : "The prior inspection record was voided. A new inspection is required, no signed K-208 stands for this vehicle."}
+                </CommandCallout>
+              )}
+              <div id="inspection">
+                <K208Panel
                   tenantId={tenantId}
-                  vin={vin}
+                  veh={veh}
                   newestSigned={newestSigned}
-                  failures={failures}
-                  members={members}
-                  canReinspect={canReinspect}
+                  newestActive={newestActive}
+                  openFailureCount={openFailures.length}
+                  ws={ws}
                   canConduct={canConduct}
+                  canExecute={canExecute}
+                  members={members}
+                  passAllEnabled={settings.service_pass_all_enabled !== false}
+                  failurePhotoRequired={settings.service_failure_photo_required === true}
+                  signerUsers={settings.k208_authorized_users || []}
+                  signerRoles={settings.k208_authority_roles || []}
                   onChanged={() => void load()}
                   logAudit={log}
                 />
               </div>
-            )}
 
-            <div id="approvals" className="space-y-3">
-              <CommandCard
-                title="Additional work"
-                subtitle="Structured request and decision. A chat message alone never authorizes work."
-                action={<RequestAdditionalWorkButton tenantId={tenantId} veh={{ id: veh.id, vin, ymm: veh.ymm }} onSubmitted={() => void load()} />}
-              >
-                <ServiceApprovalsPanel tenantId={tenantId} vin={vin} onDecided={() => void load()} />
-                {pendingRequests === 0 && (
-                  <p className="text-[11.5px] text-adm-muted py-2">No additional-work request is pending for this vehicle.</p>
-                )}
-              </CommandCard>
-            </div>
+              {newestSigned && (
+                <VoidInspectionCard
+                  tenantId={tenantId}
+                  vin={vin}
+                  inspection={newestSigned}
+                  canVoid={canVoid}
+                  onChanged={() => void load()}
+                />
+              )}
 
-            <WorkSections
-              tenantId={tenantId}
-              vin={vin}
-              gr={gr}
-              vehRecall={deriveRecallView(veh as RecallRowInput).vin.label}
-              canCompleteWork={canCompleteWork}
-              userLabel={user?.email?.split("@")[0] || "member"}
-              onChanged={() => void load()}
-              logAudit={log}
-            />
-          </div>
+              {(failures.length > 0 || isFailedInspection(newestSigned)) && (
+                <div id="failures">
+                  <FailedItemsPanel
+                    tenantId={tenantId}
+                    vin={vin}
+                    newestSigned={newestSigned}
+                    failures={failures}
+                    members={members}
+                    canReinspect={canReinspect}
+                    canConduct={canConduct}
+                    onChanged={() => void load()}
+                    logAudit={log}
+                  />
+                </div>
+              )}
 
-          {/* Right region: sticky summary + messages + timeline */}
-          <div className="space-y-4 order-3 xl:order-3 xl:sticky xl:top-4">
-            <div id="summary">
-              <SummaryCard newestSigned={newestSigned} openFailures={openFailures.length} clearance={clearance} items={grItems} />
-            </div>
-            <ServiceMessagesThread tenantId={tenantId} vin={vin} />
-            <CommandCard title="Vehicle timeline" subtitle="Audited events for this VIN, newest first.">
-              <TimelineRail
-                entries={auditRows.map((a) => ({
-                  at: formatCommandDateTime(a.created_at),
-                  title: a.action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-                  detail: a.details && (a.details.new_state || a.details.reason)
-                    ? [a.details.new_state, a.details.reason].filter(Boolean).join(" · ")
-                    : undefined,
-                }))}
+              <div id="approvals">
+                <CommandCard
+                  title="Additional work"
+                  subtitle="Structured request and decision. A chat message alone never authorizes work."
+                  action={<RequestAdditionalWorkButton tenantId={tenantId} veh={{ id: veh.id, vin, ymm: veh.ymm }} onSubmitted={() => void load()} />}
+                >
+                  <ServiceApprovalsPanel tenantId={tenantId} vin={vin} onDecided={() => void load()} />
+                  {pendingRequests === 0 && (
+                    <p className="text-[11.5px] text-adm-muted py-2">No additional-work request is pending for this vehicle.</p>
+                  )}
+                </CommandCard>
+              </div>
+
+              <WorkSections
+                tenantId={tenantId}
+                vin={vin}
+                gr={gr}
+                vehRecall={deriveRecallView(veh as RecallRowInput).vin.label}
+                canCompleteWork={canCompleteWork}
+                userLabel={user?.email?.split("@")[0] || "member"}
+                onChanged={() => void load()}
+                logAudit={log}
               />
-            </CommandCard>
-          </div>
-        </div>
+            </>
+          }
+          aside={
+            <>
+              <div id="summary">
+                <SummaryCard newestSigned={newestSigned} openFailures={openFailures.length} clearance={clearance} items={grItems} />
+              </div>
+              <AssignmentCard
+                inspection={newestActive}
+                members={members}
+                canAssign={canAssign}
+                onAssigned={() => void load()}
+              />
+              <ProgressCard items={grItems} />
+              <ServiceMessagesThread tenantId={tenantId} vin={vin} />
+              <CommandCard title="Vehicle timeline" subtitle="Audited events for this VIN, newest first.">
+                <TimelineRail
+                  entries={auditRows.map((a) => ({
+                    at: formatCommandDateTime(a.created_at),
+                    title: a.action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+                    detail: a.details && (a.details.new_state || a.details.reason)
+                      ? [a.details.new_state, a.details.reason].filter(Boolean).join(" · ")
+                      : undefined,
+                  }))}
+                />
+              </CommandCard>
+              <ServiceQrCard tenantId={tenantId} vin={vin} />
+              <TitleMcoUpload tenantId={tenantId} veh={{ id: veh.id, vin }} />
+            </>
+          }
+        />
 
         {/* Sticky mobile primary action: exactly ONE action is valid at a time */}
         {singleActionSticky && (

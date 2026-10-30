@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Download, Mail, Phone, RefreshCw, Search, UserRound } from "lucide-react";
+import { MoreHorizontal, Mail, Phone, Search, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import Seo from "@/components/Seo";
@@ -11,14 +11,14 @@ import {
   type CustomerBucket,
   type CustomerEntry,
 } from "@/components/customers/customerBook";
-import { Button, InlineNote, LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
+import { Button, InlineNote, LocalTabs, MetricStrip, PageBody, PageHeader, Td, Th, WorkTable, type LocalTab } from "@/components/product";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCustomerBook } from "@/components/customers/useCustomerBook";
 import {
   Chip,
   EmptyBlock,
   EngagementCell,
   NextActionCell,
-  TimeCell,
   VehicleCell,
 } from "@/components/customers/CustomerUi";
 
@@ -49,6 +49,8 @@ const matches = (c: CustomerEntry, needle: string) => {
   return hay.includes(needle);
 };
 
+const lastIntent = (c: CustomerEntry): string | null => c.engagement.facts[0]?.label ?? null;
+
 const Customers = () => {
   const navigate = useNavigate();
   const { book, loading, error, refetch } = useCustomerBook();
@@ -63,9 +65,17 @@ const Customers = () => {
     setSearchParams(n, { replace: true });
   };
   const [busyLead, setBusyLead] = useState<string | null>(null);
+  const [intent, setIntent] = useState("all");
 
   const needle = q.trim().toLowerCase();
-  const searched = useMemo(() => book.customers.filter((c) => matches(c, needle)), [book.customers, needle]);
+  const intents = useMemo(
+    () => Array.from(new Set(book.customers.map(lastIntent).filter((v): v is string => !!v))).sort(),
+    [book.customers],
+  );
+  const searched = useMemo(
+    () => book.customers.filter((c) => matches(c, needle) && (intent === "all" || lastIntent(c) === intent)),
+    [book.customers, needle, intent],
+  );
   const tabs = useMemo(
     () => TAB_ORDER.map((key) => ({ key, label: BUCKET_LABEL[key], count: searched.filter((c) => c.bucket === key).length })),
     [searched],
@@ -124,19 +134,8 @@ const Customers = () => {
 
       <PageHeader
         title="Customers"
-        description={loading && !book.customers.length
-          ? "Everyone working a vehicle right now: people who gave you their details, and shoppers who have not yet."
-          : `Everyone working a vehicle right now: people who gave you their details, and shoppers who have not yet. ${identified} identified · ${anonymous} anonymous with a real intent action · ${book.passiveVisitors} view-only sessions not listed.`}
-        actions={
-          <>
-            <Button onClick={refetch}>
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
-            </Button>
-            <Button onClick={exportCsv} disabled={!rows.length}>
-              <Download className="h-4 w-4" aria-hidden="true" /> Export
-            </Button>
-          </>
-        }
+        description={loading && !book.customers.length ? undefined : `${book.passiveVisitors} view-only sessions are not listed.`}
+        actions={<Button onClick={exportCsv} disabled={!rows.length}>Export</Button>}
       />
 
       {error && (
@@ -149,88 +148,97 @@ const Customers = () => {
         label="Customer stages"
         tabs={tabs.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/customers?stage=${t.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`, count: loading && !book.customers.length ? null : t.count, active: t.key === tab }))}
       />
-      <label className="relative block max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name, email, phone, VIN, stock"
-          aria-label="Search customers"
-          className="h-10 w-full rounded-md border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink placeholder:text-adm-muted focus:outline-none focus:ring-2 focus:ring-adm-primary"
-        />
-      </label>
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
+        <div className="min-w-0 flex-1">
+          <MetricStrip
+            label="Customer totals"
+            metrics={[
+              { label: BUCKET_LABEL[tab], value: loading && !book.customers.length ? null : rows.length, tone: "danger" },
+              { label: "Total active", value: loading && !book.customers.length ? null : searched.length },
+              { label: "Identified", value: loading && !book.customers.length ? null : identified, tone: "info" },
+              { label: "Anonymous", value: loading && !book.customers.length ? null : anonymous },
+            ]}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={intent}
+            onChange={(e) => setIntent(e.target.value)}
+            aria-label="Filter by intent type"
+            className="h-10 rounded-[6px] border border-adm-border bg-adm-surface px-2 text-[14px] text-adm-ink"
+          >
+            <option value="all">All intent types</option>
+            {intents.map((i) => <option key={i} value={i}>{i}</option>)}
+          </select>
+          <label className="relative block w-56">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search customers..."
+              aria-label="Search customers"
+              className="h-10 w-full rounded-[6px] border border-adm-border bg-adm-surface pl-10 pr-3 text-[14px] text-adm-ink placeholder:text-adm-muted focus:outline-none focus:ring-2 focus:ring-adm-primary"
+            />
+          </label>
+        </div>
+      </div>
 
       {loading && !book.customers.length ? (
         <div role="status" aria-label="Loading" className="rounded-[6px] border border-adm-border bg-adm-surface px-5 py-12 text-center">
           <p className="text-[14px] text-adm-muted">Loading customers...</p>
         </div>
       ) : rows.length === 0 && error && !book.customers.length ? null : rows.length === 0 ? (
-        <EmptyBlock title={`No customers in ${BUCKET_LABEL[tab]}`} body={needle ? "No customer matches that search in this tab." : BUCKET_EMPTY_COPY[tab]} />
+        <EmptyBlock title={`No customers in ${BUCKET_LABEL[tab]}`} body={needle || intent !== "all" ? "No customer matches that filter in this tab." : BUCKET_EMPTY_COPY[tab]} />
       ) : (
         <>
-          <div className="hidden lg:block bg-adm-surface rounded-2xl border border-adm-border shadow-premium overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1180px] text-left">
-                <thead className="bg-adm-workspace">
-                  <tr className="text-[12px] leading-[18px] uppercase tracking-wider text-adm-muted">
-                    <th className="font-semibold px-5 py-2.5">Customer</th>
-                    <th className="font-semibold py-2.5">Vehicle</th>
-                    <th className="font-semibold py-2.5">Engagement</th>
-                    <th className="font-semibold py-2.5">Return status</th>
-                    <th className="font-semibold py-2.5">Assigned employee</th>
-                    <th className="font-semibold py-2.5">Last activity</th>
-                    <th className="font-semibold py-2.5 pr-5">Next action</th>
+          <div className="hidden lg:block overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface">
+            <WorkTable caption="Customers" className="[&_th]:px-2 [&_td]:px-2 [&_td]:py-2.5">
+              <thead>
+                <tr>
+                  <Th>Type</Th>
+                  <Th>Customer</Th>
+                  <Th>Contact</Th>
+                  <Th>Vehicle</Th>
+                  <Th>Owner</Th>
+                  <Th>Last intent</Th>
+                  <Th>Next action</Th>
+                  <Th align="right">Updated</Th>
+                  <Th><span className="sr-only">More</span></Th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((c) => (
+                  <tr
+                    key={c.id}
+                    onClick={() => navigate(`/customers/${encodeURIComponent(c.id)}`)}
+                    className="cursor-pointer hover:bg-adm-workspace"
+                  >
+                    <Td className="whitespace-nowrap"><Chip tone={c.identified ? "good" : "neutral"}>{c.identified ? "Identified" : "Anonymous"}</Chip></Td>
+                    <Td className="max-w-[160px]">
+                      <Link
+                        to={`/customers/${encodeURIComponent(c.id)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="block truncate text-[14px] font-semibold text-adm-primary hover:underline"
+                      >
+                        {c.identified ? c.name || c.email || "Unnamed customer" : "Online shopper"}
+                      </Link>
+                    </Td>
+                    <Td className="max-w-[170px]"><span className="block truncate text-adm-muted">{c.identified ? c.email || c.phone || "Not captured" : "Not captured"}</span></Td>
+                    <Td className="max-w-[170px]"><span className="block truncate">{c.vehicles[0]?.label ?? "None attached"}</span></Td>
+                    <Td className="max-w-[110px]"><span className="block truncate">{c.assignedEmployee?.name ?? <span className="text-adm-muted">Unassigned</span>}</span></Td>
+                    <Td className="max-w-[140px]"><span className="block truncate">{lastIntent(c) ?? <span className="text-adm-muted">None linked</span>}</span></Td>
+                    <Td className="max-w-[150px]"><span className="block truncate text-[14px] font-semibold text-adm-primary">{c.nextAction.headline}</span></Td>
+                    <Td align="right" className="whitespace-nowrap text-adm-muted">{relativeTime(c.lastActivityAt)}</Td>
+                    <Td align="right" className="w-10" >
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <RowMenu customer={c} busyLead={busyLead} onMarkContacted={markContacted} />
+                      </span>
+                    </Td>
                   </tr>
-                </thead>
-                <tbody>
-                  {rows.map((c) => (
-                    <tr
-                      key={c.id}
-                      onClick={() => navigate(`/customers/${encodeURIComponent(c.id)}`)}
-                      className="border-t border-adm-border align-top cursor-pointer hover:bg-adm-workspace transition-colors"
-                    >
-                      <td className="px-5 py-3.5 w-[15%]">
-                        <CustomerIdentity customer={c} />
-                      </td>
-                      <td className="py-3.5 w-[15%] pr-4">
-                        {c.vehicles[0] ? (
-                          <VehicleCell label={c.vehicles[0].label} stock={c.vehicles[0].stock} vin={c.vehicles[0].vin} slug={c.vehicles[0].slug} />
-                        ) : (
-                          <span className="text-[12px] leading-[18px] text-adm-muted">No vehicle attached</span>
-                        )}
-                        {c.vehicles.length > 1 && (
-                          <p className="text-[12px] leading-[18px] text-adm-muted mt-1">+{c.vehicles.length - 1} more</p>
-                        )}
-                      </td>
-                      <td className="py-3.5 w-[20%] pr-4">
-                        <EngagementCell engagement={c.engagement} />
-                      </td>
-                      <td className="py-3.5 w-[12%] pr-4">
-                        <p className="text-[14px] leading-[20px] text-adm-ink">{c.returnStatus.label}</p>
-                        <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{c.returnStatus.detail}</p>
-                      </td>
-                      <td className="py-3.5 w-[10%] pr-4">
-                        {c.assignedEmployee ? (
-                          <>
-                            <p className="text-[14px] leading-[20px] text-adm-ink">{c.assignedEmployee.name}</p>
-                            <p className="text-[12px] leading-[18px] text-adm-muted">{c.assignedEmployee.source}</p>
-                          </>
-                        ) : (
-                          <span className="text-[12px] leading-[18px] text-adm-muted">Unassigned</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 w-[8%] pr-4">
-                        <TimeCell at={c.lastActivityAt} />
-                      </td>
-                      <td className="py-3.5 pr-5 w-[20%]">
-                        <NextActionCell action={c.nextAction} />
-                        <RowActions customer={c} busyLead={busyLead} onMarkContacted={markContacted} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </WorkTable>
           </div>
 
           <div className="lg:hidden space-y-3">
@@ -290,6 +298,35 @@ const CustomerIdentity = ({ customer }: { customer: CustomerEntry }) => (
     )}
   </div>
 );
+
+const RowMenu = ({
+  customer,
+  busyLead,
+  onMarkContacted,
+}: {
+  customer: CustomerEntry;
+  busyLead: string | null;
+  onMarkContacted: (c: CustomerEntry) => void;
+}) => {
+  const tel = telHref(customer.phone);
+  const lead = customer.leads.find((l) => !l.first_response_at) || customer.leads[0] || null;
+  const showMark = !!lead && lead.status !== "contacted" && lead.status !== "converted";
+  const vehicle = customer.vehicles[0];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger aria-label="More actions" className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
+        <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {tel && <DropdownMenuItem asChild><a href={tel}>Call</a></DropdownMenuItem>}
+        {customer.email && <DropdownMenuItem asChild><a href={`mailto:${customer.email}`}>Email</a></DropdownMenuItem>}
+        {vehicle?.slug && <DropdownMenuItem asChild><Link to={`/v/${vehicle.slug}`}>Open passport</Link></DropdownMenuItem>}
+        {vehicle?.listingId && <DropdownMenuItem asChild><Link to={`/vehicle-file/${vehicle.listingId}`}>Open vehicle file</Link></DropdownMenuItem>}
+        {showMark && <DropdownMenuItem disabled={busyLead === lead?.id} onSelect={() => onMarkContacted(customer)}>Mark contacted</DropdownMenuItem>}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
 
 const RowActions = ({
   customer,

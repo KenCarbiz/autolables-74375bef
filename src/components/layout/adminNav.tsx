@@ -313,7 +313,7 @@ export function buildAdminNavSections({ badges, anyAdminTab, role }: BuildNavOpt
         // Billing paperwork is the deal's paperwork, so it sits with the deals,
         // and only for the roles that hold it. Same feature switch as the Admin
         // V2 invoices tab, or the row would open the fallback tab while lit.
-        { label: "Invoices", assetIcon: "106AC", path: "/admin?tab=invoices", icon: ScrollText, capability: "can_manage_invoices", featureKey: "feature_invoicing" },
+        { label: "Invoices", assetIcon: "106AC", path: "/invoices", icon: ScrollText, capability: "can_manage_invoices", featureKey: "feature_invoicing", match: (p, s) => underSegment("/invoices")(p) || (p === "/admin" && s === "?tab=invoices") },
       ],
     },
     {

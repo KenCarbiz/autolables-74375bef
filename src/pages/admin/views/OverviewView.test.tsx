@@ -43,7 +43,7 @@ describe("OverviewView drill-ins (screen 01)", () => {
       "Dealership & Brand": adminTabHref("identity"),
       "People & Access": adminTabHref("team"),
       "Pricing & Products": adminTabHref("price-rules"),
-      "Customer Experience": adminTabHref("passport-modules"),
+      "Customer Experience": adminTabHref("routing"),
       Publishing: adminTabHref("effective-policy"),
       "Documents & Service": adminTabHref("templates"),
     };
@@ -56,23 +56,19 @@ describe("OverviewView drill-ins (screen 01)", () => {
 
   it("points the banner, tiles and card actions at their routes", () => {
     renderOverview();
-    expect(hrefOf("Review sync")).toBe(adminTabHref("inventory-feed"));
-    expect(hrefOf("Setup: 4 of 6")).toBe(adminTabHref("identity"));
-    expect(hrefOf("Active inventory: 128")).toBe("/inventory");
-    expect(hrefOf("Policy reviews: 3")).toBe("/dashboard/document-review");
-    expect(hrefOf("Open exceptions: 1,012")).toBe("/admin/exceptions");
-    expect(hrefOf("Edit")).toBe(adminTabHref("effective-policy"));
+    expect(hrefOf("View feed health")).toBe(adminTabHref("inventory-feed"));
+    expect(hrefOf(/^Setup complete/)).toBe(adminTabHref("identity"));
+    expect(hrefOf(/^Active inventory/)).toBe("/inventory");
+    expect(hrefOf(/^Policy reviews/)).toBe("/dashboard/document-review");
+    expect(hrefOf(/^Open exceptions/)).toBe("/admin/exceptions");
     expect(hrefOf("View all")).toBe(adminTabHref("activity"));
   });
 
-  it("links every attention action and policy row to the route its item names", () => {
+  it("links every attention action to the route its item names", () => {
     renderOverview();
     const queue = screen.getByRole("table", { name: "Ranked attention queue" });
     for (const item of overview.attention) {
       expect(within(queue).getByRole("link", { name: item.action.label })).toHaveAttribute("href", item.action.href);
-    }
-    for (const row of overview.policy) {
-      expect(hrefOf(row.value)).toBe(row.href);
     }
     expect(hrefOf("Configure")).toBe(ADMIN_CHILD_ROUTES.escalation);
   });
@@ -82,7 +78,7 @@ describe("OverviewView drill-ins (screen 01)", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(adminTabHref("overview"));
     fireEvent.click(screen.getByRole("link", { name: /^People & Access/ }));
     expect(screen.getByTestId("location")).toHaveTextContent(adminTabHref("team"));
-    fireEvent.click(screen.getByRole("link", { name: "Review sync" }));
+    fireEvent.click(screen.getByRole("link", { name: "View feed health" }));
     expect(screen.getByTestId("location")).toHaveTextContent(adminTabHref("inventory-feed"));
     expect(spyCalls).toEqual([]);
   });

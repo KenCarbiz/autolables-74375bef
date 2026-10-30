@@ -23,6 +23,7 @@ import {
   Search, QrCode, ChevronRight, CircleDot, Circle, Wrench, ArrowUp, ArrowDown, Minus, FileText, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MetricStrip, StatusText, Th, Td, WorkTable, type Tone } from "@/components/product";
 
 // ──────────────────────────────────────────────────────────────
 // Service Desk queue — "Vehicles Requiring Service Action" (desktop comp).
@@ -108,25 +109,25 @@ const TABS: { key: string; label: string }[] = [
   { key: "done", label: "Completed" },
 ];
 
-const GR_CHIP: Record<Row["grState"], { label: string; cls: string; Icon: typeof Circle }> = {
-  not_started: { label: "Not started", cls: "text-adm-muted", Icon: Circle },
-  in_progress: { label: "In progress", cls: "text-adm-primary", Icon: CircleDot },
-  complete: { label: "Work complete", cls: "text-adm-success", Icon: CheckCircle2 },
-  failed: { label: "Failed items", cls: "text-adm-danger", Icon: XCircle },
+const GR_CHIP: Record<Row["grState"], { label: string; cls: string; tone: Tone; Icon: typeof Circle }> = {
+  not_started: { label: "Not started", cls: "text-adm-muted", tone: "neutral", Icon: Circle },
+  in_progress: { label: "In progress", cls: "text-adm-primary", tone: "info", Icon: CircleDot },
+  complete: { label: "Work complete", cls: "text-adm-success", tone: "success", Icon: CheckCircle2 },
+  failed: { label: "Failed items", cls: "text-adm-danger", tone: "danger", Icon: XCircle },
 };
-const K208_CHIP: Record<Row["k208State"], { label: string; cls: string; Icon: typeof Circle }> = {
-  waiting: { label: "Waiting", cls: "text-adm-muted", Icon: Clock },
-  ready: { label: "Ready to certify", cls: "text-adm-primary", Icon: Clock },
-  blocked: { label: "Blocked", cls: "text-adm-danger", Icon: AlertTriangle },
-  executed: { label: "Executed", cls: "text-adm-success", Icon: CheckCircle2 },
+const K208_CHIP: Record<Row["k208State"], { label: string; cls: string; tone: Tone; Icon: typeof Circle }> = {
+  waiting: { label: "Waiting", cls: "text-adm-muted", tone: "neutral", Icon: Clock },
+  ready: { label: "Ready to certify", cls: "text-adm-primary", tone: "info", Icon: Clock },
+  blocked: { label: "Blocked", cls: "text-adm-danger", tone: "danger", Icon: AlertTriangle },
+  executed: { label: "Executed", cls: "text-adm-success", tone: "success", Icon: CheckCircle2 },
   // "superseded" is deliberately unbuilt: nothing in this repo writes it yet.
-  voided: { label: "Voided", cls: "text-adm-muted", Icon: XCircle },
+  voided: { label: "Voided", cls: "text-adm-muted", tone: "neutral", Icon: XCircle },
 };
 
 const PRIORITY_ICON = { High: ArrowUp, Medium: Minus, Low: ArrowDown } as const;
 const PRIORITY_CLS = { High: "text-adm-danger", Medium: "text-adm-warning", Low: "text-adm-muted" } as const;
 
-export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "desk" }) {
+export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_work" | "desk"; onCounts?: (c: { mine: number; desk: number }) => void }) {
   const { tenant } = useTenant();
   const { user, isAdmin } = useAuth();
   const { member } = useEntitlements();
@@ -405,271 +406,199 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
     });
   }, [rows, tab, q, techFilter, urgencyFilter]);
 
+  useEffect(() => {
+    if (!onCounts || loading) return;
+    const live = (r: Row) => !r.cleared && r.k208State !== "executed";
+    const mine = rows.filter((r) => (live(r) && r.assignedTo === uid && r.k208State !== "voided") || (r.assignedTo === uid && r.k208State === "voided") || (live(r) && !r.assignedTo && r.k208State === "waiting")).length;
+    onCounts({ mine, desk: rows.filter(live).length });
+  }, [rows, uid, loading, onCounts]);
+
   if (loading) return <div className="space-y-4"><LoadingCard rows={2} /><LoadingCard rows={6} /></div>;
   if (loadError) {
     return <ErrorCard message="We could not load the Service Desk. Your existing inspection work has not been changed." detail={loadError} onRetry={() => void load()} />;
   }
 
-  // My Service Work: the technician's default. Five queues, tablet-sized
-  // cards, one context-aware action each — never the 300-row backlog.
-  if (mode === "my_work") {
-    const active = (r: Row) => !r.cleared && r.k208State !== "executed";
-    const term = q.trim().toLowerCase();
-    const match = (r: Row) => !term || `${r.ymm} ${r.vin} ${r.stock}`.toLowerCase().includes(term);
-    const inLoop = (r: Row) => r.requestStatus != null;
-    const inProgressMine = rows.filter((r) => match(r) && active(r) && !inLoop(r) && r.assignedTo === uid && r.inspectionState === "in_progress");
-    const assignedMine = rows.filter((r) => match(r) && active(r) && !inLoop(r) && r.assignedTo === uid && r.k208State !== "voided" && r.inspectionState !== "in_progress");
-    const returnedMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.k208State === "voided");
-    const unassigned = rows.filter((r) => match(r) && active(r) && !r.assignedTo && r.k208State === "waiting");
-    const doneTodayMine = rows.filter((r) => match(r) && r.completedToday && r.assignedTo === uid);
-    const waitingManagerMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.requestStatus === "pending");
-    const clarifyMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.requestStatus === "clarify");
-    const authorizedMine = rows.filter((r) => match(r) && !r.cleared && r.assignedTo === uid && r.requestStatus === "approved");
-    const sections: { title: string; hint: string; items: Row[] }[] = [
-      { title: "Assigned to me", hint: "Vehicles waiting on you to start", items: assignedMine },
-      { title: "In progress", hint: "Inspections you have started", items: inProgressMine },
-      { title: "Waiting for manager", hint: "Your authorization requests awaiting a decision", items: waitingManagerMine },
-      { title: "Authorized work", hint: "Approved repairs to complete and verify", items: authorizedMine },
-      { title: "Returned for clarification", hint: "The manager needs more information from you", items: clarifyMine },
-      { title: "Returned to me", hint: "Voided inspections that must be corrected", items: returnedMine },
-      { title: "Unassigned & available", hint: "No technician yet — first to start takes it", items: unassigned },
-      { title: "Completed today", hint: "Certified today", items: doneTodayMine },
-    ];
-    const total = sections.reduce((n, s) => n + s.items.length, 0);
-    return (
-      <div className="space-y-5">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 text-adm-muted absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN or stock #"
-              aria-label="Search VIN or stock number"
-              className="w-full h-11 pl-9 pr-3 rounded-lg border border-adm-border bg-adm-surface text-sm" />
-          </div>
-          <button onClick={openScan} className="h-11 px-4 rounded-lg border border-adm-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-adm-workspace">
-            <QrCode className="w-4 h-4" aria-hidden="true" /> Scan Service QR
-          </button>
-        </div>
-        {total === 0 ? (
-          <div className="rounded-2xl border border-adm-border bg-adm-surface p-6">
-            <EmptyState Icon={CheckCircle2} title="No work in your queues"
-              detail="Nothing is assigned to you and no unassigned vehicles are waiting. Scan a Service QR or switch to the full desk." />
-          </div>
-        ) : sections.map((s) => s.items.length > 0 && (
-          <section key={s.title} aria-label={s.title}>
-            <div className="flex items-baseline gap-2 mb-2.5">
-              <h2 className="text-body font-bold text-adm-ink">{s.title}</h2>
-              <span className="text-xs font-semibold text-adm-muted">{s.items.length}</span>
-              <span className="text-[11px] text-adm-muted hidden sm:inline">· {s.hint}</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {s.items.map((r) => (
-                <MobileVehicleCard key={r.id} r={r} onOpen={() => setDrawer(r)} onPrimary={() => openWorkspace(r)} />
-              ))}
+  const active = (r: Row) => !r.cleared && r.k208State !== "executed";
+  const term = q.trim().toLowerCase();
+  const match = (r: Row) => !term || `${r.ymm} ${r.vin} ${r.stock}`.toLowerCase().includes(term);
+  const inLoop = (r: Row) => r.requestStatus != null;
+  const inProgressMine = rows.filter((r) => match(r) && active(r) && !inLoop(r) && r.assignedTo === uid && r.inspectionState === "in_progress");
+  const assignedMine = rows.filter((r) => match(r) && active(r) && !inLoop(r) && r.assignedTo === uid && r.k208State !== "voided" && r.inspectionState !== "in_progress");
+  const returnedMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.k208State === "voided");
+  const unassigned = rows.filter((r) => match(r) && active(r) && !r.assignedTo && r.k208State === "waiting");
+  const doneTodayMine = rows.filter((r) => match(r) && r.completedToday && r.assignedTo === uid);
+  const waitingManagerMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.requestStatus === "pending");
+  const clarifyMine = rows.filter((r) => match(r) && r.assignedTo === uid && r.requestStatus === "clarify");
+  const authorizedMine = rows.filter((r) => match(r) && !r.cleared && r.assignedTo === uid && r.requestStatus === "approved");
+  const sections: { title: string; hint: string; items: Row[] }[] = [
+    { title: "Assigned to me", hint: "Vehicles waiting on you to start", items: assignedMine },
+    { title: "In progress", hint: "Inspections you have started", items: inProgressMine },
+    { title: "Waiting for manager", hint: "Your authorization requests awaiting a decision", items: waitingManagerMine },
+    { title: "Authorized work", hint: "Approved repairs to complete and verify", items: authorizedMine },
+    { title: "Returned for clarification", hint: "The manager needs more information from you", items: clarifyMine },
+    { title: "Returned to me", hint: "Voided inspections that must be corrected", items: returnedMine },
+    { title: "Unassigned & available", hint: "No technician yet, first to start takes it", items: unassigned },
+    { title: "Completed today", hint: "Certified today", items: doneTodayMine },
+  ];
+  const myWorkRows = Array.from(new Map(sections.filter((x) => x.title !== "Completed today").flatMap((x) => x.items).map((r) => [r.id, r])).values());
+  const myTotal = sections.reduce((n, x) => n + x.items.length, 0);
+  const tableRows = mode === "my_work" ? myWorkRows : visible;
+  const dueToday = tableRows.filter((r) => isToday(r.deliveryTarget)).length;
+  const overdueCount = tableRows.filter((r) => r.overdue).length;
+  const awaitingCount = tableRows.filter((r) => r.awaiting || r.requestStatus === "pending").length;
+
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative min-w-[220px] flex-1">
+        <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN or stock #"
+          aria-label="Search VIN or stock number"
+          className="h-10 w-full rounded-[6px] border border-adm-border bg-adm-surface pl-10 pr-3 text-[14px]" />
+      </div>
+      {mode === "desk" && (
+        <>
+          <select value={tab} onChange={(e) => setTab(e.target.value)} aria-label="Filter by status"
+            className="h-10 rounded-[6px] border border-adm-border bg-adm-surface px-2 text-[14px]">
+            {TABS.map((f) => <option key={f.key} value={f.key}>{f.key === "all" ? "Status: all" : f.label}</option>)}
+          </select>
+          <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} aria-label="Filter by technician"
+            className="h-10 rounded-[6px] border border-adm-border bg-adm-surface px-2 text-[14px]">
+            <option value="any">Technician: any</option>
+            <option value="unassigned">Unassigned</option>
+            {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+          <select value={urgencyFilter} onChange={(e) => setUrgencyFilter(e.target.value)} aria-label="Filter by delivery urgency"
+            className="h-10 rounded-[6px] border border-adm-border bg-adm-surface px-2 text-[14px]">
+            <option value="any">Delivery: any</option>
+            <option value="today">Delivery today</option>
+            <option value="scheduled">Delivery scheduled</option>
+            <option value="unscheduled">No delivery scheduled</option>
+          </select>
+        </>
+      )}
+      <button onClick={openScan} className="inline-flex h-10 items-center gap-2 rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px] font-semibold hover:bg-adm-workspace">
+        <QrCode className="h-5 w-5" aria-hidden="true" /> Scan Service QR
+      </button>
+    </div>
+  );
+
+  const strip = mode === "my_work" ? (
+    <MetricStrip label="My work" metrics={[
+      { label: "My assigned", value: assignedMine.length + inProgressMine.length, tone: "info" },
+      { label: "Due today", value: dueToday },
+      { label: "Overdue", value: overdueCount, tone: overdueCount > 0 ? "danger" : "neutral" },
+      { label: "Awaiting approval", value: awaitingCount, tone: awaitingCount > 0 ? "warning" : "neutral" },
+    ]} />
+  ) : (
+    <MetricStrip label="Service desk totals" metrics={[
+      { label: "Pending work", value: stats.pending, tone: "info", hint: stats.pendingSub },
+      { label: "Awaiting certification", value: stats.ready, tone: "success", hint: stats.readySub },
+      { label: "Blocked / exceptions", value: stats.blocked, tone: stats.blocked > 0 ? "danger" : "neutral", hint: stats.blockedSub },
+      { label: "Completed today", value: stats.doneToday, hint: stats.doneSub },
+    ]} />
+  );
+
+  const mobileCards = (list: Row[]) => (
+    <div className="space-y-3 lg:hidden">
+      {mode === "my_work" ? (
+        sections.map((x) => x.items.length > 0 && (
+          <section key={x.title} aria-label={x.title}>
+            <h2 className="mb-2 text-[14px] font-semibold text-adm-ink">{x.title} <span className="text-adm-muted">({x.items.length})</span></h2>
+            <div className="space-y-3">
+              {x.items.map((r) => <MobileVehicleCard key={r.id} r={r} onOpen={() => setDrawer(r)} onPrimary={() => openWorkspace(r)} />)}
             </div>
           </section>
-        ))}
-        {drawer && (
-          <RowDrawer r={drawer} members={members} canAssign={canAssign} onAssigned={() => void load()}
-            onClose={() => setDrawer(null)} onOpenWorkspace={() => { openWorkspace(drawer); setDrawer(null); }} />
-        )}
-      </div>
-    );
-  }
+        ))
+      ) : (
+        list.map((r) => <MobileVehicleCard key={r.id} r={r} onOpen={() => setDrawer(r)} onPrimary={() => openWorkspace(r)} />)
+      )}
+    </div>
+  );
+
+  const emptyDetail = mode === "my_work"
+    ? "Nothing is assigned to you and no unassigned vehicles are waiting. Scan a Service QR or switch to the full desk."
+    : "No vehicles in this view. Change the filters, scan a Service QR, or search a VIN.";
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-adm-muted absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN or stock #"
-            aria-label="Search VIN or stock number"
-            className="w-full h-11 pl-9 pr-3 rounded-lg border border-adm-border bg-adm-surface text-sm" />
-        </div>
-        <button onClick={openScan} className="h-11 px-4 rounded-lg border border-adm-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-adm-workspace">
-          <QrCode className="w-4 h-4" aria-hidden="true" /> Scan Service QR
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <CommandStatCard label="Pending work" value={stats.pending} sub={stats.pendingSub} Icon={ClipboardList} tone="blue" onClick={() => setTab("pending")} />
-        <CommandStatCard label="Awaiting certification" value={stats.ready} sub={stats.readySub} Icon={ShieldCheck} tone="emerald" onClick={() => setTab("ready_to_sign")} />
-        <CommandStatCard label="Blocked / exceptions" value={stats.blocked} sub={stats.blockedSub} Icon={AlertTriangle} tone="red" onClick={() => setTab("failed")} />
-        <CommandStatCard label="Completed today" value={stats.doneToday} sub={stats.doneSub} Icon={CheckCircle2} tone="slate" onClick={() => setTab("done")} />
-      </div>
-
-      {attention.length > 0 && (
-        <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-adm-muted mb-3">Needs attention</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {attention.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 rounded-xl border border-adm-border p-3">
-                <VehThumb r={r} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-adm-ink truncate">{r.ymm}</p>
-                  <p className="text-xs font-semibold text-adm-danger">{r.priority.label}</p>
-                </div>
-                <button onClick={() => openWorkspace(r)} className="min-h-[44px] px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold shrink-0">
-                  {r.next.label}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Mobile (<lg): stacked vehicle cards under a sticky filter row —
-          never the squeezed 1020px table. */}
-      <div className="lg:hidden">
-        <div className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-adm-surface/95 backdrop-blur border-b border-adm-border space-y-2">
-          <div className="flex items-center gap-1.5 overflow-x-auto" aria-label="Queue status filters">
-            {TABS.map((f) => (
-              <button key={f.key} onClick={() => setTab(f.key)} aria-pressed={tab === f.key}
-                className={cn("h-11 px-3.5 rounded-md text-xs font-semibold whitespace-nowrap shrink-0",
-                  tab === f.key ? "bg-primary text-primary-foreground" : "text-adm-muted bg-adm-workspace")}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} aria-label="Filter by technician"
-              className="h-11 min-w-0 flex-1 rounded-lg border border-adm-border bg-adm-surface px-2 text-xs">
-              <option value="any">Technician: any</option>
-              <option value="unassigned">Unassigned</option>
-              {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-            </select>
-            <select value={urgencyFilter} onChange={(e) => setUrgencyFilter(e.target.value)} aria-label="Filter by delivery urgency"
-              className="h-11 min-w-0 flex-1 rounded-lg border border-adm-border bg-adm-surface px-2 text-xs">
-              <option value="any">Delivery: any</option>
-              <option value="today">Delivery today</option>
-              <option value="scheduled">Delivery scheduled</option>
-              <option value="unscheduled">No delivery scheduled</option>
-            </select>
-          </div>
-        </div>
-        <div className="mt-3 space-y-3">
-          {visible.map((r) => (
-            <MobileVehicleCard key={r.id} r={r} onOpen={() => setDrawer(r)} onPrimary={() => openWorkspace(r)} />
-          ))}
-          {visible.length === 0 && (
-            <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
-              <EmptyState Icon={CheckCircle2} title="All caught up"
-                detail="No vehicles in this view. Change the filters, scan a Service QR, or search a VIN." />
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="hidden lg:block rounded-2xl border border-adm-border bg-adm-surface overflow-hidden">
-        <div className="px-4 pt-4 flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="text-body font-bold text-adm-ink">Vehicles requiring service action</h2>
-          <div className="flex items-center gap-2 flex-wrap">
-            <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} aria-label="Filter by technician"
-              className="h-11 rounded-lg border border-adm-border bg-adm-surface px-2 text-xs">
-              <option value="any">Technician: any</option>
-              <option value="unassigned">Unassigned</option>
-              {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-            </select>
-            <select value={urgencyFilter} onChange={(e) => setUrgencyFilter(e.target.value)} aria-label="Filter by delivery urgency"
-              className="h-11 rounded-lg border border-adm-border bg-adm-surface px-2 text-xs">
-              <option value="any">Delivery: any</option>
-              <option value="today">Delivery today</option>
-              <option value="scheduled">Delivery scheduled</option>
-              <option value="unscheduled">No delivery scheduled</option>
-            </select>
-          </div>
-        </div>
-        <div className="px-4 pt-3 flex items-center gap-1.5 overflow-x-auto">
-          {TABS.map((f) => (
-            <button key={f.key} onClick={() => setTab(f.key)} aria-pressed={tab === f.key}
-              className={cn("h-11 px-3 rounded-md text-xs font-semibold whitespace-nowrap",
-                tab === f.key ? "bg-primary text-primary-foreground" : "text-adm-muted hover:bg-adm-workspace")}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="mt-3 overflow-auto max-h-[600px]">
-          <table className="w-full text-sm min-w-[1020px]">
-            <thead>
-              <tr className="text-[12px] leading-[18px] uppercase tracking-wide text-adm-muted border-b border-adm-border">
-                {["Priority", "Vehicle", "Stock / VIN", "Age (since intake)", "Assigned to", "Get Ready", "K-208", "Delivery"].map((h) => (
-                  <th key={h} className="text-left font-semibold px-4 py-2.5 sticky top-0 bg-adm-surface z-10">{h}</th>
-                ))}
-                <th className="text-right font-semibold px-4 py-2.5 sticky top-0 bg-adm-surface z-10">Next action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {visible.map((r) => {
-                const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
-                const P = PRIORITY_ICON[r.priority.level];
-                // Never role="button" on the tr: nesting the real action
-                // buttons inside an interactive row destroys table semantics.
-                // The vehicle-name button is the accessible opener; the row's
-                // onClick is a mouse convenience only.
-                return (
-                  <tr
-                    key={r.id}
-                    className="hover:bg-adm-workspace cursor-pointer"
-                    onClick={() => setDrawer(r)}
-                  >
-                    <td className="px-4 py-2.5">
-                      <span className={cn("inline-flex items-center gap-1 text-xs font-bold", PRIORITY_CLS[r.priority.level])}>
-                        <P className="w-3.5 h-3.5" aria-hidden="true" /> {r.priority.level}
+    <div className="space-y-4">
+      {strip}
+      {toolbar}
+      {mobileCards(tableRows)}
+      <div className="hidden lg:block overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface">
+        <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption={mode === "my_work" ? "My service work" : "Vehicles requiring service action"}>
+          <thead>
+            <tr>
+              {mode === "my_work" ? <Th>Due</Th> : <Th>Priority</Th>}
+              <Th>Status</Th>
+              <Th>Vehicle</Th>
+              <Th>{mode === "my_work" ? "Task" : "Age"}</Th>
+              {mode === "desk" && <Th>Assigned to</Th>}
+              {mode === "desk" && <Th>K-208</Th>}
+              <Th align="right">Next action</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.map((r) => {
+              const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
+              const P = PRIORITY_ICON[r.priority.level];
+              return (
+                <tr key={r.id} className="cursor-pointer hover:bg-adm-workspace" onClick={() => setDrawer(r)}>
+                  <Td className="whitespace-nowrap">
+                    {mode === "my_work" ? (
+                      <span className={cn("text-[14px]", r.overdue ? "font-semibold text-adm-danger" : "text-adm-muted")}>
+                        {r.deliveryTarget ? formatCommandDateTime(r.deliveryTarget) : r.overdue ? "Overdue" : "No date"}
                       </span>
-                      <p className="text-[10.5px] text-adm-muted">{r.priority.label}</p>
-                    </td>
-                    <td className="px-4 py-2.5"><div className="flex items-center gap-2.5 min-w-0"><VehThumb r={r} /><div className="min-w-0">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setDrawer(r); }}
-                        aria-label={`Open service preview for ${r.ymm}`}
-                        className="block max-w-full font-semibold text-adm-ink truncate text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
-                      >
-                        {r.ymm}
-                      </button>
-                      <p className="text-[11px] text-adm-muted">{r.condition}{r.trim ? ` · ${r.trim}` : ""}</p>
-                    </div></div></td>
-                    <td className="px-4 py-2.5"><p className="font-mono text-[12px] text-adm-ink">{r.stock || "—"}</p><p className="font-mono text-[11px] text-adm-muted">…{r.vin.slice(-6)}</p></td>
-                    <td className="px-4 py-2.5">
-                      <span className={cn("text-xs font-semibold tabular-nums", r.overdue ? "text-adm-danger" : "text-adm-ink")}>{ageDisplay(r)}</span>
-                      {r.overdue && <p className="text-[10px] text-adm-muted">{ageLabel(r.ageHours)} since intake</p>}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {r.assignedName ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-adm-ink">
-                          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary grid place-items-center text-[10px] font-black">{r.assignedName.slice(0, 2).toUpperCase()}</span>
-                          {r.assignedName}
-                        </span>
-                      ) : <span className="text-xs text-adm-muted">Unassigned</span>}
-                    </td>
-                    <td className="px-4 py-2.5">{r.awaiting
-                      ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-adm-warning"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> Awaiting approval</span>
-                      : <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", G.cls)}><G.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {G.label}{r.openFailures > 0 ? ` (${r.openFailures})` : ""}</span>}</td>
-                    <td className="px-4 py-2.5"><span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", K.cls)}><K.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {K.label}</span></td>
-                    <td className="px-4 py-2.5">
-                      <span className={cn("text-xs font-medium", r.delivery === "Delivery blocked" ? "text-adm-danger" : r.delivery === "Cleared" ? "text-adm-success" : "text-adm-muted")}>{r.delivery}</span>
-                      {r.deliveryTarget && <p className="text-[10px] text-adm-muted">{formatCommandDateTime(r.deliveryTarget)}</p>}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button onClick={(e) => { e.stopPropagation(); openWorkspace(r); }}
-                        className={cn("min-h-[40px] px-3 rounded-lg text-xs font-semibold inline-flex items-center gap-1",
-                          r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-adm-border text-adm-ink hover:bg-adm-workspace" : "bg-primary text-primary-foreground")}>
-                        {r.next.tone === "ghost" ? null : <Wrench className="w-3.5 h-3.5" aria-hidden="true" />} {r.next.label} <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {visible.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-6">
-                  <EmptyState Icon={CheckCircle2} title="All caught up"
-                    detail="No vehicles in this view. Change the filters, scan a Service QR, or search a VIN." />
-                </td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    ) : (
+                      <span className={cn("inline-flex items-center gap-1 text-[14px] font-semibold", PRIORITY_CLS[r.priority.level])}>
+                        <P className="h-5 w-5" aria-hidden="true" /> {r.priority.level}
+                      </span>
+                    )}
+                  </Td>
+                  <Td className="whitespace-nowrap">
+                    {r.awaiting
+                      ? <StatusText tone="warning">Awaiting approval</StatusText>
+                      : <StatusText tone={G.tone}>{G.label}{r.openFailures > 0 ? ` (${r.openFailures})` : ""}</StatusText>}
+                  </Td>
+                  <Td className="max-w-[170px]">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDrawer(r); }}
+                      aria-label={`Open service preview for ${r.ymm}`}
+                      className="block max-w-full truncate text-left text-[14px] font-semibold text-adm-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                    >
+                      {r.ymm}
+                    </button>
+                    <p className="truncate text-[12px] leading-[16px] text-adm-muted">{r.stock ? `Stock ${r.stock}` : "No stock number"} · {r.vin.slice(-6)}</p>
+                  </Td>
+                  <Td className={cn("whitespace-nowrap", mode === "my_work" && "max-w-[120px] truncate")}>
+                    {mode === "my_work"
+                      ? <span className="block truncate">{r.nextTask}</span>
+                      : <span className={cn("tabular-nums", r.overdue ? "font-semibold text-adm-danger" : "text-adm-ink")}>{ageDisplay(r)}</span>}
+                  </Td>
+                  {mode === "desk" && (
+                    <Td className="whitespace-nowrap">{r.assignedName ?? <span className="text-adm-muted">Unassigned</span>}</Td>
+                  )}
+                  {mode === "desk" && <Td className="whitespace-nowrap"><StatusText tone={K.tone}>{K.label}</StatusText></Td>}
+                  <Td align="right" className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); openWorkspace(r); }}
+                      className={cn("text-[14px] font-semibold hover:underline", r.next.tone === "danger" ? "text-adm-danger" : "text-adm-primary")}
+                    >
+                      {r.next.label}
+                    </button>
+                  </Td>
+                </tr>
+              );
+            })}
+            {tableRows.length === 0 && (
+              <tr><td colSpan={7} className="px-4 py-6">
+                <EmptyState Icon={CheckCircle2} title={mode === "my_work" && myTotal === 0 ? "No work in your queues" : "All caught up"} detail={emptyDetail} />
+              </td></tr>
+            )}
+          </tbody>
+        </WorkTable>
       </div>
-
       {drawer && (
         <RowDrawer r={drawer} members={members} canAssign={canAssign} onAssigned={() => void load()}
           onClose={() => setDrawer(null)} onOpenWorkspace={() => { openWorkspace(drawer); setDrawer(null); }} />

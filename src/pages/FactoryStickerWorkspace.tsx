@@ -427,6 +427,7 @@ export default function FactoryStickerWorkspace({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [pageIdx, setPageIdx] = useState(0);
+  const [rightTab, setRightTab] = useState<"details" | "technical">("details");
   const [showHistory, setShowHistory] = useState(false);
   const [scenario, setScenario] = useState<keyof typeof FIXTURE_SCENARIOS>("used");
   const [zoom, setZoom] = useState<"fit" | number>("fit");
@@ -720,18 +721,57 @@ export default function FactoryStickerWorkspace({
             {data ? ` ${data.identity.year} ${data.identity.make} ${data.identity.model}${data.identity.trim ? ` ${data.identity.trim}` : ""}` : ""}
             {currentDoc ? `, v${currentDoc.version}` : ""}
           </>}
+          meta={genStatus ? (
+            <span className="inline-flex items-center gap-2">
+              <Badge tone={GEN_STATUS_TONE[genStatus] || "off"}>{humanize(genStatus)}</Badge>
+              {currentDoc ? <span>{`v${currentDoc.version}`}</span> : null}
+            </span>
+          ) : undefined}
           actions={
-            <>
-              {genStatus && <Badge tone={GEN_STATUS_TONE[genStatus] || "off"}>{humanize(genStatus)}</Badge>}
-              {!fixture && !embedded && vehicle && (
-                <Link
-                  to={`/vehicle-file/${vehicle.id}`}
-                  className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-md border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace"
-                >
-                  <ArrowLeft className="w-5 h-5" /> Vehicle File
-                </Link>
-              )}
-            </>
+            !fixture ? (
+              <>
+                {!embedded && vehicle && (
+                  <Link
+                    to={`/vehicle-file/${vehicle.id}`}
+                    className="inline-flex items-center min-h-[40px] px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace"
+                  >
+                    Vehicle file
+                  </Link>
+                )}
+                {pdfUrl && (
+                  <a
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center min-h-[40px] px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace"
+                  >
+                    Preview PDF
+                  </a>
+                )}
+                {manager && genStatus !== "PUBLISHED" && (
+                  <button
+                    type="button"
+                    onClick={() => act("approve_publish")}
+                    disabled={!!busy || !currentDoc}
+                    className="inline-flex items-center gap-2 min-h-[40px] px-4 rounded-[6px] bg-adm-primary hover:bg-adm-primary-hover text-white text-[14px] font-semibold disabled:opacity-50"
+                  >
+                    {busy === "approve_publish" ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                    Review publication
+                  </button>
+                )}
+                {manager && genStatus === "PUBLISHED" && (
+                  <button
+                    type="button"
+                    onClick={() => act("unpublish")}
+                    disabled={!!busy}
+                    className="inline-flex items-center gap-2 min-h-[40px] px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace disabled:opacity-50"
+                  >
+                    {busy === "unpublish" ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                    Unpublish
+                  </button>
+                )}
+              </>
+            ) : undefined
           }
         />
 
@@ -742,10 +782,6 @@ export default function FactoryStickerWorkspace({
             ? "fixed inset-0 z-50 bg-slate-900/95 p-6 overflow-auto"
             : "rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3"}>
             <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
-              <p className={`text-[11px] ${fullscreen ? "text-slate-300" : "text-muted-foreground"}`}>
-                Landscape Letter (11 × 8.5 in) · renderer v{record?.renderer_version || "1.0.0"} — the identical
-                layout model the PDF is produced from. Page edge = trim boundary.
-              </p>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {([
                   ["Fit", "fit"],
@@ -895,6 +931,162 @@ export default function FactoryStickerWorkspace({
               </div>
             </div>
 
+            {(record?.review_reason || record?.last_error || data?.generic) && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-1.5">
+                <h2 className="text-[14px] leading-[20px] font-semibold text-amber-800">Data warnings</h2>
+                {data?.generic && (
+                  <p className="text-[11px] text-amber-800">
+                    Generic decode — this is a typical factory configuration for the trim, not a VIN-exact build. The
+                    document labels itself accordingly.
+                  </p>
+                )}
+                {record?.review_reason && <p className="text-[11px] text-amber-800">Review: {record.review_reason}</p>}
+                {record?.last_error && <p className="text-[11px] text-rose-700">Last error: {record.last_error}</p>}
+              </div>
+            )}
+          </div>
+
+          </div>
+
+          {/* RIGHT — validation and publication */}
+          <div className="space-y-4">
+          <div className="rounded-[6px] border border-adm-border bg-adm-surface">
+            <div role="tablist" aria-label="Build record sections" className="flex gap-6 border-b border-adm-border px-4">
+              {([["details", "Details"], ["technical", "Technical data"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={rightTab === key}
+                  onClick={() => setRightTab(key)}
+                  className={`-mb-px min-h-[44px] border-b-2 text-[14px] ${rightTab === key ? "border-adm-primary font-semibold text-adm-primary" : "border-transparent font-medium text-adm-muted hover:text-adm-ink"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-4 p-4 [&>div]:rounded-none [&>div]:border-0 [&>div]:p-0 [&>div]:bg-transparent">
+            {rightTab === "details" ? (
+              <>
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Source & classification</h2>
+              <StatusRow
+                label="Classification"
+                value={fixture ? "Benchmark fixture" : record?.source_classification ? humanize(record.source_classification) : "Not run"}
+              />
+              <StatusRow
+                label="Verification"
+                tone={record?.verification_status === "AUTO_VERIFIED" || record?.verification_status === "DEALER_VERIFIED"
+                  ? "pass" : record?.verification_status === "UNVERIFIED_GENERIC" ? "warn"
+                  : record?.verification_status ? "info" : fixture ? "info" : "off"}
+                value={fixture ? "Fixture" : record?.verification_status ? humanize(record.verification_status) : "Not run"}
+              />
+            </div>
+
+            {!fixture && (
+              <StickerBlockersPanel
+                blockers={blockers}
+                role={entitlements.member?.role}
+                isPlatformAdmin={isAdmin}
+                busy={!!busy}
+                onRegenerate={() => act(record ? "regenerate" : "orchestrate")}
+                onRetrieveSourceData={() => act("orchestrate", { allowSourceFetch: true })}
+              />
+            )}
+
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">MSRP reconciliation</h2>
+              {pricing ? (
+                <>
+                  <StatusRow label="Base MSRP" value={fmtMoney(pricing.baseMsrp)} />
+                  <StatusRow label="Packages (priced)" value={fmtMoney(packagesTotal)} />
+                  <StatusRow label="Options (priced)" value={fmtMoney(optionsOnlyTotal)} />
+                  <StatusRow label="Factory options total" value={fmtMoney(pricing.optionsTotal)} />
+                  <StatusRow label="Destination charge" value={fmtMoney(pricing.destinationCharge)} />
+                  <StatusRow label="Calculated total" value={fmtMoney(calculated)} />
+                  <StatusRow label="Provider-reported total" value={fmtMoney(pricing.totalMsrp)} />
+                  <StatusRow
+                    label="Difference"
+                    tone={difference == null ? "off" : Math.abs(difference) <= 5 ? "pass" : Math.abs(difference) <= 100 ? "warn" : "fail"}
+                    value={difference == null ? "Insufficient data" : fmtMoney(Math.abs(difference))}
+                  />
+                  {!fixture && (
+                    <StatusRow
+                      label="Stored verdict"
+                      tone={record?.reconciliation_status === "MATCHED" ? "pass"
+                        : record?.reconciliation_status === "MINOR_VARIATION" ? "warn"
+                        : record?.reconciliation_status === "REVIEW_REQUIRED" ? "fail"
+                        : "off"}
+                      value={record?.reconciliation_status ? humanize(record.reconciliation_status) : "Not run"}
+                    />
+                  )}
+                </>
+              ) : (
+                <p className="text-[11px] text-muted-foreground py-1">No normalized pricing yet — reconciliation has not run.</p>
+              )}
+            </div>
+
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-2.5">
+              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Publication</h2>
+              <StatusRow
+                label="Eligibility"
+                tone={fixture ? "info" : eligible && publishBlockers.length === 0 ? "pass" : "warn"}
+                value={fixture ? "Fixture — n/a" : publishBlockers.length > 0 ? "Blocked" : eligible ? "Eligible" : "Not ready"}
+              />
+              {publishBlockers.length > 0 && (
+                <ul className="text-[11px] text-amber-700 list-disc pl-4 space-y-0.5">
+                  {publishBlockers.map((b) => <li key={b}>{b}</li>)}
+                </ul>
+              )}
+              <StatusRow label="Version" value={currentDoc ? `v${currentDoc.version}` : "—"} />
+              <StatusRow
+                label="Document status"
+                tone={currentDoc?.document_status === "published" ? "pass" : currentDoc ? "info" : "off"}
+                value={currentDoc ? humanize(currentDoc.document_status) : "No document"}
+              />
+              {record?.reviewed_at && <StatusRow label="Reviewed" value={fmtDate(record.reviewed_at)} />}
+              {record?.approved_at && <StatusRow label="Approved" value={fmtDate(record.approved_at)} />}
+              {record?.published_at && <StatusRow label="Published" value={fmtDate(record.published_at)} />}
+
+              {!fixture && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 text-[14px] font-semibold text-adm-primary">
+                  {manager && (
+                    <button type="button" onClick={() => act(record ? "regenerate" : "orchestrate")} disabled={!!busy} className="hover:underline disabled:opacity-50">
+                      {busy === "regenerate" || busy === "orchestrate" ? "Working…" : "Regenerate"}
+                    </button>
+                  )}
+                  {pdfUrl && <a href={pdfUrl} download target="_blank" rel="noreferrer" className="hover:underline">Download PDF</a>}
+                  <button type="button" onClick={() => setShowHistory((s) => !s)} className="hover:underline">Versions ({docs.length})</button>
+                  {record?.passport_slug && <a href={`/v/${record.passport_slug}`} target="_blank" rel="noreferrer" className="hover:underline">View on Passport</a>}
+                </div>
+              )}
+
+              {showHistory && docs.length > 0 && (
+                <div className="pt-1 space-y-1">
+                  {docs.map((d) => (
+                    <div key={d.id} className="flex items-center justify-between gap-2 text-[11px] py-1 border-b border-border/60 last:border-0">
+                      <span className="font-semibold text-foreground">v{d.version}</span>
+                      <span className="text-muted-foreground">{humanize(d.document_status)}</span>
+                      <span className="text-muted-foreground">{fmtDate(d.created_at)}</span>
+                      {d.pdf_url || d.online_url ? (
+                        <button
+                          type="button"
+                          onClick={() => openFiledVersion(d)}
+                          disabled={openingDoc === d.id}
+                          className="text-blue-600 hover:underline disabled:opacity-50"
+                        >
+                          {openingDoc === d.id ? "Opening…" : "PDF"}
+                        </button>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+              </>
+            ) : (
+              <>
             <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
               <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Data sources</h2>
               <StatusRow
@@ -935,51 +1127,6 @@ export default function FactoryStickerWorkspace({
               />
             </div>
 
-            {(record?.review_reason || record?.last_error || data?.generic) && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-1.5">
-                <h2 className="text-[14px] leading-[20px] font-semibold text-amber-800">Data warnings</h2>
-                {data?.generic && (
-                  <p className="text-[11px] text-amber-800">
-                    Generic decode — this is a typical factory configuration for the trim, not a VIN-exact build. The
-                    document labels itself accordingly.
-                  </p>
-                )}
-                {record?.review_reason && <p className="text-[11px] text-amber-800">Review: {record.review_reason}</p>}
-                {record?.last_error && <p className="text-[11px] text-rose-700">Last error: {record.last_error}</p>}
-              </div>
-            )}
-          </div>
-
-          </div>
-
-          {/* RIGHT — validation and publication */}
-          <div className="space-y-4">
-            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
-              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Source & classification</h2>
-              <StatusRow
-                label="Classification"
-                value={fixture ? "Benchmark fixture" : record?.source_classification ? humanize(record.source_classification) : "Not run"}
-              />
-              <StatusRow
-                label="Verification"
-                tone={record?.verification_status === "AUTO_VERIFIED" || record?.verification_status === "DEALER_VERIFIED"
-                  ? "pass" : record?.verification_status === "UNVERIFIED_GENERIC" ? "warn"
-                  : record?.verification_status ? "info" : fixture ? "info" : "off"}
-                value={fixture ? "Fixture" : record?.verification_status ? humanize(record.verification_status) : "Not run"}
-              />
-            </div>
-
-            {!fixture && (
-              <StickerBlockersPanel
-                blockers={blockers}
-                role={entitlements.member?.role}
-                isPlatformAdmin={isAdmin}
-                busy={!!busy}
-                onRegenerate={() => act(record ? "regenerate" : "orchestrate")}
-                onRetrieveSourceData={() => act("orchestrate", { allowSourceFetch: true })}
-              />
-            )}
-
             {!fixture && vehicle?.tenant_id && vehicleId && record && (
               <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
                 <TemplateOverrideControl
@@ -990,38 +1137,6 @@ export default function FactoryStickerWorkspace({
                 />
               </div>
             )}
-
-            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
-              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">MSRP reconciliation</h2>
-              {pricing ? (
-                <>
-                  <StatusRow label="Base MSRP" value={fmtMoney(pricing.baseMsrp)} />
-                  <StatusRow label="Packages (priced)" value={fmtMoney(packagesTotal)} />
-                  <StatusRow label="Options (priced)" value={fmtMoney(optionsOnlyTotal)} />
-                  <StatusRow label="Factory options total" value={fmtMoney(pricing.optionsTotal)} />
-                  <StatusRow label="Destination charge" value={fmtMoney(pricing.destinationCharge)} />
-                  <StatusRow label="Calculated total" value={fmtMoney(calculated)} />
-                  <StatusRow label="Provider-reported total" value={fmtMoney(pricing.totalMsrp)} />
-                  <StatusRow
-                    label="Difference"
-                    tone={difference == null ? "off" : Math.abs(difference) <= 5 ? "pass" : Math.abs(difference) <= 100 ? "warn" : "fail"}
-                    value={difference == null ? "Insufficient data" : fmtMoney(Math.abs(difference))}
-                  />
-                  {!fixture && (
-                    <StatusRow
-                      label="Stored verdict"
-                      tone={record?.reconciliation_status === "MATCHED" ? "pass"
-                        : record?.reconciliation_status === "MINOR_VARIATION" ? "warn"
-                        : record?.reconciliation_status === "REVIEW_REQUIRED" ? "fail"
-                        : "off"}
-                      value={record?.reconciliation_status ? humanize(record.reconciliation_status) : "Not run"}
-                    />
-                  )}
-                </>
-              ) : (
-                <p className="text-[11px] text-muted-foreground py-1">No normalized pricing yet — reconciliation has not run.</p>
-              )}
-            </div>
 
             <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
               <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Identity & QA</h2>
@@ -1058,130 +1173,10 @@ export default function FactoryStickerWorkspace({
               )}
             </div>
 
-            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-2.5">
-              <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Publication</h2>
-              <StatusRow
-                label="Eligibility"
-                tone={fixture ? "info" : eligible && publishBlockers.length === 0 ? "pass" : "warn"}
-                value={fixture ? "Fixture — n/a" : publishBlockers.length > 0 ? "Blocked" : eligible ? "Eligible" : "Not ready"}
-              />
-              {publishBlockers.length > 0 && (
-                <ul className="text-[11px] text-amber-700 list-disc pl-4 space-y-0.5">
-                  {publishBlockers.map((b) => <li key={b}>{b}</li>)}
-                </ul>
-              )}
-              <StatusRow label="Version" value={currentDoc ? `v${currentDoc.version}` : "—"} />
-              <StatusRow
-                label="Document status"
-                tone={currentDoc?.document_status === "published" ? "pass" : currentDoc ? "info" : "off"}
-                value={currentDoc ? humanize(currentDoc.document_status) : "No document"}
-              />
-              {record?.reviewed_at && <StatusRow label="Reviewed" value={fmtDate(record.reviewed_at)} />}
-              {record?.approved_at && <StatusRow label="Approved" value={fmtDate(record.approved_at)} />}
-              {record?.published_at && <StatusRow label="Published" value={fmtDate(record.published_at)} />}
-
-              {!fixture && (
-                <div className="grid grid-cols-2 gap-2 pt-1.5">
-                  {manager && genStatus !== "PUBLISHED" && (
-                    <button
-                      type="button"
-                      onClick={() => act("approve_publish")}
-                      disabled={!!busy || !currentDoc}
-                      className="col-span-2 inline-flex items-center justify-center gap-1.5 h-9 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-50"
-                    >
-                      {busy === "approve_publish" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                      Approve & Publish
-                    </button>
-                  )}
-                  {manager && genStatus === "PUBLISHED" && (
-                    <button
-                      type="button"
-                      onClick={() => act("unpublish")}
-                      disabled={!!busy}
-                      className="col-span-2 inline-flex items-center justify-center gap-1.5 h-9 rounded-md border border-border text-xs font-bold hover:bg-muted/40 disabled:opacity-50"
-                    >
-                      {busy === "unpublish" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
-                      Unpublish
-                    </button>
-                  )}
-                  {manager && (
-                    <button
-                      type="button"
-                      onClick={() => act(record ? "regenerate" : "orchestrate")}
-                      disabled={!!busy}
-                      className="inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-border text-xs font-semibold hover:bg-muted/40 disabled:opacity-50"
-                    >
-                      {busy === "regenerate" || busy === "orchestrate" ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                      Regenerate
-                    </button>
-                  )}
-                  {pdfUrl ? (
-                    <a
-                      href={pdfUrl}
-                      download
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-border text-xs font-semibold hover:bg-muted/40"
-                    >
-                      <Download className="w-3 h-3" /> Download PDF
-                    </a>
-                  ) : (
-                    <span className="inline-flex items-center justify-center h-8 rounded-md border border-dashed border-border text-[11px] text-muted-foreground">
-                      {currentDoc ? "Preparing PDF…" : "No PDF yet"}
-                    </span>
-                  )}
-                  {pdfUrl && (
-                    <a
-                      href={pdfUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-border text-xs font-semibold hover:bg-muted/40"
-                    >
-                      <Printer className="w-3 h-3" /> Print
-                    </a>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowHistory((s) => !s)}
-                    className="inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-border text-xs font-semibold hover:bg-muted/40"
-                  >
-                    <History className="w-3 h-3" /> Versions ({docs.length})
-                  </button>
-                  {record?.passport_slug && (
-                    <a
-                      href={`/v/${record.passport_slug}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="col-span-2 inline-flex items-center justify-center gap-1.5 h-8 rounded-md border border-border text-xs font-semibold hover:bg-muted/40"
-                    >
-                      <ExternalLink className="w-3 h-3" /> View on Passport
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {showHistory && docs.length > 0 && (
-                <div className="pt-1 space-y-1">
-                  {docs.map((d) => (
-                    <div key={d.id} className="flex items-center justify-between gap-2 text-[11px] py-1 border-b border-border/60 last:border-0">
-                      <span className="font-semibold text-foreground">v{d.version}</span>
-                      <span className="text-muted-foreground">{humanize(d.document_status)}</span>
-                      <span className="text-muted-foreground">{fmtDate(d.created_at)}</span>
-                      {d.pdf_url || d.online_url ? (
-                        <button
-                          type="button"
-                          onClick={() => openFiledVersion(d)}
-                          disabled={openingDoc === d.id}
-                          className="text-blue-600 hover:underline disabled:opacity-50"
-                        >
-                          {openingDoc === d.id ? "Opening…" : "PDF"}
-                        </button>
-                      ) : <span className="text-muted-foreground">—</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
+              </>
+            )}
             </div>
+          </div>
 
             {oemOriginalUrl && (
               <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 flex items-center gap-3">

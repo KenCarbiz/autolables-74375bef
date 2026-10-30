@@ -104,8 +104,8 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
     label: "Customer Experience",
     description: "Routing, fallback, response and customer contact policy.",
     tabs: [
-      { id: "passport-modules", label: "Passport modules", aliases: ["passport-ctas"], legacyTab: "passport-ctas" },
       { id: "routing", label: "Contact & Routing", aliases: ["passport-routing"], legacyTab: "passport-routing" },
+      { id: "passport-modules", label: "Passport modules", aliases: ["passport-ctas"], legacyTab: "passport-ctas" },
       { id: "calls-to-action", label: "Calls to action", capabilities: ["can_manage_settings"] },
       { id: "customer-previews", label: "Customer previews", capabilities: ["can_manage_settings", "can_manage_deals"] },
     ],
@@ -165,6 +165,8 @@ export const ADMIN_CHILD_ROUTES = {
   feeReview: "/admin/pricing/fee-review",
   productApplicability: (productId: string) => `/admin/products/${encodeURIComponent(productId)}/applicability`,
   escalation: "/admin/customer-experience/escalation",
+  customerPreview: "/admin/customer-experience/preview",
+  printCalibration: "/admin/documents/print-calibration",
   syncRun: (runId: string) => `/admin/integrations/runs/${encodeURIComponent(runId)}`,
   providerDetail: (providerId: string) => `/admin/integrations/providers/${encodeURIComponent(providerId)}`,
   jobDetail: (jobId: string) => `/admin/integrations/jobs/${encodeURIComponent(jobId)}`,

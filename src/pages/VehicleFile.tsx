@@ -213,7 +213,7 @@ const VehicleFile = () => {
     }
   };
 
-  const summary: StatusFact[] = [facts.lifecycle, facts.publication, facts.retail, facts.signing, facts.delivery, recallLine];
+  const summary: StatusFact[] = [facts.publication, facts.retail, recallLine];
 
   const tabs: LocalTab[] = TABS.map((t) => ({
     key: t.id,

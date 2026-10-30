@@ -1,283 +1,80 @@
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Download, FileArchive, Fingerprint, Search, ShieldCheck } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { buildAuditPacket, type AuditPacket } from "@/lib/auditPacket";
-import { downloadPacketHtml } from "@/lib/auditPacketRenderer";
-import { EmptyState, Panel, SectionHeading, StateBadge, TableShell, formatDateTime } from "./primitives";
+import { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Search } from "lucide-react";
+import { Button, Panel, StatusText, Td, Th, WorkTable } from "@/components/product";
+import { SectionHeading } from "./primitives";
+import { complianceVinParam, vinDefenseHref } from "./childLinks";
+import type { IssueRow } from "./complianceData";
 
-// deno-lint-ignore no-explicit-any
-const sb = () => supabase as any;
+export const VinDefenseSection = ({ rows, loading }: { rows: IssueRow[]; loading: boolean }) => {
+  const navigate = useNavigate();
+  const [vin, setVin] = useState("");
+  const [q, setQ] = useState("");
+  const clean = complianceVinParam(vin);
 
-const cleanVin = (raw: string): string => raw.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/gi, "").slice(0, 17);
-
-const SECTION_TITLES: Record<string, string> = {
-  "01-vehicle-file": "Vehicle file",
-  "02-listings": "Vehicle listings",
-  "03-addendums": "Addendums",
-  "04-signings": "Signatures",
-  "05-prep-sign-offs": "Prep sign-offs",
-  "06-deal-jackets": "Deal jackets",
-  "07-recall-snapshot": "NHTSA recall snapshot",
-  "08-audit-log": "Audit events",
-  "09-archive": "Archived documents",
-  "10-get-ready": "Get-Ready records",
-  "11-advertised-prices": "Price snapshots",
-  "12-addon-elections": "Customer elections",
-  "13-install-proofs": "Installation proof",
-};
-
-interface SupportingDocs {
-  buyersGuides: number;
-  stickers: number;
-  vehicleDocuments: { doc_type: string; created_at: string }[];
-}
-
-const EMPTY_DOCS: SupportingDocs = { buyersGuides: 0, stickers: 0, vehicleDocuments: [] };
-
-export const VinDefenseSection = ({
-  initialVin,
-  tenantId,
-  tenantName,
-}: {
-  initialVin: string;
-  tenantId: string | null;
-  tenantName: string | null;
-}) => {
-  const { user } = useAuth();
-  const [vin, setVin] = useState(() => cleanVin(initialVin));
-  const [packet, setPacket] = useState<AuditPacket | null>(null);
-  const [docs, setDocs] = useState<SupportingDocs>(EMPTY_DOCS);
-  const [building, setBuilding] = useState(false);
-  const [receipt, setReceipt] = useState<string | null>(null);
-
-  const assemble = useCallback(async (target: string) => {
-    if (target.length < 11) {
-      toast.error("Enter at least 11 characters of a VIN");
-      return;
-    }
-    setBuilding(true);
-    setPacket(null);
-    setDocs(EMPTY_DOCS);
-    setReceipt(null);
-    try {
-      const [built, listingRes, vehicleDocs] = await Promise.all([
-        buildAuditPacket({
-          // deno-lint-ignore no-explicit-any
-          supabase: supabase as any,
-          vin: target,
-          tenantId,
-          tenantName,
-          generatedBy: user?.email || null,
-        }),
-        sb().from("vehicle_listings").select("id").eq("vin", target).limit(20),
-        sb().from("vehicle_documents").select("doc_type, created_at").eq("vin", target).limit(200),
-      ]);
-
-      const listingIds = ((listingRes?.data as { id: string }[] | null) ?? []).map((l) => l.id);
-      let generated: { document_type: string | null }[] = [];
-      if (listingIds.length > 0) {
-        const genRes = await sb()
-          .from("generated_documents")
-          .select("document_type")
-          .in("vehicle_id", listingIds)
-          .limit(500);
-        generated = (genRes?.data as { document_type: string | null }[] | null) ?? [];
-      }
-      const typeIs = (needle: string) =>
-        generated.filter((g) => String(g.document_type || "").toLowerCase().includes(needle)).length;
-      setDocs({
-        buyersGuides: typeIs("buyers_guide") + typeIs("buyers-guide"),
-        stickers: typeIs("sticker"),
-        vehicleDocuments: ((vehicleDocs?.data as { doc_type: string; created_at: string }[] | null) ?? []),
-      });
-      setPacket(built);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not assemble the packet");
-    } finally {
-      setBuilding(false);
-    }
-  }, [tenantId, tenantName, user?.email]);
-
-  useEffect(() => {
-    const target = cleanVin(initialVin);
-    if (target.length >= 11) {
-      setVin(target);
-      void assemble(target);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialVin]);
-
-  const exportHtml = () => {
-    if (!packet) return;
-    setReceipt(packet.manifest.chain_root);
-    // Tamper-evident receipt that this chain root existed at this time, so the
-    // packet stays re-verifiable later: regenerate, compare roots.
-    sb().rpc("record_evidence_receipt", {
-      _vin: packet.manifest.vin,
-      _chain_root: packet.manifest.chain_root,
-      _manifest: packet.manifest.sections,
-      _packet_version: packet.manifest.version,
-    }).then(() => undefined, () => undefined);
-    downloadPacketHtml(packet);
-    toast.success("Evidence packet downloaded");
-  };
-
-  const exportJson = () => {
-    if (!packet) return;
-    const blob = new Blob([JSON.stringify(packet, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `vin-defense-${packet.manifest.vin}-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  const s = packet?.summary;
-  const coverage = packet
-    ? [
-        { label: "Price snapshots", count: s?.advertised_price_snapshot_count ?? 0, note: "Every advertised price captured for this VIN, with source and timestamp." },
-        { label: "Window stickers", count: docs.stickers, note: "Generated sticker documents whose frozen snapshot carries this VIN." },
-        { label: "Addendums", count: s?.addendum_count ?? 0, note: `${s?.signed_addendum_count ?? 0} signed.` },
-        { label: "Buyers Guide", count: docs.buyersGuides, note: "FTC Used Car Rule guide generated for this VIN." },
-        { label: "Customer elections", count: packet.sections.find((x) => x.name === "12-addon-elections")?.count ?? 0, note: "Per add-on proof the customer initialled or affirmatively accepted." },
-        { label: "Installation proof", count: s?.install_photo_count ?? 0, note: `${s?.install_signature_count ?? 0} installer signature(s) on record.` },
-        { label: "Signatures", count: s?.customer_signing_count ?? 0, note: "Customer and co-buyer signings, with consent and IP capture." },
-        { label: "Documents", count: docs.vehicleDocuments.length, note: "Title, MCO, and other dealer-only files attached to the vehicle." },
-        { label: "Audit events", count: s?.audit_event_count ?? 0, note: "Immutable log entries naming this VIN." },
-      ]
-    : [];
+  const listed = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => !needle || [r.title, r.vin, r.stockNumber].filter(Boolean).join(" ").toLowerCase().includes(needle)).slice(0, 25);
+  }, [rows, q]);
 
   return (
-    <div className="space-y-5">
-      <SectionHeading
-        title="VIN defense"
-        description="One VIN, one evidence packet. Every price snapshot, sticker, addendum, Buyers Guide, customer election, installation proof, signature, document, and audit event on record — canonicalised, SHA-256 hashed section by section, and chained to a single root the dealership can quote verbatim."
-      />
-
-      <Panel>
+    <div className="flex flex-col gap-6">
+      <SectionHeading title="VIN defense" description="Open a vehicle's evidence packet: every price snapshot, sticker, addendum, signature and audit event on record, hashed into one chain root." />
+      <Panel inset="sm" bodyClassName="pt-4">
         <form
-          className="flex flex-wrap items-center gap-3 p-4"
+          className="flex flex-wrap items-center gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            void assemble(vin);
+            if (clean.length >= 11) navigate(vinDefenseHref(clean));
           }}
         >
           <div className="relative min-w-[260px] flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
             <input
               value={vin}
-              onChange={(e) => setVin(cleanVin(e.target.value))}
-              placeholder="17-character VIN"
+              onChange={(e) => setVin(complianceVinParam(e.target.value))}
+              placeholder="Enter a VIN"
               maxLength={17}
+              aria-label="VIN"
               autoComplete="off"
-              autoCapitalize="characters"
-              className="h-11 w-full rounded-xl border border-adm-border bg-adm-surface pl-10 pr-3 font-mono tracking-widest text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
+              className="h-10 w-full rounded-md border border-adm-border bg-adm-surface pl-10 pr-3 font-mono text-[14px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
             />
           </div>
-          <button
-            type="submit"
-            disabled={building || vin.length < 11}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-foreground px-5 text-[14px] font-semibold text-background disabled:opacity-50"
-          >
-            <ShieldCheck className="h-4 w-4" />
-            {building ? "Assembling…" : "Assemble packet"}
-          </button>
+          <Button type="submit" variant="primary" disabled={clean.length < 11}>Open packet</Button>
         </form>
       </Panel>
-
-      {!packet && !building && (
-        <Panel>
-          <EmptyState
-            icon={Fingerprint}
-            headline="No packet assembled yet."
-            body="Enter a VIN to pull its complete evidence record. Nothing is fabricated: a section with no artifacts is reported as empty."
-          />
-        </Panel>
-      )}
-
-      {packet && (
-        <>
-          <Panel
-            title={`Evidence coverage for ${packet.manifest.vin}`}
-            meta={`Assembled ${formatDateTime(packet.manifest.generated_at)}${packet.manifest.generated_by ? ` by ${packet.manifest.generated_by}` : ""}`}
-          >
-            <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
-              {coverage.map((c) => (
-                <div key={c.label} className="bg-adm-surface p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[12px] leading-[18px] font-bold uppercase tracking-label text-adm-muted">{c.label}</p>
-                    <StateBadge tone={c.count > 0 ? "clear" : "neutral"}>
-                      {c.count > 0 ? `${c.count} on record` : "None on record"}
-                    </StateBadge>
-                  </div>
-                  <p className="mt-1.5 text-[12px] leading-[18px] leading-4 text-adm-muted">{c.note}</p>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel
-            title="Packet manifest"
-            meta="Each section is canonicalised and hashed independently. Changing any included artifact changes its section hash, which changes the chain root."
-          >
-            <TableShell headers={["Section", "Records", "SHA-256"]}>
-              {packet.manifest.sections.map((sec) => (
-                <tr key={sec.name} className="hover:bg-adm-workspace">
-                  <td className="px-4 py-2.5 text-[14px] leading-[20px] text-adm-ink">
-                    {SECTION_TITLES[sec.name] ?? sec.name}
-                  </td>
-                  <td className="px-4 py-2.5 text-[14px] leading-[20px] tabular-nums text-adm-ink">
-                    {sec.count === 0 ? <span className="text-adm-muted">Empty</span> : sec.count}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <code className="break-all font-mono text-[12px] leading-[18px] text-adm-muted">{sec.sha256}</code>
-                  </td>
+      <Panel title="In-stock vehicles" flush inset="sm" action={
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter vehicles" aria-label="Filter vehicles" className="h-9 w-56 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] outline-none focus:ring-2 focus:ring-adm-primary" />
+      }>
+        <WorkTable caption="In-stock vehicles" minWidth={640}>
+          <thead>
+            <tr>
+              <Th>Vehicle</Th>
+              <Th>Stock</Th>
+              <Th>VIN</Th>
+              <Th>Open issues</Th>
+              <Th align="right">Evidence</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><Td className="text-adm-muted">Loading vehicles</Td><Td /><Td /><Td /><Td /></tr>
+            ) : listed.length === 0 ? (
+              <tr><Td className="text-adm-muted">No vehicles match.</Td><Td /><Td /><Td /><Td /></tr>
+            ) : (
+              listed.map((r) => (
+                <tr key={r.vehicleId}>
+                  <Td className="max-w-[280px] truncate font-medium">{r.title}</Td>
+                  <Td className="font-mono text-[13px]">{r.stockNumber || "Unknown"}</Td>
+                  <Td className="font-mono text-[13px]">{r.vin}</Td>
+                  <Td>{r.issues.length === 0 ? <StatusText tone="success">Clear</StatusText> : <StatusText tone={r.critical > 0 ? "danger" : "warning"}>{r.issues.length} open</StatusText>}</Td>
+                  <Td align="right"><Link to={vinDefenseHref(r.vin)} className="font-semibold text-adm-primary hover:underline">Open packet</Link></Td>
                 </tr>
-              ))}
-            </TableShell>
-          </Panel>
-
-          <Panel title="Chain root" meta="Quote this hash verbatim in any production to counsel, a state AG, or the FTC.">
-            <div className="space-y-3 p-4">
-              <code className="block break-all rounded-xl border border-adm-border bg-adm-workspace p-3 font-mono text-[12px] leading-[18px] text-adm-ink">
-                {packet.manifest.chain_root}
-              </code>
-              {receipt === packet.manifest.chain_root && (
-                <p className="text-[12px] leading-[18px] text-adm-muted">
-                  A receipt for this chain root was recorded at export time so the packet can be re-verified later.
-                </p>
-              )}
-              {s && !s.has_listing && (
-                <p className="text-[14px] leading-[20px] text-adm-warning">
-                  No vehicle listing exists for this VIN under this tenant. The packet still reports whatever
-                  artifacts were found, but confirm the VIN and your store scope before relying on it.
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={exportHtml}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground px-4 text-[14px] font-semibold text-background"
-                >
-                  <FileArchive className="h-4 w-4" /> Export evidence packet
-                </button>
-                <button
-                  type="button"
-                  onClick={exportJson}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-adm-border bg-adm-surface px-4 text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace"
-                >
-                  <Download className="h-4 w-4" /> Export raw JSON
-                </button>
-              </div>
-            </div>
-          </Panel>
-        </>
-      )}
+              ))
+            )}
+          </tbody>
+        </WorkTable>
+      </Panel>
     </div>
   );
 };

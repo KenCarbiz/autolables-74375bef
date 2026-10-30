@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import type { Tone } from "@/components/admin/v2/primitives";
 
 /** Parent / Child trail above a child page title. The last item is the current page. */
 export const Crumbs = ({ items }: { items: Array<{ label: ReactNode; to?: string }> }) => (
@@ -62,3 +63,8 @@ export const fmtDateTime = (iso?: string | null): string =>
 
 export const fmtDay = (iso?: string | null): string =>
   iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Unknown";
+
+const COMMAND_TONE: Record<string, Tone> = { slate: "neutral", blue: "info", amber: "warning", red: "danger", emerald: "success", violet: "info" };
+
+/** Maps the command-center tone names onto the product Tone scale. */
+export const productTone = (tone: string | undefined): Tone => (tone ? COMMAND_TONE[tone] : undefined) ?? "neutral";

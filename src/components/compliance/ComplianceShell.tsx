@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import { Button, InlineNote, LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { useTenant } from "@/contexts/TenantContext";
-import { useDealerSettings } from "@/contexts/DealerSettingsContext";
-import { getStateCompliance } from "@/data/stateCompliance";
-import { resolveOperatingState } from "@/lib/dealerState";
 import { COMPLIANCE_SECTIONS, isComplianceSection, type ComplianceSectionId } from "./complianceData";
 import { useComplianceCenterData } from "./useComplianceCenterData";
+import { vinDefenseHref } from "./childLinks";
 import OverviewSection from "./OverviewSection";
 import IssuesSection from "./IssuesSection";
 import PriceIntegritySection from "./PriceIntegritySection";
@@ -26,14 +24,10 @@ import LibrarySection from "./LibrarySection";
 export const ComplianceShell = ({ defaultSection }: { defaultSection: ComplianceSectionId }) => {
   const [params, setParams] = useSearchParams();
   const { pathname } = useLocation();
-  const { tenant, currentStore } = useTenant();
-  const { settings } = useDealerSettings();
+  const { tenant } = useTenant();
   const data = useComplianceCenterData();
 
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
-  const dealerState = resolveOperatingState(settings, currentStore?.state);
-  const compliance = getStateCompliance(dealerState);
-  const storeName = currentStore?.name || settings.dealer_name || "Your dealership";
 
   const vinParam = (params.get("vin") || "").toUpperCase();
   const tabParam = params.get("tab");
@@ -48,16 +42,6 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
       const q = new URLSearchParams(params);
       q.set("tab", next);
       if (next !== "vin-defense") q.delete("vin");
-      setParams(q, { replace: true });
-    },
-    [params, setParams],
-  );
-
-  const openVin = useCallback(
-    (vin: string) => {
-      const q = new URLSearchParams(params);
-      q.set("tab", "vin-defense");
-      q.set("vin", vin);
       setParams(q, { replace: true });
     },
     [params, setParams],
@@ -90,16 +74,6 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
     return null;
   };
 
-  const sb766 = Date.now() >= Date.parse("2026-10-01T00:00:00") ? "took effect" : "takes effect";
-  const scopeLine = [
-    storeName,
-    compliance.stateName || dealerState || null,
-    `${compliance.docFeeTerminology}${compliance.docFeeMaxCap !== null ? ` capped at $${compliance.docFeeMaxCap}` : ""}`,
-    compliance.carsActState ? `California SB 766 ${sb766} October 1, 2026` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   const tabs: LocalTab[] = COMPLIANCE_SECTIONS.map((s) => {
     const q = new URLSearchParams();
     q.set("tab", s.id);
@@ -112,15 +86,23 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
     };
   });
 
+  if (section === "vin-defense" && vinParam.length >= 11) return <Navigate to={vinDefenseHref(vinParam)} replace />;
+
   return (
     <PageBody width="wide">
       <PageHeader
-        title="Compliance"
-        description={scopeLine}
+        title={section === "audit" ? "Audit Log" : "Compliance"}
+        description={
+          section === "audit"
+            ? "The immutable event record for this store."
+            : "Monitor deal readiness, identify blockers, and manage regulatory requirements."
+        }
         actions={
-          <Button onClick={data.refresh} disabled={data.loading}>
-            <RefreshCw className={`h-4 w-4 ${data.loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
-          </Button>
+          section === "audit" || section === "vin-defense" ? undefined : (
+            <Button onClick={data.refresh} disabled={data.loading}>
+              <RefreshCw className={`h-5 w-5 ${data.loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
+            </Button>
+          )
         }
       />
 
@@ -143,14 +125,11 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
           loading={data.loading}
           failed={!!data.error}
           onNavigate={setSection}
-          onOpenVin={openVin}
         />
       )}
       {section === "issues" && <IssuesSection rows={data.issueRows} loading={data.loading} />}
       {section === "price" && <PriceIntegritySection rows={data.priceRows} loading={data.loading} />}
-      {section === "vin-defense" && (
-        <VinDefenseSection initialVin={vinParam} tenantId={tenantId} tenantName={tenant?.name || null} />
-      )}
+      {section === "vin-defense" && <VinDefenseSection rows={data.issueRows} loading={data.loading} />}
       {section === "titles" && (
         <TitlesSection rows={data.titleRows} loading={data.loading} tenantId={tenantId} />
       )}

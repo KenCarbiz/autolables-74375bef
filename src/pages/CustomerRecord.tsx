@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Mail, Phone } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import Seo from "@/components/Seo";
-import { PageBody, PageHeader, QueryState } from "@/components/product";
+import { LinkButton, PageBody, PageHeader, Panel, QueryState } from "@/components/product";
+import { Crumbs, SummaryList } from "@/components/detail/parts";
 import AddendumStatusTimeline from "@/components/addendum/AddendumStatusTimeline";
 import {
   BUCKET_LABEL,
@@ -15,8 +15,6 @@ import {
   Chip,
   EmptyBlock,
   NextActionCell,
-  PriceIntegrityChip,
-  SectionCard,
   dealStateTone,
 } from "@/components/customers/CustomerUi";
 import { mmss } from "@/lib/shopperActivity";
@@ -50,7 +48,7 @@ const CustomerRecord = () => {
   if (!customer) {
     return (
       <PageBody width="form">
-        <BackLink />
+        <Crumbs items={[{ label: "Customers", to: "/customers" }, { label: "Not found" }]} />
         <EmptyBlock
           title="Customer not found"
           body="This record is not in the current customer window. It may be older than the activity window, or it may belong to another store."
@@ -60,267 +58,201 @@ const CustomerRecord = () => {
   }
 
   const bridged = customer.documentRequests.filter((r) => r.visitor_id).length > 0;
+  const title = customer.identified ? customer.name || customer.email || "Unnamed customer" : "Unidentified shopper";
+  const primaryVehicle = customer.vehicles[0] ?? null;
+  const callHref = customer.phone ? `tel:${customer.phone.replace(/[^\d+]/g, "")}` : null;
+  const leadSource = customer.leads.length
+    ? customer.leads.map((l) => `${l.source || "unknown"}${l.sub_source ? ` / ${l.sub_source}` : ""}`).join(", ")
+    : "No lead form submitted";
 
   return (
-    <PageBody width="form">
+    <PageBody width="wide">
       <Seo
         title={customer.identified ? `${customer.name || "Customer"} - Customer record` : "Unidentified shopper"}
         description="One customer, assembled from leads, document requests, tracked engagement and deals."
         path={`/customers/${customerId}`}
       />
-      <BackLink />
+      <Crumbs items={[{ label: "Customers", to: "/customers" }, { label: title }]} />
 
       <PageHeader
-        title={customer.identified ? customer.name || customer.email || "Unnamed customer" : "Unidentified shopper"}
+        title={
+          <span className="inline-flex flex-wrap items-center gap-3">
+            {title}
+            <Chip tone={customer.identified ? "good" : "neutral"}>{customer.identified ? "Identified" : "Unidentified"}</Chip>
+            <Chip tone={customer.bucket === "hot" ? "attention" : customer.bucket === "won" ? "good" : "neutral"}>
+              {BUCKET_LABEL[customer.bucket]}
+            </Chip>
+          </span>
+        }
         description={`${customer.identified ? "Contact captured" : "No contact captured"} · Last activity ${relativeTime(customer.lastActivityAt)}`}
-        meta={
-          <Chip tone={customer.bucket === "hot" ? "attention" : customer.bucket === "won" ? "good" : "neutral"}>
-            {BUCKET_LABEL[customer.bucket]}
-          </Chip>
+        actions={
+          <>
+            {customer.email && <LinkButton variant="secondary" to={`mailto:${customer.email}`}>Email</LinkButton>}
+            {callHref && <LinkButton variant="primary" to={callHref}>Call {customer.phone}</LinkButton>}
+          </>
         }
       />
 
-      <div className="bg-adm-surface rounded-2xl border border-adm-border shadow-premium p-5">
-        <p className="text-[12px] leading-[18px] uppercase tracking-wider text-adm-muted">Next action</p>
-        <div className="mt-1.5">
-          <NextActionCell action={customer.nextAction} />
-        </div>
-        <div className="flex flex-wrap gap-2 mt-3">
-          {customer.phone && (
-            <a
-              href={`tel:${customer.phone.replace(/[^\d+]/g, "")}`}
-              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-[14px] leading-[20px] font-semibold hover:brightness-110 transition-all"
-            >
-              <Phone className="w-4 h-4" /> Call {customer.phone}
-            </a>
-          )}
-          {customer.email && (
-            <a
-              href={`mailto:${customer.email}`}
-              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md border border-adm-border text-[14px] leading-[20px] font-semibold hover:bg-adm-workspace transition-colors"
-            >
-              <Mail className="w-4 h-4" /> Email
-            </a>
-          )}
-        </div>
-      </div>
-
-      <SectionCard title="Contact" subtitle={bridged ? "Identity proven by a document request that carries the same visitor id as their browsing." : "Identity from a form only."}>
-        <dl className="grid sm:grid-cols-2 gap-4">
-          <Field label="Name" value={customer.identified ? customer.name || "Not given" : "Unidentified shopper - no contact captured"} />
-          <Field label="Phone" value={customer.phone || "Not captured"} />
-          <Field label="Email" value={customer.email || "Not captured"} />
-          <Field label="Assigned employee" value={customer.assignedEmployee ? `${customer.assignedEmployee.name} (${customer.assignedEmployee.source})` : "Unassigned"} />
-          <Field
-            label="Lead source"
-            value={
-              customer.leads.length
-                ? customer.leads.map((l) => `${l.source || "unknown"}${l.sub_source ? ` / ${l.sub_source}` : ""}`).join(", ")
-                : "No lead form was ever submitted"
-            }
-          />
-          <Field
-            label="First response"
-            value={
-              customer.leads.length
-                ? customer.leads[0].first_response_at
-                  ? `Logged ${relativeTime(customer.leads[0].first_response_at)}`
-                  : "Never logged"
-                : "Not applicable"
-            }
-          />
-        </dl>
-        {!customer.identified && (
-          <p className="text-[14px] leading-[20px] text-adm-muted mt-4 border-t border-adm-border pt-4">
-            This shopper is a browser session, not a person on file. The clickstream carries a visitor id only - no name, phone or email
-            was ever submitted - so nothing here may be attributed to a named customer. Work the vehicle instead.
-          </p>
-        )}
-      </SectionCard>
-
-      <SectionCard title="Vehicles of interest" subtitle={`${customer.vehicles.length} ${customer.vehicles.length === 1 ? "vehicle" : "vehicles"} touched`}>
-        {customer.vehicles.length === 0 ? (
-          <EmptyBlock title="No vehicle attached" body="No lead, document request, deal or tracked session names a vehicle for this customer." />
-        ) : (
-          <ul className="space-y-3">
-            {customer.vehicles.map((v) => (
-              <li key={v.vin || v.label} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-adm-border p-4">
-                <div className="min-w-0">
-                  <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{v.label}</p>
-                  <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">
-                    {v.stock ? `Stock ${v.stock}` : "No stock number"}
-                    {v.vin ? ` · VIN ${v.vin}` : ""}
-                  </p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {v.sources.map((s) => (
-                      <Chip key={s}>{s}</Chip>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {v.slug && (
-                    <a
-                      href={`/v/${v.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center h-8 px-3 rounded-md border border-adm-border text-[12px] leading-[18px] font-semibold hover:bg-adm-workspace transition-colors"
-                    >
-                      Passport
-                    </a>
-                  )}
-                  {v.listingId && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/vehicle-file/${v.listingId}`)}
-                      className="inline-flex items-center h-8 px-3 rounded-md border border-adm-border text-[12px] leading-[18px] font-semibold hover:bg-adm-workspace transition-colors"
-                    >
-                      Vehicle file
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
-
-      <SectionCard
-        title="Engagement"
-        subtitle={customer.engagement.linked ? "Every line below is a captured event, with the move it implies." : "Nothing links this customer to a browsing session."}
-      >
-        {!customer.engagement.linked ? (
-          <div className="space-y-4">
-            <EmptyBlock
-              title="No engagement linked to this customer"
-              body="Passport activity is keyed on an anonymous visitor id. A lead form does not capture that id, so this person's browsing cannot be proven. A document request from the passport does capture it - that is the only bridge that exists today."
+      <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_320px] lg:items-start">
+        <div className="flex min-w-0 flex-col gap-6">
+          <Panel title="Contact information" description={bridged ? "Identity proven by a document request that carries the same visitor id." : "Identity from a form only."}>
+            <SummaryList
+              rows={[
+                { label: "Name", value: customer.identified ? customer.name || "Not given" : "Unidentified" },
+                { label: "Phone", value: customer.phone || "Not captured" },
+                { label: "Email", value: <span className="break-all">{customer.email || "Not captured"}</span> },
+                { label: "Lead source", value: leadSource },
+                {
+                  label: "First response",
+                  value: customer.leads.length
+                    ? customer.leads[0].first_response_at ? `Logged ${relativeTime(customer.leads[0].first_response_at)}` : "Never logged"
+                    : "Not applicable",
+                },
+              ]}
             />
-            {sameVehicleShoppers > 0 && (
-              <p className="text-[14px] leading-[20px] text-adm-muted">
-                {sameVehicleShoppers} anonymous {sameVehicleShoppers === 1 ? "shopper is" : "shoppers are"} active on the same vehicle. They
-                are not this person - treat it as competition for the car, and move on price and availability.
+            {!customer.identified && (
+              <p className="mt-3 border-t border-adm-border pt-3 text-[13px] leading-[18px] text-adm-muted">
+                This shopper is a browser session, not a person on file. Nothing here may be attributed to a named customer.
               </p>
             )}
-          </div>
-        ) : (
-          <div className="space-y-5">
-            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <Field label="Visits" value={String(customer.engagement.sessions)} />
-              <Field label="Days active" value={String(customer.engagement.visitDays)} />
-              <Field label="Reading time" value={dwellLabel(customer.engagement.dwellSeconds)} />
-              <Field label="First seen" value={relativeTime(customer.engagement.firstAt)} />
-            </dl>
+          </Panel>
+          <Panel title="Communication consent">
+            <SummaryList rows={[{ label: "Email", value: "Unknown" }, { label: "SMS", value: "Unknown" }, { label: "Phone", value: "Unknown" }]} />
+          </Panel>
+          <Panel title="Assigned to">
+            <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">
+              {customer.assignedEmployee ? customer.assignedEmployee.name : "Unassigned"}
+            </p>
+            {customer.assignedEmployee && <p className="text-[13px] leading-[18px] text-adm-muted">{customer.assignedEmployee.source}</p>}
+          </Panel>
+        </div>
 
-            <div>
-              <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">What they did, and what to do about it</h3>
-              <ul className="mt-2 divide-y divide-border">
-                {customer.engagement.facts.map((f) => (
-                  <li key={f.key} className="py-3 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-6">
+          <Panel title="Current vehicle journey" description={`${customer.vehicles.length} ${customer.vehicles.length === 1 ? "vehicle" : "vehicles"} touched`}>
+            {customer.vehicles.length === 0 ? (
+              <p className="text-[14px] leading-[20px] text-adm-muted">No lead, document request, deal or tracked session names a vehicle for this customer.</p>
+            ) : (
+              <ul className="divide-y divide-adm-border">
+                {customer.vehicles.map((v) => (
+                  <li key={v.vin || v.label} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0">
-                      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">
-                        {f.label}
-                        {f.count > 1 ? ` x${f.count}` : ""}
+                      <p className="truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{v.label}</p>
+                      <p className="truncate text-[13px] leading-[18px] text-adm-muted">
+                        {v.stock ? `Stock ${v.stock}` : "No stock number"}{v.vin ? ` · VIN ${v.vin}` : ""} · {v.sources.join(", ")}
                       </p>
-                      <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{f.action}</p>
                     </div>
-                    <span className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">{relativeTime(f.lastAt)}</span>
+                    <span className="flex shrink-0 items-center gap-3 text-[14px] font-semibold">
+                      {v.slug && <a href={`/v/${v.slug}`} target="_blank" rel="noopener noreferrer" className="text-adm-primary hover:underline">Passport</a>}
+                      {v.listingId && <button type="button" onClick={() => navigate(`/vehicle-file/${v.listingId}`)} className="text-adm-primary hover:underline">Vehicle file</button>}
+                    </span>
                   </li>
                 ))}
               </ul>
-            </div>
+            )}
+          </Panel>
 
-            {customer.engagement.modules.length > 0 && (
-              <div>
-                <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Where the attention went</h3>
-                <ul className="mt-2 space-y-1.5">
-                  {customer.engagement.modules.map((m) => (
-                    <li key={m.module} className="flex items-center justify-between gap-3 text-[14px] leading-[20px]">
-                      <span className="text-adm-ink">{m.label}</span>
-                      <span className="text-adm-muted tabular-nums">{mmss(m.seconds)}</span>
+          <Panel title="Intent timeline" description="Leads, document requests, tracked engagement, signatures and returns in one trail.">
+            {customer.activity.length === 0 ? (
+              <p className="text-[14px] leading-[20px] text-adm-muted">Nothing has been captured for this customer yet.</p>
+            ) : (
+              <ol className="relative ml-1.5 border-l border-adm-border">
+                {customer.activity.map((a, i) => (
+                  <li key={`${a.at}-${i}`} className="relative pb-4 pl-5 last:pb-0">
+                    <span className="absolute -left-[5px] top-[7px] h-[9px] w-[9px] rounded-full bg-adm-primary" aria-hidden="true" />
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{a.label}</p>
+                      <span className="whitespace-nowrap text-[13px] leading-[18px] text-adm-muted">{relativeTime(a.at)}</span>
+                    </div>
+                    <p className="text-[13px] leading-[18px] text-adm-muted">{a.detail}</p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Panel>
+
+          <Panel
+            title="Engagement"
+            description={customer.engagement.linked ? "Every line is a captured event, with the move it implies." : "Nothing links this customer to a browsing session."}
+          >
+            {!customer.engagement.linked ? (
+              <div className="space-y-2 text-[14px] leading-[20px] text-adm-muted">
+                <p>Passport activity is keyed on an anonymous visitor id. A lead form does not capture it, so this person's browsing cannot be proven. A document request from the passport is the only bridge that exists today.</p>
+                {sameVehicleShoppers > 0 && (
+                  <p>{sameVehicleShoppers} anonymous {sameVehicleShoppers === 1 ? "shopper is" : "shoppers are"} active on the same vehicle. They are not this person.</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <SummaryList
+                  rows={[
+                    { label: "Visits", value: String(customer.engagement.sessions) },
+                    { label: "Days active", value: String(customer.engagement.visitDays) },
+                    { label: "Reading time", value: dwellLabel(customer.engagement.dwellSeconds) },
+                    { label: "First seen", value: relativeTime(customer.engagement.firstAt) },
+                  ]}
+                />
+                <ul className="divide-y divide-adm-border">
+                  {customer.engagement.facts.map((f) => (
+                    <li key={f.key} className="flex flex-wrap items-start justify-between gap-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{f.label}{f.count > 1 ? ` x${f.count}` : ""}</p>
+                        <p className="text-[13px] leading-[18px] text-adm-muted">{f.action}</p>
+                      </div>
+                      <span className="whitespace-nowrap text-[13px] text-adm-muted">{relativeTime(f.lastAt)}</span>
                     </li>
                   ))}
                 </ul>
-                <p className="text-[12px] leading-[18px] text-adm-muted mt-2">
-                  Lead with the section they spent the most time in - it is the objection they are still working through.
-                </p>
+                {customer.engagement.modules.length > 0 && (
+                  <SummaryList rows={customer.engagement.modules.map((m) => ({ label: m.label, value: mmss(m.seconds) }))} />
+                )}
               </div>
             )}
-          </div>
-        )}
-        <p className="text-[12px] leading-[18px] text-adm-muted mt-5 border-t border-adm-border pt-4">
-          Not captured by this platform: walkaround video request, send, open, completion and replay. No code emits those events, so they
-          are not shown as zeros here.
-        </p>
-      </SectionCard>
+          </Panel>
+        </div>
 
-      <SectionCard title="Deals" subtitle={`${customer.deals.length} ${customer.deals.length === 1 ? "deal" : "deals"} on file`}>
-        {customer.deals.length === 0 ? (
-          <EmptyBlock title="No deal yet" body="No addendum on this store carries this customer's name or email." />
-        ) : (
-          <ul className="space-y-4">
-            {customer.deals.map((deal) => (
-              <li key={deal.id} className="rounded-xl border border-adm-border p-4 space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{deal.vehicleLabel}</p>
-                    <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">
-                      {deal.stock ? `Stock ${deal.stock} · ` : ""}
-                      {money(deal.amount)}
-                      {deal.employeeName ? ` · Sold by ${deal.employeeName}` : ""}
+        <div className="flex min-w-0 flex-col gap-6">
+          <Panel title={`Tasks (${customer.nextAction ? 1 : 0})`}>
+            {customer.nextAction ? (
+              <NextActionCell action={customer.nextAction} />
+            ) : (
+              <p className="text-[14px] leading-[20px] text-adm-muted">No open task.</p>
+            )}
+          </Panel>
+          <Panel title="Contact actions">
+            <div className="flex flex-col gap-2">
+              {callHref ? <LinkButton variant="secondary" to={callHref}>Call</LinkButton> : null}
+              {customer.email ? <LinkButton variant="secondary" to={`mailto:${customer.email}`}>Send email</LinkButton> : null}
+              {primaryVehicle?.slug ? <LinkButton variant="secondary" to={`/v/${primaryVehicle.slug}`}>Open Passport</LinkButton> : null}
+              {!callHref && !customer.email && !primaryVehicle?.slug ? (
+                <p className="text-[14px] leading-[20px] text-adm-muted">No contact method captured.</p>
+              ) : null}
+            </div>
+          </Panel>
+          <Panel title={`Deals (${customer.deals.length})`}>
+            {customer.deals.length === 0 ? (
+              <p className="text-[14px] leading-[20px] text-adm-muted">No addendum on this store carries this customer's name or email.</p>
+            ) : (
+              <ul className="divide-y divide-adm-border">
+                {customer.deals.map((deal) => (
+                  <li key={deal.id} className="space-y-1 py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{deal.vehicleLabel}</p>
+                      <Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip>
+                    </div>
+                    <p className="text-[13px] leading-[18px] text-adm-muted">
+                      {money(deal.amount)}{deal.employeeName ? ` · Sold by ${deal.employeeName}` : ""}
                     </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip>
-                    <PriceIntegrityChip integrity={deal.priceIntegrity} />
-                  </div>
-                </div>
-                {deal.returnInfo && (
-                  <p className="text-[14px] leading-[20px] text-adm-ink">
-                    {deal.returnInfo.label}
-                    {deal.returnInfo.reason ? ` - "${deal.returnInfo.reason}"` : ""}
-                  </p>
-                )}
-                <NextActionCell action={deal.nextAction} />
-                {deal.state === "out_for_signature" && <AddendumStatusTimeline addendumId={deal.id} />}
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
-
-      <SectionCard title="Activity" subtitle="Leads, document requests, tracked engagement, signatures and returns in one trail.">
-        {customer.activity.length === 0 ? (
-          <EmptyBlock title="No activity recorded" body="Nothing has been captured for this customer yet." />
-        ) : (
-          <ol className="divide-y divide-border">
-            {customer.activity.map((a, i) => (
-              <li key={`${a.at}-${i}`} className="py-3 flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{a.label}</p>
-                  <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{a.detail}</p>
-                </div>
-                <span className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">{relativeTime(a.at)}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </SectionCard>
+                    {deal.returnInfo && <p className="text-[13px] leading-[18px] text-adm-ink">{deal.returnInfo.label}</p>}
+                    {deal.state === "out_for_signature" && <AddendumStatusTimeline addendumId={deal.id} />}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+        </div>
+      </div>
     </PageBody>
   );
 };
-
-// Back returns to the exact list state (stage, search) when there is history;
-// a direct load falls back to the Customers list.
-const BackLink = () => (
-  <Link to="/customers" onClick={(e) => { if (window.history.length > 1) { e.preventDefault(); window.history.back(); } }} className="inline-flex items-center gap-1.5 text-[14px] leading-[20px] font-semibold text-adm-muted hover:text-adm-ink transition-colors">
-    <ArrowLeft className="w-4 h-4" /> Customers
-  </Link>
-);
-
-const Field = ({ label, value }: { label: string; value: string }) => (
-  <div className="min-w-0">
-    <dt className="text-[12px] leading-[18px] uppercase tracking-wider text-adm-muted">{label}</dt>
-    <dd className="text-[14px] leading-[20px] text-adm-ink mt-0.5 break-words">{value}</dd>
-  </div>
-);
 
 export default CustomerRecord;

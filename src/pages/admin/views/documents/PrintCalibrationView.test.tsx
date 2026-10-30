@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("sonner", () => ({ toast: Object.assign(() => {}, { info: () => {}, error: () => {}, success: () => {} }) }));
 vi.mock("@/contexts/DealerSettingsContext", () => ({ useDealerSettings: () => ({ settings: { label_defaults: {} }, updateSettings: mocks.updateSettings, loading: false }) }));
 vi.mock("@/contexts/TenantContext", () => ({ useTenant: () => ({ tenant: { id: "tenant-test", name: "Example Motors" }, currentStore: null, stores: [] }) }));
-vi.mock("@/components/admin/PrintSettingsPanel", () => ({ default: () => <div>Print settings panel</div> }));
 vi.mock("@/integrations/supabase/client", () => {
   const chain = () => {
     const c: Record<string, unknown> = {};
@@ -56,7 +55,7 @@ describe("PrintCalibrationView", () => {
 
   it("says Needs setup when no profile row exists and writes nothing", async () => {
     renderView();
-    expect(screen.getByText("Print settings panel")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open printer calibration" })).toBeInTheDocument();
     expect(await screen.findByText("Needs setup")).toBeInTheDocument();
     expect(screen.getByText("No profile saved")).toBeInTheDocument();
     expect(mocks.updateSettings).not.toHaveBeenCalled();
