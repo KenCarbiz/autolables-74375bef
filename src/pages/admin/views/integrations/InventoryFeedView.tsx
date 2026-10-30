@@ -353,9 +353,11 @@ const SourceCard = ({
       ) : (
         <p className="mt-0.5 text-[20px] leading-[26px] font-bold text-adm-muted">Not pinned</p>
       )}
-      <p className={cn("mt-2 -ml-px flex items-center gap-[7px] text-[14px] leading-[20px] font-semibold", source.identity === "needs_review" ? "text-adm-warning" : "text-adm-success")}>
+      <p className={cn("mt-2 -ml-px flex items-center gap-[7px] text-[14px] leading-[20px] font-semibold", source.identity === "needs_review" ? "text-adm-warning" : source.pinValue ? "text-adm-success" : "text-adm-muted")}>
         {source.identity === "needs_review" ? (
           <CircleAlert className="w-[26px] h-[26px] flex-shrink-0 text-white fill-adm-warning" aria-hidden="true" />
+        ) : !source.pinValue ? (
+          <CircleMinus className="w-[26px] h-[26px] flex-shrink-0 text-white fill-adm-muted" aria-hidden="true" />
         ) : (
           <CircleCheck className="w-[26px] h-[26px] flex-shrink-0 text-white fill-adm-success" aria-hidden="true" />
         )}

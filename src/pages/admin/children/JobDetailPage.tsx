@@ -103,9 +103,10 @@ export default function JobDetailPage() {
         </Panel>
         <Panel title="Outcome" titleSize="md" inset="sm">
           <KeyValueList
+            className="grid-cols-[minmax(96px,112px)_1fr] gap-x-4"
             rows={[
               { label: "Last outcome", value: row.lastOutcome ? <>{outcomeText}{row.lastOutcome && !row.lastSuccessAt && succeeded ? " (scheduler run)" : ""}</> : <span className="text-adm-muted">None recorded</span> },
-              { label: "Last success", value: row.lastSuccessAt ? formatAt(row.lastSuccessAt) : <span className="text-adm-muted">{succeeded ? "No output confirmed for this rooftop" : "None recorded"}</span> },
+              { label: "Last success", value: row.lastSuccessAt ? formatAt(row.lastSuccessAt) : <span className="text-adm-muted">{succeeded ? "None confirmed" : "None recorded"}</span> },
               { label: "Evidence", value: row.evidence === "rooftop_ledger" ? "This rooftop's ledger" : row.evidence === "scheduler" ? "Scheduler record" : "None" },
               { label: "Retained data", value: row.verdict.inventoryPreserved === "unknown" ? "Unknown" : row.verdict.inventoryPreserved ? "Last good data kept" : "Not kept" },
             ]}

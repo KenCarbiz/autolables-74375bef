@@ -5,6 +5,7 @@ export interface Finding {
   label: string;
   result: FindingResult;
   notes: string;
+  measurement: string;
 }
 
 export const FINDING_RESULT_LABEL: Record<FindingResult, string> = {
@@ -22,7 +23,7 @@ const toResult = (raw: string | undefined): FindingResult => {
 
 /** Rows of the newest inspection record, one finding per recorded checklist item. */
 export function buildFindings(
-  checklist: { id?: string; label?: string; result?: string; explanation?: string }[] | null | undefined,
+  checklist: { id?: string; label?: string; result?: string; explanation?: string; measurement?: string | number | null }[] | null | undefined,
 ): Finding[] {
   return (checklist ?? [])
     .filter((c) => c && (c.label || c.id))
@@ -31,6 +32,7 @@ export function buildFindings(
       label: c.label || String(c.id),
       result: toResult(c.result),
       notes: (c.explanation ?? "").trim(),
+      measurement: c.measurement == null ? "" : String(c.measurement).trim(),
     }));
 }
 

@@ -243,13 +243,13 @@ export const AdminTable = ({ children, className, caption, dense = false, inset 
 );
 
 export const Th = ({ children, className, align = "left" }: { children?: ReactNode; className?: string; align?: "left" | "right" }) => (
-  <th scope="col" className={cn("bg-adm-workspace px-3 py-3 text-[12px] leading-[18px] font-semibold text-adm-muted border-b border-adm-border", align === "right" ? "text-right" : "text-left", className)}>
+  <th scope="col" className={cn("bg-adm-workspace px-3 py-2.5 text-[12px] leading-[18px] font-semibold text-adm-muted border-b border-adm-border", align === "right" ? "text-right" : "text-left", className)}>
     {children}
   </th>
 );
 
-export const Td = ({ children, className, align = "left", colSpan }: { children?: ReactNode; className?: string; align?: "left" | "right"; colSpan?: number }) => (
-  <td colSpan={colSpan} className={cn("px-3 py-3.5 border-b border-adm-border align-middle", align === "right" ? "text-right tabular-nums" : "text-left", className)}>{children}</td>
+export const Td = ({ children, className, align = "left", colSpan, title }: { children?: ReactNode; className?: string; align?: "left" | "right"; colSpan?: number; title?: string }) => (
+  <td colSpan={colSpan} title={title} className={cn("px-3 py-[11px] border-b border-adm-border align-middle", align === "right" ? "text-right tabular-nums" : "text-left", className)}>{children}</td>
 );
 
 export const KeyValueList = ({ rows, className }: { rows: Array<{ label: ReactNode; value: ReactNode }>; className?: string }) => (

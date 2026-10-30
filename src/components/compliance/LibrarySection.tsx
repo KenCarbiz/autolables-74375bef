@@ -86,7 +86,7 @@ export const LibrarySection = () => {
         <Button variant="primary" onClick={clear}>Clear filters</Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
         <Panel flush>
           {rows.length === 0 ? (
             <EmptyState title="No requirement matches these filters" detail="Clear a filter or change the search." compact />
@@ -112,14 +112,14 @@ export const LibrarySection = () => {
                       className={`cursor-pointer ${on ? "bg-adm-selected" : "hover:bg-adm-workspace"}`}
                       aria-selected={on}
                     >
-                      <Td className="whitespace-nowrap px-2.5 text-adm-muted">{r.jurisdiction}</Td>
-                      <Td className="max-w-[190px] truncate px-2.5 font-semibold">
-                        <button type="button" onClick={() => setSelectedId(r.id)} className="max-w-full truncate text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">{r.requirement}</button>
+                      <Td className="whitespace-nowrap px-2.5 py-2 text-adm-muted">{r.jurisdiction}</Td>
+                      <Td className="px-2.5 py-2 font-semibold text-[13px] leading-[18px]">
+                        <button type="button" onClick={() => setSelectedId(r.id)} className="line-clamp-2 text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">{r.requirement}</button>
                       </Td>
-                      <Td className="whitespace-nowrap px-2.5"><StatusText tone={TYPE_TONE[r.type]}>{r.type}</StatusText></Td>
-                      <Td className="max-w-[140px] truncate px-2.5 text-adm-muted">{r.source}</Td>
-                      <Td className="whitespace-nowrap px-2.5 text-adm-muted">{r.reviewed ?? "Unknown"}</Td>
-                      <Td className="max-w-[110px] truncate px-2.5 text-adm-muted">{r.workflow}</Td>
+                      <Td className="whitespace-nowrap px-2.5 py-2 text-adm-muted">{r.type}</Td>
+                      <Td className="px-2.5 py-2 text-[13px] leading-[18px] text-adm-muted"><span className="line-clamp-2">{r.source}</span></Td>
+                      <Td className="whitespace-nowrap px-2.5 py-2 text-adm-muted">{r.reviewed ?? "Unknown"}</Td>
+                      <Td className="px-2.5 py-2 text-[13px] leading-[18px] text-adm-muted"><span className="line-clamp-2">{r.workflow}</span></Td>
                     </tr>
                   );
                 })}

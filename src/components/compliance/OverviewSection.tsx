@@ -63,7 +63,7 @@ export const OverviewSection = ({
         <QueryState
           status={status}
           errorTitle="Vehicles needing attention are unavailable"
-          errorDetail="The compliance read failed, so this list is unknown rather than clear. Use Refresh to try again."
+          errorDetail="The compliance read failed, so this list is unknown rather than clear. Retry to try again."
           emptyTitle={overview.activeInventory > 0 ? "No open issues" : "No active inventory"}
           emptyDetail={overview.activeInventory > 0 ? "Every in-stock vehicle is clear of certification, exception, price, document and recall issues." : "Nothing is in stock for this store, so there is nothing to check."}
         >
@@ -83,8 +83,8 @@ export const OverviewSection = ({
                 const action = nextAction(r, issue);
                 return (
                   <tr key={r.vehicleId}>
-                    <Td className="max-w-[260px] truncate"><span className="font-medium">{r.title}</span> <span className="font-mono text-[12px] text-adm-muted">({r.vin})</span></Td>
-                    <Td className="max-w-[320px] truncate">{ISSUE_CATEGORY_LABEL[issue.category]}: {issue.label}</Td>
+                    <Td className="whitespace-nowrap" title={r.title}><span className="font-medium">{r.title.split(" ").slice(0, 3).join(" ")}</span> <span className="font-mono text-[12px] text-adm-muted">({r.vin.slice(-8)})</span></Td>
+                    <Td className="max-w-[380px] truncate">{ISSUE_CATEGORY_LABEL[issue.category]}: {issue.label}</Td>
                     <Td className="whitespace-nowrap text-adm-muted">{formatDateTime(r.lastCheckedAt)}</Td>
                     <Td><Link to={action.to} className="font-semibold text-adm-primary hover:underline">{action.label}</Link></Td>
                     <Td><StatusText tone={r.critical > 0 ? "danger" : "warning"}>{r.critical > 0 ? "Critical" : "Open"}</StatusText></Td>

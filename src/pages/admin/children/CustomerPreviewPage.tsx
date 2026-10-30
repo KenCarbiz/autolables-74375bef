@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { FileText } from "lucide-react";
 import { AdminButton } from "@/components/admin/v2/primitives";
+import { Crumbs } from "@/components/detail/parts";
 import { PageBody, PageHeader } from "@/components/product";
+import { adminTabHref } from "@/lib/admin/sections";
 
 // Dealer-only picker for the served customer Passport. It sets the preview
 // parameters the served page already understands and loads that page in a
@@ -30,8 +32,9 @@ export default function CustomerPreviewPage() {
 
   return (
     <PageBody width="wide">
+      <Crumbs items={[{ label: "Administration", to: "/admin" }, { label: "Customer Experience", to: adminTabHref("customer-previews") }, { label: "Passport preview" }]} />
       <PageHeader
-        title="Customer Passport Preview: dealer view only"
+        title="Customer Passport Preview — Dealer View Only"
         description="This preview uses the existing production component. The customer-facing Passport design is unchanged."
       />
       <form

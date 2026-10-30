@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Crumbs } from "@/components/detail/parts";
 import { AdminButton, AdminCard, SkeletonBlock } from "@/components/admin/v2/primitives";
@@ -32,7 +32,7 @@ const num = (v: number) => (Number.isFinite(v) ? v : 0);
 
 const PX_PER_IN = 22;
 
-const PagePreview = ({ type, cal, active }: { type: StickerType; cal: PrintCalibration; active: boolean }) => {
+const PagePreview = ({ type, cal, footer }: { type: StickerType; cal: PrintCalibration; footer?: ReactNode }) => {
   const spec = PAPER[type];
   const w = spec.widthIn * PX_PER_IN;
   const h = spec.heightIn * PX_PER_IN;
@@ -50,21 +50,22 @@ const PagePreview = ({ type, cal, active }: { type: StickerType; cal: PrintCalib
         <g transform={`translate(${dx} ${dy})`}>
           <rect x={pad + inset} y={pad + top} width={Math.max(w - inset * 2, 0) * s} height={Math.max(h - top * 2, 0) * s} fill="#F3F6FC" stroke="#2457D6" strokeDasharray="4 3" />
           {(narrow ? ["AutoLabels", "Test Page"] : ["AutoLabels Test Page"]).map((line, i) => (
-            <text key={line} x={pad + w / 2} y={pad + h / 2 - 6 + i * 13} textAnchor="middle" fontSize="11" fontWeight="600" fill="#1D2433">{line}</text>
+            <text key={line} x={pad + w / 2} y={pad + h / 2 - 6 + i * 15} textAnchor="middle" fontSize="12" fontWeight="600" fill="#1D2433">{line}</text>
           ))}
-          {(narrow ? ["Margins match", "the printed output"] : ["Margins match the printed output"]).map((line, i) => (
-            <text key={line} x={pad + w / 2} y={pad + h / 2 + (narrow ? 22 : 10) + i * 11} textAnchor="middle" fontSize="9" fill="#5B6578">{line}</text>
+          {["Margins match", "the printed output"].map((line, i) => (
+            <text key={line} x={pad + w / 2} y={pad + h / 2 + (narrow ? 26 : 14) + i * 14} textAnchor="middle" fontSize="12" fill="#5B6578">{line}</text>
           ))}
         </g>
         <line x1={pad} y1={pad - 14} x2={pad + w} y2={pad - 14} stroke="#8A94A6" />
-        <text x={pad + w / 2} y={pad - 19} textAnchor="middle" fontSize="11" fill="#1D2433">{spec.widthIn} in ({Math.round(spec.widthIn * 96)} px at 96 dpi)</text>
+        <text x={pad + w / 2} y={pad - 19} textAnchor="middle" fontSize="12" fill="#1D2433">{spec.widthIn} in ({Math.round(spec.widthIn * 96)} px at 96 dpi)</text>
         <line x1={pad + w + 14} y1={pad} x2={pad + w + 14} y2={pad + h} stroke="#8A94A6" />
-        <text x={pad + w + 20} y={pad + h / 2} fontSize="11" fill="#1D2433">
+        <text x={pad + w + 20} y={pad + h / 2} fontSize="12" fill="#1D2433">
           <tspan x={pad + w + 20}>{spec.heightIn} in</tspan>
-          <tspan x={pad + w + 20} dy="13">{Math.round(spec.heightIn * 96)} px</tspan>
-          <tspan x={pad + w + 20} dy="13">at 96 dpi</tspan>
+          <tspan x={pad + w + 20} dy="15">{Math.round(spec.heightIn * 96)} px</tspan>
+          <tspan x={pad + w + 20} dy="15">at 96 dpi</tspan>
         </text>
       </svg>
+      {footer}
     </AdminCard>
   );
 };
@@ -105,12 +106,11 @@ export default function PrintCalibrationPage() {
       <PageHeader
         title="Printer Calibration"
         description="Calibrate printer settings to ensure accurate document layout and page boundaries."
-        actions={<AdminButton variant="primary" onClick={printTest}>Print test page</AdminButton>}
       />
       {loading ? (
         <SkeletonBlock className="h-72 w-full" />
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)_minmax(0,1fr)] items-start">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)_minmax(0,1fr)] items-stretch [&>*]:h-full">
           <AdminCard inset="sm" flush>
             <div role="tablist" aria-label="Calibration steps" className="flex border-b border-adm-border px-4">
               {STEPS.map((s) => (
@@ -195,8 +195,8 @@ export default function PrintCalibrationPage() {
               )}
             </div>
           </AdminCard>
-          <PagePreview type="window" cal={cal} active={format === "window"} />
-          <PagePreview type="addendum" cal={cal} active={format === "addendum"} />
+          <PagePreview type="window" cal={cal} footer={<AdminButton variant="primary" className="mt-4" onClick={printTest}>Print test page</AdminButton>} />
+          <PagePreview type="addendum" cal={cal} />
         </div>
       )}
     </PageBody>

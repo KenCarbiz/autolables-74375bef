@@ -10,6 +10,7 @@ import { canDispatchGetReady } from "@/lib/commandCenter/dispatchAuthority";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Search, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { proposedServiceLines, proposedServiceTotal, type ProposedServiceLine } from "@/lib/getReady/proposedService";
 import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, QueryState, StatusText, Td, Th, WorkTable, type LocalTab, type Tone } from "@/components/product";
 
 // /get-ready-command — the used-car manager's fleet-level intake queue.
@@ -81,6 +82,24 @@ export default function ManagerIntake() {
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
   const [drawerTab, setDrawerTab] = useState<"Proposed service" | "Condition" | "Notes" | "History">("Proposed service");
+
+  const [proposed, setProposed] = useState<{ vehicleId: string; lines: ProposedServiceLine[] } | null>(null);
+  const drawerVehicleId = drawer?.vehicleId ?? null;
+  useEffect(() => {
+    if (!drawerVehicleId || !tenantId) return;
+    let cancelled = false;
+    (async () => {
+      const { data: ests } = await sb().from("recon_estimates")
+        .select("id").eq("tenant_id", tenantId).eq("vehicle_listing_id", drawerVehicleId);
+      const ids = ((ests as { id: string }[]) || []).map((e) => e.id);
+      if (!ids.length) { if (!cancelled) setProposed({ vehicleId: drawerVehicleId, lines: [] }); return; }
+      const { data: ls } = await sb().from("recon_estimate_lines")
+        .select("id, estimate_id, category, description, line_total, approval_status, completed_at")
+        .eq("tenant_id", tenantId).in("estimate_id", ids);
+      if (!cancelled) setProposed({ vehicleId: drawerVehicleId, lines: proposedServiceLines((ls as never[]) || []) });
+    })().catch(() => { if (!cancelled) setProposed({ vehicleId: drawerVehicleId, lines: [] }); });
+    return () => { cancelled = true; };
+  }, [drawerVehicleId, tenantId]);
 
   const load = useCallback(async () => {
     if (!tenantId) { setLoading(false); return; }
@@ -295,7 +314,7 @@ export default function ManagerIntake() {
           <aside role="dialog" aria-modal="true" aria-label={`${drawer.ymm} intake review`}
             className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[740px] flex-col border-l border-adm-border bg-adm-surface">
             <div className="flex items-center justify-between px-5 py-3 border-b border-adm-border">
-              <h3 className="text-[17px] leading-[24px] font-semibold text-adm-ink">Review vehicle</h3>
+              <h3 className="text-[20px] leading-[28px] font-bold text-adm-ink">Review vehicle</h3>
               <button onClick={() => setDrawer(null)} aria-label="Close review" className="w-10 h-10 grid place-items-center text-adm-muted hover:text-adm-ink"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
@@ -332,7 +351,39 @@ export default function ManagerIntake() {
               </nav>
               <div className="text-[14px] leading-[20px] min-h-[96px]">
                 {drawerTab === "Proposed service" && (
-                  <p className="text-adm-muted">No proposed service items are recorded for this vehicle yet. Service proposes work after authorization, on the authorization detail page.</p>
+                  <WorkTable caption="Proposed service">
+                    <thead>
+                      <tr>
+                        <Th className="w-[88px]">Type</Th>
+                        <Th>Description</Th>
+                        <Th align="right" className="w-[88px]">Est. cost</Th>
+                        <Th className="w-[96px]">Status</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {proposed?.vehicleId !== drawer.vehicleId ? (
+                        <tr><Td colSpan={4} className="text-adm-muted">Loading proposed service.</Td></tr>
+                      ) : proposed.lines.length === 0 ? (
+                        <tr><Td colSpan={4} className="text-adm-muted">No proposed service items are recorded for this vehicle. Service proposes work on the authorization detail page.</Td></tr>
+                      ) : (
+                        <>
+                          {proposed.lines.map((l) => (
+                            <tr key={l.id} className="h-11">
+                              <Td className="whitespace-nowrap">{l.type}</Td>
+                              <Td className="max-w-[260px] truncate">{l.description}</Td>
+                              <Td align="right" className="whitespace-nowrap tabular-nums">${l.cost.toLocaleString("en-US")}</Td>
+                              <Td className="whitespace-nowrap"><StatusText tone={l.status === "declined" ? "danger" : l.status === "proposed" ? "neutral" : "success"}>{l.status[0].toUpperCase() + l.status.slice(1)}</StatusText></Td>
+                            </tr>
+                          ))}
+                          <tr className="h-11">
+                            <Td colSpan={2} className="font-semibold">Estimated total</Td>
+                            <Td align="right" className="font-semibold tabular-nums">${proposedServiceTotal(proposed.lines).toLocaleString("en-US")}</Td>
+                            <Td />
+                          </tr>
+                        </>
+                      )}
+                    </tbody>
+                  </WorkTable>
                 )}
                 {drawerTab === "Condition" && (
                   <dl className="space-y-1.5">

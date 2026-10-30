@@ -188,8 +188,13 @@ export const MetricStrip = ({ metrics, label, className, action }: { metrics: Me
                 {m.hint && <dd className="truncate text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}
               </>
             );
+            const barred = !m.loading && m.value !== 0 && m.value !== "0" && (m.tone === "danger" || m.tone === "success" || m.tone === "warning");
             const cell = cn(
               "relative block py-3 px-5 min-w-0",
+              barred && "before:absolute before:left-0 before:top-3 before:bottom-3 before:w-[3px]",
+              barred && m.tone === "danger" && "before:bg-adm-danger",
+              barred && m.tone === "success" && "before:bg-adm-success",
+              barred && m.tone === "warning" && "before:bg-[#B45309]",
               i % 2 === 1 && "border-l border-adm-border",
               i >= 2 && "border-t border-adm-border lg:border-t-0",
               i >= 1 && "lg:border-l",

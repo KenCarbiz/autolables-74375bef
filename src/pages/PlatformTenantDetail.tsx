@@ -307,12 +307,12 @@ const PlatformTenantDetail = () => {
         />
         {tab === "overview" ? (
           <div className="flex flex-col gap-4">
-            <div className="grid gap-4 xl:grid-cols-3 items-start">
+            <div className="grid gap-4 xl:grid-cols-3 items-stretch [&>*]:h-full">
               {dealershipPanel}
               {summary}
               {entitlementsCompact}
             </div>
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-start">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-stretch [&>*]:h-full">
               {providerPanel}
               {membersPanel(5)}
             </div>

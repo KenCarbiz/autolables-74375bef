@@ -188,13 +188,13 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
                 <Fragment key={r.id}>
                   <tr>
                     <Td className="whitespace-nowrap text-adm-muted">{formatDateTime(r.created_at)}</Td>
-                    <Td className="max-w-[170px] truncate">{r.user_email || "System"}</Td>
+                    <Td className="max-w-[230px] truncate">{r.user_email || "System"}</Td>
                     <Td className="whitespace-nowrap">{activityLabel(r.action)}</Td>
                     <Td className="max-w-[200px] truncate">{entityKindLabel(r.entity_type)} <span className="font-mono text-[13px] text-adm-muted">{entityRef(r)}</span></Td>
                     <Td className="whitespace-nowrap"><StatusText tone={outcomeOf(r) === "Failed" ? "danger" : "success"}>{outcomeOf(r)}</StatusText></Td>
-                    <Td className="max-w-[220px] truncate text-adm-muted">{detailText(r)}</Td>
+                    <Td className="max-w-[260px] truncate text-adm-muted">{detailText(r)}</Td>
                     <Td align="right">
-                      <button type="button" aria-expanded={open === r.id} aria-label="Show event detail" onClick={() => setOpen(open === r.id ? null : r.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-adm-primary hover:bg-adm-selected">
+                      <button type="button" aria-expanded={open === r.id} aria-label="Show event detail" onClick={() => setOpen(open === r.id ? null : r.id)} className="inline-flex h-6 w-6 items-center justify-center rounded-md text-adm-primary hover:bg-adm-selected">
                         <ChevronDown className={`h-5 w-5 transition-transform ${open === r.id ? "rotate-180" : ""}`} aria-hidden="true" />
                       </button>
                     </Td>

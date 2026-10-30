@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
-import { Lock, RefreshCw } from "lucide-react";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
+import { Lock } from "lucide-react";
 import { Button, InlineNote, LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { useTenant } from "@/contexts/TenantContext";
 import { COMPLIANCE_SECTIONS, isComplianceSection, type ComplianceSectionId } from "./complianceData";
@@ -98,8 +98,7 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
   return (
     <PageBody width="wide">
       <PageHeader
-        scope={section === "titles" ? <Link to="/compliance" className="text-adm-primary hover:underline">Compliance</Link> : undefined}
-        title={own ? header.title : "Compliance"}
+                title={own ? header.title : "Compliance"}
         description={section === "titles" ? header.description : own ? undefined : "Monitor deal readiness, identify blockers, and manage regulatory requirements."}
         actions={
           section === "titles" ? (
@@ -107,11 +106,7 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
               <Lock className="mt-0.5 h-5 w-5 flex-shrink-0" aria-hidden="true" />
               <span>Internal use only. These are private ownership documents. Do not share outside the dealership.</span>
             </div>
-          ) : own || section === "vin-defense" ? undefined : (
-            <Button onClick={data.refresh} disabled={data.loading}>
-              <RefreshCw className={`h-5 w-5 ${data.loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
-            </Button>
-          )
+          ) : undefined
         }
       />
 

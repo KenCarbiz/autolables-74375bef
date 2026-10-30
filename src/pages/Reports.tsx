@@ -98,14 +98,15 @@ const ViewHeader = ({ title, scope }: { title: string; scope: string }) => (
 const DailyChart = ({ title, data, days }: { title: string; data: { day: string; count: number }[]; days: number }) => {
   const total = data.reduce((n, d) => n + d.count, 0);
   const max = Math.max(1, ...data.map((d) => d.count));
-  const W = 760;
-  const H = 190;
-  const L = 36;
-  const B = 24;
+  const W = 580;
+  const H = 180;
+  const L = 32;
+  const B = 26;
   const step = data.length > 1 ? (W - L - 8) / (data.length - 1) : 0;
   const y = (c: number) => H - B - (c / max) * (H - B - 12);
   const pts = data.map((d, i) => `${L + i * step},${y(d.count)}`);
-  const ticks = [0, Math.ceil(max / 2), max];
+  const ticks = max >= 4 ? [0, Math.round(max / 4), Math.round(max / 2), Math.round((3 * max) / 4), max].filter((t, i, a) => a.indexOf(t) === i) : [0, Math.ceil(max / 2), max];
+  const labelAt = data.length > 1 ? [0, 1, 2, 3, 4].map((k) => Math.round((k * (data.length - 1)) / 4)).filter((v, i, a) => a.indexOf(v) === i) : [0];
   return (
     <section className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
       <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{title}</h3>
@@ -117,13 +118,15 @@ const DailyChart = ({ title, data, days }: { title: string; data: { day: string;
           {ticks.map((t) => (
             <g key={t}>
               <line x1={L} x2={W - 8} y1={y(t)} y2={y(t)} stroke="#E3E7EC" />
-              <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#5B6578">{t}</text>
+              <text x={L - 6} y={y(t) + 4} textAnchor="end" fontSize="12" fill="#5B6578">{t}</text>
             </g>
           ))}
           <polygon points={`${L},${H - B} ${pts.join(" ")} ${L + (data.length - 1) * step},${H - B}`} fill="#2457D6" opacity="0.1" />
           <polyline points={pts.join(" ")} fill="none" stroke="#2457D6" strokeWidth="2" strokeLinejoin="round" />
-          <text x={L} y={H - 6} fontSize="11" fill="#5B6578">{data[0]?.day}</text>
-          <text x={W - 8} y={H - 6} textAnchor="end" fontSize="11" fill="#5B6578">{data[data.length - 1]?.day}</text>
+          {data.map((d, i) => <circle key={d.day} cx={L + i * step} cy={y(d.count)} r="2.5" fill="#2457D6" />)}
+          {labelAt.map((i, k) => (
+            <text key={data[i].day} x={L + i * step} y={H - 6} textAnchor={k === 0 ? "start" : k === labelAt.length - 1 ? "end" : "middle"} fontSize="12" fill="#5B6578">{data[i].day.slice(5)}</text>
+          ))}
         </svg>
       )}
     </section>

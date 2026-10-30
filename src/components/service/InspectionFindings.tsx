@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { Camera, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState, Panel, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
 import { FINDING_RESULT_LABEL, countFindings, type Finding, type FindingResult } from "@/lib/service/inspectionFindings";
@@ -45,6 +45,7 @@ export function FindingsTable({ findings, selectedId, onSelect }: { findings: Fi
               <tr>
                 <Th>Item</Th>
                 <Th>Result</Th>
+                <Th>Measurement</Th>
                 <Th>Notes</Th>
                 <Th className="w-10"><span className="sr-only">Open</span></Th>
               </tr>
@@ -54,6 +55,7 @@ export function FindingsTable({ findings, selectedId, onSelect }: { findings: Fi
                 <tr key={f.id} className={cn("cursor-pointer hover:bg-adm-workspace", selectedId === f.id && "bg-adm-selected")} onClick={() => onSelect(f.id)}>
                   <Td className="font-semibold max-w-[200px] truncate">{f.label}</Td>
                   <Td><StatusText tone={RESULT_TONE[f.result]}>{FINDING_RESULT_LABEL[f.result]}</StatusText></Td>
+                  <Td className="max-w-[120px] truncate tabular-nums">{f.measurement || <span className="text-adm-muted">Not recorded</span>}</Td>
                   <Td className="max-w-[260px] truncate text-adm-muted">{f.notes || "No notes"}</Td>
                   <Td>
                     <button type="button" aria-label={`Show detail for ${f.label}`} onClick={() => onSelect(f.id)} className="text-adm-muted">
@@ -63,7 +65,7 @@ export function FindingsTable({ findings, selectedId, onSelect }: { findings: Fi
                 </tr>
               ))}
               {shown.length === 0 && (
-                <tr><Td colSpan={4} className="text-center text-adm-muted">No findings match this filter.</Td></tr>
+                <tr><Td colSpan={5} className="text-center text-adm-muted">No findings match this filter.</Td></tr>
               )}
             </tbody>
           </WorkTable>
@@ -78,11 +80,13 @@ export function FindingDetail({
   repairLabel,
   photos,
   vehicleFileHref,
+  onAddPhotos,
 }: {
   finding: Finding | null;
   repairLabel: string | null;
   photos: string[];
   vehicleFileHref: string;
+  onAddPhotos?: (files: FileList | null) => void;
 }) {
   if (!finding) {
     return (
@@ -106,7 +110,7 @@ export function FindingDetail({
         <p className="text-adm-ink">{finding.notes || "No notes were recorded for this item."}</p>
         {photos.length > 0 ? (
           <div className="grid grid-cols-3 gap-2">
-            {photos.slice(0, 3).map((u) => (
+            {photos.slice(0, 6).map((u) => (
               <a key={u} href={u} target="_blank" rel="noreferrer">
                 <img src={u} alt="Inspection evidence" className="h-20 w-full rounded-[6px] border border-adm-border object-cover" />
               </a>
@@ -114,6 +118,14 @@ export function FindingDetail({
           </div>
         ) : (
           <p className="text-adm-muted">No evidence photos on file for this item.</p>
+        )}
+        {onAddPhotos && (
+          <div>
+            <input type="file" accept="image/*" multiple className="sr-only" id={`finding-photo-${finding.id}`} onChange={(e) => { onAddPhotos(e.target.files); e.target.value = ""; }} />
+            <label htmlFor={`finding-photo-${finding.id}`} className="inline-flex min-h-[36px] cursor-pointer items-center gap-2 rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace">
+              <Camera className="w-5 h-5" aria-hidden="true" /> Add evidence photo
+            </label>
+          </div>
         )}
         <div>
           <p className="font-semibold text-adm-ink">Repair status</p>

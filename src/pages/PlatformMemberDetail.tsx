@@ -14,6 +14,7 @@ import { formatDate, memberLabel, memberStatus, planLabel } from "@/pages/Platfo
 
 type Level = "Allow" | "Read only" | "Deny";
 
+const CELL_FILL: Partial<Record<Tone, string>> = { success: "bg-adm-success-bg/70 text-adm-success", warning: "bg-adm-warning-bg text-adm-warning", danger: "bg-adm-danger-bg text-adm-danger" };
 const LEVEL_TONE: Record<Level, Tone> = { Allow: "success", "Read only": "warning", Deny: "danger" };
 
 const MATRIX: { label: string; view: DealerCapability; manage?: DealerCapability }[] = [
@@ -162,16 +163,16 @@ const PlatformMemberDetail = () => {
                   <thead>
                     <tr>
                       <Th>Capability</Th>
-                      {entitledSeats.map(({ seat }) => <Th key={seat.id}>{tenantName(seat.tenant_id)}</Th>)}
+                      {entitledSeats.map(({ seat }) => <Th key={seat.id} className="text-center">{tenantName(seat.tenant_id)}</Th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {MATRIX.map((row, i) => (
                       <tr key={row.label}>
-                        <Td className="whitespace-nowrap !py-2.5">{row.label}</Td>
+                        <Td className="whitespace-nowrap !py-2">{row.label}</Td>
                         {entitledSeats.map(({ seat, ent }) => {
                           const level = levels(seat, isEntitled(ent))[i];
-                          return <Td key={seat.id} className="!py-2.5"><StatusText tone={LEVEL_TONE[level]}>{level}</StatusText></Td>;
+                          return <Td key={seat.id} className={`!py-2 text-center text-[13px] font-semibold ${CELL_FILL[LEVEL_TONE[level]]}`}>{level}</Td>;
                         })}
                       </tr>
                     ))}

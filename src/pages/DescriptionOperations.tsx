@@ -206,6 +206,7 @@ export default function DescriptionOperations() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [syncing, setSyncing] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<"overview" | "source">("overview");
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("vehicle");
   const select = (id: string | null) => {
@@ -381,8 +382,10 @@ export default function DescriptionOperations() {
 
 
   const drawer = selectedRow ? (
-    <aside aria-label="Description record" className="min-w-0 rounded-[6px] border border-adm-border bg-adm-surface lg:sticky lg:top-4">
-      <div className="flex items-start justify-between gap-3 border-b border-adm-border px-4 py-3">
+    <>
+    <div className="fixed inset-0 z-40 bg-black/20" onClick={() => select(null)} aria-hidden />
+    <aside aria-label="Description record" className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[400px] flex-col border-l border-adm-border bg-adm-surface">
+      <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="min-w-0">
           <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{vehicleStockNumber(selectedRow.vehicle) || "No stock number"}</p>
           <p className="text-[13px] leading-[18px] text-adm-muted truncate">{selectedRow.vehicle.ymm || "Vehicle"}</p>
@@ -391,9 +394,20 @@ export default function DescriptionOperations() {
           <X className="w-5 h-5" />
         </button>
       </div>
-      <div className="space-y-4 px-4 py-4 text-[14px] leading-[20px]">
+      <div role="tablist" aria-label="Record sections" className="mt-3 flex gap-6 border-b border-adm-border px-4">
+        {([["overview", "Overview"], ["source", "Source details"]] as const).map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={drawerTab === key} onClick={() => setDrawerTab(key)}
+            className={`-mb-px min-h-[40px] border-b-2 text-[14px] ${drawerTab === key ? "border-adm-primary font-semibold text-adm-primary" : "border-transparent font-medium text-adm-muted hover:text-adm-ink"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 overflow-y-auto space-y-4 px-4 py-4 text-[14px] leading-[20px]">
+        {drawerTab === "overview" ? (
+          <>
         <dl className="space-y-1.5">
           {[
+            ["Stock #", vehicleStockNumber(selectedRow.vehicle) || "Unknown"],
             ["VIN", selectedRow.vehicle.vin || "Unknown"],
             ["Condition", selectedRow.vehicle.condition ? String(selectedRow.vehicle.condition).replace(/^./, (c) => c.toUpperCase()) : "Unknown"],
             ["Status", <StatusText key="s" tone={STATE_META[selectedRow.state].tone}>{STATE_META[selectedRow.state].label}</StatusText>],
@@ -428,9 +442,9 @@ export default function DescriptionOperations() {
           </p>
           {selectedRow.caseRow?.status && <p className="text-adm-muted">{String(selectedRow.caseRow.status).replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase())}</p>}
         </div>
-        <details className="group">
-          <summary className="cursor-pointer font-semibold text-adm-primary">Diagnostics</summary>
-          <div className="mt-2 overflow-x-auto">
+          </>
+        ) : (
+          <div className="overflow-x-auto">
             <VehicleDiagnosticPanel
               vin={selectedRow.vehicle.vin || ""}
               caseStatus={(selectedRow.caseRow?.status as string | undefined) ?? null}
@@ -446,7 +460,7 @@ export default function DescriptionOperations() {
               onOpenStudio={() => navigate(`/description-studio?vehicle=${selectedRow.vehicleId}`)}
             />
           </div>
-        </details>
+        )}
       </div>
       <div className="flex flex-col gap-2 border-t border-adm-border px-4 py-3">
         <Button variant="primary" onClick={() => navigate(`/description-intelligence/${selectedRow.vehicleId}`)}>Review description record</Button>
@@ -456,6 +470,7 @@ export default function DescriptionOperations() {
         </div>
       </div>
     </aside>
+    </>
   ) : null;
 
   return (
@@ -465,7 +480,7 @@ export default function DescriptionOperations() {
         description="Which vehicles have a description, and which ones need a person."
         actions={
           <>
-            <Button variant="primary" onClick={() => applyStateFilter("needs_review")}>
+            <Button onClick={() => applyStateFilter("needs_review")}>
               Review vehicles{kpis.needs_review > 0 ? ` (${kpis.needs_review})` : ""}
             </Button>
           </>
@@ -528,7 +543,7 @@ export default function DescriptionOperations() {
         </button>
       </div>
 
-      <div className={drawer ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start" : ""}>
+      <div>
       <div className="min-w-0 rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
         {error || exceptionError ? (
           <div className="p-8 text-center">
@@ -563,9 +578,7 @@ export default function DescriptionOperations() {
           <>
             <table className="w-full table-fixed text-left border-collapse">
               <colgroup>
-                {drawer
-                  ? <><col className="w-[38%]" /><col className="w-[12%]" /><col className="w-[22%]" /><col className="w-[28%]" /></>
-                  : <><col className="w-[24%]" /><col className="w-[10%]" /><col className="w-[16%]" /><col className="w-[20%]" /><col className="w-[16%]" /><col className="w-[8%]" /><col className="w-[6%]" /></>}
+                <col className="w-[24%]" /><col className="w-[10%]" /><col className="w-[16%]" /><col className="w-[20%]" /><col className="w-[16%]" /><col className="w-[8%]" /><col className="w-[6%]" />
               </colgroup>
               <thead>
                 <tr className="text-[12px] leading-[18px] font-semibold text-adm-muted bg-adm-workspace border-b border-adm-border">
@@ -573,9 +586,9 @@ export default function DescriptionOperations() {
                   <th className="px-3 py-2.5">Stock #</th>
                   <SortHead k="state">Description state</SortHead>
                   <th className="px-3 py-2.5">Primary issue</th>
-                  {!drawer && <th className="px-3 py-2.5">Latest attempt</th>}
-                  {!drawer && <th className="px-3 py-2.5">Channels</th>}
-                  {!drawer && <SortHead k="updated">Updated</SortHead>}
+                  <th className="px-3 py-2.5">Latest attempt</th>
+                  <th className="px-3 py-2.5">Channels</th>
+                  <SortHead k="updated">Updated</SortHead>
                 </tr>
               </thead>
               <tbody className="divide-y divide-adm-border">
@@ -588,7 +601,7 @@ export default function DescriptionOperations() {
                       key={r.vehicleId}
                       onClick={() => select(active ? null : r.vehicleId)}
                       aria-selected={active}
-                      className={`h-14 cursor-pointer transition-colors ${active ? "bg-adm-selected" : "hover:bg-adm-workspace"}`}
+                      className={`h-11 cursor-pointer transition-colors ${active ? "bg-adm-selected" : "hover:bg-adm-workspace"}`}
                     >
                       <td className="px-3 text-[14px] font-semibold text-adm-ink truncate">
                         <button type="button" onClick={(e) => { e.stopPropagation(); select(active ? null : r.vehicleId); }} className="text-left max-w-full truncate hover:underline focus-visible:underline">
@@ -598,19 +611,15 @@ export default function DescriptionOperations() {
                       <td className="px-3 text-[14px] text-adm-muted truncate">{stock || "Unknown"}</td>
                       <td className="px-3"><StatusText tone={state.tone}>{state.label}</StatusText></td>
                       <td className="px-3 text-[14px] text-adm-ink truncate">{r.issue || "None"}</td>
-                      {!drawer && <td className="px-3 text-[13px] text-adm-muted truncate">
+                      <td className="px-3 text-[13px] text-adm-muted truncate">
                         {r.caseRow?.last_orchestrated_at ? new Date(r.caseRow.last_orchestrated_at as string).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "None"}
-                      </td>}
-                      {!drawer && (
-                        <td className="px-3 text-[14px] tabular-nums text-adm-ink truncate">
-                          {configuredChannels.length === 0 ? "None" : `${r.channelsPresent.length}/${configuredChannels.length}`}
-                        </td>
-                      )}
-                      {!drawer && (
-                        <td className="px-3 text-[13px] text-adm-muted whitespace-nowrap">
-                          {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Unknown"}
-                        </td>
-                      )}
+                      </td>
+                      <td className="px-3 text-[14px] tabular-nums text-adm-ink truncate">
+                        {configuredChannels.length === 0 ? "None" : `${r.channelsPresent.length}/${configuredChannels.length}`}
+                      </td>
+                      <td className="px-3 text-[13px] text-adm-muted whitespace-nowrap">
+                        {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Unknown"}
+                      </td>
                     </tr>
                   );
                 })}

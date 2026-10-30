@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { HEALTH_META, describeAge } from "@/lib/admin/health";
 import { PROVIDER_CARDS, providerDrillIn, aggregateEvents, type ProviderEventRow } from "@/lib/admin/integrations/providers";
@@ -102,6 +102,7 @@ export default function ProviderDetailPage() {
               <KeyValueList
                 rows={[
                   ...(tab === "data" ? [{ label: "Affects", value: spec.affectedOutput }] : []),
+                  ...(tab === "overview" ? [{ label: "Output", value: spec.affectedOutput }] : []),
                   ...(tab !== "data" && spec.registryKeys.length ? [{ label: "Registry keys", value: <span className="font-mono text-[13px]">{spec.registryKeys.join(", ")}</span> }] : []),
                   ...(tab !== "data" ? [{ label: "Mode", value: spec.manual ? "Manual, on request" : "Automatic" }] : []),
                   { label: "Last attempt", value: card.lastAttemptAt ? formatAt(card.lastAttemptAt) : <span className="text-adm-muted">None recorded</span> },
@@ -113,7 +114,7 @@ export default function ProviderDetailPage() {
             </Panel>
           )}
           {(tab === "overview" || tab === "attempts") && (
-            <Panel title="Recent attempts" titleSize="md" inset="sm" flush>
+            <Panel title="Recent attempts" titleSize="md" inset="sm" flush action={tab === "overview" && attempts.length > 0 ? <Link to={`${base}?tab=attempts`} className="text-[13px] font-medium text-adm-primary hover:underline">View all attempts</Link> : undefined}>
               <WorkTable caption="Recent provider calls">
                 <thead>
                   <tr><Th>Date and time</Th><Th>Product</Th><Th>Outcome</Th><Th align="right">HTTP</Th></tr>

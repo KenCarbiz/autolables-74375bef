@@ -79,11 +79,16 @@ export async function loadLedgerHeads(tenantId: string): Promise<LedgerHeads> {
 export async function loadLastSuccessAt(tenantId: string): Promise<{ at: string | null; failed: boolean }> {
   try {
     const rpc = await db().rpc("admin_feed_last_success", { p_tenant_id: tenantId });
-    if (!rpc.error) return { at: typeof rpc.data === "string" ? rpc.data : null, failed: false };
+    if (!rpc.error && typeof rpc.data === "string") return { at: rpc.data, failed: false };
+    if (!rpc.error) return loadLastSuccessFromLedger(tenantId);
     if (!isUndefinedFunction(rpc.error)) return { at: null, failed: true };
   } catch {
     return { at: null, failed: true };
   }
+  return loadLastSuccessFromLedger(tenantId);
+}
+
+async function loadLastSuccessFromLedger(tenantId: string): Promise<{ at: string | null; failed: boolean }> {
   try {
     const { data, error } = await db().from("inventory_sync_runs").select("started_at").eq("tenant_id", tenantId).in("status", ["success", "partial"]).order("started_at", { ascending: false }).limit(1).maybeSingle();
     if (error) return { at: null, failed: true };

@@ -462,6 +462,21 @@ export default function ServiceVehicleWorkspace() {
                 repairLabel={activeFailure ? REPAIR_STATE_LABELS[activeFailure.repair_state as RepairState] ?? null : null}
                 photos={Array.isArray(activeFailure?.photos) ? activeFailure.photos : []}
                 vehicleFileHref={`/vehicle-file/${veh.id}`}
+                onAddPhotos={activeFailure && canCompleteWork ? async (files) => {
+                  if (!files?.length) return;
+                  const urls: string[] = [];
+                  for (const file of Array.from(files)) {
+                    try {
+                      const up = await uploadPhoto("prep-photos", file, { tenantId, vin });
+                      if (up?.url) urls.push(up.url);
+                    } catch { toast.error(`Couldn't upload ${file.name}`); }
+                  }
+                  if (!urls.length) return;
+                  const { error } = await (supabase as any).from("safety_inspection_item_failures").update({ photos: [...(activeFailure.photos || []), ...urls] }).eq("id", activeFailure.id);
+                  if (error) { toast.error("Couldn't save the photo."); return; }
+                  log({ action: "failure_photo_added", entity_type: "vehicle", entity_id: vin, store_id: tenantId, user_id: "", details: { failure_id: activeFailure.id, item_id: activeFailure.item_id, photos: urls } });
+                  void load();
+                } : undefined}
               />
               <div id="summary">
                 <SummaryCard findings={findings} newestSigned={newestSigned} openFailures={openFailures.length} clearance={clearance} items={grItems} />

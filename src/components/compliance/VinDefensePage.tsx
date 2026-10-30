@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { Download } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Crumbs, DetailLayout, SummaryList, fmtDateTime } from "@/components/detail/parts";
 import { Button, LinkButton, LocalTabs, PageBody, PageHeader, Panel, QueryState, StatusText, Td, Th, WorkTable } from "@/components/product";
 import { useTenant } from "@/contexts/TenantContext";
@@ -89,7 +90,7 @@ export default function VinDefensePage() {
     <PageBody width="wide">
       <Crumbs items={[{ label: "Compliance", to: "/compliance" }, { label: "VIN defense", to: "/compliance?tab=vin-defense" }, { label: vin }]} />
       <PageHeader
-        title={title ? `VIN defense — ${title}` : "VIN defense"}
+        title={title ? `VIN defense — ${title.split(" ").slice(0, 3).join(" ")}` : "VIN defense"}
         description={<span className="font-mono">VIN {vin}</span>}
         meta={
           packet ? (
@@ -101,8 +102,15 @@ export default function VinDefensePage() {
         }
         actions={
           <>
-            <Button variant="outline" onClick={exportJson} disabled={!packet}><Download className="h-5 w-5" aria-hidden="true" /> Export raw JSON</Button>
             <Button variant="primary" onClick={() => void assemble()} disabled={building || vin.length < 11}>{building ? "Assembling" : "Assemble packet"}</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">More <ChevronDown className="h-5 w-5" aria-hidden="true" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={!packet} onSelect={exportJson}>Export raw JSON</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       />

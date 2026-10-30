@@ -15,4 +15,12 @@ describe("inspection findings", () => {
   it("returns nothing for an empty or missing checklist", () => {
     expect(buildFindings(null)).toEqual([]);
   });
+  it("carries a recorded measurement and defaults to empty", () => {
+    const f = buildFindings([
+      { id: "a", label: "Brakes", result: "fail", measurement: "3 mm" },
+      { id: "b", label: "Tires", result: "pass", measurement: 7 },
+      { id: "c", label: "Battery", result: "pass" },
+    ]);
+    expect(f.map((x) => x.measurement)).toEqual(["3 mm", "7", ""]);
+  });
 });

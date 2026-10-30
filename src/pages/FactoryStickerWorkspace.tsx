@@ -731,7 +731,7 @@ export default function FactoryStickerWorkspace({
             </span>
           ) : undefined}
           actions={
-            !fixture && manager && !currentDoc ? (
+            !fixture && manager && !currentDoc && !data ? (
               <button
                 type="button"
                 onClick={() => act("orchestrate", { allowSourceFetch: true })}
@@ -868,7 +868,7 @@ export default function FactoryStickerWorkspace({
 
           {/* LEFT — vehicle and data status */}
           <div className="space-y-4">
-            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3">
+            {!pageSvg && <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3">
               <div className="flex items-center gap-3">
                 {hero ? (
                   <img src={hero} alt="Vehicle" className="h-14 w-[84px] shrink-0 object-cover rounded-[6px] border border-border" />
@@ -891,7 +891,7 @@ export default function FactoryStickerWorkspace({
               {!embedded && vehicle && (
                 <Link to={`/vehicle-file/${vehicle.id}`} className="inline-block text-[14px] font-semibold text-adm-primary hover:underline">Open vehicle file</Link>
               )}
-            </div>
+            </div>}
 
             {(record?.review_reason || record?.last_error || data?.generic) && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-1.5">
@@ -930,6 +930,28 @@ export default function FactoryStickerWorkspace({
             <div className="space-y-4 p-4 [&>div]:rounded-none [&>div]:border-0 [&>div]:p-0 [&>div]:bg-transparent">
             {rightTab === "details" ? (
               <>
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4" aria-label="Build record details">
+              <StatusRow label="Version" value={currentDoc ? `v${currentDoc.version}` : "None yet"} />
+              <StatusRow label="Generated" value={currentDoc ? fmtDate(currentDoc.created_at) : "Not generated"} />
+              <StatusRow label="Source" value={fixture ? "Benchmark fixture" : record?.source_provider || "Not run"} />
+              <StatusRow label="MSRP (OEM)" value={fmtMoney(pricing?.totalMsrp ?? null)} />
+              <StatusRow
+                label="MSRP (record)"
+                tone={difference == null ? "off" : Math.abs(difference) <= 5 ? "pass" : Math.abs(difference) <= 100 ? "warn" : "fail"}
+                value={difference == null ? "Not run" : Math.abs(difference) <= 5 ? "Match" : `Off by ${fmtMoney(Math.abs(difference))}`}
+              />
+              <StatusRow label="Status" value={genStatus ? humanize(genStatus) : "Not generated"} />
+              <StatusRow label="Visible on site" value={genStatus === "PUBLISHED" ? "Yes" : "No"} />
+              {!fixture && blockers.length > 0 && (
+                <p className="pt-2 text-[14px] leading-[20px] text-adm-muted">
+                  {blockers.length} open blocker{blockers.length === 1 ? "" : "s"}.{" "}
+                  <button type="button" onClick={() => setRightTab("technical")} className="font-semibold text-adm-primary hover:underline">See Technical data</button>
+                </p>
+              )}
+            </div>
+              </>
+            ) : (
+              <>
             <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
               <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Source & classification</h2>
               <StatusRow
@@ -952,7 +974,7 @@ export default function FactoryStickerWorkspace({
                 isPlatformAdmin={isAdmin}
                 busy={!!busy}
                 onRegenerate={() => act(record ? "regenerate" : "orchestrate")}
-                onRetrieveSourceData={manager && !currentDoc ? undefined : () => act("orchestrate", { allowSourceFetch: true })}
+                onRetrieveSourceData={manager && !currentDoc && !data ? undefined : () => act("orchestrate", { allowSourceFetch: true })}
               />
             )}
 
@@ -1046,9 +1068,6 @@ export default function FactoryStickerWorkspace({
               )}
             </div>
 
-              </>
-            ) : (
-              <>
             <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
               <h2 className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-1.5">Data sources</h2>
               <StatusRow

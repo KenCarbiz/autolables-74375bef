@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
-  ArrowLeft, Car, ChevronRight, Copy, ExternalLink, Globe, MoreHorizontal,
+  ArrowLeft, Car, ChevronRight, Copy, ExternalLink, Globe, MoreHorizontal, Pencil,
 } from "lucide-react";
 import { PageBody, LocalTabs, Button, LinkButton, StatusText, EmptyState, SkeletonBlock, type LocalTab } from "@/components/product";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -22,6 +22,7 @@ import DocumentsTab from "@/components/vehicleFile/DocumentsTab";
 import GetReadyTab from "@/components/vehicleFile/GetReadyTab";
 import CustomerTab from "@/components/vehicleFile/CustomerTab";
 import ComplianceTab from "@/components/vehicleFile/ComplianceTab";
+import EditVehicleSheet from "@/components/vehicleFile/EditVehicleSheet";
 import {
   readinessSummary, resolveTab, type TabId, type VehicleRow,
 } from "@/components/vehicleFile/types";
@@ -56,6 +57,7 @@ const VehicleFile = () => {
   const [tab, setTab] = useState<TabId>(() => resolveTab(searchParams.get("tab")));
   const [imgIdx, setImgIdx] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  const [editing, setEditing] = useState(false);
   // Open-recall service task (auto-raised by a DB trigger on every recall pull).
   const recall = useRecallTask(vehicle?.vin, vehicle?.tenant_id);
   const lifecycle = useVehicleLifecycle(vehicle?.tenant_id, vehicle?.id, vehicle?.condition);
@@ -312,14 +314,17 @@ const VehicleFile = () => {
 
             <div className="flex flex-wrap gap-2 lg:shrink-0 lg:justify-end">
               {published ? (
-                <LinkButton to={viewUrl} variant={tab === "overview" ? "primary" : undefined} target="_blank" rel="noreferrer">
+                <LinkButton to={viewUrl} target="_blank" rel="noreferrer">
                   <ExternalLink className="w-5 h-5" /> View shopper page
                 </LinkButton>
               ) : (
-                <Button variant="primary" onClick={publish} disabled={publishing}>
+                <Button onClick={publish} disabled={publishing}>
                   <Globe className="w-5 h-5" /> {publishing ? "Publishing…" : "Publish to shopper portal"}
                 </Button>
               )}
+              <Button variant="primary" onClick={() => setEditing(true)}>
+                <Pencil className="w-5 h-5" /> Edit vehicle
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger aria-label="More actions" className="h-10 w-10 grid place-items-center rounded-[6px] border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace">
                   <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
@@ -359,6 +364,8 @@ const VehicleFile = () => {
         {tab === "compliance" && <ComplianceTab vehicle={vehicle} ready={ready} recall={recall} lifecycle={lifecycle} onReload={load} strip={strip} />}
         {tab === "history" && <HistoryTab vehicle={vehicle} lifecycle={lifecycle} />}
       </div>
+
+      <EditVehicleSheet vehicle={vehicle} open={editing} onOpenChange={setEditing} onSaved={load} />
 
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-adm-border bg-adm-surface px-4 py-3 space-y-2">
         {published ? (

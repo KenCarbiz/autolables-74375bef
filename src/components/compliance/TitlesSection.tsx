@@ -77,6 +77,7 @@ export const TitlesSection = ({
                 <Th>Vehicle</Th>
                 <Th>VIN</Th>
                 <Th>Document</Th>
+                <Th>Required sides</Th>
                 <Th>Received</Th>
                 <Th className="whitespace-nowrap">Age (days)</Th>
                 <Th>Clerk</Th>
@@ -87,9 +88,10 @@ export const TitlesSection = ({
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.vehicleId} className="[&>td]:!py-2.5">
-                  <Td className="max-w-[300px] truncate font-semibold">{r.title}</Td>
+                  <Td className="whitespace-nowrap font-semibold" title={r.title}>{r.title.split(" ").slice(0, 3).join(" ")}</Td>
                   <Td className="font-mono text-[12px] text-adm-muted whitespace-nowrap">{r.vin}</Td>
-                  <Td className="whitespace-nowrap">{r.requirement.label}</Td>
+                  <Td className="whitespace-nowrap">{r.requirement.kind === "mco" ? "MCO" : "Title"}</Td>
+                  <Td className="whitespace-nowrap text-adm-muted">{r.requirement.back ? "Front and back" : "Front only"}</Td>
                   <Td className="whitespace-nowrap text-adm-muted">{r.receivedAt ? formatDate(r.receivedAt) : "Unknown"}</Td>
                   <Td className="tabular-nums">{r.ageDays == null ? "Unknown" : r.ageDays}</Td>
                   <Td className="max-w-[160px] truncate text-adm-muted">{r.owner || "Unassigned"}</Td>

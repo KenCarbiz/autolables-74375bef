@@ -109,6 +109,9 @@ export default function SyncRunPage() {
     };
   }, [run]);
 
+  const runSucceeded = !!model && (model.outcome === "success" || model.outcome === "partial") && !!run;
+  const lastSuccessAt = data?.lastSuccessAt ?? (runSucceeded && run ? run.finished_at ?? run.started_at : null);
+
   const crumbs = [
     { label: "Administration", href: "/admin" },
     { label: "Integrations", href: adminTabHref("inventory-feed") },
@@ -193,8 +196,8 @@ export default function SyncRunPage() {
             <div className="mt-[14px] grid grid-cols-1 sm:grid-cols-[1.18fr_1fr] xl:grid-cols-[259px_minmax(0,1fr)] divide-y sm:divide-y-0 sm:divide-x divide-[#C5D4F7] border-t border-[#C5D4F7] pt-[10px]">
               <div className="min-w-0 pb-2.5 sm:pb-0 sm:pr-6">
                 <p className="text-[14px] leading-[20px] text-adm-muted">Last successful run</p>
-                {data.lastSuccessAt ? (
-                  <p data-parity="timestamp" className="mt-0.5 text-[16px] leading-[22px] font-semibold text-adm-ink" title={describeAge(data.lastSuccessAt, now)}>{formatAt(data.lastSuccessAt, { withYear: true, withZone: true })}</p>
+                {lastSuccessAt ? (
+                  <p data-parity="timestamp" className="mt-0.5 text-[16px] leading-[22px] font-semibold text-adm-ink" title={describeAge(lastSuccessAt, now)}>{formatAt(lastSuccessAt, { withYear: true, withZone: true })}</p>
                 ) : (
                   <p className="mt-0.5 text-[16px] leading-[22px] font-semibold text-adm-muted">None recorded</p>
                 )}
@@ -338,7 +341,7 @@ export default function SyncRunPage() {
                     <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                     Back to feed
                   </AdminLinkButton>
-                  <AdminButton variant="primary" className="min-h-[44px] sm:min-h-[44px] text-[15px]" onClick={() => setRetryOpen((o) => !o)} aria-expanded={retryOpen}>Review retry options</AdminButton>
+                  <AdminButton variant={meta.retryable ? "primary" : "outline"} className="min-h-[44px] sm:min-h-[44px] text-[15px]" onClick={() => setRetryOpen((o) => !o)} aria-expanded={retryOpen}>Review retry options</AdminButton>
                 </div>
                 {retryOpen && (
                   <InlineNote tone="info" title="Retry options" className="mt-3">

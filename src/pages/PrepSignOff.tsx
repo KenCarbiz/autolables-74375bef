@@ -13,6 +13,7 @@ import { GetReadySheet } from "@/components/admin/GetReadySheet";
 import { StartGetReadyModal } from "@/components/admin/StartGetReadyModal";
 import SignaturePad from "@/components/addendum/SignaturePad";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ShieldCheck, Camera, Check, X, AlertTriangle, Clock, CheckCircle2, ClipboardCheck, FileText, Image as ImageIcon, Upload, FileSignature, ArrowRight, Car, Wrench, ChevronLeft, Plus } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
@@ -39,7 +40,8 @@ const PrepSignOff = () => {
   // store row) have no currentStore — fall back to the tenant id, which is the
   // store key the Get-Ready / Service surfaces already use.
   const storeId = currentStore?.id || tenant?.id || "";
-  const { signOffs, pending, ready, loading: signOffsLoading, createSignOff, signOff, reject, override, isListingAllowed } = usePrepSignOff(storeId);
+  const { signOffs, pending, ready, loading: signOffsLoading, load: reloadSignOffs, createSignOff, signOff, reject, override, isListingAllowed } = usePrepSignOff(storeId);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const { records: getReadyRecords } = useGetReady(storeId);
 
   const filterParam = searchParams.get("filter");
@@ -140,6 +142,26 @@ const PrepSignOff = () => {
       n.set("sel", sid ?? "");
       setSearchParams(n, { replace: true });
     };
+    const addInstallPhoto = async (files: FileList | null) => {
+      if (!selected || !files?.length) return;
+      setUploadingId(selected.id);
+      try {
+        const added: InstallPhoto[] = [];
+        for (const file of Array.from(files)) {
+          try {
+            const up = await uploadPhoto("prep-photos", file, { tenantId: tenant?.id, storeId, vin: selected.vin });
+            if (up?.url) added.push({ url: up.url, caption: file.name, category: "after", uploaded_at: new Date().toISOString() });
+          } catch { toast.error(`Could not upload ${file.name}`); }
+        }
+        if (added.length === 0) return;
+        const { error } = await (supabase as any).from("prep_sign_offs").update({ install_photos: [...(selected.install_photos || []), ...added] }).eq("id", selected.id);
+        if (error) { toast.error("The photo could not be saved to this sign-off."); return; }
+        toast.success(added.length === 1 ? "Photo added" : `${added.length} photos added`);
+        await reloadSignOffs();
+      } finally {
+        setUploadingId(null);
+      }
+    };
     return (
       <PageBody width="wide">
         <PageHeader
@@ -182,23 +204,23 @@ const PrepSignOff = () => {
               : `This filter shows ${filter} sign-offs only; ${signOffs.length} ${signOffs.length === 1 ? "request exists" : "requests exist"} in total.`}
           />
         ) : (
-          <div className={selected ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start" : ""}>
+          <div>
             <div className="min-w-0">
-            <WorkTable caption="Prep sign-offs" minWidth={selected ? 440 : 860}>
+            <WorkTable caption="Prep sign-offs" minWidth={860}>
               <thead>
                 <tr>
                   <Th>Vehicle</Th>
                   <Th>Task</Th>
                   <Th>Vendor</Th>
-                  {!selected && <Th className="whitespace-nowrap">Proof needed</Th>}
+                  <Th className="whitespace-nowrap">Proof needed</Th>
                   <Th>Status</Th>
-                  {!selected && <Th>Updated</Th>}
-                  {!selected && <Th align="right"><span className="sr-only">Next action</span></Th>}
+                  <Th>Updated</Th>
+                  <Th align="right"><span className="sr-only">Next action</span></Th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(s => (
-                  <tr key={s.id} className={`h-14 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
+                  <tr key={s.id} className={`h-11 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
                     <Td className="max-w-[260px]">
                       <p className="truncate font-semibold text-adm-ink">{s.ymm || s.vin}</p>
                       <p className="truncate text-[12px] leading-[16px] text-adm-muted">{s.stock_number ? `Stock ${s.stock_number}` : s.vin}</p>
@@ -207,25 +229,26 @@ const PrepSignOff = () => {
                       <p className="truncate">{taskLabel(s.accessories_installed)}</p>
                     </Td>
                     <Td className="whitespace-nowrap"><p>{vendorLabel(s.accessories_installed)}</p></Td>
-                    {!selected && <Td className="whitespace-nowrap text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>}
+                    <Td className="whitespace-nowrap text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
                     <Td>
                       <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
                         {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
                       </StatusText>
                     </Td>
-                    {!selected && <Td className="whitespace-nowrap text-adm-muted">{format(new Date(s.updated_at), "MMM d, h:mm a")}</Td>}
-                    {!selected && <Td align="right">
+                    <Td className="whitespace-nowrap text-adm-muted">{format(new Date(s.updated_at), "MMM d, h:mm a")}</Td>
+                    <Td align="right">
                       <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline whitespace-nowrap" onClick={(e) => { e.stopPropagation(); select(s.id); }}>
                         {s.status === "pending" ? "Review" : "View"}
                       </button>
-                    </Td>}
+                    </Td>
                   </tr>
                 ))}
               </tbody>
             </WorkTable>
             </div>
             {selected && (
-              <aside aria-label="Sign-off detail" className="min-w-0 rounded-[6px] border border-adm-border bg-adm-surface lg:sticky lg:top-4">
+              <>
+              <aside aria-label="Sign-off detail" className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[400px] flex-col border-l border-adm-border bg-adm-surface">
                 <div className="flex items-start justify-between gap-3 border-b border-adm-border px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">Detail work</p>
@@ -233,7 +256,18 @@ const PrepSignOff = () => {
                   </div>
                   <button type="button" onClick={() => select(null)} aria-label="Close detail" className="w-9 h-9 grid place-items-center rounded-md text-adm-muted hover:bg-adm-workspace"><X className="w-5 h-5" /></button>
                 </div>
-                <div className="space-y-4 px-4 py-4 text-[14px] leading-[20px]">
+                <div className="flex-1 overflow-y-auto space-y-4 px-4 py-4 text-[14px] leading-[20px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-adm-ink">Install photo</p>
+                    {selected.status === "pending" && (
+                      <>
+                        <input type="file" accept="image/*" multiple className="sr-only" id="prep-install-photo" onChange={(e) => { void addInstallPhoto(e.target.files); e.target.value = ""; }} />
+                        <label htmlFor="prep-install-photo" className="inline-flex min-h-[36px] cursor-pointer items-center gap-2 rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace">
+                          <Upload className="w-5 h-5" aria-hidden="true" /> {uploadingId === selected.id ? "Uploading" : "Upload photo"}
+                        </label>
+                      </>
+                    )}
+                  </div>
                   {selected.install_photos?.[0]?.url ? (
                     <img src={selected.install_photos[0].url} alt={selected.install_photos[0].caption || "Install photo"} className="w-full max-h-[180px] rounded-[4px] border border-adm-border object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   ) : (
@@ -265,6 +299,15 @@ const PrepSignOff = () => {
                       </ul>
                     )}
                   </div>
+                  <div>
+                    <p className="font-semibold text-adm-ink mb-1">Foreman signature</p>
+                    {selected.foreman_signature_data ? (
+                      <img src={selected.foreman_signature_data} alt={`Signature of ${selected.foreman_name}`} className="h-16 w-full rounded-[4px] border border-adm-border bg-white object-contain" />
+                    ) : (
+                      <p className="text-adm-muted">Not signed yet.</p>
+                    )}
+                    <p className="text-adm-muted">{selected.foreman_name}{selected.signed_at ? `, ${format(new Date(selected.signed_at), "MMM d, yyyy")}` : ""}</p>
+                  </div>
                   {selected.notes && <p className="text-adm-muted">{selected.notes}</p>}
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t border-adm-border px-4 py-3">
@@ -274,6 +317,7 @@ const PrepSignOff = () => {
                   </ProductButton>
                 </div>
               </aside>
+              </>
             )}
           </div>
         )}

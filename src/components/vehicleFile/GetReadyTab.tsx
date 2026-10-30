@@ -11,6 +11,10 @@ import { Button } from "@/components/product";
 import {
   OFF_RAIL, RAIL, stageStates, type LifecycleResult, type StageState,
 } from "./lifecycle";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
+import { toast } from "sonner";
+import { VEHICLE_NOTE_ACTION, cleanNote, notesFromAudit, type NoteAuditRow } from "./vehicleNotes";
 import { STATE_LABEL, type LifecycleState } from "@/lib/lifecycle/states";
 import type { ReadinessSummary, VehicleRow } from "./types";
 
@@ -120,13 +124,18 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
   const [prep, setPrep] = useState<PrepRow[]>([]);
   const [gates, setGates] = useState<GateEvent[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [noteRows, setNoteRows] = useState<NoteAuditRow[]>([]);
+  const [draft, setDraft] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const { user } = useAuth();
+  const { tenant } = useTenant();
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       // deno-lint-ignore no-explicit-any
       const sb = supabase as unknown as { from: (t: string) => any };
-      const [prepRes, gateRes] = await Promise.all([
+      const [prepRes, gateRes, noteRes] = await Promise.all([
         sb.from("prep_sign_offs")
           .select("id,created_at,signed_at,updated_at,status,foreman_name,inspection_passed,inspection_form_type,rejection_reason,listing_unlocked,accessories_installed,install_photos,notes")
           .eq("vin", vehicle.vin).order("updated_at", { ascending: false }).limit(20),
@@ -135,7 +144,13 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
           .eq("action", "vehicle_lifecycle_gate_set")
           .eq("entity_id", vehicle.vin)
           .order("created_at", { ascending: false }).limit(25),
+        sb.from("audit_log")
+          .select("id, created_at, user_email, details")
+          .eq("action", VEHICLE_NOTE_ACTION)
+          .eq("entity_id", vehicle.vin)
+          .order("created_at", { ascending: false }).limit(50),
       ]);
+      setNoteRows((noteRes?.data || []) as NoteAuditRow[]);
       setPrep((prepRes.data || []) as PrepRow[]);
       setGates((gateRes.data || []) as GateEvent[]);
     } catch {
@@ -147,6 +162,26 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
   }, [vehicle.vin]);
 
   useEffect(() => { void loadHistory(); }, [loadHistory]);
+
+  const addNote = async () => {
+    const text = cleanNote(draft);
+    if (!text) return;
+    setSavingNote(true);
+    // deno-lint-ignore no-explicit-any
+    const { error: err } = await (supabase as any).from("audit_log").insert({
+      action: VEHICLE_NOTE_ACTION,
+      entity_type: "vehicle_listing",
+      entity_id: vehicle.vin,
+      store_id: tenant?.id || null,
+      user_email: user?.email || null,
+      details: { vin: vehicle.vin, listing_id: vehicle.id, text },
+    });
+    setSavingNote(false);
+    if (err) { toast.error("Note could not be saved"); return; }
+    setDraft("");
+    toast.success("Note added");
+    void loadHistory();
+  };
 
   const state = row?.state ?? null;
   const offRail = !!state && OFF_RAIL.includes(state);
@@ -253,10 +288,26 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
             </div>
             <div className="min-w-0 flex flex-col gap-4">
       <Card title="Notes">
+        <form className="flex flex-col gap-2" onSubmit={(e) => { e.preventDefault(); void addNote(); }}>
+          <label className="sr-only" htmlFor="vehicle-note">Add a note</label>
+          <textarea
+            id="vehicle-note"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            maxLength={1000}
+            rows={2}
+            placeholder="Add a note for the team"
+            className="w-full rounded-[6px] border border-adm-border bg-adm-surface px-3 py-2 text-[14px] leading-[20px] text-adm-ink focus:outline-none focus:ring-2 focus:ring-adm-primary"
+          />
+          <div className="flex justify-end">
+            <Button type="submit" disabled={savingNote || !draft.trim()}>{savingNote ? "Saving" : "Add note"}</Button>
+          </div>
+        </form>
         {historyLoading ? (
           <p className="text-[14px] text-adm-muted">Loading notes...</p>
         ) : (() => {
           const notes = [
+            ...notesFromAudit(noteRows),
             ...(row?.gate_reason ? [{ key: "gate", when: row.state_changed_at, who: "Manager gate", text: row.gate_reason }] : []),
             ...prep.filter((r) => r.notes && r.notes.trim()).map((r) => ({ key: r.id, when: r.updated_at, who: r.foreman_name || "Prep sign-off", text: r.notes as string })),
           ];
