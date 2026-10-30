@@ -206,7 +206,7 @@ const DealDetail = () => {
       <SummaryList
         rows={[
           { label: "Selling price", value: money(deal.sellingPrice) },
-          { label: "Total with options", value: money(deal.amount), strong: true },
+          { label: "Add-on options total", value: money(deal.amount) },
           {
             label: "Price check",
             value:

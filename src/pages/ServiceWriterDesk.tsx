@@ -445,13 +445,13 @@ export default function ServiceWriterDesk() {
                     <input type="checkbox" aria-label={`Select ${r.ymm}`} className="h-4 w-4 accent-[#2457D6]" checked={picked.has(r.vehicleId)}
                       onChange={(e) => setPicked((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.vehicleId); else n.delete(r.vehicleId); return n; })} />
                   </Td>
-                  <Td className="max-w-[300px]">
+                  <Td className="max-w-[380px]">
                     <div className="flex items-center gap-3">
                       {r.photo
                         ? <img src={r.photo} alt="" className="h-10 w-14 shrink-0 rounded-[4px] border border-adm-border object-cover" />
                         : <span className="h-10 w-14 shrink-0 rounded-[4px] bg-adm-workspace" aria-hidden="true" />}
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-adm-ink">{r.ymm}</p>
+                        <p className="font-semibold text-adm-ink">{r.ymm}</p>
                         <p className="truncate font-mono text-[12px] leading-[18px] text-adm-muted">{r.stockNumber ? `${r.stockNumber} / ` : ""}{r.vin}</p>
                       </div>
                     </div>

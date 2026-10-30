@@ -342,8 +342,15 @@ const ReconEstimateDetail = () => {
         actions={
           <>
             {listing && <LinkButton to={`/vehicle-file/${listing.id}`}>View vehicle</LinkButton>}
-            <Button onClick={() => printWorkOrder(sel, lines)} disabled={!detail}>Print work order</Button>
             {canDecide && <Button variant="primary" onClick={() => document.getElementById("review-estimate")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Review</Button>}
+            <DropdownMenu>
+              <DropdownMenuTrigger aria-label="More actions" className="inline-flex h-10 w-10 items-center justify-center rounded-[6px] border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace">
+                <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={!detail} onSelect={() => printWorkOrder(sel, lines)}>Print work order</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       />

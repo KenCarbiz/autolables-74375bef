@@ -219,14 +219,14 @@ const PrepSignOff = () => {
               <tbody>
                 {filtered.map(s => (
                   <tr key={s.id} className={`h-11 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
-                    <Td className="max-w-[190px] !px-2">
-                      <p className="truncate text-[13px] font-semibold text-adm-ink" title={s.ymm || s.vin}>{s.ymm || s.vin}</p>
+                    <Td className="min-w-[150px] !px-2">
+                      <p className="text-[13px] font-semibold text-adm-ink" title={s.ymm || s.vin}>{s.ymm || s.vin}</p>
                       <p className="truncate text-[12px] leading-[16px] text-adm-muted">{s.stock_number ? `Stock ${s.stock_number}` : s.vin}</p>
                     </Td>
-                    <Td className="max-w-[125px] !px-2">
-                      <p className="truncate" title={taskLabel(s.accessories_installed)}>{taskLabel(s.accessories_installed)}</p>
+                    <Td className="min-w-[110px] !px-2">
+                      <p title={taskLabel(s.accessories_installed)}>{taskLabel(s.accessories_installed)}</p>
                     </Td>
-                    <Td className="max-w-[90px] !px-2"><p className="truncate">{vendorLabel(s.accessories_installed)}</p></Td>
+                    <Td className="whitespace-nowrap !px-2">{vendorLabel(s.accessories_installed)}</Td>
                     <Td className="whitespace-nowrap !px-2 text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
                     <Td className="!px-2">
                       <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>

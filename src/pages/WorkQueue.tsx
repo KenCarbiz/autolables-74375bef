@@ -396,40 +396,42 @@ const WorkQueue = () => {
                 : undefined
             }
           >
-            <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Work items" minWidth={760}>
-              <thead>
-                <tr>
-                  <Th className="w-8">
-                    <input type="checkbox" aria-label="Select all" checked={allSelected} disabled={selectable.length === 0}
-                      onChange={(e) => setSelected(e.target.checked ? new Set(selectable.map((i) => i.id)) : new Set())} className="h-4 w-4 accent-[#2457D6]" />
-                  </Th>
-                  <Th>Age</Th>
-                  <Th>Vehicle</Th>
-                  <Th>Task</Th>
-                  <Th>Owner</Th>
-                  <Th>Type</Th>
-                  <Th>Due</Th>
-                  <Th>Status</Th>
-                  <Th align="right"><span className="sr-only">Actions</span></Th>
-                </tr>
-              </thead>
-              <tbody>
-                {laneItems.map((item) => isSystemException(item) ? (
-                  <ExceptionRow key={item.id} item={item} onOpen={navigate} onDismiss={updateStatus} />
-                ) : (
-                  <HumanTaskRow
-                    key={item.id}
-                    item={item}
-                    currentUserId={user?.id}
-                    previews={previewVehicleWork(item).length}
-                    selected={selected.has(item.id)}
-                    onSelect={(on) => setSelected((prev) => { const n = new Set(prev); if (on) n.add(item.id); else n.delete(item.id); return n; })}
-                    onOpen={navigate}
-                    onUpdate={updateStatus}
-                  />
-                ))}
-              </tbody>
-            </WorkTable>
+            <div className="overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface">
+              <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Work items" minWidth={760}>
+                <thead>
+                  <tr>
+                    <Th className="w-8">
+                      <input type="checkbox" aria-label="Select all" checked={allSelected} disabled={selectable.length === 0}
+                        onChange={(e) => setSelected(e.target.checked ? new Set(selectable.map((i) => i.id)) : new Set())} className="h-4 w-4 accent-[#2457D6]" />
+                    </Th>
+                    <Th>Age</Th>
+                    <Th>Vehicle</Th>
+                    <Th>Task</Th>
+                    <Th>Owner</Th>
+                    <Th>Type</Th>
+                    <Th>Due</Th>
+                    <Th>Status</Th>
+                    <Th align="right"><span className="sr-only">Actions</span></Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {laneItems.map((item) => isSystemException(item) ? (
+                    <ExceptionRow key={item.id} item={item} onOpen={navigate} onDismiss={updateStatus} />
+                  ) : (
+                    <HumanTaskRow
+                      key={item.id}
+                      item={item}
+                      currentUserId={user?.id}
+                      previews={previewVehicleWork(item).length}
+                      selected={selected.has(item.id)}
+                      onSelect={(on) => setSelected((prev) => { const n = new Set(prev); if (on) n.add(item.id); else n.delete(item.id); return n; })}
+                      onOpen={navigate}
+                      onUpdate={updateStatus}
+                    />
+                  ))}
+                </tbody>
+              </WorkTable>
+            </div>
           </QueryState>
         </div>
       )}

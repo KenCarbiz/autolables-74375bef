@@ -94,7 +94,7 @@ async function loadOverview(tenantId: string, now: number): Promise<LiveOverview
   const cfg = cfgRes.data as { enabled: boolean; source: string | null; frequency: string | null } | null;
   const cadence = cfg?.frequency === "weekly" ? 24 * 7 : cfg?.frequency === "biweekly" ? 24 * 14 : cfg?.frequency === "monthly" ? 24 * 30 : 24;
   const feed = deriveFeedHealth({
-    configured: cfg ? !!cfg.source : loadFailed ? null : false,
+    configured: cfg ? !!cfg.source : loadFailed ? null : !!realRes.data,
     enabled: cfg ? cfg.enabled : null,
     latestRun: latestRes.data ?? null,
     latestRealRun: realRes.data ?? null,

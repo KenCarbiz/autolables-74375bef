@@ -114,6 +114,8 @@ export function assessConsistency(
     mode,
   );
   const website = observation && observation.price > 0 ? observation.price : null;
+  const derivedSelling = label != null ? (basis === "includes_fee" ? label - docFee : label) : null;
+  const sellingPrice = listing.advertisedBeforeDoc ?? (derivedSelling != null && derivedSelling > 0 ? derivedSelling : null);
   const reviewHref = listing.vehicleFileId ? `/vehicle-file/${listing.vehicleFileId}` : `/inventory?q=${encodeURIComponent(listing.vin)}`;
 
   let evidence: EvidenceState = "awaiting";
@@ -146,7 +148,7 @@ export function assessConsistency(
   if (website == null || label == null) {
     const base = website == null ? "No website observation for this vehicle yet." : "No stored label price to compare.";
     return {
-      listing, vehicle: vehicleTitle(listing), sellingPrice: listing.advertisedBeforeDoc, docFee, website, label, passport, basis, websiteBasis: "as_shown",
+      listing, vehicle: vehicleTitle(listing), sellingPrice, docFee, website, label, passport, basis, websiteBasis: "as_shown",
       evidence: "awaiting", status: breakdownText ? "mismatch" : "not_checked", detail: breakdownText ? `${base} ${breakdownText}` : base,
       delta: null, passportDelta: null, breakdownDelta: breakdownAgrees ? 0 : breakdownDifference, reviewHref, sourceUrl: observation?.sourceUrl ?? null,
     };
@@ -180,7 +182,7 @@ export function assessConsistency(
       : `Website, label and Passport agree on the ${basisText}.`;
 
   return {
-    listing, vehicle: vehicleTitle(listing), sellingPrice: listing.advertisedBeforeDoc, docFee, website, label, passport, basis, websiteBasis,
+    listing, vehicle: vehicleTitle(listing), sellingPrice, docFee, website, label, passport, basis, websiteBasis,
     evidence, status, detail, delta: websiteAgrees ? 0 : difference, passportDelta: passportAgrees ? 0 : passportDifference, breakdownDelta: breakdownAgrees ? 0 : breakdownDifference, reviewHref,
     sourceUrl: observation?.sourceUrl ?? null,
   };

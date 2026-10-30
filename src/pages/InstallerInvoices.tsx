@@ -222,7 +222,7 @@ const InstallerInvoices = () => {
         />
       ) : (
         <Panel flush>
-          <WorkTable caption="Installer invoices" minWidth={960}>
+          <WorkTable className="[&_td]:px-2 [&_th]:px-2" caption="Installer invoices" minWidth={960}>
             <thead>
               <tr>
                 <Th className="w-8">
@@ -234,7 +234,7 @@ const InstallerInvoices = () => {
                 <Th>RO</Th>
                 <Th>Vehicle</Th>
                 <Th>VIN</Th>
-                <Th>Installer / Vendor</Th>
+                <Th className="whitespace-nowrap">Installer / Vendor</Th>
                 <Th>Work performed</Th>
                 <Th align="right">Amount</Th>
                 <Th>Status</Th>
@@ -252,18 +252,18 @@ const InstallerInvoices = () => {
                         checked={picked.has(e.derived.recordId)}
                         onChange={(ev) => setPicked((prev) => { const n = new Set(prev); if (ev.target.checked) n.add(e.derived.recordId); else n.delete(e.derived.recordId); return n; })} />
                     </Td>
-                    <Td className="whitespace-nowrap">{fmtDay(e.date)}</Td>
+                    <Td className="whitespace-nowrap" title={fmtDay(e.date)}>{fmtDay(e.date).replace(/,\s*\d{4}$/, "")}</Td>
                     <Td className="whitespace-nowrap">{e.derived.roNumber || "Unknown"}</Td>
-                    <Td className="max-w-[190px]"><span className="block truncate font-medium" title={e.derived.ymm}>{e.derived.ymm || "Vehicle"}</span></Td>
-                    <Td className="whitespace-nowrap font-mono text-[12px]">{e.derived.vin}</Td>
-                    <Td className="max-w-[130px]"><span className="block truncate">{installerOf(e.lines)}</span></Td>
-                    <Td className="max-w-[190px]"><span className="block truncate" title={workSummary(e.lines)}>{workSummary(e.lines)}</span></Td>
+                    <Td className="min-w-[170px]"><span className="block font-medium">{e.derived.ymm || "Vehicle"}</span></Td>
+                    <Td className="whitespace-nowrap font-mono text-[11px]">{e.derived.vin}</Td>
+                    <Td className="whitespace-nowrap">{installerOf(e.lines)}</Td>
+                    <Td className="min-w-[120px]">{workSummary(e.lines)}</Td>
                     <Td align="right" className="whitespace-nowrap">{money(e.total)}</Td>
-                    <Td>
+                    <Td className="whitespace-nowrap">
                       <StatusText tone={e.tab === "paid" ? "success" : e.tab === "invoiced" ? "info" : "warning"}>{TAB_LABEL[e.tab]}</StatusText>
                     </Td>
                     <Td align="right">
-                      <span className="inline-flex items-center justify-end gap-2">
+                      <span className="inline-flex items-center justify-end gap-1">
                         {available && next ? (
                           <button
                             type="button"
@@ -290,7 +290,7 @@ const InstallerInvoices = () => {
             </tbody>
           </WorkTable>
           <div className="flex items-center justify-between border-t border-adm-border px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
-            <span>Showing {shown.length} of {entries.length} <button type="button" onClick={exportCsv} className="ml-3 font-semibold text-adm-primary hover:underline">Export CSV</button></span>
+            <span>Showing {shown.length} of {shown.length} <button type="button" onClick={exportCsv} className="ml-3 font-semibold text-adm-primary hover:underline">Export CSV</button></span>
             <span className="text-[14px] text-adm-ink">Total <span className="font-semibold tabular-nums">{money(shownTotal)}</span></span>
           </div>
         </Panel>

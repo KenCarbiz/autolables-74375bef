@@ -106,28 +106,30 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
 
   return (
     <div className="space-y-2">
-      <WorkTable caption="Documents on file for this vehicle" minWidth={760}>
-        <thead>
-          <tr><Th>Type</Th><Th>Version</Th><Th>State</Th><Th>Visibility</Th><Th>Updated</Th><Th align="right">Action</Th></tr>
-        </thead>
-        <tbody>
-          {grouped.flatMap(({ g, items }) => [
-            <tr key={`g-${g}`}><td colSpan={6} className="bg-adm-workspace px-3 py-2.5 text-[14px] leading-[20px] font-bold text-adm-ink border-b border-adm-border">{g}</td></tr>,
-            ...items.map((r) => (
-            <tr key={r.key}>
-              <Td>{r.name}</Td>
-              <Td className="text-adm-muted">{r.version ?? "-"}</Td>
-              <Td><StatusText tone={r.tone}>{r.status}</StatusText></Td>
-              <Td className="text-adm-muted">{r.packet}</Td>
-              <Td className="text-adm-muted">{r.updated ? new Date(r.updated).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "-"}</Td>
-              <Td align="right">
-                {r.to ? <Link className="text-adm-primary hover:underline" to={r.to}>Review</Link> : r.href ? <a className="text-adm-primary hover:underline" href={r.href} target="_blank" rel="noreferrer">Open</a> : <span className="text-adm-muted">-</span>}
-              </Td>
-            </tr>
-            )),
-          ])}
-        </tbody>
-      </WorkTable>
+      <div className="overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface">
+        <WorkTable caption="Documents on file for this vehicle" minWidth={760}>
+          <thead>
+            <tr><Th>Type</Th><Th>Version</Th><Th>State</Th><Th>Visibility</Th><Th>Updated</Th><Th align="right">Action</Th></tr>
+          </thead>
+          <tbody>
+            {grouped.flatMap(({ g, items }) => [
+              <tr key={`g-${g}`}><td colSpan={6} className="bg-adm-workspace px-3 py-2.5 text-[14px] leading-[20px] font-bold text-adm-ink border-b border-adm-border">{g}</td></tr>,
+              ...items.map((r) => (
+              <tr key={r.key}>
+                <Td>{r.name}</Td>
+                <Td className="text-adm-muted">{r.version ?? "-"}</Td>
+                <Td><StatusText tone={r.tone}>{r.status}</StatusText></Td>
+                <Td className="text-adm-muted">{r.packet}</Td>
+                <Td className="text-adm-muted">{r.updated ? new Date(r.updated).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "-"}</Td>
+                <Td align="right">
+                  {r.to ? <Link className="text-adm-primary hover:underline" to={r.to}>Review</Link> : r.href ? <a className="text-adm-primary hover:underline" href={r.href} target="_blank" rel="noreferrer">Open</a> : <span className="text-adm-muted">-</span>}
+                </Td>
+              </tr>
+              )),
+            ])}
+          </tbody>
+        </WorkTable>
+      </div>
     </div>
   );
 };

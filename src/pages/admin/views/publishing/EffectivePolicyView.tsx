@@ -122,10 +122,10 @@ export default function EffectivePolicyView() {
                         {r.label}
                       </button>
                     </Td>
-                    <Td className="px-5"><Cell cell={r.listingVisibility} /></Td>
-                    <Td className="px-5"><Cell cell={r.documentPublication} /></Td>
-                    <Td className="px-5"><Cell cell={r.retailReadiness} /></Td>
-                    <Td className="px-5"><Cell cell={r.overrides} /></Td>
+                    <Td className="px-4 whitespace-nowrap"><Cell cell={r.listingVisibility} /></Td>
+                    <Td className="px-4 whitespace-nowrap"><Cell cell={r.documentPublication} /></Td>
+                    <Td className="px-4 whitespace-nowrap"><Cell cell={r.retailReadiness} /></Td>
+                    <Td className="px-4 whitespace-nowrap"><Cell cell={r.overrides} /></Td>
                   </tr>
                 );
               })}

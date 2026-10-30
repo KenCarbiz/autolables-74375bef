@@ -552,20 +552,20 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
                       : <StatusText tone={G.tone}>{G.label}{r.openFailures > 0 ? ` (${r.openFailures})` : ""}</StatusText>}
                   </Td>
                   {mode === "my_work" && <Td className="whitespace-nowrap tabular-nums text-adm-muted">{r.roNumber || "Unknown"}</Td>}
-                  <Td className="max-w-[170px]">
+                  <Td className="min-w-[170px]">
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setDrawer(r); }}
                       aria-label={`Open service preview for ${r.ymm}`}
-                      className="block max-w-full truncate text-left text-[14px] font-semibold text-adm-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      className="block max-w-full text-left text-[14px] font-semibold text-adm-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                     >
                       {r.ymm}
                     </button>
                     <p className="truncate text-[12px] leading-[16px] text-adm-muted">{r.stock ? `Stock ${r.stock}` : "No stock number"} · {r.vin.slice(-6)}</p>
                   </Td>
-                  <Td className={cn("whitespace-nowrap", mode === "my_work" && "max-w-[150px] truncate")}>
+                  <Td className={cn(mode === "desk" && "whitespace-nowrap")}>
                     {mode === "my_work"
-                      ? <span className="block truncate">{r.nextTask}</span>
+                      ? <span className="block">{r.nextTask}</span>
                       : <span className={cn("tabular-nums", r.overdue ? "font-semibold text-adm-danger" : "text-adm-ink")}>{ageDisplay(r)}</span>}
                   </Td>
                   {mode === "desk" && (

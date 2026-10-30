@@ -2,7 +2,7 @@ import { useState } from "react";
 import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, FolderCheck, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleAlert, FolderCheck, ShieldCheck } from "lucide-react";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
@@ -14,7 +14,7 @@ import { useDealRecord, dealDocStatus } from "@/hooks/useDealRecord";
 import { useVehicleEvidence } from "@/lib/stickerStudio/useVehicleEvidence";
 import { useRecallTask } from "@/hooks/useRecallTask";
 import { Card, EmptyNote, Pair, btn, fmtWhen } from "./primitives";
-import { VehicleSubHeader } from "./SubPageHeader";
+import { IdentityStrip, VehicleSubHeader, lifecycleFacts } from "./SubPageHeader";
 import { useComplianceFacts } from "./useComplianceFacts";
 import RecallCard from "./RecallCard";
 import PriceIntegrityCards from "./PriceIntegrityCard";
@@ -100,7 +100,7 @@ const OfficialFormsCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   );
 };
 
-export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload, strip }: {
+export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
   strip?: ReactNode;
   vehicle: VehicleRow;
   ready: ReadinessSummary;
@@ -118,6 +118,35 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload, str
   const recallLine = recallFact(vehicle);
   const readiness = { label: facts.retail.value };
   const cf = useComplianceFacts(vehicle);
+
+  const blockerRows: { key: string; item: string; details: string; evidence?: { label: string; to: string }; when: string | null }[] = [];
+  if (recallLine.tone === "neutral") {
+    blockerRows.push({ key: "recall", item: "Recall status unknown", details: "No VIN-level recall check has answered.", evidence: { label: "View recall card", to: "#vf-recall-card" }, when: vehicle.recall_checked_at });
+  }
+  for (const b of ready.blockers.filter((c) => /recall/i.test(c.label))) {
+    blockerRows.push({ key: `ready-${b.label}`, item: b.label, details: "Blocks publishing until the service department records an outcome.", when: b.when });
+  }
+  if (!cf.loading) {
+    if (cf.price.tone === "danger") blockerRows.push({ key: "price", item: "Price mismatch", details: cf.price.detail ?? "", evidence: { label: "View price card", to: "#vf-price-card" }, when: cf.price.checkedAt });
+    if (cf.safety.tone === "danger") blockerRows.push({ key: "safety", item: `Safety inspection ${cf.safety.value.toLowerCase()}`, details: cf.safety.detail ?? "", evidence: { label: "View inspection", to: "#vf-forms-card" }, when: cf.safety.checkedAt });
+    if (cf.delivery.tone === "warning") blockerRows.push({ key: "delivery", item: "Delivery sign-offs incomplete", details: `${cf.delivery.value}. ${cf.delivery.detail ?? ""}`.trim(), evidence: { label: "View sign-offs", to: "#vf-delivery-card" }, when: null });
+    if (cf.title.tone === "warning") blockerRows.push({ key: "title", item: "Title missing", details: cf.title.detail ?? "", evidence: { label: "View title", to: "#vf-title-card" }, when: null });
+  }
+  const strip = (
+    <IdentityStrip
+      vehicle={vehicle}
+      facts={(() => {
+        const lc = lifecycleFacts(vehicle, lifecycle, blockerRows.length);
+        return [
+          { label: "Owner", value: lc.owner },
+          { label: "Days in inventory", value: String(lc.days) },
+          { label: "Current state", value: lc.state },
+          { label: "Next action", value: lc.nextAction },
+        ];
+      })()}
+      tag={blockerRows.length > 0 ? <StatusText tone="danger">Not retail ready</StatusText> : undefined}
+    />
+  );
 
   // The defense packet is the whole compliance state of one VIN in a single
   // file: what was checked, what was signed, what was advertised, and the
@@ -240,34 +269,30 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload, str
 
         <div id="vf-compliance-blockers" className="scroll-mt-24">
           <p className="text-[15px] leading-[22px] font-semibold text-adm-ink mb-2">
-            Current blockers ({ready.remaining.length + (recallLine.tone === "neutral" ? 1 : 0)})
+            Current blockers ({blockerRows.length})
           </p>
-          {ready.remaining.length === 0 && recallLine.tone !== "neutral" ? (
-            <p className="text-[14px] leading-[20px] text-adm-muted">Every tracked item on this vehicle is complete.</p>
+          {blockerRows.length === 0 ? (
+            <p className="text-[14px] leading-[20px] text-adm-muted">No compliance blockers on this vehicle.</p>
           ) : (
-            <WorkTable caption="Current blockers" minWidth={640}>
-              <thead>
-                <tr><Th>Item</Th><Th>Details</Th><Th>Evidence</Th><Th>Updated</Th></tr>
-              </thead>
-              <tbody>
-                {recallLine.tone === "neutral" && (
-                  <tr>
-                    <Td className="font-semibold">Recall status unknown</Td>
-                    <Td className="text-adm-muted">No VIN-level recall check has answered.</Td>
-                    <Td><a className="text-adm-primary hover:underline" href="#vf-recall-card">View recall card</a></Td>
-                    <Td className="text-adm-muted">{fmtWhen(vehicle.recall_checked_at) ?? "-"}</Td>
-                  </tr>
-                )}
-                {ready.remaining.map((c) => (
-                  <tr key={c.label}>
-                    <Td className="font-semibold">{c.label}</Td>
-                    <Td className="text-adm-muted">{c.blocks ? "Blocks publishing." : "Open item."}</Td>
-                    <Td className="text-adm-muted">-</Td>
-                    <Td className="text-adm-muted">{fmtWhen(c.when) ?? "-"}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </WorkTable>
+            <div className="overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface">
+              <WorkTable caption="Current blockers" minWidth={640}>
+                <thead>
+                  <tr><Th>Item</Th><Th>Details</Th><Th>Evidence</Th><Th>Updated</Th></tr>
+                </thead>
+                <tbody>
+                  {blockerRows.map((r) => (
+                    <tr key={r.key}>
+                      <Td className="font-semibold">
+                        <span className="inline-flex items-center gap-2"><CircleAlert className="h-5 w-5 shrink-0 text-adm-danger" aria-hidden="true" />{r.item}</span>
+                      </Td>
+                      <Td className="text-adm-muted">{r.details}</Td>
+                      <Td>{r.evidence ? <a className="text-adm-primary hover:underline" href={r.evidence.to}>{r.evidence.label}</a> : <span className="text-adm-muted">-</span>}</Td>
+                      <Td className="text-adm-muted">{fmtWhen(r.when) ?? "-"}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </WorkTable>
+            </div>
           )}
         </div>
         {events.length === 0 && (

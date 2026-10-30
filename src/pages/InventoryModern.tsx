@@ -27,7 +27,7 @@ import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surface
 import { presentLegacyPosition } from "@/lib/market/presentation";
 import { MARKET_BATCH_NOTICE } from "@/lib/market/batchTransition";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
-import { PageBody, PageHeader, MetricStrip, LocalTabs, WorkTable, Th, Td, Button, StatusText, type LocalTab, type Tone } from "@/components/product";
+import { PageBody, PageHeader, MetricStrip, LocalTabs, WorkTable, Th, Td, Button, FilterSelect, StatusText, type LocalTab, type Tone } from "@/components/product";
 import { summarizeReadiness } from "@/lib/inventory/readinessSummary";
 
 // ──────────────────────────────────────────────────────────────
@@ -130,6 +130,8 @@ const InventoryModern = () => {
   const [perPage, setPerPage] = useState(PAGE_SIZE);
   const [sortKey, setSortKey] = useState<SortKey>("updated");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [showFilters, setShowFilters] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [searchParams, setSearchParams] = useSearchParams();
   // Condition lives in the URL so New / Used / CPO survive reload and back.
   const urlCondition = searchParams.get("condition");
@@ -515,6 +517,7 @@ const InventoryModern = () => {
   ];
 
   const moreActions: KebabItem[] = [
+    { label: showFilters ? "Hide filters and sort" : "Filter and sort", icon: Search, onClick: () => setShowFilters((v) => !v) },
     { label: "Scan VIN", icon: ScanLine, onClick: openScan },
     { label: "OEM Window Sticker", icon: Printer, onClick: () => navigate("/window-sticker-studio") },
     { label: "New Addendum", icon: FileSignature, onClick: () => navigate("/addendum") },
@@ -525,6 +528,21 @@ const InventoryModern = () => {
   ];
 
   const below = counts.avgBelowMarket;
+
+  const exportPicked = () => {
+    const chosen = rows.filter((r) => picked.has(r.id));
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csv = [
+      ["Stock", "VIN", "Vehicle", "Condition", "Status", "Price"].join(","),
+      ...chosen.map((r) => [r.stock_number, r.vin, r.ymm, r.condition, r.status, r.price].map(esc).join(",")),
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `inventory-selected-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <PageBody width="wide">
@@ -553,48 +571,57 @@ const InventoryModern = () => {
           ]}
         />
 
-        <p className="text-[12px] leading-[18px] text-adm-muted">
-          <button type="button" className="underline hover:text-adm-ink" onClick={runMarketBatch} disabled title={MARKET_BATCH_NOTICE} aria-describedby="market-batch-notice">
-            Average market position ${Math.abs(below).toLocaleString()} {below >= 0 ? "below" : "above"}
-          </button>
-        </p>
+        {(showFilters || status !== "all" || derived !== "all" || q) && (
+          <>
+            <p className="text-[12px] leading-[18px] text-adm-muted">
+              <button type="button" className="underline hover:text-adm-ink" onClick={runMarketBatch} disabled title={MARKET_BATCH_NOTICE} aria-describedby="market-batch-notice">
+                Average market position ${Math.abs(below).toLocaleString()} {below >= 0 ? "below" : "above"}
+              </button>
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[200px] max-w-md">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-5 h-5 text-adm-muted" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" placeholder="Search VIN, stock #, year, make, model, trim" className="w-full min-h-[36px] pl-9 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]" />
+              </div>
+              <FilterSelect label="Filter by status" value={status} onChange={(v) => setStatus(v as StatusFilter)}
+                options={[{ value: "all", label: "All statuses" }, { value: "draft", label: `Draft (${counts.draft})` }, { value: "published", label: `Published (${counts.published})` }, { value: "archived", label: "Archived" }]} />
+              <FilterSelect label="Filter by attention" value={derived} onChange={(v) => setDerived(v as DerivedFilter)}
+                options={[
+                  { value: "all", label: "All vehicles" },
+                  { value: "needs-sticker", label: `Needs sticker (${counts.needsSticker})` },
+                  { value: "missing-addendum", label: `Missing addendum (${counts.missingAddendum})` },
+                  { value: "price-verify", label: `Price verification (${counts.priceVerify})` },
+                  { value: "open-recalls", label: `Recall reported (${counts.openRecallVehicles})` },
+                  { value: "needs-attention", label: `Needs attention (${counts.needsAttention})` },
+                ]} />
+              <FilterSelect label="Sort vehicles" value={sortKey} onChange={(v) => setSortKey(v as SortKey)} className="min-w-[200px]"
+                options={(Object.keys(SORT_LABEL) as SortKey[]).map((k) => ({ value: k, label: `Sort: ${SORT_LABEL[k]}` }))} />
+              {(status !== "all" || condition !== "all" || derived !== "all" || q) && (
+                <Button size="sm" variant="ghost" onClick={() => { setStatus("all"); setCondition("all"); setDerived("all"); setQ(""); }}>Clear filters</Button>
+              )}
+              <div className="ml-auto inline-flex items-center rounded-md border border-adm-border bg-adm-surface overflow-hidden">
+                <button
+                  onClick={() => setViewMode("list")} aria-pressed={viewMode === "list"}
+                  className={`w-9 h-9 inline-flex items-center justify-center ${viewMode === "list" ? "bg-adm-selected text-adm-primary" : "text-adm-muted hover:bg-adm-workspace"}`}
+                  title="List view" aria-label="List view"
+                ><ClipboardList className="w-5 h-5" /></button>
+                <button
+                  onClick={() => setViewMode("grid")} aria-pressed={viewMode === "grid"}
+                  className={`w-9 h-9 inline-flex items-center justify-center ${viewMode === "grid" ? "bg-adm-selected text-adm-primary" : "text-adm-muted hover:bg-adm-workspace"}`}
+                  title="Grid view" aria-label="Grid view"
+                ><Building2 className="w-5 h-5" /></button>
+              </div>
+            </div>
+          </>
+        )}
 
-        {/* Compact toolbar: search, three selects, sort, view */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-adm-muted" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" placeholder="Search VIN, stock #, year, make, model, trim" className="w-full min-h-[36px] pl-8 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]" />
+        {picked.size > 0 && (
+          <div className="flex items-center gap-3 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-2 text-[14px]">
+            <span className="font-semibold text-adm-ink">{picked.size} selected</span>
+            <button type="button" className="font-semibold text-adm-primary hover:underline" onClick={exportPicked}>Export CSV</button>
+            <button type="button" className="text-adm-muted hover:underline" onClick={() => setPicked(new Set())}>Clear selection</button>
           </div>
-          <select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} className="min-h-[36px] px-2.5 rounded-md border border-adm-border bg-adm-surface text-[14px]">
-            <option value="all">All statuses</option><option value="draft">Draft ({counts.draft})</option><option value="published">Published ({counts.published})</option><option value="archived">Archived</option>
-          </select>
-          <select aria-label="Filter by attention" value={derived} onChange={(e) => setDerived(e.target.value as DerivedFilter)} className="min-h-[36px] px-2.5 rounded-md border border-adm-border bg-adm-surface text-[14px]">
-            <option value="all">All vehicles</option>
-            <option value="needs-sticker">Needs sticker ({counts.needsSticker})</option>
-            <option value="missing-addendum">Missing addendum ({counts.missingAddendum})</option>
-            <option value="price-verify">Price verification ({counts.priceVerify})</option>
-            <option value="open-recalls">Recall reported ({counts.openRecallVehicles})</option>
-            <option value="needs-attention">Needs attention ({counts.needsAttention})</option>
-          </select>
-          <select aria-label="Sort vehicles" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} className="min-h-[36px] px-2.5 rounded-md border border-adm-border bg-adm-surface text-[14px]">
-            {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => <option key={k} value={k}>Sort: {SORT_LABEL[k]}</option>)}
-          </select>
-          {(status !== "all" || condition !== "all" || derived !== "all" || q) && (
-            <Button size="sm" variant="ghost" onClick={() => { setStatus("all"); setCondition("all"); setDerived("all"); setQ(""); }}>Clear filters</Button>
-          )}
-          <div className="ml-auto inline-flex items-center rounded-md border border-adm-border bg-adm-surface overflow-hidden">
-            <button
-              onClick={() => setViewMode("list")} aria-pressed={viewMode === "list"}
-              className={`w-9 h-9 inline-flex items-center justify-center ${viewMode === "list" ? "bg-adm-selected text-adm-primary" : "text-adm-muted hover:bg-adm-workspace"}`}
-              title="List view" aria-label="List view"
-            ><ClipboardList className="w-4 h-4" /></button>
-            <button
-              onClick={() => setViewMode("grid")} aria-pressed={viewMode === "grid"}
-              className={`w-9 h-9 inline-flex items-center justify-center ${viewMode === "grid" ? "bg-adm-selected text-adm-primary" : "text-adm-muted hover:bg-adm-workspace"}`}
-              title="Grid view" aria-label="Grid view"
-            ><Building2 className="w-4 h-4" /></button>
-          </div>
-        </div>
+        )}
 
         {/* List */}
         {loading ? (
@@ -607,6 +634,11 @@ const InventoryModern = () => {
               <WorkTable caption="Inventory vehicles" minWidth={900}>
                 <thead>
                   <tr>
+                    <Th className="w-10">
+                      <input type="checkbox" aria-label="Select all vehicles on this page" className="h-4 w-4 accent-[#2457D6]"
+                        checked={pageRows.length > 0 && pageRows.every((x) => picked.has(x.id))}
+                        onChange={(e) => setPicked((prev) => { const n = new Set(prev); pageRows.forEach((x) => (e.target.checked ? n.add(x.id) : n.delete(x.id))); return n; })} />
+                    </Th>
                     <Th>Vehicle</Th>
                     <Th>Stock / VIN</Th>
                     <Th>Condition</Th>
@@ -627,6 +659,10 @@ const InventoryModern = () => {
                       : "Open vehicle";
                     return (
                       <tr key={r.id} className="h-14 group hover:bg-adm-workspace cursor-pointer" onClick={() => navigate(`/vehicle-file/${r.id}`)}>
+                        <Td className="w-10">
+                          <input type="checkbox" onClick={(e) => e.stopPropagation()} aria-label={`Select ${r.ymm || r.vin}`} className="h-4 w-4 accent-[#2457D6]" checked={picked.has(r.id)}
+                            onChange={(e) => setPicked((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} />
+                        </Td>
                         <Td className="py-1.5 max-w-[280px]">
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[4px] bg-adm-workspace">

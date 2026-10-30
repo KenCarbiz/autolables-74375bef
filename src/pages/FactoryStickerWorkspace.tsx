@@ -431,7 +431,7 @@ export default function FactoryStickerWorkspace({
   const [rightTab, setRightTab] = useState<"details" | "technical">("details");
   const [showHistory, setShowHistory] = useState(false);
   const [scenario, setScenario] = useState<keyof typeof FIXTURE_SCENARIOS>("used");
-  const [zoom, setZoom] = useState<"fit" | number>("fit");
+  const [zoom, setZoom] = useState<"fit" | number>(1);
   const [fullscreen, setFullscreen] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [openingDoc, setOpeningDoc] = useState<string | null>(null);
@@ -821,7 +821,7 @@ export default function FactoryStickerWorkspace({
               </div>
             </div>}
             {pageSvg ? (
-              <div className={zoom === "fit" ? "" : "overflow-auto"}>
+              <div className={zoom === "fit" ? "" : fullscreen ? "overflow-auto" : "max-h-[640px] overflow-auto"}>
                 <div
                   data-product-surface="document"
                   className={`border border-border bg-white shadow-sm [&>svg]:block [&>svg]:h-auto ${fullscreen ? "" : "cursor-zoom-in"}`}

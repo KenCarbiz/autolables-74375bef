@@ -265,14 +265,14 @@ export default function InventoryIntelligence() {
                     />
                   </Td>
                   <Td className="whitespace-nowrap font-mono text-[12px] text-adm-muted">{vehicleStockNumber(vehicle) ?? "Unknown"}</Td>
-                  <Td className="whitespace-nowrap text-[13px] font-medium text-adm-ink">{vehicle.ymm || "Vehicle"}</Td>
+                  <Td className="max-w-[200px] truncate whitespace-nowrap text-[13px] font-medium text-adm-ink" title={vehicle.ymm || undefined}>{vehicle.ymm || "Vehicle"}</Td>
                   <Td className="whitespace-nowrap font-mono text-[11px] text-adm-muted">{vehicle.vin || "Unknown"}</Td>
                   <Td><Stage stage={intel.sourceStage} /></Td>
                   {COLUMNS.map((c) => {
                     const f = c.ids.map((id) => intel.families.find((x) => x.family === id)).find((x) => x && x.stage !== "Not Applicable") ?? intel.families.find((x) => x.family === c.ids[0]);
                     return <Td key={c.key}>{f ? <Stage stage={f.stage} /> : null}</Td>;
                   })}
-                  <Td className="max-w-[150px]">
+                  <Td className="max-w-[130px]">
                     {intel.blocker
                       ? <span className="block truncate" title={intel.blocker}><StatusText tone="warning" className="max-w-full truncate">{intel.blocker}</StatusText></span>
                       : <span className="text-[12px] text-adm-muted">None</span>}

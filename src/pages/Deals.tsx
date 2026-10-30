@@ -211,15 +211,15 @@ const Deals = () => {
             <table className="w-full table-fixed text-left">
               <thead className="bg-adm-workspace">
                 <tr className="text-[12px] leading-[18px] text-adm-muted">
-                  <th className="font-semibold px-4 py-2.5 w-[9%]">Stock #</th>
-                  <th className="font-semibold py-2.5 w-[22%]">Vehicle</th>
-                  <th className="font-semibold py-2.5 w-[12%]">Customer</th>
-                  <th className="font-semibold py-2.5 w-[8%] text-right pr-4">Amount</th>
+                  <th className="font-semibold px-4 py-2.5 w-[8%]">Stock #</th>
+                  <th className="font-semibold py-2.5 w-[27%]">Vehicle</th>
+                  <th className="font-semibold py-2.5 w-[11%]">Customer</th>
+                  <th className="font-semibold py-2.5 w-[9%] text-right pr-4">Selling price</th>
                   <th className="font-semibold py-2.5 w-[13%]">Document state</th>
-                  <th className="font-semibold py-2.5 w-[12%]">Price integrity</th>
-                  <th className="font-semibold py-2.5 pl-3 w-[5%]">Age</th>
-                  <th className="font-semibold py-2.5 w-[15%]">Next action</th>
-                  <th className="font-semibold py-2.5 pr-3 w-[4%]"><span className="sr-only">Actions</span></th>
+                  <th className="font-semibold py-2.5 w-[11%]">Price integrity</th>
+                  <th className="font-semibold py-2.5 pl-3 w-[4%]">Age</th>
+                  <th className="font-semibold py-2.5 w-[14%]">Next action</th>
+                  <th className="font-semibold py-2.5 pr-3 w-[3%]"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -236,7 +236,7 @@ const Deals = () => {
                           ? <Link to={`/customers/${encodeURIComponent(deal.customerId)}`} className="text-adm-primary hover:underline">{deal.customerName}</Link>
                           : deal.customerName || "No customer"}
                       </td>
-                      <td className="pr-4 text-[14px] text-adm-ink text-right tabular-nums truncate">{money(deal.amount)}</td>
+                      <td className="pr-4 text-[14px] text-adm-ink text-right tabular-nums truncate">{deal.sellingPrice != null ? money(deal.sellingPrice) : "Unknown"}</td>
                       <td className="pr-3 whitespace-nowrap"><Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip></td>
                       <td className="pr-3 whitespace-nowrap"><PriceIntegrityChip integrity={deal.priceIntegrity} /></td>
                       <td className="pl-3 pr-3 text-[13px] text-adm-muted tabular-nums whitespace-nowrap">{ageDays(deal.createdAt)}</td>
@@ -265,7 +265,7 @@ const Deals = () => {
                   <div className="flex flex-wrap items-center gap-2">
                     <Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip>
                     <PriceIntegrityChip integrity={deal.priceIntegrity} />
-                    <span className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{money(deal.amount)}</span>
+                    <span className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{deal.sellingPrice != null ? money(deal.sellingPrice) : "Unknown"}</span>
                   </div>
                   <p className="text-[12px] leading-[18px] text-adm-muted">
                     {deal.customerName || "No customer on the deal"}

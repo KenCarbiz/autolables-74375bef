@@ -85,32 +85,34 @@ export default function ReconBoard() {
           emptyTitle={estimates.length === 0 ? "No recon estimates yet." : `No estimates are ${shown.label.toLowerCase()}.`}
           emptyDetail={estimates.length === 0 ? "Service submits the first one with New estimate." : `This is the ${shown.label} view only; ${estimates.length} ${estimates.length === 1 ? "estimate exists" : "estimates exist"} in total.`}
         >
-          <WorkTable caption="Recon estimates" minWidth={820}>
-            <thead>
-              <tr>
-                <Th>Age</Th>
-                <Th>Estimate #</Th>
-                <Th>Vehicle</Th>
-                <Th>Owner</Th>
-                <Th align="right">Total</Th>
-                <Th>Status</Th>
-                <Th>Next action</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.items.map((e) => (
-                <tr key={e.id} className="h-14 hover:bg-adm-workspace">
-                  <Td className="whitespace-nowrap text-adm-muted">{ageOf(e.created_at)}</Td>
-                  <Td className="whitespace-nowrap font-mono text-[13px] text-adm-muted">{`REC-${e.id.slice(0, 8).toUpperCase()}`}</Td>
-                  <Td className="max-w-[300px] truncate font-medium text-adm-ink">{e.ymm || "Vehicle"}</Td>
-                  <Td className="text-adm-muted">{(e.submitted_by && names[e.submitted_by]) || "Unknown"}</Td>
-                  <Td align="right" className="tabular-nums">{money(e.subtotal)}</Td>
-                  <Td><EstimateState status={e.status} /></Td>
-                  <Td><button type="button" onClick={() => openEstimate(e.id)} aria-label={`Review estimate for ${e.ymm || e.vin}`} className="text-[14px] font-semibold text-adm-primary hover:underline">{e.status === "submitted" ? "Review" : "View"}</button></Td>
+          <div className="overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface">
+            <WorkTable caption="Recon estimates" minWidth={820}>
+              <thead>
+                <tr>
+                  <Th>Age</Th>
+                  <Th>Estimate #</Th>
+                  <Th>Vehicle</Th>
+                  <Th>Owner</Th>
+                  <Th align="right">Total</Th>
+                  <Th>Status</Th>
+                  <Th>Next action</Th>
                 </tr>
-              ))}
-            </tbody>
-          </WorkTable>
+              </thead>
+              <tbody>
+                {shown.items.map((e) => (
+                  <tr key={e.id} className="h-14 hover:bg-adm-workspace">
+                    <Td className="whitespace-nowrap text-adm-muted">{ageOf(e.created_at)}</Td>
+                    <Td className="whitespace-nowrap font-mono text-[13px] text-adm-muted">{`REC-${e.id.slice(0, 8).toUpperCase()}`}</Td>
+                    <Td className="max-w-[300px] truncate font-medium text-adm-ink">{e.ymm || "Vehicle"}</Td>
+                    <Td className="text-adm-muted">{(e.submitted_by && names[e.submitted_by]) || "Unknown"}</Td>
+                    <Td align="right" className="tabular-nums">{money(e.subtotal)}</Td>
+                    <Td><EstimateState status={e.status} /></Td>
+                    <Td><button type="button" onClick={() => openEstimate(e.id)} aria-label={`Review estimate for ${e.ymm || e.vin}`} className="text-[14px] font-semibold text-adm-primary hover:underline">{e.status === "submitted" ? "Review" : "View"}</button></Td>
+                  </tr>
+                ))}
+              </tbody>
+            </WorkTable>
+          </div>
         </QueryState>
       </div>
 

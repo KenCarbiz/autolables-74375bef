@@ -11,7 +11,7 @@ import {
   type CustomerBucket,
   type CustomerEntry,
 } from "@/components/customers/customerBook";
-import { Button, InlineNote, LocalTabs, MetricStrip, PageBody, PageHeader, Td, Th, WorkTable, type LocalTab } from "@/components/product";
+import { Button, FilterSelect, InlineNote, LocalTabs, MetricStrip, PageBody, PageHeader, Td, Th, WorkTable, type LocalTab } from "@/components/product";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCustomerBook } from "@/components/customers/useCustomerBook";
 import {
@@ -21,6 +21,13 @@ import {
   NextActionCell,
   VehicleCell,
 } from "@/components/customers/CustomerUi";
+
+const maskContact = (value: string | null | undefined): string => {
+  if (!value) return "Not captured";
+  const at = value.indexOf("@");
+  if (at > 0) return `${value[0]}***${value.slice(at)}`;
+  return `***${value.replace(/\D/g, "").slice(-4)}`;
+};
 
 // /customers (still routed at /leads) — the Customers workspace.
 //
@@ -134,8 +141,6 @@ const Customers = () => {
 
       <PageHeader
         title="Customers"
-        description={loading && !book.customers.length ? undefined : `${book.passiveVisitors} view-only sessions are not listed.`}
-        actions={<Button onClick={exportCsv} disabled={!rows.length}>Export</Button>}
       />
 
       {error && (
@@ -162,15 +167,13 @@ const Customers = () => {
           />
         </div>
         <div className="flex items-center gap-2">
-          <select
+          <FilterSelect
+            label="Filter by intent type"
             value={intent}
-            onChange={(e) => setIntent(e.target.value)}
-            aria-label="Filter by intent type"
-            className="h-10 rounded-[6px] border border-adm-border bg-adm-surface px-2 text-[14px] text-adm-ink"
-          >
-            <option value="all">All intent types</option>
-            {intents.map((i) => <option key={i} value={i}>{i}</option>)}
-          </select>
+            onChange={setIntent}
+            className="min-w-[170px]"
+            options={[{ value: "all", label: "All intent types" }, ...intents.map((i) => ({ value: i, label: i }))]}
+          />
           <label className="relative block w-56">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
             <input
@@ -215,20 +218,20 @@ const Customers = () => {
                     className="cursor-pointer hover:bg-adm-workspace"
                   >
                     <Td className="whitespace-nowrap"><Chip tone={c.identified ? "good" : "neutral"}>{c.identified ? "Identified" : "Anonymous"}</Chip></Td>
-                    <Td className="max-w-[160px]">
+                    <Td className="whitespace-nowrap">
                       <Link
                         to={`/customers/${encodeURIComponent(c.id)}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="block truncate text-[14px] font-semibold text-adm-primary hover:underline"
+                        className="block text-[14px] font-semibold text-adm-primary hover:underline"
                       >
                         {c.identified ? c.name || c.email || "Unnamed customer" : "Online shopper"}
                       </Link>
                     </Td>
-                    <Td className="max-w-[170px]"><span className="block truncate text-adm-muted">{c.identified ? c.email || c.phone || "Not captured" : "Not captured"}</span></Td>
-                    <Td className="max-w-[170px]"><span className="block truncate">{c.vehicles[0]?.label ?? "None attached"}</span></Td>
-                    <Td className="max-w-[110px]"><span className="block truncate">{c.assignedEmployee?.name ?? <span className="text-adm-muted">Unassigned</span>}</span></Td>
-                    <Td className="max-w-[140px]"><span className="block truncate">{lastIntent(c) ?? <span className="text-adm-muted">None linked</span>}</span></Td>
-                    <Td className="max-w-[150px]"><span className="block truncate text-[14px] font-semibold text-adm-primary">{c.nextAction.headline}</span></Td>
+                    <Td className="whitespace-nowrap text-adm-muted">{c.identified ? maskContact(c.email || c.phone) : "Not captured"}</Td>
+                    <Td className="min-w-[150px]">{c.vehicles[0]?.label ?? "None attached"}</Td>
+                    <Td className="whitespace-nowrap">{c.assignedEmployee?.name ?? <span className="text-adm-muted">Unassigned</span>}</Td>
+                    <Td className="min-w-[110px]">{lastIntent(c) ?? <span className="text-adm-muted">None linked</span>}</Td>
+                    <Td className="min-w-[130px]"><span className="block text-[14px] font-semibold text-adm-primary">{c.nextAction.headline}</span></Td>
                     <Td align="right" className="whitespace-nowrap text-adm-muted">{relativeTime(c.lastActivityAt)}</Td>
                     <Td align="right" className="w-10" >
                       <span onClick={(e) => e.stopPropagation()}>
@@ -239,6 +242,10 @@ const Customers = () => {
                 ))}
               </tbody>
             </WorkTable>
+            <div className="flex items-center justify-between border-t border-adm-border px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
+              <span>{rows.length} {rows.length === 1 ? "customer" : "customers"} <button type="button" onClick={exportCsv} className="ml-3 font-semibold text-adm-primary hover:underline">Export CSV</button></span>
+              <span>{book.passiveVisitors} view-only sessions are not listed</span>
+            </div>
           </div>
 
           <div className="lg:hidden space-y-3">

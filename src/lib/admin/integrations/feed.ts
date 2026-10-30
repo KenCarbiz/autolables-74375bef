@@ -125,8 +125,9 @@ export interface FeedSnapshot {
   };
 }
 
-function sourceIdentityState(cfg: FeedConfigRow | null, configLoadFailed: boolean, outcome: RunOutcome | null, lastSuccessAt: string | null): SourceIdentityState {
+function sourceIdentityState(cfg: FeedConfigRow | null, configLoadFailed: boolean, outcome: RunOutcome | null, lastSuccessAt: string | null, hasRunSource = false): SourceIdentityState {
   if (configLoadFailed) return "unknown";
+  if (!cfg && hasRunSource) return "not_pinned";
   if (!cfg || !cfg.source) return "not_configured";
   if (!cfg.mc_scope_value) return "not_pinned";
   if (outcome === "identity_hold") return "needs_review";
@@ -145,8 +146,9 @@ export function deriveFeedSnapshot(i: FeedSnapshotInput): FeedSnapshot {
   const lastSuccessAt = i.lastSuccessAt;
   const cadence = cadenceHoursFor(cfg?.frequency);
 
+  const runsProveSource = !cfg && !!real && !!outcome;
   const health = deriveFeedHealth({
-    configured: configLoadFailed ? null : cfg ? !!cfg.source : false,
+    configured: configLoadFailed ? null : cfg ? !!cfg.source : runsProveSource,
     enabled: cfg ? cfg.enabled : null,
     latestRun: i.latestRun ? canonicalRunLike(i.latestRun, outcomeForRun(i.latestRun)) : null,
     latestRealRun: real && outcome ? canonicalRunLike(real, outcome) : null,
@@ -156,7 +158,7 @@ export function deriveFeedSnapshot(i: FeedSnapshotInput): FeedSnapshot {
     loadFailed: configLoadFailed || !!i.runsLoadFailed,
   });
 
-  const identity = sourceIdentityState(cfg, configLoadFailed, outcome, lastSuccessAt);
+  const identity = sourceIdentityState(cfg, configLoadFailed, outcome, lastSuccessAt, runsProveSource);
   const host = sourceHost(real ?? i.latestRun, cfg?.source ?? null);
   const pinValue = cfg?.mc_scope_value ?? null;
 
@@ -189,7 +191,7 @@ export function deriveFeedSnapshot(i: FeedSnapshotInput): FeedSnapshot {
   const providerError = isProviderErrorOutcome(outcome);
   const reviewEnabled = !!cfg && !providerError && !configLoadFailed;
   const reviewReason = !cfg
-    ? "No source is configured for this rooftop."
+    ? runsProveSource ? "Pulls are arriving, but no source pin is recorded for this rooftop." : "No source is configured for this rooftop."
     : providerError
       ? "Review source is disabled while a provider error is active."
       : outcome === "identity_hold"
@@ -200,6 +202,7 @@ export function deriveFeedSnapshot(i: FeedSnapshotInput): FeedSnapshot {
     const scope = "This rooftop";
     const schedule = scheduleLabel(cfg);
     if (configLoadFailed) return { scope, schedule: "Unknown", status: "unknown", statusLabel: "Unknown", tone: "neutral" };
+    if (!cfg && runsProveSource) return { scope, schedule: "Not recorded", status: "no_run", statusLabel: "Pulling", tone: "neutral" };
     if (!cfg || !cfg.source) return { scope, schedule: "Not configured", status: "not_configured", statusLabel: "Not configured", tone: "neutral" };
     if (cfg.allowed === false) return { scope, schedule, status: "not_granted", statusLabel: "Not granted on this plan", tone: "neutral" };
     if (cfg.enabled === false) return { scope, schedule, status: "paused", statusLabel: "Paused", tone: "neutral" };

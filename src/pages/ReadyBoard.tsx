@@ -353,7 +353,7 @@ export default function ReadyBoard() {
           emptyTitle={`${current.empty}${scopeNote ? scopeNote : " in this view"}.`}
           emptyDetail={bucket === "all" && !todayOnly ? "No vehicles in inventory yet." : `This is the ${current.label} view only; it does not say the rest of the pipeline is clear.${otherViews}`}
         >
-          <WorkTable className="[&_td]:py-1.5" caption="Vehicles and their get-ready stations" minWidth={960}>
+          <WorkTable className="[&_td]:py-1.5 [&_td]:px-2 [&_th]:px-2" caption="Vehicles and their get-ready stations" minWidth={960}>
             <thead>
               <tr>
                 <Th className="w-8">
@@ -398,7 +398,7 @@ export default function ReadyBoard() {
                       <input type="checkbox" aria-label={`Select ${r.ymm || r.vin}`} className="h-4 w-4 accent-[#2457D6]" checked={picked.has(r.vin)}
                         onChange={(e) => setPicked((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.vin); else n.delete(r.vin); return n; })} />
                     </Td>
-                    <Td className="max-w-[340px]">
+                    <Td className="max-w-[400px]">
                       <div className="flex items-center gap-3">
                         {r.hero_image_url
                           ? <img src={r.hero_image_url} alt="" className="h-10 w-14 shrink-0 rounded-[4px] border border-adm-border object-cover" />
