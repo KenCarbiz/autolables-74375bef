@@ -1,18 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { canDispatchGetReady } from "@/lib/commandCenter/dispatchAuthority";
-import {
-  CommandStatCard, EmptyState, ErrorCard, LoadingCard, StatusPill, BTN_PRIMARY, BTN_SECONDARY,
-} from "@/components/command/CommandPrimitives";
-import {
-  ClipboardCheck, PauseCircle, AlertTriangle, CheckCircle2, Search, ChevronRight, Car, X, FileText,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Search, X, FileText } from "lucide-react";
+import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, Panel, QueryState, StatusText, Td, Th, WorkTable, type LocalTab, type Tone } from "@/components/product";
 
 // /get-ready-command — the used-car manager's fleet-level intake queue.
 // Reads the STORED vehicle_lifecycle (never a client derivation) and issues
@@ -22,6 +18,9 @@ import { cn } from "@/lib/utils";
 //   Wholesale                -> set_vehicle_lifecycle_gate('WHOLESALE', reason)
 //   Remove                   -> set_vehicle_lifecycle_gate('REMOVED', reason)
 // Per-vehicle authorization detail stays at /get-ready-command/:vehicleId.
+
+const BTN_PRIMARY = "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-adm-primary bg-adm-primary px-3.5 text-[14px] font-semibold text-white hover:bg-adm-primary-hover disabled:cursor-not-allowed";
+const BTN_SECONDARY = "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-adm-border bg-adm-surface px-3.5 text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace disabled:cursor-not-allowed";
 
 // deno-lint-ignore no-explicit-any
 const sb = () => supabase as any;
@@ -40,12 +39,12 @@ const GATE_TABS = [
   { key: "all", label: "All" },
 ] as const;
 
-const STATE_PILL: Record<string, { label: string; tone: "amber" | "red" | "blue" | "slate" | "emerald" }> = {
-  AWAITING_MANAGER_AUTHORIZATION: { label: "Awaiting authorization", tone: "amber" },
-  PRELOAD_EXCEPTION: { label: "Preload exception", tone: "red" },
-  ON_HOLD: { label: "On hold", tone: "slate" },
-  WHOLESALE: { label: "Wholesale", tone: "slate" },
-  REMOVED: { label: "Removed", tone: "slate" },
+const STATE_PILL: Record<string, { label: string; tone: Tone }> = {
+  AWAITING_MANAGER_AUTHORIZATION: { label: "Awaiting authorization", tone: "warning" },
+  PRELOAD_EXCEPTION: { label: "Preload exception", tone: "danger" },
+  ON_HOLD: { label: "On hold", tone: "neutral" },
+  WHOLESALE: { label: "Wholesale", tone: "neutral" },
+  REMOVED: { label: "Removed", tone: "neutral" },
 };
 
 export default function ManagerIntake() {
@@ -59,9 +58,24 @@ export default function ManagerIntake() {
   const [authorizedToday, setAuthorizedToday] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [tab, setTab] = useState<(typeof GATE_TABS)[number]["key"]>("awaiting");
-  const [q, setQ] = useState("");
-  const [drawer, setDrawer] = useState<Row | null>(null);
+  // Filter, search and the open review live in the URL so reload and back
+  // return to the same queue state.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const gate = searchParams.get("gate");
+  const tab: (typeof GATE_TABS)[number]["key"] = GATE_TABS.some((t) => t.key === gate) ? (gate as (typeof GATE_TABS)[number]["key"]) : "awaiting";
+  const q = searchParams.get("q") ?? "";
+  const setQ = (v: string) => {
+    const n = new URLSearchParams(searchParams);
+    if (v) n.set("q", v); else n.delete("q");
+    setSearchParams(n, { replace: true });
+  };
+  const reviewId = searchParams.get("review");
+  const drawer: Row | null = useMemo(() => rows.find((r) => r.vehicleId === reviewId) ?? null, [rows, reviewId]);
+  const setDrawer = (r: Row | null) => {
+    const n = new URLSearchParams(searchParams);
+    if (r) n.set("review", r.vehicleId); else n.delete("review");
+    setSearchParams(n);
+  };
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
 
@@ -169,113 +183,130 @@ export default function ManagerIntake() {
   };
 
   if (!tenantId) return null;
-  if (loading) return <div className="max-w-[1400px] mx-auto p-6 space-y-4"><LoadingCard rows={2} /><LoadingCard rows={6} /></div>;
-  if (loadError) {
-    return <div className="max-w-[1400px] mx-auto p-6">
-      <ErrorCard message="We could not load the intake queue." detail={loadError} onRetry={() => void load()} />
-    </div>;
-  }
+
+  const ready = !loading && !loadError;
+  const status = loadError ? "error" : loading ? "loading" : visible.length === 0 ? "empty" : "ready";
+  const tabs: LocalTab[] = GATE_TABS.map((t) => {
+    const n = new URLSearchParams();
+    n.set("gate", t.key);
+    return { key: t.key, label: t.label, to: `/get-ready-command?${n.toString()}`, count: ready && t.key !== "all" ? counts[t.key] : ready ? rows.length : null, active: t.key === tab };
+  });
+  const tabLabel = GATE_TABS.find((t) => t.key === tab)!.label;
 
   return (
-    <div className="max-w-[1400px] mx-auto p-4 md:p-6 space-y-5">
-      <div>
-        <div className="flex items-center gap-2">
-          <ClipboardCheck className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h1 className="text-al-page font-display text-foreground">Manager Intake & Authorization</h1>
-        </div>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Fleet-level release queue after automatic nightly ingest. Authorization is the gate that releases service and detail work.
-        </p>
-      </div>
+    <PageBody width="wide">
+      <PageHeader
+        title="Manager Intake & Authorization"
+        description="Fleet-level release queue after automatic nightly ingest. Authorization is the gate that releases service and detail work."
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <CommandStatCard label="Awaiting authorization" value={counts.awaiting} sub="Vehicles ready for review" Icon={ClipboardCheck} tone="amber" onClick={() => setTab("awaiting")} />
-        <CommandStatCard label="Holds" value={counts.holds} sub="Awaiting manager follow-up" Icon={PauseCircle} tone="slate" onClick={() => setTab("holds")} />
-        <CommandStatCard label="Exceptions" value={counts.exceptions} sub="Preload needs attention" Icon={AlertTriangle} tone="red" onClick={() => setTab("exceptions")} />
-        <CommandStatCard label="Authorized today" value={authorizedToday} sub="Released to Get Ready" Icon={CheckCircle2} tone="emerald" />
-      </div>
+      <MetricStrip
+        label="Intake queue summary"
+        metrics={[
+          { label: "Awaiting authorization", value: ready ? counts.awaiting : null, loading, hint: "vehicles ready for review", tone: "warning", href: "/get-ready-command?gate=awaiting" },
+          { label: "Holds", value: ready ? counts.holds : null, loading, hint: "awaiting manager follow-up", tone: "neutral", href: "/get-ready-command?gate=holds" },
+          { label: "Exceptions", value: ready ? counts.exceptions : null, loading, hint: "preload needs attention", tone: "danger", href: "/get-ready-command?gate=exceptions" },
+          { label: "Authorized today", value: ready ? authorizedToday : null, loading, hint: "released to Get Ready", tone: "success" },
+        ]}
+      />
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by year, make, model, or VIN"
-            aria-label="Search intake queue"
-            className="w-full h-11 pl-9 pr-3 rounded-lg border border-border bg-background text-sm" />
-        </div>
-        <div className="flex items-center gap-1.5 overflow-x-auto">
-          {GATE_TABS.map((t) => (
-            <button key={t.key} onClick={() => setTab(t.key)} aria-pressed={tab === t.key}
-              className={cn("h-11 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0",
-                tab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground bg-muted/60")}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <LocalTabs label="Intake queue filters" tabs={tabs} />
 
-      <div className="space-y-3">
-        {visible.map((r) => {
-          const pill = STATE_PILL[r.state] ?? { label: r.state, tone: "slate" as const };
-          return (
-            <article key={r.vehicleId} className="rounded-2xl border border-border bg-card p-3.5 flex items-center gap-3 flex-wrap">
-              {r.photo
-                ? <img src={r.photo} alt="" className="w-16 h-12 rounded-md object-cover border border-border shrink-0" />
-                : <span className="w-16 h-12 rounded-md bg-muted grid place-items-center text-muted-foreground shrink-0"><Car className="w-5 h-5" aria-hidden="true" /></span>}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-foreground truncate">{r.ymm}</p>
-                <p className="font-mono text-[11px] text-muted-foreground">
-                  …{r.vin.slice(-6)} · {r.condition} · {r.ageDays}d in stock
-                  {r.mileage != null ? ` · ${r.mileage.toLocaleString("en-US")} mi` : ""}
-                  {r.price != null ? ` · $${r.price.toLocaleString("en-US")}` : ""}
-                </p>
-                {r.gateReason && <p className="text-[11.5px] text-muted-foreground mt-0.5 truncate">{r.gateReason}</p>}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {/do_not_drive|do-not-drive/i.test(r.recall) && <StatusPill tone="red">Do-not-drive recall</StatusPill>}
-                <StatusPill tone={pill.tone}>{pill.label}</StatusPill>
-                <button onClick={() => { setDrawer(r); setReason(""); }}
-                  className="min-h-[44px] px-3.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center gap-1">
-                  Review <ChevronRight className="w-4 h-4" aria-hidden="true" />
-                </button>
-              </div>
-            </article>
-          );
-        })}
-        {visible.length === 0 && (
-          <div className="rounded-2xl border border-border bg-card p-6">
-            <EmptyState Icon={CheckCircle2} title="Nothing waiting here"
-              detail="New vehicles from tonight's ingest will arrive in this queue automatically. Existing inventory was grandfathered as authorized at rollout." />
+      <Panel
+        flush
+        title={ready ? `${visible.length.toLocaleString()} ${visible.length === 1 ? "vehicle" : "vehicles"} · ${tabLabel}${q ? ` matching "${q}"` : ""}` : tabLabel}
+        action={
+          <div className="relative w-full min-w-[220px] max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by year, make, model, or VIN"
+              aria-label="Search intake queue"
+              className="h-10 w-full rounded-md border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px]" />
           </div>
-        )}
-      </div>
+        }
+      >
+        <QueryState
+          status={status}
+          onRetry={() => void load()}
+          errorTitle="We could not load the intake queue."
+          errorDetail={loadError ?? undefined}
+          emptyTitle={q ? "No vehicles match that search." : `Nothing is waiting in ${tabLabel}.`}
+          emptyDetail="New vehicles from tonight's ingest arrive in this queue automatically. This is the selected filter only. Existing inventory was grandfathered as authorized at rollout."
+        >
+          <WorkTable caption="Intake authorization queue" minWidth={860}>
+            <thead>
+              <tr>
+                <Th>Vehicle</Th>
+                <Th>State</Th>
+                <Th>Evidence</Th>
+                <Th align="right">Asking price</Th>
+                <Th align="right">Age</Th>
+                <Th align="right">Action</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((r) => {
+                const pill = STATE_PILL[r.state] ?? { label: r.state, tone: "neutral" as Tone };
+                const dnd = /do_not_drive|do-not-drive/i.test(r.recall);
+                return (
+                  <tr key={r.vehicleId}>
+                    <Td>
+                      <div className="flex items-center gap-3">
+                        {r.photo
+                          ? <img src={r.photo} alt="" className="h-12 w-16 shrink-0 rounded-md border border-adm-border object-cover" />
+                          : <span className="h-12 w-16 shrink-0 rounded-md bg-adm-workspace" aria-hidden="true" />}
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-adm-ink">{r.ymm}</p>
+                          <p className="font-mono text-[12px] text-adm-muted">…{r.vin.slice(-6)} · {r.condition}{r.mileage != null ? ` · ${r.mileage.toLocaleString("en-US")} mi` : ""}</p>
+                          {r.gateReason && <p className="max-w-[320px] truncate text-[12px] text-adm-muted">{r.gateReason}</p>}
+                        </div>
+                      </div>
+                    </Td>
+                    <Td><StatusText tone={pill.tone} icon>{pill.label}</StatusText></Td>
+                    <Td>
+                      {dnd ? <StatusText tone="danger" icon>Do-not-drive recall</StatusText>
+                        : r.recall ? <span className="text-adm-muted">Recall: {r.recall.replace(/_/g, " ")}</span>
+                        : <span className="text-adm-muted">No recall recorded</span>}
+                    </Td>
+                    <Td align="right">{r.price != null ? `$${r.price.toLocaleString("en-US")}` : <span className="text-adm-muted">Unknown</span>}</Td>
+                    <Td align="right" className="whitespace-nowrap">{r.ageDays}d</Td>
+                    <Td align="right">
+                      <Button size="sm" variant="primary" onClick={() => { setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</Button>
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </WorkTable>
+        </QueryState>
+      </Panel>
 
       {drawer && (
         <>
           <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setDrawer(null)} aria-hidden />
           <aside role="dialog" aria-modal="true" aria-label={`${drawer.ymm} intake review`}
-            className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[420px] bg-card border-l border-border shadow-xl overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card z-10">
-              <h3 className="text-sm font-bold text-foreground">Intake review</h3>
-              <button onClick={() => setDrawer(null)} aria-label="Close review" className="w-11 h-11 grid place-items-center text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+            className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[420px] bg-adm-surface border-l border-adm-border  overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-adm-border sticky top-0 bg-adm-surface z-10">
+              <h3 className="text-sm font-bold text-adm-ink">Intake review</h3>
+              <button onClick={() => setDrawer(null)} aria-label="Close review" className="w-11 h-11 grid place-items-center text-adm-muted hover:text-adm-ink"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <p className="font-bold text-foreground">{drawer.ymm}</p>
-                <p className="font-mono text-[11px] text-muted-foreground">VIN {drawer.vin} · {drawer.ageDays}d in stock</p>
+                <p className="font-bold text-adm-ink">{drawer.ymm}</p>
+                <p className="font-mono text-[11px] text-adm-muted">VIN {drawer.vin} · {drawer.ageDays}d in stock</p>
               </div>
               <dl className="space-y-1.5 text-[12.5px]">
-                <div className="flex justify-between"><dt className="text-muted-foreground">Asking price</dt><dd className="text-foreground font-semibold">{drawer.price != null ? `$${drawer.price.toLocaleString("en-US")}` : "—"}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted-foreground">Mileage</dt><dd className="text-foreground">{drawer.mileage != null ? `${drawer.mileage.toLocaleString("en-US")} mi` : "—"}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted-foreground">Recall</dt><dd className={/do_not_drive|do-not-drive/i.test(drawer.recall) ? "text-red-600 font-semibold" : "text-foreground"}>{drawer.recall ? drawer.recall.replace(/_/g, " ") : "None recorded"}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted-foreground">Current state</dt><dd className="text-foreground">{(STATE_PILL[drawer.state] ?? { label: drawer.state }).label}</dd></div>
+                <div className="flex justify-between"><dt className="text-adm-muted">Asking price</dt><dd className="text-adm-ink font-semibold">{drawer.price != null ? `$${drawer.price.toLocaleString("en-US")}` : "—"}</dd></div>
+                <div className="flex justify-between"><dt className="text-adm-muted">Mileage</dt><dd className="text-adm-ink">{drawer.mileage != null ? `${drawer.mileage.toLocaleString("en-US")} mi` : "—"}</dd></div>
+                <div className="flex justify-between"><dt className="text-adm-muted">Recall</dt><dd className={/do_not_drive|do-not-drive/i.test(drawer.recall) ? "text-adm-danger font-semibold" : "text-adm-ink"}>{drawer.recall ? drawer.recall.replace(/_/g, " ") : "None recorded"}</dd></div>
+                <div className="flex justify-between"><dt className="text-adm-muted">Current state</dt><dd className="text-adm-ink">{(STATE_PILL[drawer.state] ?? { label: drawer.state }).label}</dd></div>
               </dl>
               <div>
-                <label htmlFor="intake-reason" className="block text-al-meta font-bold uppercase tracking-wide text-muted-foreground mb-1">
+                <label htmlFor="intake-reason" className="block text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted mb-1">
                   Note / reason
                 </label>
                 <textarea id="intake-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2}
                   placeholder="Required for wholesale, remove, and information requests"
-                  className="w-full rounded-lg border border-border bg-background p-2.5 text-sm" />
+                  className="w-full rounded-lg border border-adm-border bg-adm-surface p-2.5 text-sm" />
               </div>
               <div className="space-y-2">
                 <button onClick={() => void decide(drawer, "authorize")} disabled={busy || !canDecide}
@@ -293,12 +324,12 @@ export default function ManagerIntake() {
                 </button>
               </div>
               {!canDecide && (
-                <p className="text-[11.5px] text-muted-foreground">Intake decisions require a manager role; the server enforces this independently.</p>
+                <p className="text-[11.5px] text-adm-muted">Intake decisions require a manager role; the server enforces this independently.</p>
               )}
             </div>
           </aside>
         </>
       )}
-    </div>
+    </PageBody>
   );
 }
