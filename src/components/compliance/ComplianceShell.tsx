@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, RefreshCw, ShieldCheck } from "lucide-react";
+import { useLocation, useSearchParams } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
+import { Button, InlineNote, LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { getStateCompliance } from "@/data/stateCompliance";
@@ -24,6 +25,7 @@ import LibrarySection from "./LibrarySection";
 
 export const ComplianceShell = ({ defaultSection }: { defaultSection: ComplianceSectionId }) => {
   const [params, setParams] = useSearchParams();
+  const { pathname } = useLocation();
   const { tenant, currentStore } = useTenant();
   const { settings } = useDealerSettings();
   const data = useComplianceCenterData();
@@ -88,70 +90,50 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
     return null;
   };
 
-  return (
-    <div className="mx-auto max-w-[1400px] space-y-6 p-4 lg:p-6">
-      <header className="space-y-2">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-foreground" strokeWidth={2} />
-          <h1 className="text-al-page font-display text-foreground">Compliance</h1>
-        </div>
-        <p className="max-w-3xl text-al-body text-muted-foreground">
-          {storeName}
-          {compliance.stateName ? ` · ${compliance.stateName}` : dealerState ? ` · ${dealerState}` : ""}
-          {" · "}
-          {compliance.docFeeTerminology}
-          {compliance.docFeeMaxCap !== null ? ` capped at $${compliance.docFeeMaxCap}` : ""}
-          {compliance.carsActState ? " · California SB 766 takes effect October 1, 2026" : ""}
-        </p>
-      </header>
+  const sb766 = Date.now() >= Date.parse("2026-10-01T00:00:00") ? "took effect" : "takes effect";
+  const scopeLine = [
+    storeName,
+    compliance.stateName || dealerState || null,
+    `${compliance.docFeeTerminology}${compliance.docFeeMaxCap !== null ? ` capped at $${compliance.docFeeMaxCap}` : ""}`,
+    compliance.carsActState ? `California SB 766 ${sb766} October 1, 2026` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-      <nav className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
-        {COMPLIANCE_SECTIONS.map((s) => {
-          const active = s.id === section;
-          const badge = badgeFor(s.id);
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSection(s.id)}
-              title={s.blurb}
-              className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-al-meta font-bold uppercase tracking-label transition-colors ${
-                active
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              {s.label}
-              {badge != null && badge > 0 && (
-                <span
-                  className={`rounded-full px-1.5 tabular-nums ${
-                    active ? "bg-background/20" : "bg-muted text-foreground"
-                  }`}
-                >
-                  {badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={data.refresh}
-          disabled={data.loading}
-          className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-al-meta font-bold text-foreground hover:bg-muted disabled:opacity-60"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${data.loading ? "animate-spin" : ""}`} /> Refresh
-        </button>
-      </nav>
+  const tabs: LocalTab[] = COMPLIANCE_SECTIONS.map((s) => {
+    const q = new URLSearchParams();
+    q.set("tab", s.id);
+    return {
+      key: s.id,
+      label: s.label,
+      to: `${pathname}?${q.toString()}`,
+      count: badgeFor(s.id) || null,
+      active: s.id === section,
+    };
+  });
+
+  return (
+    <PageBody width="wide">
+      <PageHeader
+        title="Compliance"
+        description={scopeLine}
+        actions={
+          <Button onClick={data.refresh} disabled={data.loading}>
+            <RefreshCw className={`h-4 w-4 ${data.loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
+          </Button>
+        }
+      />
+
+      <LocalTabs label="Compliance sections" tabs={tabs} />
 
       {data.error && (
-        <div className="flex items-start gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
-          <div>
-            <p className="text-al-card text-destructive">Compliance data could not be loaded</p>
-            <p className="text-al-body text-muted-foreground">{data.error}</p>
-          </div>
-        </div>
+        <InlineNote
+          tone="danger"
+          title="Compliance data could not be loaded"
+          action={<Button size="sm" onClick={data.refresh}>Retry</Button>}
+        >
+          {data.error}
+        </InlineNote>
       )}
 
       {section === "overview" && (
@@ -159,6 +141,7 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
           overview={data.overview}
           issueRows={data.issueRows}
           loading={data.loading}
+          failed={!!data.error}
           onNavigate={setSection}
           onOpenVin={openVin}
         />
@@ -173,7 +156,7 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
       )}
       {section === "audit" && <AuditLogSection tenantId={tenantId} />}
       {section === "library" && <LibrarySection />}
-    </div>
+    </PageBody>
   );
 };
 

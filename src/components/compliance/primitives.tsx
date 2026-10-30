@@ -1,5 +1,13 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { StatusText, SkeletonBlock } from "@/components/product";
+import type { Tone as ChipTone } from "@/components/product";
+
+// Compliance pieces rebuilt on the national product vocabulary. The export
+// names are unchanged so every section keeps working; only the treatment
+// changed: flat panels, flat metric cells, text status, no pills, no tinted
+// cards. A count that has not been read yet shows a skeleton, never zero.
 
 export const SectionHeading = ({
   title,
@@ -12,8 +20,8 @@ export const SectionHeading = ({
 }) => (
   <div className="flex flex-wrap items-end justify-between gap-3">
     <div className="max-w-3xl">
-      <h2 className="text-al-section font-display text-foreground">{title}</h2>
-      <p className="mt-1 text-al-body text-muted-foreground">{description}</p>
+      <h2 className="text-[17px] leading-[24px] font-semibold text-adm-ink">{title}</h2>
+      <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{description}</p>
     </div>
     {action}
   </div>
@@ -21,25 +29,18 @@ export const SectionHeading = ({
 
 export type Tone = "neutral" | "critical" | "attention" | "clear";
 
-const TONE_TILE: Record<Tone, string> = {
-  neutral: "border-border bg-card",
-  critical: "border-destructive/30 bg-destructive/5",
-  attention: "border-amber-300 bg-amber-50",
-  clear: "border-emerald-300 bg-emerald-50",
+const TONE_CHIP: Record<Tone, ChipTone> = {
+  neutral: "neutral",
+  critical: "danger",
+  attention: "warning",
+  clear: "success",
 };
 
-const TONE_VALUE: Record<Tone, string> = {
-  neutral: "text-foreground",
-  critical: "text-destructive",
-  attention: "text-amber-800",
-  clear: "text-emerald-800",
-};
-
-const TONE_LABEL: Record<Tone, string> = {
-  neutral: "text-muted-foreground",
-  critical: "text-destructive",
-  attention: "text-amber-800",
-  clear: "text-emerald-800",
+const TONE_BAR: Record<Tone, string> = {
+  neutral: "bg-adm-border",
+  critical: "bg-adm-danger",
+  attention: "bg-[#D98B00]",
+  clear: "bg-adm-success",
 };
 
 /** A count plus the sentence that says exactly what population it counts. */
@@ -50,43 +51,48 @@ export const CountTile = ({
   tone = "neutral",
   active = false,
   onClick,
+  loading = false,
 }: {
   label: string;
-  value: number | string;
+  value: number | string | null;
   means: string;
   tone?: Tone;
   active?: boolean;
   onClick?: () => void;
+  loading?: boolean;
 }) => {
   const body = (
     <>
-      <p className={`text-al-meta font-bold uppercase tracking-label ${TONE_LABEL[tone]}`}>{label}</p>
-      <p className={`mt-1 font-display text-3xl font-black tabular-nums ${TONE_VALUE[tone]}`}>{value}</p>
-      <p className="mt-1.5 text-al-meta leading-4 text-muted-foreground">{means}</p>
+      <span className={cn("absolute left-4 top-4 bottom-4 w-[3px] rounded-[2px]", TONE_BAR[tone])} aria-hidden="true" />
+      <p className="text-[12px] leading-[18px] font-medium text-adm-muted">{label}</p>
+      <p className="mt-0.5 text-[24px] leading-[32px] font-bold tabular-nums text-adm-ink">
+        {loading ? <SkeletonBlock className="h-7 w-16" /> : value === null ? <span className="text-adm-muted">Unknown</span> : value}
+      </p>
+      <p className="mt-0.5 text-[12px] leading-[18px] text-adm-muted">{means}</p>
     </>
   );
-  const shell = `rounded-2xl border p-4 text-left ${TONE_TILE[tone]} ${active ? "ring-2 ring-ring" : ""}`;
+  const shell = cn(
+    "relative block min-w-0 rounded-[6px] border border-adm-border bg-adm-surface py-4 pl-8 pr-4 text-left",
+    active && "outline outline-2 -outline-offset-2 outline-adm-primary",
+  );
   if (!onClick) return <div className={shell}>{body}</div>;
   return (
-    <button type="button" onClick={onClick} className={`${shell} hover:bg-muted/40`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(shell, "hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary")}
+    >
       {body}
     </button>
   );
 };
 
-export const StateBadge = ({ tone, children }: { tone: Tone; children: ReactNode }) => {
-  const map: Record<Tone, string> = {
-    neutral: "border-border bg-muted text-muted-foreground",
-    critical: "border-destructive/30 bg-destructive/10 text-destructive",
-    attention: "border-amber-300 bg-amber-50 text-amber-800",
-    clear: "border-emerald-300 bg-emerald-50 text-emerald-800",
-  };
-  return (
-    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-al-meta font-bold ${map[tone]}`}>
-      {children}
-    </span>
-  );
-};
+/** State as icon plus text on a flat tint. Not a pill. */
+export const StateBadge = ({ tone, children }: { tone: Tone; children: ReactNode }) => (
+  <StatusText tone={TONE_CHIP[tone]} icon={tone !== "neutral"}>
+    {children}
+  </StatusText>
+);
 
 export const Panel = ({
   title,
@@ -101,12 +107,12 @@ export const Panel = ({
   children: ReactNode;
   className?: string;
 }) => (
-  <section className={`overflow-hidden rounded-2xl border border-border bg-card ${className}`}>
+  <section className={cn("overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface", className)}>
     {(title || action) && (
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-adm-border px-4 py-3">
         <div>
-          {title && <h3 className="text-al-card text-foreground">{title}</h3>}
-          {meta && <p className="mt-0.5 text-al-meta text-muted-foreground">{meta}</p>}
+          {title && <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{title}</h3>}
+          {meta && <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{meta}</p>}
         </div>
         {action}
       </header>
@@ -127,29 +133,35 @@ export const EmptyState = ({
   body: string;
   tone?: Tone;
 }) => (
-  <div className="px-6 py-12 text-center">
+  <div className="px-6 py-10 text-center">
     <Icon
-      className={`mx-auto mb-3 h-7 w-7 ${tone === "clear" ? "text-emerald-600" : "text-muted-foreground"}`}
+      className={cn("mx-auto mb-3 h-6 w-6", tone === "clear" ? "text-adm-success" : "text-adm-muted")}
       strokeWidth={1.75}
+      aria-hidden="true"
     />
-    <p className="text-al-card text-foreground">{headline}</p>
-    <p className="mx-auto mt-1 max-w-md text-al-body text-muted-foreground">{body}</p>
+    <p className="text-[14px] font-semibold text-adm-ink">{headline}</p>
+    <p className="mx-auto mt-1 max-w-md text-[13px] leading-[18px] text-adm-muted">{body}</p>
   </div>
 );
 
+/** Rows here are VIN lists, so the shell scrolls inside itself on a phone. */
 export const TableShell = ({ headers, children }: { headers: string[]; children: ReactNode }) => (
-  <div className="overflow-x-auto">
-    <table className="w-full min-w-[860px] text-left">
-      <thead className="border-b border-border bg-muted/50">
+  <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Table">
+    <table className="w-full min-w-[860px] border-collapse text-left text-[14px] leading-[20px] text-adm-ink">
+      <thead>
         <tr>
-          {headers.map((h) => (
-            <th key={h} className="px-4 py-2.5 text-al-meta font-bold uppercase tracking-label text-muted-foreground">
+          {headers.map((h, i) => (
+            <th
+              key={`${h}-${i}`}
+              scope="col"
+              className="border-b border-adm-border bg-adm-workspace px-4 py-3 text-[12px] leading-[18px] font-semibold text-adm-muted"
+            >
               {h}
             </th>
           ))}
         </tr>
       </thead>
-      <tbody className="divide-y divide-border">{children}</tbody>
+      <tbody className="divide-y divide-adm-border">{children}</tbody>
     </table>
   </div>
 );
@@ -164,7 +176,7 @@ export const RowAction = ({
   href?: string;
 }) => {
   const cls =
-    "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-al-meta font-bold text-foreground hover:bg-muted";
+    "inline-flex min-h-[32px] items-center gap-1.5 rounded-md border border-adm-border bg-adm-surface px-3 text-[13px] font-semibold text-adm-ink hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary";
   if (href) {
     return (
       <a href={href} target="_blank" rel="noreferrer" className={cls}>

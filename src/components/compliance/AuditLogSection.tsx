@@ -78,7 +78,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-al-button text-foreground hover:bg-muted disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-adm-border bg-adm-surface px-4 text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
@@ -95,29 +95,29 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
                 key={w.days}
                 type="button"
                 onClick={() => setDays(w.days)}
-                className={`h-9 rounded-lg border px-3 text-al-meta font-bold ${
+                className={`h-9 rounded-lg border px-3 text-[12px] leading-[18px] font-semibold ${
                   days === w.days
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border bg-card text-foreground hover:bg-muted"
+                    ? "border-adm-primary bg-adm-selected text-adm-primary"
+                    : "border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace"
                 }`}
               >
                 {w.label}
               </button>
             ))}
             <div className="relative w-full max-w-xs">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search action, entity, user"
-                className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-al-body text-foreground outline-none focus:ring-2 focus:ring-ring"
+                className="h-9 w-full rounded-lg border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] leading-[20px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
               />
             </div>
           </div>
         }
       >
         {loading ? (
-          <p className="px-4 py-10 text-center text-al-body text-muted-foreground">Loading events…</p>
+          <p className="px-4 py-10 text-center text-[14px] leading-[20px] text-adm-muted">Loading events…</p>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={History}
@@ -131,18 +131,18 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
         ) : (
           <TableShell headers={["When", "Action", "Entity", "User", "Hash"]}>
             {filtered.map((r) => (
-              <tr key={r.id} className="hover:bg-muted/30">
-                <td className="whitespace-nowrap px-4 py-2.5 text-al-meta text-muted-foreground">
+              <tr key={r.id} className="hover:bg-adm-workspace">
+                <td className="whitespace-nowrap px-4 py-2.5 text-[12px] leading-[18px] text-adm-muted">
                   {formatDateTime(r.created_at)}
                 </td>
-                <td className="px-4 py-2.5 text-al-body text-foreground">{r.action}</td>
+                <td className="px-4 py-2.5 text-[14px] leading-[20px] text-adm-ink">{r.action}</td>
                 <td className="px-4 py-2.5">
-                  <p className="text-al-meta text-foreground">{r.entity_type}</p>
-                  <p className="font-mono text-al-meta text-muted-foreground">{r.entity_id}</p>
+                  <p className="text-[12px] leading-[18px] text-adm-ink">{r.entity_type}</p>
+                  <p className="font-mono text-[12px] leading-[18px] text-adm-muted">{r.entity_id}</p>
                 </td>
-                <td className="px-4 py-2.5 text-al-meta text-muted-foreground">{r.user_email || "System"}</td>
+                <td className="px-4 py-2.5 text-[12px] leading-[18px] text-adm-muted">{r.user_email || "System"}</td>
                 <td className="px-4 py-2.5">
-                  <code className="font-mono text-al-meta text-muted-foreground">
+                  <code className="font-mono text-[12px] leading-[18px] text-adm-muted">
                     {(r.content_hash || r.row_hash || "").slice(0, 16) || "—"}
                   </code>
                 </td>

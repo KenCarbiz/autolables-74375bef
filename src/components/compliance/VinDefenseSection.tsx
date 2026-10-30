@@ -168,7 +168,7 @@ export const VinDefenseSection = ({
           }}
         >
           <div className="relative min-w-[260px] flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
             <input
               value={vin}
               onChange={(e) => setVin(cleanVin(e.target.value))}
@@ -176,13 +176,13 @@ export const VinDefenseSection = ({
               maxLength={17}
               autoComplete="off"
               autoCapitalize="characters"
-              className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-3 font-mono tracking-widest text-foreground outline-none focus:ring-2 focus:ring-ring"
+              className="h-11 w-full rounded-xl border border-adm-border bg-adm-surface pl-10 pr-3 font-mono tracking-widest text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
             />
           </div>
           <button
             type="submit"
             disabled={building || vin.length < 11}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-foreground px-5 text-al-button text-background disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-foreground px-5 text-[14px] font-semibold text-background disabled:opacity-50"
           >
             <ShieldCheck className="h-4 w-4" />
             {building ? "Assembling…" : "Assemble packet"}
@@ -208,14 +208,14 @@ export const VinDefenseSection = ({
           >
             <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">
               {coverage.map((c) => (
-                <div key={c.label} className="bg-card p-4">
+                <div key={c.label} className="bg-adm-surface p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-al-meta font-bold uppercase tracking-label text-muted-foreground">{c.label}</p>
+                    <p className="text-[12px] leading-[18px] font-bold uppercase tracking-label text-adm-muted">{c.label}</p>
                     <StateBadge tone={c.count > 0 ? "clear" : "neutral"}>
                       {c.count > 0 ? `${c.count} on record` : "None on record"}
                     </StateBadge>
                   </div>
-                  <p className="mt-1.5 text-al-meta leading-4 text-muted-foreground">{c.note}</p>
+                  <p className="mt-1.5 text-[12px] leading-[18px] leading-4 text-adm-muted">{c.note}</p>
                 </div>
               ))}
             </div>
@@ -227,15 +227,15 @@ export const VinDefenseSection = ({
           >
             <TableShell headers={["Section", "Records", "SHA-256"]}>
               {packet.manifest.sections.map((sec) => (
-                <tr key={sec.name} className="hover:bg-muted/30">
-                  <td className="px-4 py-2.5 text-al-body text-foreground">
+                <tr key={sec.name} className="hover:bg-adm-workspace">
+                  <td className="px-4 py-2.5 text-[14px] leading-[20px] text-adm-ink">
                     {SECTION_TITLES[sec.name] ?? sec.name}
                   </td>
-                  <td className="px-4 py-2.5 text-al-body tabular-nums text-foreground">
-                    {sec.count === 0 ? <span className="text-muted-foreground">Empty</span> : sec.count}
+                  <td className="px-4 py-2.5 text-[14px] leading-[20px] tabular-nums text-adm-ink">
+                    {sec.count === 0 ? <span className="text-adm-muted">Empty</span> : sec.count}
                   </td>
                   <td className="px-4 py-2.5">
-                    <code className="break-all font-mono text-al-meta text-muted-foreground">{sec.sha256}</code>
+                    <code className="break-all font-mono text-[12px] leading-[18px] text-adm-muted">{sec.sha256}</code>
                   </td>
                 </tr>
               ))}
@@ -244,16 +244,16 @@ export const VinDefenseSection = ({
 
           <Panel title="Chain root" meta="Quote this hash verbatim in any production to counsel, a state AG, or the FTC.">
             <div className="space-y-3 p-4">
-              <code className="block break-all rounded-xl border border-border bg-muted/50 p-3 font-mono text-al-meta text-foreground">
+              <code className="block break-all rounded-xl border border-adm-border bg-adm-workspace p-3 font-mono text-[12px] leading-[18px] text-adm-ink">
                 {packet.manifest.chain_root}
               </code>
               {receipt === packet.manifest.chain_root && (
-                <p className="text-al-meta text-muted-foreground">
+                <p className="text-[12px] leading-[18px] text-adm-muted">
                   A receipt for this chain root was recorded at export time so the packet can be re-verified later.
                 </p>
               )}
               {s && !s.has_listing && (
-                <p className="text-al-body text-amber-800">
+                <p className="text-[14px] leading-[20px] text-adm-warning">
                   No vehicle listing exists for this VIN under this tenant. The packet still reports whatever
                   artifacts were found, but confirm the VIN and your store scope before relying on it.
                 </p>
@@ -262,14 +262,14 @@ export const VinDefenseSection = ({
                 <button
                   type="button"
                   onClick={exportHtml}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground px-4 text-al-button text-background"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground px-4 text-[14px] font-semibold text-background"
                 >
                   <FileArchive className="h-4 w-4" /> Export evidence packet
                 </button>
                 <button
                   type="button"
                   onClick={exportJson}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-al-button text-foreground hover:bg-muted"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-adm-border bg-adm-surface px-4 text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace"
                 >
                   <Download className="h-4 w-4" /> Export raw JSON
                 </button>
