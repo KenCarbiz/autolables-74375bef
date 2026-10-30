@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  AlertTriangle, ExternalLink, Loader2, RefreshCw, Radar, Search,
+  ExternalLink, Loader2, RefreshCw, Search,
 } from "lucide-react";
+import { PageBody, PageHeader, Panel, WorkTable, Th, Td, Button, StatusText, InlineNote, QueryState, type Tone } from "@/components/product";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -23,18 +24,14 @@ import { DOCUMENT_FAMILIES, DOCUMENT_FAMILY_IDS, familyForDocumentType } from "@
 // no combined score anywhere on this page, because a combined score would
 // hide exactly the case a dealer needs to act on.
 
-const TONE_CLASS: Record<string, string> = {
-  good: "bg-emerald-50 text-emerald-700",
-  warn: "bg-amber-50 text-amber-700",
-  bad: "bg-rose-50 text-rose-700",
-  info: "bg-blue-50 text-blue-700",
-  muted: "bg-muted text-muted-foreground",
+const STAGE_TONE_MAP: Record<string, Tone> = {
+  good: "success", warn: "warning", bad: "danger", info: "info", muted: "neutral",
 };
 
+// Compact status text: unknown and not-applicable stay distinct words, not
+// repeated bright badges.
 const Stage = ({ stage }: { stage: PipelineStage }) => (
-  <span className={`inline-flex text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${TONE_CLASS[STAGE_TONE[stage]]}`}>
-    {stage}
-  </span>
+  <StatusText tone={STAGE_TONE_MAP[STAGE_TONE[stage]] ?? "neutral"}>{stage}</StatusText>
 );
 
 interface Vehicle {
@@ -172,132 +169,113 @@ export default function InventoryIntelligence() {
   };
 
   if (!tenantId) {
-    return <div className="p-4 md:p-6"><p className="text-sm text-muted-foreground">Select a dealership to view inventory intelligence.</p></div>;
+    return (
+      <PageBody>
+        <PageHeader title="Inventory Intelligence" description="What the ingest pipeline did to each vehicle, per document family." />
+        <InlineNote tone="info" title="Select a dealership">Inventory intelligence is shown for one dealership at a time.</InlineNote>
+      </PageBody>
+    );
   }
 
   const blockedCount = rows?.filter((r) => r.intel.blocker).length ?? 0;
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="max-w-[1600px] mx-auto space-y-4">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-al-page text-foreground inline-flex items-center gap-2">
-              <Radar className="w-5 h-5 text-blue-600" /> Inventory Intelligence
-            </h1>
-            <p className="text-[12.5px] text-muted-foreground mt-0.5">
-              What the ingest pipeline did to each vehicle, per document family. No combined score — a vehicle can be
-              approved on one document and blocked on another.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={load}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-[13px] font-semibold hover:bg-muted/40"
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Refresh
-          </button>
+    <PageBody width="wide">
+      <PageHeader
+        title="Inventory Intelligence"
+        description="What the ingest pipeline did to each vehicle, per document family. No combined score: a vehicle can be approved on one document and blocked on another."
+        actions={<Button onClick={load}><RefreshCw className="w-3.5 h-3.5" /> Refresh</Button>}
+      />
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-adm-muted" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="VIN, year, make or model"
+            className="w-full min-h-[36px] pl-8 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
+            aria-label="Filter inventory"
+          />
         </div>
-
-        <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="VIN, year, make or model"
-                className="w-full h-9 pl-8 pr-3 rounded-md border border-border bg-background text-[13px]"
-                aria-label="Filter inventory"
-              />
-            </div>
-            <label className="inline-flex items-center gap-2 text-[12.5px] font-semibold text-foreground">
-              <input type="checkbox" checked={onlyBlocked} onChange={(e) => setOnlyBlocked(e.target.checked)} />
-              Needs attention only{blockedCount ? ` (${blockedCount})` : ""}
-            </label>
-          </div>
-
-          {error && (
-            <p className="text-[12px] text-rose-600 inline-flex items-start gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" /> Couldn't load inventory: {error}
-            </p>
-          )}
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12.5px]">
-              <thead>
-                <tr className="text-left text-al-meta uppercase tracking-wide text-muted-foreground border-b border-border">
-                  <th className="py-2 pr-3 font-semibold">Vehicle</th>
-                  <th className="py-2 pr-3 font-semibold">Source data</th>
-                  {DOCUMENT_FAMILY_IDS.map((id) => (
-                    <th key={id} className="py-2 pr-3 font-semibold whitespace-nowrap">
-                      {DOCUMENT_FAMILIES[id].adminTitle}
-                    </th>
-                  ))}
-                  <th className="py-2 pr-3 font-semibold">Blocker</th>
-                  <th className="py-2 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filtered === null && (
-                  <tr><td colSpan={9} className="py-3 text-muted-foreground">Loading inventory…</td></tr>
-                )}
-                {filtered?.length === 0 && (
-                  <tr><td colSpan={9} className="py-3 text-muted-foreground">No vehicles match.</td></tr>
-                )}
-                {filtered?.map(({ vehicle, intel }) => (
-                  <tr key={vehicle.id} className="align-top">
-                    <td className="py-2.5 pr-3">
-                      <span className="block font-semibold text-foreground">{vehicle.ymm || "Vehicle"}</span>
-                      <span className="block text-[11px] font-mono text-muted-foreground">{vehicle.vin || "no VIN"}</span>
-                      <span className="block text-[11px] text-muted-foreground">
-                        {intel.conditionClass} · refreshed {fmtWhen(vehicle.updated_at)}
-                      </span>
-                    </td>
-                    <td className="py-2.5 pr-3"><Stage stage={intel.sourceStage} /></td>
-                    {DOCUMENT_FAMILY_IDS.map((id) => {
-                      const f = intel.families.find((x) => x.family === id);
-                      return (
-                        <td key={id} className="py-2.5 pr-3">
-                          {f ? <Stage stage={f.stage} /> : null}
-                        </td>
-                      );
-                    })}
-                    <td className="py-2.5 pr-3 max-w-[260px]">
-                      {intel.blocker
-                        ? <span className="text-[11.5px] text-amber-700">{intel.blocker}</span>
-                        : <span className="text-[11.5px] text-muted-foreground">—</span>}
-                    </td>
-                    <td className="py-2.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <Link
-                          to={`/vehicle-file/${vehicle.id}`}
-                          className="h-7 px-2 rounded border border-border text-[11.5px] font-semibold hover:bg-muted/40 inline-flex items-center gap-1"
-                        >
-                          <ExternalLink className="w-3 h-3" /> File
-                        </Link>
-                        {canRegenerate && (
-                          <button
-                            type="button"
-                            onClick={() => processVin(vehicle.id)}
-                            disabled={busy || working === vehicle.id}
-                            className="h-7 px-2 rounded border border-border text-[11.5px] font-semibold hover:bg-muted/40 inline-flex items-center gap-1 disabled:opacity-50"
-                          >
-                            {working === vehicle.id
-                              ? <Loader2 className="w-3 h-3 animate-spin" />
-                              : <RefreshCw className="w-3 h-3" />}
-                            Process
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <label className="inline-flex items-center gap-2 text-[14px] text-adm-ink min-h-[36px]">
+          <input type="checkbox" checked={onlyBlocked} onChange={(e) => setOnlyBlocked(e.target.checked)} />
+          Needs attention only{blockedCount ? ` (${blockedCount})` : ""}
+        </label>
       </div>
-    </div>
+
+      {error && (
+        <InlineNote tone="danger" title="Could not load inventory" action={<Button size="sm" onClick={load}>Retry</Button>}>{error}</InlineNote>
+      )}
+
+      <Panel>
+        <QueryState
+          status={filtered === null ? "loading" : error ? "error" : filtered.length === 0 ? "empty" : "ready"}
+          errorTitle="Inventory intelligence could not be read."
+          onRetry={load}
+          emptyTitle="No vehicles match"
+          emptyDetail="Clear the search or the attention filter to widen the list."
+        >
+          <WorkTable caption="Document pipeline by vehicle and family" minWidth={1100}>
+            <thead>
+              <tr>
+                <Th>Vehicle</Th>
+                <Th>Source data</Th>
+                {DOCUMENT_FAMILY_IDS.map((id) => (
+                  <Th key={id} className="whitespace-nowrap">{DOCUMENT_FAMILIES[id].adminTitle}</Th>
+                ))}
+                <Th>Blocker</Th>
+                <Th align="right">Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered?.map(({ vehicle, intel }) => (
+                <tr key={vehicle.id} className="align-top hover:bg-adm-workspace">
+                  <Td>
+                    <span className="block font-semibold text-adm-ink">{vehicle.ymm || "Vehicle"}</span>
+                    <span className="block text-[12px] leading-[18px] font-mono text-adm-muted">{vehicle.vin || "no VIN"}</span>
+                    <span className="block text-[12px] leading-[18px] text-adm-muted">
+                      {intel.conditionClass} | refreshed {fmtWhen(vehicle.updated_at)}
+                    </span>
+                  </Td>
+                  <Td><Stage stage={intel.sourceStage} /></Td>
+                  {DOCUMENT_FAMILY_IDS.map((id) => {
+                    const f = intel.families.find((x) => x.family === id);
+                    return <Td key={id}>{f ? <Stage stage={f.stage} /> : null}</Td>;
+                  })}
+                  <Td className="max-w-[260px]">
+                    {intel.blocker
+                      ? <span className="text-[12px] leading-[18px] text-adm-warning">{intel.blocker}</span>
+                      : <span className="text-[12px] text-adm-muted">None</span>}
+                  </Td>
+                  <Td align="right">
+                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                      <Link
+                        to={`/vehicle-file/${vehicle.id}`}
+                        className="min-h-[32px] px-2.5 rounded-md border border-adm-border bg-adm-surface text-[13px] font-semibold hover:bg-adm-workspace inline-flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" /> File
+                      </Link>
+                      {canRegenerate && (
+                        <Button
+                          size="sm"
+                          onClick={() => processVin(vehicle.id)}
+                          disabled={busy || working === vehicle.id}
+                        >
+                          {working === vehicle.id
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <RefreshCw className="w-3 h-3" />}
+                          Process
+                        </Button>
+                      )}
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </WorkTable>
+        </QueryState>
+      </Panel>
+    </PageBody>
   );
 }
