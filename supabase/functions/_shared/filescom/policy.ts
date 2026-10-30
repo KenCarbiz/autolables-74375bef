@@ -110,9 +110,16 @@ type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 // Single-stream download from the fixed origin only. Redirects are refused so
 // the API key is never presented to another host.
 export async function downloadFileContents(fetchFn: Fetch, key: string, path: string): Promise<Uint8Array> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), DOWNLOAD_TIMEOUT_MS);
+  try { return await streamContents(fetchFn, key, path, ctl.signal); }
+  finally { clearTimeout(timer); }
+}
+
+async function streamContents(fetchFn: Fetch, key: string, path: string, signal: AbortSignal): Promise<Uint8Array> {
   let res: Response;
   try {
-    res = await fetchFn(fileContentsUrl(path), { headers: { "X-FilesAPI-Key": key }, redirect: "error", signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
+    res = await fetchFn(fileContentsUrl(path), { headers: { "X-FilesAPI-Key": key }, redirect: "error", signal });
   } catch {
     throw new Error("download_refused_or_timeout");
   }

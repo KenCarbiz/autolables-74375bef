@@ -89,7 +89,7 @@ describe("authorization and quarantine", () => {
     expect(src).not.toMatch(/from\("vehicle_listings"\)\.(insert|update|upsert|delete)/);
     expect(src).not.toMatch(/marketcheck\.com|MARKETCHECK_API|marketcheck-|functions\.invoke/i);
     expect(src).not.toMatch(/x-dms-tenant/i);
-    expect([...src.matchAll(/fetch\(/g)].length).toBe(2);
+    expect([...src.matchAll(/fetch\(/g)].length).toBe(1);
   });
 });
 
