@@ -29,6 +29,13 @@
       "when": 1793224026521,
       "tag": "0003_tighten_tenant_insert_and_budget_read",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793382488986,
+      "tag": "0004_filescom_inventory_connector",
+      "breakpoints": true
     }
   ]
 }
