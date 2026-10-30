@@ -49,6 +49,21 @@ const fileName = (p: string) => p.split("/").pop() ?? p;
 const when = (s: string | null | undefined) => (s ? new Date(s).toLocaleString() : "Never");
 const STATUS_TONE: Record<string, Tone> = { validated: "success", passed: "success", approved: "success", rejected: "danger", failed: "danger", quarantined: "warning", pending: "info", validating: "info", running: "info", disabled: "neutral" };
 const FIELD_TONE: Record<Field, Tone> = { match: "success", mismatch: "danger", unknown: "neutral" };
+async function loadState(): Promise<Omit<Overview, "config">> {
+  const [files, bindings, runs, events] = await Promise.all([
+    supabase.from("inventory_feed_files").select("*").order("path"),
+    supabase.from("inventory_feed_bindings").select("*").order("path"),
+    supabase.from("inventory_feed_runs").select("id,path,status,failure_reason,binding_status,tenant_id,started_at,finished_at,remote_size,report").order("started_at", { ascending: false }).limit(50),
+    supabase.from("inventory_feed_events").select("id,action,path,received_at").order("received_at", { ascending: false }).limit(25),
+  ]);
+  const err = files.error ?? bindings.error ?? runs.error ?? events.error;
+  if (err) throw new Error(err.message);
+  const ids = [...new Set([...(bindings.data ?? []).map((b) => b.tenant_id), ...(runs.data ?? []).map((r) => r.tenant_id)].filter((x): x is string => !!x))];
+  const tenants = ids.length ? await supabase.from("tenants").select("id,name").in("id", ids) : { data: [], error: null };
+  if (tenants.error) throw new Error(tenants.error.message);
+  return { files: (files.data ?? []) as FileRow[], bindings: (bindings.data ?? []) as Binding[], runs: (runs.data ?? []) as unknown as Run[], events: events.data ?? [], tenants: (tenants.data ?? []) as Array<{ id: string; name: string }> };
+}
+
 const callbackUrl = (path: string) => `${import.meta.env.VITE_SUPABASE_URL ?? ""}${path}`;
 
 export default function FilesComFeedPage() {
@@ -56,7 +71,9 @@ export default function FilesComFeedPage() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: Tone; text: string } | null>(null);
-  const q = useQuery({ queryKey: ["filescom-overview"], queryFn: () => call<Overview>({ action: "overview" }), enabled: isAdmin });
+  const q = useQuery({ queryKey: ["filescom-overview"], queryFn: loadState, enabled: isAdmin });
+  const health = useMutation({ mutationFn: () => call<Overview>({ action: "overview" }) });
+  const config = health.data?.config ?? null;
   const run = useMutation({
     mutationFn: (body: Record<string, unknown>) => call<Record<string, unknown>>(body),
     onSuccess: (_d, body) => { setNotice({ tone: "success", text: `${String(body.action).replace(/_/g, " ")} finished` }); qc.invalidateQueries({ queryKey: ["filescom-overview"] }); },
@@ -77,7 +94,8 @@ export default function FilesComFeedPage() {
   const bindingOf = (path: string) => d?.bindings.find((b) => b.path === path) ?? null;
   const tenantName = (id: string | null) => (id ? d?.tenants.find((t) => t.id === id)?.name ?? "Unknown dealer" : "Not mapped");
   const latestRun = (path: string) => d?.runs.find((r) => r.path === path) ?? null;
-  const keyMissing = d ? !d.config.secrets.FILESCOM_API_KEY : false;
+  const keyMissing = config ? !config.secrets.FILESCOM_API_KEY : false;
+  const secretChip = (name: string) => (!config ? <StatusText tone="neutral">Not checked</StatusText> : <StatusText tone={config.secrets[name] ? "success" : "danger"}>{config.secrets[name] ? "Saved" : `Missing: ${name}`}</StatusText>);
   const sel = selected && d ? d.files.find((f) => f.path === selected) ?? null : null;
 
   return (
@@ -87,7 +105,7 @@ export default function FilesComFeedPage() {
       title="Files.com inventory"
       badge={<StatusText tone="info">Dry run only</StatusText>}
       subtitle="vAuto inventory files from Files.com. Validation never changes vehicles, prices or the customer Passport."
-      actions={<Button variant="primary" disabled={!d || keyMissing || run.isPending} onClick={() => run.mutate({ action: "discover" })}>Discover files</Button>}
+      actions={<Button variant="primary" disabled={!d || !config || keyMissing || run.isPending} onClick={() => run.mutate({ action: "discover" })}>Discover files</Button>}
     >
       <div className="space-y-4">
         {notice && <InlineNote tone={notice.tone} title={notice.text} />}
@@ -96,13 +114,14 @@ export default function FilesComFeedPage() {
 
         {d && (
           <>
-            <Panel title="Connection health">
+            <Panel title="Connection health" action={<Button size="sm" disabled={health.isPending} onClick={() => health.mutate()}>{config ? "Check again" : "Check connection"}</Button>}>
+              {health.isError && <InlineNote tone="danger" title="Connection check failed">{(health.error as Error).message}</InlineNote>}
               <KeyValueList rows={[
-                { label: "Files.com site", value: d.config.origin },
-                { label: "Watched folder", value: d.config.folder },
-                { label: "Read-only API key", value: <StatusText tone={d.config.secrets.FILESCOM_API_KEY ? "success" : "danger"}>{d.config.secrets.FILESCOM_API_KEY ? "Saved" : "Missing: FILESCOM_API_KEY"}</StatusText> },
-                { label: "Webhook verification token", value: <StatusText tone={d.config.secrets.FILESCOM_WEBHOOK_SECRET ? "success" : "danger"}>{d.config.secrets.FILESCOM_WEBHOOK_SECRET ? "Saved" : "Missing: FILESCOM_WEBHOOK_SECRET"}</StatusText> },
-                { label: "Webhook callback URL", value: <code className="break-all text-[13px]">{callbackUrl(d.config.callbackPath)}</code> },
+                { label: "Files.com site", value: "https://autocurb.files.com" },
+                { label: "Watched folder", value: "prod/inventory/vauto/inbound" },
+                { label: "Read-only API key", value: secretChip("FILESCOM_API_KEY") },
+                { label: "Webhook verification token", value: secretChip("FILESCOM_WEBHOOK_SECRET") },
+                { label: "Webhook callback URL", value: <code className="break-all text-[13px]">{callbackUrl("/functions/v1/files-inventory-notify")}</code> },
                 { label: "Last webhook received", value: d.events[0] ? `${when(d.events[0].received_at)} (${d.events[0].action}, ${fileName(d.events[0].path)})` : "None received yet" },
                 { label: "Last discovery", value: when(d.files.map((f) => f.discovered_at).filter(Boolean).sort().pop() ?? null) },
               ]} />
@@ -110,7 +129,7 @@ export default function FilesComFeedPage() {
 
             <Panel title="Files" description="Files without an approved dealer mapping are held in quarantine." flush>
               {d.files.length === 0 ? (
-                <EmptyState title="No files recorded yet" detail={keyMissing ? "Save the read-only API key, then run Discover files." : "Run Discover files to list the inbound folder."} compact />
+                <EmptyState title="No files recorded yet" detail={!config ? "Check the connection, then run Discover files." : keyMissing ? "Save the read-only API key, then run Discover files." : "Run Discover files to list the inbound folder."} compact />
               ) : (
                 <WorkTable caption="Files.com inventory files" minWidth={900}>
                   <thead><tr><Th>File</Th><Th>Dealer mapping</Th><Th>Status</Th><Th align="right">Size</Th><Th>Modified</Th><Th>Last dry run</Th><Th align="right">Actions</Th></tr></thead>
@@ -128,7 +147,7 @@ export default function FilesComFeedPage() {
                           <Td>{r ? <StatusText tone={STATUS_TONE[r.status] ?? "neutral"}>{r.status}</StatusText> : "Never"}</Td>
                           <Td align="right">
                             <div className="flex justify-end gap-2">
-                              <Button size="sm" disabled={keyMissing || run.isPending} onClick={() => run.mutate({ action: "validate", path: f.path })}>{r ? "Retry dry run" : "Dry run"}</Button>
+                              <Button size="sm" disabled={!config || keyMissing || run.isPending} onClick={() => run.mutate({ action: "validate", path: f.path })}>{r ? "Retry dry run" : "Dry run"}</Button>
                               <Button size="sm" variant="ghost" onClick={() => setSelected(f.path)}>Review mapping</Button>
                             </div>
                           </Td>
