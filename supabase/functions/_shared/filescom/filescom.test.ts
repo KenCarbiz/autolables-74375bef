@@ -163,3 +163,13 @@ describe("dry run", () => {
     expect(partial.verdict).toBe("incomplete");
   });
 });
+
+describe("download path", () => {
+  it("streams via file_contents on the allowlisted origin with redirects refused", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("supabase/functions/files-inventory-admin/index.ts", "utf8");
+    expect(src).toMatch(/file_contents\//);
+    expect(src).not.toMatch(/download_uri/);
+    expect(src).not.toMatch(/redirect: "manual"|redirect: "follow"/);
+  });
+});

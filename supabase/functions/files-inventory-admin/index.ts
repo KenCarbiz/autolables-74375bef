@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   FILESCOM_ORIGIN, INBOUND_FOLDER, MAX_CSV_BYTES, assertConnectorWrite, authorizePlatformAdmin, canonicalInboundPath,
-  encodeApiPath, intakeStatus, isSafeDownloadUrl, remoteMeta, sameVersion, sha256Hex, type BindingStatus, type RemoteMeta,
+  encodeApiPath, intakeStatus, remoteMeta, sameVersion, sha256Hex, type BindingStatus, type RemoteMeta,
 } from "../_shared/filescom/policy.ts";
 import { parseCsv } from "../_shared/filescom/csv.ts";
 import { compareIdentity, runDryRun, type TenantProfile } from "../_shared/filescom/dryRun.ts";
@@ -33,12 +33,15 @@ async function fcApi(key: string, path: string): Promise<unknown> {
 const fileMeta = async (key: string, path: string): Promise<RemoteMeta> => remoteMeta(await fcApi(key, `file_actions/metadata/${encodeApiPath(path)}`));
 
 async function download(key: string, path: string): Promise<Uint8Array> {
-  const obj = (await fcApi(key, `files/${encodeApiPath(path)}`)) as { download_uri?: unknown };
-  if (!isSafeDownloadUrl(obj.download_uri)) throw new FcError("download_url_rejected");
-  const res = await fetch(obj.download_uri as string, { redirect: "manual" });
+  let res: Response;
+  try {
+    res = await fetch(`${FILESCOM_ORIGIN}/api/rest/v1/file_contents/${encodeApiPath(path)}`, { headers: { "X-FilesAPI-Key": key }, redirect: "error" });
+  } catch {
+    throw new FcError("download_redirect_refused");
+  }
   if (res.status !== 200) {
     await res.body?.cancel();
-    throw new FcError("download_failed", res.status);
+    throw new FcError(res.status === 401 || res.status === 403 ? "filescom_auth_failed" : "download_failed", res.status);
   }
   const len = Number(res.headers.get("content-length") ?? "0");
   if (len > MAX_CSV_BYTES) throw new FcError("file_too_large");
