@@ -2,8 +2,11 @@
 // marketcheck-comps — comparable active listings + price stats for a vehicle,
 // for the Passport V2 "Comparable Vehicles" detail page. Server-side only.
 //
-// Invoked on demand (NOT on every passport view) so MarketCheck quota is only
-// spent when a shopper actually opens the comp set.
+// A public Passport load never spends provider credits (change order 2026-10-27,
+// guardrail "public Passport page loads cannot spend provider credits"): an
+// anonymous caller is served the cached comp set, or the honest pending state.
+// Only a signed-in member of the listing's tenant, a platform admin or the
+// service role may buy a refresh on a cache miss.
 //
 // Body: { slug: string }
 // Returns: { count, median, comparables: [...], checkedAt }
@@ -23,6 +26,24 @@ const num = (v: any): number | null => {
   const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.]/g, ""));
   return Number.isFinite(n) && n > 0 ? n : null;
 };
+
+// An anonymous shopper may see a comp set up to a week old; older than that it
+// is no longer a fair picture of the market and the page shows pending.
+const PUBLIC_STALE_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+
+async function callerMayRefresh(req: Request, admin: ReturnType<typeof adminClient>, tenantId: string | null): Promise<boolean> {
+  const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!auth) return false;
+  if (SERVICE_KEY && auth === SERVICE_KEY) return true;
+  const { data: ures, error: uerr } = await admin.auth.getUser(auth).catch(() => ({ data: null, error: true }));
+  const userId = ures?.user?.id;
+  if (uerr || !userId) return false;
+  const { data: isAdmin } = await admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+  if (isAdmin) return true;
+  if (!tenantId) return false;
+  const { data: membership } = await admin.from("tenant_members").select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId).maybeSingle();
+  return !!membership;
+}
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
@@ -81,12 +102,17 @@ Deno.serve(async (req) => {
         .then(() => undefined, () => undefined);
       return json(200, payload);
     };
-    {
-      const { data: hit } = await admin.from("marketcheck_comps_cache")
-        .select("payload, cached_at").eq("slug", cacheSlug).maybeSingle();
-      if (hit?.payload && hit.cached_at && (Date.now() - new Date(hit.cached_at as string).getTime()) < CACHE_TTL_MS) {
-        return json(200, { ...(hit.payload as Record<string, unknown>), cached: true });
+    const { data: hit } = await admin.from("marketcheck_comps_cache")
+      .select("payload, cached_at").eq("slug", cacheSlug).maybeSingle();
+    const cacheAgeMs = hit?.payload && hit.cached_at ? Date.now() - new Date(hit.cached_at as string).getTime() : null;
+    if (cacheAgeMs != null && cacheAgeMs < CACHE_TTL_MS) {
+      return json(200, { ...(hit!.payload as Record<string, unknown>), cached: true });
+    }
+    if (!(await callerMayRefresh(req, admin, row.tenant_id ?? null))) {
+      if (cacheAgeMs != null && cacheAgeMs < PUBLIC_STALE_MAX_MS) {
+        return json(200, { ...(hit!.payload as Record<string, unknown>), cached: true, stale: true });
       }
+      return json(200, { available: false, reason: "not_cached" });
     }
 
     const ymm = String(row.ymm || "").trim();

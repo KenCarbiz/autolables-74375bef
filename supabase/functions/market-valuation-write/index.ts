@@ -22,6 +22,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 import { createSupabaseContext } from "https://esm.sh/@supabase/server@1.6.0";
 import {
   buildSecretKeySet, credentialCarrier, decideUserAuthorization,
@@ -47,7 +48,7 @@ import {
   providerCallPermitted, readProviderPolicy, sanitizeInvocationSource,
 } from "../_shared/factorySticker/lib/market/shadowPipeline.ts";
 import {
-  callProviderOnce, failureReason, type ProviderFetch,
+  callProviderOnce, failureReason, type ProviderCallResult, type ProviderFetch,
 } from "../_shared/factorySticker/lib/market/providerTransport.ts";
 import { PROVIDER_FRESH_DAYS, PROVIDER_HARD_EXPIRY_DAYS } from "../_shared/factorySticker/lib/market/freshness.ts";
 import type { ProviderValuation } from "../_shared/factorySticker/lib/market/types.ts";
@@ -311,7 +312,15 @@ Deno.serve(async (req) => {
       attemptId = slot.attempt_id;
       // ── 12-13. The call itself. Never made in a test: this branch needs a
       // deployed runtime, an API key and a granted reservation.
-      const result = await callProvider(predictionUrl(MC_BASE, built.sanitizedParams, MC_KEY));
+      // The tenant reservation above is this writer's own budget; the account's
+      // monthly call cap and its feed reserve are shared with every other
+      // MarketCheck caller, so the call must also pass the account gate.
+      const url = predictionUrl(MC_BASE, built.sanitizedParams, MC_KEY);
+      const gate = await admitProviderCall(admin, { url, caller: "market-valuation-write", tenantId, vin });
+      const result: ProviderCallResult = gate.admitted
+        ? await callProvider(url)
+        : { outcome: "not_attempted", status: null, body: null, attempts: 0 };
+      if (gate.admitted) await recordProviderCall(admin, gate.eventId, result.status);
       attemptOutcome = result.outcome;
 
       if (result.outcome === "succeeded") {
@@ -333,7 +342,7 @@ Deno.serve(async (req) => {
         p_attempt_id: attemptId,
         p_status: result.outcome === "succeeded" ? "succeeded" : "failed",
         p_actual_cost: null,
-        p_failure_reason: result.outcome === "succeeded" ? null : failureReason(result.outcome, result.status),
+        p_failure_reason: result.outcome === "succeeded" ? null : gate.admitted ? failureReason(result.outcome, result.status) : `account_budget_${gate.reason}`,
       });
     } else {
       // Budget exhausted, provider disabled, or another caller already holds

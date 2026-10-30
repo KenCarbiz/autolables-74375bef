@@ -102,9 +102,11 @@ describe("only market-valuation-write decides a market verdict", () => {
   it("the writer reserves before it spends", () => {
     const body = readFileSync(`${FUNCTIONS_DIR}/${SOLE_WRITER}/index.ts`, "utf8");
     const reserveAt = body.indexOf("market_reserve_provider_call");
-    const callAt = body.indexOf("callProvider(predictionUrl");
+    const gateAt = body.indexOf("admitProviderCall(admin", reserveAt);
+    const callAt = body.indexOf("await callProvider(url)");
     expect(reserveAt).toBeGreaterThan(-1);
-    expect(callAt).toBeGreaterThan(reserveAt);
+    expect(gateAt).toBeGreaterThan(reserveAt);
+    expect(callAt).toBeGreaterThan(gateAt);
   });
 
   it("the writer commits the decision and its evidence in one call", () => {
