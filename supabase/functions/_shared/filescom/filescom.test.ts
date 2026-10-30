@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   assertConnectorWrite, authorizePlatformAdmin, canonicalInboundPath, intakeStatus, approvalDecision, checkDownloadedContent, downloadFileContents, FILESCOM_ORIGIN,
-  parseNotifyBody, sameVersion, sha256Hex, verifySignatureV2,
+  parseNotifyBody, sameVersion, sha256Hex, verifySignatureV2, providerPath, canonicalFromProvider, API_FOLDER_LIST_PATH,
 } from "./policy";
 import { parseCsv } from "./csv";
 import { VAUTO_HEADERS, compareIdentity, parseMoney, runDryRun } from "./dryRun";
@@ -177,7 +177,7 @@ describe("single-stream download", () => {
     const out = await downloadFileContents(async (url, init) => { calls.push({ url, init }); return new Response("a,b"); }, "k", P);
     expect(new TextDecoder().decode(out)).toBe("a,b");
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe(`${FILESCOM_ORIGIN}/api/rest/v1/file_contents/${P}`);
+    expect(calls[0].url).toBe(`${FILESCOM_ORIGIN}/api/rest/v1/file_contents/MP15395_inventory.csv`);
     expect(calls[0].init.redirect).toBe("error");
     expect(calls[0].init.signal).toBeDefined();
   });
@@ -185,6 +185,33 @@ describe("single-stream download", () => {
     await expect(downloadFileContents(async () => { throw new TypeError("redirect"); }, "k", P)).rejects.toThrow("download_refused_or_timeout");
     await expect(downloadFileContents(async () => new Response("", { status: 302 }), "k", P)).rejects.toThrow("download_failed");
     await expect(downloadFileContents(async () => new Response("", { status: 403 }), "k", P)).rejects.toThrow("filescom_auth_failed");
+  });
+  it("never downloads a path outside the inbound folder", async () => {
+    let called = false;
+    await expect(downloadFileContents(async () => { called = true; return new Response(""); }, "k", "prod/inventory/vauto/outbound/MP1_inventory.csv")).rejects.toThrow();
+    expect(called).toBe(false);
+  });
+});
+
+describe("jailed-root path translation", () => {
+  it("maps the exact canonical inbound path to the root-relative file name", () => {
+    expect(providerPath("prod/inventory/vauto/inbound/MP15395_inventory.csv")).toBe("MP15395_inventory.csv");
+    expect(API_FOLDER_LIST_PATH).toBe("folders/?per_page=1000");
+  });
+  it("refuses to translate anything not exactly inside the inbound folder", () => {
+    for (const bad of [
+      "/prod/inventory/vauto/inbound/MP1_inventory.csv",
+      "prod/inventory/vauto/inbound/../x/MP1_inventory.csv",
+      "prod/inventory/vauto/inbound/sub/MP1_inventory.csv",
+      "prod/inventory/vauto/outbound/MP1_inventory.csv",
+      "MP1_inventory.csv",
+      "prod/inventory/vauto/inbound/report.csv",
+    ]) expect(() => providerPath(bad)).toThrow("provider_path_invalid");
+  });
+  it("maps root listing names back to canonical full paths and rejects nested or traversal names", () => {
+    expect(canonicalFromProvider("MP25214_inventory.csv")).toEqual({ ok: true, path: "prod/inventory/vauto/inbound/MP25214_inventory.csv", fileName: "MP25214_inventory.csv" });
+    for (const bad of ["sub/MP1_inventory.csv", "../MP1_inventory.csv", "prod/inventory/vauto/inbound/MP1_inventory.csv", "..", "notes.txt", 5, null])
+      expect(canonicalFromProvider(bad).ok).toBe(false);
   });
 });
 
